@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,9 +31,9 @@
 
 #include <type_traits>
 
-#include "mongo/platform/compiler.h"
+#include "merizo/platform/compiler.h"
 
-namespace mongo {
+namespace merizo {
 
 template <typename F>
 class ScopeGuard {
@@ -73,7 +73,7 @@ auto makeGuard(F&& fun) {
     return ScopeGuard<std::decay_t<F>>(std::forward<F>(fun));
 }
 
-}  // namespace mongo
+}  // namespace merizo
 
 #define MONGO_SCOPEGUARD_CAT2(s1, s2) s1##s2
 #define MONGO_SCOPEGUARD_CAT(s1, s2) MONGO_SCOPEGUARD_CAT2(s1, s2)

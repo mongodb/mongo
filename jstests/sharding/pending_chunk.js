@@ -5,11 +5,11 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2, mongos: 2, other: {separateConfig: true}});
+    var st = new ShardingTest({shards: 2, merizos: 2, other: {separateConfig: true}});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB('admin');
-    var coll = mongos.getCollection('foo.bar');
+    var merizos = st.s0;
+    var admin = merizos.getDB('admin');
+    var coll = merizos.getCollection('foo.bar');
     var ns = coll.getFullName();
     var dbName = coll.getDB().getName();
 

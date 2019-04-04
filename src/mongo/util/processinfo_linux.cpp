@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include "processinfo.h"
 
@@ -54,13 +54,13 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 
-#include "mongo/util/file.h"
-#include "mongo/util/log.h"
+#include "merizo/util/file.h"
+#include "merizo/util/log.h"
 
 #define KLONG long
 #define KLF "l"
 
-namespace mongo {
+namespace merizo {
 
 class LinuxProc {
 public:
@@ -404,7 +404,7 @@ public:
             meminfo = meminfo.substr(lineOff);
 
             unsigned long long systemMem = 0;
-            if (mongo::parseNumberFromString(meminfo, &systemMem).isOK()) {
+            if (merizo::parseNumberFromString(meminfo, &systemMem).isOK()) {
                 return systemMem * 1024;  // convert from kB to bytes
             } else
                 log() << "Unable to collect system memory information";
@@ -423,7 +423,7 @@ public:
         unsigned long long cgroupMemBytes = 0;
         std::string cgmemlimit = readLineFromFile("/sys/fs/cgroup/memory/memory.limit_in_bytes");
         if (!cgmemlimit.empty() &&
-            mongo::parseNumberFromString(cgmemlimit, &cgroupMemBytes).isOK()) {
+            merizo::parseNumberFromString(cgmemlimit, &cgroupMemBytes).isOK()) {
             return std::min(systemMemBytes, cgroupMemBytes);
         }
         return systemMemBytes;

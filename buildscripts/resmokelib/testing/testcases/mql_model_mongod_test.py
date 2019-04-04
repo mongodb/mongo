@@ -14,14 +14,14 @@ from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 class MqlModelMongodTestCase(jsrunnerfile.JSRunnerFileTestCase):
     """A MQL MongoD Model test to execute."""
 
-    REGISTERED_NAME = "mql_model_mongod_test"
+    REGISTERED_NAME = "mql_model_merizod_test"
 
     def __init__(self, logger, json_filename, shell_executable=None, shell_options=None):
         """Initialize the MqlModelMongodTestCase with the JSON test file."""
 
         jsrunnerfile.JSRunnerFileTestCase.__init__(
             self, logger, "MQL MongoD Model test", json_filename,
-            test_runner_file="jstests/libs/mql_model_mongod_test_runner.js",
+            test_runner_file="jstests/libs/mql_model_merizod_test_runner.js",
             shell_executable=shell_executable, shell_options=shell_options)
 
     @property

@@ -2,7 +2,7 @@
     'use strict';
     var checkShell = function(retCode) {
         var args = [
-            "mongo",
+            "merizo",
             "--nodb",
             "--eval",
             "quit(" + retCode + ");",

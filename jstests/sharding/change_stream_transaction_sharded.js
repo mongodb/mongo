@@ -17,8 +17,8 @@
         rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
     });
 
-    const mongosConn = st.s;
-    assert.commandWorked(mongosConn.getDB(dbName).getCollection(collName).createIndex({shard: 1}));
+    const merizosConn = st.s;
+    assert.commandWorked(merizosConn.getDB(dbName).getCollection(collName).createIndex({shard: 1}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
     // Shard the test collection and split it into two chunks: one that contains all {shard: 1}
     // documents and one that contains all {shard: 2} documents.
@@ -29,12 +29,12 @@
                  dbName,
                  true);
     // Seed each chunk with an initial document.
-    assert.commandWorked(mongosConn.getDB(dbName).getCollection(collName).insert(
+    assert.commandWorked(merizosConn.getDB(dbName).getCollection(collName).insert(
         {shard: 1}, {writeConcern: {w: "majority"}}));
-    assert.commandWorked(mongosConn.getDB(dbName).getCollection(collName).insert(
+    assert.commandWorked(merizosConn.getDB(dbName).getCollection(collName).insert(
         {shard: 2}, {writeConcern: {w: "majority"}}));
 
-    const db = mongosConn.getDB(dbName);
+    const db = merizosConn.getDB(dbName);
     const coll = db.getCollection(collName);
     let changeListShard1 = [], changeListShard2 = [];
 

@@ -1,8 +1,8 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -27,12 +27,12 @@
 #
 
 global:
-    cpp_namespace: "mongo::write_ops"
+    cpp_namespace: "merizo::write_ops"
     cpp_includes:
-        - "mongo/db/ops/write_ops_parsers.h"
+        - "merizo/db/ops/write_ops_parsers.h"
 
 imports:
-    - "mongo/db/logical_session_id.idl"
+    - "merizo/db/logical_session_id.idl"
 
 types:
     multi_delete_bool:
@@ -41,8 +41,8 @@ types:
                       command, which has a mandatory value of either 0 or 1, where 0 means multi
                       delete and 1 means delete just one."
         cpp_type: "bool"
-        serializer: "::mongo::write_ops::writeMultiDeleteProperty"
-        deserializer: "::mongo::write_ops::readMultiDeleteProperty"
+        serializer: "::merizo::write_ops::writeMultiDeleteProperty"
+        deserializer: "::merizo::write_ops::readMultiDeleteProperty"
 
 structs:
 

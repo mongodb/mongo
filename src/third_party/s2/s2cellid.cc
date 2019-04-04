@@ -27,7 +27,7 @@ using std::vector;
 #include "util/math/mathutil.h"
 #include "util/math/vector2-inl.h"
 
-#include "mongo/base/init.h"
+#include "merizo/base/init.h"
 
 // The following lookup tables are used to convert efficiently between an
 // (i,j) cell index and the corresponding position along the Hilbert curve.
@@ -95,9 +95,9 @@ static void Init() {
   InitLookupCell(0, 0, 0, kSwapMask|kInvertMask, 0, kSwapMask|kInvertMask);
 }
 
-MONGO_INITIALIZER(S2CellIdInit)(mongo::InitializerContext *context) {
+MONGO_INITIALIZER(S2CellIdInit)(merizo::InitializerContext *context) {
     Init();
-    return mongo::Status::OK();
+    return merizo::Status::OK();
 }
 
 int S2CellId::level() const {

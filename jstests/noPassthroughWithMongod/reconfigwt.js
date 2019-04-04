@@ -1,11 +1,11 @@
 // Reconfigure WiredTiger test cases
 //
-// Start our own instance of mongod so that are settings tests
+// Start our own instance of merizod so that are settings tests
 // do not cause issues for other tests
 //
 var ss = db.serverStatus();
 
-// Test is only valid in the WT suites which run against a mongod with WiredTiger enabled
+// Test is only valid in the WT suites which run against a merizod with WiredTiger enabled
 if (ss.storageEngine.name !== "wiredTiger") {
     print("Skipping reconfigwt.js since this server does not have WiredTiger enabled");
 } else {
@@ -34,7 +34,7 @@ if (ss.storageEngine.name !== "wiredTiger") {
     assert.commandWorked(reconfigure("eviction_dirty_target=82"));
     assert.commandWorked(reconfigure("shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)"));
 
-    // Negative tests - bad input to mongod
+    // Negative tests - bad input to merizod
     assert.commandFailed(reconfigure("abc\0as"));
 
     // Negative tests - bad input to wt

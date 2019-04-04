@@ -24,7 +24,7 @@ let corruptFile = function(file) {
 };
 
 /**
- * Starts a mongod on the provided data path without clearing data. Accepts 'options' as parameters
+ * Starts a merizod on the provided data path without clearing data. Accepts 'options' as parameters
  * to runMongod.
  */
 let startMongodOnExistingPath = function(dbpath, options) {
@@ -46,10 +46,10 @@ let assertQueryUsesIndex = function(coll, query, indexName) {
 };
 
 /**
- * Assert that running MongoDB with --repair on the provided dbpath exits cleanly.
+ * Assert that running MerizoDB with --repair on the provided dbpath exits cleanly.
  */
 let assertRepairSucceeds = function(dbpath, port, opts) {
-    let args = ["mongod", "--repair", "--port", port, "--dbpath", dbpath, "--bind_ip_all"];
+    let args = ["merizod", "--repair", "--port", port, "--dbpath", dbpath, "--bind_ip_all"];
     for (let a in opts) {
         if (opts.hasOwnProperty(a))
             args.push("--" + a);
@@ -69,11 +69,11 @@ let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
     assert.eq(
         MongoRunner.EXIT_ABRUPT,
         runMongoProgram(
-            "mongod", "--repair", "--port", port, "--dbpath", dbpath, "--setParameter", param));
+            "merizod", "--repair", "--port", port, "--dbpath", dbpath, "--setParameter", param));
 };
 
 /**
- * Assert that starting MongoDB with --replSet on an existing data path exits with a specific
+ * Assert that starting MerizoDB with --replSet on an existing data path exits with a specific
  * error.
  */
 let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
@@ -89,7 +89,7 @@ let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
 };
 
 /**
- * Assert that starting MongoDB as a standalone on an existing data path exits with a specific
+ * Assert that starting MerizoDB as a standalone on an existing data path exits with a specific
  * error because the previous repair failed.
  */
 let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
@@ -105,7 +105,7 @@ let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
 };
 
 /**
- * Assert that starting MongoDB as a standalone on an existing data path succeeds. Uses a provided
+ * Assert that starting MerizoDB as a standalone on an existing data path succeeds. Uses a provided
  * testFunc to run any caller-provided checks on the started node.
  */
 let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port, testFunc) {
@@ -117,7 +117,7 @@ let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port, testFu
 };
 
 /**
- * Assert that starting MongoDB with --replSet succeeds. Uses a provided testFunc to run any
+ * Assert that starting MerizoDB with --replSet succeeds. Uses a provided testFunc to run any
  * caller-provided checks on the started node.
  *
  * Returns the started node.
@@ -148,19 +148,19 @@ let assertStartInReplSet = function(replSet, originalNode, cleanData, expectResy
  */
 let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
     dbpath, dbName, collName, deleteOrCorruptFunc, errmsg) {
-    // Start a MongoDB instance, create the collection file.
-    const mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
-    const testColl = mongod.getDB(dbName)[collName];
+    // Start a MerizoDB instance, create the collection file.
+    const merizod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
+    const testColl = merizod.getDB(dbName)[collName];
     const doc = {a: 1};
     assert.commandWorked(testColl.insert(doc));
 
-    // Stop MongoDB and corrupt/delete certain files.
-    deleteOrCorruptFunc(mongod, testColl);
+    // Stop MerizoDB and corrupt/delete certain files.
+    deleteOrCorruptFunc(merizod, testColl);
 
-    // Restart the MongoDB instance and get an expected error message.
+    // Restart the MerizoDB instance and get an expected error message.
     clearRawMongoProgramOutput();
     assert.eq(MongoRunner.EXIT_ABRUPT,
-              runMongoProgram("mongod", "--port", mongod.port, "--dbpath", dbpath));
+              runMongoProgram("merizod", "--port", merizod.port, "--dbpath", dbpath));
     assert.gte(rawMongoProgramOutput().indexOf(errmsg), 0);
 };
 
@@ -169,24 +169,24 @@ let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
  */
 let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
     dbpath, dbName, collName, deleteOrCorruptFunc, requestFunc, errmsg) {
-    // Start a MongoDB instance, create the collection file.
-    mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
-    testColl = mongod.getDB(dbName)[collName];
+    // Start a MerizoDB instance, create the collection file.
+    merizod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
+    testColl = merizod.getDB(dbName)[collName];
     const doc = {a: 1};
     assert.commandWorked(testColl.insert(doc));
 
-    // Stop MongoDB and corrupt/delete certain files.
-    deleteOrCorruptFunc(mongod, testColl);
+    // Stop MerizoDB and corrupt/delete certain files.
+    deleteOrCorruptFunc(merizod, testColl);
 
-    // Restart the MongoDB instance.
+    // Restart the MerizoDB instance.
     clearRawMongoProgramOutput();
-    mongod = MongoRunner.runMongod({dbpath: dbpath, port: mongod.port, noCleanData: true});
+    merizod = MongoRunner.runMongod({dbpath: dbpath, port: merizod.port, noCleanData: true});
 
     // This request crashes the server.
-    testColl = mongod.getDB(dbName)[collName];
+    testColl = merizod.getDB(dbName)[collName];
     requestFunc(testColl);
 
     // Get an expected error message.
     assert.gte(rawMongoProgramOutput().indexOf(errmsg), 0);
-    MongoRunner.stopMongod(mongod, 9, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    MongoRunner.stopMongod(merizod, 9, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 };

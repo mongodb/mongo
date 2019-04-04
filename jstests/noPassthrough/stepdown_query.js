@@ -71,7 +71,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     runTest(rst.getURL(), rst, true);
     rst.stopSet();
 
-    // Test querying a replica set primary through mongos.
+    // Test querying a replica set primary through merizos.
     var st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2});
     rst = st.rs0;
     runTest(st.s0.host, rst, true);

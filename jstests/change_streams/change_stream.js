@@ -31,7 +31,7 @@
     // "local" databases.
     assertInvalidChangeStreamNss("admin", "testColl");
     assertInvalidChangeStreamNss("config", "testColl");
-    // Not allowed to access 'local' database through mongos.
+    // Not allowed to access 'local' database through merizos.
     if (!isMongos) {
         assertInvalidChangeStreamNss("local", "testColl");
     }

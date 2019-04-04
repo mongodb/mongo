@@ -21,7 +21,7 @@ selector:
   # TODO: SERVER-35390
   - jstests/multiVersion/upgrade_cluster.js
 
-# Multiversion tests start their own mongod's.
+# Multiversion tests start their own merizod's.
 executor:
   config:
     shell_options:

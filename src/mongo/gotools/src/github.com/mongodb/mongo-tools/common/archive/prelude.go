@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/mongodb/mongo-tools/common"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -45,7 +45,7 @@ func (md *MetadataFile) Pos() int64 {
 }
 
 // DirLike represents the group of methods done on directories and files in dump directories,
-// or in archives, when mongorestore is figuring out what intents to create.
+// or in archives, when merizorestore is figuring out what intents to create.
 type DirLike interface {
 	Name() string
 	Path() string
@@ -80,7 +80,7 @@ func (prelude *Prelude) Read(in io.Reader) error {
 	)
 
 	if readMagicNumber != MagicNumber {
-		return fmt.Errorf("stream or file does not appear to be a mongodump archive")
+		return fmt.Errorf("stream or file does not appear to be a merizodump archive")
 	}
 
 	if prelude.NamespaceMetadatasByDB != nil {

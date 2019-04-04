@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <limits>
 
-#include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/platform/overflow_arithmetic.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 
@@ -49,34 +49,34 @@ namespace {
     } while (false)
 
 #define assertSignedMultiplyNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(int64_t, mongoSignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(int64_t, merizoSignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
 #define assertSignedMultiplyWithOverflow(LHS, RHS) \
-    assertArithOverflow(int64_t, mongoSignedMultiplyOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(int64_t, merizoSignedMultiplyOverflow64, LHS, RHS, true, 0)
 
 #define assertUnsignedMultiplyNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(uint64_t, mongoUnsignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(uint64_t, merizoUnsignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
 #define assertUnsignedMultiplyWithOverflow(LHS, RHS) \
-    assertArithOverflow(uint64_t, mongoUnsignedMultiplyOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(uint64_t, merizoUnsignedMultiplyOverflow64, LHS, RHS, true, 0)
 
 #define assertSignedAddNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(int64_t, mongoSignedAddOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(int64_t, merizoSignedAddOverflow64, LHS, RHS, false, EXPECTED)
 #define assertSignedAddWithOverflow(LHS, RHS) \
-    assertArithOverflow(int64_t, mongoSignedAddOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(int64_t, merizoSignedAddOverflow64, LHS, RHS, true, 0)
 
 #define assertUnsignedAddNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(uint64_t, mongoUnsignedAddOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(uint64_t, merizoUnsignedAddOverflow64, LHS, RHS, false, EXPECTED)
 #define assertUnsignedAddWithOverflow(LHS, RHS) \
-    assertArithOverflow(uint64_t, mongoUnsignedAddOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(uint64_t, merizoUnsignedAddOverflow64, LHS, RHS, true, 0)
 
 #define assertSignedSubtractNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(int64_t, mongoSignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(int64_t, merizoSignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
 #define assertSignedSubtractWithOverflow(LHS, RHS) \
-    assertArithOverflow(int64_t, mongoSignedSubtractOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(int64_t, merizoSignedSubtractOverflow64, LHS, RHS, true, 0)
 
 #define assertUnsignedSubtractNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(uint64_t, mongoUnsignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(uint64_t, merizoUnsignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
 #define assertUnsignedSubtractWithOverflow(LHS, RHS) \
-    assertArithOverflow(uint64_t, mongoUnsignedSubtractOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(uint64_t, merizoUnsignedSubtractOverflow64, LHS, RHS, true, 0)
 
 TEST(OverflowArithmetic, SignedMultiplicationTests) {
     using limits = std::numeric_limits<int64_t>;
@@ -181,4 +181,4 @@ TEST(OverflowArithmetic, UnsignedSubtractionTests) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

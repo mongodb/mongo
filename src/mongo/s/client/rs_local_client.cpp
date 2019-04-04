@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,23 +29,23 @@
 
 #include <boost/none_t.hpp>
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/client/rs_local_client.h"
+#include "merizo/s/client/rs_local_client.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/unique_message.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/unique_message.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 void RSLocalClient::_updateLastOpTimeFromClient(OperationContext* opCtx,
                                                 const repl::OpTime& previousOpTimeOnClient) {
@@ -157,4 +157,4 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

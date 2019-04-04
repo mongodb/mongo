@@ -70,7 +70,7 @@ class MetadataRepository(object):
 
         Args:
             metadata_revision: a revision (git hash) of this repository.
-            project: an Evergreen project name (e.g. mongodb-mongo-master).
+            project: an Evergreen project name (e.g. merizodb-merizo-master).
         """
         references_content = self._get_references_content(metadata_revision)
         references = yaml.safe_load(references_content)
@@ -89,7 +89,7 @@ def _clone_repository(url, branch):
     return git.Repository.clone(url, target_directory, branch)
 
 
-def _get_metadata_revision(metadata_repo, mongo_repo, project, revision):
+def _get_metadata_revision(metadata_repo, merizo_repo, project, revision):
     """Get the metadata revision that corresponds to a given repository, project, revision."""
     for metadata_revision in metadata_repo.list_revisions():
         reference = metadata_repo.get_reference(metadata_revision, project)
@@ -97,7 +97,7 @@ def _get_metadata_revision(metadata_repo, mongo_repo, project, revision):
             # No reference for this revision. This should not happen but we keep trying in
             # case we can find an older revision with a reference.
             continue
-        if mongo_repo.is_ancestor(reference, revision):
+        if merizo_repo.is_ancestor(reference, revision):
             # We found a reference that is a parent of the current revision.
             return metadata_revision
     return None
@@ -119,8 +119,8 @@ def fetch_test_lifecycle(metadata_repo_url, references_file, lifecycle_file, pro
     """
     metadata_repo = MetadataRepository(
         _clone_repository(metadata_repo_url, project), references_file, lifecycle_file)
-    mongo_repo = git.Repository(os.getcwd())
-    metadata_revision = _get_metadata_revision(metadata_repo, mongo_repo, project, revision)
+    merizo_repo = git.Repository(os.getcwd())
+    metadata_revision = _get_metadata_revision(metadata_repo, merizo_repo, project, revision)
     if metadata_revision:
         LOGGER.info("Using metadata repository revision '%s'", metadata_revision)
         result = metadata_repo.get_lifecycle_file_content(metadata_revision)
@@ -133,7 +133,7 @@ def main():
     """Execute Main program.
 
     Utility to fetch the etc/test_lifecycle.yml file corresponding to a given revision from
-    the mongo-test-metadata repository.
+    the merizo-test-metadata repository.
     """
     parser = optparse.OptionParser(
         description=textwrap.dedent(main.__doc__), usage="Usage: %prog [options] evergreen-project")
@@ -143,7 +143,7 @@ def main():
                             " file."))
 
     parser.add_option("--metadataRepo", dest="metadata_repo_url", metavar="<metadata-repo-url>",
-                      default="git@github.com:mongodb/mongo-test-metadata.git",
+                      default="git@github.com:merizodb/merizo-test-metadata.git",
                       help=("The URL to the metadata repository that contains the test lifecycle"
                             " tags file."))
 

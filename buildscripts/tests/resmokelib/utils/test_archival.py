@@ -13,7 +13,7 @@ from buildscripts.resmokelib.utils import archival
 
 # pylint: disable=missing-docstring,protected-access
 
-_BUCKET = "mongodatafiles"
+_BUCKET = "merizodatafiles"
 
 
 def create_random_file(file_name, num_chars_mb):

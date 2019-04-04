@@ -31,7 +31,7 @@
             assert.commandWorked(db.runCommand({getMore: emptyBatchCursorId, collection: collName}))
                 .cursor.id);
     } else {
-        // A mongod should know immediately that the collection doesn't exist, and return a 0 cursor
+        // A merizod should know immediately that the collection doesn't exist, and return a 0 cursor
         // id.
         assert.eq(0, emptyBatchCursorId);
     }

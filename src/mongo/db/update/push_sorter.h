@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/collation/collator_interface.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/query/collation/collator_interface.h"
 
-namespace mongo {
+namespace merizo {
 
 // Extracts the value for 'pattern' for both 'lhs' and 'rhs' and return true if 'lhs' <
 // 'rhs'. We expect that both 'lhs' and 'rhs' be key patterns.
@@ -46,7 +46,7 @@ struct PatternElementCmp {
         : sortPattern(pattern), useWholeValue(pattern.hasField("")), collator(collator) {}
 
     bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const {
-        namespace dps = ::mongo::dotted_path_support;
+        namespace dps = ::merizo::dotted_path_support;
         if (useWholeValue) {
             const int comparedValue = lhs.compareWithElement(rhs, collator, false);
 
@@ -72,4 +72,4 @@ struct PatternElementCmp {
     const CollatorInterface* collator = nullptr;
 };
 
-}  // namespace mongo
+}  // namespace merizo

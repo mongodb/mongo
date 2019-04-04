@@ -3,7 +3,7 @@
  * - It must be the first stage in the pipeline.
  * - It can only be run on admin, and the "aggregate" field must be 1.
  * - Only active connections are shown unless {idleConnections: true} is specified.
- * - Specifying {localOps: true} shows the local ops on mongoS rather than shard ops.
+ * - Specifying {localOps: true} shows the local ops on merizoS rather than shard ops.
  * - A user without the inprog privilege can see their own ops, but no-one else's.
  * - A user with the inprog privilege can see all ops.
  * - Non-local readConcerns are rejected.
@@ -46,18 +46,18 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 
     // Create a new sharded cluster for testing. We set the internalQueryExecYieldIterations
     // parameter so that plan execution yields on every iteration. For some tests, we will
-    // temporarily set yields to hang the mongod so we can capture particular operations in the
+    // temporarily set yields to hang the merizod so we can capture particular operations in the
     // currentOp output.
     const st = new ShardingTest(stParams);
 
     // Assign various elements of the cluster. We will use shard rs0 to test replica-set level
     // $currentOp behaviour.
     let shardConn = st.rs0.getPrimary();
-    let mongosConn = st.s;
+    let merizosConn = st.s;
     let shardRS = st.rs0;
 
-    let clusterTestDB = mongosConn.getDB(jsTestName());
-    let clusterAdminDB = mongosConn.getDB("admin");
+    let clusterTestDB = merizosConn.getDB(jsTestName());
+    let clusterAdminDB = merizosConn.getDB("admin");
     shardConn.waitForClusterTime(60);
     let shardTestDB = shardConn.getDB(jsTestName());
     let shardAdminDB = shardConn.getDB("admin");
@@ -88,7 +88,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 
     // Create necessary users at both cluster and shard-local level.
     createUsers(shardConn);
-    createUsers(mongosConn);
+    createUsers(merizosConn);
 
     // Create a test database and some dummy data on rs0.
     assert(clusterAdminDB.auth("admin", "pwd"));
@@ -120,10 +120,10 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         st.keyFile = newOpts.keyFile;
         // Re-link the cluster components.
         shardConn = st.rs0.getPrimary();
-        mongosConn = st.s;
+        merizosConn = st.s;
         shardRS = st.rs0;
-        clusterTestDB = mongosConn.getDB(jsTestName());
-        clusterAdminDB = mongosConn.getDB("admin");
+        clusterTestDB = merizosConn.getDB(jsTestName());
+        clusterAdminDB = merizosConn.getDB("admin");
         shardTestDB = shardConn.getDB(jsTestName());
         shardAdminDB = shardConn.getDB("admin");
     }
@@ -233,8 +233,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             return Object.assign({}, curOpSpec, spec);
         }
 
-        const isLocalMongosCurOp = (conn == mongosConn && curOpSpec.localOps);
-        const isRemoteShardCurOp = (conn == mongosConn && !curOpSpec.localOps);
+        const isLocalMongosCurOp = (conn == merizosConn && curOpSpec.localOps);
+        const isRemoteShardCurOp = (conn == merizosConn && !curOpSpec.localOps);
 
         // Test that an unauthenticated connection cannot run $currentOp even with {allUsers:
         // false}.
@@ -425,7 +425,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             }
         } else if (isLocalMongosCurOp) {
             expectedStages[0].$currentOp.localOps = true;
-            assert.docEq(explainPlan.mongos.stages, expectedStages);
+            assert.docEq(explainPlan.merizos.stages, expectedStages);
         } else {
             assert.docEq(explainPlan.stages, expectedStages);
         }
@@ -449,16 +449,16 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                                      ErrorCodes.Unauthorized);
     }
 
-    // Run the common tests on a shard, through mongoS, and on mongoS with 'localOps' enabled.
+    // Run the common tests on a shard, through merizoS, and on merizoS with 'localOps' enabled.
     runCommonTests(shardConn);
-    runCommonTests(mongosConn);
-    runCommonTests(mongosConn, {localOps: true});
+    runCommonTests(merizosConn);
+    runCommonTests(merizosConn, {localOps: true});
 
     //
-    // mongoS specific tests.
+    // merizoS specific tests.
     //
 
-    // Test that a user without the inprog privilege cannot run non-local $currentOp via mongoS even
+    // Test that a user without the inprog privilege cannot run non-local $currentOp via merizoS even
     // if allUsers is false.
     assert(clusterAdminDB.logout());
     assert(clusterAdminDB.auth("user_no_inprog", "pwd"));
@@ -469,11 +469,11 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         ErrorCodes.Unauthorized);
 
     // Test that a user without the inprog privilege cannot run non-local currentOp command via
-    // mongoS even if $ownOps is true.
+    // merizoS even if $ownOps is true.
     assert.commandFailedWithCode(clusterAdminDB.currentOp({$ownOps: true}),
                                  ErrorCodes.Unauthorized);
 
-    // Test that a non-local $currentOp pipeline via mongoS returns results from all shards, and
+    // Test that a non-local $currentOp pipeline via merizoS returns results from all shards, and
     // includes both the shard and host names.
     assert(clusterAdminDB.logout());
     assert(clusterAdminDB.auth("user_inprog", "pwd"));
@@ -491,7 +491,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                 {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}}
               ]);
 
-    // Test that a $currentOp pipeline with {localOps:true} returns operations from the mongoS
+    // Test that a $currentOp pipeline with {localOps:true} returns operations from the merizoS
     // itself rather than the shards.
     assert.eq(clusterAdminDB
                   .aggregate(
@@ -499,12 +499,12 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                         {$currentOp: {localOps: true}},
                         {
                           $match: {
-                              $expr: {$eq: ["$host", "$clientMetadata.mongos.host"]},
-                              "command.comment": "mongos_currentop_localOps"
+                              $expr: {$eq: ["$host", "$clientMetadata.merizos.host"]},
+                              "command.comment": "merizos_currentop_localOps"
                           }
                         }
                       ],
-                      {comment: "mongos_currentop_localOps"})
+                      {comment: "merizos_currentop_localOps"})
                   .itcount(),
               1);
 
@@ -512,7 +512,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     // localOps tests.
     //
 
-    // Runs a suite of tests for behaviour common to both replica sets and mongoS with
+    // Runs a suite of tests for behaviour common to both replica sets and merizoS with
     // {localOps:true}.
     function runLocalOpsTests(conn) {
         // The 'localOps' parameter is not supported by the currentOp command, so we limit its
@@ -602,8 +602,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             getMoreTest({conn: conn, curOpSpec: {allUsers: false, localOps: true}}));
     }
 
-    // Run the localOps tests for both replset and mongoS.
-    runLocalOpsTests(mongosConn);
+    // Run the localOps tests for both replset and merizoS.
+    runLocalOpsTests(merizosConn);
     runLocalOpsTests(shardConn);
 
     //
@@ -807,7 +807,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     }));
     session.endSession();
 
-    // Run a set of tests of behaviour common to replset and mongoS when auth is disabled.
+    // Run a set of tests of behaviour common to replset and merizoS when auth is disabled.
     function runNoAuthTests(conn, curOpSpec) {
         // Test that the allUsers parameter is ignored when authentication is disabled.
         // Ensure that there is at least one other connection present.
@@ -845,8 +845,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     }
 
     runNoAuthTests(shardConn);
-    runNoAuthTests(mongosConn);
-    runNoAuthTests(mongosConn, {localOps: true});
+    runNoAuthTests(merizosConn);
+    runNoAuthTests(merizosConn, {localOps: true});
 
     //
     // Replset specific tests.
@@ -857,7 +857,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     shardTestDB = shardConn.getDB(jsTestName());
     shardAdminDB = shardConn.getDB("admin");
 
-    // Test that the host field is present and the shard field is absent when run on mongoD.
+    // Test that the host field is present and the shard field is absent when run on merizoD.
     assert.eq(shardAdminDB
                   .aggregate([
                       {$currentOp: {allUsers: true, idleConnections: true}},
@@ -868,7 +868,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                 {_id: {host: shardConn.host}},
               ]);
 
-    // Test that attempting to 'spoof' a sharded request on non-shardsvr mongoD fails.
+    // Test that attempting to 'spoof' a sharded request on non-shardsvr merizoD fails.
     assert.commandFailedWithCode(
         shardAdminDB.runCommand(
             {aggregate: 1, pipeline: [{$currentOp: {}}], fromMongos: true, cursor: {}}),
@@ -902,7 +902,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         shardAdminDB.aggregate(aggPipeline, {comment: "agg_current_op_bson_limit_test"}).itcount(),
         1);
 
-    // Test that $currentOp can run while the mongoD is write-locked.
+    // Test that $currentOp can run while the merizoD is write-locked.
     let awaitShell = startParallelShell(function() {
         assert.commandFailedWithCode(db.adminCommand({sleep: 1, lock: "w", secs: 300}),
                                      ErrorCodes.Interrupted);

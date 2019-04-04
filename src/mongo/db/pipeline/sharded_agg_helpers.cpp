@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,23 +26,23 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include "sharded_agg_helpers.h"
 
-#include "mongo/db/curop.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/query/cluster_query_knobs_gen.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_out.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/query/cluster_query_knobs_gen.h"
+#include "merizo/s/query/document_source_merge_cursors.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace sharded_agg_helpers {
 
 MONGO_FAIL_POINT_DEFINE(clusterAggregateHangBeforeEstablishingShardCursors);
@@ -167,7 +167,7 @@ BSONObj createCommandForTargetedShards(
     bool needsMerge) {
     // Create the command for the shards.
     MutableDocument targetedCmd(request.serializeToCommandObj());
-    // If we've parsed a pipeline on mongos, always override the pipeline, in case parsing it
+    // If we've parsed a pipeline on merizos, always override the pipeline, in case parsing it
     // has defaulted any arguments or otherwise changed the spec. For example, $listSessions may
     // have detected a logged in user and appended that user name to the $listSessions spec to
     // send to the shards.
@@ -179,7 +179,7 @@ BSONObj createCommandForTargetedShards(
         targetedCmd[AggregationRequest::kNeedsMergeName] = Value(true);
 
         // If this is a change stream aggregation, set the 'mergeByPBRT' flag on the command. This
-        // notifies the shards that the mongoS is capable of merging streams based on resume token.
+        // notifies the shards that the merizoS is capable of merging streams based on resume token.
         // TODO SERVER-38539: the 'mergeByPBRT' flag is no longer necessary in 4.4.
         targetedCmd[AggregationRequest::kMergeByPBRTName] = Value(litePipe.hasChangeStream());
 
@@ -254,7 +254,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
     // - There is a stage that needs to be run on the primary shard and the single target shard
     //   is not the primary.
-    // - The pipeline contains one or more stages which must always merge on mongoS.
+    // - The pipeline contains one or more stages which must always merge on merizoS.
     const bool needsSplit = (shardIds.size() > 1u || needsMongosMerge ||
                              (needsPrimaryShardMerge && executionNsRoutingInfo &&
                               *(shardIds.begin()) != executionNsRoutingInfo->db().primaryId()));
@@ -497,4 +497,4 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     return mergePipeline;
 }
 }  // namespace sharded_agg_helpers
-}  // namespace mongo
+}  // namespace merizo

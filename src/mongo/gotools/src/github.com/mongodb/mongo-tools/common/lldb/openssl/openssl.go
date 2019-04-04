@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -6,7 +6,7 @@
 
 // +build ssl,!openssl_pre_1.0
 
-// Package openssl implements connection to MongoDB over ssl.
+// Package openssl implements connection to MerizoDB over ssl.
 package openssl
 
 import (
@@ -16,10 +16,10 @@ import (
 
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/openssl"
-	"github.com/mongodb/mongo-tools/common/lldb/kerberos"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/lldb/kerberos"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/util"
 )
 
 // For connecting to the database over ssl

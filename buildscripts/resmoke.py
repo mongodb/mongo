@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Command line utility for executing MongoDB tests of all kinds."""
+"""Command line utility for executing MerizoDB tests of all kinds."""
 
 from __future__ import absolute_import
 

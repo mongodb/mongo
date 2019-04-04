@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/base/system_error.h"
-#include "mongo/config.h"
-#include "mongo/util/errno_util.h"
-#include "mongo/util/future.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/sockaddr.h"
-#include "mongo/util/net/ssl_manager.h"
+#include "merizo/base/status.h"
+#include "merizo/base/system_error.h"
+#include "merizo/config.h"
+#include "merizo/util/errno_util.h"
+#include "merizo/util/future.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/net/sockaddr.h"
+#include "merizo/util/net/ssl_manager.h"
 
 #ifndef _WIN32
 #include <sys/poll.h>
@@ -44,7 +44,7 @@
 
 #include <asio.hpp>
 
-namespace mongo {
+namespace merizo {
 namespace transport {
 
 inline SockAddr endpointToSockAddr(const asio::generic::stream_protocol::endpoint& endPoint) {
@@ -54,7 +54,7 @@ inline SockAddr endpointToSockAddr(const asio::generic::stream_protocol::endpoin
     return wrappedAddr;
 }
 
-// Utility function to turn an ASIO endpoint into a mongo HostAndPort
+// Utility function to turn an ASIO endpoint into a merizo HostAndPort
 inline HostAndPort endpointToHostAndPort(const asio::generic::stream_protocol::endpoint& endPoint) {
     return HostAndPort(endpointToSockAddr(endPoint));
 }
@@ -81,9 +81,9 @@ inline Status errorCodeToStatus(const std::error_code& ec) {
         return {ErrorCodes::HostUnreachable, "Connection reset by network"};
     }
 
-    // If the ec.category() is a mongoErrorCategory() then this error was propogated from
-    // mongodb code and we should just pass the error cdoe along as-is.
-    ErrorCodes::Error errorCode = (ec.category() == mongoErrorCategory())
+    // If the ec.category() is a merizoErrorCategory() then this error was propogated from
+    // merizodb code and we should just pass the error cdoe along as-is.
+    ErrorCodes::Error errorCode = (ec.category() == merizoErrorCategory())
         ? ErrorCodes::Error(ec.value())
         // Otherwise it's an error code from the network and we should pass it along as a
         // SocketException
@@ -324,7 +324,7 @@ boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const Buffer& buffe
 
 /**
  * Pass this to asio functions in place of a callback to have them return a Future<T>. This behaves
- * similarly to asio::use_future_t, however it returns a mongo::Future<T> rather than a
+ * similarly to asio::use_future_t, however it returns a merizo::Future<T> rather than a
  * std::future<T>.
  *
  * The type of the Future will be determined by the arguments that the callback would have if one
@@ -428,15 +428,15 @@ struct AsyncResult {
 
 }  // namespace use_future_details
 }  // namespace transport
-}  // namespace mongo
+}  // namespace merizo
 
 namespace asio {
 template <typename Comp, typename Sig>
 class async_result;
 
 template <typename Result, typename... Args>
-class async_result<::mongo::transport::UseFuture, Result(Args...)>
-    : public ::mongo::transport::use_future_details::AsyncResult<Args...> {
-    using ::mongo::transport::use_future_details::AsyncResult<Args...>::AsyncResult;
+class async_result<::merizo::transport::UseFuture, Result(Args...)>
+    : public ::merizo::transport::use_future_details::AsyncResult<Args...> {
+    using ::merizo::transport::use_future_details::AsyncResult<Args...>::AsyncResult;
 };
 }  // namespace asio

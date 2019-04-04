@@ -1,19 +1,19 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Main package for the mongofiles tool.
+// Main package for the merizofiles tool.
 package main
 
 import (
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongofiles"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/signals"
+	"github.com/merizodb/merizo-tools/common/util"
+	"github.com/merizodb/merizo-tools/merizofiles"
 
 	"fmt"
 	"os"
@@ -21,18 +21,18 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := options.New("mongofiles", mongofiles.Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: false, URI: true})
+	opts := options.New("merizofiles", merizofiles.Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: false, URI: true})
 
-	storageOpts := &mongofiles.StorageOptions{}
+	storageOpts := &merizofiles.StorageOptions{}
 	opts.AddOptions(storageOpts)
-	inputOpts := &mongofiles.InputOptions{}
+	inputOpts := &merizofiles.InputOptions{}
 	opts.AddOptions(inputOpts)
 	opts.URI.AddKnownURIParameters(options.KnownURIOptionsReadPreference)
 
 	args, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
-		log.Logvf(log.Always, "try 'mongofiles --help' for more information")
+		log.Logvf(log.Always, "try 'merizofiles --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -61,7 +61,7 @@ func main() {
 		os.Exit(util.ExitError)
 	}
 	defer provider.Close()
-	mf := mongofiles.MongoFiles{
+	mf := merizofiles.MongoFiles{
 		ToolOptions:     opts,
 		StorageOptions:  storageOpts,
 		SessionProvider: provider,
@@ -70,7 +70,7 @@ func main() {
 
 	if err := mf.ValidateCommand(args); err != nil {
 		log.Logvf(log.Always, "%v", err)
-		log.Logvf(log.Always, "try 'mongofiles --help' for more information")
+		log.Logvf(log.Always, "try 'merizofiles --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 

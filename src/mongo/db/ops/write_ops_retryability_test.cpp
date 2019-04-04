@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/ops/write_ops_retryability.h"
-#include "mongo/db/query/find_and_modify_request.h"
-#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/ops/write_ops_retryability.h"
+#include "merizo/db/query/find_and_modify_request.h"
+#include "merizo/db/repl/mock_repl_coord_server_fixture.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using unittest::assertGet;
@@ -536,4 +536,4 @@ TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithRemoveErrors) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

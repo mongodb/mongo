@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/session_catalog_mongod.h"
+#include "merizo/db/session_catalog_merizod.h"
 
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/log.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/client.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/util/concurrency/thread_pool.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 struct SessionTasksExecutor {
@@ -258,4 +258,4 @@ MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWitho
               txnParticipant.transactionIsPrepared());
 }
 
-}  // namespace mongo
+}  // namespace merizo

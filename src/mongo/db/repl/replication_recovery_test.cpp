@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,34 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer_noop.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/replication_consistency_markers_mock.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/replication_recovery.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/client.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer_noop.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/oplog_interface_local.h"
+#include "merizo/db/repl/replication_consistency_markers_mock.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/replication_recovery.h"
+#include "merizo/db/repl/storage_interface_impl.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/session_txn_record_gen.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
 namespace {
 
-using namespace mongo;
-using namespace mongo::repl;
+using namespace merizo;
+using namespace merizo::repl;
 
 const auto& oplogNs = NamespaceString::kRsOplogNamespace;
 const NamespaceString testNs("a.a");

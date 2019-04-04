@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Packager Enterprise module."""
 
-# This program makes Debian and RPM repositories for MongoDB, by
+# This program makes Debian and RPM repositories for MerizoDB, by
 # downloading our tarballs of statically linked executables and
 # insinuating them into Linux packages.  It must be run on a
 # Debianoid, since Debian provides tools to make RPMs, but RPM-based
@@ -38,7 +38,7 @@ import time
 
 import packager  # pylint: disable=relative-import
 
-# The MongoDB names for the architectures we support.
+# The MerizoDB names for the architectures we support.
 ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64"]
 
 # Made up names for the flavors of distribution we package for.
@@ -69,26 +69,26 @@ class EnterpriseDistro(packager.Distro):
 
         Examples:
 
-        repo/apt/ubuntu/dists/precise/mongodb-enterprise/testing/multiverse/binary-amd64
-        repo/apt/ubuntu/dists/precise/mongodb-enterprise/testing/multiverse/binary-i386
+        repo/apt/ubuntu/dists/precise/merizodb-enterprise/testing/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/precise/merizodb-enterprise/testing/multiverse/binary-i386
 
-        repo/apt/ubuntu/dists/precise/mongodb-enterprise/2.5/multiverse/binary-amd64
-        repo/apt/ubuntu/dists/precise/mongodb-enterprise/2.5/multiverse/binary-i386
+        repo/apt/ubuntu/dists/precise/merizodb-enterprise/2.5/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/precise/merizodb-enterprise/2.5/multiverse/binary-i386
 
-        repo/apt/ubuntu/dists/trusty/mongodb-enterprise/2.5/multiverse/binary-amd64
-        repo/apt/ubuntu/dists/trusty/mongodb-enterprise/2.5/multiverse/binary-i386
+        repo/apt/ubuntu/dists/trusty/merizodb-enterprise/2.5/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/trusty/merizodb-enterprise/2.5/multiverse/binary-i386
 
-        repo/apt/debian/dists/wheezy/mongodb-enterprise/2.5/main/binary-amd64
-        repo/apt/debian/dists/wheezy/mongodb-enterprise/2.5/main/binary-i386
+        repo/apt/debian/dists/wheezy/merizodb-enterprise/2.5/main/binary-amd64
+        repo/apt/debian/dists/wheezy/merizodb-enterprise/2.5/main/binary-i386
 
-        repo/yum/redhat/6/mongodb-enterprise/2.5/x86_64
-        repo/yum/redhat/6/mongodb-enterprise/2.5/i386
+        repo/yum/redhat/6/merizodb-enterprise/2.5/x86_64
+        repo/yum/redhat/6/merizodb-enterprise/2.5/i386
 
-        repo/zypper/suse/11/mongodb-enterprise/2.5/x86_64
-        repo/zypper/suse/11/mongodb-enterprise/2.5/i386
+        repo/zypper/suse/11/merizodb-enterprise/2.5/x86_64
+        repo/zypper/suse/11/merizodb-enterprise/2.5/i386
 
-        repo/zypper/suse/11/mongodb-enterprise/testing/x86_64
-        repo/zypper/suse/11/mongodb-enterprise/testing/i386
+        repo/zypper/suse/11/merizodb-enterprise/testing/x86_64
+        repo/zypper/suse/11/merizodb-enterprise/testing/i386
         """
 
         repo_directory = ""
@@ -99,14 +99,14 @@ class EnterpriseDistro(packager.Distro):
             repo_directory = spec.branch()
 
         if re.search("^(debian|ubuntu)", self.dname):
-            return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (
+            return "repo/apt/%s/dists/%s/merizodb-enterprise/%s/%s/binary-%s/" % (
                 self.dname, self.repo_os_version(build_os), repo_directory, self.repo_component(),
                 self.archname(arch))
         elif re.search("(redhat|fedora|centos|amazon)", self.dname):
-            return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
+            return "repo/yum/%s/%s/merizodb-enterprise/%s/%s/RPMS/" % (
                 self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         elif re.search("(suse)", self.dname):
-            return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
+            return "repo/zypper/%s/%s/merizodb-enterprise/%s/%s/RPMS/" % (
                 self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
@@ -191,7 +191,7 @@ def main():
 
 def tarfile(build_os, arch, spec):
     """Return the location where we store the downloaded tarball for this package."""
-    return "dl/mongodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), build_os, arch)
+    return "dl/merizodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), build_os, arch)
 
 
 def setupdir(distro, build_os, arch, spec):
@@ -200,8 +200,8 @@ def setupdir(distro, build_os, arch, spec):
     # distro's packaging tools (e.g., package metadata files, init
     # scripts, etc, along with the already-built binaries).  In case
     # the following format string is unclear, an example setupdir
-    # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
-    # or dst/x86_64/redhat/rhel57/mongodb-org-unstable/
+    # would be dst/x86_64/debian-sysvinit/wheezy/merizodb-org-unstable/
+    # or dst/x86_64/redhat/rhel57/merizodb-org-unstable/
     return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(),
                                       spec.suffix(), spec.pversion(distro))
 
@@ -217,7 +217,7 @@ def unpack_binaries_into(build_os, arch, spec, where):
     os.chdir(where)
     try:
         packager.sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
-        release_dir = glob('mongodb-linux-*')[0]
+        release_dir = glob('merizodb-linux-*')[0]
         for releasefile in "bin", "snmp", "LICENSE-Enterprise.txt", "README", "THIRD-PARTY-NOTICES", "THIRD-PARTY-NOTICES.gotools", "MPL-2":
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
@@ -251,10 +251,10 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
-    # Remove the mongoreplay binary due to libpcap dynamic
+    # Remove the merizoreplay binary due to libpcap dynamic
     # linkage.
-    if os.path.exists(sdir + "bin/mongoreplay"):
-        os.unlink(sdir + "bin/mongoreplay")
+    if os.path.exists(sdir + "bin/merizoreplay"):
+        os.unlink(sdir + "bin/merizoreplay")
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 
@@ -291,13 +291,13 @@ def make_deb_repo(repo, distro, build_os):
     # Notes: the Release{,.gpg} files must live in a special place,
     # and must be created after all the Packages.gz files have been
     # done.
-    s1 = """Origin: mongodb
-Label: mongodb
+    s1 = """Origin: merizodb
+Label: merizodb
 Suite: %s
-Codename: %s/mongodb-enterprise
+Codename: %s/merizodb-enterprise
 Architectures: amd64 ppc64el s390x arm64
 Components: %s
-Description: MongoDB packages
+Description: MerizoDB packages
 """ % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
     if os.path.exists(repo + "../../Release"):
         os.unlink(repo + "../../Release")

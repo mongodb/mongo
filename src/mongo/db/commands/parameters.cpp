@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <set>
 
-#include "mongo/bson/json.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/parameters_gen.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/parse_log_component_settings.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/json.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/config.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/command_generic_argument.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/parameters_gen.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/logger/logger.h"
+#include "merizo/logger/parse_log_component_settings.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
 using std::string;
 using std::stringstream;
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 using logger::globalLogDomain;
@@ -392,7 +392,7 @@ Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
     int newValue;
     if (!newValueElement.coerce(&newValue) || newValue < 0)
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "Invalid value for logLevel: "
+                      merizoutils::str::stream() << "Invalid value for logLevel: "
                                                 << newValueElement);
     LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
     globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
@@ -406,7 +406,7 @@ Status LogLevelServerParameter::setFromString(const std::string& strLevel) {
         return status;
     if (newValue < 0)
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "Invalid value for logLevel: " << newValue);
+                      merizoutils::str::stream() << "Invalid value for logLevel: " << newValue);
     LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
     globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
     return Status::OK();
@@ -423,7 +423,7 @@ void LogComponentVerbosityServerParameter::append(OperationContext*,
 Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElement) {
     if (!newValueElement.isABSONObj()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "log component verbosity is not a BSON object: "
+                      merizoutils::str::stream() << "log component verbosity is not a BSON object: "
                                                 << newValueElement);
     }
     return setLogComponentVerbosity(newValueElement.Obj());
@@ -456,7 +456,7 @@ Status AutomationServiceDescriptorServerParameter::setFromString(const std::stri
     auto kMaxSize = 64U;
     if (str.size() > kMaxSize)
         return {ErrorCodes::Overflow,
-                mongoutils::str::stream() << "Value for parameter automationServiceDescriptor"
+                merizoutils::str::stream() << "Value for parameter automationServiceDescriptor"
                                           << " must be no more than "
                                           << kMaxSize
                                           << " bytes"};
@@ -469,4 +469,4 @@ Status AutomationServiceDescriptorServerParameter::setFromString(const std::stri
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

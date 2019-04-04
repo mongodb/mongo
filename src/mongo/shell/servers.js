@@ -6,7 +6,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
     var shellVersion = version;
 
-    // Record the exit codes of mongod and mongos processes that crashed during startup keyed by
+    // Record the exit codes of merizod and merizos processes that crashed during startup keyed by
     // port. This map is cleared when MongoRunner._startWithArgs and MongoRunner.stopMongod/s are
     // called.
     var serverExitCodeMap = {};
@@ -75,9 +75,9 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.dataDir = "/data/db";
     MongoRunner.dataPath = "/data/db/";
 
-    MongoRunner.mongodPath = "mongod";
-    MongoRunner.mongosPath = "mongos";
-    MongoRunner.mongoShellPath = "mongo";
+    MongoRunner.merizodPath = "merizod";
+    MongoRunner.merizosPath = "merizos";
+    MongoRunner.merizoShellPath = "merizo";
 
     MongoRunner.VersionSub = function(pattern, version) {
         this.pattern = pattern;
@@ -97,7 +97,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         assert.gt(versionArray.length,
                   1,
-                  "MongoDB versions must have at least two components to compare, but \"" +
+                  "MerizoDB versions must have at least two components to compare, but \"" +
                       versionString + "\" has " + versionArray.length);
         return versionArray;
     };
@@ -115,7 +115,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
     // These patterns allow substituting the binary versions used for each version string to support
     // the
-    // dev/stable MongoDB release cycle.
+    // dev/stable MerizoDB release cycle.
     //
     // If you add a new version substitution to this list, you should add it to the lists of
     // versions being checked in 'verify_versions_test.js' to verify it is susbstituted correctly.
@@ -435,12 +435,12 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
     MongoRunner.savedOptions = {};
 
-    MongoRunner.mongoOptions = function(opts) {
+    MongoRunner.merizoOptions = function(opts) {
         // Don't remember waitForConnect
         var waitForConnect = opts.waitForConnect;
         delete opts.waitForConnect;
 
-        // If we're a mongo object
+        // If we're a merizo object
         if (opts.getDB) {
             opts = {restart: opts.runId};
         }
@@ -490,7 +490,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         if (opts.hasOwnProperty('binVersion')) {
             if (opts.binVersion instanceof MongoRunner.versionIterator.iterator) {
                 // Advance the version iterator so that subsequent calls to
-                // MongoRunner.mongoOptions() use the next version in the list.
+                // MongoRunner.merizoOptions() use the next version in the list.
                 const iterator = opts.binVersion;
                 opts.binVersion = iterator.current();
                 iterator.advance();
@@ -553,7 +553,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         return false;
     };
 
-    // Removes a setParameter parameter from mongods running a version that won't recognize them.
+    // Removes a setParameter parameter from merizods running a version that won't recognize them.
     var _removeSetParameterIfBeforeVersion = function(opts, parameterName, requiredVersion) {
         var versionCompatible = (opts.binVersion === "" || opts.binVersion === undefined ||
                                  _isMongodVersionEqualOrAfter(requiredVersion, opts.binVersion));
@@ -561,7 +561,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             opts.setParameter[parameterName] != undefined) {
             print("Removing '" + parameterName + "' setParameter with value " +
                   opts.setParameter[parameterName] +
-                  " because it isn't compatibile with mongod running version " + opts.binVersion);
+                  " because it isn't compatibile with merizod running version " + opts.binVersion);
             delete opts.setParameter[parameterName];
         }
     };
@@ -580,11 +580,11 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      *     oplogSize
      *   }
      */
-    MongoRunner.mongodOptions = function(opts) {
+    MongoRunner.merizodOptions = function(opts) {
 
-        opts = MongoRunner.mongoOptions(opts);
+        opts = MongoRunner.merizoOptions(opts);
 
-        opts.dbpath = MongoRunner.toRealDir(opts.dbpath || "$dataDir/mongod-$port", opts.pathOpts);
+        opts.dbpath = MongoRunner.toRealDir(opts.dbpath || "$dataDir/merizod-$port", opts.pathOpts);
 
         opts.pathOpts = Object.merge(opts.pathOpts, {dbpath: opts.dbpath});
 
@@ -594,7 +594,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         _removeSetParameterIfBeforeVersion(opts, "migrationLockAcquisitionMaxWaitMS", "4.1.7");
 
         if (!opts.logFile && opts.useLogFiles) {
-            opts.logFile = opts.dbpath + "/mongod.log";
+            opts.logFile = opts.dbpath + "/merizod.log";
         } else if (opts.logFile) {
             opts.logFile = MongoRunner.toRealFile(opts.logFile, opts.pathOpts);
         }
@@ -658,8 +658,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         return opts;
     };
 
-    MongoRunner.mongosOptions = function(opts) {
-        opts = MongoRunner.mongoOptions(opts);
+    MongoRunner.merizosOptions = function(opts) {
+        opts = MongoRunner.merizoOptions(opts);
 
         // Normalize configdb option to be host string if currently a host
         if (opts.configdb && opts.configdb.getDB) {
@@ -671,7 +671,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         if (!opts.logFile && opts.useLogFiles) {
             opts.logFile =
-                MongoRunner.toRealFile("$dataDir/mongos-$configdb-$port.log", opts.pathOpts);
+                MongoRunner.toRealFile("$dataDir/merizos-$configdb-$port.log", opts.pathOpts);
         } else if (opts.logFile) {
             opts.logFile = MongoRunner.toRealFile(opts.logFile, opts.pathOpts);
         }
@@ -697,11 +697,11 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             opts.auditDestination = testOptions.auditDestination;
         }
 
-        if (!opts.hasOwnProperty('binVersion') && testOptions.mongosBinVersion) {
-            opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongosBinVersion);
+        if (!opts.hasOwnProperty('binVersion') && testOptions.merizosBinVersion) {
+            opts.binVersion = MongoRunner.getBinVersionFor(testOptions.merizosBinVersion);
         }
 
-        // If the mongos is being restarted with a newer version, make sure we remove any options
+        // If the merizos is being restarted with a newer version, make sure we remove any options
         // that no longer exist in the newer version.
         if (opts.restart && MongoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
             delete opts.noAutoSplit;
@@ -711,7 +711,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     };
 
     /**
-     * Starts a mongod instance.
+     * Starts a merizod instance.
      *
      * @param {Object} opts
      *
@@ -724,10 +724,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      *     noCleanData {boolean}: Do not clean files (cleanData takes priority).
      *     binVersion {string}: version for binary (also see MongoRunner.binVersionSubs).
      *
-     *     @see MongoRunner.mongodOptions for other options
+     *     @see MongoRunner.merizodOptions for other options
      *   }
      *
-     * @return {Mongo} connection object to the started mongod instance.
+     * @return {Mongo} connection object to the started merizod instance.
      *
      * @see MongoRunner.arrOptions
      */
@@ -741,7 +741,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         var fullOptions = opts;
 
         if (isObject(opts)) {
-            opts = MongoRunner.mongodOptions(opts);
+            opts = MongoRunner.merizodOptions(opts);
             fullOptions = opts;
 
             if (opts.useHostName != undefined) {
@@ -756,31 +756,31 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             waitForConnect = opts.waitForConnect;
 
             if (opts.forceLock)
-                removeFile(opts.dbpath + "/mongod.lock");
+                removeFile(opts.dbpath + "/merizod.lock");
             if ((opts.cleanData || opts.startClean) || (!opts.restart && !opts.noCleanData)) {
                 print("Resetting db path '" + opts.dbpath + "'");
                 resetDbpath(opts.dbpath);
             }
 
-            var mongodProgram = MongoRunner.mongodPath;
-            opts = MongoRunner.arrOptions(mongodProgram, opts);
+            var merizodProgram = MongoRunner.merizodPath;
+            opts = MongoRunner.arrOptions(merizodProgram, opts);
         }
 
-        var mongod = MongoRunner._startWithArgs(opts, env, waitForConnect);
-        if (!mongod) {
+        var merizod = MongoRunner._startWithArgs(opts, env, waitForConnect);
+        if (!merizod) {
             return null;
         }
 
-        mongod.commandLine = MongoRunner.arrToOpts(opts);
-        mongod.name = (useHostName ? getHostName() : "localhost") + ":" + mongod.commandLine.port;
-        mongod.host = mongod.name;
-        mongod.port = parseInt(mongod.commandLine.port);
-        mongod.runId = runId || ObjectId();
-        mongod.dbpath = fullOptions.dbpath;
-        mongod.savedOptions = MongoRunner.savedOptions[mongod.runId];
-        mongod.fullOptions = fullOptions;
+        merizod.commandLine = MongoRunner.arrToOpts(opts);
+        merizod.name = (useHostName ? getHostName() : "localhost") + ":" + merizod.commandLine.port;
+        merizod.host = merizod.name;
+        merizod.port = parseInt(merizod.commandLine.port);
+        merizod.runId = runId || ObjectId();
+        merizod.dbpath = fullOptions.dbpath;
+        merizod.savedOptions = MongoRunner.savedOptions[merizod.runId];
+        merizod.fullOptions = fullOptions;
 
-        return mongod;
+        return merizod;
     };
 
     MongoRunner.runMongos = function(opts) {
@@ -793,44 +793,44 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         var fullOptions = opts;
 
         if (isObject(opts)) {
-            opts = MongoRunner.mongosOptions(opts);
+            opts = MongoRunner.merizosOptions(opts);
             fullOptions = opts;
 
             useHostName = opts.useHostName || opts.useHostname;
             runId = opts.runId;
             waitForConnect = opts.waitForConnect;
             env = opts.env;
-            var mongosProgram = MongoRunner.mongosPath;
-            opts = MongoRunner.arrOptions(mongosProgram, opts);
+            var merizosProgram = MongoRunner.merizosPath;
+            opts = MongoRunner.arrOptions(merizosProgram, opts);
         }
 
-        var mongos = MongoRunner._startWithArgs(opts, env, waitForConnect);
-        if (!mongos) {
+        var merizos = MongoRunner._startWithArgs(opts, env, waitForConnect);
+        if (!merizos) {
             return null;
         }
 
-        mongos.commandLine = MongoRunner.arrToOpts(opts);
-        mongos.name = (useHostName ? getHostName() : "localhost") + ":" + mongos.commandLine.port;
-        mongos.host = mongos.name;
-        mongos.port = parseInt(mongos.commandLine.port);
-        mongos.runId = runId || ObjectId();
-        mongos.savedOptions = MongoRunner.savedOptions[mongos.runId];
-        mongos.fullOptions = fullOptions;
+        merizos.commandLine = MongoRunner.arrToOpts(opts);
+        merizos.name = (useHostName ? getHostName() : "localhost") + ":" + merizos.commandLine.port;
+        merizos.host = merizos.name;
+        merizos.port = parseInt(merizos.commandLine.port);
+        merizos.runId = runId || ObjectId();
+        merizos.savedOptions = MongoRunner.savedOptions[merizos.runId];
+        merizos.fullOptions = fullOptions;
 
-        return mongos;
+        return merizos;
     };
 
     MongoRunner.StopError = function(returnCode) {
         this.name = "StopError";
         this.returnCode = returnCode;
-        this.message = "MongoDB process stopped with exit code: " + this.returnCode;
+        this.message = "MerizoDB process stopped with exit code: " + this.returnCode;
         this.stack = this.toString() + "\n" + (new Error()).stack;
     };
 
     MongoRunner.StopError.prototype = Object.create(Error.prototype);
     MongoRunner.StopError.prototype.constructor = MongoRunner.StopError;
 
-    // Constants for exit codes of MongoDB processes
+    // Constants for exit codes of MerizoDB processes
     MongoRunner.EXIT_ABORT = -6;
     MongoRunner.EXIT_CLEAN = 0;
     MongoRunner.EXIT_BADOPTIONS = 2;
@@ -857,7 +857,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.validateCollectionsCallback = function(port) {};
 
     /**
-     * Kills a mongod process.
+     * Kills a merizod process.
      *
      * @param {Mongo} conn the connection object to the process to kill
      * @param {number} signal The signal number to use for killing
@@ -871,7 +871,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      *      allowedExitCode: <int>
      *    }
      *
-     * Note: The auth option is required in a authenticated mongod running in Windows since
+     * Note: The auth option is required in a authenticated merizod running in Windows since
      *  it uses the shutdown command, which requires admin credentials.
      */
     MongoRunner.stopMongod = function(conn, signal, opts) {
@@ -904,9 +904,9 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             returnCode = serverExitCodeMap[port];
             delete serverExitCodeMap[port];
         } else {
-            // Invoke callback to validate collections and indexes before shutting down mongod.
+            // Invoke callback to validate collections and indexes before shutting down merizod.
             // We skip calling the callback function when the expected return code of
-            // the mongod process is non-zero since it's likely the process has already exited.
+            // the merizod process is non-zero since it's likely the process has already exited.
 
             var skipValidation = false;
             if (opts.skipValidation) {
@@ -922,7 +922,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         if (allowedExitCode !== returnCode) {
             throw new MongoRunner.StopError(returnCode);
         } else if (returnCode !== MongoRunner.EXIT_CLEAN) {
-            print("MongoDB process on port " + port + " intentionally exited with error code ",
+            print("MerizoDB process on port " + port + " intentionally exited with error code ",
                   returnCode);
         }
 
@@ -932,7 +932,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.stopMongos = MongoRunner.stopMongod;
 
     /**
-     * Starts an instance of the specified mongo tool
+     * Starts an instance of the specified merizo tool
      *
      * @param {String} binaryName - The name of the tool to run.
      * @param {Object} [opts={}] - Options of the form --flag or --key=value to pass to the tool.
@@ -959,13 +959,13 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         }
         opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
 
-        // Recent versions of the mongo tools support a --dialTimeout flag to set for how
-        // long they retry connecting to a mongod or mongos process. We have them retry
+        // Recent versions of the merizo tools support a --dialTimeout flag to set for how
+        // long they retry connecting to a merizod or merizos process. We have them retry
         // connecting for up to 30 seconds to handle when the tests are run on a
         // resource-constrained host machine.
         //
         // The bsondump tool doesn't accept the --dialTimeout flag because it doesn't connect to a
-        // mongod or mongos process.
+        // merizod or merizos process.
         if (!opts.hasOwnProperty('dialTimeout') && binaryName !== 'bsondump' &&
             _toolVersionSupportsDialTimeout(opts.binVersion)) {
             opts['dialTimeout'] = '30';
@@ -1018,12 +1018,12 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         return dir;
     };
 
-    // Start a mongod instance and return a 'Mongo' object connected to it.
-    // This function's arguments are passed as command line arguments to mongod.
+    // Start a merizod instance and return a 'Mongo' object connected to it.
+    // This function's arguments are passed as command line arguments to merizod.
     // The specified 'dbpath' is cleared if it exists, created if not.
     // var conn = _startMongodEmpty("--port", 30000, "--dbpath", "asdf");
     var _startMongodEmpty = function() {
-        var args = createMongoArgs("mongod", Array.from(arguments));
+        var args = createMongoArgs("merizod", Array.from(arguments));
 
         var dbpath = _parsePath.apply(null, args);
         resetDbpath(dbpath);
@@ -1056,8 +1056,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             });
         }
 
-        // programName includes the version, e.g., mongod-3.2.
-        // baseProgramName is the program name without any version information, e.g., mongod.
+        // programName includes the version, e.g., merizod-3.2.
+        // baseProgramName is the program name without any version information, e.g., merizod.
         let programName = argArray[0];
 
         let [baseProgramName, programVersion] = programName.split("-");
@@ -1067,7 +1067,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             programMajorMinorVersion = parseInt(major) * 100 + parseInt(minor);
         }
 
-        if (baseProgramName === 'mongod' || baseProgramName === 'mongos') {
+        if (baseProgramName === 'merizod' || baseProgramName === 'merizos') {
             if (jsTest.options().enableTestCommands) {
                 argArray.push(...['--setParameter', "enableTestCommands=1"]);
             }
@@ -1100,10 +1100,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 argArray.push(...['--setParameter', "disableLogicalSessionCacheRefresh=true"]);
             }
 
-            // Since options may not be backward compatible, mongos options are not
-            // set on older versions, e.g., mongos-3.0.
-            if (programName.endsWith('mongos')) {
-                // apply setParameters for mongos
+            // Since options may not be backward compatible, merizos options are not
+            // set on older versions, e.g., merizos-3.0.
+            if (programName.endsWith('merizos')) {
+                // apply setParameters for merizos
                 if (jsTest.options().setParametersMongos) {
                     let params = jsTest.options().setParametersMongos;
                     for (let paramName of Object.keys(params)) {
@@ -1121,12 +1121,12 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                         argArray.push(...['--setParameter', setParamStr]);
                     }
                 }
-            } else if (baseProgramName === 'mongod') {
+            } else if (baseProgramName === 'merizod') {
                 if (jsTestOptions().roleGraphInvalidationIsFatal) {
                     argArray.push(...['--setParameter', "roleGraphInvalidationIsFatal=true"]);
                 }
 
-                // Set storageEngine for mongod. There was no storageEngine parameter before 3.0.
+                // Set storageEngine for merizod. There was no storageEngine parameter before 3.0.
                 if (jsTest.options().storageEngine &&
                     (!programVersion || programMajorMinorVersion >= 300)) {
                     if (!argArrayContains("--storageEngine")) {
@@ -1134,7 +1134,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
 
-                // New mongod-specific options in 4.0.x
+                // New merizod-specific options in 4.0.x
                 if (!programMajorMinorVersion || programMajorMinorVersion >= 400) {
                     if (jsTest.options().transactionLifetimeLimitSeconds !== undefined) {
                         if (!argArrayContainsSetParameterValue(
@@ -1154,9 +1154,9 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
 
-                // Since options may not be backward compatible, mongod options are not
-                // set on older versions, e.g., mongod-3.0.
-                if (programName.endsWith('mongod')) {
+                // Since options may not be backward compatible, merizod options are not
+                // set on older versions, e.g., merizod-3.0.
+                if (programName.endsWith('merizod')) {
                     if (jsTest.options().storageEngine === "wiredTiger" ||
                         !jsTest.options().storageEngine) {
                         if (jsTest.options().enableMajorityReadConcern !== undefined &&
@@ -1197,7 +1197,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                                 ...["--inMemorySizeGB", jsTest.options().storageEngineCacheSizeGB]);
                         }
                     }
-                    // apply setParameters for mongod. The 'setParameters' field should be given as
+                    // apply setParameters for merizod. The 'setParameters' field should be given as
                     // a plain JavaScript object, where each key is a parameter name and the value
                     // is the value to set for that parameter.
                     if (jsTest.options().setParameters) {
@@ -1225,14 +1225,14 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     }
 
     /**
-     * Start a mongo process with a particular argument array.
+     * Start a merizo process with a particular argument array.
      * If we aren't waiting for connect, return {pid: <pid>}.
      * If we are waiting for connect:
      *     returns connection to process on success;
      *     otherwise returns null if we fail to connect.
      */
     MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
-        // TODO: Make there only be one codepath for starting mongo processes
+        // TODO: Make there only be one codepath for starting merizo processes
 
         argArray = appendSetParameterArgs(argArray);
         var port = _parsePort.apply(null, argArray);
@@ -1260,14 +1260,14 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             } catch (e) {
                 var res = checkProgram(pid);
                 if (!res.alive) {
-                    print("Could not start mongo program at " + port +
+                    print("Could not start merizo program at " + port +
                           ", process ended with exit code: " + res.exitCode);
                     serverExitCodeMap[port] = res.exitCode;
                     return true;
                 }
             }
             return false;
-        }, "unable to connect to mongo program on port " + port, 600 * 1000);
+        }, "unable to connect to merizo program on port " + port, 600 * 1000);
 
         return conn;
     };
@@ -1275,8 +1275,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     /**
      * DEPRECATED
      *
-     * Start mongod or mongos and return a Mongo() object connected to there.
-     * This function's first argument is "mongod" or "mongos" program name, \
+     * Start merizod or merizos and return a Mongo() object connected to there.
+     * This function's first argument is "merizod" or "merizos" program name, \
      * and subsequent arguments to this function are passed as
      * command line arguments to the program.
      */
@@ -1299,7 +1299,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             } catch (e) {
                 var res = checkProgram(pid);
                 if (!res.alive) {
-                    print("Could not start mongo program at " + port +
+                    print("Could not start merizo program at " + port +
                           ", process ended with exit code: " + res.exitCode);
                     // Break out
                     m = null;
@@ -1307,7 +1307,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 }
             }
             return false;
-        }, "unable to connect to mongo program on port " + port, 600 * 1000);
+        }, "unable to connect to merizo program on port " + port, 600 * 1000);
 
         return m;
     };
@@ -1317,7 +1317,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         args = appendSetParameterArgs(args);
         var progName = args[0];
 
-        if (jsTestOptions().auth && progName != 'mongod') {
+        if (jsTestOptions().auth && progName != 'merizod') {
             args = args.slice(1);
             args.unshift(progName,
                          '-u',
@@ -1327,7 +1327,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                          '--authenticationDatabase=admin');
         }
 
-        if (progName == 'mongo' && !_useWriteCommandsDefault()) {
+        if (progName == 'merizo' && !_useWriteCommandsDefault()) {
             progName = args[0];
             args = args.slice(1);
             args.unshift(progName, '--useLegacyWriteOps');
@@ -1336,7 +1336,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         return _runMongoProgram.apply(null, args);
     };
 
-    // Start a mongo program instance.  This function's first argument is the
+    // Start a merizo program instance.  This function's first argument is the
     // program name, and subsequent arguments to this function are passed as
     // command line arguments to the program.  Returns pid of the spawned program.
     startMongoProgramNoConnect = function() {
@@ -1354,7 +1354,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                          '--authenticationDatabase=admin');
         }
 
-        if (progName == 'mongo' && !_useWriteCommandsDefault()) {
+        if (progName == 'merizo' && !_useWriteCommandsDefault()) {
             args = args.slice(1);
             args.unshift(progName, '--useLegacyWriteOps');
         }

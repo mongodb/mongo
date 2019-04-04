@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,31 +31,31 @@
 
 #include <cstdint>
 
-#include "mongo/base/string_data.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/client/dbclient_base.h"
-#include "mongo/client/index_spec.h"
-#include "mongo/client/mongo_uri.h"
-#include "mongo/client/query.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/logger/log_severity.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/rpc/message.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/protocol.h"
-#include "mongo/rpc/unique_message.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/transport/message_compressor_manager.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/string_data.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/dbclient_base.h"
+#include "merizo/client/index_spec.h"
+#include "merizo/client/merizo_uri.h"
+#include "merizo/client/query.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/dbmessage.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/logger/log_severity.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/rpc/message.h"
+#include "merizo/rpc/metadata.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/rpc/protocol.h"
+#include "merizo/rpc/unique_message.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/transport/message_compressor_manager.h"
+#include "merizo/transport/session.h"
+#include "merizo/transport/transport_layer.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace executor {
 struct RemoteCommandResponse;
@@ -146,7 +146,7 @@ public:
      *
      * @param dbname the database to logout from.
      * @param info the result object for the logout command (provided for backwards
-     *     compatibility with mongo shell)
+     *     compatibility with merizo shell)
      */
     void logout(const std::string& dbname, BSONObj& info) override;
 
@@ -341,4 +341,4 @@ private:
 BSONElement getErrField(const BSONObj& result);
 bool hasErrField(const BSONObj& result);
 
-}  // namespace mongo
+}  // namespace merizo

@@ -5,8 +5,8 @@
     "use strict";
     var name = "operationalLatencyHistogramTest";
 
-    var mongo = MongoRunner.runMongod();
-    var testDB = mongo.getDB("test");
+    var merizo = MongoRunner.runMongod();
+    var testDB = merizo.getDB("test");
     var testColl = testDB[name + "coll"];
 
     testColl.drop();
@@ -164,5 +164,5 @@
     // Test non-command.
     assert.commandFailed(testColl.runCommand("IHopeNobodyEverMakesThisACommand"));
     lastHistogram = checkHistogramDiff(0, 0, 1);
-    MongoRunner.stopMongod(mongo);
+    MongoRunner.stopMongod(merizo);
 }());

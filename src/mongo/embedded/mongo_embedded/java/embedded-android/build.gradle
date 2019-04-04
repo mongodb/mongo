@@ -78,9 +78,9 @@ uploadArchives {
 
                 developers {
                     developer {
-                        id 'mongodb'
-                        name 'MongoDB Inc.'
-                        email 'build@mongodb.com'
+                        id 'merizodb'
+                        name 'MerizoDB Inc.'
+                        email 'build@merizodb.com'
                     }
                 }
             }

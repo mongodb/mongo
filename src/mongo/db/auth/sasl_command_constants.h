@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include "merizo/base/string_data.h"
 
-namespace mongo {
+namespace merizo {
 
 /// String name of the saslStart command.
 constexpr auto saslStartCommandName = "saslStart"_sd;
@@ -69,24 +69,24 @@ constexpr auto saslCommandPayloadFieldName = "payload"_sd;
 constexpr auto saslCommandUserFieldName = "user"_sd;
 
 /// Field containing the string identifier of the database containing credential information,
-/// or "$external" if the credential information is stored outside of the mongo cluster.
+/// or "$external" if the credential information is stored outside of the merizo cluster.
 constexpr auto saslCommandUserDBFieldName = "db"_sd;
 
-/// Field overriding the FQDN of the hostname hosting the mongodb srevice in
+/// Field overriding the FQDN of the hostname hosting the merizodb srevice in
 /// saslClientAuthenticate().
 constexpr auto saslCommandServiceHostnameFieldName = "serviceHostname"_sd;
 
-/// Field overriding the name of the mongodb service saslClientAuthenticate().
+/// Field overriding the name of the merizodb service saslClientAuthenticate().
 constexpr auto saslCommandServiceNameFieldName = "serviceName"_sd;
 
 /// Default database against which sasl authentication commands should run.
 constexpr auto saslDefaultDBName = "$external"_sd;
 
-/// Default sasl service name, "mongodb".
-constexpr auto saslDefaultServiceName = "mongodb"_sd;
+/// Default sasl service name, "merizodb".
+constexpr auto saslDefaultServiceName = "merizodb"_sd;
 
 // Field whose value should be set to true if the field in saslCommandPasswordFieldName needs to
 // be digested.
 constexpr auto saslCommandDigestPasswordFieldName = "digestPassword"_sd;
 
-}  // namespace mongo
+}  // namespace merizo

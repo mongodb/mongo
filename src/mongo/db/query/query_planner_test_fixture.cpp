@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/query_planner_test_fixture.h"
+#include "merizo/db/query/query_planner_test_fixture.h"
 
 #include <algorithm>
 
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_test_lib.h"
-#include "mongo/util/log.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/query_planner_test_lib.h"
+#include "merizo/util/log.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
-namespace mongo {
+namespace merizo {
 
 using unittest::assertGet;
 
@@ -473,12 +473,12 @@ size_t QueryPlannerTest::getNumSolutions() const {
 }
 
 void QueryPlannerTest::dumpSolutions() const {
-    mongoutils::str::stream ost;
+    merizoutils::str::stream ost;
     dumpSolutions(ost);
     log() << std::string(ost);
 }
 
-void QueryPlannerTest::dumpSolutions(mongoutils::str::stream& ost) const {
+void QueryPlannerTest::dumpSolutions(merizoutils::str::stream& ost) const {
     for (auto&& soln : solns) {
         ost << soln->toString() << '\n';
     }
@@ -488,7 +488,7 @@ void QueryPlannerTest::assertNumSolutions(size_t expectSolutions) const {
     if (getNumSolutions() == expectSolutions) {
         return;
     }
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     ss << "expected " << expectSolutions << " solutions but got " << getNumSolutions()
        << " instead. solutions generated: " << '\n';
     dumpSolutions(ss);
@@ -512,7 +512,7 @@ void QueryPlannerTest::assertSolutionExists(const std::string& solnJson, size_t 
     if (numMatches == matches) {
         return;
     }
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     ss << "expected " << numMatches << " matches for solution " << solnJson << " but got "
        << matches << " instead. all solutions generated: " << '\n';
     dumpSolutions(ss);
@@ -530,7 +530,7 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
     if (1U == matches) {
         return;
     }
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     ss << "assertHasOneSolutionOf expected one matching solution"
        << " but got " << matches << " instead. all solutions generated: " << '\n';
     dumpSolutions(ss);
@@ -554,4 +554,4 @@ std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(
     return std::move(status.getValue());
 }
 
-}  // namespace mongo
+}  // namespace merizo

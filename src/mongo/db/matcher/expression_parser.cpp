@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,52 +27,52 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/matcher/expression_parser.h"
+#include "merizo/db/matcher/expression_parser.h"
 
 #include <boost/container/flat_set.hpp>
 #include <pcrecpp.h>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/matcher/expression_expr.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_internal_expr_eq.h"
-#include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/expression_type.h"
-#include "mongo/db/matcher/expression_with_placeholder.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/matcher/schema/json_schema_parser.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/string_map.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/matcher/expression_always_boolean.h"
+#include "merizo/db/matcher/expression_array.h"
+#include "merizo/db/matcher/expression_expr.h"
+#include "merizo/db/matcher/expression_geo.h"
+#include "merizo/db/matcher/expression_internal_expr_eq.h"
+#include "merizo/db/matcher/expression_leaf.h"
+#include "merizo/db/matcher/expression_tree.h"
+#include "merizo/db/matcher/expression_type.h"
+#include "merizo/db/matcher/expression_with_placeholder.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_cond.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_eq.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_fmod.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_match_array_index.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_max_items.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_max_properties.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_min_length.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_min_properties.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_object_match.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_unique_items.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "merizo/db/matcher/schema/json_schema_parser.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/string_map.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 
 /**
  * Returns true if subtree contains MatchExpression 'type'.
@@ -91,7 +91,7 @@ bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 constexpr StringData AlwaysFalseMatchExpression::kName;
 constexpr StringData AlwaysTrueMatchExpression::kName;
@@ -1841,7 +1841,7 @@ StatusWithMatchExpression MatchExpressionParser::parse(
     invariant(expCtx.get());
     const DocumentParseLevel currentLevelCall = DocumentParseLevel::kPredicateTopLevel;
     try {
-        return ::mongo::parse(obj, expCtx, &extensionsCallback, allowedFeatures, currentLevelCall);
+        return ::merizo::parse(obj, expCtx, &extensionsCallback, allowedFeatures, currentLevelCall);
     } catch (const DBException& ex) {
         return {ex.toStatus()};
     }
@@ -1989,4 +1989,4 @@ boost::optional<PathAcceptingKeyword> MatchExpressionParser::parsePathAcceptingK
     }
     return defaultKeyword;
 }
-}  // namespace mongo
+}  // namespace merizo

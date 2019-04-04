@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -38,15 +38,15 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/bson/oid.h"
+#include "merizo/bson/ordering.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/bson/util/builder.h"

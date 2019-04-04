@@ -1,7 +1,7 @@
 // @tags: [requires_non_retryable_writes]
 
 // SERVER-23129 Write commands should reject unknown fields. This is run in passthrough tests to
-// ensure that both mongos and mongod reject these commands.
+// ensure that both merizos and merizod reject these commands.
 (function() {
     'use strict';
 

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,24 +29,24 @@
 
 #include <vector>
 
-#include "mongo/db/query/query_solution.h"
+#include "merizo/db/query/query_solution.h"
 
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/planner_analysis.h"
-#include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_planner_common.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/matcher/expression_geo.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/db/query/index_bounds_builder.h"
+#include "merizo/db/query/planner_analysis.h"
+#include "merizo/db/query/planner_wildcard_helpers.h"
+#include "merizo/db/query/query_planner_common.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
-namespace wcp = ::mongo::wildcard_planning;
+namespace wcp = ::merizo::wildcard_planning;
 
 // Create an ordred interval list which represents the bounds for all BSON elements of type String,
 // Object, or Array.
@@ -157,19 +157,19 @@ void addEqualityFieldSorts(const BSONObj& sortPattern,
 }
 
 string QuerySolutionNode::toString() const {
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     appendToString(&ss, 0);
     return ss;
 }
 
 // static
-void QuerySolutionNode::addIndent(mongoutils::str::stream* ss, int level) {
+void QuerySolutionNode::addIndent(merizoutils::str::stream* ss, int level) {
     for (int i = 0; i < level; ++i) {
         *ss << "---";
     }
 }
 
-void QuerySolutionNode::addCommon(mongoutils::str::stream* ss, int indent) const {
+void QuerySolutionNode::addCommon(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "fetched = " << fetched() << '\n';
     addIndent(ss, indent + 1);
@@ -186,7 +186,7 @@ void QuerySolutionNode::addCommon(mongoutils::str::stream* ss, int indent) const
 // TextNode
 //
 
-void TextNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void TextNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "TEXT\n";
     addIndent(ss, indent + 1);
@@ -228,7 +228,7 @@ QuerySolutionNode* TextNode::clone() const {
 CollectionScanNode::CollectionScanNode()
     : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), tailable(false), direction(1) {}
 
-void CollectionScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void CollectionScanNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "COLLSCAN\n";
     addIndent(ss, indent + 1);
@@ -262,7 +262,7 @@ AndHashNode::AndHashNode() : _sort(SimpleBSONObjComparator::kInstance.makeBSONOb
 
 AndHashNode::~AndHashNode() {}
 
-void AndHashNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void AndHashNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "AND_HASH\n";
     if (NULL != filter) {
@@ -316,7 +316,7 @@ AndSortedNode::AndSortedNode() : _sort(SimpleBSONObjComparator::kInstance.makeBS
 
 AndSortedNode::~AndSortedNode() {}
 
-void AndSortedNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void AndSortedNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "AND_SORTED\n";
     addCommon(ss, indent);
@@ -366,7 +366,7 @@ OrNode::OrNode() : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), d
 
 OrNode::~OrNode() {}
 
-void OrNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void OrNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "OR\n";
     if (NULL != filter) {
@@ -427,7 +427,7 @@ MergeSortNode::MergeSortNode()
 
 MergeSortNode::~MergeSortNode() {}
 
-void MergeSortNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void MergeSortNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "MERGE_SORT\n";
     if (NULL != filter) {
@@ -486,7 +486,7 @@ QuerySolutionNode* MergeSortNode::clone() const {
 
 FetchNode::FetchNode() : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
 
-void FetchNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void FetchNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "FETCH\n";
     if (NULL != filter) {
@@ -523,7 +523,7 @@ IndexScanNode::IndexScanNode(IndexEntry index)
       shouldDedup(index.multikey),
       queryCollator(nullptr) {}
 
-void IndexScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void IndexScanNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "IXSCAN\n";
     addIndent(ss, indent + 1);
@@ -851,7 +851,7 @@ bool IndexScanNode::operator==(const IndexScanNode& other) const {
 // ProjectionNode
 //
 
-void ProjectionNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void ProjectionNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "PROJ\n";
     addIndent(ss, indent + 1);
@@ -932,7 +932,7 @@ ProjectionNode* ProjectionNodeSimple::clone() const {
 // SortKeyGeneratorNode
 //
 
-void SortKeyGeneratorNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void SortKeyGeneratorNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SORT_KEY_GENERATOR\n";
     addIndent(ss, indent + 1);
@@ -954,7 +954,7 @@ QuerySolutionNode* SortKeyGeneratorNode::clone() const {
 // SortNode
 //
 
-void SortNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void SortNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SORT\n";
     addIndent(ss, indent + 1);
@@ -983,7 +983,7 @@ QuerySolutionNode* SortNode::clone() const {
 //
 
 
-void LimitNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void LimitNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "LIMIT\n";
     addIndent(ss, indent + 1);
@@ -1008,7 +1008,7 @@ QuerySolutionNode* LimitNode::clone() const {
 // SkipNode
 //
 
-void SkipNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void SkipNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SKIP\n";
     addIndent(ss, indent + 1);
@@ -1032,7 +1032,7 @@ QuerySolutionNode* SkipNode::clone() const {
 // GeoNear2DNode
 //
 
-void GeoNear2DNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void GeoNear2DNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "GEO_NEAR_2D\n";
     addIndent(ss, indent + 1);
@@ -1064,7 +1064,7 @@ QuerySolutionNode* GeoNear2DNode::clone() const {
 // GeoNear2DSphereNode
 //
 
-void GeoNear2DSphereNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void GeoNear2DSphereNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "GEO_NEAR_2DSPHERE\n";
     addIndent(ss, indent + 1);
@@ -1098,7 +1098,7 @@ QuerySolutionNode* GeoNear2DSphereNode::clone() const {
 // ShardingFilterNode
 //
 
-void ShardingFilterNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void ShardingFilterNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SHARDING_FILTER\n";
     if (NULL != filter) {
@@ -1124,7 +1124,7 @@ QuerySolutionNode* ShardingFilterNode::clone() const {
 // DistinctNode
 //
 
-void DistinctNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void DistinctNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "DISTINCT\n";
     addIndent(ss, indent + 1);
@@ -1162,7 +1162,7 @@ void DistinctNode::computeProperties() {
 // CountScanNode
 //
 
-void CountScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void CountScanNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "COUNT\n";
     addIndent(ss, indent + 1);
@@ -1192,7 +1192,7 @@ QuerySolutionNode* CountScanNode::clone() const {
 // EnsureSortedNode
 //
 
-void EnsureSortedNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void EnsureSortedNode::appendToString(merizoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "ENSURE_SORTED\n";
     addIndent(ss, indent + 1);
@@ -1212,4 +1212,4 @@ QuerySolutionNode* EnsureSortedNode::clone() const {
     return copy;
 }
 
-}  // namespace mongo
+}  // namespace merizo

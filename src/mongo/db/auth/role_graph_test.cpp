@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,13 +33,13 @@
 
 #include <algorithm>
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/db/auth/role_graph.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/sequence_util.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/db/auth/role_graph.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/sequence_util.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 TEST(RoleParsingTest, BuildRoleBSON) {
@@ -206,7 +206,7 @@ TEST(RoleGraphTest, AddRemoveRoles) {
     } else if (cur == roleC) {
         ASSERT_EQUALS(it.next().getFullName(), roleB.getFullName());
     } else {
-        FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        FAIL(merizoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
     }
     ASSERT_FALSE(it.more());
 
@@ -226,7 +226,7 @@ TEST(RoleGraphTest, AddRemoveRoles) {
         } else if (cur == roleD) {
             hasD = true;
         } else {
-            FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+            FAIL(merizoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
         }
     }
     ASSERT_EQUALS(3, num);
@@ -241,7 +241,7 @@ TEST(RoleGraphTest, AddRemoveRoles) {
     } else if (cur == roleD) {
         ASSERT_EQUALS(it.next().getFullName(), roleC.getFullName());
     } else {
-        FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        FAIL(merizoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
     }
     ASSERT_FALSE(it.more());
 
@@ -262,7 +262,7 @@ TEST(RoleGraphTest, AddRemoveRoles) {
     } else if (cur == roleB) {
         ASSERT_EQUALS(it.next().getFullName(), roleA.getFullName());
     } else {
-        FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        FAIL(merizoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
     }
     ASSERT_FALSE(it.more());
 
@@ -959,4 +959,4 @@ TEST(RoleGraphTest, AddRoleFromDocumentWithRestricitonMerge) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -57,9 +57,9 @@ def download_pkg(link, pkg_format=''):
         subprocess.check_call(['curl', '--fail', '-L', '-o', filename, link],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as error:
-        print 'Unable to download MongoDB Compass, please check your internet' \
+        print 'Unable to download MerizoDB Compass, please check your internet' \
             ' connection. If the issue persists go to' \
-            ' https://www.mongodb.com/download-center?jmp=hero#compass' \
+            ' https://www.merizodb.com/download-center?jmp=hero#compass' \
             ' to download the compass installer for your platform.'
 
     try:
@@ -96,18 +96,18 @@ def install_mac(dmg):
         # We don't really care about what errors come up here. Just log the failure
         # and use the finally to make sure we always unmount the dmg.
         except IOError:
-            print 'Unknown error copying MongoDB Compass to /Applications/'
+            print 'Unknown error copying MerizoDB Compass to /Applications/'
         finally:
             subprocess.check_call(
                 ['hdiutil', 'detach', tmp], stdout=fnull, stderr=fnull)
 
-        if path.isdir('/Applications/MongoDB Compass.app'):
+        if path.isdir('/Applications/MerizoDB Compass.app'):
             subprocess.check_call(
-                ['open', '/Applications/MongoDB Compass.app'])
+                ['open', '/Applications/MerizoDB Compass.app'])
             return
-        if path.isdir('/Applications/MongoDB Compass Community.app'):
+        if path.isdir('/Applications/MerizoDB Compass Community.app'):
             subprocess.check_call(
-                ['open', '/Applications/MongoDB Compass Community.app'])
+                ['open', '/Applications/MerizoDB Compass Community.app'])
             return
 
 
@@ -171,7 +171,7 @@ def download_and_install_compass():
 
     if os_type.startswith('linux') and not is_supported_distro():
         print 'You are using an unsupported Linux distribution.\n' \
-            'Please visit: https://compass.mongodb.com/community-supported-platforms' \
+            'Please visit: https://compass.merizodb.com/community-supported-platforms' \
             ' to view available community supported packages.'
         sys.exit(1)
 
@@ -181,11 +181,11 @@ def download_and_install_compass():
         sys.exit(1)
 
     if platform.machine() != 'x86_64':
-        print 'Sorry, MongoDB Compass is only supported on 64 bit platforms.' \
+        print 'Sorry, MerizoDB Compass is only supported on 64 bit platforms.' \
             ' If you believe you\'re seeing this message in error please open a' \
-            ' ticket on the SERVER project at https://jira.mongodb.org/'
+            ' ticket on the SERVER project at https://jira.merizodb.org/'
 
-    link = 'https://compass.mongodb.com/api/v2/download/latest/@compass_type@/stable/' + os_type
+    link = 'https://compass.merizodb.com/api/v2/download/latest/@compass_type@/stable/' + os_type
     print 'Downloading the package...'
     try:
         pkg = download_pkg(link, pkg_format=pkg_format)
@@ -194,7 +194,7 @@ def download_and_install_compass():
     # the user in the case we have a new failure case we didn't think about.
     except Exception:
         print 'Unkown error downloading compass. Please open a ticket on the' \
-            ' SERVER project at https://jira.mongodb.org/'
+            ' SERVER project at https://jira.merizodb.org/'
 
     print 'Installing the package...'
     try:
@@ -206,7 +206,7 @@ def download_and_install_compass():
             print 'Unrecognized os_type: %s' % os_type
     except Exception:
         print 'Unkown error downloading compass. Please open a ticket on the' \
-            ' SERVER project at https://jira.mongodb.org/'
+            ' SERVER project at https://jira.merizodb.org/'
 
     print 'Cleaning up...'
     os.remove(pkg)

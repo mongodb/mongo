@@ -1,10 +1,10 @@
 
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-package com.mongodb.embedded.capi.internal;
+package com.merizodb.embedded.capi.internal;
 
 import com.sun.jna.Callback;
 import com.sun.jna.Memory;
@@ -66,54 +66,54 @@ public class CAPI {
         }
     }
 
-    public static class mongo_embedded_v1_status extends PointerType {
+    public static class merizo_embedded_v1_status extends PointerType {
 
-        public mongo_embedded_v1_status() {
+        public merizo_embedded_v1_status() {
             super();
         }
 
-        public mongo_embedded_v1_status(Pointer address) {
+        public merizo_embedded_v1_status(Pointer address) {
             super(address);
         }
     }
 
-    public static class mongo_embedded_v1_lib extends PointerType {
-        public mongo_embedded_v1_lib() {
+    public static class merizo_embedded_v1_lib extends PointerType {
+        public merizo_embedded_v1_lib() {
             super();
         }
 
-        public mongo_embedded_v1_lib(Pointer address) {
+        public merizo_embedded_v1_lib(Pointer address) {
             super(address);
         }
     }
 
-    public static class mongo_embedded_v1_instance extends PointerType {
-        public mongo_embedded_v1_instance() {
+    public static class merizo_embedded_v1_instance extends PointerType {
+        public merizo_embedded_v1_instance() {
             super();
         }
 
-        public mongo_embedded_v1_instance(Pointer address) {
+        public merizo_embedded_v1_instance(Pointer address) {
             super(address);
         }
     }
 
-    public static class mongo_embedded_v1_client extends PointerType {
-        public mongo_embedded_v1_client() {
+    public static class merizo_embedded_v1_client extends PointerType {
+        public merizo_embedded_v1_client() {
             super();
         }
 
-        public mongo_embedded_v1_client(Pointer address) {
+        public merizo_embedded_v1_client(Pointer address) {
             super(address);
         }
     }
 
-    public static class mongo_embedded_v1_init_params extends Structure {
+    public static class merizo_embedded_v1_init_params extends Structure {
         public cstring yaml_config;
         public long log_flags;
-        public mongo_embedded_v1_log_callback log_callback;
+        public merizo_embedded_v1_log_callback log_callback;
         public Pointer log_user_data;
 
-        public mongo_embedded_v1_init_params() {
+        public merizo_embedded_v1_init_params() {
             super();
         }
 
@@ -122,46 +122,46 @@ public class CAPI {
                     "log_user_data");
         }
 
-        public static class ByReference extends mongo_embedded_v1_init_params
+        public static class ByReference extends merizo_embedded_v1_init_params
                 implements Structure.ByReference {
         }
     }
 
-    public interface mongo_embedded_v1_log_callback extends Callback {
+    public interface merizo_embedded_v1_log_callback extends Callback {
         void log(Pointer user_data, cstring message, cstring component, cstring context, int severity);
     }
 
-    public static native mongo_embedded_v1_status mongo_embedded_v1_status_create();
+    public static native merizo_embedded_v1_status merizo_embedded_v1_status_create();
 
-    public static native void mongo_embedded_v1_status_destroy(mongo_embedded_v1_status status);
+    public static native void merizo_embedded_v1_status_destroy(merizo_embedded_v1_status status);
 
-    public static native int mongo_embedded_v1_status_get_error(mongo_embedded_v1_status status);
+    public static native int merizo_embedded_v1_status_get_error(merizo_embedded_v1_status status);
 
-    public static native cstring mongo_embedded_v1_status_get_explanation(mongo_embedded_v1_status status);
+    public static native cstring merizo_embedded_v1_status_get_explanation(merizo_embedded_v1_status status);
 
-    public static native int mongo_embedded_v1_status_get_code(mongo_embedded_v1_status status);
+    public static native int merizo_embedded_v1_status_get_code(merizo_embedded_v1_status status);
 
-    public static native mongo_embedded_v1_lib mongo_embedded_v1_lib_init(mongo_embedded_v1_init_params.ByReference init_params,
-                                                                          mongo_embedded_v1_status status);
+    public static native merizo_embedded_v1_lib merizo_embedded_v1_lib_init(merizo_embedded_v1_init_params.ByReference init_params,
+                                                                          merizo_embedded_v1_status status);
 
-    public static native int mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib lib, mongo_embedded_v1_status status);
+    public static native int merizo_embedded_v1_lib_fini(merizo_embedded_v1_lib lib, merizo_embedded_v1_status status);
 
-    public static native mongo_embedded_v1_instance mongo_embedded_v1_instance_create(mongo_embedded_v1_lib lib, cstring yaml_config,
-                                                                                      mongo_embedded_v1_status status);
+    public static native merizo_embedded_v1_instance merizo_embedded_v1_instance_create(merizo_embedded_v1_lib lib, cstring yaml_config,
+                                                                                      merizo_embedded_v1_status status);
 
-    public static native int mongo_embedded_v1_instance_destroy(mongo_embedded_v1_instance instance, mongo_embedded_v1_status status);
+    public static native int merizo_embedded_v1_instance_destroy(merizo_embedded_v1_instance instance, merizo_embedded_v1_status status);
 
-    public static native mongo_embedded_v1_client mongo_embedded_v1_client_create(mongo_embedded_v1_instance instance,
-                                                                                  mongo_embedded_v1_status status);
+    public static native merizo_embedded_v1_client merizo_embedded_v1_client_create(merizo_embedded_v1_instance instance,
+                                                                                  merizo_embedded_v1_status status);
 
-    public static native int mongo_embedded_v1_client_destroy(mongo_embedded_v1_client client, mongo_embedded_v1_status status);
+    public static native int merizo_embedded_v1_client_destroy(merizo_embedded_v1_client client, merizo_embedded_v1_status status);
 
-    public static native int mongo_embedded_v1_client_invoke(mongo_embedded_v1_client client, Pointer input, NativeLong size,
+    public static native int merizo_embedded_v1_client_invoke(merizo_embedded_v1_client client, Pointer input, NativeLong size,
                                                              PointerByReference output, NativeLongByReference output_size,
-                                                             mongo_embedded_v1_status status);
+                                                             merizo_embedded_v1_status status);
 
     static {
-        Native.register(CAPI.class, "mongo_embedded");
+        Native.register(CAPI.class, "merizo_embedded");
     }
 
 }

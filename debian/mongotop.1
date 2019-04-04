@@ -1,8 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOTOP" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
+.TH "MONGOTOP" "1" "Jun 21, 2018" "4.0" "merizodb-manual"
 .SH NAME
-mongotop \- MongoDB Activity Monitor
+merizotop \- MerizoDB Activity Monitor
 .
 .nr rst2man-indent-level 0
 .
@@ -48,25 +48,25 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP "Mac OSX Sierra and Go 1.6 Incompatibility"
 .sp
 Users running on Mac OSX Sierra require the 3.2.10 or newer version
-of  mongotop\&.
+of  merizotop\&.
 .UNINDENT
 .UNINDENT
 .SH SYNOPSIS
 .sp
-\fI\%mongotop\fP provides a method to track the amount of time a
-MongoDB instance spends reading and writing data. \fI\%mongotop\fP
+\fI\%merizotop\fP provides a method to track the amount of time a
+MerizoDB instance spends reading and writing data. \fI\%merizotop\fP
 provides statistics on a per\-collection level. By default,
-\fI\%mongotop\fP returns values every second.
+\fI\%merizotop\fP returns values every second.
 .sp
-Run \fI\%mongotop\fP from the system command line, not the \fBmongo\fP shell.
+Run \fI\%merizotop\fP from the system command line, not the \fBmerizo\fP shell.
 .sp
 \fBSEE ALSO:\fP
 .INDENT 0.0
 .INDENT 3.5
-For more information about monitoring MongoDB, see
+For more information about monitoring MerizoDB, see
 /administration/monitoring\&.
 .sp
-For additional background on various other MongoDB status outputs
+For additional background on various other MerizoDB status outputs
 see:
 .INDENT 0.0
 .IP \(bu 2
@@ -79,13 +79,13 @@ see:
 /reference/command/collStats
 .UNINDENT
 .sp
-For an additional utility that provides MongoDB metrics
-see mongostat\&.
+For an additional utility that provides MerizoDB metrics
+see merizostat\&.
 .UNINDENT
 .UNINDENT
 .SH REQUIRED ACCESS
 .sp
-In order to connect to a \fBmongod\fP that enforces authorization
+In order to connect to a \fBmerizod\fP that enforces authorization
 with the \fB\-\-auth\fP option, you must use the
 \fI\%\-\-username\fP and \fI\%\-\-password\fP options, and the connecting user must
 have the \fBserverStatus\fP and \fBtop\fP privileges.
@@ -95,12 +95,12 @@ The most appropriate built\-in role that has these privileges is
 .SH OPTIONS
 .INDENT 0.0
 .TP
-.B mongotop
+.B merizotop
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-help
-Returns information on the options and use of \fBmongotop\fP\&.
+Returns information on the options and use of \fBmerizotop\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -112,7 +112,7 @@ including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .INDENT 0.0
 .TP
 .B \-\-quiet
-Runs \fBmongotop\fP in a quiet mode that attempts to limit the amount
+Runs \fBmerizotop\fP in a quiet mode that attempts to limit the amount
 of output.
 .sp
 This option suppresses:
@@ -130,7 +130,7 @@ connection closed events
 .INDENT 0.0
 .TP
 .B \-\-version
-Returns the \fBmongotop\fP release number.
+Returns the \fBmerizotop\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -139,7 +139,7 @@ New in version 3.4.6.
 
 .sp
 Specify a resolvable URI
-connection string for the \fBmongod\fP to which to
+connection string for the \fBmerizod\fP to which to
 connect.
 .sp
 The following is the standard
@@ -149,7 +149,7 @@ URI connection scheme:
 .sp
 .nf
 .ft C
-mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
+merizodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
 .ft P
 .fi
 .UNINDENT
@@ -163,7 +163,7 @@ documentation.
 \fBIMPORTANT:\fP
 .INDENT 7.0
 .INDENT 3.5
-The following \fI\%mongotop\fP options are incompatible with the
+The following \fI\%merizotop\fP options are incompatible with the
 \fB\-\-uri\fP option. Instead, specify these options as part of your
 \fB\-\-uri\fP connection string when applicable:
 .INDENT 0.0
@@ -191,8 +191,8 @@ URI connection string)
 .B \-\-host <hostname><:port>, \-h <hostname><:port>
 \fIDefault\fP: localhost:27017
 .sp
-Specifies a resolvable hostname for the \fBmongod\fP to which to
-connect. By default, the \fBmongotop\fP attempts to connect to a MongoDB
+Specifies a resolvable hostname for the \fBmerizod\fP to which to
+connect. By default, the \fBmerizotop\fP attempts to connect to a MerizoDB
 instance running on the localhost on port number \fB27017\fP\&.
 .sp
 To connect to a replica set, specify the
@@ -209,7 +209,7 @@ the following:
 .UNINDENT
 .UNINDENT
 .sp
-You can always connect directly to a single MongoDB instance by
+You can always connect directly to a single MerizoDB instance by
 specifying the host and port number directly.
 .sp
 Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
@@ -218,14 +218,14 @@ brackets (e.g. \fB[<address>]\fP).
 
 .sp
 If connected to a replica set where the primary is not
-reachable, \fBmongotop\fP returns an error message.
+reachable, \fBmerizotop\fP returns an error message.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-port <port>
 \fIDefault\fP: 27017
 .sp
-Specifies the TCP port on which the MongoDB instance listens for
+Specifies the TCP port on which the MerizoDB instance listens for
 client connections.
 .UNINDENT
 .INDENT 0.0
@@ -233,9 +233,9 @@ client connections.
 .B \-\-ipv6
 \fIRemoved in version 3.0.\fP
 .sp
-Enables IPv6 support and allows \fBmongotop\fP to connect to the
-MongoDB instance using an IPv6 network. Prior to MongoDB 3.0, you
-had to specify \fI\%\-\-ipv6\fP to use IPv6. In MongoDB 3.0 and later, IPv6
+Enables IPv6 support and allows \fBmerizotop\fP to connect to the
+MerizoDB instance using an IPv6 network. Prior to MerizoDB 3.0, you
+had to specify \fI\%\-\-ipv6\fP to use IPv6. In MerizoDB 3.0 and later, IPv6
 is always enabled.
 .UNINDENT
 .INDENT 0.0
@@ -244,10 +244,10 @@ is always enabled.
 New in version 2.6.
 
 .sp
-Enables connection to a \fBmongod\fP or \fBmongos\fP that has
+Enables connection to a \fBmerizod\fP or \fBmerizos\fP that has
 TLS/SSL support enabled.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -273,18 +273,18 @@ must be specified.
 .INDENT 7.0
 .INDENT 3.5
 \fBVersion 3.2 and earlier:\fP For TLS/SSL connections (\fB\-\-ssl\fP) to
-\fBmongod\fP and \fBmongos\fP, if the \fBmongotop\fP runs without the
-\fI\%\-\-sslCAFile\fP, \fBmongotop\fP will not attempt
+\fBmerizod\fP and \fBmerizos\fP, if the \fBmerizotop\fP runs without the
+\fI\%\-\-sslCAFile\fP, \fBmerizotop\fP will not attempt
 to validate the server certificates. This creates a vulnerability
-to expired \fBmongod\fP and \fBmongos\fP certificates as
-well as to foreign processes posing as valid \fBmongod\fP or
-\fBmongos\fP instances. Ensure that you \fIalways\fP specify the
+to expired \fBmerizod\fP and \fBmerizos\fP certificates as
+well as to foreign processes posing as valid \fBmerizod\fP or
+\fBmerizos\fP instances. Ensure that you \fIalways\fP specify the
 CA file to validate the server certificates in cases where
 intrusion is a possibility.
 .UNINDENT
 .UNINDENT
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -299,11 +299,11 @@ and key. Specify the file name of the \fB\&.pem\fP file using relative
 or absolute paths.
 .sp
 This option is required when using the \fI\%\-\-ssl\fP option to connect
-to a \fBmongod\fP or \fBmongos\fP that has
+to a \fBmerizod\fP or \fBmerizos\fP that has
 \fBCAFile\fP enabled \fIwithout\fP
 \fBallowConnectionsWithoutCertificates\fP\&.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -315,14 +315,14 @@ New in version 2.6.
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
 \fI\%\-\-sslPEMKeyFile\fP). Use the \fI\%\-\-sslPEMKeyPassword\fP option only if the
-certificate\-key file is encrypted. In all cases, the \fBmongotop\fP will
+certificate\-key file is encrypted. In all cases, the \fBmerizotop\fP will
 redact the password from all logging and reporting output.
 .sp
 If the private key in the PEM file is encrypted and you do not specify
-the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongotop\fP will prompt for a passphrase. See
+the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmerizotop\fP will prompt for a passphrase. See
 ssl\-certificate\-password\&.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -336,7 +336,7 @@ Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -348,10 +348,10 @@ New in version 2.6.
 .sp
 Bypasses the validation checks for server certificates and allows
 the use of invalid certificates. When using the
-\fBallowInvalidCertificates\fP setting, MongoDB logs as a
+\fBallowInvalidCertificates\fP setting, MerizoDB logs as a
 warning the use of the invalid certificate.
 .sp
-Starting in MongoDB 4.0, if you specify
+Starting in MerizoDB 4.0, if you specify
 \fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
 true\fP when using x.509 authentication, an invalid certificate is
 only sufficient to establish a TLS/SSL connection but is
@@ -360,25 +360,25 @@ only sufficient to establish a TLS/SSL connection but is
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
-For TLS/SSL connections to \fBmongod\fP and
-\fBmongos\fP, avoid using
+For TLS/SSL connections to \fBmerizod\fP and
+\fBmerizos\fP, avoid using
 \fB\-\-sslAllowInvalidCertificates\fP if possible and only use
 \fB\-\-sslAllowInvalidCertificates\fP on systems where intrusion is
 not possible.
 .sp
-If the \fBmongo\fP shell (and other
-mongodb\-tools\-support\-ssl) runs with the
+If the \fBmerizo\fP shell (and other
+merizodb\-tools\-support\-ssl) runs with the
 \fB\-\-sslAllowInvalidCertificates\fP option, the
-\fBmongo\fP shell (and other
-mongodb\-tools\-support\-ssl) will not attempt to validate
+\fBmerizo\fP shell (and other
+merizodb\-tools\-support\-ssl) will not attempt to validate
 the server certificates. This creates a vulnerability to expired
-\fBmongod\fP and \fBmongos\fP certificates as
+\fBmerizod\fP and \fBmerizos\fP certificates as
 well as to foreign processes posing as valid
-\fBmongod\fP or \fBmongos\fP instances.
+\fBmerizod\fP or \fBmerizos\fP instances.
 .UNINDENT
 .UNINDENT
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -389,10 +389,10 @@ New in version 3.0.
 
 .sp
 Disables the validation of the hostnames in TLS/SSL certificates. Allows
-\fBmongotop\fP to connect to MongoDB instances even if the hostname in their
+\fBmerizotop\fP to connect to MerizoDB instances even if the hostname in their
 certificates do not match the specified hostname.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -402,7 +402,7 @@ For more information about TLS/SSL and MongoDB, see
 New in version 2.6.
 
 .sp
-Directs the \fBmongotop\fP to use the FIPS mode of the installed OpenSSL
+Directs the \fBmerizotop\fP to use the FIPS mode of the installed OpenSSL
 library. Your system must have a FIPS compliant OpenSSL library to use
 the \fI\%\-\-sslFIPSMode\fP option.
 .sp
@@ -410,7 +410,7 @@ the \fI\%\-\-sslFIPSMode\fP option.
 .INDENT 7.0
 .INDENT 3.5
 FIPS\-compatible TLS/SSL is
-available only in \fI\%MongoDB Enterprise\fP\&. See
+available only in \fI\%MerizoDB Enterprise\fP\&. See
 /tutorial/configure\-fips for more information.
 .UNINDENT
 .UNINDENT
@@ -418,22 +418,22 @@ available only in \fI\%MongoDB Enterprise\fP\&. See
 .INDENT 0.0
 .TP
 .B \-\-username <username>, \-u <username>
-Specifies a username with which to authenticate to a MongoDB database
+Specifies a username with which to authenticate to a MerizoDB database
 that uses authentication. Use in conjunction with the \fB\-\-password\fP and
 \fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-password <password>, \-p <password>
-Specifies a password with which to authenticate to a MongoDB database
+Specifies a password with which to authenticate to a MerizoDB database
 that uses authentication. Use in conjunction with the \fB\-\-username\fP and
 \fB\-\-authenticationDatabase\fP options.
 .sp
-Changed in version 3.0.0: If you do not specify an argument for \fI\%\-\-password\fP, \fBmongotop\fP returns
+Changed in version 3.0.0: If you do not specify an argument for \fI\%\-\-password\fP, \fBmerizotop\fP returns
 an error.
 
 .sp
-Changed in version 3.0.2: If you wish \fBmongotop\fP to prompt the user
+Changed in version 3.0.2: If you wish \fBmerizotop\fP to prompt the user
 for the password, pass the \fI\%\-\-username\fP option without
 \fI\%\-\-password\fP or specify an empty string as the \fI\%\-\-password\fP value,
 as in \fB\-\-password ""\fP .
@@ -445,8 +445,8 @@ as in \fB\-\-password ""\fP .
 Specifies the database in which the user is created.
 See user\-authentication\-database\&.
 .sp
-Changed in version 3.0.0: \fI\%\-\-authenticationDatabase\fP is required for \fBmongod\fP
-and \fBmongos\fP instances that use authentication\&.
+Changed in version 3.0.0: \fI\%\-\-authenticationDatabase\fP is required for \fBmerizod\fP
+and \fBmerizos\fP instances that use authentication\&.
 
 .UNINDENT
 .INDENT 0.0
@@ -454,13 +454,13 @@ and \fBmongos\fP instances that use authentication\&.
 .B \-\-authenticationMechanism <name>
 \fIDefault\fP: SCRAM\-SHA\-1
 .sp
-Specifies the authentication mechanism the \fBmongotop\fP instance uses to
-authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+Specifies the authentication mechanism the \fBmerizotop\fP instance uses to
+authenticate to the \fBmerizod\fP or \fBmerizos\fP\&.
 .sp
-Changed in version 4.0: MongoDB removes support for the deprecated MongoDB
+Changed in version 4.0: MerizoDB removes support for the deprecated MerizoDB
 Challenge\-Response (\fBMONGODB\-CR\fP) authentication mechanism.
 .sp
-MongoDB adds support for SCRAM mechanism using the SHA\-256 hash
+MerizoDB adds support for SCRAM mechanism using the SHA\-256 hash
 function (\fBSCRAM\-SHA\-256\fP).
 
 .TS
@@ -496,14 +496,14 @@ _
 T{
 MONGODB\-X509
 T}	T{
-MongoDB TLS/SSL certificate authentication.
+MerizoDB TLS/SSL certificate authentication.
 T}
 _
 T{
 GSSAPI (Kerberos)
 T}	T{
 External authentication using Kerberos. This mechanism is
-available only in \fI\%MongoDB Enterprise\fP\&.
+available only in \fI\%MerizoDB Enterprise\fP\&.
 T}
 _
 T{
@@ -512,7 +512,7 @@ T}	T{
 External authentication using LDAP. You can also use \fBPLAIN\fP
 for authenticating in\-database users. \fBPLAIN\fP transmits
 passwords in plain text. This mechanism is available only in
-\fI\%MongoDB Enterprise\fP\&.
+\fI\%MerizoDB Enterprise\fP\&.
 T}
 _
 .TE
@@ -524,9 +524,9 @@ New in version 2.6.
 
 .sp
 Specify the name of the service using GSSAPI/Kerberos\&. Only required if the service does not use the
-default name of \fBmongodb\fP\&.
+default name of \fBmerizodb\fP\&.
 .sp
-This option is available only in MongoDB Enterprise.
+This option is available only in MerizoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -537,22 +537,22 @@ New in version 2.6.
 Specify the hostname of a service using GSSAPI/Kerberos\&. \fIOnly\fP required if the hostname of a machine does
 not match the hostname resolved by DNS.
 .sp
-This option is available only in MongoDB Enterprise.
+This option is available only in MerizoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-locks
-Toggles the mode of \fI\%mongotop\fP to report on use of per\-database
+Toggles the mode of \fI\%merizotop\fP to report on use of per\-database
 locks\&. This data is only available when connected to a
-MongoDB 2.6 or older instance.
+MerizoDB 2.6 or older instance.
 .sp
-\fI\%\-\-locks\fP returns an error when called against a \fBmongod\fP 3.0 or
+\fI\%\-\-locks\fP returns an error when called against a \fBmerizod\fP 3.0 or
 newer instance that does not report per\-database lock usage.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-rowcount int, \-n int
-Number of lines of data that \fBmongotop\fP should print. “0 for indefinite”
+Number of lines of data that \fBmerizotop\fP should print. “0 for indefinite”
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -560,83 +560,83 @@ Number of lines of data that \fBmongotop\fP should print. “0 for indefinite”
 New in version 3.0.0.
 
 .sp
-Returns output for \fBmongotop\fP in JSON format.
+Returns output for \fBmerizotop\fP in JSON format.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B <sleeptime>
 The final argument is the length of time, in seconds, that
-\fBmongotop\fP waits in between calls. By default \fBmongotop\fP returns
+\fBmerizotop\fP waits in between calls. By default \fBmerizotop\fP returns
 data every second.
 .UNINDENT
 .SH FIELDS
 .sp
-\fI\%mongotop\fP returns time values specified in milliseconds
+\fI\%merizotop\fP returns time values specified in milliseconds
 (ms.)
 .sp
-\fI\%mongotop\fP only reports active namespaces or databases,
+\fI\%merizotop\fP only reports active namespaces or databases,
 depending on the \fI\%\-\-locks\fP option. If you don’t see a database
 or collection, it has received no recent activity. You can issue a
-simple operation in the \fBmongo\fP shell to generate activity to
-affect the output of \fI\%mongotop\fP\&.
+simple operation in the \fBmerizo\fP shell to generate activity to
+affect the output of \fI\%merizotop\fP\&.
 .INDENT 0.0
 .TP
-.B mongotop.ns
+.B merizotop.ns
 Contains the database namespace, which combines the database name
 and collection.
 .sp
-If you use the \fI\%mongotop \-\-locks\fP, the \fI\%ns\fP
-field does not appear in the \fI\%mongotop\fP output.
+If you use the \fI\%merizotop \-\-locks\fP, the \fI\%ns\fP
+field does not appear in the \fI\%merizotop\fP output.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B mongotop.db
+.B merizotop.db
 Contains the name of the database. The database named \fB\&.\fP refers
 to the global lock, rather than a specific database.
 .sp
 This field does not appear unless you have invoked
-\fI\%mongotop\fP with the \fI\%\-\-locks\fP option.
+\fI\%merizotop\fP with the \fI\%\-\-locks\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B mongotop.total
-Provides the total amount of time that this \fBmongod\fP spent
+.B merizotop.total
+Provides the total amount of time that this \fBmerizod\fP spent
 operating on this namespace.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B mongotop.read
-Provides the amount of time that this \fBmongod\fP spent
+.B merizotop.read
+Provides the amount of time that this \fBmerizod\fP spent
 performing read operations on this namespace.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B mongotop.write
-Provides the amount of time that this \fBmongod\fP spent
+.B merizotop.write
+Provides the amount of time that this \fBmerizod\fP spent
 performing write operations on this namespace.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B mongotop.<timestamp>
+.B merizotop.<timestamp>
 Provides a time stamp for the returned data.
 .UNINDENT
 .SH USE
 .sp
-By default \fI\%mongotop\fP connects to the MongoDB instance
-running on the localhost port \fB27017\fP\&. However, \fI\%mongotop\fP can optionally
-connect to remote \fBmongod\fP
-instances. See the \fI\%mongotop options\fP for more
+By default \fI\%merizotop\fP connects to the MerizoDB instance
+running on the localhost port \fB27017\fP\&. However, \fI\%merizotop\fP can optionally
+connect to remote \fBmerizod\fP
+instances. See the \fI\%merizotop options\fP for more
 information.
 .sp
-To force \fI\%mongotop\fP to return less frequently specify a number, in
-seconds at the end of the command. In this example, \fI\%mongotop\fP will
+To force \fI\%merizotop\fP to return less frequently specify a number, in
+seconds at the end of the command. In this example, \fI\%merizotop\fP will
 return every 15 seconds.
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongotop 15
+merizotop 15
 .ft P
 .fi
 .UNINDENT
@@ -674,25 +674,25 @@ local.system.namespaces      0ms     0ms      0ms
 .UNINDENT
 .UNINDENT
 .sp
-The output varies depending on your MongoDB setup. For example,
+The output varies depending on your MerizoDB setup. For example,
 \fBlocal.system.indexes\fP and \fBlocal.system.namespaces\fP only appear
-for \fBmongod\fP instances using the MMAPv1
+for \fBmerizod\fP instances using the MMAPv1
 storage engine.
 .sp
-To return a \fI\%mongotop\fP report every 5 minutes, use the
+To return a \fI\%merizotop\fP report every 5 minutes, use the
 following command:
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongotop 300
+merizotop 300
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .SH AUTHOR
-MongoDB Documentation Project
+MerizoDB Documentation Project
 .SH COPYRIGHT
 2008-2018
 .\" Generated by docutils manpage writer.

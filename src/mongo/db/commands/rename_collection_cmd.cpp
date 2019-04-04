@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/rename_collection.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/rename_collection.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/rename_collection.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/ops/insert.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/service_context.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::min;
 using std::string;
@@ -151,4 +151,4 @@ public:
 } cmdrenamecollection;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

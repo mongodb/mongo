@@ -1,4 +1,4 @@
-"""Utility functions to create MongoDB processes.
+"""Utility functions to create MerizoDB processes.
 
 Handles all the nitty-gritty parameter conversion.
 """
@@ -15,8 +15,8 @@ from . import process
 from .. import config
 from .. import utils
 
-# The below parameters define the default 'logComponentVerbosity' object passed to mongod processes
-# started either directly via resmoke or those that will get started by the mongo shell. We allow
+# The below parameters define the default 'logComponentVerbosity' object passed to merizod processes
+# started either directly via resmoke or those that will get started by the merizo shell. We allow
 # this default to be different for tests run locally and tests run in Evergreen. This allows us, for
 # example, to keep log verbosity high in Evergreen test runs without polluting the logs for
 # developers running local tests.
@@ -49,23 +49,23 @@ def make_process(*args, **kwargs):
     return process_cls(*args, **kwargs)
 
 
-def default_mongod_log_component_verbosity():
-    """Return the default 'logComponentVerbosity' value to use for mongod processes."""
+def default_merizod_log_component_verbosity():
+    """Return the default 'logComponentVerbosity' value to use for merizod processes."""
     if config.EVERGREEN_TASK_ID:
         return DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY
     return DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY
 
 
-def default_mongos_log_component_verbosity():
-    """Return the default 'logComponentVerbosity' value to use for mongos processes."""
+def default_merizos_log_component_verbosity():
+    """Return the default 'logComponentVerbosity' value to use for merizos processes."""
     if config.EVERGREEN_TASK_ID:
         return DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY
     return DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY
 
 
-def mongod_program(  # pylint: disable=too-many-branches
+def merizod_program(  # pylint: disable=too-many-branches
         logger, executable=None, process_kwargs=None, **kwargs):
-    """Return a Process instance that starts mongod arguments constructed from 'kwargs'."""
+    """Return a Process instance that starts merizod arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOD_EXECUTABLE)
     args = [executable]
@@ -79,7 +79,7 @@ def mongod_program(  # pylint: disable=too-many-branches
 
     # Set default log verbosity levels if none were specified.
     if "logComponentVerbosity" not in suite_set_parameters:
-        suite_set_parameters["logComponentVerbosity"] = default_mongod_log_component_verbosity()
+        suite_set_parameters["logComponentVerbosity"] = default_merizod_log_component_verbosity()
 
     # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
     # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
@@ -169,8 +169,8 @@ def mongod_program(  # pylint: disable=too-many-branches
     return make_process(logger, args, **process_kwargs)
 
 
-def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
-    """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
+def merizos_program(logger, executable=None, process_kwargs=None, **kwargs):
+    """Return a Process instance that starts a merizos with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOS_EXECUTABLE)
     args = [executable]
@@ -184,7 +184,7 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
 
     # Set default log verbosity levels if none were specified.
     if "logComponentVerbosity" not in suite_set_parameters:
-        suite_set_parameters["logComponentVerbosity"] = default_mongos_log_component_verbosity()
+        suite_set_parameters["logComponentVerbosity"] = default_merizos_log_component_verbosity()
 
     _apply_set_parameters(args, suite_set_parameters)
 
@@ -197,10 +197,10 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     return make_process(logger, args, **process_kwargs)
 
 
-def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+def merizo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         logger, executable=None, connection_string=None, filename=None, process_kwargs=None,
         **kwargs):
-    """Return a Process instance that starts a mongo shell.
+    """Return a Process instance that starts a merizo shell.
 
     The shell is started with the given connection string and arguments constructed from 'kwargs'.
     """
@@ -240,34 +240,34 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
 
     global_vars["TestData"] = test_data
 
-    # Initialize setParameters for mongod and mongos, to be passed to the shell via TestData. Since
+    # Initialize setParameters for merizod and merizos, to be passed to the shell via TestData. Since
     # they are dictionaries, they will be converted to JavaScript objects when passed to the shell
     # by the _format_shell_vars() function.
-    mongod_set_parameters = test_data.get("setParameters", {}).copy()
-    mongos_set_parameters = test_data.get("setParametersMongos", {}).copy()
+    merizod_set_parameters = test_data.get("setParameters", {}).copy()
+    merizos_set_parameters = test_data.get("setParametersMongos", {}).copy()
 
-    # Propagate additional setParameters to mongod processes spawned by the mongo shell. Command
+    # Propagate additional setParameters to merizod processes spawned by the merizo shell. Command
     # line options to resmoke.py override the YAML configuration.
     if config.MONGOD_SET_PARAMETERS is not None:
-        mongod_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+        merizod_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
 
-    # Propagate additional setParameters to mongos processes spawned by the mongo shell. Command
+    # Propagate additional setParameters to merizos processes spawned by the merizo shell. Command
     # line options to resmoke.py override the YAML configuration.
     if config.MONGOS_SET_PARAMETERS is not None:
-        mongos_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+        merizos_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
 
-    # If the 'logComponentVerbosity' setParameter for mongod was not already specified, we set its
+    # If the 'logComponentVerbosity' setParameter for merizod was not already specified, we set its
     # value to a default.
-    mongod_set_parameters.setdefault("logComponentVerbosity",
-                                     default_mongod_log_component_verbosity())
+    merizod_set_parameters.setdefault("logComponentVerbosity",
+                                     default_merizod_log_component_verbosity())
 
-    # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
+    # If the 'logComponentVerbosity' setParameter for merizos was not already specified, we set its
     # value to a default.
-    mongos_set_parameters.setdefault("logComponentVerbosity",
-                                     default_mongos_log_component_verbosity())
+    merizos_set_parameters.setdefault("logComponentVerbosity",
+                                     default_merizos_log_component_verbosity())
 
-    test_data["setParameters"] = mongod_set_parameters
-    test_data["setParametersMongos"] = mongos_set_parameters
+    test_data["setParameters"] = merizod_set_parameters
+    test_data["setParametersMongos"] = merizos_set_parameters
 
     # There's a periodic background thread that checks for and aborts expired transactions.
     # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
@@ -281,7 +281,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
         eval_sb.append(str(kwargs.pop("eval_prepend")))
 
     # If nodb is specified, pass the connection string through TestData so it can be used inside the
-    # test, then delete it so it isn't given as an argument to the mongo shell.
+    # test, then delete it so it isn't given as an argument to the merizo shell.
     if "nodb" in kwargs and connection_string is not None:
         test_data["connectionString"] = connection_string
         connection_string = None
@@ -292,7 +292,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     if "eval" in kwargs:
         eval_sb.append(str(kwargs.pop("eval")))
 
-    # Load this file to allow a callback to validate collections before shutting down mongod.
+    # Load this file to allow a callback to validate collections before shutting down merizod.
     eval_sb.append("load('jstests/libs/override_methods/validate_collections_on_shutdown.js');")
 
     # Load a callback to check UUID consistency before shutting down a ShardingTest.
@@ -314,9 +314,9 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
         kwargs["writeMode"] = config.SHELL_WRITE_MODE
 
     if connection_string is not None:
-        # The --host and --port options are ignored by the mongo shell when an explicit connection
+        # The --host and --port options are ignored by the merizo shell when an explicit connection
         # string is specified. We remove these options to avoid any ambiguity with what server the
-        # logged mongo shell invocation will connect to.
+        # logged merizo shell invocation will connect to.
         if "port" in kwargs:
             kwargs.pop("port")
 
@@ -329,7 +329,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     if connection_string is not None:
         args.append(connection_string)
 
-    # Have the mongo shell run the specified file.
+    # Have the merizo shell run the specified file.
     if filename is not None:
         args.append(filename)
 
@@ -432,7 +432,7 @@ def _apply_kwargs(args, kwargs):
 def _set_keyfile_permissions(opts):
     """Change the permissions of keyfiles in 'opts' to 600, (only user can read and write the file).
 
-    This necessary to avoid having the mongod/mongos fail to start up
+    This necessary to avoid having the merizod/merizos fail to start up
     because "permissions on the keyfiles are too open".
 
     We can't permanently set the keyfile permissions because git is not

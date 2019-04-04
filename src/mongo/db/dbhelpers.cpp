@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/dbhelpers.h"
+#include "merizo/db/dbhelpers.h"
 
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/btree_access_method.h"
-#include "mongo/db/json.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/update_result.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/index/btree_access_method.h"
+#include "merizo/db/json.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/ops/delete.h"
+#include "merizo/db/ops/update.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/ops/update_result.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::set;
@@ -266,4 +266,4 @@ void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& ns
     deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }
 
-}  // namespace mongo
+}  // namespace merizo

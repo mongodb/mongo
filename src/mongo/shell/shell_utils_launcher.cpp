@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/shell/shell_utils_launcher.h"
+#include "merizo/shell/shell_utils_launcher.h"
 
 #include <algorithm>
 #include <array>
@@ -58,27 +58,27 @@
 #include <unistd.h>
 #endif
 
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/db/traffic_reader.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/shell/shell_options.h"
-#include "mongo/shell/shell_utils.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/destructor_guard.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/signal_win32.h"
-#include "mongo/util/stringutils.h"
-#include "mongo/util/text.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/db/traffic_reader.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/shell/shell_options.h"
+#include "merizo/shell/shell_utils.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/destructor_guard.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/signal_win32.h"
+#include "merizo/util/stringutils.h"
+#include "merizo/util/text.h"
 
 #ifndef _WIN32
 extern char** environ;
 #endif
 
-namespace mongo {
+namespace merizo {
 
 using std::cout;
 using std::endl;
@@ -241,7 +241,7 @@ void ProgramOutputMultiplexer::appendLine(int port,
                                           ProcessId pid,
                                           const std::string& name,
                                           const std::string& line) {
-    stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
+    stdx::lock_guard<stdx::mutex> lk(merizoProgramOutputMutex);
     boost::iostreams::tee_device<std::ostream, std::stringstream> teeDevice(cout, _buffer);
     boost::iostreams::stream<decltype(teeDevice)> teeStream(teeDevice);
     if (port > 0) {
@@ -252,12 +252,12 @@ void ProgramOutputMultiplexer::appendLine(int port,
 }
 
 string ProgramOutputMultiplexer::str() const {
-    stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
+    stdx::lock_guard<stdx::mutex> lk(merizoProgramOutputMutex);
     return _buffer.str();
 }
 
 void ProgramOutputMultiplexer::clear() {
-    stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
+    stdx::lock_guard<stdx::mutex> lk(merizoProgramOutputMutex);
     _buffer.str("");
 }
 
@@ -276,11 +276,11 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     _pipe = -1;
     _port = -1;
 
-    string prefix("mongod-");
-    bool isMongodProgram = isMongo && (string("mongod") == programName ||
+    string prefix("merizod-");
+    bool isMongodProgram = isMongo && (string("merizod") == programName ||
                                        programName.string().compare(0, prefix.size(), prefix) == 0);
-    prefix = "mongos-";
-    bool isMongosProgram = isMongo && (string("mongos") == programName ||
+    prefix = "merizos-";
+    bool isMongosProgram = isMongo && (string("merizos") == programName ||
                                        programName.string().compare(0, prefix.size(), prefix) == 0);
 
     if (!isMongo) {
@@ -289,7 +289,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
         _name = "d";
     } else if (isMongosProgram) {
         _name = "s";
-    } else if (programName == "mongobridge") {
+    } else if (programName == "merizobridge") {
         _name = "b";
     } else {
         _name = "sh";
@@ -309,7 +309,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
             ss << e.number();
             str = ss.str();
         } else {
-            verify(e.type() == mongo::String);
+            verify(e.type() == merizo::String);
             str = e.valuestr();
         }
         if (isMongo) {
@@ -327,7 +327,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     // Load explicitly set environment key value pairs into _envp.
     for (const BSONElement& e : env) {
         // Environment variable values must be strings
-        verify(e.type() == mongo::String);
+        verify(e.type() == merizo::String);
 
         _envp.emplace(std::string(e.fieldName()), std::string(e.valuestr()));
     }
@@ -368,7 +368,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     }
 #endif
     bool needsPort =
-        isMongo && (isMongodProgram || isMongosProgram || (programName == "mongobridge"));
+        isMongo && (isMongodProgram || isMongosProgram || (programName == "merizobridge"));
     if (!needsPort) {
         _port = -1;
     }
@@ -467,7 +467,7 @@ void ProgramRunner::operator()() {
     while (std::getline(fdStream, line)) {
         if (line.find('\0') != std::string::npos) {
             programOutputLogger.appendLine(
-                _port, _pid, _name, "WARNING: mongod wrote null bytes to output");
+                _port, _pid, _name, "WARNING: merizod wrote null bytes to output");
         }
         programOutputLogger.appendLine(_port, _pid, _name, line);
     }
@@ -481,7 +481,7 @@ boost::filesystem::path ProgramRunner::findProgram(const string& prog) {
 
 #ifdef _WIN32
     // The system programs either come versioned in the form of <utility>-<major.minor>
-    // (e.g., mongorestore-2.4) or just <utility>. For windows, the appropriate extension
+    // (e.g., merizorestore-2.4) or just <utility>. For windows, the appropriate extension
     // needs to be appended.
     //
 
@@ -871,7 +871,7 @@ void copyDir(const boost::filesystem::path& from, const boost::filesystem::path&
                 log() << "Skipping copying of file from '" << p.generic_string() << "' to '"
                       << (to / p.leaf()).generic_string() << "' due to: " << ec.message();
             }
-        } else if (p.leaf() != "mongod.lock" && p.leaf() != "WiredTiger.lock") {
+        } else if (p.leaf() != "merizod.lock" && p.leaf() != "WiredTiger.lock") {
             if (boost::filesystem::is_directory(p)) {
                 boost::filesystem::path newDir = to / p.leaf();
                 boost::filesystem::create_directory(newDir);
@@ -929,7 +929,7 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
             try {
                 DBClientConnection conn;
                 conn.connect(HostAndPort{"127.0.0.1:" + BSONObjBuilder::numStr(port)},
-                             "MongoDB Shell");
+                             "MerizoDB Shell");
 
                 BSONElement authObj = opt["auth"];
 
@@ -1046,7 +1046,7 @@ BSONObj StopMongoProgram(const BSONObj& a, void* data) {
     uassert(ErrorCodes::BadValue, "stopMongoProgram needs a number", a.firstElement().isNumber());
     int port = int(a.firstElement().number());
     int code = killDb(port, ProcessId::fromNative(0), getSignal(a), getStopMongodOpts(a));
-    log() << "shell: stopped mongo program on port " << port;
+    log() << "shell: stopped merizo program on port " << port;
     return BSON("" << (double)code);
 }
 
@@ -1057,7 +1057,7 @@ BSONObj StopMongoProgramByPid(const BSONObj& a, void* data) {
         ErrorCodes::BadValue, "stopMongoProgramByPid needs a number", a.firstElement().isNumber());
     ProcessId pid = ProcessId::fromNative(int(a.firstElement().number()));
     int code = killDb(0, pid, getSignal(a), getStopMongodOpts(a));
-    log() << "shell: stopped mongo program with pid " << pid;
+    log() << "shell: stopped merizo program with pid " << pid;
     return BSON("" << (double)code);
 }
 
@@ -1087,8 +1087,8 @@ int KillMongoProgramInstances() {
 std::vector<ProcessId> getRunningMongoChildProcessIds() {
     std::vector<ProcessId> registeredPids, outPids;
     registry.getRegisteredPids(registeredPids);
-    // Only return processes that are still alive. A client may have started a program using a mongo
-    // helper but terminated another way. E.g. if a mongod is started with MongoRunner.startMongod
+    // Only return processes that are still alive. A client may have started a program using a merizo
+    // helper but terminated another way. E.g. if a merizod is started with MongoRunner.startMongod
     // but exited with db.shutdownServer.
     std::copy_if(registeredPids.begin(),
                  registeredPids.end(),
@@ -1123,4 +1123,4 @@ void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("convertTrafficRecordingToBSON", ConvertTrafficRecordingToBSON);
 }
 }  // namespace shell_utils
-}  // namespace mongo
+}  // namespace merizo

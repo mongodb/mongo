@@ -3,7 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/noPassthrough/*.js
-  - src/mongo/db/modules/*/jstests/hot_backups/*.js
+  - src/merizo/db/modules/*/jstests/hot_backups/*.js
 
   # Self-tests for the Concurrency testing framework are run as part of this test suite.
   - jstests/concurrency/*.js
@@ -11,7 +11,7 @@ selector:
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
 
-# noPassthrough tests start their own mongod's.
+# noPassthrough tests start their own merizod's.
 executor:
   archive:
     tests:

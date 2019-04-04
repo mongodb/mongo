@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kConnectionPool
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kConnectionPool
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/executor/connection_pool.h"
+#include "merizo/executor/connection_pool.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
-#include "mongo/util/log.h"
-#include "mongo/util/lru_cache.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/executor/connection_pool_stats.h"
+#include "merizo/executor/remote_command_request.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/destructor_guard.h"
+#include "merizo/util/log.h"
+#include "merizo/util/lru_cache.h"
+#include "merizo/util/scopeguard.h"
 
 // One interesting implementation note herein concerns how setup() and
 // refresh() are invoked outside of the global lock, but setTimeout is not.
@@ -50,7 +50,7 @@
 // value. In practice, dumping the locks is always safe (because we restrict
 // ourselves to operations over the connection).
 
-namespace mongo {
+namespace merizo {
 namespace executor {
 
 void ConnectionPool::ConnectionInterface::indicateUsed() {
@@ -993,4 +993,4 @@ void ConnectionPool::SpecificPool::updateStateInLock() {
 }
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace merizo

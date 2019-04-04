@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 // Always notifies prepare conflict waiters when a transaction commits or aborts, even when the
@@ -836,4 +836,4 @@ bool WiredTigerRecoveryUnit::_isCommittingOrAborting() const {
     return State::kCommitting == _state || State::kAborting == _state;
 }
 
-}  // namespace mongo
+}  // namespace merizo

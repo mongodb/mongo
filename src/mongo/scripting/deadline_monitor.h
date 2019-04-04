@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,16 +30,16 @@
 
 #include <cstdint>
 
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/time_support.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 // Returns the current interrupt interval from the setParameter value
 int getScriptingEngineInterruptInterval();
@@ -78,7 +78,7 @@ public:
         // of this instance must be initialized before the thread is created.  As a result, we
         // should not create the thread in the initializer list.  Creating it there leaves us
         // vulnerable to errors introduced by rearranging the order of fields in the class.
-        _monitorThread = stdx::thread(&mongo::DeadlineMonitor<_Task>::deadlineMonitorThread, this);
+        _monitorThread = stdx::thread(&merizo::DeadlineMonitor<_Task>::deadlineMonitorThread, this);
     }
 
     ~DeadlineMonitor() {
@@ -195,4 +195,4 @@ private:
     bool _inShutdown = false;
 };
 
-}  // namespace mongo
+}  // namespace merizo

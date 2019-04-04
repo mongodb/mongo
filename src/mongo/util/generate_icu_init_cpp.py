@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -50,11 +50,11 @@ def generate_cpp_file(data_file_path, cpp_file_path):
     source_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 // See generate_icu_init_cpp.py.
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -63,7 +63,7 @@ def generate_cpp_file(data_file_path, cpp_file_path):
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -78,14 +78,14 @@ def generate_cpp_file(data_file_path, cpp_file_path):
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <unicode/udata.h>
 
-#include "mongo/base/init.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/base/init.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 // alignas() is used here to ensure 16-alignment of ICU data.  See the following excerpt from the
@@ -109,7 +109,7 @@ MONGO_INITIALIZER_GENERAL(LoadICUData, MONGO_NO_PREREQUISITES, ("BeginStartupOpt
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo
 '''
     decimal_encoded_data = ''
     with open(data_file_path, 'rb') as data_file:

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/field_parser.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/merge_chunk_request_type.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/field_parser.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/s/shard_filtering_metadata_refresh.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/s/catalog/type_chunk.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/request_types/merge_chunk_request_type.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 bool checkMetadataForSuccess(OperationContext* opCtx,
@@ -351,4 +351,4 @@ BSONField<std::vector<BSONObj>> MergeChunksCommand::boundsField("bounds");
 BSONField<OID> MergeChunksCommand::epochField("epoch");
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

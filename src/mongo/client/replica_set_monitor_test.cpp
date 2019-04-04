@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_internal.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/client/replica_set_monitor_internal.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::set;
@@ -79,7 +79,7 @@ TEST(ReplicaSetMonitor, InitialState) {
 }
 
 TEST(ReplicaSetMonitor, InitialStateMongoURI) {
-    auto uri = MongoURI::parse("mongodb://a,b,c/?replicaSet=name");
+    auto uri = MongoURI::parse("merizodb://a,b,c/?replicaSet=name");
     ASSERT_OK(uri.getStatus());
     SetStatePtr state = std::make_shared<SetState>(uri.getValue());
     ASSERT_EQUALS(state->name, "name");
@@ -97,8 +97,8 @@ TEST(ReplicaSetMonitor, InitialStateMongoURI) {
 }
 
 TEST(ReplicaSetMonitor, IsMasterBadParse) {
-    BSONObj ismaster = BSON("hosts" << BSON_ARRAY("mongo.example:badport"));
-    IsMasterReply imr(HostAndPort("mongo.example:27017"), -1, ismaster);
+    BSONObj ismaster = BSON("hosts" << BSON_ARRAY("merizo.example:badport"));
+    IsMasterReply imr(HostAndPort("merizo.example:27017"), -1, ismaster);
     ASSERT_EQUALS(imr.ok, false);
 }
 
@@ -115,7 +115,7 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSNotInitiated) {
                    << "maxWriteBatchSize"
                    << 1000
                    << "localTime"
-                   << mongo::jsTime()
+                   << merizo::jsTime()
                    << "maxWireVersion"
                    << 2
                    << "minWireVersion"
@@ -149,11 +149,11 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSPrimary) {
                             << "secondary"
                             << false
                             << "hosts"
-                            << BSON_ARRAY("mongo.example:3000")
+                            << BSON_ARRAY("merizo.example:3000")
                             << "primary"
-                            << "mongo.example:3000"
+                            << "merizo.example:3000"
                             << "me"
-                            << "mongo.example:3000"
+                            << "merizo.example:3000"
                             << "maxBsonObjectSize"
                             << 16777216
                             << "maxMessageSizeBytes"
@@ -161,7 +161,7 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSPrimary) {
                             << "maxWriteBatchSize"
                             << 1000
                             << "localTime"
-                            << mongo::jsTime()
+                            << merizo::jsTime()
                             << "maxWireVersion"
                             << 2
                             << "minWireVersion"
@@ -169,18 +169,18 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSPrimary) {
                             << "ok"
                             << 1);
 
-    IsMasterReply imr(HostAndPort("mongo.example:3000"), -1, ismaster);
+    IsMasterReply imr(HostAndPort("merizo.example:3000"), -1, ismaster);
 
     ASSERT_EQUALS(imr.ok, true);
-    ASSERT_EQUALS(imr.host.toString(), HostAndPort("mongo.example:3000").toString());
+    ASSERT_EQUALS(imr.host.toString(), HostAndPort("merizo.example:3000").toString());
     ASSERT_EQUALS(imr.setName, "test");
     ASSERT_EQUALS(imr.configVersion, 1);
     ASSERT_EQUALS(imr.electionId, OID("7fffffff0000000000000001"));
     ASSERT_EQUALS(imr.hidden, false);
     ASSERT_EQUALS(imr.secondary, false);
     ASSERT_EQUALS(imr.isMaster, true);
-    ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
+    ASSERT_EQUALS(imr.primary.toString(), HostAndPort("merizo.example:3000").toString());
+    ASSERT(imr.normalHosts.count(HostAndPort("merizo.example:3000")));
     ASSERT(imr.tags.isEmpty());
 }
 
@@ -196,15 +196,15 @@ TEST(ReplicaSetMonitor, IsMasterReplyPassiveSecondary) {
                             << "secondary"
                             << true
                             << "hosts"
-                            << BSON_ARRAY("mongo.example:3000")
+                            << BSON_ARRAY("merizo.example:3000")
                             << "passives"
-                            << BSON_ARRAY("mongo.example:3001")
+                            << BSON_ARRAY("merizo.example:3001")
                             << "primary"
-                            << "mongo.example:3000"
+                            << "merizo.example:3000"
                             << "passive"
                             << true
                             << "me"
-                            << "mongo.example:3001"
+                            << "merizo.example:3001"
                             << "maxBsonObjectSize"
                             << 16777216
                             << "maxMessageSizeBytes"
@@ -212,7 +212,7 @@ TEST(ReplicaSetMonitor, IsMasterReplyPassiveSecondary) {
                             << "maxWriteBatchSize"
                             << 1000
                             << "localTime"
-                            << mongo::jsTime()
+                            << merizo::jsTime()
                             << "maxWireVersion"
                             << 2
                             << "minWireVersion"
@@ -220,18 +220,18 @@ TEST(ReplicaSetMonitor, IsMasterReplyPassiveSecondary) {
                             << "ok"
                             << 1);
 
-    IsMasterReply imr(HostAndPort("mongo.example:3001"), -1, ismaster);
+    IsMasterReply imr(HostAndPort("merizo.example:3001"), -1, ismaster);
 
     ASSERT_EQUALS(imr.ok, true);
-    ASSERT_EQUALS(imr.host.toString(), HostAndPort("mongo.example:3001").toString());
+    ASSERT_EQUALS(imr.host.toString(), HostAndPort("merizo.example:3001").toString());
     ASSERT_EQUALS(imr.setName, "test");
     ASSERT_EQUALS(imr.configVersion, 2);
     ASSERT_EQUALS(imr.hidden, false);
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
-    ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3001")));
+    ASSERT_EQUALS(imr.primary.toString(), HostAndPort("merizo.example:3000").toString());
+    ASSERT(imr.normalHosts.count(HostAndPort("merizo.example:3000")));
+    ASSERT(imr.normalHosts.count(HostAndPort("merizo.example:3001")));
     ASSERT(imr.tags.isEmpty());
     ASSERT(!imr.electionId.isSet());
 }
@@ -248,15 +248,15 @@ TEST(ReplicaSetMonitor, IsMasterReplyHiddenSecondary) {
                             << "secondary"
                             << true
                             << "hosts"
-                            << BSON_ARRAY("mongo.example:3000")
+                            << BSON_ARRAY("merizo.example:3000")
                             << "primary"
-                            << "mongo.example:3000"
+                            << "merizo.example:3000"
                             << "passive"
                             << true
                             << "hidden"
                             << true
                             << "me"
-                            << "mongo.example:3001"
+                            << "merizo.example:3001"
                             << "maxBsonObjectSize"
                             << 16777216
                             << "maxMessageSizeBytes"
@@ -264,7 +264,7 @@ TEST(ReplicaSetMonitor, IsMasterReplyHiddenSecondary) {
                             << "maxWriteBatchSize"
                             << 1000
                             << "localTime"
-                            << mongo::jsTime()
+                            << merizo::jsTime()
                             << "maxWireVersion"
                             << 2
                             << "minWireVersion"
@@ -272,17 +272,17 @@ TEST(ReplicaSetMonitor, IsMasterReplyHiddenSecondary) {
                             << "ok"
                             << 1);
 
-    IsMasterReply imr(HostAndPort("mongo.example:3001"), -1, ismaster);
+    IsMasterReply imr(HostAndPort("merizo.example:3001"), -1, ismaster);
 
     ASSERT_EQUALS(imr.ok, true);
-    ASSERT_EQUALS(imr.host.toString(), HostAndPort("mongo.example:3001").toString());
+    ASSERT_EQUALS(imr.host.toString(), HostAndPort("merizo.example:3001").toString());
     ASSERT_EQUALS(imr.setName, "test");
     ASSERT_EQUALS(imr.configVersion, 2);
     ASSERT_EQUALS(imr.hidden, true);
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
-    ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
+    ASSERT_EQUALS(imr.primary.toString(), HostAndPort("merizo.example:3000").toString());
+    ASSERT(imr.normalHosts.count(HostAndPort("merizo.example:3000")));
     ASSERT(imr.tags.isEmpty());
     ASSERT(!imr.electionId.isSet());
 }
@@ -299,12 +299,12 @@ TEST(ReplicaSetMonitor, IsMasterSecondaryWithTags) {
                             << "secondary"
                             << true
                             << "hosts"
-                            << BSON_ARRAY("mongo.example:3000"
-                                          << "mongo.example:3001")
+                            << BSON_ARRAY("merizo.example:3000"
+                                          << "merizo.example:3001")
                             << "primary"
-                            << "mongo.example:3000"
+                            << "merizo.example:3000"
                             << "me"
-                            << "mongo.example:3001"
+                            << "merizo.example:3001"
                             << "maxBsonObjectSize"
                             << 16777216
                             << "maxMessageSizeBytes"
@@ -312,7 +312,7 @@ TEST(ReplicaSetMonitor, IsMasterSecondaryWithTags) {
                             << "maxWriteBatchSize"
                             << 1000
                             << "localTime"
-                            << mongo::jsTime()
+                            << merizo::jsTime()
                             << "maxWireVersion"
                             << 2
                             << "minWireVersion"
@@ -325,18 +325,18 @@ TEST(ReplicaSetMonitor, IsMasterSecondaryWithTags) {
                             << "ok"
                             << 1);
 
-    IsMasterReply imr(HostAndPort("mongo.example:3001"), -1, ismaster);
+    IsMasterReply imr(HostAndPort("merizo.example:3001"), -1, ismaster);
 
     ASSERT_EQUALS(imr.ok, true);
-    ASSERT_EQUALS(imr.host.toString(), HostAndPort("mongo.example:3001").toString());
+    ASSERT_EQUALS(imr.host.toString(), HostAndPort("merizo.example:3001").toString());
     ASSERT_EQUALS(imr.setName, "test");
     ASSERT_EQUALS(imr.configVersion, 2);
     ASSERT_EQUALS(imr.hidden, false);
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
-    ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3001")));
+    ASSERT_EQUALS(imr.primary.toString(), HostAndPort("merizo.example:3000").toString());
+    ASSERT(imr.normalHosts.count(HostAndPort("merizo.example:3000")));
+    ASSERT(imr.normalHosts.count(HostAndPort("merizo.example:3001")));
     ASSERT(imr.tags.hasElement("dc"));
     ASSERT(imr.tags.hasElement("use"));
     ASSERT(!imr.electionId.isSet());
@@ -1915,4 +1915,4 @@ TEST(ReplicaSetMonitor, MinOpTimeIgnored) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/log_builder.h"
+#include "merizo/db/update/log_builder.h"
 
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/safe_num.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/mutable_bson_test_utils.h"
+#include "merizo/db/json.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/safe_num.h"
 
 namespace {
 
-namespace mmb = mongo::mutablebson;
-using mongo::LogBuilder;
+namespace mmb = merizo::mutablebson;
+using merizo::LogBuilder;
 
 TEST(LogBuilder, Initialization) {
     mmb::Document doc;
@@ -54,7 +54,7 @@ TEST(LogBuilder, AddOneToSet) {
     ASSERT_TRUE(elt_ab.ok());
     ASSERT_OK(lb.addToSets(elt_ab));
 
-    ASSERT_EQUALS(mongo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
+    ASSERT_EQUALS(merizo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
 }
 
 TEST(LogBuilder, AddElementToSet) {
@@ -65,36 +65,36 @@ TEST(LogBuilder, AddElementToSet) {
     ASSERT_TRUE(elt_ab.ok());
     ASSERT_OK(lb.addToSetsWithNewFieldName("a.b", elt_ab));
 
-    ASSERT_EQUALS(mongo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
+    ASSERT_EQUALS(merizo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
 }
 
 TEST(LogBuilder, AddBSONElementToSet) {
     mmb::Document doc;
     LogBuilder lb(doc.root());
 
-    mongo::BSONObj obj = mongo::fromjson("{'':1}");
+    merizo::BSONObj obj = merizo::fromjson("{'':1}");
 
     ASSERT_OK(lb.addToSetsWithNewFieldName("a.b", obj.firstElement()));
 
-    ASSERT_EQUALS(mongo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
+    ASSERT_EQUALS(merizo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
 }
 
 TEST(LogBuilder, AddSafeNumToSet) {
     mmb::Document doc;
     LogBuilder lb(doc.root());
 
-    mongo::BSONObj obj = mongo::fromjson("{'':1}");
+    merizo::BSONObj obj = merizo::fromjson("{'':1}");
 
-    ASSERT_OK(lb.addToSets("a.b", mongo::SafeNum(1)));
+    ASSERT_OK(lb.addToSets("a.b", merizo::SafeNum(1)));
 
-    ASSERT_EQUALS(mongo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
+    ASSERT_EQUALS(merizo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
 }
 
 TEST(LogBuilder, AddOneToUnset) {
     mmb::Document doc;
     LogBuilder lb(doc.root());
     ASSERT_OK(lb.addToUnsets("x.y"));
-    ASSERT_EQUALS(mongo::fromjson("{ $unset : { 'x.y' : true } }"), doc);
+    ASSERT_EQUALS(merizo::fromjson("{ $unset : { 'x.y' : true } }"), doc);
 }
 
 TEST(LogBuilder, AddOneToEach) {
@@ -107,7 +107,7 @@ TEST(LogBuilder, AddOneToEach) {
 
     ASSERT_OK(lb.addToUnsets("x.y"));
 
-    ASSERT_EQUALS(mongo::fromjson("{ "
+    ASSERT_EQUALS(merizo::fromjson("{ "
                                   "   $set : { 'a.b' : 1 }, "
                                   "   $unset : { 'x.y' : true } "
                                   "}"),
@@ -122,13 +122,13 @@ TEST(LogBuilder, AddOneObjectReplacementEntry) {
     ASSERT_FALSE(replacement.ok());
     ASSERT_OK(lb.getReplacementObject(&replacement));
     ASSERT_TRUE(replacement.ok());
-    ASSERT_TRUE(replacement.isType(mongo::Object));
+    ASSERT_TRUE(replacement.isType(merizo::Object));
 
     const mmb::Element elt_a = doc.makeElementInt("a", 1);
     ASSERT_TRUE(elt_a.ok());
     ASSERT_OK(replacement.pushBack(elt_a));
 
-    ASSERT_EQUALS(mongo::fromjson("{ a : 1 }"), doc);
+    ASSERT_EQUALS(merizo::fromjson("{ a : 1 }"), doc);
 }
 
 TEST(LogBuilder, AddTwoObjectReplacementEntry) {
@@ -139,7 +139,7 @@ TEST(LogBuilder, AddTwoObjectReplacementEntry) {
     ASSERT_FALSE(replacement.ok());
     ASSERT_OK(lb.getReplacementObject(&replacement));
     ASSERT_TRUE(replacement.ok());
-    ASSERT_TRUE(replacement.isType(mongo::Object));
+    ASSERT_TRUE(replacement.isType(merizo::Object));
 
     const mmb::Element elt_a = doc.makeElementInt("a", 1);
     ASSERT_TRUE(elt_a.ok());
@@ -149,7 +149,7 @@ TEST(LogBuilder, AddTwoObjectReplacementEntry) {
     ASSERT_TRUE(elt_b.ok());
     ASSERT_OK(replacement.pushBack(elt_b));
 
-    ASSERT_EQUALS(mongo::fromjson("{ a : 1, b: 2 }"), doc);
+    ASSERT_EQUALS(merizo::fromjson("{ a : 1, b: 2 }"), doc);
 }
 
 TEST(LogBuilder, VerifySetsAreGrouped) {
@@ -164,7 +164,7 @@ TEST(LogBuilder, VerifySetsAreGrouped) {
     ASSERT_TRUE(elt_xy.ok());
     ASSERT_OK(lb.addToSets(elt_xy));
 
-    ASSERT_EQUALS(mongo::fromjson("{ $set : {"
+    ASSERT_EQUALS(merizo::fromjson("{ $set : {"
                                   "   'a.b' : 1, "
                                   "   'x.y' : 1 "
                                   "} }"),
@@ -178,7 +178,7 @@ TEST(LogBuilder, VerifyUnsetsAreGrouped) {
     ASSERT_OK(lb.addToUnsets("a.b"));
     ASSERT_OK(lb.addToUnsets("x.y"));
 
-    ASSERT_EQUALS(mongo::fromjson("{ $unset : {"
+    ASSERT_EQUALS(merizo::fromjson("{ $unset : {"
                                   "   'a.b' : true, "
                                   "   'x.y' : true "
                                   "} }"),

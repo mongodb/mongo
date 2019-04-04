@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/authentication_session.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/authentication_commands.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/sequence_util.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/sasl_client_authenticate.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/authentication_session.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/authz_manager_external_state_mock.h"
+#include "merizo/db/auth/authz_session_external_state_mock.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/authentication_commands.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/sequence_util.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::stringstream;
@@ -323,7 +323,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     AuthenticationSession* session = static_cast<AuthenticationSession*>(sessionGuard.get());
 
     auto& mechanism = session->getMechanism();
-    // Authenticating the __system@local user to the admin database on mongos is required
+    // Authenticating the __system@local user to the admin database on merizos is required
     // by the auth passthrough test suite.
     if (mechanism.getAuthenticationDatabase() != db && !getTestCommandsEnabled()) {
         uasserted(ErrorCodes::ProtocolError,
@@ -356,4 +356,4 @@ MONGO_INITIALIZER(PreSaslCommands)
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

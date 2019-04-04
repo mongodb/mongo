@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/expression_index.h"
+#include "merizo/db/query/expression_index.h"
 
 #include <iostream>
 #include <unordered_set>
 
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/r2_region_coverer.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/index/expression_params.h"
-#include "mongo/db/query/expression_index_knobs_gen.h"
+#include "merizo/db/geo/geoconstants.h"
+#include "merizo/db/geo/r2_region_coverer.h"
+#include "merizo/db/hasher.h"
+#include "merizo/db/index/expression_params.h"
+#include "merizo/db/query/expression_index_knobs_gen.h"
 #include "third_party/s2/s2cellid.h"
 #include "third_party/s2/s2region.h"
 #include "third_party/s2/s2regioncoverer.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::set;
 
@@ -228,4 +228,4 @@ void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2Cell
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

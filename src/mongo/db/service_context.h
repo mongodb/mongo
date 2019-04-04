@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,24 +33,24 @@
 #include <functional>
 #include <vector>
 
-#include "mongo/base/global_initializer_registerer.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/list.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/transport/service_executor.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/tick_source.h"
+#include "merizo/base/global_initializer_registerer.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/list.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/transport/service_executor.h"
+#include "merizo/transport/session.h"
+#include "merizo/util/clock_source.h"
+#include "merizo/util/concurrency/with_lock.h"
+#include "merizo/util/decorable.h"
+#include "merizo/util/periodic_runner.h"
+#include "merizo/util/tick_source.h"
 
-namespace mongo {
+namespace merizo {
 
 class AbstractMessagingPort;
 class Client;
@@ -251,7 +251,7 @@ public:
     public:
         /**
          * This constructor registers a constructor and optional destructor with the given
-         * "name" and no prerequisite constructors or mongo initializers.
+         * "name" and no prerequisite constructors or merizo initializers.
          */
         ConstructorActionRegisterer(std::string name,
                                     ConstructorAction constructor,
@@ -623,4 +623,4 @@ void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceConte
  */
 bool supportsDocLocking();
 
-}  // namespace mongo
+}  // namespace merizo

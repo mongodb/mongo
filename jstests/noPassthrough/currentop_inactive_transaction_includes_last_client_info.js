@@ -40,9 +40,9 @@
     const connectionId = currentOpEntry.connectionId;
     // Check that the currentOp object contains information about the last client that has run an
     // operation and that its values align with our expectations.
-    assert.eq(currentOpEntry.appName, "MongoDB Shell");
-    assert.eq(currentOpEntry.clientMetadata.application.name, "MongoDB Shell");
-    assert.eq(currentOpEntry.clientMetadata.driver.name, "MongoDB Internal Client");
+    assert.eq(currentOpEntry.appName, "MerizoDB Shell");
+    assert.eq(currentOpEntry.clientMetadata.application.name, "MerizoDB Shell");
+    assert.eq(currentOpEntry.clientMetadata.driver.name, "MerizoDB Internal Client");
 
     // Create a new Client and run another operation on the same session.
     const otherClient = new Mongo(rst.getPrimary().host);

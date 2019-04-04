@@ -95,7 +95,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         assert.setEq(new Set(kIds), new Set(docsFoundInOrder.map(doc => doc.fullDocument._id)));
 
         // Now resume using the resume token from the first change (which was read before the
-        // failover). The mongos should talk to the new primary.
+        // failover). The merizos should talk to the new primary.
         const resumeCursor =
             cst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: firstChange._id});
 

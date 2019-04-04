@@ -17,7 +17,7 @@ var doTest = function(signal) {
         nodes: {n0: ssl_options1, n1: ssl_options1, n2: ssl_options2}
     });
 
-    // call startSet() to start each mongod in the replica set
+    // call startSet() to start each merizod in the replica set
     // this returns a list of nodes
     var nodes = replTest.startSet();
 

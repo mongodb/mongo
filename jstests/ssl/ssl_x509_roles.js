@@ -14,10 +14,10 @@ load('jstests/ssl/libs/ssl_helpers.js');
     const CLIENT_TITLE_CERT = "jstests/libs/client_title.pem";
 
     const CLIENT_USER =
-        "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel Users,CN=Kernel Client Peer Role";
+        "C=US,ST=New York,L=New York City,O=MerizoDB,OU=Kernel Users,CN=Kernel Client Peer Role";
 
     function authAndTest(port) {
-        const mongo = runMongoProgram("mongo",
+        const merizo = runMongoProgram("merizo",
                                       "--host",
                                       "localhost",
                                       "--port",
@@ -30,9 +30,9 @@ load('jstests/ssl/libs/ssl_helpers.js');
                                       "jstests/ssl/libs/ssl_x509_role_auth.js");
 
         // runMongoProgram returns 0 on success
-        assert.eq(0, mongo, "Connection attempt failed");
+        assert.eq(0, merizo, "Connection attempt failed");
 
-        const escaped = runMongoProgram("mongo",
+        const escaped = runMongoProgram("merizo",
                                         "--host",
                                         "localhost",
                                         "--port",
@@ -47,7 +47,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
         // runMongoProgram returns 0 on success
         assert.eq(0, escaped, "Connection attempt failed");
 
-        const utf8 = runMongoProgram("mongo",
+        const utf8 = runMongoProgram("merizo",
                                      "--host",
                                      "localhost",
                                      "--port",
@@ -62,7 +62,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
         // runMongoProgram returns 0 on success
         assert.eq(0, utf8, "Connection attempt failed");
 
-        const email = runMongoProgram("mongo",
+        const email = runMongoProgram("merizo",
                                       "--host",
                                       "localhost",
                                       "--port",
@@ -80,25 +80,25 @@ load('jstests/ssl/libs/ssl_helpers.js');
 
     const x509_options = {sslMode: "requireSSL", sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT};
 
-    print("1. Testing x.509 auth to mongod");
+    print("1. Testing x.509 auth to merizod");
     {
-        let mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
+        let merizo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
 
-        authAndTest(mongo.port);
+        authAndTest(merizo.port);
 
-        MongoRunner.stopMongod(mongo);
+        MongoRunner.stopMongod(merizo);
     }
 
-    print("2. Testing x.509 auth to mongos");
+    print("2. Testing x.509 auth to merizos");
     {
         // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
         let st = new ShardingTest({
             shards: 1,
-            mongos: 1,
+            merizos: 1,
             other: {
                 keyFile: 'jstests/libs/key1',
                 configOptions: x509_options,
-                mongosOptions: x509_options,
+                merizosOptions: x509_options,
                 shardOptions: x509_options,
                 useHostname: false,
                 shardAsReplicaSet: false

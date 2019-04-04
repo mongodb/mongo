@@ -2,7 +2,7 @@
   "tests": [
     {
       "description": "Single IPv4 host without port",
-      "uri": "mongodb://127.0.0.1",
+      "uri": "merizodb://127.0.0.1",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -17,7 +17,7 @@
     },
     {
       "description": "Single IPv4 host with port",
-      "uri": "mongodb://127.0.0.1:27018",
+      "uri": "merizodb://127.0.0.1:27018",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -32,7 +32,7 @@
     },
     {
       "description": "Single IP literal host without port",
-      "uri": "mongodb://[::1]",
+      "uri": "merizodb://[::1]",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -47,7 +47,7 @@
     },
     {
       "description": "Single IP literal host with port",
-      "uri": "mongodb://[::1]:27019",
+      "uri": "merizodb://[::1]:27019",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -62,7 +62,7 @@
     },
     {
       "description": "Single hostname without port",
-      "uri": "mongodb://example.com",
+      "uri": "merizodb://example.com",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -77,7 +77,7 @@
     },
     {
       "description": "Single hostname with port",
-      "uri": "mongodb://example.com:27020",
+      "uri": "merizodb://example.com:27020",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -92,7 +92,7 @@
     },
     {
       "description": "Single hostname (resembling IPv4) without port",
-      "uri": "mongodb://256.0.0.1",
+      "uri": "merizodb://256.0.0.1",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -107,7 +107,7 @@
     },
     {
       "description": "Multiple hosts (mixed formats)",
-      "uri": "mongodb://127.0.0.1,[::1]:27018,example.com:27019",
+      "uri": "merizodb://127.0.0.1,[::1]:27018,example.com:27019",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -132,7 +132,7 @@
     },
     {
       "description": "Multiple hosts (mixed formats)",
-      "uri": "mongodb://127.0.0.1,[::1]:27018,example.com:27019/?replicaSet=replset",
+      "uri": "merizodb://127.0.0.1,[::1]:27018,example.com:27019/?replicaSet=replset",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -159,7 +159,7 @@
     },
     {
       "description": "UTF-8 hosts",
-      "uri": "mongodb://bücher.example.com,umläut.example.com/",
+      "uri": "merizodb://bücher.example.com,umläut.example.com/",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -179,7 +179,7 @@
     }, 
     {
       "description": "UTF-8 hosts",
-      "uri": "mongodb://bücher.example.com,umläut.example.com/?replicaSet=replset",
+      "uri": "merizodb://bücher.example.com,umläut.example.com/?replicaSet=replset",
       "valid": true,
       "warning": false,
       "hosts": [

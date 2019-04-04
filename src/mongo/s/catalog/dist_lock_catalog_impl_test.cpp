@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <utility>
 
-#include "mongo/bson/json.h"
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/query/find_and_modify_request.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/network_test_env.h"
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/s/catalog/type_locks.h"
-#include "mongo/s/client/shard_factory.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/time_support.h"
+#include "merizo/bson/json.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/query/find_and_modify_request.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/storage/duplicate_key_error_info.h"
+#include "merizo/executor/network_interface_mock.h"
+#include "merizo/executor/network_test_env.h"
+#include "merizo/s/catalog/dist_lock_catalog_impl.h"
+#include "merizo/s/catalog/dist_lock_manager_mock.h"
+#include "merizo/s/catalog/sharding_catalog_client_mock.h"
+#include "merizo/s/catalog/type_lockpings.h"
+#include "merizo/s/catalog/type_locks.h"
+#include "merizo/s/client/shard_factory.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/shard_server_test_fixture.h"
+#include "merizo/s/write_ops/batched_command_request.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using executor::NetworkInterfaceMock;
@@ -255,7 +255,7 @@ TEST_F(DistLockCatalogTest, GrabLockNoOp) {
         OID myID("555f80be366c194b13fb0372");
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
         auto resultStatus = distLockCatalog()
-                                ->grabLock(opCtx, "test", myID, "me", "mongos", now, "because")
+                                ->grabLock(opCtx, "test", myID, "me", "merizos", now, "because")
                                 .getStatus();
 
         ASSERT_EQUALS(ErrorCodes::LockStateChangeFailed, resultStatus.code());
@@ -273,7 +273,7 @@ TEST_F(DistLockCatalogTest, GrabLockNoOp) {
                         ts: ObjectId("555f80be366c194b13fb0372"),
                         state: 2,
                         who: "me",
-                        process: "mongos",
+                        process: "merizos",
                         when: { $date: "2015-05-22T19:17:18.098Z" },
                         why: "because"
                     }
@@ -297,7 +297,7 @@ TEST_F(DistLockCatalogTest, GrabLockWithNewDoc) {
         OID myID("555f80be366c194b13fb0372");
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
         auto resultStatus =
-            distLockCatalog()->grabLock(opCtx, "test", myID, "me", "mongos", now, "because");
+            distLockCatalog()->grabLock(opCtx, "test", myID, "me", "merizos", now, "because");
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
@@ -305,7 +305,7 @@ TEST_F(DistLockCatalogTest, GrabLockWithNewDoc) {
         ASSERT_EQUALS("test", lockDoc.getName());
         ASSERT_EQUALS(myID, lockDoc.getLockID());
         ASSERT_EQUALS("me", lockDoc.getWho());
-        ASSERT_EQUALS("mongos", lockDoc.getProcess());
+        ASSERT_EQUALS("merizos", lockDoc.getProcess());
         ASSERT_EQUALS("because", lockDoc.getWhy());
     });
 
@@ -321,7 +321,7 @@ TEST_F(DistLockCatalogTest, GrabLockWithNewDoc) {
                         ts: ObjectId("555f80be366c194b13fb0372"),
                         state: 2,
                         who: "me",
-                        process: "mongos",
+                        process: "merizos",
                         when: { $date: "2015-05-22T19:17:18.098Z" },
                         why: "because"
                     }
@@ -345,7 +345,7 @@ TEST_F(DistLockCatalogTest, GrabLockWithNewDoc) {
                     ts: ObjectId("555f80be366c194b13fb0372"),
                     state: 2,
                     who: "me",
-                    process: "mongos",
+                    process: "merizos",
                     when: { $date: "2015-05-22T19:17:18.098Z" },
                     why: "because"
                 },
@@ -378,7 +378,7 @@ TEST_F(DistLockCatalogTest, GrabLockWithBadLockDoc) {
                     ts: ObjectId("555f80be366c194b13fb0372"),
                     state: "x",
                     who: "me",
-                    process: "mongos",
+                    process: "merizos",
                     when: { $date: "2015-05-22T19:17:18.098Z" },
                     why: "because"
                 },
@@ -574,7 +574,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockNoOp) {
         auto resultStatus =
             distLockCatalog()
                 ->overtakeLock(
-                    operationContext(), "test", myID, currentOwner, "me", "mongos", now, "because")
+                    operationContext(), "test", myID, currentOwner, "me", "merizos", now, "because")
                 .getStatus();
 
         ASSERT_EQUALS(ErrorCodes::LockStateChangeFailed, resultStatus.code());
@@ -597,7 +597,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockNoOp) {
                         ts: ObjectId("555f80be366c194b13fb0372"),
                         state: 2,
                         who: "me",
-                        process: "mongos",
+                        process: "merizos",
                         when: { $date: "2015-05-22T19:17:18.098Z" },
                         why: "because"
                     }
@@ -621,7 +621,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWithNewDoc) {
         OID currentOwner("555f99712c99a78c5b083358");
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
         auto resultStatus = distLockCatalog()->overtakeLock(
-            operationContext(), "test", myID, currentOwner, "me", "mongos", now, "because");
+            operationContext(), "test", myID, currentOwner, "me", "merizos", now, "because");
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
@@ -629,7 +629,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWithNewDoc) {
         ASSERT_EQUALS("test", lockDoc.getName());
         ASSERT_EQUALS(myID, lockDoc.getLockID());
         ASSERT_EQUALS("me", lockDoc.getWho());
-        ASSERT_EQUALS("mongos", lockDoc.getProcess());
+        ASSERT_EQUALS("merizos", lockDoc.getProcess());
         ASSERT_EQUALS("because", lockDoc.getWhy());
     });
 
@@ -650,7 +650,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWithNewDoc) {
                         ts: ObjectId("555f80be366c194b13fb0372"),
                         state: 2,
                         who: "me",
-                        process: "mongos",
+                        process: "merizos",
                         when: { $date: "2015-05-22T19:17:18.098Z" },
                         why: "because"
                     }
@@ -673,7 +673,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWithNewDoc) {
                     ts: ObjectId("555f80be366c194b13fb0372"),
                     state: 2,
                     who: "me",
-                    process: "mongos",
+                    process: "merizos",
                     when: { $date: "2015-05-22T19:17:18.098Z" },
                     why: "because"
                 },
@@ -708,7 +708,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWithBadLockDoc) {
                     ts: ObjectId("555f80be366c194b13fb0372"),
                     state: "x",
                     who: "me",
-                    process: "mongos",
+                    process: "merizos",
                     when: { $date: "2015-05-22T19:17:18.098Z" },
                     why: "because"
                 },
@@ -1740,4 +1740,4 @@ TEST_F(DistLockCatalogTest, GetLockByNameUnsupportedFormat) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

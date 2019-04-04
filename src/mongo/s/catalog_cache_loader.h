@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,20 +31,20 @@
 
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/notification.h"
-#include "mongo/util/uuid.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/s/catalog/type_chunk.h"
+#include "merizo/s/catalog/type_collection.h"
+#include "merizo/s/catalog/type_database.h"
+#include "merizo/s/chunk_version.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/concurrency/notification.h"
+#include "merizo/util/uuid.h"
 
 #define LOG_CATALOG_REFRESH(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kShardingCatalogRefresh)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kShardingCatalogRefresh)
 
-namespace mongo {
+namespace merizo {
 
 class NamespaceString;
 class OperationContext;
@@ -168,4 +168,4 @@ protected:
     CatalogCacheLoader() = default;
 };
 
-}  // namespace mongo
+}  // namespace merizo

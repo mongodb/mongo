@@ -6,7 +6,7 @@
 
     // login method to login into the database
     function login(userObj) {
-        var authResult = mongos.getDB(userObj.db).auth(userObj.username, userObj.password);
+        var authResult = merizos.getDB(userObj.db).auth(userObj.username, userObj.password);
         printjson(authResult);
     }
 
@@ -16,16 +16,16 @@
     // set up a 2 shard cluster with keyfile
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     var st = new ShardingTest(
-        {shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}});
+        {shards: 1, merizos: 1, other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
+    var merizos = st.s0;
+    var admin = merizos.getDB("admin");
 
     print("1 shard system setup");
 
     // add the admin user
     print("adding user");
-    mongos.getDB(adminUser.db).createUser({
+    merizos.getDB(adminUser.db).createUser({
         user: adminUser.username,
         pwd: adminUser.password,
         roles: jsTest.adminUserRoles
@@ -36,7 +36,7 @@
 
     assert.eq(1, st.config.shards.count(), "initial server count wrong");
 
-    // start a mongod with NO keyfile
+    // start a merizod with NO keyfile
     var conn = MongoRunner.runMongod({shardsvr: ""});
     print(conn);
 
@@ -44,18 +44,18 @@
     // Add shard to the existing cluster (should fail because it was added without a keyfile)
     printjson(assert.commandFailed(admin.runCommand({addShard: conn.host})));
 
-    // stop mongod
+    // stop merizod
     MongoRunner.stopMongod(conn);
 
     //--------------- Test 2 --------------------
-    // start mongod again, this time with keyfile
+    // start merizod again, this time with keyfile
     var conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1", shardsvr: ""});
     // try adding the new shard
     assert.commandWorked(admin.runCommand({addShard: conn.host}));
 
     // Add some data
-    var db = mongos.getDB("foo");
-    var collA = mongos.getCollection("foo.bar");
+    var db = merizos.getDB("foo");
+    var collA = merizos.getCollection("foo.bar");
 
     // enable sharding on a collection
     assert.commandWorked(admin.runCommand({enableSharding: "" + collA.getDB()}));
@@ -75,7 +75,7 @@
     // verify the chunk was moved
     admin.runCommand({flushRouterConfig: 1});
 
-    var config = mongos.getDB("config");
+    var config = merizos.getDB("config");
     st.printShardingStatus(true);
 
     // start balancer before removing the shard

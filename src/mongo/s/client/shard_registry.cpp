@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/client/shard_registry.h"
+#include "merizo/s/client/shard_registry.h"
 
 #include <set>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/client.h"
-#include "mongo/db/logical_time_metadata_hook.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_factory.h"
-#include "mongo/s/grid.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/log.h"
-#include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/client.h"
+#include "merizo/db/logical_time_metadata_hook.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/server_options.h"
+#include "merizo/executor/network_connection_hook.h"
+#include "merizo/executor/network_interface_factory.h"
+#include "merizo/executor/network_interface_thread_pool.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/executor/thread_pool_task_executor.h"
+#include "merizo/rpc/metadata/egress_metadata_hook_list.h"
+#include "merizo/s/catalog/sharding_catalog_client.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/client/shard_factory.h"
+#include "merizo/s/grid.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/concurrency/with_lock.h"
+#include "merizo/util/log.h"
+#include "merizo/util/map_util.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::shared_ptr;
 using std::set;
@@ -595,4 +595,4 @@ void ShardRegistryData::_addShard(WithLock lk,
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// MonitorCommand stores settings for the mongoreplay 'monitor' subcommand
+// MonitorCommand stores settings for the merizoreplay 'monitor' subcommand
 type MonitorCommand struct {
 	GlobalOpts *Options `no-flag:"true"`
 	StatOptions
@@ -111,12 +111,12 @@ func (monitor *MonitorCommand) Execute(args []string) error {
 		if err != nil {
 			return err
 		}
-		opChan = ctx.mongoOpStream.Ops
+		opChan = ctx.merizoOpStream.Ops
 		e := make(chan error)
 		errChan = e
 		go func() {
 			defer close(e)
-			if err := ctx.packetHandler.Handle(ctx.mongoOpStream, -1); err != nil {
+			if err := ctx.packetHandler.Handle(ctx.merizoOpStream, -1); err != nil {
 				e <- fmt.Errorf("monitor: error handling packet stream: %s", err)
 			}
 		}()

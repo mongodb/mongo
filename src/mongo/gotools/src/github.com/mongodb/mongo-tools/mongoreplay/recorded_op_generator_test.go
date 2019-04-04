@@ -1,4 +1,4 @@
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"

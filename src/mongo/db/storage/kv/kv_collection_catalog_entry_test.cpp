@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/optional/optional_io.hpp>
 #include <iostream>
 #include <string>
 
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/devnull/devnull_kv_engine.h"
-#include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index/multikey_paths.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/service_context_test_fixture.h"
+#include "merizo/db/storage/devnull/devnull_kv_engine.h"
+#include "merizo/db/storage/kv/kv_database_catalog_entry_mock.h"
+#include "merizo/db/storage/kv/kv_engine.h"
+#include "merizo/db/storage/kv/kv_storage_engine.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 static std::string kSideWritesTableIdent("sideWrites");
@@ -451,4 +451,4 @@ DEATH_TEST_F(KVCollectionCatalogEntryTest,
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

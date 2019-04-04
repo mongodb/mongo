@@ -11,7 +11,7 @@ var common_options = {
 function runInitialSyncTest() {
     load("jstests/replsets/rslib.js");
 
-    // The mongo shell cannot authenticate as the internal __system user in tests that use x509 for
+    // The merizo shell cannot authenticate as the internal __system user in tests that use x509 for
     // cluster authentication. Choosing the default value for wcMajorityJournalDefault in
     // ReplSetTest cannot be done automatically without the shell performing such authentication, so
     // in this test we must make the choice explicitly, based on the global test options.

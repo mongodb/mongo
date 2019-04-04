@@ -1,4 +1,4 @@
-// Test mongo shell connect strings.
+// Test merizo shell connect strings.
 (function() {
     'use strict';
 
@@ -19,25 +19,25 @@
     rst.startSet();
     rst.initiate();
 
-    const mongod = rst.getPrimary();
-    const host = mongod.host;
-    const port = mongod.port;
+    const merizod = rst.getPrimary();
+    const host = merizod.host;
+    const port = merizod.port;
 
     const username = "user";
     const usernameNotTest = "userNotTest";
-    const usernameX509 = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
+    const usernameX509 = "C=US,ST=New York,L=New York City,O=MerizoDB,OU=KernelUser,CN=client";
 
     const password = username;
     const passwordNotTest = usernameNotTest;
 
-    mongod.getDB("test").createUser({user: username, pwd: username, roles: []});
-    mongod.getDB("notTest").createUser({user: usernameNotTest, pwd: usernameNotTest, roles: []});
-    mongod.getDB("$external").createUser({user: usernameX509, roles: []});
+    merizod.getDB("test").createUser({user: username, pwd: username, roles: []});
+    merizod.getDB("notTest").createUser({user: usernameNotTest, pwd: usernameNotTest, roles: []});
+    merizod.getDB("$external").createUser({user: usernameX509, roles: []});
 
     var i = 0;
     function testConnect(noPasswordPrompt, ...args) {
         const command = [
-            'mongo',
+            'merizo',
             '--eval',
             ';',
             '--ssl',
@@ -60,22 +60,22 @@
         assert.eq(!noPasswordPrompt, rawMongoProgramOutput().includes("Enter password:"));
     }
 
-    testConnect(false, `mongodb://${username}@${host}/test`);
-    testConnect(false, `mongodb://${username}@${host}/test`, '--password');
+    testConnect(false, `merizodb://${username}@${host}/test`);
+    testConnect(false, `merizodb://${username}@${host}/test`, '--password');
 
-    testConnect(false, `mongodb://${username}@${host}/test`, '--username', username);
-    testConnect(false, `mongodb://${username}@${host}/test`, '--password', '--username', username);
+    testConnect(false, `merizodb://${username}@${host}/test`, '--username', username);
+    testConnect(false, `merizodb://${username}@${host}/test`, '--password', '--username', username);
 
     testConnect(false,
-                `mongodb://${usernameNotTest}@${host}/test?authSource=notTest`,
+                `merizodb://${usernameNotTest}@${host}/test?authSource=notTest`,
                 '--password',
                 '--username',
                 usernameNotTest);
 
-    testConnect(false, `mongodb://${usernameNotTest}@${host}/test?authSource=notTest`);
+    testConnect(false, `merizodb://${usernameNotTest}@${host}/test?authSource=notTest`);
 
     testConnect(false,
-                `mongodb://${usernameNotTest}@${host}/test?authSource=notTest`,
+                `merizodb://${usernameNotTest}@${host}/test?authSource=notTest`,
                 '--password',
                 '--username',
                 usernameNotTest,
@@ -83,27 +83,27 @@
                 'notTest');
 
     testConnect(false,
-                `mongodb://${usernameNotTest}@${host}/test`,
+                `merizodb://${usernameNotTest}@${host}/test`,
                 '--password',
                 '--username',
                 usernameNotTest,
                 '--authenticationDatabase',
                 'notTest');
 
-    testConnect(false, `mongodb://${host}/test?authSource=notTest`, '--username', usernameNotTest);
+    testConnect(false, `merizodb://${host}/test?authSource=notTest`, '--username', usernameNotTest);
 
-    testConnect(false, `mongodb://${host}/test`, '--username', username);
-    testConnect(false, `mongodb://${host}/test`, '--password', '--username', username);
+    testConnect(false, `merizodb://${host}/test`, '--username', username);
+    testConnect(false, `merizodb://${host}/test`, '--password', '--username', username);
 
-    testConnect(true, `mongodb://${host}/test`, '--password', password, '--username', username);
+    testConnect(true, `merizodb://${host}/test`, '--password', password, '--username', username);
 
-    testConnect(true, `mongodb://${username}:${password}@${host}/test`);
-    testConnect(true, `mongodb://${username}:${password}@${host}/test`, '--password');
-    testConnect(true, `mongodb://${username}:${password}@${host}/test`, '--password', password);
-    testConnect(true, `mongodb://${username}@${host}/test`, '--password', password);
+    testConnect(true, `merizodb://${username}:${password}@${host}/test`);
+    testConnect(true, `merizodb://${username}:${password}@${host}/test`, '--password');
+    testConnect(true, `merizodb://${username}:${password}@${host}/test`, '--password', password);
+    testConnect(true, `merizodb://${username}@${host}/test`, '--password', password);
 
     testConnect(true,
-                `mongodb://${usernameNotTest}@${host}/test?authSource=notTest`,
+                `merizodb://${usernameNotTest}@${host}/test?authSource=notTest`,
                 '--username',
                 usernameNotTest,
                 '--password',
@@ -112,19 +112,19 @@
                 'notTest');
 
     testConnect(true,
-                `mongodb://${usernameNotTest}@${host}/test?authSource=notTest`,
+                `merizodb://${usernameNotTest}@${host}/test?authSource=notTest`,
                 '--username',
                 usernameNotTest,
                 '--password',
                 passwordNotTest);
 
     testConnect(true,
-                `mongodb://${usernameNotTest}@${host}/test?authSource=notTest`,
+                `merizodb://${usernameNotTest}@${host}/test?authSource=notTest`,
                 '--password',
                 passwordNotTest);
 
     testConnect(true,
-                `mongodb://${host}/test?authSource=notTest`,
+                `merizodb://${host}/test?authSource=notTest`,
                 '--username',
                 usernameNotTest,
                 '--password',
@@ -135,48 +135,48 @@
     if (false) {
         testConnect(
             true,
-            `mongodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`);
+            `merizodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`);
         testConnect(
             true,
-            `mongodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
+            `merizodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
             '--username',
             usernameX509);
         testConnect(true,
-                    `mongodb://${usernameX509}@${host}/test?authSource=$external`,
+                    `merizodb://${usernameX509}@${host}/test?authSource=$external`,
                     '--authenticationMechanism',
                     'MONGODB-X509');
 
         testConnect(
             true,
-            `mongodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
+            `merizodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
             '--authenticationMechanism',
             'MONGODB-X509');
         testConnect(
             true,
-            `mongodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
+            `merizodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
             '--authenticationMechanism',
             'MONGODB-X509',
             '--username',
             usernameX509);
         testConnect(true,
-                    `mongodb://${usernameX509}@${host}/test?authSource=$external`,
+                    `merizodb://${usernameX509}@${host}/test?authSource=$external`,
                     '--authenticationMechanism',
                     'MONGODB-X509');
     }
     /* */
 
-    testConnect(true, `mongodb://${host}/test?authMechanism=MONGODB-X509&authSource=$external`);
+    testConnect(true, `merizodb://${host}/test?authMechanism=MONGODB-X509&authSource=$external`);
     testConnect(true,
-                `mongodb://${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
+                `merizodb://${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
                 '--username',
                 usernameX509);
 
     testConnect(true,
-                `mongodb://${host}/test?authSource=$external`,
+                `merizodb://${host}/test?authSource=$external`,
                 '--authenticationMechanism',
                 'MONGODB-X509');
     testConnect(true,
-                `mongodb://${host}/test?authSource=$external`,
+                `merizodb://${host}/test?authSource=$external`,
                 '--username',
                 usernameX509,
                 '--authenticationMechanism',

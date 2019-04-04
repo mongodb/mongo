@@ -6,7 +6,7 @@ import os.path
 import random
 
 import bson
-import pymongo.errors
+import pymerizo.errors
 
 from . import cleanup
 from . import interface
@@ -69,7 +69,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
     def run_test(self):
         """Execute test hook."""
         sync_node = self.fixture.get_initial_sync_node()
-        sync_node_conn = sync_node.mongo_client()
+        sync_node_conn = sync_node.merizo_client()
 
         # If it's been 'n' tests so far, wait for the initial sync node to finish syncing.
         if self._hook.tests_run >= self._hook.n:
@@ -104,7 +104,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                     self.__restart_init_sync(sync_node)
                     self._hook.random_restarts += 1
                 return
-        except pymongo.errors.OperationFailure:
+        except pymerizo.errors.OperationFailure:
             # replSetGetStatus can fail if the node is in STARTUP state. The node will soon go into
             # STARTUP2 state and replSetGetStatus will succeed after the next test.
             self.logger.info(
@@ -187,7 +187,7 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
     def run_test(self):
         """Execute test hook."""
         sync_node = self.fixture.get_initial_sync_node()
-        sync_node_conn = sync_node.mongo_client()
+        sync_node_conn = sync_node.merizo_client()
 
         sync_node.teardown()
 

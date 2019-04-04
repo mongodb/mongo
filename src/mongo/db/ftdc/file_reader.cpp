@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/ftdc/file_reader.h"
+#include "merizo/db/ftdc/file_reader.h"
 
 #include <boost/filesystem.hpp>
 #include <fstream>
 
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_validated.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/ftdc/config.h"
-#include "mongo/db/ftdc/util.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/data_range_cursor.h"
+#include "merizo/base/data_type_validated.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/db/ftdc/config.h"
+#include "merizo/db/ftdc/util.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/rpc/object_check.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 FTDCFileReader::~FTDCFileReader() {
     _stream.close();
@@ -223,4 +223,4 @@ Status FTDCFileReader::open(const boost::filesystem::path& file) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

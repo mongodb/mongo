@@ -5,13 +5,13 @@
             "description": "Unix domain socket (absolute path with trailing slash)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://%2Ftmp%2Fmongodb-27017.sock/",
+            "uri": "merizodb://%2Ftmp%2Fmerizodb-27017.sock/",
             "valid": true,
             "warning": false
         },
@@ -20,13 +20,13 @@
             "description": "Unix domain socket (absolute path without trailing slash)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://%2Ftmp%2Fmongodb-27017.sock",
+            "uri": "merizodb://%2Ftmp%2Fmerizodb-27017.sock",
             "valid": true,
             "warning": false
         },
@@ -35,13 +35,13 @@
             "description": "Unix domain socket (absolute path with spaces in path)",
             "hosts": [
                 {
-                    "host": "/tmp/ /mongodb-27017.sock",
+                    "host": "/tmp/ /merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://%2Ftmp%2F %2Fmongodb-27017.sock",
+            "uri": "merizodb://%2Ftmp%2F %2Fmerizodb-27017.sock",
             "valid": true,
             "warning": false
         },
@@ -50,18 +50,18 @@
             "description": "Multiple Unix domain sockets (absolute paths)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock",
+            "uri": "merizodb://%2Ftmp%2Fmerizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock",
             "valid": true,
             "warning": false
         },
@@ -75,13 +75,13 @@
                     "type": "ipv4"
                 },
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://127.0.0.1:27017,%2Ftmp%2Fmongodb-27017.sock",
+            "uri": "merizodb://127.0.0.1:27017,%2Ftmp%2Fmerizodb-27017.sock",
             "valid": true,
             "warning": false
         },
@@ -90,18 +90,18 @@
             "description": "Multiple hosts (absolute path and hostname resembling relative path)",
             "hosts": [
                 {
-                    "host": "mongodb-27017.sock",
+                    "host": "merizodb-27017.sock",
                     "port": null,
                     "type": "hostname"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://mongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock",
+            "uri": "merizodb://merizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock",
             "valid": true,
             "warning": false
         },
@@ -110,12 +110,12 @@
             "description": "Multiple Unix domain sockets (absolute paths)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
@@ -123,7 +123,7 @@
             "options": {
                 "replicaSet": "replset"
             },
-            "uri": "mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/?replicaSet=replset",
+            "uri": "merizodb://%2Ftmp%2Fmerizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock/?replicaSet=replset",
             "valid": true,
             "warning": false
         },
@@ -137,7 +137,7 @@
                     "type": "ipv4"
                 },
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
@@ -145,7 +145,7 @@
             "options": {
                 "replicaSet": "replset"
             },
-            "uri": "mongodb://127.0.0.1:27017,%2Ftmp%2Fmongodb-27017.sock/?replicaSet=replset",
+            "uri": "merizodb://127.0.0.1:27017,%2Ftmp%2Fmerizodb-27017.sock/?replicaSet=replset",
             "valid": true,
             "warning": false
         },
@@ -154,12 +154,12 @@
             "description": "Multiple hosts (absolute path and hostname resembling relative path)",
             "hosts": [
                 {
-                    "host": "mongodb-27017.sock",
+                    "host": "merizodb-27017.sock",
                     "port": null,
                     "type": "hostname"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
@@ -167,7 +167,7 @@
             "options": {
                 "replicaSet": "replset"
             },
-            "uri": "mongodb://mongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/?replicaSet=replset",
+            "uri": "merizodb://merizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock/?replicaSet=replset",
             "valid": true,
             "warning": false
         },
@@ -180,13 +180,13 @@
             "description": "Unix domain socket with auth database (absolute path)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://alice:foo@%2Ftmp%2Fmongodb-27017.sock/admin",
+            "uri": "merizodb://alice:foo@%2Ftmp%2Fmerizodb-27017.sock/admin",
             "valid": true,
             "warning": false
         },
@@ -195,13 +195,13 @@
             "description": "Unix domain socket with path resembling socket file (absolute path with trailing slash)",
             "hosts": [
                 {
-                    "host": "/tmp/path.to.sock/mongodb-27017.sock",
+                    "host": "/tmp/path.to.sock/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://%2Ftmp%2Fpath.to.sock%2Fmongodb-27017.sock/",
+            "uri": "merizodb://%2Ftmp%2Fpath.to.sock%2Fmerizodb-27017.sock/",
             "valid": true,
             "warning": false
         },
@@ -210,13 +210,13 @@
             "description": "Unix domain socket with path resembling socket file (absolute path without trailing slash)",
             "hosts": [
                 {
-                    "host": "/tmp/path.to.sock/mongodb-27017.sock",
+                    "host": "/tmp/path.to.sock/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://%2Ftmp%2Fpath.to.sock%2Fmongodb-27017.sock",
+            "uri": "merizodb://%2Ftmp%2Fpath.to.sock%2Fmerizodb-27017.sock",
             "valid": true,
             "warning": false
         },
@@ -229,13 +229,13 @@
             "description": "Unix domain socket with path resembling socket file and auth (absolute path)",
             "hosts": [
                 {
-                    "host": "/tmp/path.to.sock/mongodb-27017.sock",
+                    "host": "/tmp/path.to.sock/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://bob:bar@%2Ftmp%2Fpath.to.sock%2Fmongodb-27017.sock/admin",
+            "uri": "merizodb://bob:bar@%2Ftmp%2Fpath.to.sock%2Fmerizodb-27017.sock/admin",
             "valid": true,
             "warning": false
         },
@@ -248,18 +248,18 @@
             "description": "Multiple Unix domain sockets and auth DB (absolute path)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
             ],
             "options": null,
-            "uri": "mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/admin",
+            "uri": "merizodb://%2Ftmp%2Fmerizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock/admin",
             "valid": true,
             "warning": false
         },
@@ -272,12 +272,12 @@
             "description": "Multiple Unix domain sockets and auth DB (absolute path)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
@@ -285,7 +285,7 @@
             "options": {
                 "replicaSet": "replset"
             },
-            "uri": "mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/admin?replicaSet=replset",
+            "uri": "merizodb://%2Ftmp%2Fmerizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock/admin?replicaSet=replset",
             "valid": true,
             "warning": false
         },
@@ -298,12 +298,12 @@
             "description": "Multiple Unix domain sockets with auth and query string (absolute path)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
@@ -311,7 +311,7 @@
             "options": {
                 "w": 1
             },
-            "uri": "mongodb://bob:bar@%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/admin?w=1",
+            "uri": "merizodb://bob:bar@%2Ftmp%2Fmerizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock/admin?w=1",
             "valid": true,
             "warning": false
         }, 
@@ -324,12 +324,12 @@
             "description": "Multiple Unix domain sockets with auth and query string (absolute path)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
@@ -338,7 +338,7 @@
                 "w": 1, 
                 "replicaSet":"replset"
             },
-            "uri": "mongodb://bob:bar@%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/admin?w=1&replicaSet=replset",
+            "uri": "merizodb://bob:bar@%2Ftmp%2Fmerizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock/admin?w=1&replicaSet=replset",
             "valid": true,
             "warning": false
         }, 
@@ -351,12 +351,12 @@
             "description": "Multiple Unix domain sockets with auth and query string (absolute path)",
             "hosts": [
                 {
-                    "host": "/tmp/mongodb-27017.sock",
+                    "host": "/tmp/merizodb-27017.sock",
                     "port": null,
                     "type": "unix"
                 },
                 {
-                    "host": "/tmp/mongodb-27018.sock",
+                    "host": "/tmp/merizodb-27018.sock",
                     "port": null,
                     "type": "unix"
                 }
@@ -365,7 +365,7 @@
                 "w": 1, 
                 "replicaSet":"replset"
             },
-            "uri": "mongodb://bob:bar@%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/admin?replicaSet=replset&w=1",
+            "uri": "merizodb://bob:bar@%2Ftmp%2Fmerizodb-27017.sock,%2Ftmp%2Fmerizodb-27018.sock/admin?replicaSet=replset&w=1",
             "valid": true,
             "warning": false
         }

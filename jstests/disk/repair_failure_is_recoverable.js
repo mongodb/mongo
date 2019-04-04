@@ -1,5 +1,5 @@
 /**
- * This test ensures that a failure during repair does not allow MongoDB to start normally and
+ * This test ensures that a failure during repair does not allow MerizoDB to start normally and
  * requires it to be restarted with --repair again.
  *
  * This is not storage-engine specific.
@@ -19,17 +19,17 @@
     const dbpath = MongoRunner.dataPath + baseName + "/";
     resetDbpath(dbpath);
 
-    let mongod = MongoRunner.runMongod({dbpath: dbpath});
-    const port = mongod.port;
+    let merizod = MongoRunner.runMongod({dbpath: dbpath});
+    const port = merizod.port;
 
-    let testColl = mongod.getDB(dbName)[collName];
+    let testColl = merizod.getDB(dbName)[collName];
 
     assert.commandWorked(testColl.insert({_id: 0, foo: "bar"}));
 
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 
     /**
-     * Test 1. Cause an exit before repairing data. MongoDB should not be able to restart without
+     * Test 1. Cause an exit before repairing data. MerizoDB should not be able to restart without
      * --repair.
      */
     assertRepairFailsWithFailpoint(dbpath, port, exitBeforeRepairParameter);
@@ -45,7 +45,7 @@
     });
 
     /**
-     * Test 2. Fail after repairing data, before invalidating the replica set config. MongoDB should
+     * Test 2. Fail after repairing data, before invalidating the replica set config. MerizoDB should
      * not be able to restart without --repair.
      */
     assertRepairFailsWithFailpoint(dbpath, port, exitBeforeRepairInvalidatesConfigParameter);

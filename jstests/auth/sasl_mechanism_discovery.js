@@ -56,11 +56,11 @@
     runTest(m);
     MongoRunner.stopMongod(m);
 
-    // Test mongos.
+    // Test merizos.
     var st = new ShardingTest({
         shards: 0,
         other: {
-            mongosOptions:
+            merizosOptions:
                 {setParameter: "authenticationMechanisms=PLAIN,SCRAM-SHA-256,SCRAM-SHA-1"}
         }
     });

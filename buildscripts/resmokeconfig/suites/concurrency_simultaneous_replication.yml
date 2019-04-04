@@ -57,7 +57,7 @@ executor:
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1

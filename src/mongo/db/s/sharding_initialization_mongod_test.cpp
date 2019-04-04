@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/config_server_op_observer.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
-#include "mongo/db/s/shard_server_catalog_cache_loader.h"
-#include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/type_shard_identity.h"
-#include "mongo/db/server_options.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config_server_catalog_cache_loader.h"
-#include "mongo/s/shard_server_test_fixture.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/s/config_server_op_observer.h"
+#include "merizo/db/s/op_observer_sharding_impl.h"
+#include "merizo/db/s/shard_server_catalog_cache_loader.h"
+#include "merizo/db/s/shard_server_op_observer.h"
+#include "merizo/db/s/sharding_initialization_merizod.h"
+#include "merizo/db/s/type_shard_identity.h"
+#include "merizo/db/server_options.h"
+#include "merizo/s/catalog/dist_lock_manager_mock.h"
+#include "merizo/s/catalog/sharding_catalog_client_impl.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/config_server_catalog_cache_loader.h"
+#include "merizo/s/shard_server_test_fixture.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const std::string kShardName("TestShard");
@@ -527,4 +527,4 @@ TEST_F(ShardingInitializationMongoDTest,
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

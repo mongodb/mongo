@@ -1,5 +1,5 @@
 /**
- * Test that verifies mongod can start using paths that contain UTF-8 characters that are not ASCII.
+ * Test that verifies merizod can start using paths that contain UTF-8 characters that are not ASCII.
  */
 (function() {
     'use strict';
@@ -22,7 +22,7 @@
         }
 
         let conn = MongoRunner.runMongod(options);
-        assert.neq(null, conn, 'mongod was unable to start up');
+        assert.neq(null, conn, 'merizod was unable to start up');
 
         let coll = conn.getCollection(db_name + ".foo");
         assert.writeOK(coll.insert({_id: 1}));

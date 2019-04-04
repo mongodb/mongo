@@ -57,7 +57,7 @@ func New(username, password, mechanism, service, host string) (saslStepper, erro
 
 	ss := &saslSession{mech: mechanism}
 	if service == "" {
-		service = "mongodb"
+		service = "merizodb"
 	}
 	if i := strings.Index(host, ":"); i >= 0 {
 		host = host[:i]

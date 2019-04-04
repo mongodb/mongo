@@ -42,7 +42,7 @@
     let error = assert.throws(() => cursor.itcount());
 
     if (testDB.runCommand({isdbgrid: 1}).isdbgrid && shellReadMode == 'legacy') {
-        // The cursor will be invalidated on mongos, and we won't be able to find it.
+        // The cursor will be invalidated on merizos, and we won't be able to find it.
         assert.neq(-1, error.message.indexOf('didn\'t exist on server'), error.message);
     } else {
         assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));

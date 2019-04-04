@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
+#include "merizo/db/json.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/s/chunk_manager.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/s/sharding_router_test_fixture.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const double INF = std::numeric_limits<double>::infinity();
@@ -405,7 +405,7 @@ TEST_F(CMCollapseTreeTest, HashedRegex) {
 /**
  * Tests the KeyPattern key bounds generation logic.
  */
-class CMKeyBoundsTest : public mongo::unittest::Test {
+class CMKeyBoundsTest : public merizo::unittest::Test {
 protected:
     void checkBoundList(const BoundList& list, const BoundList& expected) {
         ASSERT_EQUALS(list.size(), expected.size());
@@ -519,4 +519,4 @@ TEST_F(CMKeyBoundsTest, NonPointIntervalExpasion) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

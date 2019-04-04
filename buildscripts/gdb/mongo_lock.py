@@ -100,8 +100,8 @@ class Graph(object):
       {'node_key': {'node': {id: val}, 'next_nodes': [node_key_1, ...]}}
     Example graph:
       {
-       'Lock 1': {'node': {1: 'MongoDB lock'}, 'next_nodes': ['Thread 1']},
-       'Lock 2': {'node': {2: 'MongoDB lock'}, 'next_nodes': ['Thread 2']},
+       'Lock 1': {'node': {1: 'MerizoDB lock'}, 'next_nodes': ['Thread 1']},
+       'Lock 2': {'node': {2: 'MerizoDB lock'}, 'next_nodes': ['Thread 2']},
        'Thread 1': {'node': {1: 123}, 'next_nodes': ['Lock 2']},
        'Thread 2': {'node': {2: 456}, 'next_nodes': ['Lock 1']}
       }
@@ -186,7 +186,7 @@ class Graph(object):
                   ' MODE_IX')
         if message is not None:
             sb.append(message)
-        sb.append('digraph "mongod+lock-status" {')
+        sb.append('digraph "merizod+lock-status" {')
         # Draw the graph from left to right. There can be hundreds of threads blocked by the same
         # resource, but only a few resources involved in a deadlock, so we prefer a long graph
         # than a super wide one. Long resource / thread names would make a wide graph even wider.
@@ -313,10 +313,10 @@ def find_mutex_holder(graph, thread_dict, show):
 
 def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-many-locals
     """Find lock manager holders."""
-    # In versions of MongoDB 4.0 and older, the LockerImpl class is templatized with a boolean
-    # parameter. With the removal of the MMAPv1 storage engine in MongoDB 4.2, the LockerImpl class
+    # In versions of MerizoDB 4.0 and older, the LockerImpl class is templatized with a boolean
+    # parameter. With the removal of the MMAPv1 storage engine in MerizoDB 4.2, the LockerImpl class
     # is no longer templatized.
-    frame = find_frame(r'mongo::LockerImpl(?:\<.*\>)?::')
+    frame = find_frame(r'merizo::LockerImpl(?:\<.*\>)?::')
     if not frame:
         return
 
@@ -326,17 +326,17 @@ def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-
     lock_waiter = thread_dict[lock_waiter_lwpid]
 
     try:
-        locker_ptr_type = gdb.lookup_type("mongo::LockerImpl<false>").pointer()
+        locker_ptr_type = gdb.lookup_type("merizo::LockerImpl<false>").pointer()
     except gdb.error as err:
         # If we don't find the templatized version of the LockerImpl class, then we try to find the
         # non-templatized version.
         if not err.args[0].startswith("No type named"):
             raise
 
-        locker_ptr_type = gdb.lookup_type("mongo::LockerImpl").pointer()
+        locker_ptr_type = gdb.lookup_type("merizo::LockerImpl").pointer()
 
     lock_head = gdb.parse_and_eval(
-        "mongo::getGlobalLockManager()->_getBucket(resId)->findOrInsert(resId)")
+        "merizo::getGlobalLockManager()->_getBucket(resId)->findOrInsert(resId)")
 
     granted_list = lock_head.dereference()["grantedList"]
     lock_request_ptr = granted_list["_front"]
@@ -352,7 +352,7 @@ def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-
         else:
             lock_holder = find_thread(thread_dict, lock_holder_id)
         if show:
-            print("MongoDB Lock at {} held by {} ({}) waited on by {}".format(
+            print("MerizoDB Lock at {} held by {} ({}) waited on by {}".format(
                 lock_head, lock_holder, lock_request["mode"], lock_waiter))
         if graph:
             graph.add_edge(lock_waiter, Lock(long(lock_head), lock_request["mode"]))
@@ -396,45 +396,45 @@ def get_threads_info():
     return thread_dict
 
 
-class MongoDBShowLocks(gdb.Command):
-    """Show MongoDB locks & pthread mutexes."""
+class MerizoDBShowLocks(gdb.Command):
+    """Show MerizoDB locks & pthread mutexes."""
 
     def __init__(self):
-        """Initialize MongoDBShowLocks."""
+        """Initialize MerizoDBShowLocks."""
         RegisterMongoCommand.register(  # pylint: disable=undefined-variable
-            self, "mongodb-show-locks", gdb.COMMAND_DATA)
+            self, "merizodb-show-locks", gdb.COMMAND_DATA)
 
     def invoke(self, *_):
-        """Invoke mongodb_show_locks."""
-        self.mongodb_show_locks()
+        """Invoke merizodb_show_locks."""
+        self.merizodb_show_locks()
 
     @staticmethod
-    def mongodb_show_locks():
+    def merizodb_show_locks():
         """GDB in-process python supplement."""
         try:
             thread_dict = get_threads_info()
             get_locks(graph=None, thread_dict=thread_dict, show=True)
         except gdb.error as err:
-            print("Ignoring GDB error '%s' in mongodb_show_locks" % str(err))
+            print("Ignoring GDB error '%s' in merizodb_show_locks" % str(err))
 
 
-MongoDBShowLocks()
+MerizoDBShowLocks()
 
 
-class MongoDBWaitsForGraph(gdb.Command):
-    """Create MongoDB WaitsFor lock graph [graph_file]."""
+class MerizoDBWaitsForGraph(gdb.Command):
+    """Create MerizoDB WaitsFor lock graph [graph_file]."""
 
     def __init__(self):
-        """Initialize MongoDBWaitsForGraph."""
+        """Initialize MerizoDBWaitsForGraph."""
         RegisterMongoCommand.register(  # pylint: disable=undefined-variable
-            self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
+            self, "merizodb-waitsfor-graph", gdb.COMMAND_DATA)
 
     def invoke(self, arg, *_):
-        """Invoke mongodb_waitsfor_graph."""
-        self.mongodb_waitsfor_graph(arg)
+        """Invoke merizodb_waitsfor_graph."""
+        self.merizodb_waitsfor_graph(arg)
 
     @staticmethod
-    def mongodb_waitsfor_graph(graph_file=None):
+    def merizodb_waitsfor_graph(graph_file=None):
         """GDB in-process python supplement."""
 
         graph = Graph()
@@ -458,9 +458,9 @@ class MongoDBWaitsForGraph(gdb.Command):
                 print(graph.to_graph(nodes=cycle_nodes, message=cycle_message))
 
         except gdb.error as err:
-            print("Ignoring GDB error '%s' in mongod_deadlock_graph" % str(err))
+            print("Ignoring GDB error '%s' in merizod_deadlock_graph" % str(err))
 
 
-MongoDBWaitsForGraph()
+MerizoDBWaitsForGraph()
 
-print("MongoDB Lock analysis commands loaded")
+print("MerizoDB Lock analysis commands loaded")

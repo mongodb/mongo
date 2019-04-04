@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/initialize_server_global_state_gen.h"
+#include "merizo/db/initialize_server_global_state.h"
+#include "merizo/db/initialize_server_global_state_gen.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <iostream>
@@ -45,24 +45,24 @@
 #include <syslog.h>
 #endif
 
-#include "mongo/base/init.h"
-#include "mongo/config.h"
-#include "mongo/db/server_options.h"
-#include "mongo/logger/console_appender.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/message_event.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/logger/ramlog.h"
-#include "mongo/logger/rotatable_file_appender.h"
-#include "mongo/logger/rotatable_file_manager.h"
-#include "mongo/logger/rotatable_file_writer.h"
-#include "mongo/logger/syslog_appender.h"
-#include "mongo/platform/process_id.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/signal_handlers_synchronous.h"
+#include "merizo/base/init.h"
+#include "merizo/config.h"
+#include "merizo/db/server_options.h"
+#include "merizo/logger/console_appender.h"
+#include "merizo/logger/logger.h"
+#include "merizo/logger/message_event.h"
+#include "merizo/logger/message_event_utf8_encoder.h"
+#include "merizo/logger/ramlog.h"
+#include "merizo/logger/rotatable_file_appender.h"
+#include "merizo/logger/rotatable_file_manager.h"
+#include "merizo/logger/rotatable_file_writer.h"
+#include "merizo/logger/syslog_appender.h"
+#include "merizo/platform/process_id.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/processinfo.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/signal_handlers_synchronous.h"
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -70,7 +70,7 @@
 
 namespace fs = boost::filesystem;
 
-namespace mongo {
+namespace merizo {
 
 using std::cerr;
 using std::cout;
@@ -254,7 +254,7 @@ MONGO_INITIALIZER_GENERAL(
             exists = boost::filesystem::exists(absoluteLogpath);
         } catch (boost::filesystem::filesystem_error& e) {
             return Status(ErrorCodes::FileNotOpen,
-                          mongoutils::str::stream() << "Failed probe for \"" << absoluteLogpath
+                          merizoutils::str::stream() << "Failed probe for \"" << absoluteLogpath
                                                     << "\": "
                                                     << e.code().message());
         }
@@ -263,7 +263,7 @@ MONGO_INITIALIZER_GENERAL(
             if (boost::filesystem::is_directory(absoluteLogpath)) {
                 return Status(
                     ErrorCodes::FileNotOpen,
-                    mongoutils::str::stream() << "logpath \"" << absoluteLogpath
+                    merizoutils::str::stream() << "logpath \"" << absoluteLogpath
                                               << "\" should name a file, not a directory.");
             }
 
@@ -276,7 +276,7 @@ MONGO_INITIALIZER_GENERAL(
                           << renameTarget << "\".";
                 } else {
                     return Status(ErrorCodes::FileRenameFailed,
-                                  mongoutils::str::stream()
+                                  merizoutils::str::stream()
                                       << "Could not rename preexisting log file \""
                                       << absoluteLogpath
                                       << "\" to \""
@@ -329,7 +329,7 @@ MONGO_INITIALIZER_GENERAL(
  * case, to avoid static-destructor problems in the server, this exits the
  * process immediately with code EXIT_FAILURE.
  *
- * TODO: Remove once exit() executes safely in mongo server processes.
+ * TODO: Remove once exit() executes safely in merizo server processes.
  */
 static void shortCircuitExit() {
     quickExit(EXIT_FAILURE);
@@ -380,4 +380,4 @@ bool initializeServerGlobalState(ServiceContext* service) {
     return true;
 }
 
-}  // namespace mongo
+}  // namespace merizo

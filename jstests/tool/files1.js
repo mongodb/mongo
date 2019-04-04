@@ -4,7 +4,7 @@ t = new ToolTest("files1");
 
 db = t.startDB();
 
-filename = 'mongod';
+filename = 'merizod';
 if (_isWindows())
     filename += '.exe';
 

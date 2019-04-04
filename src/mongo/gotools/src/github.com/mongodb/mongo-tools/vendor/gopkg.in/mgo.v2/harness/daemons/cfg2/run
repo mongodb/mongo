@@ -7,7 +7,7 @@ if versionAtLeast 3 4; then
 	COMMONCOPTS="--replSet csrs2 $COMMONCOPTS"
 fi
 
-exec mongod $COMMONCOPTS \
+exec merizod $COMMONCOPTS \
 	--port 40102 \
 	--configsvr
 

@@ -1,5 +1,5 @@
 /*
- * SERVER-28990: Tests that a mongod started with --repair doesn't attempt binding to a port.
+ * SERVER-28990: Tests that a merizod started with --repair doesn't attempt binding to a port.
  */
 
 (function() {
@@ -9,9 +9,9 @@
 
     function runTest(conn) {
         let returnCode =
-            runNonMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
+            runNonMongoProgram("merizod", "--port", conn.port, "--repair", "--dbpath", dbpath);
         assert.eq(
-            returnCode, 0, "expected mongod --repair to execute successfully regardless of port");
+            returnCode, 0, "expected merizod --repair to execute successfully regardless of port");
     }
 
     let conn = MongoRunner.runMongod();

@@ -6,51 +6,51 @@
    ...
 }
 {
-   mongod-writes-uninitialized-data-for-journal
+   merizod-writes-uninitialized-data-for-journal
    Memcheck:Param
    write(buf)
    obj:/lib64/libpthread-2.14.90.so
-   fun:_ZN5mongo7LogFile17synchronousAppendEPKvm
+   fun:_ZN5merizo7LogFile17synchronousAppendEPKvm
 }
 {
    NetworkCounter-hit-method-is-race-prone-by-design
    Helgrind:Race
-   fun:_ZN5mongo14NetworkCounter3hitExx
+   fun:_ZN5merizo14NetworkCounter3hitExx
    ...
 }
 {
    OpCounters-methods-use-race-prone-rarely-macro-to-check-for-integer-overflow-gotCommand
    Helgrind:Race
-   fun:_ZN5mongo10OpCounters10gotCommandEv
+   fun:_ZN5merizo10OpCounters10gotCommandEv
    ...
 }
 {
    OpCounters-methods-use-race-prone-rarely-macro-to-check-for-integer-overflow-gotDelete
    Helgrind:Race
-   fun:_ZN5mongo10OpCounters9gotDeleteEv
+   fun:_ZN5merizo10OpCounters9gotDeleteEv
    ...
 }
 {
    OpCounters-methods-use-race-prone-rarely-macro-to-check-for-integer-overflow-gotGetMore
    Helgrind:Race
-   fun:_ZN5mongo10OpCounters10gotGetMoreEv
+   fun:_ZN5merizo10OpCounters10gotGetMoreEv
    ...
 }
 {
    OpCounters-methods-use-race-prone-rarely-macro-to-check-for-integer-overflow-gotInsert
    Helgrind:Race
-   fun:_ZN5mongo10OpCounters9gotInsertEv
+   fun:_ZN5merizo10OpCounters9gotInsertEv
    ...
 }
 {
    OpCounters-methods-use-race-prone-rarely-macro-to-check-for-integer-overflow-gotQuery
    Helgrind:Race
-   fun:_ZN5mongo10OpCounters8gotQueryEv
+   fun:_ZN5merizo10OpCounters8gotQueryEv
    ...
 }
 {
    OpCounters-methods-use-race-prone-rarely-macro-to-check-for-integer-overflow-gotUpdate
    Helgrind:Race
-   fun:_ZN5mongo10OpCounters9gotUpdateEv
+   fun:_ZN5merizo10OpCounters9gotUpdateEv
    ...
 }

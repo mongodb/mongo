@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,22 +31,22 @@
 
 #include <atomic>
 
-#include "mongo/base/status.h"
-#include "mongo/config.h"
-#include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/message_compressor_base.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/service_executor.h"
-#include "mongo/transport/service_executor_task_names.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_mode.h"
+#include "merizo/base/status.h"
+#include "merizo/config.h"
+#include "merizo/db/service_context.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/transport/message_compressor_base.h"
+#include "merizo/transport/service_entry_point.h"
+#include "merizo/transport/service_executor.h"
+#include "merizo/transport/service_executor_task_names.h"
+#include "merizo/transport/session.h"
+#include "merizo/transport/transport_mode.h"
 
-namespace mongo {
+namespace merizo {
 
 /*
  * The ServiceStateMachine holds the state of a single client connection and represents the
@@ -273,4 +273,4 @@ T& operator<<(T& stream, const ServiceStateMachine::State& state) {
     return stream;
 }
 
-}  // namespace mongo
+}  // namespace merizo

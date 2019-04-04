@@ -1,6 +1,6 @@
 /**
- * This tests that updates to user and role definitions made on one mongos propagate properly
- * to other mongoses.
+ * This tests that updates to user and role definitions made on one merizos propagate properly
+ * to other merizoses.
  * @tags: [requires_sharding]
  */
 
@@ -14,7 +14,7 @@ var hasAuthzError = function(result) {
 var st = new ShardingTest({
     shards: 2,
     config: 3,
-    mongos: [
+    merizos: [
         {},
         {setParameter: "userCacheInvalidationIntervalSecs=5"},
         {setParameter: "userCacheInvalidationIntervalSecs=600"}
@@ -62,10 +62,10 @@ db3.auth('spencer', 'pwd');
 
 /**
  * At this point we have 3 handles to the "test" database, each of which are on connections to
- * different mongoses.  "db1", "db2", and "db3" are all auth'd as spencer@test and will be used
- * to verify that user and role data changes get propaged to their mongoses.
- * "db2" is connected to a mongos with a 5 second user cache invalidation interval,
- * while "db3" is connected to a mongos with a 10 minute cache invalidation interval.
+ * different merizoses.  "db1", "db2", and "db3" are all auth'd as spencer@test and will be used
+ * to verify that user and role data changes get propaged to their merizoses.
+ * "db2" is connected to a merizos with a 5 second user cache invalidation interval,
+ * while "db3" is connected to a merizos with a 10 minute cache invalidation interval.
  */
 
 (function testChangingInvalidationInterval() {
@@ -167,7 +167,7 @@ db3.auth('spencer', 'pwd');
 })();
 
 (function testConcurrentUserModification() {
-    jsTestLog("Testing having 2 mongoses modify the same user at the same time");  // SERVER-13850
+    jsTestLog("Testing having 2 merizoses modify the same user at the same time");  // SERVER-13850
 
     assert.writeOK(db1.foo.update({}, {$inc: {a: 1}}));
     assert.writeOK(db3.foo.update({}, {$inc: {a: 1}}));
@@ -217,4 +217,4 @@ db3.auth('spencer', 'pwd');
 
 st.stop();
 
-print("SUCCESS Completed mongos_cache_invalidation.js");
+print("SUCCESS Completed merizos_cache_invalidation.js");

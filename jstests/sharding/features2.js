@@ -2,7 +2,7 @@
 
     "use strict";
 
-    var s = new ShardingTest({name: "features2", shards: 2, mongos: 1});
+    var s = new ShardingTest({name: "features2", shards: 2, merizos: 1});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', s.shard1.shardName);

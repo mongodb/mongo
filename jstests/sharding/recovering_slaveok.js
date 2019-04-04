@@ -12,20 +12,20 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     load("jstests/replsets/rslib.js");
 
     var shardTest =
-        new ShardingTest({name: "recovering_slaveok", shards: 2, mongos: 2, other: {rs: true}});
+        new ShardingTest({name: "recovering_slaveok", shards: 2, merizos: 2, other: {rs: true}});
 
-    var mongos = shardTest.s0;
-    var mongosSOK = shardTest.s1;
-    mongosSOK.setSlaveOk();
+    var merizos = shardTest.s0;
+    var merizosSOK = shardTest.s1;
+    merizosSOK.setSlaveOk();
 
-    var admin = mongos.getDB("admin");
-    var config = mongos.getDB("config");
+    var admin = merizos.getDB("admin");
+    var config = merizos.getDB("config");
 
     const dbName = "test";
-    var dbase = mongos.getDB(dbName);
+    var dbase = merizos.getDB(dbName);
     var coll = dbase.getCollection("foo");
-    var dbaseSOk = mongosSOK.getDB("" + dbase);
-    var collSOk = mongosSOK.getCollection("" + coll);
+    var dbaseSOk = merizosSOK.getDB("" + dbase);
+    var collSOk = merizosSOK.getCollection("" + coll);
 
     var rsA = shardTest.rs0;
     var rsB = shardTest.rs1;
@@ -102,12 +102,12 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     print("10: check our regular and slaveOk query");
 
-    // We need to make sure our nodes are considered accessible from mongos - otherwise we fail
+    // We need to make sure our nodes are considered accessible from merizos - otherwise we fail
     // See SERVER-7274
     awaitRSClientHosts(coll.getMongo(), rsA.nodes, {ok: true});
     awaitRSClientHosts(coll.getMongo(), rsB.nodes, {ok: true});
 
-    // We need to make sure at least one secondary is accessible from mongos - otherwise we fail
+    // We need to make sure at least one secondary is accessible from merizos - otherwise we fail
     // See SERVER-7699
     awaitRSClientHosts(collSOk.getMongo(), [rsA.getSecondaries()[0]], {secondary: true, ok: true});
     awaitRSClientHosts(collSOk.getMongo(), [rsB.getSecondaries()[0]], {secondary: true, ok: true});

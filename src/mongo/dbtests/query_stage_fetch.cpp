@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,21 +31,21 @@
  * This file tests db/exec/fetch.cpp.  Fetch goes to disk so we cannot test outside of a dbtest.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/client.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/exec/fetch.h"
+#include "merizo/db/exec/plan_stage.h"
+#include "merizo/db/exec/queued_data_stage.h"
+#include "merizo/db/json.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/stdx/memory.h"
 
 namespace QueryStageFetch {
 

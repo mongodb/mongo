@@ -342,7 +342,7 @@
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     let cluster = new ShardingTest({
         shards: 1,
-        mongos: 1,
+        merizos: 1,
         keyFile: "jstests/libs/key1",
         other: {shardOptions: {auth: ""}, shardAsReplicaSet: false}
     });

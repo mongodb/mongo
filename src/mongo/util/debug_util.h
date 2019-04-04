@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/config.h"
-#include "mongo/platform/atomic_word.h"
+#include "merizo/config.h"
+#include "merizo/platform/atomic_word.h"
 
-namespace mongo {
+namespace merizo {
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
 constexpr bool kDebugBuild = true;
@@ -58,4 +58,4 @@ private:
 struct Occasionally : SampleEveryNth<16> {};
 struct Rarely : SampleEveryNth<128> {};
 
-}  // namespace mongo
+}  // namespace merizo

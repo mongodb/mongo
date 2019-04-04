@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -15,20 +15,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/failpoint"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/bsonutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/failpoint"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 )
 
 // BSONDump is a container for the user-specified options and
 // internal state used for running bsondump.
 type BSONDump struct {
-	// generic mongo tool options
+	// generic merizo tool options
 	ToolOptions *options.ToolOptions
 
 	// BSONDumpOptions defines options used to control how BSON data is displayed

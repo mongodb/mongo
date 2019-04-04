@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,13 +32,13 @@
 #include <limits>
 #include <wiredtiger.h>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObjBuilder;
 class OperationContext;
@@ -53,7 +53,7 @@ inline bool wt_keeptxnopen() {
 Status wtRCToStatus_slow(int retCode, const char* prefix);
 
 /**
- * converts wiredtiger return codes to mongodb statuses.
+ * converts wiredtiger return codes to merizodb statuses.
  */
 inline Status wtRCToStatus(int retCode, const char* prefix = NULL) {
     if (MONGO_likely(retCode == 0))
@@ -91,7 +91,7 @@ struct WiredTigerItem : public WT_ITEM {
 };
 
 /**
- * Returns a WT_EVENT_HANDLER with MongoDB's default handlers.
+ * Returns a WT_EVENT_HANDLER with MerizoDB's default handlers.
  * The default handlers just log so it is recommended that you consider calling them even if
  * you are capturing the output.
  *
@@ -358,4 +358,4 @@ ResultType WiredTigerUtil::_castStatisticsValue(uint64_t statisticsValue,
         : static_cast<ResultType>(statisticsValue);
 }
 
-}  // namespace mongo
+}  // namespace merizo

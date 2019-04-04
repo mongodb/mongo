@@ -7,7 +7,7 @@
     load("jstests/libs/feature_compatibility_version.js");
 
     const conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
 
     let adminDB = conn.getDB("admin");
 

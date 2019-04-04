@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,46 +27,46 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/sharding_initialization_mongod.h"
+#include "merizo/db/s/sharding_initialization_merizod.h"
 
-#include "mongo/client/connection_string.h"
-#include "mongo/client/global_conn_pool.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/client/remote_command_targeter_factory_impl.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/logical_time_metadata_hook.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/chunk_splitter.h"
-#include "mongo/db/s/periodic_balancer_config_refresher.h"
-#include "mongo/db/s/read_only_catalog_cache_loader.h"
-#include "mongo/db/s/shard_server_catalog_cache_loader.h"
-#include "mongo/db/s/sharding_config_optime_gossip.h"
-#include "mongo/db/s/transaction_coordinator_service.h"
-#include "mongo/db/server_options.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/shard_factory.h"
-#include "mongo/s/client/shard_local.h"
-#include "mongo/s/client/shard_remote.h"
-#include "mongo/s/client/sharding_connection_hook.h"
-#include "mongo/s/config_server_catalog_cache_loader.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_initialization.h"
-#include "mongo/util/log.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/global_conn_pool.h"
+#include "merizo/client/remote_command_targeter.h"
+#include "merizo/client/remote_command_targeter_factory_impl.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/logical_time_metadata_hook.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/ops/update.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/chunk_splitter.h"
+#include "merizo/db/s/periodic_balancer_config_refresher.h"
+#include "merizo/db/s/read_only_catalog_cache_loader.h"
+#include "merizo/db/s/shard_server_catalog_cache_loader.h"
+#include "merizo/db/s/sharding_config_optime_gossip.h"
+#include "merizo/db/s/transaction_coordinator_service.h"
+#include "merizo/db/server_options.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/rpc/metadata/egress_metadata_hook_list.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/shard_connection.h"
+#include "merizo/s/client/shard_factory.h"
+#include "merizo/s/client/shard_local.h"
+#include "merizo/s/client/shard_remote.h"
+#include "merizo/s/client/sharding_connection_hook.h"
+#include "merizo/s/config_server_catalog_cache_loader.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/sharding_initialization.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const auto getInstance = ServiceContext::declareDecoration<ShardingInitializationMongoD>();
@@ -396,7 +396,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
         [service] { return makeEgressHooksList(service); },
         // We only need one task executor here because sharding task executors aren't used for user
-        // queries in mongod.
+        // queries in merizod.
         1));
 
     auto const replCoord = repl::ReplicationCoordinator::get(service);
@@ -406,4 +406,4 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/update_driver.h"
+#include "merizo/db/update/update_driver.h"
 
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/update/log_builder.h"
-#include "mongo/db/update/modifier_table.h"
-#include "mongo/db/update/object_replace_node.h"
-#include "mongo/db/update/path_support.h"
-#include "mongo/db/update/storage_validation.h"
-#include "mongo/util/embedded_builder.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/matcher/expression_leaf.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/update/log_builder.h"
+#include "merizo/db/update/modifier_table.h"
+#include "merizo/db/update/object_replace_node.h"
+#include "merizo/db/update/path_support.h"
+#include "merizo/db/update/storage_validation.h"
+#include "merizo/util/embedded_builder.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
-namespace str = mongoutils::str;
-namespace mb = mongo::mutablebson;
+namespace str = merizoutils::str;
+namespace mb = merizo::mutablebson;
 
 using std::unique_ptr;
 using std::vector;
@@ -171,7 +171,7 @@ void UpdateDriver::parse(
     // Register the fact that this driver is not doing a full object replacement.
     _replacementMode = false;
 
-    // Some versions of mongod support more than one version of the update language and look for a
+    // Some versions of merizod support more than one version of the update language and look for a
     // $v "UpdateSemantics" field when applying an oplog entry, in order to know which version of
     // the update language to apply with. We currently only support the 'kUpdateNode' version, but
     // we parse $v and check its value for compatibility.
@@ -276,7 +276,7 @@ Status UpdateDriver::update(StringData matchedField,
         *docWasModified = !applyResult.noop;
     }
     if (!_replacementMode && _logOp && logOpRec) {
-        // If there are binVersion=3.6 mongod nodes in the replica set, they need to be told that
+        // If there are binVersion=3.6 merizod nodes in the replica set, they need to be told that
         // this update is using the "kUpdateNode" version of the update semantics and not the older
         // update semantics that could be used by a featureCompatibilityVersion=3.4 node.
         //
@@ -335,4 +335,4 @@ bool UpdateDriver::isDocReplacement(const BSONObj& updateExpr) {
     return *updateExpr.firstElementFieldName() != '$';
 }
 
-}  // namespace mongo
+}  // namespace merizo

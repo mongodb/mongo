@@ -1,7 +1,7 @@
 // SERVER-6591: Localhost authentication exception doesn't work right on sharded cluster
 //
 // This test is to ensure that localhost authentication works correctly against a standalone
-// mongod whether it is hosted with "localhost" or a hostname.
+// merizod whether it is hosted with "localhost" or a hostname.
 
 var baseName = "auth_server-6591";
 var dbpath = MongoRunner.dataPath + baseName;
@@ -15,16 +15,16 @@ var createUser = function(db) {
     db.createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
 };
 
-var createRole = function(mongo) {
+var createRole = function(merizo) {
     print("============ adding a role.");
-    mongo.getDB("admin").createRole(
+    merizo.getDB("admin").createRole(
         {role: "roleAdministrator", roles: [{role: "userAdmin", db: "admin"}], privileges: []});
 };
 
-var assertCannotRunCommands = function(mongo) {
+var assertCannotRunCommands = function(merizo) {
     print("============ ensuring that commands cannot be run.");
 
-    var test = mongo.getDB("test");
+    var test = merizo.getDB("test");
     assert.throws(function() {
         test.system.users.findOne();
     });
@@ -52,12 +52,12 @@ var assertCannotRunCommands = function(mongo) {
     // Additional commands not permitted
     // Create non-admin user
     assert.throws(function() {
-        mongo.getDB("test").createUser({user: username, pwd: password, roles: ['readWrite']});
+        merizo.getDB("test").createUser({user: username, pwd: password, roles: ['readWrite']});
     });
     // Create collection
     var authorizeErrorCode = 13;
     assert.commandFailedWithCode(
-        mongo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),
+        merizo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),
         authorizeErrorCode,
         "createCollection");
     // Set/Get system parameters
@@ -79,20 +79,20 @@ var assertCannotRunCommands = function(mongo) {
         var cmd = {setParameter: 1};
         cmd[p.param] = p.val;
         assert.commandFailedWithCode(
-            mongo.getDB("admin").runCommand(cmd), authorizeErrorCode, "setParameter: " + p.param);
+            merizo.getDB("admin").runCommand(cmd), authorizeErrorCode, "setParameter: " + p.param);
     });
     params.forEach(function(p) {
         var cmd = {getParameter: 1};
         cmd[p.param] = 1;
         assert.commandFailedWithCode(
-            mongo.getDB("admin").runCommand(cmd), authorizeErrorCode, "getParameter: " + p.param);
+            merizo.getDB("admin").runCommand(cmd), authorizeErrorCode, "getParameter: " + p.param);
     });
 };
 
-var assertCanRunCommands = function(mongo) {
+var assertCanRunCommands = function(merizo) {
     print("============ ensuring that commands can be run.");
 
-    var test = mongo.getDB("test");
+    var test = merizo.getDB("test");
     // will throw on failure
     test.system.users.findOne();
 
@@ -110,9 +110,9 @@ var assertCanRunCommands = function(mongo) {
         {out: "other"});
 };
 
-var authenticate = function(mongo) {
+var authenticate = function(merizo) {
     print("============ authenticating user.");
-    mongo.getDB("admin").auth(username, password);
+    merizo.getDB("admin").auth(username, password);
 };
 
 var shutdown = function(conn) {
@@ -122,55 +122,55 @@ var shutdown = function(conn) {
 
 var runTest = function(useHostName, useSession) {
     print("==========================");
-    print("starting mongod: useHostName=" + useHostName);
+    print("starting merizod: useHostName=" + useHostName);
     print("==========================");
     var conn = MongoRunner.runMongod({auth: "", dbpath: dbpath, useHostName: useHostName});
 
-    var mongo = new Mongo("localhost:" + conn.port);
+    var merizo = new Mongo("localhost:" + conn.port);
 
-    assertCannotRunCommands(mongo);
+    assertCannotRunCommands(merizo);
 
     if (useSession) {
-        var session = mongo.startSession();
+        var session = merizo.startSession();
         createUser(session.getDatabase("admin"));
         session.endSession();
     } else {
-        createUser(mongo.getDB("admin"));
+        createUser(merizo.getDB("admin"));
     }
 
-    assertCannotRunCommands(mongo);
+    assertCannotRunCommands(merizo);
 
-    authenticate(mongo);
+    authenticate(merizo);
 
-    assertCanRunCommands(mongo);
+    assertCanRunCommands(merizo);
 
     print("============ reconnecting with new client.");
-    mongo = new Mongo("localhost:" + conn.port);
+    merizo = new Mongo("localhost:" + conn.port);
 
-    assertCannotRunCommands(mongo);
+    assertCannotRunCommands(merizo);
 
-    authenticate(mongo);
+    authenticate(merizo);
 
-    assertCanRunCommands(mongo);
+    assertCanRunCommands(merizo);
 
     shutdown(conn);
 };
 
 var runNonlocalTest = function(host) {
     print("==========================");
-    print("starting mongod: non-local host access " + host);
+    print("starting merizod: non-local host access " + host);
     print("==========================");
     var conn = MongoRunner.runMongod({auth: "", dbpath: dbpath});
 
-    var mongo = new Mongo(host + ":" + conn.port);
+    var merizo = new Mongo(host + ":" + conn.port);
 
-    assertCannotRunCommands(mongo);
+    assertCannotRunCommands(merizo);
     assert.throws(function() {
-        mongo.getDB("admin").createUser(
+        merizo.getDB("admin").createUser(
             {user: username, pwd: password, roles: jsTest.adminUserRoles});
     });
     assert.throws(function() {
-        mongo.getDB("$external")
+        merizo.getDB("$external")
             .createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
     });
     shutdown(conn);
@@ -182,14 +182,14 @@ var runNonlocalTest = function(host) {
 // now enabled.
 var runRoleTest = function() {
     var conn = MongoRunner.runMongod({dbpath: dbpath});
-    var mongo = new Mongo("localhost:" + conn.port);
-    assertCanRunCommands(mongo);
-    createRole(mongo);
-    assertCanRunCommands(mongo);
+    var merizo = new Mongo("localhost:" + conn.port);
+    assertCanRunCommands(merizo);
+    createRole(merizo);
+    assertCanRunCommands(merizo);
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({auth: '', dbpath: dbpath, restart: true, cleanData: false});
-    mongo = new Mongo("localhost:" + conn.port);
-    assertCannotRunCommands(mongo);
+    merizo = new Mongo("localhost:" + conn.port);
+    assertCannotRunCommands(merizo);
     MongoRunner.stopMongod(conn);
 };
 

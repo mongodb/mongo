@@ -19,7 +19,7 @@
 
     const st = new ShardingTest({
         shards: 2,
-        mongos: 2,
+        merizos: 2,
         useBridge: true,
         rs: {
             nodes: 1,
@@ -28,24 +28,24 @@
         }
     });
 
-    const mongosDB = st.s0.getDB(jsTestName());
-    const mongosColl = mongosDB[jsTestName()];
+    const merizosDB = st.s0.getDB(jsTestName());
+    const merizosColl = merizosDB[jsTestName()];
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.rs0.getURL());
 
     // Shard the test collection on _id.
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {_id: 1}}));
 
     // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey).
     assert.commandWorked(
-        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
+        merizosDB.adminCommand({split: merizosColl.getFullName(), middle: {_id: 0}}));
 
     // Move the [0, MaxKey) chunk to st.shard1.shardName.
-    assert.commandWorked(mongosDB.adminCommand(
-        {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
+    assert.commandWorked(merizosDB.adminCommand(
+        {moveChunk: merizosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
     function checkStream() {
         load('jstests/libs/change_stream_util.js');  // For assertChangeStreamEventEq.
@@ -80,8 +80,8 @@
         changeStream.close();
     }
 
-    // Start the $changeStream with shard 1 unavailable on the second mongos (s1).  We will be
-    // writing through the first mongos (s0), which will remain connected to all shards.
+    // Start the $changeStream with shard 1 unavailable on the second merizos (s1).  We will be
+    // writing through the first merizos (s0), which will remain connected to all shards.
     st.rs1.getPrimary().disconnect(st.s1);
     let waitForShell = startParallelShell(checkStream, st.s1.port);
 
@@ -91,7 +91,7 @@
                               .getDB('admin')
                               .aggregate([
                                   {"$currentOp": {"idleCursors": true}},
-                                  {"$match": {ns: mongosColl.getFullName(), type: "idleCursor"}}
+                                  {"$match": {ns: merizosColl.getFullName(), type: "idleCursor"}}
 
                               ])
                               .itcount() === 1);
@@ -99,17 +99,17 @@
     // Make sure the shard 0 $changeStream cursor is established before doing the first writes.
     waitForShardCursor(st.rs0);
 
-    assert.writeOK(mongosColl.insert({_id: -1000}, {writeConcern: {w: "majority"}}));
+    assert.writeOK(merizosColl.insert({_id: -1000}, {writeConcern: {w: "majority"}}));
 
     // This write to shard 1 occurs before the $changeStream cursor on shard 1 is open, because the
-    // mongos where the $changeStream is running is disconnected from shard 1.
-    assert.writeOK(mongosColl.insert({_id: 1001}, {writeConcern: {w: "majority"}}));
+    // merizos where the $changeStream is running is disconnected from shard 1.
+    assert.writeOK(merizosColl.insert({_id: 1001}, {writeConcern: {w: "majority"}}));
 
     jsTestLog("Reconnecting");
     st.rs1.getPrimary().reconnect(st.s1);
     waitForShardCursor(st.rs1);
 
-    assert.writeOK(mongosColl.insert({_id: -1002}, {writeConcern: {w: "majority"}}));
+    assert.writeOK(merizosColl.insert({_id: -1002}, {writeConcern: {w: "majority"}}));
     waitForShell();
     st.stop();
 })();

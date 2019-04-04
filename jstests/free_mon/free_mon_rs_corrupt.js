@@ -1,5 +1,5 @@
 // Validate a user manipulating system.version for free monitoring does
-// not crash mongod
+// not crash merizod
 load("jstests/free_mon/libs/free_mon.js");
 
 (function() {

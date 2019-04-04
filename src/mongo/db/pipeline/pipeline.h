@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,19 +34,19 @@
 
 #include <boost/intrusive_ptr.hpp>
 
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/query/async_results_merger_params_gen.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/timer.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/dependencies.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/db/query/explain_options.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/s/query/async_results_merger_params_gen.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/intrusive_counter.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 class BSONObj;
 class BSONObjBuilder;
 class CollatorInterface;
@@ -205,7 +205,7 @@ public:
     bool needsPrimaryShardMerger() const;
 
     /**
-     * Returns 'true' if the pipeline must merge on mongoS.
+     * Returns 'true' if the pipeline must merge on merizoS.
      */
     bool needsMongosMerger() const;
 
@@ -215,13 +215,13 @@ public:
     bool needsShard() const;
 
     /**
-     * Returns true if the pipeline can run on mongoS, but is not obliged to; that is, it can run
-     * either on mongoS or on a shard.
+     * Returns true if the pipeline can run on merizoS, but is not obliged to; that is, it can run
+     * either on merizoS or on a shard.
      */
     bool canRunOnMongos() const;
 
     /**
-     * Returns true if this pipeline must only run on mongoS. Can be called on unsplit or merge
+     * Returns true if this pipeline must only run on merizoS. Can be called on unsplit or merge
      * pipelines, but not on the shards part of a split pipeline.
      */
     bool requiredToRunOnMongos() const;
@@ -243,7 +243,7 @@ public:
      */
     std::vector<Value> serialize() const;
 
-    // The initial source is special since it varies between mongos and mongod.
+    // The initial source is special since it varies between merizos and merizod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
 
     void addFinalSource(boost::intrusive_ptr<DocumentSource> source);
@@ -315,10 +315,10 @@ public:
 
     /**
      * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists
-     * because of linkage requirements. Pipeline needs to function in mongod and mongos. PipelineD
-     * contains extra functionality required in mongod, and which can't appear in mongos because the
+     * because of linkage requirements. Pipeline needs to function in merizod and merizos. PipelineD
+     * contains extra functionality required in merizod, and which can't appear in merizos because the
      * required symbols are unavailable for linking there. Consider PipelineD to be an extension of
-     * this class for mongod only.
+     * this class for merizod only.
      */
     friend class PipelineD;
 
@@ -391,7 +391,7 @@ private:
     void validateCommon() const;
 
     /**
-     * Returns Status::OK if the pipeline can run on mongoS, or an error with a message explaining
+     * Returns Status::OK if the pipeline can run on merizoS, or an error with a message explaining
      * why it cannot.
      */
     Status _pipelineCanRunOnMongoS() const;
@@ -443,4 +443,4 @@ private:
     bool _dismissed = false;
 };
 
-}  // namespace mongo
+}  // namespace merizo

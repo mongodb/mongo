@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
+#include "merizo/db/storage/kv/kv_engine_test_harness.h"
 
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/storage/kv/kv_catalog_feature_tracker.h"
+#include "merizo/db/storage/kv/kv_engine.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using NonRepairableFeature = KVCatalog::FeatureTracker::NonRepairableFeature;
@@ -369,8 +369,8 @@ TEST_F(KVCatalogFeatureTrackerTest,
         auto status = getFeatureTracker()->isCompatibleWithCurrentCode(opCtx.get());
         ASSERT_EQ(ErrorCodes::MustUpgrade, status.code());
         ASSERT_EQ(
-            "The data files use features not recognized by this version of mongod; the NR feature"
-            " bits in positions [ 0 ] aren't recognized by this version of mongod",
+            "The data files use features not recognized by this version of merizod; the NR feature"
+            " bits in positions [ 0 ] aren't recognized by this version of merizod",
             status.reason());
     }
 }
@@ -405,8 +405,8 @@ TEST_F(KVCatalogFeatureTrackerTest,
         auto status = getFeatureTracker()->isCompatibleWithCurrentCode(opCtx.get());
         ASSERT_EQ(ErrorCodes::MustUpgrade, status.code());
         ASSERT_EQ(
-            "The data files use features not recognized by this version of mongod; the NR feature"
-            " bits in positions [ 1, 2 ] aren't recognized by this version of mongod",
+            "The data files use features not recognized by this version of merizod; the NR feature"
+            " bits in positions [ 1, 2 ] aren't recognized by this version of merizod",
             status.reason());
     }
 }
@@ -455,8 +455,8 @@ TEST_F(KVCatalogFeatureTrackerTest, DataFilesAreIncompatibleWithAnUnrecognizedRe
         auto status = getFeatureTracker()->isCompatibleWithCurrentCode(opCtx.get());
         ASSERT_EQ(ErrorCodes::CanRepairToDowngrade, status.code());
         ASSERT_EQ(
-            "The data files use features not recognized by this version of mongod; the R feature"
-            " bits in positions [ 0 ] aren't recognized by this version of mongod",
+            "The data files use features not recognized by this version of merizod; the R feature"
+            " bits in positions [ 0 ] aren't recognized by this version of merizod",
             status.reason());
     }
 }
@@ -489,11 +489,11 @@ TEST_F(KVCatalogFeatureTrackerTest,
         auto status = getFeatureTracker()->isCompatibleWithCurrentCode(opCtx.get());
         ASSERT_EQ(ErrorCodes::CanRepairToDowngrade, status.code());
         ASSERT_EQ(
-            "The data files use features not recognized by this version of mongod; the R feature"
-            " bits in positions [ 1, 2 ] aren't recognized by this version of mongod",
+            "The data files use features not recognized by this version of merizod; the R feature"
+            " bits in positions [ 1, 2 ] aren't recognized by this version of merizod",
             status.reason());
     }
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

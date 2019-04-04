@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
+    var s = new ShardingTest({shards: 2, merizos: 1, other: {chunkSize: 1, enableBalancer: true}});
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', s.shard1.shardName);
@@ -32,7 +32,7 @@
             var x = coll.find({_id: i}).explain();
         } catch (e) {
             // Ignore stale shard version exceptions, since there are many migrations happening, and
-            // mongos may not be able to complete the find within the stale version retries limit.
+            // merizos may not be able to complete the find within the stale version retries limit.
             if (e.message.contains("stale config")) {
                 return;
             }

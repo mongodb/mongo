@@ -162,13 +162,13 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         explainServer = getExplainServer(explain);
         assert.eq(primaryNode.name, explainServer);
 
-        // Check that mongos will try the next tag if nothing matches the first
+        // Check that merizos will try the next tag if nothing matches the first
         explain = getExplain("secondary", [{z: "3"}, {dc: "jp"}]);
         explainServer = getExplainServer(explain);
         checkTag(explainServer, {dc: "jp"});
         assert.eq(1, explain.executionStats.nReturned);
 
-        // Check that mongos will fallback to primary if none of tags given matches
+        // Check that merizos will fallback to primary if none of tags given matches
         explain = getExplain("secondaryPreferred", [{z: "3"}, {dc: "ph"}]);
         explainServer = getExplainServer(explain);
         // Call getPrimary again since the primary could have changed after the restart.

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/client/parallel.h"
+#include "merizo/s/client/parallel.h"
 
-#include "mongo/client/constants.h"
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/client/dbclient_rs.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_exception.h"
+#include "merizo/client/constants.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/client/dbclient_rs.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/shard_connection.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_exception.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::shared_ptr;
 using std::map;
@@ -55,7 +55,7 @@ using std::set;
 using std::string;
 using std::vector;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 namespace {
 
@@ -368,7 +368,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
         if (!rsMonitor->isKnownToHaveGoodPrimary()) {
             state->conn->donotCheckVersion();
 
-            // A side effect of this short circuiting is the mongos will not be able figure out
+            // A side effect of this short circuiting is the merizos will not be able figure out
             // that the primary is now up on it's own and has to rely on other threads to refresh
             // node states.
 
@@ -1350,4 +1350,4 @@ void throwCursorStale(DBClientCursor* cursor) {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -95,7 +95,7 @@ func SplitAndValidateNamespace(namespace string) (string, string, error) {
 	return database, collection, nil
 }
 
-// ValidateFullNamespace validates a full mongodb namespace (database +
+// ValidateFullNamespace validates a full merizodb namespace (database +
 // collection), returning an error if it is invalid.
 func ValidateFullNamespace(namespace string) error {
 
@@ -147,7 +147,7 @@ func ValidateFullNamespace(namespace string) error {
 
 }
 
-// ValidateDBName validates that a string is a valid name for a mongodb
+// ValidateDBName validates that a string is a valid name for a merizodb
 // database. An error is returned if it is not valid.
 func ValidateDBName(database string) error {
 
@@ -167,7 +167,7 @@ func ValidateDBName(database string) error {
 	return nil
 }
 
-// ValidateCollectionName validates that a string is a valid name for a mongodb
+// ValidateCollectionName validates that a string is a valid name for a merizodb
 // collection. An error is returned if it is not valid.
 func ValidateCollectionName(collection string) error {
 	// collection names cannot begin with 'system.'

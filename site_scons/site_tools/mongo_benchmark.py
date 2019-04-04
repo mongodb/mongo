@@ -28,7 +28,7 @@ def build_benchmark(env, target, source, **kwargs):
         bmEnv.Append(LIBS=["ShLwApi.lib"])
 
     libdeps = kwargs.get('LIBDEPS', [])
-    libdeps.append('$BUILD_DIR/mongo/unittest/benchmark_main')
+    libdeps.append('$BUILD_DIR/merizo/unittest/benchmark_main')
 
     kwargs['LIBDEPS'] = libdeps
     kwargs['INSTALL_ALIAS'] = ['benchmarks']

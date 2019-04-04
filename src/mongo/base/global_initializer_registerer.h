@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,8 +32,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/initializer_function.h"
-#include "mongo/base/status.h"
+#include "merizo/base/initializer_function.h"
+#include "merizo/base/status.h"
 
 /**
 * Convenience parameter representing the default set of dependents for initializer functions. Should
@@ -42,14 +42,14 @@
 */
 #define MONGO_DEFAULT_PREREQUISITES_STR "default"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Type representing the act of registering a process-global intialization function.
  *
  * Create a module-global instance of this type to register a new initializer, to be run by a
- * call to a variant of mongo::runGlobalInitializers().  See mongo/base/initializer.h,
- * mongo/base/init.h and mongo/base/initializer_dependency_graph.h for details.
+ * call to a variant of merizo::runGlobalInitializers().  See merizo/base/initializer.h,
+ * merizo/base/init.h and merizo/base/initializer_dependency_graph.h for details.
  */
 class GlobalInitializerRegisterer {
     GlobalInitializerRegisterer(const GlobalInitializerRegisterer&) = delete;
@@ -100,7 +100,7 @@ public:
     * dependents.
     *
     * At run time, the full set of prerequisites for NAME will be computed as the union of the
-    * explicit PREREQUISITES and the set of all other mongo initializers that name NAME in their
+    * explicit PREREQUISITES and the set of all other merizo initializers that name NAME in their
     * list of dependents.
     *
     * Does not support deinitialization and will never be re-initialized.
@@ -177,7 +177,7 @@ public:
     * dependents.
     *
     * At run time, the full set of prerequisites for NAME will be computed as the union of the
-    * explicit PREREQUISITES and the set of all other mongo initializers that name NAME in their
+    * explicit PREREQUISITES and the set of all other merizo initializers that name NAME in their
     * list of dependents.
     *
     * It also provides a deinitialization that will execute in reverse order from initialization and
@@ -249,4 +249,4 @@ inline GlobalInitializerRegisterer::GlobalInitializerRegisterer(
     : GlobalInitializerRegisterer(
           std::move(name), std::move(prerequisites), {}, std::move(initFn), std::move(deinitFn)) {}
 
-}  // namespace mongo
+}  // namespace merizo

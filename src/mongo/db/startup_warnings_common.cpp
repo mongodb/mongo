@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/startup_warnings_common.h"
+#include "merizo/db/startup_warnings_common.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
-#include "mongo/client/authenticate.h"
-#include "mongo/config.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/version.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/config.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/processinfo.h"
+#include "merizo/util/version.h"
 
-namespace mongo {
+namespace merizo {
 
 //
 // system warnings
@@ -57,7 +57,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         auto&& vii = VersionInfoInterface::instance();
         if ((vii.minorVersion() % 2) != 0) {
             log() << startupWarningsLog;
-            log() << "** NOTE: This is a development version (" << vii.version() << ") of MongoDB."
+            log() << "** NOTE: This is a development version (" << vii.version() << ") of MerizoDB."
                   << startupWarningsLog;
             log() << "**       Not recommended for production." << startupWarningsLog;
             warned = true;
@@ -77,7 +77,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     const bool is32bit = sizeof(int*) == 4;
     if (is32bit) {
         log() << startupWarningsLog;
-        log() << "** WARNING: This 32-bit MongoDB binary is deprecated" << startupWarningsLog;
+        log() << "** WARNING: This 32-bit MerizoDB binary is deprecated" << startupWarningsLog;
         warned = true;
     }
 
@@ -104,9 +104,9 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     BOOL wow64Process;
     BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
     if (retWow64 && wow64Process) {
-        log() << "** NOTE: This is a 32-bit MongoDB binary running on a 64-bit operating"
+        log() << "** NOTE: This is a 32-bit MerizoDB binary running on a 64-bit operating"
               << startupWarningsLog;
-        log() << "**      system. Switch to a 64-bit build of MongoDB to" << startupWarningsLog;
+        log() << "**      system. Switch to a 64-bit build of MerizoDB to" << startupWarningsLog;
         log() << "**      support larger databases." << startupWarningsLog;
         warned = true;
     }
@@ -150,4 +150,4 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         log() << startupWarningsLog;
     }
 }
-}  // namespace mongo
+}  // namespace merizo

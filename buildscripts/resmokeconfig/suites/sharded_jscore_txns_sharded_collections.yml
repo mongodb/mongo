@@ -3,11 +3,11 @@ selector:
   roots:
   - jstests/core/txns/**/*.js
   exclude_files:
-  # Profile can only be run against the admin database on mongos.
+  # Profile can only be run against the admin database on merizos.
   - jstests/core/txns/transactions_profiling.js
   - jstests/core/txns/transactions_profiling_with_drops.js
 
-  # No featureCompatibilityVersion parameter on mongos.
+  # No featureCompatibilityVersion parameter on merizos.
   - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
 
   # Mongos doesn't upconvert from local or majority level readConcern to snapshot.
@@ -17,20 +17,20 @@ selector:
   # cluster.
   - jstests/core/txns/transactions_block_ddl.js
 
-  # TODO SERVER-36120: No doTxn command on mongos.
+  # TODO SERVER-36120: No doTxn command on merizos.
   - jstests/core/txns/do_txn_atomicity.js
   - jstests/core/txns/do_txn_basic.js
 
-  # transactionLifetimeLimitSeconds parameter is not available in mongos.
+  # transactionLifetimeLimitSeconds parameter is not available in merizos.
   - jstests/core/txns/abort_expired_transaction.js
   - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
   - jstests/core/txns/kill_op_on_txn_expiry.js
 
-  # Writes to the local database are not allowed through mongos.
+  # Writes to the local database are not allowed through merizos.
   # TODO SERVER-28756: Mongos CSRS write retry logic drops txnNumbers.
   - jstests/core/txns/banned_txn_dbs.js
 
-  # Uses hangAfterCollectionInserts failpoint not available on mongos.
+  # Uses hangAfterCollectionInserts failpoint not available on merizos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
   # Cannot shard a capped collection.
@@ -40,13 +40,13 @@ selector:
   - jstests/core/txns/view_reads_in_transaction.js
 
   exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
+  - assumes_against_merizod_not_merizos
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
-  # Prepare is not a command on mongos.
+  # Prepare is not a command on merizos.
   - uses_prepare_transaction
 executor:
   archive:
@@ -66,10 +66,10 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
-    mongos_options:
+    merizos_options:
       set_parameters:
         enableTestCommands: 1
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1
         # TODO SERVER-38302: Disable the no-op writer.

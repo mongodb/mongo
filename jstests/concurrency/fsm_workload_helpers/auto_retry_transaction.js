@@ -75,7 +75,7 @@ var {withTxnAndAutoRetry} = (function() {
                     // error from abortTransaction because the transaction may have implicitly
                     // been aborted by the server already and will therefore return a
                     // NoSuchTransaction error response.
-                    // We need to call abortTransaction() in order to update the mongo shell's
+                    // We need to call abortTransaction() in order to update the merizo shell's
                     // state such that it agrees no transaction is currently in progress on this
                     // session.
                     session.abortTransaction();

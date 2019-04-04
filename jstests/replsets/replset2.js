@@ -8,7 +8,7 @@ doTest = function(signal) {
     // Create a new replica set test. Specify set name and the number of nodes you want.
     var replTest = new ReplSetTest({name: 'testSet', nodes: 3, oplogSize: 5});
 
-    // call startSet() to start each mongod in the replica set
+    // call startSet() to start each merizod in the replica set
     // this returns a list of nodes
     var nodes = replTest.startSet();
 

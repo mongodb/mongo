@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/variables.h"
-#include "mongo/db/client.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/platform/basic.h"
-#include "mongo/platform/random.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/time_support.h"
+#include "merizo/db/pipeline/variables.h"
+#include "merizo/db/client.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/platform/basic.h"
+#include "merizo/platform/random.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 constexpr Variables::Id Variables::kRootId;
 constexpr Variables::Id Variables::kRemoveId;
@@ -200,7 +200,7 @@ void Variables::generateRuntimeConstants(OperationContext* opCtx) {
         if (auto logicalClock = LogicalClock::get(opCtx); logicalClock) {
             auto clusterTime = logicalClock->getClusterTime();
 
-            // On a standalone mongod the logical clock may not be running and $$CLUSTER_TIME is not
+            // On a standalone merizod the logical clock may not be running and $$CLUSTER_TIME is not
             // available.
             if (clusterTime != LogicalTime::kUninitialized) {
                 _runtimeConstants[kClusterTimeId] = Value(clusterTime.asTimestamp());

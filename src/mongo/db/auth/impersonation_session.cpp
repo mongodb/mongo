@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/impersonation_session.h"
+#include "merizo/db/auth/impersonation_session.h"
 
 #include <boost/optional.hpp>
 #include <tuple>
 
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/resource_pattern.h"
+#include "merizo/db/client.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/rpc/metadata/impersonated_user_metadata.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/destructor_guard.h"
 
-namespace mongo {
+namespace merizo {
 
 ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* opCtx) : _opCtx(opCtx) {
     auto authSession = AuthorizationSession::get(_opCtx->getClient());
@@ -68,4 +68,4 @@ ImpersonationSessionGuard::~ImpersonationSessionGuard() {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

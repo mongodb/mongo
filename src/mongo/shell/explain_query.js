@@ -81,7 +81,7 @@ var DBExplainQuery = (function() {
 
         this._query = query;
         this._verbosity = Explainable.parseVerbosity(verbosity);
-        this._mongo = query._mongo;
+        this._merizo = query._merizo;
         this._finished = false;
 
         // Used if this query is a count, not a find.
@@ -136,7 +136,7 @@ var DBExplainQuery = (function() {
             // Explain always gets pretty printed.
             this._query._prettyShell = true;
 
-            if (this._mongo.hasExplainCommand()) {
+            if (this._merizo.hasExplainCommand()) {
                 // The wire protocol version indicates that the server has the explain command.
                 // Convert this explain query into an explain command, and send the command to
                 // the server.

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <set>
 #include <vector>
 
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_internal.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/client/replica_set_monitor_internal.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::set;
@@ -123,7 +123,7 @@ BSONArray getSingleNoMatchTag() {
 
 BSONArray getMultiNoMatchTag() {
     BSONArrayBuilder arrayBuilder;
-    arrayBuilder.append(BSON("mongo"
+    arrayBuilder.append(BSON("merizo"
                              << "db"));
     arrayBuilder.append(BSON("by"
                              << "10gen"));
@@ -136,7 +136,7 @@ TEST(ReplSetMonitorReadPref, PrimaryOnly) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -150,7 +150,7 @@ TEST(ReplSetMonitorReadPref, PrimaryOnlyPriNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -163,7 +163,7 @@ TEST(ReplSetMonitorReadPref, PrimaryMissing) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -174,7 +174,7 @@ TEST(ReplSetMonitorReadPref, PriPrefWithPriOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 1, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryPreferred, tags, 1, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -188,7 +188,7 @@ TEST(ReplSetMonitorReadPref, PriPrefWithPriNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 1, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryPreferred, tags, 1, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT(host.host() == "a" || host.host() == "c");
@@ -202,7 +202,7 @@ TEST(ReplSetMonitorReadPref, SecOnly) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 1, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryOnly, tags, 1, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -217,7 +217,7 @@ TEST(ReplSetMonitorReadPref, SecOnlyOnlyPriOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 1, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryOnly, tags, 1, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -230,7 +230,7 @@ TEST(ReplSetMonitorReadPref, SecPref) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -245,7 +245,7 @@ TEST(ReplSetMonitorReadPref, SecPrefWithNoSecOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -261,7 +261,7 @@ TEST(ReplSetMonitorReadPref, SecPrefWithNoNodeOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -276,7 +276,7 @@ TEST(ReplSetMonitorReadPref, NearestAllLocal) {
 
     bool isPrimarySelected = 0;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
     // Any host is ok
     ASSERT(!host.empty());
@@ -293,7 +293,7 @@ TEST(ReplSetMonitorReadPref, NearestOneLocal) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
     ASSERT_EQUALS("a", host.host());
     ASSERT(!isPrimarySelected);
@@ -305,7 +305,7 @@ TEST(ReplSetMonitorReadPref, PriOnlyWithTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     // Note: PrimaryOnly ignores tag
@@ -320,7 +320,7 @@ TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTags) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("c", host.host());
@@ -332,7 +332,7 @@ TEST(ReplSetMonitorReadPref, PriPrefPriOkWithTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -346,7 +346,7 @@ TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -357,7 +357,7 @@ TEST(ReplSetMonitorReadPref, SecOnlyWithTags) {
 
     bool isPrimarySelected;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("c", host.host());
@@ -373,7 +373,7 @@ TEST(ReplSetMonitorReadPref, SecOnlyWithTagsMatchOnlyPri) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -384,7 +384,7 @@ TEST(ReplSetMonitorReadPref, SecPrefWithTags) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("c", host.host());
@@ -402,7 +402,7 @@ TEST(ReplSetMonitorReadPref, SecPrefSecNotOkWithTags) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -414,7 +414,7 @@ TEST(ReplSetMonitorReadPref, SecPrefPriOkWithTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -428,7 +428,7 @@ TEST(ReplSetMonitorReadPref, SecPrefPriNotOkWithTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -439,7 +439,7 @@ TEST(ReplSetMonitorReadPref, SecPrefPriOkWithSecNotMatchTag) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -455,7 +455,7 @@ TEST(ReplSetMonitorReadPref, NearestWithTags) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -467,7 +467,7 @@ TEST(ReplSetMonitorReadPref, NearestWithTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -478,7 +478,7 @@ TEST(ReplSetMonitorReadPref, MultiPriOnlyTag) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -492,7 +492,7 @@ TEST(ReplSetMonitorReadPref, MultiPriOnlyPriNotOkTag) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -510,13 +510,13 @@ TEST(ReplSetMonitorReadPref, PriPrefPriOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
 }
 
-class MultiTags : public mongo::unittest::Test {
+class MultiTags : public merizo::unittest::Test {
 public:
     const TagSet& getMatchesFirstTagSet() {
         if (matchFirstTags.get() != NULL) {
@@ -600,7 +600,7 @@ TEST_F(MultiTags, MultiTagsMatchesFirst) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::PrimaryPreferred,
+                                  merizo::ReadPreference::PrimaryPreferred,
                                   getMatchesFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -617,7 +617,7 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesFirstNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::PrimaryPreferred,
+                                  merizo::ReadPreference::PrimaryPreferred,
                                   getMatchesFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -633,7 +633,7 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondTest) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::PrimaryPreferred,
+                                  merizo::ReadPreference::PrimaryPreferred,
                                   getMatchesSecondTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -650,7 +650,7 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondNotOkTest) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::PrimaryPreferred,
+                                  merizo::ReadPreference::PrimaryPreferred,
                                   getMatchesSecondTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -666,7 +666,7 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesLastTest) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::PrimaryPreferred,
+                                  merizo::ReadPreference::PrimaryPreferred,
                                   getMatchesLastTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -683,7 +683,7 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesLastNotOkTest) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::PrimaryPreferred,
+                                  merizo::ReadPreference::PrimaryPreferred,
                                   getMatchesLastTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -698,7 +698,7 @@ TEST(MultiTags, PriPrefPriOkNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -712,7 +712,7 @@ TEST(MultiTags, PriPrefPriNotOkNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -722,7 +722,7 @@ TEST_F(MultiTags, SecOnlyMatchesFirstTest) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryOnly,
+                                  merizo::ReadPreference::SecondaryOnly,
                                   getMatchesFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -738,7 +738,7 @@ TEST_F(MultiTags, SecOnlyMatchesFirstNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryOnly,
+                                  merizo::ReadPreference::SecondaryOnly,
                                   getMatchesFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -752,7 +752,7 @@ TEST_F(MultiTags, SecOnlyMatchesSecond) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryOnly,
+                                  merizo::ReadPreference::SecondaryOnly,
                                   getMatchesSecondTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -768,7 +768,7 @@ TEST_F(MultiTags, SecOnlyMatchesSecondNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryOnly,
+                                  merizo::ReadPreference::SecondaryOnly,
                                   getMatchesSecondTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -782,7 +782,7 @@ TEST_F(MultiTags, SecOnlyMatchesLast) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(), 3, &isPrimarySelected);
+        nodes, merizo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(), 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -795,7 +795,7 @@ TEST_F(MultiTags, SecOnlyMatchesLastNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(), 3, &isPrimarySelected);
+        nodes, merizo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(), 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -805,7 +805,7 @@ TEST_F(MultiTags, SecOnlyMultiTagsWithPriMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::SecondaryOnly, getMatchesPriTagSet(), 3, &isPrimarySelected);
+        nodes, merizo::ReadPreference::SecondaryOnly, getMatchesPriTagSet(), 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -817,7 +817,7 @@ TEST_F(MultiTags, SecOnlyMultiTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -827,7 +827,7 @@ TEST_F(MultiTags, SecPrefMatchesFirst) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
+                                  merizo::ReadPreference::SecondaryPreferred,
                                   getMatchesFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -843,7 +843,7 @@ TEST_F(MultiTags, SecPrefMatchesFirstNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
+                                  merizo::ReadPreference::SecondaryPreferred,
                                   getMatchesFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -857,7 +857,7 @@ TEST_F(MultiTags, SecPrefMatchesSecond) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
+                                  merizo::ReadPreference::SecondaryPreferred,
                                   getMatchesSecondTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -873,7 +873,7 @@ TEST_F(MultiTags, SecPrefMatchesSecondNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
+                                  merizo::ReadPreference::SecondaryPreferred,
                                   getMatchesSecondTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -887,7 +887,7 @@ TEST_F(MultiTags, SecPrefMatchesLast) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
+                                  merizo::ReadPreference::SecondaryPreferred,
                                   getMatchesLastTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -903,7 +903,7 @@ TEST_F(MultiTags, SecPrefMatchesLastNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
+                                  merizo::ReadPreference::SecondaryPreferred,
                                   getMatchesLastTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -917,7 +917,7 @@ TEST_F(MultiTags, SecPrefMultiTagsWithPriMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
+                                  merizo::ReadPreference::SecondaryPreferred,
                                   getMatchesPriTagSet(),
                                   3,
                                   &isPrimarySelected);
@@ -932,7 +932,7 @@ TEST(MultiTags, SecPrefMultiTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -946,7 +946,7 @@ TEST(MultiTags, SecPrefMultiTagsNoMatchPriNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -956,7 +956,7 @@ TEST_F(MultiTags, NearestMatchesFirst) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::Nearest, getMatchesFirstTagSet(), 3, &isPrimarySelected);
+        nodes, merizo::ReadPreference::Nearest, getMatchesFirstTagSet(), 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -977,7 +977,7 @@ TEST(MultiTags, NearestMatchesFirstNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -988,7 +988,7 @@ TEST_F(MultiTags, NearestMatchesSecond) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::Nearest, getMatchesSecondTagSet(), 3, &isPrimarySelected);
+        nodes, merizo::ReadPreference::Nearest, getMatchesSecondTagSet(), 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("c", host.host());
@@ -1011,7 +1011,7 @@ TEST_F(MultiTags, NearestMatchesSecondNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -1022,7 +1022,7 @@ TEST_F(MultiTags, NearestMatchesLast) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3, &isPrimarySelected);
+        nodes, merizo::ReadPreference::Nearest, getMatchesLastTagSet(), 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -1035,7 +1035,7 @@ TEST_F(MultiTags, NeatestMatchesLastNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3, &isPrimarySelected);
+        nodes, merizo::ReadPreference::Nearest, getMatchesLastTagSet(), 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -1045,7 +1045,7 @@ TEST_F(MultiTags, NearestMultiTagsWithPriMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::Nearest, getMatchesPriTagSet(), 3, &isPrimarySelected);
+        nodes, merizo::ReadPreference::Nearest, getMatchesPriTagSet(), 3, &isPrimarySelected);
 
     ASSERT(isPrimarySelected);
     ASSERT_EQUALS("b", host.host());
@@ -1057,7 +1057,7 @@ TEST(MultiTags, NearestMultiTagsNoMatch) {
 
     bool isPrimarySelected = false;
     HostAndPort host =
-        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+        selectNode(nodes, merizo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -1068,4 +1068,4 @@ TEST(TagSet, DefaultConstructorMatchesAll) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

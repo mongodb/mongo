@@ -15,7 +15,7 @@
         other: {
             enableBalancer: true,
             configOptions: x509_options,
-            mongosOptions: x509_options,
+            merizosOptions: x509_options,
             rsOptions: x509_options,
             shardOptions: x509_options,
             shardAsReplicaSet: false

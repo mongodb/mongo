@@ -22,12 +22,12 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
     StandaloneFixture = function() {};
 
     StandaloneFixture.prototype.runLoadPhase = function runLoadPhase(test) {
-        this.mongod = MongoRunner.runMongod({});
-        this.dbpath = this.mongod.dbpath;
+        this.merizod = MongoRunner.runMongod({});
+        this.dbpath = this.merizod.dbpath;
 
-        test.load(this.mongod.getDB("test")[test.name]);
-        assert.commandWorked(this.mongod.getDB("local").dropDatabase());
-        MongoRunner.stopMongod(this.mongod);
+        test.load(this.merizod.getDB("test")[test.name]);
+        assert.commandWorked(this.merizod.getDB("local").dropDatabase());
+        MongoRunner.stopMongod(this.merizod);
     };
 
     StandaloneFixture.prototype.runExecPhase = function runExecPhase(test) {
@@ -36,12 +36,12 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
             var options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
 
-            this.mongod = MongoRunner.runMongod(options);
-            assert.neq(this.mongod, null);
+            this.merizod = MongoRunner.runMongod(options);
+            assert.neq(this.merizod, null);
 
-            test.exec(this.mongod.getDB("test")[test.name]);
+            test.exec(this.merizod.getDB("test")[test.name]);
 
-            MongoRunner.stopMongod(this.mongod);
+            MongoRunner.stopMongod(this.merizod);
         } finally {
             makeDirectoryWritable(this.dbpath);
         }
@@ -54,7 +54,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
     ShardedFixture.prototype.runLoadPhase = function runLoadPhase(test) {
         // TODO: SERVER-33830 remove shardAsReplicaSet: false
         this.shardingTest =
-            new ShardingTest({mongos: 1, shards: this.nShards, other: {shardAsReplicaSet: false}});
+            new ShardingTest({merizos: 1, shards: this.nShards, other: {shardAsReplicaSet: false}});
 
         this.paths = this.shardingTest.getDBPaths();
 
@@ -106,7 +106,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
                 });
             }
 
-            jsTest.log("restarting mongos...");
+            jsTest.log("restarting merizos...");
 
             this.shardingTest.restartMongos(0);
 

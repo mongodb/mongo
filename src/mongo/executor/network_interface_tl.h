@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,17 +31,17 @@
 
 #include <deque>
 
-#include "mongo/client/async_client.h"
-#include "mongo/db/service_context.h"
-#include "mongo/executor/connection_pool.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/transport/baton.h"
-#include "mongo/transport/transport_layer.h"
+#include "merizo/client/async_client.h"
+#include "merizo/db/service_context.h"
+#include "merizo/executor/connection_pool.h"
+#include "merizo/executor/network_interface.h"
+#include "merizo/rpc/metadata/metadata_hook.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/transport/baton.h"
+#include "merizo/transport/transport_layer.h"
 
-namespace mongo {
+namespace merizo {
 namespace executor {
 
 class NetworkInterfaceTL : public NetworkInterface {
@@ -168,4 +168,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace merizo

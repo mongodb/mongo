@@ -3,9 +3,9 @@
 // This test is to ensure that localhost authentication works correctly against a sharded
 // cluster whether they are hosted with "localhost" or a hostname.
 
-// Checking UUID consistency, which occurs on ShardingTest.stop, involves using a mongos to read
+// Checking UUID consistency, which occurs on ShardingTest.stop, involves using a merizos to read
 // data on the config server, but this test uses a special shutdown function which stops the
-// mongoses before calling ShardingTest.stop.
+// merizoses before calling ShardingTest.stop.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 (function() {
@@ -17,9 +17,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     var username = "foo";
     var password = "bar";
 
-    var createUser = function(mongo) {
+    var createUser = function(merizo) {
         print("============ adding a user.");
-        mongo.getDB("admin").createUser(
+        merizo.getDB("admin").createUser(
             {user: username, pwd: password, roles: jsTest.adminUserRoles});
     };
 
@@ -56,11 +56,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         return null;
     };
 
-    var assertCannotRunCommands = function(mongo, st) {
+    var assertCannotRunCommands = function(merizo, st) {
         print("============ ensuring that commands cannot be run.");
 
         // CRUD
-        var test = mongo.getDB("test");
+        var test = merizo.getDB("test");
         assert.throws(function() {
             test.system.users.findOne();
         });
@@ -85,11 +85,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         // Config
         assert.throws(function() {
-            mongo.getDB("config").shards.findOne();
+            merizo.getDB("config").shards.findOne();
         });
 
         var authorizeErrorCode = 13;
-        var res = mongo.getDB("admin").runCommand({
+        var res = merizo.getDB("admin").runCommand({
             moveChunk: "test.foo",
             find: {_id: 1},
             to: st.shard0.shardName  // Arbitrary shard.
@@ -97,7 +97,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         assert.commandFailedWithCode(res, authorizeErrorCode, "moveChunk");
         // Create collection
         assert.commandFailedWithCode(
-            mongo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),
+            merizo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),
             authorizeErrorCode,
             "createCollection");
         // Set/Get system parameters
@@ -118,24 +118,24 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         params.forEach(function(p) {
             var cmd = {setParameter: 1};
             cmd[p.param] = p.val;
-            assert.commandFailedWithCode(mongo.getDB("admin").runCommand(cmd),
+            assert.commandFailedWithCode(merizo.getDB("admin").runCommand(cmd),
                                          authorizeErrorCode,
                                          "setParameter: " + p.param);
         });
         params.forEach(function(p) {
             var cmd = {getParameter: 1};
             cmd[p.param] = 1;
-            assert.commandFailedWithCode(mongo.getDB("admin").runCommand(cmd),
+            assert.commandFailedWithCode(merizo.getDB("admin").runCommand(cmd),
                                          authorizeErrorCode,
                                          "getParameter: " + p.param);
         });
     };
 
-    var assertCanRunCommands = function(mongo, st) {
+    var assertCanRunCommands = function(merizo, st) {
         print("============ ensuring that commands can be run.");
 
         // CRUD
-        var test = mongo.getDB("test");
+        var test = merizo.getDB("test");
 
         // this will throw if it fails
         test.system.users.findOne();
@@ -156,27 +156,27 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         // Config
         // this will throw if it fails
-        mongo.getDB("config").shards.findOne();
+        merizo.getDB("config").shards.findOne();
 
         var to = findEmptyShard(st, "test.foo");
-        var res = mongo.getDB("admin").runCommand({moveChunk: "test.foo", find: {_id: 1}, to: to});
+        var res = merizo.getDB("admin").runCommand({moveChunk: "test.foo", find: {_id: 1}, to: to});
         assert.commandWorked(res);
     };
 
-    var authenticate = function(mongo) {
+    var authenticate = function(merizo) {
         print("============ authenticating user.");
-        mongo.getDB("admin").auth(username, password);
+        merizo.getDB("admin").auth(username, password);
     };
 
     var setupSharding = function(shardingTest) {
-        var mongo = shardingTest.s;
+        var merizo = shardingTest.s;
 
         print("============ enabling sharding on test.foo.");
-        mongo.getDB("admin").runCommand({enableSharding: "test"});
+        merizo.getDB("admin").runCommand({enableSharding: "test"});
         shardingTest.ensurePrimaryShard('test', st.shard1.shardName);
-        mongo.getDB("admin").runCommand({shardCollection: "test.foo", key: {_id: 1}});
+        merizo.getDB("admin").runCommand({shardCollection: "test.foo", key: {_id: 1}});
 
-        var test = mongo.getDB("test");
+        var test = merizo.getDB("test");
         for (var i = 1; i < 20; i++) {
             test.foo.insert({_id: i});
         }
@@ -205,7 +205,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // ShardingTest.stop does not have a way to provide auth
         // information.  Therefore, we'll do this manually for now.
 
-        for (var i = 0; i < st._mongos.length; i++) {
+        for (var i = 0; i < st._merizos.length; i++) {
             var conn = st["s" + i];
             MongoRunner.stopMongos(conn,
                                    /*signal*/ false,
@@ -236,35 +236,35 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     var host = st.s.host;
     var extraShards = [];
 
-    var mongo = new Mongo(host);
+    var merizo = new Mongo(host);
 
-    assertCannotRunCommands(mongo, st);
+    assertCannotRunCommands(merizo, st);
 
     extraShards.push(addShard(st, 1));
-    createUser(mongo);
+    createUser(merizo);
 
-    authenticate(mongo);
+    authenticate(merizo);
     authenticate(st.s);
     setupSharding(st);
 
     addUsersToEachShard(st);
     st.printShardingStatus();
 
-    assertCanRunCommands(mongo, st);
+    assertCanRunCommands(merizo, st);
 
     print("===============================");
     print("reconnecting with a new client.");
     print("===============================");
 
-    mongo = new Mongo(host);
+    merizo = new Mongo(host);
 
-    assertCannotRunCommands(mongo, st);
-    extraShards.push(addShard(mongo, 0));
+    assertCannotRunCommands(merizo, st);
+    extraShards.push(addShard(merizo, 0));
 
-    authenticate(mongo);
+    authenticate(merizo);
 
-    assertCanRunCommands(mongo, st);
-    extraShards.push(addShard(mongo, 1));
+    assertCanRunCommands(merizo, st);
+    extraShards.push(addShard(merizo, 1));
     st.printShardingStatus();
 
     shutdown(st);

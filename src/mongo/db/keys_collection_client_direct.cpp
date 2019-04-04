@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/keys_collection_client_direct.h"
+#include "merizo/db/keys_collection_client_direct.h"
 
 #include <boost/optional.hpp>
 #include <vector>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/keys_collection_document.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/keys_collection_document.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_time.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/catalog/sharding_catalog_client.h"
+#include "merizo/s/write_ops/batched_command_request.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const int kOnErrorNumRetries = 3;
@@ -167,4 +167,4 @@ Status KeysCollectionClientDirect::insertNewKey(OperationContext* opCtx, const B
         opCtx, KeysCollectionDocument::ConfigNS, doc, ShardingCatalogClient::kMajorityWriteConcern);
 }
 
-}  // namespace mongo
+}  // namespace merizo

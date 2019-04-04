@@ -1,7 +1,7 @@
 /*
- * This test checks that when mongod is started with UNIX sockets enabled or disabled,
+ * This test checks that when merizod is started with UNIX sockets enabled or disabled,
  * that we are able to connect (or not connect) and run commands:
- * 1) There should be a default unix socket of /tmp/mongod-portnumber.sock
+ * 1) There should be a default unix socket of /tmp/merizod-portnumber.sock
  * 2) If you specify a custom socket in the bind_ip param, that it shows up as
  *    /tmp/custom_socket.sock
  * 3) That bad socket paths, like paths longer than the maximum size of a sockaddr
@@ -45,16 +45,16 @@
 
         var conn, shards;
         if (optMongos) {
-            shards = new ShardingTest({shards: 1, mongos: 1, other: {mongosOptions: optDict}});
+            shards = new ShardingTest({shards: 1, merizos: 1, other: {merizosOptions: optDict}});
             assert.neq(shards, null, "Expected cluster to start okay");
             conn = shards.s0;
         } else {
             conn = MongoRunner.runMongod(optDict);
         }
 
-        assert.neq(conn, null, `Expected ${optMongos ? "mongos" : "mongod"} to start okay`);
+        assert.neq(conn, null, `Expected ${optMongos ? "merizos" : "merizod"} to start okay`);
 
-        const defaultUNIXSocket = `/tmp/mongodb-${conn.port}.sock`;
+        const defaultUNIXSocket = `/tmp/merizodb-${conn.port}.sock`;
         var checkPath = defaultUNIXSocket;
         if (expectSockPath) {
             checkPath = `${MongoRunner.dataDir}/${expectSockPath}`;
@@ -110,11 +110,11 @@
     mkdir(socketPrefix);
     var port = allocatePort();
     testSockOptions(
-        undefined, `socketdir/mongodb-${port}.sock`, {unixSocketPrefix: socketPrefix, port: port});
+        undefined, `socketdir/merizodb-${port}.sock`, {unixSocketPrefix: socketPrefix, port: port});
 
     port = allocatePort();
     testSockOptions(undefined,
-                    `socketdir/mongodb-${port}.sock`,
+                    `socketdir/merizodb-${port}.sock`,
                     {unixSocketPrefix: socketPrefix, port: port},
                     ',',
                     true);

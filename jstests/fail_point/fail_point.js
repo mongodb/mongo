@@ -5,7 +5,7 @@
 
     /**
      * Performs basic checks on the configureFailPoint command. Also check
-     * mongo/util/fail_point_test.cpp for unit tests.
+     * merizo/util/fail_point_test.cpp for unit tests.
      *
      * @param adminDB {DB} the admin database database object
      */
@@ -86,7 +86,7 @@
     MongoRunner.stopMongod(conn);
 
     ///////////////////////////////////////////////////////////
-    // Test mongos
+    // Test merizos
     var st = new ShardingTest({shards: 1});
     runTest(st.s.getDB('admin'));
     st.stop();

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/implscope.h"
+#include "merizo/scripting/mozjs/implscope.h"
 
 #include <js/CharacterEncoding.h>
 #include <jscustomallocator.h>
 #include <jsfriendapi.h>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/platform/stack_locator.h"
-#include "mongo/scripting/jsexception.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/platform/stack_locator.h"
+#include "merizo/scripting/jsexception.h"
+#include "merizo/scripting/mozjs/objectwrapper.h"
+#include "merizo/scripting/mozjs/valuereader.h"
+#include "merizo/scripting/mozjs/valuewriter.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
 #if !defined(__has_feature)
 #define __has_feature(x) 0
 #endif
 
-using namespace mongoutils;
+using namespace merizoutils;
 
-namespace mongo {
+namespace merizo {
 
 // Generated symbols for JS files
 namespace JSFiles {
@@ -99,7 +99,7 @@ stdx::mutex gRuntimeCreationMutex;
 bool gFirstRuntimeCreated = false;
 
 bool closeToMaxMemory() {
-    return mongo::sm::get_total_bytes() > (kInterruptGCThreshold * mongo::sm::get_max_bytes());
+    return merizo::sm::get_total_bytes() > (kInterruptGCThreshold * merizo::sm::get_max_bytes());
 }
 }  // namespace
 
@@ -224,7 +224,7 @@ void MozJSImplScope::_gcCallback(JSContext* rt, JSGCStatus status, void* data) {
     }
 
     log() << "MozJS GC " << (status == JSGC_BEGIN ? "prologue" : "epilogue") << " heap stats - "
-          << " total: " << mongo::sm::get_total_bytes() << " limit: " << mongo::sm::get_max_bytes();
+          << " total: " << merizo::sm::get_total_bytes() << " limit: " << merizo::sm::get_max_bytes();
 }
 
 #if __has_feature(address_sanitizer)
@@ -273,10 +273,10 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
         warning() << "JavaScript may not be able to initialize with a heap limit less than 10MB.";
     }
     size_t mallocMemoryLimit = 1024ul * 1024 * jsHeapLimit;
-    mongo::sm::reset(mallocMemoryLimit);
+    merizo::sm::reset(mallocMemoryLimit);
 
     // If this runtime isn't running on an NSPR thread, then it is
-    // running on a mongo thread. In that case, we need to insert a
+    // running on a merizo thread. In that case, we need to insert a
     // fake NSPR thread so that the SM runtime can call PR functions
     // without falling over.
     auto thread = PR_GetCurrentThread();
@@ -338,7 +338,7 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
 
         uassert(ErrorCodes::ExceededMemoryLimit,
                 "Out of memory while trying to initialize javascript scope",
-                mallocMemoryLimit == 0 || mongo::sm::get_total_bytes() < mallocMemoryLimit);
+                mallocMemoryLimit == 0 || merizo::sm::get_total_bytes() < mallocMemoryLimit);
 
         const StackLocator locator;
         const auto available = locator.available();
@@ -411,8 +411,8 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _jsThreadProto(_context),
       _maxKeyProto(_context),
       _minKeyProto(_context),
-      _mongoExternalProto(_context),
-      _mongoHelpersProto(_context),
+      _merizoExternalProto(_context),
+      _merizoHelpersProto(_context),
       _nativeFunctionProto(_context),
       _numberDecimalProto(_context),
       _numberIntProto(_context),
@@ -444,7 +444,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
 
     // install global utility functions
     installGlobalUtils(*this);
-    _mongoHelpersProto.install(_global);
+    _merizoHelpersProto.install(_global);
 
     // install process-specific utilities in the global scope (dependancy: types.js, assert.js)
     if (_engine->getScopeInitCallback())
@@ -591,7 +591,7 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
     auto firstElem = args.firstElement();
 
     // The first argument must be the thread start function
-    if (firstElem.type() != mongo::Code)
+    if (firstElem.type() != merizo::Code)
         uasserted(ErrorCodes::BadValue, "first thread argument must be a function");
 
     getScope(_context)->newFunction(firstElem.valueStringData(), &function);
@@ -808,7 +808,7 @@ void MozJSImplScope::externalSetup() {
         installFork();
 
         // install the Mongo function object
-        _mongoExternalProto.install(_global);
+        _merizoExternalProto.install(_global);
         execCoreFiles();
         _connectState = ConnectState::External;
     });
@@ -1000,4 +1000,4 @@ std::string MozJSImplScope::buildStackString() {
 }
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/optional/optional.hpp>
 #include <fstream>
 #include <stdlib.h>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
-#include "mongo/base/initializer_context.h"
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/cidr.h"
-#include "mongo/util/net/private/ssl_expiration.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/net/ssl/apple.hpp"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/init.h"
+#include "merizo/base/initializer_context.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/crypto/sha256_block.h"
+#include "merizo/platform/random.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/cidr.h"
+#include "merizo/util/net/private/ssl_expiration.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/net/ssl/apple.hpp"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_options.h"
 
 using asio::ssl::apple::CFUniquePtr;
 
@@ -65,7 +65,7 @@ using asio::ssl::apple::CFUniquePtr;
  */
 extern "C" SecIdentityRef SecIdentityCreate(CFAllocatorRef, SecCertificateRef, SecKeyRef);
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -78,7 +78,7 @@ constexpr T cf_cast(::CFTypeRef val) {
 // Unix Epoch (and thereby Date_t) is relative to Jan 1, 1970 00:00:00 GMT
 static const ::CFAbsoluteTime k20010101_000000_GMT = 978307200;
 
-::CFStringRef kMongoDBRolesOID = nullptr;
+::CFStringRef kMerizoDBRolesOID = nullptr;
 
 StatusWith<std::string> toString(::CFStringRef str) {
     const auto len =
@@ -398,7 +398,7 @@ StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
     return subjectName;
 }
 
-StatusWith<mongo::Date_t> extractValidityDate(::CFDictionaryRef dict,
+StatusWith<merizo::Date_t> extractValidityDate(::CFDictionaryRef dict,
                                               ::CFStringRef oid,
                                               StringData name) {
     auto swVal = extractDictionaryValue<::CFDictionaryRef>(dict, oid);
@@ -422,11 +422,11 @@ StatusWith<mongo::Date_t> extractValidityDate(::CFDictionaryRef dict,
 }
 
 StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(::CFDictionaryRef dict) {
-    if (!::CFDictionaryContainsKey(dict, kMongoDBRolesOID)) {
+    if (!::CFDictionaryContainsKey(dict, kMerizoDBRolesOID)) {
         return stdx::unordered_set<RoleName>();
     }
 
-    auto swRolesKey = extractDictionaryValue<::CFDictionaryRef>(dict, kMongoDBRolesOID);
+    auto swRolesKey = extractDictionaryValue<::CFDictionaryRef>(dict, kMerizoDBRolesOID);
     if (!swRolesKey.isOK()) {
         return swRolesKey.getStatus();
     }
@@ -1533,7 +1533,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     ::CFArrayAppendValue(oids.get(), ::kSecOIDX509V1SubjectName);
     ::CFArrayAppendValue(oids.get(), ::kSecOIDSubjectAltName);
     if (remoteHost.empty()) {
-        ::CFArrayAppendValue(oids.get(), kMongoDBRolesOID);
+        ::CFArrayAppendValue(oids.get(), kMerizoDBRolesOID);
     }
 
     ::CFErrorRef err = nullptr;
@@ -1557,7 +1557,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     }
 
     if (remoteHost.empty()) {
-        // If this is an SSL server context (on a mongod/mongos)
+        // If this is an SSL server context (on a merizod/merizos)
         // parse any client roles out of the client certificate.
         auto swPeerCertificateRoles = parsePeerRoles(cfdict.get());
         if (!swPeerCertificateRoles.isOK()) {
@@ -1567,7 +1567,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
             SSLPeerInfo(peerSubjectName, std::move(swPeerCertificateRoles.getValue())));
     }
 
-    // If this is an SSL client context (on a MongoDB server or client)
+    // If this is an SSL client context (on a MerizoDB server or client)
     // perform hostname validation of the remote server
     bool sanMatch = false;
     bool cnMatch = false;
@@ -1672,8 +1672,8 @@ std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
 (InitializerContext*) {
-    kMongoDBRolesOID = ::CFStringCreateWithCString(
-        nullptr, mongodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
+    kMerizoDBRolesOID = ::CFStringCreateWithCString(
+        nullptr, merizodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
 
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerApple(sslGlobalParams, isSSLServer);
@@ -1681,4 +1681,4 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

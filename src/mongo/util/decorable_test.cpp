@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/utility.hpp>
 
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/decoration_container.h"
-#include "mongo/util/decoration_registry.h"
-#include "mongo/util/log.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/decorable.h"
+#include "merizo/util/decoration_container.h"
+#include "merizo/util/decoration_registry.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 static int numConstructedAs;
@@ -241,4 +241,4 @@ TEST(DecorableTest, DecorationWithOwner) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

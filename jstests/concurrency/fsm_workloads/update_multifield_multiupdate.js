@@ -23,7 +23,7 @@ var $config = extendWorkload($config, function($config, $super) {
             // If a document's RecordId cannot change, then we should not have updated any document
             // more than once, since the update stage internally de-duplicates based on RecordId.
             assertWhenOwnColl.lte(this.numDocs, res.nMatched, tojson(res));
-        } else {  // mongos
+        } else {  // merizos
             assertAlways.gte(res.nMatched, 0, tojson(res));
         }
 

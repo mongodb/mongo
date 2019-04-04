@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testtype"
 )
 
 func TestAddClientCert(t *testing.T) {

@@ -21,7 +21,7 @@ function CollectionValidator() {
             }
         }
 
-        assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
+        assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a merizod?');
         assert.eq(typeof obj, 'object', 'The `obj` argument must be an object');
         assert(obj.hasOwnProperty('full'), 'Please specify whether to use full validation');
 
@@ -37,7 +37,7 @@ function CollectionValidator() {
             // catalog on the admin database.
             //
             // TODO SERVER-25493: Remove the $exists clause once performing an initial sync from
-            // versions of MongoDB <= 3.2 is no longer supported.
+            // versions of MerizoDB <= 3.2 is no longer supported.
             filter = {$or: [filter, {type: {$exists: false}}]};
         }
 

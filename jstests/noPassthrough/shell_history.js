@@ -11,7 +11,7 @@
     removeFile(tmpHome + ".dbshell");
 
     var args = [];
-    var cmdline = "mongo --nodb";
+    var cmdline = "merizo --nodb";
     var redirection = "";
     var env = {};
     if (_isWindows()) {
@@ -23,7 +23,7 @@
         redirection = "< NUL > NUL";
 
         // USERPROFILE set to the tmp homedir.
-        // Since NUL is a character device, isatty() will return true, which means that .mongorc.js
+        // Since NUL is a character device, isatty() will return true, which means that .merizorc.js
         // will be created in the HOMEDRIVE + HOMEPATH location, so we must set them also.
         if (tmpHome.match("^[a-zA-Z]:")) {
             var tmpHomeDrive = tmpHome.substr(0, 2);
@@ -40,8 +40,8 @@
         args.push("sh");
         args.push("-c");
 
-        // Use the mongo shell from the current dir, same as resmoke.py does.
-        // Doesn't handle resmoke's --mongo= option.
+        // Use the merizo shell from the current dir, same as resmoke.py does.
+        // Doesn't handle resmoke's --merizo= option.
         cmdline = "./" + cmdline;
 
         // Set umask to 0 prior to running the shell.

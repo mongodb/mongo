@@ -7,12 +7,12 @@
 
     const st = new ShardingTest({shards: 2, config: 1});
 
-    const mongosDb = st.s.getDB(jsTestName());
-    const coll = mongosDb.getCollection("foo");
+    const merizosDb = st.s.getDB(jsTestName());
+    const coll = merizosDb.getCollection("foo");
 
     // Enable sharding on the test DB and ensure its primary is shard 0.
-    assert.commandWorked(mongosDb.adminCommand({enableSharding: mongosDb.getName()}));
-    st.ensurePrimaryShard(mongosDb.getName(), st.rs0.getURL());
+    assert.commandWorked(merizosDb.adminCommand({enableSharding: merizosDb.getName()}));
+    st.ensurePrimaryShard(merizosDb.getName(), st.rs0.getURL());
 
     // Shard the collection.
     coll.drop();
@@ -23,7 +23,7 @@
     // Run an aggregation which will fail on shard 1, and verify that the error message contains
     // the host and port of the shard that failed.
     // We need to be careful here to involve some data in the computation that is actually
-    // sent to the shard before failing (i.e. "$_id") so that mongos doesn't short-curcuit and
+    // sent to the shard before failing (i.e. "$_id") so that merizos doesn't short-curcuit and
     // fail during optimization.
     const pipe = [{$project: {a: {$divide: ["$_id", 0]}}}];
     const divideByZeroErrorCode = 16608;

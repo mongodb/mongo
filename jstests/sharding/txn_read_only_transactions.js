@@ -52,7 +52,7 @@
         rs0: {nodes: [{}, {rsConfig: {priority: 0}}]},
         rs1: {nodes: [{}, {rsConfig: {priority: 0}}]},
         config: 1,
-        other: {mongosOptions: {verbose: 3}},
+        other: {merizosOptions: {verbose: 3}},
     });
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));

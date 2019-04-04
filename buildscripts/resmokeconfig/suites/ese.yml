@@ -2,9 +2,9 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/encryptdb/*.js
+  - src/merizo/db/modules/*/jstests/encryptdb/*.js
 
-# Encrypted storage engine tests start their own mongod processes
+# Encrypted storage engine tests start their own merizod processes
 executor:
   config:
     shell_options:

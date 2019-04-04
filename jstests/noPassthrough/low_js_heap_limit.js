@@ -12,7 +12,7 @@
     const e = assert.throws(() => db.foo.findOne({$where: 'sleep(10000);'}));
     assert.eq(e.code, ErrorCodes.ExceededMemoryLimit);
 
-    var returnCode = runProgram("mongo", "--jsHeapLimitMB=1", "--nodb", "--eval='exit();'");
+    var returnCode = runProgram("merizo", "--jsHeapLimitMB=1", "--nodb", "--eval='exit();'");
     assert.eq(returnCode, 1);
     MongoRunner.stopMongod(conn);
 }());

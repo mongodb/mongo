@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-// RecordCommand stores settings for the mongoreplay 'record' subcommand
+// RecordCommand stores settings for the merizoreplay 'record' subcommand
 type RecordCommand struct {
 	GlobalOpts *Options `no-flag:"true"`
 	OpStreamSettings
@@ -35,7 +35,7 @@ func (e ErrPacketsDropped) Error() string {
 
 type packetHandlerContext struct {
 	packetHandler *PacketHandler
-	mongoOpStream *MongoOpStream
+	merizoOpStream *MongoOpStream
 	pcapHandle    *pcap.Handle
 }
 
@@ -170,9 +170,9 @@ func Record(ctx *packetHandlerContext,
 	go func() {
 		defer close(ch)
 		var fail error
-		for op := range ctx.mongoOpStream.Ops {
+		for op := range ctx.merizoOpStream.Ops {
 			// since we don't currently have a way to shutdown packetHandler.Handle()
-			// continue to read from ctx.mongoOpStream.Ops even after a fatal error
+			// continue to read from ctx.merizoOpStream.Ops even after a fatal error
 			if fail != nil {
 				toolDebugLogger.Logvf(DebugHigh, "not recording op because of record error %v", fail)
 				continue
@@ -195,7 +195,7 @@ func Record(ctx *packetHandlerContext,
 		ch <- fail
 	}()
 
-	if err := ctx.packetHandler.Handle(ctx.mongoOpStream, -1); err != nil {
+	if err := ctx.packetHandler.Handle(ctx.merizoOpStream, -1); err != nil {
 		return fmt.Errorf("record: error handling packet stream: %s", err)
 	}
 

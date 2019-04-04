@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/catalog/replset_dist_lock_manager.h"
+#include "merizo/s/catalog/replset_dist_lock_manager.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/catalog/dist_lock_catalog.h"
-#include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/s/catalog/type_locks.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/service_context.h"
+#include "merizo/s/catalog/dist_lock_catalog.h"
+#include "merizo/s/catalog/type_lockpings.h"
+#include "merizo/s/catalog/type_locks.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/stdx/chrono.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/concurrency/thread_name.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/time_support.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DEFINE(setDistLockTimeout);
 
@@ -508,4 +508,4 @@ void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID,
     _unlockList.push_back(std::make_pair(lockSessionID, name));
 }
 
-}  // namespace mongo
+}  // namespace merizo

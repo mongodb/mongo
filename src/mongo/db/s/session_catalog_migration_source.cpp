@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/session_catalog_migration_source.h"
+#include "merizo/db/s/session_catalog_migration_source.h"
 
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/session.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/session.h"
+#include "merizo/db/session_txn_record_gen.h"
+#include "merizo/db/transaction_history_iterator.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/platform/random.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
@@ -401,4 +401,4 @@ repl::OplogEntry SessionCatalogMigrationSource::SessionOplogIterator::getNext(
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,4 +1,4 @@
-// Confirms basic killOp execution via mongos.
+// Confirms basic killOp execution via merizos.
 // @tags: [requires_replication, requires_sharding]
 
 (function() {

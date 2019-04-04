@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/shutdown.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/log_process_details.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/ntservice.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/ramlog.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/shutdown.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/log_process_details.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/ntservice.h"
+#include "merizo/util/processinfo.h"
+#include "merizo/util/ramlog.h"
 
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::string;
@@ -361,4 +361,4 @@ void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

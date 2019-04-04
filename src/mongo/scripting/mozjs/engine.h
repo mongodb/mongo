@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,13 +31,13 @@
 
 #include <jsapi.h>
 
-#include "mongo/scripting/deadline_monitor.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "merizo/scripting/deadline_monitor.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/concurrency/mutex.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 class MozJSImplScope;
@@ -46,13 +46,13 @@ class MozJSImplScope;
  * Implements the global ScriptEngine interface for MozJS.  The associated TU
  * pulls this in for the polymorphic globalScriptEngine.
  */
-class MozJSScriptEngine final : public mongo::ScriptEngine {
+class MozJSScriptEngine final : public merizo::ScriptEngine {
 public:
     MozJSScriptEngine();
     ~MozJSScriptEngine() override;
 
-    mongo::Scope* createScope() override;
-    mongo::Scope* createScopeForCurrentThread() override;
+    merizo::Scope* createScope() override;
+    merizo::Scope* createScopeForCurrentThread() override;
 
     void runTest() override {}
 
@@ -94,11 +94,11 @@ private:
     stdx::mutex _globalInterruptLock;
 
     using OpIdToScopeMap = stdx::unordered_map<unsigned, MozJSImplScope*>;
-    OpIdToScopeMap _opToScopeMap;  // map of mongo op ids to scopes (protected by
+    OpIdToScopeMap _opToScopeMap;  // map of merizo op ids to scopes (protected by
                                    // _globalInterruptLock).
 
     DeadlineMonitor<MozJSImplScope> _deadlineMonitor;
 };
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

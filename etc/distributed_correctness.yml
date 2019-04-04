@@ -52,7 +52,7 @@ functions:
           cd ./clusters/${cluster}
           # stage aws credential for terraform
           cp ../../terraform/* .
-          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/mongod-${version_id}.tar.gz
+          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/merizod-${version_id}.tar.gz
           # generate aws private key file
           echo "${ec2_pem}" > ../../keys/aws.pem
           chmod 400 ../../keys/aws.pem
@@ -64,7 +64,7 @@ functions:
         working_dir: src/dsi/dsi
         silent: true
         script: |
-          # to create a mongod EC2 cluster
+          # to create a merizod EC2 cluster
           set -e
           set -v
           cd ./clusters/${cluster}
@@ -102,9 +102,9 @@ functions:
           cd ./clusters/${cluster}
           tar -xf cluster_config.tgz
 
-  "configure mongodb cluster":
+  "configure merizodb cluster":
     - command: shell.exec
-      # bring up the mongod
+      # bring up the merizod
       params:
         working_dir: src/dsi/dsi
         script: |
@@ -112,9 +112,9 @@ functions:
           set -v
           source ./venv/bin/activate
           cd ./clusters/${cluster}
-          cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          ../../bin/mongodb_setup.py --config
-          echo "${cluster} MongoDB Cluster STARTED."
+          cp merizodb_setup.${setup}.${storageEngine}.yml merizodb_setup.yml
+          ../../bin/merizodb_setup.py --config
+          echo "${cluster} MerizoDB Cluster STARTED."
 
   "run test":
     - command: shell.exec
@@ -253,25 +253,25 @@ tasks:
 
           ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} core
 
-          mkdir -p mongodb/bin
-          strip mongo
-          strip mongod
-          strip mongos
-          mv mongo mongodb/bin
-          mv mongod mongodb/bin
-          mv mongos mongodb/bin
-          tar cvf mongodb.tar mongodb
-          gzip mongodb.tar
+          mkdir -p merizodb/bin
+          strip merizo
+          strip merizod
+          strip merizos
+          mv merizo merizodb/bin
+          mv merizod merizodb/bin
+          mv merizos merizodb/bin
+          tar cvf merizodb.tar merizodb
+          gzip merizodb.tar
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb.tar.gz
-        remote_file: dsi/${version_id}/${revision}/mongod-${version_id}.tar.gz
+        local_file: src/merizodb.tar.gz
+        remote_file: dsi/${version_id}/${revision}/merizod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb.tar.gz
+        display_name: merizodb.tar.gz
 
 # The distributed_correctness_suite_1 task runs the "bring up cluster" task and is
 # the only one to do so - all other tasks run "restore cluster".  As such,
@@ -287,7 +287,7 @@ tasks:
   commands:
     - func: "prepare environment"
     - func: "bring up cluster"
-    - func: "configure mongodb cluster"
+    - func: "configure merizodb cluster"
       vars:
         storageEngine: "wiredTiger"
 
@@ -332,7 +332,7 @@ buildvariants:
     - dsi
     - workloads
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v3/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/merizodbtoolchain/v3/bin/gcc CXX=/opt/merizodbtoolchain/v3/bin/g++ OBJCOPY=/opt/merizodbtoolchain/v3/bin/objcopy
     setup: standalone
     cluster: single-correctness
     use_scons_cache: true

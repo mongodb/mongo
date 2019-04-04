@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,33 +31,33 @@
  * Connect to a Mongo database as a database, from C++.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/dbclient_cursor.h"
+#include "merizo/client/dbclient_cursor.h"
 
-#include "mongo/client/connpool.h"
-#include "mongo/db/client.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/bufreader.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/destructor_guard.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/client/connpool.h"
+#include "merizo/db/client.h"
+#include "merizo/db/dbmessage.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/getmore_request.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/rpc/factory.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/metadata.h"
+#include "merizo/rpc/object_check.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/bufreader.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/destructor_guard.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::endl;
@@ -108,7 +108,7 @@ Message DBClientCursor::_assembleInit() {
         // invalid options, we validate them here, and fall back to generating an OP_QUERY
         // through assembleQueryRequest if the options are invalid.
         bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
-        bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
+        bool hasValidFlagsForCommand = !(opts & merizo::QueryOption_Exhaust);
         bool hasInvalidMaxTimeMs = query.hasField("$maxTimeMS");
 
         if (hasValidNToReturnForCommand && hasValidFlagsForCommand && !hasInvalidMaxTimeMs) {
@@ -596,4 +596,4 @@ void DBClientCursor::kill() {
 }
 
 
-}  // namespace mongo
+}  // namespace merizo

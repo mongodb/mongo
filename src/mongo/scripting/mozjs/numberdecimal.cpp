@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/numberdecimal.h"
+#include "merizo/scripting/mozjs/numberdecimal.h"
 
-#include "mongo/platform/decimal128.h"
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/text.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/scripting/mozjs/implscope.h"
+#include "merizo/scripting/mozjs/objectwrapper.h"
+#include "merizo/scripting/mozjs/valuereader.h"
+#include "merizo/scripting/mozjs/valuewriter.h"
+#include "merizo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec NumberDecimalInfo::methods[3] = {
@@ -115,4 +115,4 @@ void NumberDecimalInfo::make(JSContext* cx, JS::MutableHandleValue thisv, Decima
 }
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

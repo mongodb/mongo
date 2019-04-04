@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "merizo/dbtests/mock/mock_remote_db_server.h"
 
 #include <tuple>
 
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/time_support.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/rpc/metadata.h"
+#include "merizo/rpc/op_msg_rpc_impls.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/time_support.h"
 
 using std::string;
 using std::vector;
 
-namespace mongo {
+namespace merizo {
 
 MockRemoteDBServer::CircularBSONIterator::CircularBSONIterator(const vector<BSONObj>& replyVector) {
-    for (std::vector<mongo::BSONObj>::const_iterator iter = replyVector.begin();
+    for (std::vector<merizo::BSONObj>::const_iterator iter = replyVector.begin();
          iter != replyVector.end();
          ++iter) {
         _replyObjs.push_back(iter->copy());
@@ -109,7 +109,7 @@ bool MockRemoteDBServer::isRunning() const {
     return _isRunning;
 }
 
-void MockRemoteDBServer::setCommandReply(const string& cmdName, const mongo::BSONObj& replyObj) {
+void MockRemoteDBServer::setCommandReply(const string& cmdName, const merizo::BSONObj& replyObj) {
     vector<BSONObj> replySequence;
     replySequence.push_back(replyObj);
     setCommandReply(cmdName, replySequence);
@@ -137,7 +137,7 @@ void MockRemoteDBServer::remove(const string& ns, Query query, int flags) {
     _dataMgr.erase(ns);
 }
 
-void MockRemoteDBServer::assignCollectionUuid(const std::string& ns, const mongo::UUID& uuid) {
+void MockRemoteDBServer::assignCollectionUuid(const std::string& ns, const merizo::UUID& uuid) {
     scoped_spinlock sLock(_lock);
     _uuidToNs[uuid] = ns;
 }
@@ -158,7 +158,7 @@ rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgReques
     }
 
     if (_delayMilliSec > 0) {
-        mongo::sleepmillis(_delayMilliSec);
+        merizo::sleepmillis(_delayMilliSec);
     }
 
     checkIfUp(id);
@@ -175,9 +175,9 @@ rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgReques
     return rpc::UniqueReply(std::move(message), std::move(replyView));
 }
 
-mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
+merizo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
                                            const NamespaceStringOrUUID& nsOrUuid,
-                                           mongo::Query query,
+                                           merizo::Query query,
                                            int nToReturn,
                                            int nToSkip,
                                            const BSONObj* fieldsToReturn,
@@ -186,7 +186,7 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
     checkIfUp(id);
 
     if (_delayMilliSec > 0) {
-        mongo::sleepmillis(_delayMilliSec);
+        merizo::sleepmillis(_delayMilliSec);
     }
 
     checkIfUp(id);
@@ -204,8 +204,8 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
     return BSONArray(result.obj());
 }
 
-mongo::ConnectionString::ConnectionType MockRemoteDBServer::type() const {
-    return mongo::ConnectionString::CUSTOM;
+merizo::ConnectionString::ConnectionType MockRemoteDBServer::type() const {
+    return merizo::ConnectionString::CUSTOM;
 }
 
 size_t MockRemoteDBServer::getCmdCount() const {
@@ -236,7 +236,7 @@ void MockRemoteDBServer::checkIfUp(InstanceID id) const {
     scoped_spinlock sLock(_lock);
 
     if (!_isRunning || id < _instanceID) {
-        throwSocketError(mongo::SocketErrorKind::CLOSED, _hostAndPort);
+        throwSocketError(merizo::SocketErrorKind::CLOSED, _hostAndPort);
     }
 }
 }

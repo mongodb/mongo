@@ -10,9 +10,9 @@
 
     // TODO (SERVER-38673): Remove this once BACKPORT-3428, BACKPORT-3429 are completed.
     if (!jsTestOptions().enableMajorityReadConcern &&
-        jsTestOptions().mongosBinVersion === 'last-stable') {
+        jsTestOptions().merizosBinVersion === 'last-stable') {
         jsTestLog(
-            "Skipping test since 'last-stable' mongos doesn't support speculative majority update lookup queries.");
+            "Skipping test since 'last-stable' merizos doesn't support speculative majority update lookup queries.");
         return;
     }
 
@@ -29,26 +29,26 @@
         rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
     });
 
-    const mongosDB = st.s0.getDB(jsTestName());
-    const mongosColl = mongosDB[jsTestName()];
+    const merizosDB = st.s0.getDB(jsTestName());
+    const merizosColl = merizosDB[jsTestName()];
 
     // Enable sharding, shard on _id, and insert a test document which will be updated later.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
-    assert.writeOK(mongosColl.insert({_id: 1}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {_id: 1}}));
+    assert.writeOK(merizosColl.insert({_id: 1}));
 
-    // Verify that the pipeline splits and merges on mongoS despite only targeting a single shard.
+    // Verify that the pipeline splits and merges on merizoS despite only targeting a single shard.
     const explainPlan = assert.commandWorked(
-        mongosColl.explain().aggregate([{$changeStream: {fullDocument: "updateLookup"}}]));
+        merizosColl.explain().aggregate([{$changeStream: {fullDocument: "updateLookup"}}]));
     assert.neq(explainPlan.splitPipeline, null);
-    assert.eq(explainPlan.mergeType, "mongos");
+    assert.eq(explainPlan.mergeType, "merizos");
 
     // Open a $changeStream on the collection with 'updateLookup' and update the test doc.
-    const stream = mongosColl.watch([], {fullDocument: "updateLookup"});
-    const wholeDbStream = mongosDB.watch([], {fullDocument: "updateLookup"});
+    const stream = merizosColl.watch([], {fullDocument: "updateLookup"});
+    const wholeDbStream = merizosDB.watch([], {fullDocument: "updateLookup"});
 
-    mongosColl.update({_id: 1}, {$set: {updated: true}});
+    merizosColl.update({_id: 1}, {$set: {updated: true}});
 
     // Verify that the document is successfully retrieved from the single-collection and whole-db
     // change streams.

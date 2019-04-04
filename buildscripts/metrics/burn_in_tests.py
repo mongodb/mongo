@@ -30,7 +30,7 @@ BURN_IN_TIME_MS = BURN_IN_TIME_SEC * 1000
 BURN_IN_TASKS_EXCEED = "burn_in_tasks_exceeding_{}s".format(BURN_IN_TIME_SEC)
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
-DEFAULT_PROJECT = "mongodb-mongo-master"
+DEFAULT_PROJECT = "merizodb-merizo-master"
 DEFAULT_DAYS = 28
 
 DEFAULT_REPORT_FILE = "burn_in_tests_metrics.json"

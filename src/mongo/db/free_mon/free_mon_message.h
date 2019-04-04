@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,13 +32,13 @@
 #include <condition_variable>
 #include <vector>
 
-#include "mongo/db/free_mon/free_mon_protocol_gen.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/time_support.h"
+#include "merizo/db/free_mon/free_mon_protocol_gen.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/duration.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Message types for free monitoring.
@@ -410,4 +410,4 @@ private:
 
 using FreeMonRegisterCommandMessage =
     FreeMonWaitableMessageWithPayload<FreeMonMessageType::RegisterCommand>;
-}  // namespace mongo
+}  // namespace merizo

@@ -22,7 +22,7 @@
     // this test and to allow mocking certain responses.
     let cmdObjsSeen = [];
     let mockNetworkError, mockFirstResponse, mockFirstCommitResponse;
-    const mongoRunCommandOriginal = Mongo.prototype.runCommand;
+    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
     Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
         cmdObjsSeen.push(cmdObj);
 
@@ -44,7 +44,7 @@
             return mockedRes;
         }
 
-        return mongoRunCommandOriginal.apply(this, arguments);
+        return merizoRunCommandOriginal.apply(this, arguments);
     };
 
     // Runs the given function with a collection from a session made with the sessionOptions on

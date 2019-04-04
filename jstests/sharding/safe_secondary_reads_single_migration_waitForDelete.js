@@ -20,7 +20,7 @@
     "use strict";
 
     load('jstests/libs/profiler.js');
-    load('jstests/sharding/libs/last_stable_mongos_commands.js');
+    load('jstests/sharding/libs/last_stable_merizos_commands.js');
 
     let db = "test";
     let coll = "foo";
@@ -71,8 +71,8 @@
         addShard: {skip: "primary only"},
         addShardToZone: {skip: "primary only"},
         aggregate: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {aggregate: coll, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}},
             checkResults: function(res) {
@@ -108,8 +108,8 @@
         connectionStatus: {skip: "does not return user data"},
         convertToCapped: {skip: "primary only"},
         count: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {count: coll, query: {x: 1}},
             checkResults: function(res) {
@@ -130,9 +130,9 @@
         dbStats: {skip: "does not return user data"},
         delete: {skip: "primary only"},
         distinct: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {distinct: coll, key: "x"},
             checkResults: function(res) {
@@ -158,8 +158,8 @@
         features: {skip: "does not return user data"},
         filemd5: {skip: "does not return user data"},
         find: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {find: coll, filter: {x: 1}},
             checkResults: function(res) {
@@ -174,7 +174,7 @@
         forceerror: {skip: "does not return user data"},
         fsync: {skip: "does not return user data"},
         fsyncUnlock: {skip: "does not return user data"},
-        geoSearch: {skip: "not supported in mongos"},
+        geoSearch: {skip: "not supported in merizos"},
         getCmdLineOpts: {skip: "does not return user data"},
         getDiagnosticData: {skip: "does not return user data"},
         getLastError: {skip: "primary only"},
@@ -210,9 +210,9 @@
         logout: {skip: "does not return user data"},
         makeSnapshot: {skip: "does not return user data"},
         mapReduce: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {
                 mapReduce: coll,
@@ -316,7 +316,7 @@
 
     // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
     let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};
-    let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
+    let st = new ShardingTest({merizos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
 
     let recipientShardPrimary = st.rs1.getPrimary();
     let donorShardSecondary = st.rs0.getSecondary();
@@ -353,9 +353,9 @@
 
         assert.commandWorked(staleMongos.adminCommand({split: nss, middle: {x: 0}}));
 
-        // Do dummy read from the stale mongos so it loads the routing table into memory once.
+        // Do dummy read from the stale merizos so it loads the routing table into memory once.
         // Additionally, do a secondary read to ensure that the secondary has loaded the initial
-        // routing table -- the first read to the primary will refresh the mongos' shardVersion,
+        // routing table -- the first read to the primary will refresh the merizos' shardVersion,
         // which will then be used against the secondary to ensure the secondary is fresh.
         assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
         assert.commandWorked(freshMongos.getDB(db).runCommand(
@@ -373,7 +373,7 @@
         assert.commandWorked(donorShardSecondary.getDB(db).setProfilingLevel(2));
         assert.commandWorked(recipientShardSecondary.getDB(db).setProfilingLevel(2));
 
-        // Do a moveChunk from the fresh mongos to make the other mongos stale.
+        // Do a moveChunk from the fresh merizos to make the other merizos stale.
         // Use {w:2} (all) write concern so the metadata change gets persisted to the secondary
         // before stalely versioned commands are sent against the secondary.
         assert.commandWorked(freshMongos.adminCommand({
@@ -427,7 +427,7 @@
             });
 
             // Check that the recipient shard secondary received the request and returned stale
-            // shardVersion once, even though the mongos is fresh, because the secondary was
+            // shardVersion once, even though the merizos is fresh, because the secondary was
             // stale.
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: donorShardSecondary.getDB(db),

@@ -4,11 +4,11 @@ var shardOpts = [
 ];
 
 var st = new ShardingTest({shards: shardOpts});
-var mongos = st.s;
+var merizos = st.s;
 
 st.shardColl('bar', {x: 1});
 
-var testDB = mongos.getDB('test');
+var testDB = merizos.getDB('test');
 var coll = testDB.bar;
 
 coll.insert({x: 1});
@@ -25,11 +25,11 @@ var mrResult = testDB.runCommand({mapreduce: 'bar', map: map, reduce: reduce, ou
 
 assert.eq(0, mrResult.ok, 'mr result: ' + tojson(mrResult));
 
-// Confirm that mongos did not crash
+// Confirm that merizos did not crash
 assert(testDB.adminCommand({serverStatus: 1}).ok);
 
 // Confirm that the rest of the shards did not crash
-mongos.getDB('config').shards.find().forEach(function(shardDoc) {
+merizos.getDB('config').shards.find().forEach(function(shardDoc) {
     var shardConn = new Mongo(shardDoc.host);
     var adminDB = shardConn.getDB('admin');
     var cmdResult = adminDB.runCommand({serverStatus: 1});

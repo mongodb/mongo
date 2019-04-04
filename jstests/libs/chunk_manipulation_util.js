@@ -8,7 +8,7 @@ load('./jstests/libs/test_background_ops.js');
 // Start a background moveChunk.
 // staticMongod:   Server to use for communication, use
 //                 "MongoRunner.runMongod({})" to make one.
-// mongosURL:      Like 'localhost:27017'.
+// merizosURL:      Like 'localhost:27017'.
 // findCriteria:   Like { _id: 1 }, passed to moveChunk's "find" option.
 // bounds:         Array of two documents that specify the lower and upper
 //                 shard key values of a chunk to move. Specify either the
@@ -19,16 +19,16 @@ load('./jstests/libs/test_background_ops.js');
 // Returns a join function; call it to wait for moveChunk to complete.
 //
 
-function moveChunkParallel(staticMongod, mongosURL, findCriteria, bounds, ns, toShardId) {
+function moveChunkParallel(staticMongod, merizosURL, findCriteria, bounds, ns, toShardId) {
     assert((findCriteria || bounds) && !(findCriteria && bounds),
            'Specify either findCriteria or bounds, but not both.');
 
-    function runMoveChunk(mongosURL, findCriteria, bounds, ns, toShardId) {
-        assert(mongosURL && ns && toShardId, 'Missing arguments.');
+    function runMoveChunk(merizosURL, findCriteria, bounds, ns, toShardId) {
+        assert(merizosURL && ns && toShardId, 'Missing arguments.');
         assert((findCriteria || bounds) && !(findCriteria && bounds),
                'Specify either findCriteria or bounds, but not both.');
 
-        var mongos = new Mongo(mongosURL), admin = mongos.getDB('admin'), cmd = {moveChunk: ns};
+        var merizos = new Mongo(merizosURL), admin = merizos.getDB('admin'), cmd = {moveChunk: ns};
 
         if (findCriteria) {
             cmd.find = findCriteria;
@@ -47,7 +47,7 @@ function moveChunkParallel(staticMongod, mongosURL, findCriteria, bounds, ns, to
 
     // Return the join function.
     return startParallelOps(
-        staticMongod, runMoveChunk, [mongosURL, findCriteria, bounds, ns, toShardId]);
+        staticMongod, runMoveChunk, [merizosURL, findCriteria, bounds, ns, toShardId]);
 }
 
 // moveChunk starts at step 0 and proceeds to 1 (it has *finished* parsing

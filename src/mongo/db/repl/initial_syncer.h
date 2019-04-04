@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,31 +34,31 @@
 #include <iosfwd>
 #include <memory>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/callback_completion_guard.h"
-#include "mongo/db/repl/collection_cloner.h"
-#include "mongo/db/repl/data_replicator_external_state.h"
-#include "mongo/db/repl/database_cloner.h"
-#include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplog_applier.h"
-#include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/db/repl/oplog_fetcher.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/rollback_checker.h"
-#include "mongo/db/repl/sync_source_selector.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repl/callback_completion_guard.h"
+#include "merizo/db/repl/collection_cloner.h"
+#include "merizo/db/repl/data_replicator_external_state.h"
+#include "merizo/db/repl/database_cloner.h"
+#include "merizo/db/repl/multiapplier.h"
+#include "merizo/db/repl/oplog_applier.h"
+#include "merizo/db/repl/oplog_buffer.h"
+#include "merizo/db/repl/oplog_fetcher.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/rollback_checker.h"
+#include "merizo/db/repl/sync_source_selector.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/concurrency/thread_pool.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 // TODO: Remove forward declares once we remove rs_initialsync.cpp and other dependents.
@@ -670,4 +670,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

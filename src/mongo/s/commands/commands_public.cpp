@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/rename_collection.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/store_possible_cursor.h"
-#include "mongo/util/log.h"
-#include "mongo/util/timer.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/rename_collection.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/commands/cluster_explain.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/query/store_possible_cursor.h"
+#include "merizo/util/log.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 bool cursorCommandPassthrough(OperationContext* opCtx,
@@ -313,7 +313,7 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
         uassert(ErrorCodes::IllegalOperation,
-                "Performing splitVector across dbs isn't supported via mongos",
+                "Performing splitVector across dbs isn't supported via merizos",
                 nss.db() == dbName);
 
         return NotAllowedOnShardedCollectionCmd::run(opCtx, dbName, cmdObj, result);
@@ -525,4 +525,4 @@ public:
 } cmdListIndexes;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

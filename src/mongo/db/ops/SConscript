@@ -10,19 +10,19 @@ env.Library(
         'write_ops_exec.cpp',
         ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog_raii',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/curop_metrics',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
-        '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/db/write_ops',
-        '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/log_and_backoff',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/catalog_raii',
+        '$BUILD_DIR/merizo/db/catalog/collection_options',
+        '$BUILD_DIR/merizo/db/curop',
+        '$BUILD_DIR/merizo/db/curop_metrics',
+        '$BUILD_DIR/merizo/db/repl/oplog',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/stats/counters',
+        '$BUILD_DIR/merizo/db/stats/server_read_concern_write_concern_metrics',
+        '$BUILD_DIR/merizo/db/transaction',
+        '$BUILD_DIR/merizo/db/write_ops',
+        '$BUILD_DIR/merizo/util/fail_point',
+        '$BUILD_DIR/merizo/util/log_and_backoff',
     ],
 )
 
@@ -33,9 +33,9 @@ env.Library(
         env.Idlc('write_ops.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/dbmessage',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ],
 )
 
@@ -45,8 +45,8 @@ env.Library(
         'write_ops_parsers_test_helpers.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/dbmessage',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/dbmessage',
     ],
 )
 
@@ -54,9 +54,9 @@ env.Library(
     target='parsed_update',
     source='parsed_update.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
-        '$BUILD_DIR/mongo/db/update/update_driver',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/matcher/expressions_merizod_only',
+        '$BUILD_DIR/merizo/db/update/update_driver',
     ],
 )
 
@@ -73,9 +73,9 @@ env.CppIntegrationTest(
     target='write_ops_document_stream_integration_test',
     source='write_ops_document_stream_integration_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/merizo/client/clientdriver_network',
+        '$BUILD_DIR/merizo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/merizo/util/version_impl',
     ],
 )
 
@@ -83,10 +83,10 @@ env.CppUnitTest(
     target='write_ops_retryability_test',
     source='write_ops_retryability_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
-        '$BUILD_DIR/mongo/db/repl/oplog_entry',
-        '$BUILD_DIR/mongo/db/write_ops',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/query_exec',
+        '$BUILD_DIR/merizo/db/repl/mock_repl_coord_server_fixture',
+        '$BUILD_DIR/merizo/db/repl/oplog_entry',
+        '$BUILD_DIR/merizo/db/write_ops',
     ],
 )

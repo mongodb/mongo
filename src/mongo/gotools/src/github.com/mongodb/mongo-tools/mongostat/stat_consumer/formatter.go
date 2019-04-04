@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -9,7 +9,7 @@ package stat_consumer
 import (
 	"sync/atomic"
 
-	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
+	"github.com/merizodb/merizo-tools/merizostat/stat_consumer/line"
 )
 
 // A LineFormatter formats StatLines for printing.
@@ -19,7 +19,7 @@ type LineFormatter interface {
 
 	// IsFinished returns true iff the formatter cannot print any more data
 	IsFinished() bool
-	// Finish() is called when mongostat is shutting down so that the formatter can clean up
+	// Finish() is called when merizostat is shutting down so that the formatter can clean up
 	Finish()
 }
 

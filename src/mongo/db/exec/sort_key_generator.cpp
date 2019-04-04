@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/exec/sort_key_generator.h"
+#include "merizo/db/exec/sort_key_generator.h"
 
 #include <vector>
 
-#include "mongo/bson/bsonobj_comparator.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/bsonobj_comparator.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/exec/working_set_computed_data.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 const char* SortKeyGeneratorStage::kStageType = "SORT_KEY_GENERATOR";
 
@@ -136,4 +136,4 @@ StatusWith<BSONObj> SortKeyGeneratorStage::getSortKeyFromIndexKey(
     return objBuilder.obj();
 }
 
-}  // namespace mongo
+}  // namespace merizo

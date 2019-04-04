@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/query/index_bounds.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/repl/idempotency_document_structure.h"
-#include "mongo/db/repl/idempotency_test_fixture.h"
-#include "mongo/db/repl/idempotency_update_sequence.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/query/index_bounds.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/repl/idempotency_document_structure.h"
+#include "merizo/db/repl/idempotency_test_fixture.h"
+#include "merizo/db/repl/idempotency_update_sequence.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/server_options.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 namespace {
 
@@ -76,7 +76,7 @@ BSONObj RandomizedIdempotencyTest::canonicalizeDocumentForDataHash(const BSONObj
     while (iter.more()) {
         auto elem = iter.next();
         if (elem.isABSONObj()) {
-            if (elem.type() == mongo::Array) {
+            if (elem.type() == merizo::Array) {
                 objBuilder.append(elem.fieldName(), obj);
             } else {
                 // If it is a sub object, we'll have to sort it as well before we append it.
@@ -199,4 +199,4 @@ TEST_F(RandomizedIdempotencyTest, CheckUpdateSequencesAreIdempotent) {
 
 }  // namespace
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

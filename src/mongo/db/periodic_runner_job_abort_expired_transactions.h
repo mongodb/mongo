@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,7 +29,7 @@
 
 #pragma once
 
-namespace mongo {
+namespace merizo {
 
 class ServiceContext;
 
@@ -38,9 +38,9 @@ class ServiceContext;
  * The job will run every (transactionLifetimeLimitSeconds/2) seconds, or at most once per second
  * and at least once per minute.
  *
- * This function should only ever be called once, during mongod server startup (db.cpp).
+ * This function should only ever be called once, during merizod server startup (db.cpp).
  * The PeriodicRunner will handle shutting down the job on shutdown, no extra handling necessary.
  */
 void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContext);
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/cloner.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/rename_collection.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/repl/isself.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/util/log.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/resource_pattern.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/cloner.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/rename_collection.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/ops/insert.h"
+#include "merizo/db/repl/isself.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::string;
@@ -59,7 +59,7 @@ using std::endl;
 
 /**
  * The cloneCollection command is deprecated.
- * See http://dochub.mongodb.org/core/clonecollection-deprecation.
+ * See http://dochub.merizodb.org/core/clonecollection-deprecation.
  */
 class CmdCloneCollection : public ErrmsgCommandDeprecated {
 public:
@@ -111,7 +111,7 @@ public:
                            BSONObjBuilder& result) {
         const char* deprecationWarning =
             "Support for the cloneCollection command has been deprecated. See "
-            "http://dochub.mongodb.org/core/clonecollection-deprecation";
+            "http://dochub.merizodb.org/core/clonecollection-deprecation";
         warning() << deprecationWarning;
         result.append("note", deprecationWarning);
 
@@ -167,4 +167,4 @@ public:
 
 } cmdCloneCollection;
 
-}  // namespace mongo
+}  // namespace merizo

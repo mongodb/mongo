@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/index_build_entry_helpers.h"
+#include "merizo/db/index_build_entry_helpers.h"
 
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database_impl.h"
-#include "mongo/db/catalog/index_build_entry_gen.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/uuid.h"
+#include "merizo/db/catalog/commit_quorum_options.h"
+#include "merizo/db/catalog/create_collection.h"
+#include "merizo/db/catalog/database_impl.h"
+#include "merizo/db/catalog/index_build_entry_gen.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/db/record_id.h"
+#include "merizo/db/storage/write_unit_of_work.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -70,7 +70,7 @@ Status upsert(OperationContext* opCtx, IndexBuildEntry indexBuildEntry) {
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
                                   Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
-                                      mongoutils::str::stream ss;
+                                      merizoutils::str::stream ss;
                                       ss << "Collection not found: "
                                          << NamespaceString::kIndexBuildEntryNamespace.ns();
                                       return Status(ErrorCodes::NamespaceNotFound, ss);
@@ -126,7 +126,7 @@ Status addIndexBuildEntry(OperationContext* opCtx, IndexBuildEntry indexBuildEnt
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
                                   Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
-                                      mongoutils::str::stream ss;
+                                      merizoutils::str::stream ss;
                                       ss << "Collection not found: "
                                          << NamespaceString::kIndexBuildEntryNamespace.ns();
                                       return Status(ErrorCodes::NamespaceNotFound, ss);
@@ -153,7 +153,7 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
                 opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
             Collection* collection = autoCollection.getCollection();
             if (!collection) {
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
                 return Status(ErrorCodes::NamespaceNotFound, ss);
             }
@@ -161,7 +161,7 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
             RecordId rid = Helpers::findOne(
                 opCtx, collection, BSON("_id" << indexBuildUUID), /*requireIndex=*/true);
             if (rid.isNull()) {
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;
                 return Status(ErrorCodes::NoMatchingDocument, ss);
             }
@@ -178,7 +178,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
     Collection* collection = autoCollection.getCollection();
     if (!collection) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
         return Status(ErrorCodes::NamespaceNotFound, ss);
     }
@@ -187,7 +187,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     bool foundObj = Helpers::findOne(
         opCtx, collection, BSON("_id" << indexBuildUUID), obj, /*requireIndex=*/true);
     if (!foundObj) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;
         return Status(ErrorCodes::NoMatchingDocument, ss);
     }
@@ -197,7 +197,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
         IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
         return indexBuildEntry;
     } catch (...) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "Invalid BSON found for matching document with indexBuildUUID: " << indexBuildUUID;
         return Status(ErrorCodes::InvalidBSON, ss);
     }
@@ -208,7 +208,7 @@ StatusWith<std::vector<IndexBuildEntry>> getIndexBuildEntries(OperationContext* 
     AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
     Collection* collection = autoCollection.getCollection();
     if (!collection) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
         return Status(ErrorCodes::NamespaceNotFound, ss);
     }
@@ -250,7 +250,7 @@ StatusWith<std::vector<IndexBuildEntry>> getIndexBuildEntries(OperationContext* 
             IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
             indexBuildEntries.push_back(indexBuildEntry);
         } catch (...) {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             ss << "Invalid BSON found for RecordId " << loc << " in collection "
                << collection->ns();
             return Status(ErrorCodes::InvalidBSON, ss);
@@ -356,7 +356,7 @@ Status clearAllIndexBuildEntries(OperationContext* opCtx) {
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_X);
                                   Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
-                                      mongoutils::str::stream ss;
+                                      merizoutils::str::stream ss;
                                       ss << "Collection not found: "
                                          << NamespaceString::kIndexBuildEntryNamespace.ns();
                                       return Status(ErrorCodes::NamespaceNotFound, ss);
@@ -373,4 +373,4 @@ Status clearAllIndexBuildEntries(OperationContext* opCtx) {
 }
 
 }  // namespace indexbuildentryhelpers
-}  // namespace mongo
+}  // namespace merizo

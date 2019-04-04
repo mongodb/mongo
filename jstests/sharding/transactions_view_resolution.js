@@ -1,4 +1,4 @@
-// Tests mongos behavior when reading against views in a transaction.
+// Tests merizos behavior when reading against views in a transaction.
 //
 // @tags: [
 //   requires_find_command,
@@ -58,7 +58,7 @@
         return shardedView;
     }
 
-    const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+    const st = new ShardingTest({shards: 2, merizos: 1, config: 1});
     const session = st.s.startSession();
 
     // Set up an unsharded collection on shard0.
@@ -164,7 +164,7 @@
     // Transactions on shards that return a view resolution error on the first statement remain
     // aborted if the shard is not targeted by the retry on the resolved namespace.
     //
-    // This may happen when reading from a sharded view, because mongos will target the primary
+    // This may happen when reading from a sharded view, because merizos will target the primary
     // shard first to resolve the view, but the retry on the underlying sharded collection is not
     // guaranteed to target the primary again.
     //

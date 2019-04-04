@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongodump
+package merizodump
 
 import (
 	"bytes"
@@ -17,14 +17,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/bsonutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testutil"
+	"github.com/merizodb/merizo-tools/common/util"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -32,9 +32,9 @@ import (
 
 var (
 	// database with test data
-	testDB = "mongodump_test_db"
+	testDB = "merizodump_test_db"
 	// temp database used for restoring a DB
-	testRestoreDB       = "temp_mongodump_restore_test_db"
+	testRestoreDB       = "temp_merizodump_restore_test_db"
 	testCollectionNames = []string{"coll1", "coll2", "coll3"}
 )
 
@@ -48,7 +48,7 @@ func simpleMongoDumpInstance() *MongoDump {
 	// get ToolOptions from URI or defaults
 	if uri := os.Getenv("MONGOD"); uri != "" {
 		fakeArgs := []string{"--uri=" + uri}
-		toolOptions = options.New("mongodump", "", options.EnabledOptions{URI: true})
+		toolOptions = options.New("merizodump", "", options.EnabledOptions{URI: true})
 		toolOptions.URI.AddKnownURIParameters(options.KnownURIOptionsReadPreference)
 		_, err := toolOptions.ParseArgs(fakeArgs)
 		if err != nil {
@@ -382,12 +382,12 @@ func TestMongoDumpValidateOptions(t *testing.T) {
 func TestMongoDumpKerberos(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.KerberosTestType)
 
-	Convey("Should be able to run mongodump with Kerberos auth", t, func() {
+	Convey("Should be able to run merizodump with Kerberos auth", t, func() {
 		opts, err := testutil.GetKerberosOptions()
 
 		So(err, ShouldBeNil)
 
-		mongoDump := MongoDump{
+		merizoDump := MongoDump{
 			ToolOptions:  opts,
 			InputOptions: &InputOptions{},
 			OutputOptions: &OutputOptions{
@@ -395,11 +395,11 @@ func TestMongoDumpKerberos(t *testing.T) {
 			},
 		}
 
-		mongoDump.OutputOptions.Out = KerberosDumpDirectory
+		merizoDump.OutputOptions.Out = KerberosDumpDirectory
 
-		err = mongoDump.Init()
+		err = merizoDump.Init()
 		So(err, ShouldBeNil)
-		err = mongoDump.Dump()
+		err = merizoDump.Dump()
 		So(err, ShouldBeNil)
 		path, err := os.Getwd()
 		So(err, ShouldBeNil)
@@ -742,7 +742,7 @@ func TestMongoDumpOplog(t *testing.T) {
 			// Start with clean database
 			So(tearDownMongoDumpTestData(), ShouldBeNil)
 
-			// Prepare mongodump with options
+			// Prepare merizodump with options
 			md := simpleMongoDumpInstance()
 			md.OutputOptions.Oplog = true
 			md.ToolOptions.Namespace = &options.Namespace{}
@@ -756,7 +756,7 @@ func TestMongoDumpOplog(t *testing.T) {
 			go backgroundInsert(ready, done, errs)
 			<-ready
 
-			// Run mongodump
+			// Run merizodump
 			err = md.Dump()
 			So(err, ShouldBeNil)
 

@@ -6,7 +6,7 @@
 
 /**
  * Defines, Enums, Functions, and Types extract from include/js/Utility.h
- * to support MongoDB's jscustomallocator.h
+ * to support MerizoDB's jscustomallocator.h
  */
 
 #pragma once

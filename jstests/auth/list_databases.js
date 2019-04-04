@@ -3,17 +3,17 @@
 (function() {
     'use strict';
 
-    function runTest(mongod) {
-        const admin = mongod.getDB('admin');
+    function runTest(merizod) {
+        const admin = merizod.getDB('admin');
         admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
         assert(admin.auth('admin', 'pass'));
 
         // Establish db0..db7
         for (let i = 0; i < 8; ++i) {
-            mongod.getDB('db' + i).foo.insert({bar: "baz"});
+            merizod.getDB('db' + i).foo.insert({bar: "baz"});
         }
-        mongod.getDB("db0").baz.insert({x: "y"});
-        mongod.getDB("db2").baz.insert({x: "y"});
+        merizod.getDB("db0").baz.insert({x: "y"});
+        merizod.getDB("db2").baz.insert({x: "y"});
 
         admin.createRole({
             role: 'dbLister',
@@ -101,21 +101,21 @@
             }
 
             // Test using shell helper Mongo.getDBs().
-            assert.eq(mongod.getDBs(undefined, {}, true).filter(filterSpecial),
+            assert.eq(merizod.getDBs(undefined, {}, true).filter(filterSpecial),
                       test.dbs,
                       "Shell helper speaking to same version");
             if (test.user !== 'admin' && test.user !== "user7") {
                 // Admin and user7 don't have an explicit list of DBs to parse.
-                assert.eq(mongod._getDatabaseNamesFromPrivileges(), test.authDbs || test.dbs);
+                assert.eq(merizod._getDatabaseNamesFromPrivileges(), test.authDbs || test.dbs);
 
                 // Test (non-admin) call to Mongo.getDBs() on a < 4.0 MongoD
                 // by injecting a command failure into Mongo.adminCommand().
                 // This will allow us to resemble a < 4.0 server.
-                const adminCommandFunction = mongod.adminCommand;
-                const adminCommandMethod = adminCommandFunction.bind(mongod);
+                const adminCommandFunction = merizod.adminCommand;
+                const adminCommandMethod = adminCommandFunction.bind(merizod);
 
                 try {
-                    mongod.adminCommand = function(cmd) {
+                    merizod.adminCommand = function(cmd) {
                         if (cmd.hasOwnProperty('listDatabases')) {
                             return {
                                 ok: 0,
@@ -127,21 +127,21 @@
                         return adminCommandMethod(cmd);
                     };
                     // Command fails, but we dispatch via _getDatabaseNamesFromPrivileges().
-                    assert.eq(mongod.getDBs().databases.map(function(x) {
+                    assert.eq(merizod.getDBs().databases.map(function(x) {
                         return x.name;
                     }),
                               test.authDbs || test.dbs);
 
                     // Still dispatches with explicit nameOnly===true, returns only names.
-                    assert.eq(mongod.getDBs(undefined, undefined, true), test.authDbs || test.dbs);
+                    assert.eq(merizod.getDBs(undefined, undefined, true), test.authDbs || test.dbs);
 
                     // Command fails and unable to dispatch because nameOnly !== true.
-                    assert.throws(() => mongod.getDBs(undefined, undefined, false));
+                    assert.throws(() => merizod.getDBs(undefined, undefined, false));
 
                     // Command fails and unable to dispatch because filter is not empty.
-                    assert.throws(() => mongod.getDBs(undefined, {name: 'foo'}));
+                    assert.throws(() => merizod.getDBs(undefined, {name: 'foo'}));
                 } finally {
-                    mongod.adminCommand = adminCommandFunction;
+                    merizod.adminCommand = adminCommandFunction;
                 }
             }
 
@@ -149,15 +149,15 @@
         });
     }
 
-    const mongod = MongoRunner.runMongod({auth: ""});
-    runTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    const merizod = MongoRunner.runMongod({auth: ""});
+    runTest(merizod);
+    MongoRunner.stopMongod(merizod);
 
     if (jsTest.options().storageEngine !== "mobile") {
         // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
         const st = new ShardingTest({
             shards: 1,
-            mongos: 1,
+            merizos: 1,
             config: 1,
             other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
         });

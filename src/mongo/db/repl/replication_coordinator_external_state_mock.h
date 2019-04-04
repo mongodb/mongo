@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,18 +31,18 @@
 
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/oid.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/repl/last_vote.h"
+#include "merizo/db/repl/replication_coordinator_external_state.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 
 class ServiceContext;
 
@@ -205,4 +205,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

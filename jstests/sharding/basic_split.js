@@ -1,10 +1,10 @@
 /**
- * Perform basic tests for the split command against mongos.
+ * Perform basic tests for the split command against merizos.
  */
 (function() {
     'use strict';
 
-    var st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
+    var st = new ShardingTest({merizos: 2, shards: 2, other: {chunkSize: 1}});
     var configDB = st.s0.getDB('config');
 
     var shard0 = st.shard0.shardName;

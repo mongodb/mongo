@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,10 +31,10 @@
 
 #include <cmath>
 
-#include "mongo/platform/decimal128.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * These functions compare numbers using the same rules as BSON. Care is taken to always give
@@ -115,7 +115,7 @@ inline int compareDoubleToLong(double lhs, long long rhs) {
  *    Check for exact conversion and determine ordering based on result.
  */
 
-// Case 1: Compare two decimal values, but enforce MongoDB's total ordering convention
+// Case 1: Compare two decimal values, but enforce MerizoDB's total ordering convention
 inline int compareDecimals(Decimal128 lhs, Decimal128 rhs) {
     // When we're comparing, lhs is always a decimal, which means more often than not
     // the rhs will be less than the lhs (decimal type has the largest capacity)
@@ -178,4 +178,4 @@ inline int compareDoubleToDecimal(double lhs, Decimal128 rhs) {
     return -compareDecimalToDouble(rhs, lhs);
 }
 
-}  // namespace mongo
+}  // namespace merizo

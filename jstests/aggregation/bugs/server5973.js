@@ -1,4 +1,4 @@
-// https://jira.mongodb.org/browse/SERVER-5369
+// https://jira.merizodb.org/browse/SERVER-5369
 // correctly sort dates before 1970
 
 // use the aggregation test db

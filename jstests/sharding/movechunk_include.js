@@ -1,7 +1,7 @@
 function setupMoveChunkTest(shardOptions) {
     var st = new ShardingTest({
         shards: 2,
-        mongos: 1,
+        merizos: 1,
         other: {
             chunkSize: 1,
             shardOptions: shardOptions,

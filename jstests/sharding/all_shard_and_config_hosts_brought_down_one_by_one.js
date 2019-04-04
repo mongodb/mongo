@@ -52,7 +52,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                'Metadata cannot be loaded at all, no operations will work');
     st.configRS.stop(1);
 
-    // Instead of restarting mongos, ensure it has no metadata
+    // Instead of restarting merizos, ensure it has no metadata
     assert.commandWorked(st.s0.adminCommand({flushRouterConfig: 1}));
 
     // Throws transport error first and subsequent times when loading config data, not no primary

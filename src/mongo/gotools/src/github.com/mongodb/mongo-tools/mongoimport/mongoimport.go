@@ -1,18 +1,18 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package mongoimport allows importing content from a JSON, CSV, or TSV into a MongoDB instance.
-package mongoimport
+// Package merizoimport allows importing content from a JSON, CSV, or TSV into a MerizoDB instance.
+package merizoimport
 
 import (
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/tomb.v2"
@@ -26,14 +26,14 @@ import (
 	"sync/atomic"
 )
 
-// Input format types accepted by mongoimport.
+// Input format types accepted by merizoimport.
 const (
 	CSV  = "csv"
 	TSV  = "tsv"
 	JSON = "json"
 )
 
-// Modes accepted by mongoimport.
+// Modes accepted by merizoimport.
 const (
 	modeInsert = "insert"
 	modeUpsert = "upsert"
@@ -46,20 +46,20 @@ const (
 )
 
 // MongoImport is a container for the user-specified options and
-// internal state used for running mongoimport.
+// internal state used for running merizoimport.
 type MongoImport struct {
 	// insertionCount keeps track of how many documents have successfully
 	// been inserted into the database
 	// updated atomically, aligned at the beginning of the struct
 	insertionCount uint64
 
-	// generic mongo tool options
+	// generic merizo tool options
 	ToolOptions *options.ToolOptions
 
 	// InputOptions defines options used to read data to be ingested
 	InputOptions *InputOptions
 
-	// IngestOptions defines options used to ingest data into MongoDB
+	// IngestOptions defines options used to ingest data into MerizoDB
 	IngestOptions *IngestOptions
 
 	// SessionProvider is used for connecting to the database
@@ -358,7 +358,7 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 		imp.ToolOptions.Namespace.DB,
 		imp.ToolOptions.Namespace.Collection)
 
-	// check if the server is a replica set, mongos, or standalone
+	// check if the server is a replica set, merizos, or standalone
 	imp.nodeType, err = imp.SessionProvider.GetNodeType()
 	if err != nil {
 		return 0, fmt.Errorf("error checking connected node type: %v", err)
@@ -467,7 +467,7 @@ type flushInserter interface {
 func (imp *MongoImport) runInsertionWorker(readDocs chan bson.D) (err error) {
 	session, err := imp.SessionProvider.GetSession()
 	if err != nil {
-		return fmt.Errorf("error connecting to mongod: %v", err)
+		return fmt.Errorf("error connecting to merizod: %v", err)
 	}
 	defer session.Close()
 	if err = imp.configureSession(session); err != nil {

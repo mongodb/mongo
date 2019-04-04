@@ -1,14 +1,14 @@
 /* SERVER-4972
- * Test for mongorestore on server with --auth allows restore without credentials of colls
+ * Test for merizorestore on server with --auth allows restore without credentials of colls
  * with no index
  */
 /*
- * 1) Start mongo without auth.
+ * 1) Start merizo without auth.
  * 2) Write to collection
- * 3) Take dump of the collection using mongodump.
+ * 3) Take dump of the collection using merizodump.
  * 4) Drop the collection.
- * 5) Stop mongod from step 1.
- * 6) Restart mongod with auth.
+ * 5) Stop merizod from step 1.
+ * 6) Restart merizod with auth.
  * 7) Add admin user to kick authentication
  * 8) Try restore without auth credentials. The restore should fail
  * 9) Try restore with correct auth credentials. The restore should succeed this time.
@@ -40,20 +40,20 @@ assert.eq(foo.baz.getIndexes().length, 1);
 var dumpdir = MongoRunner.dataDir + "/restorewithauth-dump1/";
 resetDbpath(dumpdir);
 
-var exitCode = MongoRunner.runMongoTool("mongodump", {
+var exitCode = MongoRunner.runMongoTool("merizodump", {
     db: "foo",
     host: "127.0.0.1:" + conn.port,
     out: dumpdir,
 });
-assert.eq(0, exitCode, "mongodump failed to dump data from mongod without auth enabled");
+assert.eq(0, exitCode, "merizodump failed to dump data from merizod without auth enabled");
 
 // now drop the db
 foo.dropDatabase();
 
-// stop mongod
+// stop merizod
 MongoRunner.stopMongod(conn);
 
-// start mongod with --auth
+// start merizod with --auth
 conn = MongoRunner.runMongod({auth: "", nojournal: "", bind_ip: "127.0.0.1"});
 
 // admin user
@@ -69,14 +69,14 @@ assert.eq(-1, collNames.indexOf("bar"), "bar collection already exists");
 assert.eq(-1, collNames.indexOf("baz"), "baz collection already exists");
 
 // now try to restore dump
-exitCode = MongoRunner.runMongoTool("mongorestore", {
+exitCode = MongoRunner.runMongoTool("merizorestore", {
     host: "127.0.0.1:" + conn.port,
     dir: dumpdir,
     verbose: 5,
 });
 assert.neq(0,
            exitCode,
-           "mongorestore shouldn't have been able to restore data to mongod with auth enabled");
+           "merizorestore shouldn't have been able to restore data to merizod with auth enabled");
 
 // make sure that the collection isn't restored
 collNames = foo.getCollectionNames();
@@ -84,7 +84,7 @@ assert.eq(-1, collNames.indexOf("bar"), "bar collection was restored");
 assert.eq(-1, collNames.indexOf("baz"), "baz collection was restored");
 
 // now try to restore dump with correct credentials
-exitCode = MongoRunner.runMongoTool("mongorestore", {
+exitCode = MongoRunner.runMongoTool("merizorestore", {
     host: "127.0.0.1:" + conn.port,
     db: "foo",
     authenticationDatabase: "admin",
@@ -93,7 +93,7 @@ exitCode = MongoRunner.runMongoTool("mongorestore", {
     dir: dumpdir + "foo/",
     verbose: 5,
 });
-assert.eq(0, exitCode, "mongorestore failed to restore data to mongod with auth enabled");
+assert.eq(0, exitCode, "merizorestore failed to restore data to merizod with auth enabled");
 
 // make sure that the collection was restored
 collNames = foo.getCollectionNames();
@@ -109,7 +109,7 @@ foo.dropDatabase();
 foo.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
 
 // now try to restore dump with foo database credentials
-exitCode = MongoRunner.runMongoTool("mongorestore", {
+exitCode = MongoRunner.runMongoTool("merizorestore", {
     host: "127.0.0.1:" + conn.port,
     db: "foo",
     username: "user",
@@ -117,7 +117,7 @@ exitCode = MongoRunner.runMongoTool("mongorestore", {
     dir: dumpdir + "foo/",
     verbose: 5,
 });
-assert.eq(0, exitCode, "mongorestore failed to restore the 'foo' database");
+assert.eq(0, exitCode, "merizorestore failed to restore the 'foo' database");
 
 // make sure that the collection was restored
 collNames = foo.getCollectionNames();

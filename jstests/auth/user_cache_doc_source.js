@@ -3,8 +3,8 @@
 (function() {
     'use strict';
 
-    var mongod = MongoRunner.runMongod({auth: ""});
-    var db = mongod.getDB("admin");
+    var merizod = MongoRunner.runMongod({auth: ""});
+    var db = merizod.getDB("admin");
     db.createUser({user: "root", pwd: "root", roles: ["userAdminAnyDatabase"]});
     db.auth("root", "root");
     db.createUser({user: "readOnlyUser", pwd: "foobar", roles: ["readAnyDatabase"]});
@@ -18,7 +18,7 @@
     assert.eq(expectedOnlyRoot, readUserCache());
 
     /* This is broken because of SERVER-36384
-    var newConn = new Mongo(mongod.name);
+    var newConn = new Mongo(merizod.name);
     assert.eq(newConn.getDB("admin").auth("readOnlyUser", "foobar"), 1);
 
     const expectedBothActive = [
@@ -32,7 +32,7 @@
 
     var awaitShell = startParallelShell(function() {
         assert.eq(db.getSisterDB("admin").auth("readOnlyUser", "foobar"), 1);
-    }, mongod.port);
+    }, merizod.port);
 
     const expectedReadOnlyInactive = [
         {username: "readOnlyUser", db: "admin", active: false},
@@ -42,6 +42,6 @@
         return friendlyEqual(expectedReadOnlyInactive, readUserCache());
     });
 
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
     awaitShell({checkExitSuccess: false});
 })();

@@ -5,7 +5,7 @@ selector:
   - jstests/core/**/*.js
   - jstests/core_standalone/**/*.js
   exclude_files:
-  # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
+  # Transactions are not supported on MerizoDB standalone nodes, so we do not run these tests in the
   # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
   - jstests/core/txns/**/*.js
 executor:
@@ -15,7 +15,7 @@ executor:
   config:
     shell_options:
       readMode: commands
-      eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+      eval: load("jstests/libs/override_methods/detect_spawning_own_merizod.js");
   hooks:
   - class: ValidateCollections
     shell_options:
@@ -26,6 +26,6 @@ executor:
     n: 20
   fixture:
     class: MongoDFixture
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1

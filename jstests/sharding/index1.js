@@ -1,11 +1,11 @@
 // SERVER-2326 - make sure that sharding only works with unique indices
 (function() {
 
-    var s = new ShardingTest({name: "shard_index", shards: 2, mongos: 1});
+    var s = new ShardingTest({name: "shard_index", shards: 2, merizos: 1});
 
     // Regenerate fully because of SERVER-2782
     for (var i = 0; i < 22; i++) {
-        var coll = s.admin._mongo.getDB("test").getCollection("foo" + i);
+        var coll = s.admin._merizo.getDB("test").getCollection("foo" + i);
         coll.drop();
 
         var bulk = coll.initializeUnorderedBulkOp();

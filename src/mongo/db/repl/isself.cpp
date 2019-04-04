@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/isself.h"
+#include "merizo/db/repl/isself.h"
 
 #include <boost/algorithm/string.hpp>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/client/authenticate.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/service_context.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/service_context.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/scopeguard.h"
 
 #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || \
     defined(__OpenBSD__)
@@ -74,7 +74,7 @@
 #include <winsock2.h>
 #endif  // defined(_WIN32)
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 OID instanceId;
@@ -343,4 +343,4 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,14 +32,14 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/s/write_ops/batched_upsert_detail.h"
-#include "mongo/s/write_ops/write_error_detail.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/rpc/write_concern_error_detail.h"
+#include "merizo/s/write_ops/batched_upsert_detail.h"
+#include "merizo/s/write_ops/write_error_detail.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * This class represents the layout and content of a insert/update/delete runCommand,
@@ -168,7 +168,7 @@ private:
 
     // (O)  repl::OpTime assigned to the write op when it was written to the oplog.
     //      Normally, getLastError can use Client::_lastOp, but this is not valid for
-    //      mongos which loses track of the session due to RCAR.  Therefore, we must
+    //      merizos which loses track of the session due to RCAR.  Therefore, we must
     //      keep track of the lastOp manually ourselves.
     repl::OpTime _lastOp;
     bool _isLastOpSet;
@@ -190,4 +190,4 @@ private:
     std::vector<std::string> _errorLabels;
 };
 
-}  // namespace mongo
+}  // namespace merizo

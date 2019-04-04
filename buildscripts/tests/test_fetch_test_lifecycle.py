@@ -11,40 +11,40 @@ import buildscripts.fetch_test_lifecycle as fetch
 class TestFetchTestLifecycle(unittest.TestCase):
     def test_get_metadata_revision(self):
         metadata_repo = MockMetadataRepository(
-            [("metadata_revision_05", "mongo_revision_06"),
-             ("metadata_revision_04", "mongo_revision_06"), ("metadata_revision_03",
-                                                             "mongo_revision_02"),
-             ("metadata_revision_02", "mongo_revision_02"), ("metadata_revision_01", None)])
+            [("metadata_revision_05", "merizo_revision_06"),
+             ("metadata_revision_04", "merizo_revision_06"), ("metadata_revision_03",
+                                                             "merizo_revision_02"),
+             ("metadata_revision_02", "merizo_revision_02"), ("metadata_revision_01", None)])
 
-        mongo_repo = MockMongoRepository([
-            "mongo_revision_07", "mongo_revision_06", "mongo_revision_05", "mongo_revision_04",
-            "mongo_revision_03", "mongo_revision_02", "mongo_revision_01"
+        merizo_repo = MockMongoRepository([
+            "merizo_revision_07", "merizo_revision_06", "merizo_revision_05", "merizo_revision_04",
+            "merizo_revision_03", "merizo_revision_02", "merizo_revision_01"
         ])
 
-        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_07",
+        self._check_metadata_revision(metadata_repo, merizo_repo, "merizo_revision_07",
                                       "metadata_revision_05")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_06",
+        self._check_metadata_revision(metadata_repo, merizo_repo, "merizo_revision_06",
                                       "metadata_revision_05")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_05",
+        self._check_metadata_revision(metadata_repo, merizo_repo, "merizo_revision_05",
                                       "metadata_revision_03")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_04",
+        self._check_metadata_revision(metadata_repo, merizo_repo, "merizo_revision_04",
                                       "metadata_revision_03")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_03",
+        self._check_metadata_revision(metadata_repo, merizo_repo, "merizo_revision_03",
                                       "metadata_revision_03")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_02",
+        self._check_metadata_revision(metadata_repo, merizo_repo, "merizo_revision_02",
                                       "metadata_revision_03")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_01", None)
+        self._check_metadata_revision(metadata_repo, merizo_repo, "merizo_revision_01", None)
 
-    def _check_metadata_revision(self, metadata_repo, mongo_repo, mongo_revision,
+    def _check_metadata_revision(self, metadata_repo, merizo_repo, merizo_revision,
                                  expected_metadata_revision):
-        metadata_revision = fetch._get_metadata_revision(metadata_repo, mongo_repo, "project",
-                                                         mongo_revision)
+        metadata_revision = fetch._get_metadata_revision(metadata_repo, merizo_repo, "project",
+                                                         merizo_revision)
         self.assertEqual(expected_metadata_revision, metadata_revision)
 
 
@@ -65,7 +65,7 @@ class MockMetadataRepository(object):
         return [r[0] for r in self.references_revisions]
 
     def get_reference(self, revision, project):  # pylint: disable=unused-argument
-        for (metadata_revision, mongo_revision) in self.references_revisions:
+        for (metadata_revision, merizo_revision) in self.references_revisions:
             if metadata_revision == revision:
-                return mongo_revision
+                return merizo_revision
         return None

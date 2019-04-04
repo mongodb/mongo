@@ -21,9 +21,9 @@
 
     rst.awaitReplication();
 
-    function checkDbHash(mongo) {
-        var testDB = mongo.getDB('test');
-        var adminDB = mongo.getDB('admin');
+    function checkDbHash(merizo) {
+        var testDB = merizo.getDB('test');
+        var adminDB = merizo.getDB('admin');
 
         var replicatedSystemCollections = [
             'system.js',

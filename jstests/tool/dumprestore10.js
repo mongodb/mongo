@@ -37,15 +37,15 @@
         replTest.awaitReplication();
     }
 
-    step("mongodump from replset");
+    step("merizodump from replset");
 
     var data = MongoRunner.dataDir + "/dumprestore10-dump1/";
 
-    var exitCode = MongoRunner.runMongoTool("mongodump", {
+    var exitCode = MongoRunner.runMongoTool("merizodump", {
         host: "127.0.0.1:" + master.port,
         out: data,
     });
-    assert.eq(0, exitCode, "mongodump failed to dump data from the replica set");
+    assert.eq(0, exitCode, "merizodump failed to dump data from the replica set");
 
     {
         step("remove data after dumping");
@@ -57,23 +57,23 @@
         replTest.awaitReplication();
     }
 
-    step("try mongorestore with write concern");
+    step("try merizorestore with write concern");
 
-    exitCode = MongoRunner.runMongoTool("mongorestore", {
+    exitCode = MongoRunner.runMongoTool("merizorestore", {
         writeConcern: "2",
         host: "127.0.0.1:" + master.port,
         dir: data,
     });
     assert.eq(0,
               exitCode,
-              "mongorestore failed to restore the data to a replica set while using w=2 writes");
+              "merizorestore failed to restore the data to a replica set while using w=2 writes");
 
     var x = 0;
 
     // no waiting for replication
     x = master.getDB("foo").getCollection("bar").count();
 
-    assert.eq(x, total, "mongorestore should have successfully restored the collection");
+    assert.eq(x, total, "merizorestore should have successfully restored the collection");
 
     step("stopSet");
     replTest.stopSet();

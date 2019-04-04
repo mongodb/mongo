@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/db/exec/geo_near.h"
+#include "merizo/db/exec/geo_near.h"
 
 #include <memory>
 #include <vector>
@@ -37,29 +37,29 @@
 // For s2 search
 #include "third_party/s2/s2regionintersection.h"
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/geoparser.h"
-#include "mongo/db/geo/hash.h"
-#include "mongo/db/index/expression_params.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/expression_index.h"
-#include "mongo/db/query/expression_index_knobs_gen.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/exec/fetch.h"
+#include "merizo/db/exec/index_scan.h"
+#include "merizo/db/exec/working_set_computed_data.h"
+#include "merizo/db/geo/geoconstants.h"
+#include "merizo/db/geo/geoparser.h"
+#include "merizo/db/geo/hash.h"
+#include "merizo/db/index/expression_params.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/query/expression_index.h"
+#include "merizo/db/query/expression_index_knobs_gen.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
 #include <algorithm>
 
-namespace mongo {
+namespace merizo {
 
 using std::abs;
 using std::unique_ptr;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 //
 // Shared GeoNear search functionality
@@ -330,7 +330,7 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
     std::sort(neighbors.begin(), neighbors.end());
 
     for (vector<GeoHash>::const_iterator it = neighbors.begin(); it != neighbors.end(); it++) {
-        mongo::BSONObjBuilder builder;
+        merizo::BSONObjBuilder builder;
         it->appendHashMin(&builder, "");
         it->appendHashMax(&builder, "");
         oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
@@ -1091,4 +1091,4 @@ StatusWith<double> GeoNear2DSphereStage::computeDistance(WorkingSetMember* membe
     return computeGeoNearDistance(_nearParams, member);
 }
 
-}  // namespace mongo
+}  // namespace merizo

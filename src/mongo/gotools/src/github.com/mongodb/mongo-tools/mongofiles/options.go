@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongofiles
+package merizofiles
 
 var Usage = `<options> <command> <filename or _id>
 
@@ -20,7 +20,7 @@ Possible commands include:
 	delete    - delete all files with filename 'filename'
 	delete_id - delete a file with the given '_id'
 
-See http://docs.mongodb.org/manual/reference/program/mongofiles/ for more information.`
+See http://docs.merizodb.org/manual/reference/program/merizofiles/ for more information.`
 
 // StorageOptions defines the set of options to use in storing/retrieving data from server.
 type StorageOptions struct {
@@ -39,8 +39,8 @@ type StorageOptions struct {
 	// GridFSPrefix specifies what GridFS prefix to use; defaults to 'fs'
 	GridFSPrefix string `long:"prefix" value-name:"<prefix>" default:"fs" default-mask:"-" description:"GridFS prefix to use (default is 'fs')"`
 
-	// Specifies the write concern for each write operation that mongofiles writes to the target database.
-	// By default, mongofiles waits for a majority of members from the replica set to respond before returning.
+	// Specifies the write concern for each write operation that merizofiles writes to the target database.
+	// By default, merizofiles waits for a majority of members from the replica set to respond before returning.
 	// Cannot be used simultaneously with write concern options in a URI.
 	WriteConcern string `long:"writeConcern" value-name:"<write-concern>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
 }

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/util/options_parser/options_parser.h"
+#include "merizo/util/options_parser/options_parser.h"
 
 #include <algorithm>
 #include <boost/filesystem.hpp>
@@ -39,25 +39,25 @@
 #include <stdio.h>
 #include <yaml-cpp/yaml.h>
 
-#include "mongo/base/init.h"
-#include "mongo/base/parse_number.h"
-#include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/http_client.h"
-#include "mongo/util/options_parser/constraints.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/shell_exec.h"
-#include "mongo/util/text.h"
+#include "merizo/base/init.h"
+#include "merizo/base/parse_number.h"
+#include "merizo/base/status.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/net/http_client.h"
+#include "merizo/util/options_parser/constraints.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_description.h"
+#include "merizo/util/options_parser/option_section.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/shell_exec.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 namespace optionenvironment {
 
 namespace po = boost::program_options;
@@ -443,7 +443,7 @@ std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
 
     auto client = HttpClient::create();
     uassert(
-        ErrorCodes::OperationFailed, "No HTTP Client available in this build of MongoDB", client);
+        ErrorCodes::OperationFailed, "No HTTP Client available in this build of MerizoDB", client);
 
     // Expect https:// URLs unless we can be sure we're talking to localhost.
     if (!url.startsWith("https://")) {
@@ -474,10 +474,10 @@ std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
 /* Attempts to parse configuration expansion directives from a config block.
  *
  * If a __rest configuration expansion directive is found,
- * mongo::HttpClient will be invoked to fetch the resource via GET request.
+ * merizo::HttpClient will be invoked to fetch the resource via GET request.
  *
  * If an __exec configuration expansion directive is found,
- * mongo::shellExec() will be invoked to execute the process.
+ * merizo::shellExec() will be invoked to execute the process.
  *
  * See the comment for class ConfigExpandNode for more details.
  */
@@ -724,7 +724,7 @@ Status checkLongName(const po::variables_map& vm,
                  ++keyValueVectorIt) {
                 std::string key;
                 std::string value;
-                if (!mongoutils::str::splitOn(*keyValueVectorIt, '=', key, value)) {
+                if (!merizoutils::str::splitOn(*keyValueVectorIt, '=', key, value)) {
                     StringBuilder sb;
                     sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
                     return Status(ErrorCodes::BadValue, sb.str());
@@ -1454,7 +1454,7 @@ StatusWith<std::vector<std::string>> transformImplicitOptions(
                     // i.e., it is impossible to have "--option=''" on the command line as some
                     // non-empty string must follow the equal sign.
                     // This specific case is only known to affect "verbose" in the long form in
-                    // mongod and mongos which makes it a breaking change for this one specific
+                    // merizod and merizos which makes it a breaking change for this one specific
                     // change. Users can get similar behavior by removing both the option and the
                     // original string in this case.
                     if (stringStatus.isOK() && !defaultStr.empty()) {
@@ -1720,4 +1720,4 @@ Status OptionsParser::parseConfigFile(const OptionSection& options,
 }
 
 }  // namespace optionenvironment
-}  // namespace mongo
+}  // namespace merizo

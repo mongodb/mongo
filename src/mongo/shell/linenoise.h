@@ -36,7 +36,7 @@
 #ifndef __LINENOISE_H
 #define __LINENOISE_H
 
-#include "mongo/base/status.h"
+#include "merizo/base/status.h"
 
 struct linenoiseCompletions;
 
@@ -48,8 +48,8 @@ char* linenoise(const char* prompt);
 void linenoisePreloadBuffer(const char* preloadText);
 int linenoiseHistoryAdd(const char* line);
 int linenoiseHistorySetMaxLen(int len);
-mongo::Status linenoiseHistorySave(const char* filename);
-mongo::Status linenoiseHistoryLoad(const char* filename);
+merizo::Status linenoiseHistorySave(const char* filename);
+merizo::Status linenoiseHistoryLoad(const char* filename);
 void linenoiseHistoryFree(void);
 void linenoiseClearScreen(void);
 

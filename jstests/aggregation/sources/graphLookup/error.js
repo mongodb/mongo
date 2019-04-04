@@ -1,4 +1,4 @@
-// In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
+// In MerizoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
 load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
 
 (function() {

@@ -15,7 +15,7 @@
     const collName = "foo";
     const ns = dbName + "." + collName;
 
-    const st = new ShardingTest({shards: 2, mongos: 2});
+    const st = new ShardingTest({shards: 2, merizos: 2});
 
     enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 

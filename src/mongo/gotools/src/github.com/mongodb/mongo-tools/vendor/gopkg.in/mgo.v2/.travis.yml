@@ -21,9 +21,9 @@ env:
 install:
     - eval "$(gimme $GO)"
 
-    - wget $BUCKET/mongodb-linux-$MONGODB.tgz
-    - tar xzvf mongodb-linux-$MONGODB.tgz
-    - export PATH=$PWD/mongodb-linux-$MONGODB/bin:$PATH
+    - wget $BUCKET/merizodb-linux-$MONGODB.tgz
+    - tar xzvf merizodb-linux-$MONGODB.tgz
+    - export PATH=$PWD/merizodb-linux-$MONGODB/bin:$PATH
 
     - wget $BUCKET/daemontools.tar.gz
     - tar xzvf daemontools.tar.gz

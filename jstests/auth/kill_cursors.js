@@ -6,7 +6,7 @@
     // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
     TestData.disableImplicitSessions = true;
 
-    function runTest(mongod) {
+    function runTest(merizod) {
         /**
          * Open a cursor on `db` while authenticated as `authUsers`.
          * Then logout, and log back in as `killUsers` and try to kill that cursor.
@@ -28,7 +28,7 @@
                     const users = assert.commandWorked(d.runCommand({connectionStatus: 1}))
                                       .authInfo.authenticatedUsers;
                     users.forEach(function(u) {
-                        mongod.getDB(u.db).logout();
+                        merizod.getDB(u.db).logout();
                     });
                 });
             }
@@ -92,9 +92,9 @@
          * who created it is trying to kill it.
          */
 
-        const testA = mongod.getDB('testA');
-        const testB = mongod.getDB('testB');
-        const admin = mongod.getDB('admin');
+        const testA = merizod.getDB('testA');
+        const testB = merizod.getDB('testB');
+        const admin = merizod.getDB('admin');
 
         // Setup users
         admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
@@ -174,14 +174,14 @@
         tryKill(testB, [['user2', testA], ['user4', testB]], [['admin', admin]], true);
     }
 
-    const mongod = MongoRunner.runMongod({auth: ""});
-    runTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    const merizod = MongoRunner.runMongod({auth: ""});
+    runTest(merizod);
+    MongoRunner.stopMongod(merizod);
 
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     const st = new ShardingTest({
         shards: 1,
-        mongos: 1,
+        merizos: 1,
         config: 1,
         other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
     });

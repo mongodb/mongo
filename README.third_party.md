@@ -1,6 +1,6 @@
-# MongoDB Third Party Dependencies
+# MerizoDB Third Party Dependencies
 
-MongoDB depends on third party libraries to implement some
+MerizoDB depends on third party libraries to implement some
 functionality. This document describes which libraries are depended
 upon, and how. It is maintained by and for humans, and so while it is a
 best effort attempt to describe the server’s dependencies, it is subject
@@ -15,7 +15,7 @@ reflected in this list. A ticket is filed in Jira if a determination is
 made to upgrade a vendored library.
 
 Whenever a vendored library is included in released binary artifacts, is
-not authored by MongoDB, and has a license which requires reproduction,
+not authored by MerizoDB, and has a license which requires reproduction,
 a notice will be included in
 `THIRD-PARTY-NOTICES`.
 
@@ -30,7 +30,7 @@ a notice will be included in
 | [ICU4](http://site.icu-project.org/download/)                                                                   | ICU               | 63.1             | 57.1                                     |          ✗           |                ✗                |
 | [Intel Decimal FP Library](https://software.intel.com/en-us/articles/intel-decimal-floating-point-math-library) | BSD-3-Clause      | 2.0 Update 2     | 2.0 Update 1                             |                      |                ✗                |
 | [JSON-Schema-Test-Suite](https://github.com/json-schema-org/JSON-Schema-Test-Suite)                             | MIT               | HEAD             | 728066f9c5c258ba3                        |                      |                                 |
-| [kms-message](https://github.com/mongodb-labs/kms-message)                                                      |                   | HEAD             | 8d91fa28cf179be591f595ca6611f74443357fdb |                      |                ✗                |
+| [kms-message](https://github.com/merizodb-labs/kms-message)                                                      |                   | HEAD             | 8d91fa28cf179be591f595ca6611f74443357fdb |                      |                ✗                |
 | [libstemmer](https://github.com/snowballstem/snowball)                                                          | BSD-3-Clause      | HEAD             | Unknown                                  |          ✗           |                ✗                |
 | [linenoise](https://github.com/antirez/linenoise)                                                               | BSD-3-Clause      | HEAD             | Unknown + changes                        |                      |                ✗                |
 | [MozJS](https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr)                               | MPL-2.0           | ESR 60.5.1       | ESR 60.3.0                               |                      |                ✗                |
@@ -67,7 +67,7 @@ released binary artifacts.
 
 ## Libraries Imported by Tools
 
-The following Go libraries are vendored into the MongoDB tools. Their
+The following Go libraries are vendored into the MerizoDB tools. Their
 license notices are included in the `THIRD-PARTY-NOTICES.gotools` file.
 
 | Name                                                                |
@@ -76,7 +76,7 @@ license notices are included in the `THIRD-PARTY-NOTICES.gotools` file.
 | [escaper](https://github.com/10gen/escaper)                         |
 | [llmgo](https://github.com/10gen/llmgo)                             |
 | [openssl](https://github.com/10gen/openssl)                         |
-| [mongo-lint](https://github.com/3rf/mongo-lint)                     |
+| [merizo-lint](https://github.com/3rf/merizo-lint)                     |
 | [stack](https://github.com/go-stack/stack)                          |
 | [snappy](https://github.com/golang/snappy)                          |
 | [gopacket](https://github.com/google/gopacket)                      |
@@ -85,8 +85,8 @@ license notices are included in the `THIRD-PARTY-NOTICES.gotools` file.
 | [go-flags](https://github.com/jessevdk/go-flags)                    |
 | [gls](https://github.com/jtolds/gls)                                |
 | [go-runewidth](https://github.com/mattn/go-runewidth)               |
-| [mongo-go-driver](https://github.com/mongodb/mongo-go-driver)       |
-| [mongo-tools-common](https://github.com/mongodb/mongo-tools-common) |
+| [merizo-go-driver](https://github.com/merizodb/merizo-go-driver)       |
+| [merizo-tools-common](https://github.com/merizodb/merizo-tools-common) |
 | [termbox-go](https://github.com/nsf/termbox-go)                     |
 | [go-cache](https://github.com/patrickmn/go-cache)                   |
 | [assertions](https://github.com/smartystreets/assertions)           |
@@ -102,8 +102,8 @@ license notices are included in the `THIRD-PARTY-NOTICES.gotools` file.
 
 ## Dynamically Linked Libraries
 
-Sometimes MongoDB needs to load libraries provided and managed by the
-runtime environment. These libraries are not vendored into the MongoDB
+Sometimes MerizoDB needs to load libraries provided and managed by the
+runtime environment. These libraries are not vendored into the MerizoDB
 source directory, and are not compiled into release artifacts. Because
 they are provided by the runtime environment, the precise versions of
 these libraries cannot be known in advance. Further, these libraries may
@@ -128,12 +128,12 @@ of these libraries’ license in a file named
 1.  The majority of Valgrind is licensed under the GPL, with the
     exception of a single header file which is licensed under a BSD
     license. This BSD licensed header is the only file from Valgrind
-    which is vendored and consumed by MongoDB.
+    which is vendored and consumed by MerizoDB.
 
-2.  WiredTiger is maintained by MongoDB in a separate repository. As a
+2.  WiredTiger is maintained by MerizoDB in a separate repository. As a
     part of our development process, we periodically ingest the latest
     snapshot of that repository.
 
-3.  OpenSSL is only shipped as a dependency of the MongoDB tools written
-    in Go. The MongoDB shell and server binaries use Windows’
+3.  OpenSSL is only shipped as a dependency of the MerizoDB tools written
+    in Go. The MerizoDB shell and server binaries use Windows’
     cryptography APIs.

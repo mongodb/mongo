@@ -1,24 +1,24 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package mongodump creates BSON data from the contents of a MongoDB instance.
-package mongodump
+// Package merizodump creates BSON data from the contents of a MerizoDB instance.
+package merizodump
 
 import (
-	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/auth"
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/failpoint"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/archive"
+	"github.com/merizodb/merizo-tools/common/auth"
+	"github.com/merizodb/merizo-tools/common/bsonutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/failpoint"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -35,9 +35,9 @@ import (
 const defaultPermissions = 0755
 
 // MongoDump is a container for the user-specified options and
-// internal state used for running mongodump.
+// internal state used for running merizodump.
 type MongoDump struct {
-	// basic mongo tool options
+	// basic merizo tool options
 	ToolOptions   *options.ToolOptions
 	InputOptions  *InputOptions
 	OutputOptions *OutputOptions
@@ -142,7 +142,7 @@ func (dump *MongoDump) Init() error {
 	}
 
 	if dump.isMongos && dump.OutputOptions.Oplog {
-		return fmt.Errorf("can't use --oplog option when dumping from a mongos")
+		return fmt.Errorf("can't use --oplog option when dumping from a merizos")
 	}
 
 	var mode mgo.Mode
@@ -172,9 +172,9 @@ func (dump *MongoDump) Init() error {
 	dump.SessionProvider.SetTags(tags)
 	dump.SessionProvider.SetFlags(db.DisableSocketTimeout)
 
-	// return a helpful error message for mongos --repair
+	// return a helpful error message for merizos --repair
 	if dump.OutputOptions.Repair && dump.isMongos {
-		return fmt.Errorf("--repair flag cannot be used on a mongos")
+		return fmt.Errorf("--repair flag cannot be used on a merizos")
 	}
 
 	dump.manager = intents.NewIntentManager()
@@ -289,7 +289,7 @@ func (dump *MongoDump) Dump() (err error) {
 	if dump.OutputOptions.Repair {
 		log.Logv(log.DebugLow, "verifying that the connected server supports repairCursor")
 		if dump.isMongos {
-			return fmt.Errorf("cannot use --repair on mongos")
+			return fmt.Errorf("cannot use --repair on merizos")
 		}
 		exampleIntent := dump.manager.Peek()
 		if exampleIntent != nil {
@@ -413,7 +413,7 @@ func (dump *MongoDump) Dump() (err error) {
 		exists, err := dump.checkOplogTimestampExists(dump.oplogStart)
 		if !exists {
 			return fmt.Errorf(
-				"oplog overflow: mongodump was unable to capture all new oplog entries during execution")
+				"oplog overflow: merizodump was unable to capture all new oplog entries during execution")
 		}
 		if err != nil {
 			return fmt.Errorf("unable to check oplog for overflow: %v", err)
@@ -434,7 +434,7 @@ func (dump *MongoDump) Dump() (err error) {
 		exists, err = dump.checkOplogTimestampExists(dump.oplogStart)
 		if !exists {
 			return fmt.Errorf(
-				"oplog overflow: mongodump was unable to capture all new oplog entries during execution")
+				"oplog overflow: merizodump was unable to capture all new oplog entries during execution")
 		}
 		if err != nil {
 			return fmt.Errorf("unable to check oplog for overflow: %v", err)

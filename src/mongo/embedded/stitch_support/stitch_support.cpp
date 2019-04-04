@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include "stitch_support/stitch_support.h"
 
 #include "api_common.h"
-#include "mongo/base/initializer.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/client.h"
-#include "mongo/db/exec/projection_exec.h"
-#include "mongo/db/matcher/matcher.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/parsed_projection.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/update/update_driver.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/base/initializer.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/client.h"
+#include "merizo/db/exec/projection_exec.h"
+#include "merizo/db/matcher/matcher.h"
+#include "merizo/db/ops/parsed_update.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/parsed_projection.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/update/update_driver.h"
+#include "merizo/util/assert_util.h"
 
 #include <algorithm>
 #include <memory>
@@ -54,7 +54,7 @@
 #define MONGO_API_CALL
 #endif
 
-namespace mongo {
+namespace merizo {
 
 using StitchSupportStatusImpl = StatusForAPI<stitch_support_v1_error>;
 
@@ -70,14 +70,14 @@ static StitchSupportStatusImpl translateException(
 } catch (const DBException& ex) {
     return {STITCH_SUPPORT_V1_ERROR_EXCEPTION, ex.code(), ex.what()};
 } catch (const ExceptionForAPI<stitch_support_v1_error>& ex) {
-    return {ex.statusCode(), mongo::ErrorCodes::InternalError, ex.what()};
+    return {ex.statusCode(), merizo::ErrorCodes::InternalError, ex.what()};
 } catch (const std::bad_alloc& ex) {
-    return {STITCH_SUPPORT_V1_ERROR_ENOMEM, mongo::ErrorCodes::InternalError, ex.what()};
+    return {STITCH_SUPPORT_V1_ERROR_ENOMEM, merizo::ErrorCodes::InternalError, ex.what()};
 } catch (const std::exception& ex) {
-    return {STITCH_SUPPORT_V1_ERROR_UNKNOWN, mongo::ErrorCodes::InternalError, ex.what()};
+    return {STITCH_SUPPORT_V1_ERROR_UNKNOWN, merizo::ErrorCodes::InternalError, ex.what()};
 } catch (...) {
     return {STITCH_SUPPORT_V1_ERROR_UNKNOWN,
-            mongo::ErrorCodes::InternalError,
+            merizo::ErrorCodes::InternalError,
             "Unknown error encountered in performing requested stitch_support_v1 operation"};
 }
 
@@ -96,13 +96,13 @@ static void translateExceptionFallback(StitchSupportStatusImpl& status) noexcept
     setErrorMessageNoAlloc(status.what);
 }
 
-}  // namespace mongo
+}  // namespace merizo
 
 struct stitch_support_v1_status {
-    mongo::StitchSupportStatusImpl statusImpl;
+    merizo::StitchSupportStatusImpl statusImpl;
 };
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 StitchSupportStatusImpl* getStatusImpl(stitch_support_v1_status* status) {
@@ -118,7 +118,7 @@ ServiceContext* initialize() {
     // line, but we assume that clients of this library will never want anything other than the
     // defaults for all configuration that would be controlled by these parameters.
     Status status =
-        mongo::runGlobalInitializers(0 /* argc */, nullptr /* argv */, nullptr /* envp */);
+        merizo::runGlobalInitializers(0 /* argc */, nullptr /* argv */, nullptr /* envp */);
     uassertStatusOKWithContext(status, "Global initialization failed");
     setGlobalServiceContext(ServiceContext::make());
 
@@ -130,15 +130,15 @@ struct ServiceContextDestructor {
      * This destructor gets called when the Stitch Library gets torn down, either by a call to
      * stitch_support_v1_fini() or when the process exits.
      */
-    void operator()(mongo::ServiceContext* const serviceContext) const noexcept {
-        Status status = mongo::runGlobalDeinitializers();
+    void operator()(merizo::ServiceContext* const serviceContext) const noexcept {
+        Status status = merizo::runGlobalDeinitializers();
         uassertStatusOKWithContext(status, "Global deinitilization failed");
 
         setGlobalServiceContext(nullptr);
     }
 };
 
-using EmbeddedServiceContextPtr = std::unique_ptr<mongo::ServiceContext, ServiceContextDestructor>;
+using EmbeddedServiceContextPtr = std::unique_ptr<merizo::ServiceContext, ServiceContextDestructor>;
 
 ProjectionExec makeProjectionExecChecked(OperationContext* opCtx,
                                          const BSONObj& spec,
@@ -155,46 +155,46 @@ ProjectionExec makeProjectionExecChecked(OperationContext* opCtx,
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo
 
 struct stitch_support_v1_lib {
-    stitch_support_v1_lib() : serviceContext(mongo::initialize()) {}
+    stitch_support_v1_lib() : serviceContext(merizo::initialize()) {}
 
     stitch_support_v1_lib(const stitch_support_v1_lib&) = delete;
     void operator=(const stitch_support_v1_lib&) = delete;
 
-    mongo::EmbeddedServiceContextPtr serviceContext;
+    merizo::EmbeddedServiceContextPtr serviceContext;
 };
 
 struct stitch_support_v1_collator {
-    stitch_support_v1_collator(std::unique_ptr<mongo::CollatorInterface> collator)
+    stitch_support_v1_collator(std::unique_ptr<merizo::CollatorInterface> collator)
         : collator(std::move(collator)) {}
-    std::unique_ptr<mongo::CollatorInterface> collator;
+    std::unique_ptr<merizo::CollatorInterface> collator;
 };
 
 struct stitch_support_v1_matcher {
-    stitch_support_v1_matcher(mongo::ServiceContext::UniqueClient client,
-                              const mongo::BSONObj& filterBSON,
+    stitch_support_v1_matcher(merizo::ServiceContext::UniqueClient client,
+                              const merizo::BSONObj& filterBSON,
                               stitch_support_v1_collator* collator)
         : client(std::move(client)),
           opCtx(this->client->makeOperationContext()),
           matcher(filterBSON.getOwned(),
-                  new mongo::ExpressionContext(opCtx.get(),
+                  new merizo::ExpressionContext(opCtx.get(),
                                                collator ? collator->collator.get() : nullptr)){};
 
-    mongo::ServiceContext::UniqueClient client;
-    mongo::ServiceContext::UniqueOperationContext opCtx;
-    mongo::Matcher matcher;
+    merizo::ServiceContext::UniqueClient client;
+    merizo::ServiceContext::UniqueOperationContext opCtx;
+    merizo::Matcher matcher;
 };
 
 struct stitch_support_v1_projection {
-    stitch_support_v1_projection(mongo::ServiceContext::UniqueClient client,
-                                 const mongo::BSONObj& pattern,
+    stitch_support_v1_projection(merizo::ServiceContext::UniqueClient client,
+                                 const merizo::BSONObj& pattern,
                                  stitch_support_v1_matcher* matcher,
                                  stitch_support_v1_collator* collator)
         : client(std::move(client)),
           opCtx(this->client->makeOperationContext()),
-          projectionExec(mongo::makeProjectionExecChecked(
+          projectionExec(merizo::makeProjectionExecChecked(
               opCtx.get(),
               pattern.getOwned(),
               matcher ? matcher->matcher.getMatchExpression() : nullptr,
@@ -209,9 +209,9 @@ struct stitch_support_v1_projection {
                 !projectionExec.hasMetaFields() && !projectionExec.returnKey());
     }
 
-    mongo::ServiceContext::UniqueClient client;
-    mongo::ServiceContext::UniqueOperationContext opCtx;
-    mongo::ProjectionExec projectionExec;
+    merizo::ServiceContext::UniqueClient client;
+    merizo::ServiceContext::UniqueOperationContext opCtx;
+    merizo::ProjectionExec projectionExec;
 
     stitch_support_v1_matcher* matcher;
 };
@@ -221,9 +221,9 @@ struct stitch_support_v1_update_details {
 };
 
 struct stitch_support_v1_update {
-    stitch_support_v1_update(mongo::ServiceContext::UniqueClient client,
-                             mongo::BSONObj updateExpr,
-                             mongo::BSONArray arrayFilters,
+    stitch_support_v1_update(merizo::ServiceContext::UniqueClient client,
+                             merizo::BSONObj updateExpr,
+                             merizo::BSONArray arrayFilters,
                              stitch_support_v1_matcher* matcher,
                              stitch_support_v1_collator* collator)
         : client(std::move(client)),
@@ -231,13 +231,13 @@ struct stitch_support_v1_update {
           updateExpr(updateExpr.getOwned()),
           arrayFilters(arrayFilters.getOwned()),
           matcher(matcher),
-          updateDriver(new mongo::ExpressionContext(
+          updateDriver(new merizo::ExpressionContext(
               opCtx.get(), collator ? collator->collator.get() : nullptr)) {
-        std::vector<mongo::BSONObj> arrayFilterVector;
+        std::vector<merizo::BSONObj> arrayFilterVector;
         for (auto&& filter : this->arrayFilters) {
             arrayFilterVector.push_back(filter.embeddedObject());
         }
-        this->parsedFilters = uassertStatusOK(mongo::ParsedUpdate::parseArrayFilters(
+        this->parsedFilters = uassertStatusOK(merizo::ParsedUpdate::parseArrayFilters(
             arrayFilterVector, this->opCtx.get(), collator ? collator->collator.get() : nullptr));
 
         // Initializing the update as single-document allows document-replacement updates.
@@ -250,18 +250,18 @@ struct stitch_support_v1_update {
                 matcher || !updateDriver.needMatchDetails());
     }
 
-    mongo::ServiceContext::UniqueClient client;
-    mongo::ServiceContext::UniqueOperationContext opCtx;
-    mongo::BSONObj updateExpr;
-    mongo::BSONArray arrayFilters;
+    merizo::ServiceContext::UniqueClient client;
+    merizo::ServiceContext::UniqueOperationContext opCtx;
+    merizo::BSONObj updateExpr;
+    merizo::BSONArray arrayFilters;
 
     stitch_support_v1_matcher* matcher;
 
-    std::map<mongo::StringData, std::unique_ptr<mongo::ExpressionWithPlaceholder>> parsedFilters;
-    mongo::UpdateDriver updateDriver;
+    std::map<merizo::StringData, std::unique_ptr<merizo::ExpressionWithPlaceholder>> parsedFilters;
+    merizo::UpdateDriver updateDriver;
 };
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 std::unique_ptr<stitch_support_v1_lib> library;
@@ -415,31 +415,31 @@ auto fromInterfaceType(const uint8_t* bson) noexcept {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo
 
 extern "C" {
 
 stitch_support_v1_lib* MONGO_API_CALL stitch_support_v1_init(stitch_support_v1_status* status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() { return mongo::stitch_lib_init(); });
+    return enterCXX(merizo::getStatusImpl(status), [&]() { return merizo::stitch_lib_init(); });
 }
 
 int MONGO_API_CALL stitch_support_v1_fini(stitch_support_v1_lib* const lib,
                                           stitch_support_v1_status* const status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() { return mongo::stitch_lib_fini(lib); });
+    return enterCXX(merizo::getStatusImpl(status), [&]() { return merizo::stitch_lib_fini(lib); });
 }
 
 int MONGO_API_CALL
 stitch_support_v1_status_get_error(const stitch_support_v1_status* const status) {
-    return mongo::capi_status_get_error(status);
+    return merizo::capi_status_get_error(status);
 }
 
 const char* MONGO_API_CALL
 stitch_support_v1_status_get_explanation(const stitch_support_v1_status* const status) {
-    return mongo::capi_status_get_what(status);
+    return merizo::capi_status_get_what(status);
 }
 
 int MONGO_API_CALL stitch_support_v1_status_get_code(const stitch_support_v1_status* const status) {
-    return mongo::capi_status_get_code(status);
+    return merizo::capi_status_get_code(status);
 }
 
 stitch_support_v1_status* MONGO_API_CALL stitch_support_v1_status_create(void) {
@@ -454,14 +454,14 @@ stitch_support_v1_collator* MONGO_API_CALL
 stitch_support_v1_collator_create(stitch_support_v1_lib* lib,
                                   const uint8_t* collationBSON,
                                   stitch_support_v1_status* const status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj collationSpecExpr(mongo::fromInterfaceType(collationBSON));
-        return mongo::collator_create(lib, collationSpecExpr);
+    return enterCXX(merizo::getStatusImpl(status), [&]() {
+        merizo::BSONObj collationSpecExpr(merizo::fromInterfaceType(collationBSON));
+        return merizo::collator_create(lib, collationSpecExpr);
     });
 }
 
 void MONGO_API_CALL stitch_support_v1_collator_destroy(stitch_support_v1_collator* const collator) {
-    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete collator; }));
 }
 
@@ -470,14 +470,14 @@ stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
                                  const uint8_t* filterBSON,
                                  stitch_support_v1_collator* collator,
                                  stitch_support_v1_status* const status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj filter(mongo::fromInterfaceType(filterBSON));
-        return mongo::matcher_create(lib, filter, collator);
+    return enterCXX(merizo::getStatusImpl(status), [&]() {
+        merizo::BSONObj filter(merizo::fromInterfaceType(filterBSON));
+        return merizo::matcher_create(lib, filter, collator);
     });
 }
 
 void MONGO_API_CALL stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher) {
-    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete matcher; }));
 }
 
@@ -487,15 +487,15 @@ stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
                                     stitch_support_v1_matcher* matcher,
                                     stitch_support_v1_collator* collator,
                                     stitch_support_v1_status* const status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj spec(mongo::fromInterfaceType(specBSON));
-        return mongo::projection_create(lib, spec, matcher, collator);
+    return enterCXX(merizo::getStatusImpl(status), [&]() {
+        merizo::BSONObj spec(merizo::fromInterfaceType(specBSON));
+        return merizo::projection_create(lib, spec, matcher, collator);
     });
 }
 
 void MONGO_API_CALL
 stitch_support_v1_projection_destroy(stitch_support_v1_projection* const projection) {
-    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete projection; }));
 }
 
@@ -503,8 +503,8 @@ int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matc
                                                  const uint8_t* documentBSON,
                                                  bool* isMatch,
                                                  stitch_support_v1_status* status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
+    return enterCXX(merizo::getStatusImpl(status), [&]() {
+        merizo::BSONObj document(merizo::fromInterfaceType(documentBSON));
         *isMatch = matcher->matcher.matches(document, nullptr);
     });
 }
@@ -513,20 +513,20 @@ uint8_t* MONGO_API_CALL
 stitch_support_v1_projection_apply(stitch_support_v1_projection* const projection,
                                    const uint8_t* documentBSON,
                                    stitch_support_v1_status* status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
+    return enterCXX(merizo::getStatusImpl(status), [&]() {
+        merizo::BSONObj document(merizo::fromInterfaceType(documentBSON));
 
         auto outputResult = projection->projectionExec.project(document);
         auto outputObj = uassertStatusOK(outputResult);
         auto outputSize = static_cast<size_t>(outputObj.objsize());
         auto output = new (std::nothrow) char[outputSize];
 
-        uassert(mongo::ErrorCodes::ExceededMemoryLimit,
+        uassert(merizo::ErrorCodes::ExceededMemoryLimit,
                 "Failed to allocate memory for projection",
                 output);
 
         static_cast<void>(std::copy_n(outputObj.objdata(), outputSize, output));
-        return mongo::toInterfaceType(output);
+        return merizo::toInterfaceType(output);
     });
 }
 
@@ -545,17 +545,17 @@ stitch_support_v1_update_create(stitch_support_v1_lib* lib,
                                 stitch_support_v1_matcher* matcher,
                                 stitch_support_v1_collator* collator,
                                 stitch_support_v1_status* status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj updateExpr(mongo::fromInterfaceType(updateExprBSON));
-        mongo::BSONArray arrayFilters(
-            (arrayFiltersBSON ? mongo::BSONObj(mongo::fromInterfaceType(arrayFiltersBSON))
-                              : mongo::BSONObj()));
-        return mongo::update_create(lib, updateExpr, arrayFilters, matcher, collator);
+    return enterCXX(merizo::getStatusImpl(status), [&]() {
+        merizo::BSONObj updateExpr(merizo::fromInterfaceType(updateExprBSON));
+        merizo::BSONArray arrayFilters(
+            (arrayFiltersBSON ? merizo::BSONObj(merizo::fromInterfaceType(arrayFiltersBSON))
+                              : merizo::BSONObj()));
+        return merizo::update_create(lib, updateExpr, arrayFilters, matcher, collator);
     });
 }
 
 void MONGO_API_CALL stitch_support_v1_update_destroy(stitch_support_v1_update* const update) {
-    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete update; }));
 }
 
@@ -564,14 +564,14 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
                                const uint8_t* documentBSON,
                                stitch_support_v1_update_details* update_details,
                                stitch_support_v1_status* status) {
-    return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
+    return enterCXX(merizo::getStatusImpl(status), [&]() {
+        merizo::BSONObj document(merizo::fromInterfaceType(documentBSON));
         std::string matchedField;
 
         if (update->updateDriver.needMatchDetails()) {
             invariant(update->matcher);
 
-            mongo::MatchDetails matchDetails;
+            merizo::MatchDetails matchDetails;
             matchDetails.requestElemMatchKey();
             bool isMatch = update->matcher->matcher.matches(document, &matchDetails);
             invariant(isMatch);
@@ -582,13 +582,13 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
             }
         }
 
-        mongo::mutablebson::Document mutableDoc(document,
-                                                mongo::mutablebson::Document::kInPlaceDisabled);
+        merizo::mutablebson::Document mutableDoc(document,
+                                                merizo::mutablebson::Document::kInPlaceDisabled);
 
-        mongo::FieldRefSet immutablePaths;  // Empty set
+        merizo::FieldRefSet immutablePaths;  // Empty set
         bool docWasModified = false;
 
-        mongo::FieldRefSetWithStorage modifiedPaths;
+        merizo::FieldRefSetWithStorage modifiedPaths;
 
         uassertStatusOK(update->updateDriver.update(matchedField,
                                                     &mutableDoc,
@@ -604,7 +604,7 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
         auto output = new (std::nothrow) char[outputSize];
 
         uassert(
-            mongo::ErrorCodes::ExceededMemoryLimit, "Failed to allocate memory for update", output);
+            merizo::ErrorCodes::ExceededMemoryLimit, "Failed to allocate memory for update", output);
 
         static_cast<void>(std::copy_n(outputObj.objdata(), outputSize, output));
 
@@ -612,18 +612,18 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
             update_details->modifiedPaths = modifiedPaths.serialize();
         }
 
-        return mongo::toInterfaceType(output);
+        return merizo::toInterfaceType(output);
     });
 }
 
 uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update* const update,
                                                         stitch_support_v1_status* status) {
-    return enterCXX(mongo::getStatusImpl(status), [=] {
-        mongo::FieldRefSet immutablePaths;  //  Empty set
+    return enterCXX(merizo::getStatusImpl(status), [=] {
+        merizo::FieldRefSet immutablePaths;  //  Empty set
         bool docWasModified = false;
 
-        mongo::mutablebson::Document mutableDoc(mongo::BSONObj(),
-                                                mongo::mutablebson::Document::kInPlaceDisabled);
+        merizo::mutablebson::Document mutableDoc(merizo::BSONObj(),
+                                                merizo::mutablebson::Document::kInPlaceDisabled);
 
         if (update->matcher) {
             uassertStatusOK(update->updateDriver.populateDocumentWithQueryFields(
@@ -633,7 +633,7 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
                 mutableDoc));
         }
 
-        uassertStatusOK(update->updateDriver.update(mongo::StringData() /* matchedField */,
+        uassertStatusOK(update->updateDriver.update(merizo::StringData() /* matchedField */,
                                                     &mutableDoc,
                                                     false /* validateForStorage */,
                                                     immutablePaths,
@@ -647,10 +647,10 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
         auto output = new (std::nothrow) char[outputSize];
 
         uassert(
-            mongo::ErrorCodes::ExceededMemoryLimit, "Failed to allocate memory for upsert", output);
+            merizo::ErrorCodes::ExceededMemoryLimit, "Failed to allocate memory for upsert", output);
 
         static_cast<void>(std::copy_n(outputObj.objdata(), outputSize, output));
-        return mongo::toInterfaceType(output);
+        return merizo::toInterfaceType(output);
     });
 }
 
@@ -665,7 +665,7 @@ stitch_support_v1_update_details* MONGO_API_CALL stitch_support_v1_update_detail
 
 void MONGO_API_CALL
 stitch_support_v1_update_details_destroy(stitch_support_v1_update_details* update_details) {
-    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete update_details; }));
 };
 
@@ -681,7 +681,7 @@ const char* MONGO_API_CALL stitch_support_v1_update_details_path(
 }
 
 void MONGO_API_CALL stitch_support_v1_bson_free(uint8_t* bson) {
-    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete[](bson); }));
 }
 

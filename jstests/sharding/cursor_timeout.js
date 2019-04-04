@@ -1,28 +1,28 @@
 // Basic integration tests for the background job that periodically kills idle cursors, in both
-// mongod and mongos.  This test creates the following four cursors:
+// merizod and merizos.  This test creates the following four cursors:
 //
-// 1. A no-timeout cursor through mongos.
-// 2. A no-timeout cursor through mongod.
-// 3. A normal cursor through mongos.
-// 4. A normal cursor through mongod.
+// 1. A no-timeout cursor through merizos.
+// 2. A no-timeout cursor through merizod.
+// 3. A normal cursor through merizos.
+// 4. A normal cursor through merizod.
 //
 // After a period of inactivity, the test asserts that cursors #1 and #2 are still alive, and that
 // #3 and #4 have been killed.
 (function() {
     'use strict';
 
-    // Cursor timeout on mongod is handled by a single thread/timer that will sleep for
+    // Cursor timeout on merizod is handled by a single thread/timer that will sleep for
     // "clientCursorMonitorFrequencySecs" and add the sleep value to each operation's duration when
     // it wakes up, timing out those whose "now() - last accessed since" time exceeds. A cursor
     // timeout of 5 seconds with a monitor frequency of 1 second means an effective timeout period
     // of 4 to 5 seconds.
-    const mongodCursorTimeoutMs = 5000;
+    const merizodCursorTimeoutMs = 5000;
 
-    // Cursor timeout on mongos is handled by checking whether the "last accessed" cursor time stamp
+    // Cursor timeout on merizos is handled by checking whether the "last accessed" cursor time stamp
     // is older than "now() - cursorTimeoutMillis" and is checked every
     // "clientCursorMonitorFrequencySecs" by a global thread/timer. A timeout of 4 seconds with a
     // monitor frequency of 1 second means an effective timeout period of 4 to 5 seconds.
-    const mongosCursorTimeoutMs = 4000;
+    const merizosCursorTimeoutMs = 4000;
 
     const cursorMonitorFrequencySecs = 1;
 
@@ -32,14 +32,14 @@
             shardOptions: {
                 verbose: 1,
                 setParameter: {
-                    cursorTimeoutMillis: mongodCursorTimeoutMs,
+                    cursorTimeoutMillis: merizodCursorTimeoutMs,
                     clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs
                 }
             },
-            mongosOptions: {
+            merizosOptions: {
                 verbose: 1,
                 setParameter: {
-                    cursorTimeoutMillis: mongosCursorTimeoutMs,
+                    cursorTimeoutMillis: merizosCursorTimeoutMs,
                     clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs
                 }
             },
@@ -51,8 +51,8 @@
     const routerColl = st.s.getDB('test').user;
 
     const shardHost = st.config.shards.findOne({_id: st.shard1.shardName}).host;
-    const mongod = new Mongo(shardHost);
-    const shardColl = mongod.getCollection(routerColl.getFullName());
+    const merizod = new Mongo(shardHost);
+    const shardColl = merizod.getCollection(routerColl.getFullName());
 
     assert.commandWorked(adminDB.runCommand({enableSharding: routerColl.getDB().getName()}));
     st.ensurePrimaryShard(routerColl.getDB().getName(), st.shard0.shardName);
@@ -71,13 +71,13 @@
         assert.writeOK(routerColl.insert({x: x}));
     }
 
-    // Open both a normal and a no-timeout cursor on mongos. Batch size is 1 to ensure that
+    // Open both a normal and a no-timeout cursor on merizos. Batch size is 1 to ensure that
     // cursor.next() performs only a single operation.
     const routerCursorWithTimeout = routerColl.find().batchSize(1);
     const routerCursorWithNoTimeout = routerColl.find().batchSize(1);
     routerCursorWithNoTimeout.addOption(DBQuery.Option.noTimeout);
 
-    // Open both a normal and a no-timeout cursor on mongod. Batch size is 1 to ensure that
+    // Open both a normal and a no-timeout cursor on merizod. Batch size is 1 to ensure that
     // cursor.next() performs only a single operation.
     const shardCursorWithTimeout = shardColl.find().batchSize(1);
     const shardCursorWithNoTimeout = shardColl.find().batchSize(1);
@@ -100,7 +100,7 @@
     // shardCursorWithNoTimeout).
     // We cannot reliably use metrics.cursor.timedOut here, because this will be 2 if
     // routerCursorWithTimeout is killed for timing out on the shard, and 1 if
-    // routerCursorWithTimeout is killed by a killCursors command from the mongos.
+    // routerCursorWithTimeout is killed by a killCursors command from the merizos.
     assert.soon(function() {
         return shardColl.getDB().serverStatus().metrics.cursor.open.total == 2;
     }, "cursor failed to time out");

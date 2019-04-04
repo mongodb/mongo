@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,34 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/optional/optional_io.hpp>
 #include <string>
 #include <vector>
 
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
-#include "mongo/db/concurrency/lock_manager_test_help.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/progress_meter.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/global_lock_acquisition_tracker.h"
+#include "merizo/db/concurrency/lock_manager_test_help.h"
+#include "merizo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/db/storage/recovery_unit_noop.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/future.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/concurrency/ticketholder.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/progress_meter.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const int kMaxStressThreads = 32;  // max number of threads to use for lock stress
@@ -2176,4 +2176,4 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardResilientToExceptionThrownBeforeWai
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

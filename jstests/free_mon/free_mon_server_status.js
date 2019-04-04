@@ -8,11 +8,11 @@ load("jstests/free_mon/libs/free_mon.js");
     const mock_web = new FreeMonWebServer();
     mock_web.start();
 
-    const mongod = MongoRunner.runMongod({
+    const merizod = MongoRunner.runMongod({
         setParameter: "cloudFreeMonitoringEndpointURL=" + mock_web.getURL(),
     });
-    assert.neq(mongod, null, 'mongod not running');
-    const admin = mongod.getDB('admin');
+    assert.neq(merizod, null, 'merizod not running');
+    const admin = merizod.getDB('admin');
 
     const kRetryIntervalSecs = 1;
     function freeMonStats() {
@@ -23,7 +23,7 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(freeMonStats().state, 'undecided');
 
     admin.enableFreeMonitoring();
-    WaitForRegistration(mongod);
+    WaitForRegistration(merizod);
 
     // Enabled.
     const enabled = freeMonStats();
@@ -43,6 +43,6 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(disabled.metricsErrors, 0);
 
     // Cleanup.
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
     mock_web.stop();
 })();

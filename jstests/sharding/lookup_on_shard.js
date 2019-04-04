@@ -1,10 +1,10 @@
-// Test that a pipeline with a $lookup stage on a sharded foreign collection may be run on a mongod.
+// Test that a pipeline with a $lookup stage on a sharded foreign collection may be run on a merizod.
 (function() {
 
     load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
     load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
-    const sharded = new ShardingTest({mongos: 1, shards: 2});
+    const sharded = new ShardingTest({merizos: 1, shards: 2});
 
     setParameterOnAllHosts(
         DiscoverTopology.findNonConfigNodes(sharded.s), "internalQueryAllowShardedLookup", true);
@@ -32,7 +32,7 @@
     const runTest = function() {
         (function testSingleLookupFromShard() {
             // Run a pipeline which must be merged on a shard. This should force the $lookup (on
-            // the sharded collection) to be run on a mongod.
+            // the sharded collection) to be run on a merizod.
             pipeline = [
                 {
                   $lookup: {
@@ -53,7 +53,7 @@
         })();
 
         (function testMultipleLookupsFromShard() {
-            // Run two lookups in a row (both on mongod).
+            // Run two lookups in a row (both on merizod).
             pipeline = [
                 {
                   $lookup: {
@@ -104,7 +104,7 @@
                     // from "smallColl."
                     assert.eq(results[i].foreignDoc[j].collName, "foreignColl");
 
-                    // TODO SERVER-39016: Once a mongod is able to target the primary shard when
+                    // TODO SERVER-39016: Once a merizod is able to target the primary shard when
                     // reading from a non-sharded collection this should always work. Until then,
                     // the results of the query depend on which shard is chosen as the merging
                     // shard. If the primary shard is chosen, we'll get the correct results (and

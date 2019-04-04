@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-TOOLS=bsondump mongodecrypt mongodump mongoexport mongofiles mongoimport mongoldap mongorestore mongostat mongotop
+TOOLS=bsondump merizodecrypt merizodump merizoexport merizofiles merizoimport merizoldap merizorestore merizostat merizotop
 
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
@@ -20,19 +20,19 @@ build-stamp: configure-stamp
 
 	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
 	# scons 
-	#docbook-to-man debian/mongodb.sgml > mongodb.1
-	echo -n > debian/mongodb-enterprise-tools.manpages
+	#docbook-to-man debian/merizodb.sgml > merizodb.1
+	echo -n > debian/merizodb-enterprise-tools.manpages
 	for binary in ${TOOLS} ; \
 	do \
 		if [ -e debian/$$binary.1 ] ; \
 		then \
-			echo debian/$$binary.1 >> debian/mongodb-enterprise-tools.manpages ; \
+			echo debian/$$binary.1 >> debian/merizodb-enterprise-tools.manpages ; \
 		fi ; \
 	done
 
-	echo debian/mongo.1 > debian/mongodb-enterprise-shell.manpages
-	echo debian/mongod.1 > debian/mongodb-enterprise-server.manpages
-	echo debian/mongos.1 > debian/mongodb-enterprise-mongos.manpages
+	echo debian/merizo.1 > debian/merizodb-enterprise-shell.manpages
+	echo debian/merizod.1 > debian/merizodb-enterprise-server.manpages
+	echo debian/merizos.1 > debian/merizodb-enterprise-merizos.manpages
 
 	touch $@
 
@@ -42,28 +42,28 @@ clean:
 	rm -f build-stamp configure-stamp
 
 	# FIXME: scons freaks out at the presence of target files
-	# under debian/mongodb.
+	# under debian/merizodb.
 	#scons -c
 
 	rm -f debian/*.manpages
 
-	rm -rf $(CURDIR)/debian/mongodb-enterprise
-	rm -rf $(CURDIR)/debian/mongodb-enterprise-shell
-	rm -rf $(CURDIR)/debian/mongodb-enterprise-server
-	rm -rf $(CURDIR)/debian/mongodb-enterprise-mongos
-	rm -rf $(CURDIR)/debian/mongodb-enterprise-tools
+	rm -rf $(CURDIR)/debian/merizodb-enterprise
+	rm -rf $(CURDIR)/debian/merizodb-enterprise-shell
+	rm -rf $(CURDIR)/debian/merizodb-enterprise-server
+	rm -rf $(CURDIR)/debian/merizodb-enterprise-merizos
+	rm -rf $(CURDIR)/debian/merizodb-enterprise-tools
 	rm -f config.log
-	rm -f mongo
-	rm -f mongod
-	rm -f mongoimportjson
-	rm -f mongocryptd
-	rm -f mongoexport
-	rm -f mongorestore
-	rm -f mongodump
-	rm -f mongofiles
+	rm -f merizo
+	rm -f merizod
+	rm -f merizoimportjson
+	rm -f merizocryptd
+	rm -f merizoexport
+	rm -f merizorestore
+	rm -f merizodump
+	rm -f merizofiles
 	rm -f install_compass
 	rm -f .sconsign.dblite
-	rm -f libmongoclient.a
+	rm -f libmerizoclient.a
 	rm -rf client/*.o
 	rm -rf tools/*.o
 	rm -rf shell/*.o
@@ -80,33 +80,33 @@ install: build
 	dh_installdirs
 
 	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
-	# scons --prefix=$(CURDIR)/debian/mongodb/usr install
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin
-	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
-	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
-	cp -v $(CURDIR)/bin/mongocryptd $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
-	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
-	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin
+	# scons --prefix=$(CURDIR)/debian/merizodb/usr install
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-shell/usr/bin
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-server/usr/bin
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-merizos/usr/bin
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-tools/usr/bin
+	cp -v $(CURDIR)/bin/merizo $(CURDIR)/debian/merizodb-enterprise-shell/usr/bin
+	cp -v $(CURDIR)/bin/merizod $(CURDIR)/debian/merizodb-enterprise-server/usr/bin
+	cp -v $(CURDIR)/bin/merizocryptd $(CURDIR)/debian/merizodb-enterprise-server/usr/bin
+	cp -v $(CURDIR)/bin/merizos $(CURDIR)/debian/merizodb-enterprise-merizos/usr/bin
+	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/merizodb-enterprise-tools/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/merizodb-enterprise-tools/usr/bin ; \
 	done
 
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/etc
-	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-enterprise-server/etc/mongod.conf 
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-server/etc
+	cp $(CURDIR)/debian/merizod.conf $(CURDIR)/debian/merizodb-enterprise-server/etc/merizod.conf 
 
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-shell/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/share/lintian/overrides/
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-shell/usr/share/lintian/overrides/mongodb-enterprise-shell
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-server/usr/share/lintian/overrides/mongodb-enterprise-server
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/mongodb-enterprise-mongos
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-tools/usr/share/lintian/overrides/mongodb-enterprise-tools
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-shell/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-server/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-merizos/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/merizodb-enterprise-tools/usr/share/lintian/overrides/
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/merizodb-enterprise-shell/usr/share/lintian/overrides/merizodb-enterprise-shell
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/merizodb-enterprise-server/usr/share/lintian/overrides/merizodb-enterprise-server
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/merizodb-enterprise-merizos/usr/share/lintian/overrides/merizodb-enterprise-merizos
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/merizodb-enterprise-tools/usr/share/lintian/overrides/merizodb-enterprise-tools
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -126,7 +126,7 @@ binary-arch: build install
 #	dh_installemacsen
 #	dh_installpam
 #	dh_installmime
-	dh_installinit -pmongodb-enterprise-server --name=mongod
+	dh_installinit -pmerizodb-enterprise-server --name=merizod
 #	dh_installinfo
 	dh_installman
 	dh_link

@@ -27,34 +27,34 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     st.configRS.stop(2);
     st.configRS.awaitNoPrimary();
 
-    jsTestLog("Starting a new mongos when the config servers have no primary which should work");
-    var mongos2 = MongoRunner.runMongos({configdb: st.configRS.getURL()});
-    assert.neq(null, mongos2);
+    jsTestLog("Starting a new merizos when the config servers have no primary which should work");
+    var merizos2 = MongoRunner.runMongos({configdb: st.configRS.getURL()});
+    assert.neq(null, merizos2);
 
-    var testOps = function(mongos) {
+    var testOps = function(merizos) {
         jsTestLog("Doing ops that don't require metadata writes and thus should succeed against: " +
-                  mongos);
-        var initialCount = mongos.getDB('test').foo.count();
-        assert.writeOK(mongos.getDB('test').foo.insert({a: 1}));
-        assert.eq(initialCount + 1, mongos.getDB('test').foo.count());
+                  merizos);
+        var initialCount = merizos.getDB('test').foo.count();
+        assert.writeOK(merizos.getDB('test').foo.insert({a: 1}));
+        assert.eq(initialCount + 1, merizos.getDB('test').foo.count());
 
         assert.throws(function() {
-            mongos.getDB('config').shards.findOne();
+            merizos.getDB('config').shards.findOne();
         });
-        mongos.setSlaveOk(true);
-        var shardDoc = mongos.getDB('config').shards.findOne();
-        mongos.setSlaveOk(false);
+        merizos.setSlaveOk(true);
+        var shardDoc = merizos.getDB('config').shards.findOne();
+        merizos.setSlaveOk(false);
         assert.neq(null, shardDoc);
 
-        jsTestLog("Doing ops that require metadata writes and thus should fail against: " + mongos);
-        assert.writeError(mongos.getDB("newDB").foo.insert({a: 1}));
+        jsTestLog("Doing ops that require metadata writes and thus should fail against: " + merizos);
+        assert.writeError(merizos.getDB("newDB").foo.insert({a: 1}));
         assert.commandFailed(
-            mongos.getDB('admin').runCommand({shardCollection: "test.foo", key: {a: 1}}));
+            merizos.getDB('admin').runCommand({shardCollection: "test.foo", key: {a: 1}}));
     };
 
-    testOps(mongos2);
+    testOps(merizos2);
     testOps(st.s);
 
     st.stop();
-    MongoRunner.stopMongos(mongos2);
+    MongoRunner.stopMongos(merizos2);
 }());

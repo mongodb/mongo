@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_out_replace_coll.h"
+#include "merizo/db/pipeline/document_source_out_replace_coll.h"
 
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/get_status_from_command_result.h"
 
-namespace mongo {
+namespace merizo {
 
 static AtomicWord<unsigned> aggOutCounter;
 
@@ -54,17 +54,17 @@ DocumentSourceOutReplaceColl::~DocumentSourceOutReplaceColl() {
 
             // Reset the operation context back to original once dropCollection is done.
             ON_BLOCK_EXIT(
-                [this] { pExpCtx->mongoProcessInterface->setOperationContext(pExpCtx->opCtx); });
+                [this] { pExpCtx->merizoProcessInterface->setOperationContext(pExpCtx->opCtx); });
 
-            pExpCtx->mongoProcessInterface->setOperationContext(cleanupOpCtx.get());
-            pExpCtx->mongoProcessInterface->directClient()->dropCollection(_tempNs.ns());
+            pExpCtx->merizoProcessInterface->setOperationContext(cleanupOpCtx.get());
+            pExpCtx->merizoProcessInterface->directClient()->dropCollection(_tempNs.ns());
         });
 }
 
 void DocumentSourceOutReplaceColl::initializeWriteNs() {
     OutStageWriteBlock writeBlock(pExpCtx->opCtx);
 
-    DBClientBase* conn = pExpCtx->mongoProcessInterface->directClient();
+    DBClientBase* conn = pExpCtx->merizoProcessInterface->directClient();
 
     const auto& outputNs = getOutputNs();
     _tempNs = NamespaceString(str::stream() << outputNs.db() << ".tmp.agg_out."
@@ -72,7 +72,7 @@ void DocumentSourceOutReplaceColl::initializeWriteNs() {
 
     // Save the original collection options and index specs so we can check they didn't change
     // during computation.
-    _originalOutOptions = pExpCtx->mongoProcessInterface->getCollectionOptions(outputNs);
+    _originalOutOptions = pExpCtx->merizoProcessInterface->getCollectionOptions(outputNs);
     _originalIndexes = conn->getIndexSpecs(outputNs.ns());
 
     // Check if it's capped to make sure we have a chance of succeeding before we do all the work.
@@ -129,8 +129,8 @@ void DocumentSourceOutReplaceColl::finalize() {
     auto renameCommandObj =
         BSON("renameCollection" << _tempNs.ns() << "to" << outputNs.ns() << "dropTarget" << true);
 
-    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(
+    pExpCtx->merizoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(
         pExpCtx->opCtx, renameCommandObj, outputNs, _originalOutOptions, _originalIndexes);
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/storage_engine_lock_file.h"
+#include "merizo/db/storage/storage_engine_lock_file.h"
 
 #include <boost/filesystem.hpp>
 #include <fcntl.h>
@@ -42,18 +42,18 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "mongo/platform/process_id.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/platform/process_id.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
 void flushMyDirectory(const boost::filesystem::path& file) {
 #ifdef __linux__  // this isn't needed elsewhere
     static bool _warnedAboutFilesystem = false;
-    // if called without a fully qualified path it asserts; that makes mongoperf fail.
+    // if called without a fully qualified path it asserts; that makes merizoperf fail.
     // so make a warning. need a better solution longer term.
     // massert(40389, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
     if (!file.has_branch_path()) {
@@ -77,9 +77,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
             if (!_warnedAboutFilesystem) {
                 log() << "\tWARNING: This file system is not supported. For further information"
                       << " see:" << startupWarningsLog;
-                log() << "\t\t\thttp://dochub.mongodb.org/core/unsupported-filesystems"
+                log() << "\t\t\thttp://dochub.merizodb.org/core/unsupported-filesystems"
                       << startupWarningsLog;
-                log() << "\t\tPlease notify MongoDB, Inc. if an unlisted filesystem generated "
+                log() << "\t\tPlease notify MerizoDB, Inc. if an unlisted filesystem generated "
                       << "this warning." << startupWarningsLog;
                 _warnedAboutFilesystem = true;
             }
@@ -156,9 +156,9 @@ Status StorageEngineLockFile::open() {
                       str::stream() << "Unable to create/open the lock file: " << _filespec << " ("
                                     << errnoWithDescription(errorcode)
                                     << ")."
-                                    << " Ensure the user executing mongod is the owner of the lock "
+                                    << " Ensure the user executing merizod is the owner of the lock "
                                        "file and has the appropriate permissions. Also make sure "
-                                       "that another mongod instance is not already running on the "
+                                       "that another merizod instance is not already running on the "
                                     << _dbpath
                                     << " directory");
     }
@@ -170,7 +170,7 @@ Status StorageEngineLockFile::open() {
                       str::stream() << "Unable to lock the lock file: " << _filespec << " ("
                                     << errnoWithDescription(errorcode)
                                     << ")."
-                                    << " Another mongod instance is already running on the "
+                                    << " Another merizod instance is already running on the "
                                     << _dbpath
                                     << " directory");
     }
@@ -255,4 +255,4 @@ void StorageEngineLockFile::clearPidAndUnlock() {
     close();
 }
 
-}  // namespace mongo
+}  // namespace merizo

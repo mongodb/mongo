@@ -19,9 +19,9 @@ env.Library(
         'collection_options.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/command_generic_argument',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/command_generic_argument',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface',
     ],
 )
 
@@ -35,12 +35,12 @@ env.Library(
     ],
     LIBDEPS=[
         'catalog_helpers',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
     ],
 )
 
@@ -49,7 +49,7 @@ env.CppUnitTest(
     source = 'collection_test.cpp',
     LIBDEPS=[
         'catalog_test_fixture',
-        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/merizo/db/db_raii',
     ],
 )
 
@@ -59,7 +59,7 @@ env.Library(
         "document_validation.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/merizo/db/service_context",
     ],
 )
 
@@ -69,7 +69,7 @@ env.Library(
         'commit_quorum_options.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
     ],
 )
 
@@ -88,8 +88,8 @@ env.Library(
     ],
     LIBDEPS=[
         'commit_quorum_options',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ],
 )
 
@@ -100,7 +100,7 @@ env.Library(
     ],
     LIBDEPS=[
         'commit_quorum_idl',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/util/net/network',
     ],
 )
 
@@ -111,7 +111,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'index_build_entry_idl',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/unittest/unittest',
     ],
 )
 
@@ -122,10 +122,10 @@ env.Library(
         env.Idlc("health_log.idl")[0],
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/concurrency/deferred_writer",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/idl/idl_parser",
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/db/concurrency/deferred_writer",
+        "$BUILD_DIR/merizo/db/service_context",
+        "$BUILD_DIR/merizo/idl/idl_parser",
     ],
 );
 
@@ -136,11 +136,11 @@ env.Library(
     ],
     LIBDEPS=[
         'multi_index_block',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/merizo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/merizo/db/query/query_knobs',
     ]
 )
 
@@ -161,14 +161,14 @@ env.Library(
         "index_key_validate.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/index/key_generator',
-        '$BUILD_DIR/mongo/db/index_names',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
-        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/index/index_descriptor',
+        '$BUILD_DIR/merizo/db/index/key_generator',
+        '$BUILD_DIR/merizo/db/index_names',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/merizo/util/fail_point',
     ],
 )
 
@@ -179,9 +179,9 @@ env.CppUnitTest(
         'index_spec_validate_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'index_key_validate',
     ],
 )
@@ -192,7 +192,7 @@ env.Library(
         "index_catalog.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'index_catalog_entry',
     ],
 )
@@ -203,7 +203,7 @@ env.Library(
         "index_catalog_entry.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -213,13 +213,13 @@ env.Library(
         "index_timestamp_helper.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/merizo/db/logical_clock',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/server_options_core',
     ]
 )
 
@@ -229,7 +229,7 @@ env.Library(
         "collection.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -240,16 +240,16 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'multi_index_block',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/drop_pending_collection_reaper',
+        '$BUILD_DIR/merizo/db/repl/optime',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/s/op_observer_sharding_impl',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
     ],
 )
 
@@ -260,8 +260,8 @@ env.Library(
     ],
     LIBDEPS=[
         'collection',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -274,21 +274,21 @@ env.Library(
     LIBDEPS=[
         'collection',
         'index_timestamp_helper',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/background',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
-        '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/progress_meter',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/audit',
+        '$BUILD_DIR/merizo/db/background',
+        '$BUILD_DIR/merizo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/merizo/db/curop',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/merizo/util/fail_point',
+        '$BUILD_DIR/merizo/util/progress_meter',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/index/index_build_interceptor',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/db/index/index_build_interceptor',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ]
 )
 
@@ -300,9 +300,9 @@ env.CppUnitTest(
     LIBDEPS=[
         'collection',
         'multi_index_block',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )
 
@@ -316,12 +316,12 @@ env.Library(
     LIBDEPS=[
         'collection',
         'database_holder',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ]
 )
 
@@ -342,8 +342,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'uuid_catalog',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -355,9 +355,9 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'collection',
         'uuid_catalog',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repair_database',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repair_database',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -369,8 +369,8 @@ env.CppUnitTest(
     LIBDEPS=[
         'catalog_control',
         'database_holder',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/db/index_builds_coordinator_merizod',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -395,31 +395,31 @@ env.Library(
         'index_catalog',
         'index_catalog_entry',
         'index_key_validate',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/background',
-        '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/index_d',
-        '$BUILD_DIR/mongo/db/op_observer',
-        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/db/system_index',
-        '$BUILD_DIR/mongo/db/ttl_collection_cache',
-        '$BUILD_DIR/mongo/db/views/views_mongod',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/background',
+        '$BUILD_DIR/merizo/db/collection_index_usage_tracker',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/curop',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/index/index_access_method',
+        '$BUILD_DIR/merizo/db/index_d',
+        '$BUILD_DIR/merizo/db/op_observer',
+        '$BUILD_DIR/merizo/db/repl/drop_pending_collection_reaper',
+        '$BUILD_DIR/merizo/db/repl/oplog',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/storage/key_string',
+        '$BUILD_DIR/merizo/db/system_index',
+        '$BUILD_DIR/merizo/db/ttl_collection_cache',
+        '$BUILD_DIR/merizo/db/views/views_merizod',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/index/index_build_interceptor',
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/db/repl/repl_settings',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
-        '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/merizo/db/commands/server_status_core',
+        '$BUILD_DIR/merizo/db/index/index_build_interceptor',
+        '$BUILD_DIR/merizo/db/logical_clock',
+        '$BUILD_DIR/merizo/db/repl/repl_settings',
+        '$BUILD_DIR/merizo/db/storage/storage_engine_common',
+        '$BUILD_DIR/merizo/db/transaction',
     ],
 )
 
@@ -436,14 +436,14 @@ env.Library(
         'rename_collection.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/background',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/db/write_ops',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/background',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/merizo/db/query_exec',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/views/views',
+        '$BUILD_DIR/merizo/db/write_ops',
         'collection_options',
         'collection',
         'index_catalog',
@@ -459,13 +459,13 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
     ],
 )
 
@@ -477,13 +477,13 @@ env.CppUnitTest(
     LIBDEPS=[
         'catalog_helpers',
         'uuid_catalog',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
     ],
 )
 
@@ -494,16 +494,16 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/op_observer',
-        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/op_observer',
+        '$BUILD_DIR/merizo/db/repl/drop_pending_collection_reaper',
+        '$BUILD_DIR/merizo/db/repl/oplog',
+        '$BUILD_DIR/merizo/db/repl/optime',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
     ],
 )
 
@@ -514,15 +514,15 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/op_observer',
-        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/op_observer',
+        '$BUILD_DIR/merizo/db/repl/drop_pending_collection_reaper',
+        '$BUILD_DIR/merizo/db/repl/oplog',
+        '$BUILD_DIR/merizo/db/repl/optime',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
     ],
 )

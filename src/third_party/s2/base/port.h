@@ -685,7 +685,7 @@ extern inline void prefetch(const char *x) {}
 
 #endif  // !HAVE_ATTRIBUTE_SECTION
 
-// MongoDB modification: All of our target platforms define the C99 remainder function.
+// MerizoDB modification: All of our target platforms define the C99 remainder function.
 #if 0
 inline double remainder(double x, double y) {
     double quot = x/y;

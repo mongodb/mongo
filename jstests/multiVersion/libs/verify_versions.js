@@ -1,5 +1,5 @@
 /**
- * Helpers for verifying versions of started MongoDB processes.
+ * Helpers for verifying versions of started MerizoDB processes.
  */
 
 var Mongo, assert;
@@ -10,9 +10,9 @@ var Mongo, assert;
         return result.version;
     };
 
-    // Checks that our mongodb process is of a certain version
-    assert.binVersion = function(mongo, version) {
-        var currVersion = mongo.getBinVersion();
+    // Checks that our merizodb process is of a certain version
+    assert.binVersion = function(merizo, version) {
+        var currVersion = merizo.getBinVersion();
         assert(MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
                                                  MongoRunner.getBinVersionFor(version)),
                "version " + version + " (" + MongoRunner.getBinVersionFor(version) + ")" +

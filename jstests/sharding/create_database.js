@@ -5,50 +5,50 @@
 (function() {
     'use strict';
 
-    function createDatabase(mongos, dbName) {
+    function createDatabase(merizos, dbName) {
         // A database is implicitly created when a collection inside it is created.
-        assert.commandWorked(mongos.getDB(dbName).runCommand({create: collName}));
+        assert.commandWorked(merizos.getDB(dbName).runCommand({create: collName}));
     }
 
-    function cleanUp(mongos, dbName) {
-        assert.commandWorked(mongos.getDB(dbName).runCommand({dropDatabase: 1}));
+    function cleanUp(merizos, dbName) {
+        assert.commandWorked(merizos.getDB(dbName).runCommand({dropDatabase: 1}));
     }
 
-    function assertDbVersionAssigned(mongos, dbName) {
-        createDatabase(mongos, dbName);
+    function assertDbVersionAssigned(merizos, dbName) {
+        createDatabase(merizos, dbName);
 
         // Check that the entry in the sharding catalog contains a dbVersion.
-        const dbEntry = mongos.getDB("config").getCollection("databases").findOne({_id: dbName});
+        const dbEntry = merizos.getDB("config").getCollection("databases").findOne({_id: dbName});
         assert.neq(null, dbEntry);
         assert.neq(null, dbEntry.version);
         assert.neq(null, dbEntry.version.uuid);
         assert.eq(1, dbEntry.version.lastMod);
 
-        // Check that the catalog cache on the mongos contains the same dbVersion.
-        const cachedDbEntry = mongos.adminCommand({getShardVersion: dbName});
+        // Check that the catalog cache on the merizos contains the same dbVersion.
+        const cachedDbEntry = merizos.adminCommand({getShardVersion: dbName});
         assert.commandWorked(cachedDbEntry);
         assert.eq(dbEntry.version.uuid, cachedDbEntry.version.uuid);
         assert.eq(dbEntry.version.lastMod, cachedDbEntry.version.lastMod);
 
-        cleanUp(mongos, dbName);
+        cleanUp(merizos, dbName);
 
         return dbEntry;
     }
 
-    function assertDbVersionNotAssigned(mongos, dbName) {
-        createDatabase(mongos, dbName);
+    function assertDbVersionNotAssigned(merizos, dbName) {
+        createDatabase(merizos, dbName);
 
         // Check that the entry in the sharding catalog *does not* contain a dbVersion.
-        const dbEntry = mongos.getDB("config").getCollection("databases").findOne({_id: dbName});
+        const dbEntry = merizos.getDB("config").getCollection("databases").findOne({_id: dbName});
         assert.neq(null, dbEntry);
         assert.eq(null, dbEntry.version);
 
-        // Check that the catalog cache on the mongos *does not* contain a dbVersion.
-        const cachedDbEntry = mongos.adminCommand({getShardVersion: dbName});
+        // Check that the catalog cache on the merizos *does not* contain a dbVersion.
+        const cachedDbEntry = merizos.adminCommand({getShardVersion: dbName});
         assert.commandWorked(cachedDbEntry);
         assert.eq(null, cachedDbEntry.version);
 
-        cleanUp(mongos, dbName);
+        cleanUp(merizos, dbName);
 
         return dbEntry;
     }

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,44 +27,44 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 #include <string>
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/read_concern.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/client.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/cursor_manager.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/find.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/query/getmore_request.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/db/read_concern.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/speculative_majority_read_info.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/stats/top.h"
+#include "merizo/s/chunk_version.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -614,7 +614,7 @@ public:
                 // getMores do not have support for a maxTimeout duration, we hardcode the timeout
                 // to avoid waiting indefinitely.
                 uassertStatusOK(
-                    mongo::waitForLinearizableReadConcern(opCtx, kLinearizableReadConcernTimeout));
+                    merizo::waitForLinearizableReadConcern(opCtx, kLinearizableReadConcernTimeout));
             }
 
             // We're about to unpin or delete the cursor as the ClientCursorPin goes out of scope.
@@ -672,4 +672,4 @@ public:
 } getMoreCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

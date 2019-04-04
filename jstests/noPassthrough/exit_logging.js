@@ -75,7 +75,7 @@
     }
 
     (function testMongod() {
-        print("********************\nTesting exit logging in mongod\n********************");
+        print("********************\nTesting exit logging in merizod\n********************");
 
         runAllTests({
             start: function(opts) {
@@ -89,10 +89,10 @@
     }());
 
     (function testMongos() {
-        print("********************\nTesting exit logging in mongos\n********************");
+        print("********************\nTesting exit logging in merizos\n********************");
 
         var st = new ShardingTest({shards: 1});
-        var mongosLauncher = {
+        var merizosLauncher = {
             start: function(opts) {
                 var actualOpts = {configdb: st._configDB};
                 Object.extend(actualOpts, opts);
@@ -102,7 +102,7 @@
             stop: MongoRunner.stopMongos
         };
 
-        runAllTests(mongosLauncher);
+        runAllTests(merizosLauncher);
         st.stop();
     }());
 

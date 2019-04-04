@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,7 +32,7 @@
 #include <boost/preprocessor/stringize.hpp>
 
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Marks a thread as idle while in scope. Prefer to use the macro below.
@@ -54,7 +54,7 @@ public:
         endIdleThreadBlock();
     }
 
-    // These should not be called by mongo C++ code. They are only public to allow exposing this
+    // These should not be called by merizo C++ code. They are only public to allow exposing this
     // functionality to a C api.
     static void beginIdleThreadBlock(const char* location);
     static void endIdleThreadBlock();
@@ -65,4 +65,4 @@ public:
  */
 #define MONGO_IDLE_THREAD_BLOCK IdleThreadBlock markIdle(__FILE__ ":" BOOST_PP_STRINGIZE(__LINE__))
 
-}  // namespace mongo
+}  // namespace merizo

@@ -31,7 +31,7 @@
     }
 
     const conn = MongoRunner.runMongod();
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
 
     const testDB = conn.getDB("log_getmore");
     const coll = testDB.test;
@@ -60,7 +60,7 @@
     let cursorid = getLatestProfilerEntry(testDB).cursorid;
 
     let logLine =
-        'command log_getmore.test appName: "MongoDB Shell" command: find { find: "test", filter:' +
+        'command log_getmore.test appName: "MerizoDB Shell" command: find { find: "test", filter:' +
         ' { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: false, sort:' +
         ' { a: 1.0 }, hint: { a: 1.0 }';
 
@@ -85,7 +85,7 @@
     }
 
     logLine = [
-        'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
+        'command log_getmore.test appName: "MerizoDB Shell" command: getMore { getMore: ' +
             cursorIdToString(cursorid) + ', collection: "test", batchSize: 5.0',
         'originatingCommand: { find: "test", ' +
             'filter: { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: ' +
@@ -101,7 +101,7 @@
     assert.eq(cursor.itcount(), 10);
 
     logLine = [
-        'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
+        'command log_getmore.test appName: "MerizoDB Shell" command: getMore { getMore: ' +
             cursorIdToString(cursorid) + ', collection: "test"',
         'originatingCommand: { aggregate: "test", pipeline: ' +
             '[ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 }'
@@ -122,7 +122,7 @@
     cursorid = getLatestProfilerEntry(testDB).cursorid;
 
     logLine =
-        'query log_getmore.test appName: "MongoDB Shell" command: { find: "test", filter: { a: ' +
+        'query log_getmore.test appName: "MerizoDB Shell" command: { find: "test", filter: { a: ' +
         '{ $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
 
     assertLogLineContains(conn, logLine);
@@ -133,7 +133,7 @@
     coll.find({query: "foo"}).itcount();
 
     logLine =
-        'query log_getmore.test appName: "MongoDB Shell" command: { find: "test", filter: { query:' +
+        'query log_getmore.test appName: "MerizoDB Shell" command: { find: "test", filter: { query:' +
         ' "foo" } }';
 
     assertLogLineContains(conn, logLine);
@@ -144,7 +144,7 @@
 
     assert.eq(cursor.itcount(), 8);  // Iterate the cursor established above to trigger getMore.
 
-    logLine = 'getmore log_getmore.test appName: "MongoDB Shell" command: { getMore: ' +
+    logLine = 'getmore log_getmore.test appName: "MerizoDB Shell" command: { getMore: ' +
         cursorIdToString(cursorid) +
         ', collection: "test", batchSize: 5 } originatingCommand: { find: "test", filter: { a: {' +
         ' $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
@@ -160,7 +160,7 @@
     assert.eq(cursor.itcount(), 10);
 
     logLine = [
-        'getmore log_getmore.test appName: "MongoDB Shell" command: { getMore: ' +
+        'getmore log_getmore.test appName: "MerizoDB Shell" command: { getMore: ' +
             cursorIdToString(cursorid) + ', collection: "test", batchSize: 0',
         'originatingCommand: { aggregate: "test", pipeline:' +
             ' [ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 }'

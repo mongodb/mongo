@@ -40,7 +40,7 @@ DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME
 echo "dest: $DEST_DIR"
 
 if [ ! -d $SRC ]; then
-    $GIT_EXE clone https://github.com/mongodb-labs/kms-message $CLONE_DEST
+    $GIT_EXE clone https://github.com/merizodb-labs/kms-message $CLONE_DEST
 
     pushd $SRC
     $GIT_EXE checkout $REVISION

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 
-#include "mongo/embedded/logical_session_cache_factory_embedded.h"
+#include "merizo/embedded/logical_session_cache_factory_embedded.h"
 
-#include "mongo/db/logical_session_cache_impl.h"
-#include "mongo/db/service_liaison_mongod.h"
-#include "mongo/db/sessions_collection_standalone.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/db/logical_session_cache_impl.h"
+#include "merizo/db/service_liaison_merizod.h"
+#include "merizo/db/sessions_collection_standalone.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheEmbedded() {
     auto liaison = std::make_unique<ServiceLiaisonMongod>();
@@ -53,4 +53,4 @@ std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheEmbedded() {
         std::move(liaison), std::move(sessionsColl), nullptr, LogicalSessionCacheImpl::Options{});
 }
 
-}  // namespace mongo
+}  // namespace merizo

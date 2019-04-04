@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <vector>
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/haystack_access_method.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/find_common.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/index/haystack_access_method.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/find_common.h"
 
 /**
  * Examines all documents in a given radius of a given point.
  * Returns all documents that match a given search restriction.
- * See http://dochub.mongodb.org/core/haystackindexes
+ * See http://dochub.merizodb.org/core/haystackindexes
  *
  * Use when you want to look for restaurants within 25 miles with a certain name.
  * Don't use when you want to find the closest open restaurants.
  */
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::vector;
@@ -152,4 +152,4 @@ public:
     }
 } nameSearchCommand;
 
-}  // namespace mongo
+}  // namespace merizo

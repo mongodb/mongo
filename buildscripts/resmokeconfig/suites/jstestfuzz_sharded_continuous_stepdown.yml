@@ -37,10 +37,10 @@ executor:
           forceValidationWithFeatureCompatibilityVersion: "4.2"
   fixture:
     class: ShardedClusterFixture
-    mongos_options:
+    merizos_options:
       set_parameters:
         enableTestCommands: 1
-    mongod_options:
+    merizod_options:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1

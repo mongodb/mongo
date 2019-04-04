@@ -1,6 +1,6 @@
 # This test suite exercises core, generic transactions behavior. The tests in this suite, pulled
 # from 'jstests/core/txns', should be "topology agnostic". They ideally generalize to single replica
-# sets and sharded clusters. Since transactions aren't supported on MongoDB standalones in 4.0, we
+# sets and sharded clusters. Since transactions aren't supported on MerizoDB standalones in 4.0, we
 # run this set of tests in their own suite, against a 1-node replica set, to provide the most basic
 # layer of test coverage. This allows us to verify basic transaction behavior against a local node,
 # without the need to exercise data replication machinery.
@@ -25,7 +25,7 @@ executor:
     n: 20
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1
     # Use a 1-node replica set.

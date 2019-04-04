@@ -9,4 +9,4 @@ rules:
   truthy: disable
 
 ignore: |
-  buildscripts/packaging/msi/mongod.yaml
+  buildscripts/packaging/msi/merizod.yaml

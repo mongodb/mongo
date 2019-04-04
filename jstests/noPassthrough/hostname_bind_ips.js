@@ -9,7 +9,7 @@
 
     assert.soon(function() {
         try {
-            const uri = 'mongodb://127.0.0.1:' + proc.port + '/test';
+            const uri = 'merizodb://127.0.0.1:' + proc.port + '/test';
             const conn = new Mongo(uri);
             assert.commandWorked(conn.adminCommand({ping: 1}));
             return true;

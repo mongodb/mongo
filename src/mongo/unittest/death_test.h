@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,8 +32,8 @@
 #include <memory>
 #include <string>
 
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
 
 /**
  * Constructs a single death test named "TEST_NAME" within the test case "CASE_NAME".
@@ -46,16 +46,16 @@
  * in the setUp() method of the fixture.
  */
 #define DEATH_TEST(CASE_NAME, TEST_NAME, MATCH_EXPR)                               \
-    class _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) : public ::mongo::unittest::Test { \
+    class _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) : public ::merizo::unittest::Test { \
     private:                                                                       \
         virtual void _doTest();                                                    \
                                                                                    \
         static const RegistrationAgent<                                            \
-            ::mongo::unittest::DeathTest<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)>>   \
+            ::merizo::unittest::DeathTest<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)>>   \
             _agent;                                                                \
     };                                                                             \
-    const ::mongo::unittest::Test::RegistrationAgent<                              \
-        ::mongo::unittest::DeathTest<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)>>       \
+    const ::merizo::unittest::Test::RegistrationAgent<                              \
+        ::merizo::unittest::DeathTest<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)>>       \
         _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_agent(#CASE_NAME, #TEST_NAME);     \
     std::string getDeathTestPattern(_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)*) {      \
         return MATCH_EXPR;                                                         \
@@ -74,18 +74,18 @@
         virtual void _doTest();                                                      \
                                                                                      \
         static const RegistrationAgent<                                              \
-            ::mongo::unittest::DeathTest<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>>  \
+            ::merizo::unittest::DeathTest<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>>  \
             _agent;                                                                  \
     };                                                                               \
-    const ::mongo::unittest::Test::RegistrationAgent<                                \
-        ::mongo::unittest::DeathTest<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>>      \
+    const ::merizo::unittest::Test::RegistrationAgent<                                \
+        ::merizo::unittest::DeathTest<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>>      \
         _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_agent(#FIXTURE_NAME, #TEST_NAME); \
     std::string getDeathTestPattern(_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)*) {     \
         return MATCH_EXPR;                                                           \
     }                                                                                \
     void _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_doTest()
 
-namespace mongo {
+namespace merizo {
 namespace unittest {
 
 class DeathTestImpl : public Test {
@@ -117,4 +117,4 @@ private:
 };
 
 }  // namespace unittest
-}  // namespace mongo
+}  // namespace merizo

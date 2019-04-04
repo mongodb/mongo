@@ -7,7 +7,7 @@ var verifyOutput = function(out) {
 };
 
 var st = new ShardingTest(
-    {shards: 2, verbose: 1, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
+    {shards: 2, verbose: 1, merizos: 1, other: {chunkSize: 1, enableBalancer: true}});
 
 st.adminCommand({enablesharding: "mrShard"});
 st.ensurePrimaryShard('mrShard', st.shard1.shardName);

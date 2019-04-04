@@ -1,6 +1,6 @@
 /**
  * The OverrideHelpers object defines convenience methods for overriding commands and functions in
- * the mongo shell.
+ * the merizo shell.
  */
 var OverrideHelpers = (function() {
     "use strict";
@@ -72,8 +72,8 @@ var OverrideHelpers = (function() {
     }
 
     function overrideRunCommand(overrideFunc) {
-        const mongoRunCommandOriginal = Mongo.prototype.runCommand;
-        const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
+        const merizoRunCommandOriginal = Mongo.prototype.runCommand;
+        const merizoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
         Mongo.prototype.runCommand = function(dbName, commandObj, options) {
             const commandName = Object.keys(commandObj)[0];
@@ -81,7 +81,7 @@ var OverrideHelpers = (function() {
                                 dbName,
                                 commandName,
                                 commandObj,
-                                mongoRunCommandOriginal,
+                                merizoRunCommandOriginal,
                                 (commandObj) => [dbName, commandObj, options]);
         };
 
@@ -91,7 +91,7 @@ var OverrideHelpers = (function() {
                                 dbName,
                                 commandName,
                                 commandArgs,
-                                mongoRunCommandWithMetadataOriginal,
+                                merizoRunCommandWithMetadataOriginal,
                                 (commandArgs) => [dbName, metadata, commandArgs]);
         };
     }

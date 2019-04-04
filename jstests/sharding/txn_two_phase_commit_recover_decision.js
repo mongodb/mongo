@@ -106,7 +106,7 @@
     };
 
     let st =
-        new ShardingTest({shards: 2, rs: {nodes: 2}, mongos: 2, other: {rsOptions: {verbose: 2}}});
+        new ShardingTest({shards: 2, rs: {nodes: 2}, merizos: 2, other: {rsOptions: {verbose: 2}}});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard0.name);
@@ -115,7 +115,7 @@
     assert.commandWorked(
         st.s0.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard1.name}));
 
-    // Insert documents to prime mongos and shards with the latest sharding metadata.
+    // Insert documents to prime merizos and shards with the latest sharding metadata.
     let testDB = st.s0.getDB('test');
     assert.commandWorked(testDB.runCommand({insert: 'user', documents: [{x: -10}, {x: 10}]}));
 
@@ -325,7 +325,7 @@
         // Start transaction and run CRUD ops on several shards.
         const recoveryToken = startNewCrossShardTransactionThroughMongos();
 
-        // Try to recover decision from other mongos. This should block until the transaction
+        // Try to recover decision from other merizos. This should block until the transaction
         // coordinator is canceled after transactionLifetimeLimitSeconds, after which it should
         // abort the local participant and return NoSuchTransaction.
         assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
@@ -340,7 +340,7 @@
 
         const recoveryToken = startNewSingleShardTransactionThroughMongos();
 
-        // Commit the transaction from the first mongos.
+        // Commit the transaction from the first merizos.
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -349,7 +349,7 @@
             recoveryToken: recoveryToken
         }));
 
-        // Try to recover decision from other mongos.
+        // Try to recover decision from other merizos.
         assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
     }());
 
@@ -366,7 +366,7 @@
             autocommit: false
         }));
 
-        // Commit the transaction from the first mongos.
+        // Commit the transaction from the first merizos.
         assert.commandFailedWithCode(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -376,7 +376,7 @@
         }),
                                      ErrorCodes.NoSuchTransaction);
 
-        // Try to recover the decision from other mongos.
+        // Try to recover the decision from other merizos.
         assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     }());

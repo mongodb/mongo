@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_comparator.h"
-#include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/pipeline/document_comparator.h"
+#include "merizo/db/pipeline/value_comparator.h"
+#include "merizo/unittest/unittest.h"
 
 /**
  * Use to compare two instances of type Value under the default ValueComparator in unit tests.
@@ -57,9 +57,9 @@
  * Document/Value comparison utility macro. Do not use directly.
  */
 #define _ASSERT_DOCVAL_COMPARISON(NAME, a, b) \
-    ::mongo::unittest::assertComparison_##NAME(__FILE__, __LINE__, #a, #b, a, b)
+    ::merizo::unittest::assertComparison_##NAME(__FILE__, __LINE__, #a, #b, a, b)
 
-namespace mongo {
+namespace merizo {
 namespace unittest {
 
 #define _DECLARE_DOCVAL_CMP_FUNC(DOCVAL, NAME)                       \
@@ -86,4 +86,4 @@ _DECLARE_DOCVAL_CMP_FUNC(Document, NE);
 #undef _DECLARE_DOCVAL_CMP_FUNC
 
 }  // namespace unittest
-}  // namespace mongo
+}  // namespace merizo

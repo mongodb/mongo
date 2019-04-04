@@ -40,8 +40,8 @@ var roles = [
 
 /**
  * Parameters:
- *   conn -- connection, either to standalone mongod,
- *      or to mongos in sharded cluster
+ *   conn -- connection, either to standalone merizod,
+ *      or to merizos in sharded cluster
  *   t -- a test object from the tests array in jstests/auth/commands.js
  *   testcase -- the particular testcase from t to test
  *   r -- a role object from the "roles" array above
@@ -163,12 +163,12 @@ MongoRunner.stopMongod(conn);
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 conn = new ShardingTest({
     shards: 2,
-    mongos: 1,
+    merizos: 1,
     keyFile: "jstests/libs/key1",
     other: {
         shardOptions: opts,
         shardAsReplicaSet: false,
-        mongosOptions: {setParameter: "trafficRecordingDirectory=" + dbPath}
+        merizosOptions: {setParameter: "trafficRecordingDirectory=" + dbPath}
     }
 });
 authCommandsLib.runTests(conn, impls);

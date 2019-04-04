@@ -26,7 +26,7 @@ using std::vector;
 #include "s2.h"
 #include "s2cap.h"
 #include "s2cellunion.h"
-#include "mongo/base/init.h"
+#include "merizo/base/init.h"
 
 // Define storage for header file constants (the values are not needed here).
 int const S2RegionCoverer::kDefaultMaxCells = 8;
@@ -50,9 +50,9 @@ static void Init() {
   }
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(S2RegionCovererInit, ("S2CellIdInit"))(mongo::InitializerContext *context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(S2RegionCovererInit, ("S2CellIdInit"))(merizo::InitializerContext *context) {
     Init();
-    return mongo::Status::OK();
+    return merizo::Status::OK();
 }
 
 S2RegionCoverer::S2RegionCoverer() :

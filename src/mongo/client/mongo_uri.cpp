@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/mongo_uri.h"
+#include "merizo/client/merizo_uri.h"
 
 #include <utility>
 
@@ -41,15 +41,15 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/range/algorithm/count.hpp>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/stdx/utility.h"
-#include "mongo/util/dns_name.h"
-#include "mongo/util/dns_query.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/client/sasl_client_authenticate.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/stdx/utility.h"
+#include "merizo/util/dns_name.h"
+#include "merizo/util/dns_query.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/merizoutils/str.h"
 
 using namespace std::literals::string_literals;
 
@@ -67,9 +67,9 @@ const std::vector<std::pair<std::string, std::string>> permittedTXTOptions = {{"
  * RFC 3986 Section 2.1 - Percent Encoding
  *
  * Encode data elements in a way which will allow them to be embedded
- * into a mongodb:// URI safely.
+ * into a merizodb:// URI safely.
  */
-void mongo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthrough) {
+void merizo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthrough) {
     for (const auto& c : toEncode) {
         if ((c == '-') || (c == '_') || (c == '.') || (c == '~') || isalnum(c) ||
             (passthrough.find(c) != std::string::npos)) {
@@ -81,7 +81,7 @@ void mongo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthro
     }
 }
 
-mongo::StatusWith<std::string> mongo::uriDecode(StringData toDecode) {
+merizo::StatusWith<std::string> merizo::uriDecode(StringData toDecode) {
     StringBuilder out;
     for (size_t i = 0; i < toDecode.size(); ++i) {
         const char c = toDecode[i];
@@ -106,12 +106,12 @@ mongo::StatusWith<std::string> mongo::uriDecode(StringData toDecode) {
     return out.str();
 }
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
-constexpr StringData kURIPrefix = "mongodb://"_sd;
-constexpr StringData kURISRVPrefix = "mongodb+srv://"_sd;
+constexpr StringData kURIPrefix = "merizodb://"_sd;
+constexpr StringData kURISRVPrefix = "merizodb+srv://"_sd;
 constexpr StringData kDefaultMongoHost = "127.0.0.1:27017"_sd;
 
 /**
@@ -156,7 +156,7 @@ MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
     if (options.find('?') != std::string::npos) {
         uasserted(
             ErrorCodes::FailedToParse,
-            str::stream() << "URI Cannot Contain multiple questions marks for mongodb:// URL: "
+            str::stream() << "URI Cannot Contain multiple questions marks for merizodb:// URL: "
                           << url);
     }
 
@@ -169,7 +169,7 @@ MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
         if (opt.empty()) {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream()
-                          << "Missing a key/value pair in the options for mongodb:// URL: "
+                          << "Missing a key/value pair in the options for merizodb:// URL: "
                           << url);
         }
 
@@ -178,25 +178,25 @@ MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
         if (keyRaw.empty()) {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream()
-                          << "Missing a key for key/value pair in the options for mongodb:// URL: "
+                          << "Missing a key for key/value pair in the options for merizodb:// URL: "
                           << url);
         }
         const auto key = uassertStatusOKWithContext(
             uriDecode(keyRaw),
             str::stream() << "Key '" << keyRaw
-                          << "' in options cannot properly be URL decoded for mongodb:// URL: "
+                          << "' in options cannot properly be URL decoded for merizodb:// URL: "
                           << url);
         const auto valRaw = kvPair.second;
         if (valRaw.empty()) {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream() << "Missing value for key '" << keyRaw
-                                    << "' in the options for mongodb:// URL: "
+                                    << "' in the options for merizodb:// URL: "
                                     << url);
         }
         const auto val = uassertStatusOKWithContext(
             uriDecode(valRaw),
             str::stream() << "Value '" << valRaw << "' for key '" << keyRaw
-                          << "' in options cannot properly be URL decoded for mongodb:// URL: "
+                          << "' in options cannot properly be URL decoded for merizodb:// URL: "
                           << url);
 
         ret[key] = val;
@@ -254,7 +254,7 @@ struct URIParts {
 };
 
 URIParts::URIParts(StringData uri) {
-    // 1. Strip off the scheme ("mongo://")
+    // 1. Strip off the scheme ("merizo://")
     auto schemeEnd = uri.find("://");
     if (schemeEnd == std::string::npos) {
         uasserted(ErrorCodes::FailedToParse,
@@ -277,7 +277,7 @@ URIParts::URIParts(StringData uri) {
         uasserted(
             ErrorCodes::FailedToParse,
             str::stream()
-                << "URI must contain slash delimiter between hosts and options for mongodb:// URL: "
+                << "URI must contain slash delimiter between hosts and options for merizodb:// URL: "
                 << uri);
     }
 
@@ -322,7 +322,7 @@ std::string MongoURI::redact(StringData url) {
 MongoURI MongoURI::parseImpl(const std::string& url) {
     const StringData urlSD(url);
 
-    // 1. Validate and remove the scheme prefix `mongodb://` or `mongodb+srv://`
+    // 1. Validate and remove the scheme prefix `merizodb://` or `merizodb+srv://`
     const bool isSeedlist = urlSD.startsWith(kURISRVPrefix);
     if (!(urlSD.startsWith(kURIPrefix) || isSeedlist)) {
         return MongoURI(uassertStatusOK(ConnectionString::parse(url)));
@@ -343,23 +343,23 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
 
     if (containsColonOrAt(usernameSD)) {
         uasserted(ErrorCodes::FailedToParse,
-                  str::stream() << "Username must be URL Encoded for mongodb:// URL: " << url);
+                  str::stream() << "Username must be URL Encoded for merizodb:// URL: " << url);
     }
 
     if (containsColonOrAt(passwordSD)) {
         uasserted(ErrorCodes::FailedToParse,
-                  str::stream() << "Password must be URL Encoded for mongodb:// URL: " << url);
+                  str::stream() << "Password must be URL Encoded for merizodb:// URL: " << url);
     }
 
     // Get the username and make sure it did not fail to decode
     const auto username = uassertStatusOKWithContext(
         uriDecode(usernameSD),
-        str::stream() << "Username cannot properly be URL decoded for mongodb:// URL: " << url);
+        str::stream() << "Username cannot properly be URL decoded for merizodb:// URL: " << url);
 
     // Get the password and make sure it did not fail to decode
     const auto password = uassertStatusOKWithContext(
         uriDecode(passwordSD),
-        str::stream() << "Password cannot properly be URL decoded for mongodb:// URL: " << url);
+        str::stream() << "Password cannot properly be URL decoded for merizodb:// URL: " << url);
 
     // 4. Validate, split, and URL decode the host identifiers.
     const auto hostIdentifiersStr = hostIdentifiers.toString();
@@ -370,7 +370,7 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
          ++i) {
         const auto host = uassertStatusOKWithContext(
             uriDecode(boost::copy_range<std::string>(*i)),
-            str::stream() << "Host cannot properly be URL decoded for mongodb:// URL: " << url);
+            str::stream() << "Host cannot properly be URL decoded for merizodb:// URL: " << url);
 
         if (host.empty()) {
             continue;
@@ -390,23 +390,23 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
     }
 
     const std::string canonicalHost = servers.front().host();
-    // If we're in seedlist mode, lookup the SRV record for `_mongodb._tcp` on the specified
+    // If we're in seedlist mode, lookup the SRV record for `_merizodb._tcp` on the specified
     // domain name.  Take that list of servers as the new list of servers.
     if (isSeedlist) {
         if (servers.size() > 1) {
             uasserted(ErrorCodes::FailedToParse,
-                      "Only a single server may be specified with a mongo+srv:// url.");
+                      "Only a single server may be specified with a merizo+srv:// url.");
         }
 
-        const mongo::dns::HostName host(canonicalHost);
+        const merizo::dns::HostName host(canonicalHost);
 
         if (host.nameComponents().size() < 3) {
             uasserted(ErrorCodes::FailedToParse,
-                      "A server specified with a mongo+srv:// url must have at least 3 hostname "
+                      "A server specified with a merizo+srv:// url must have at least 3 hostname "
                       "components separated by dots ('.')");
         }
 
-        const mongo::dns::HostName srvSubdomain("_mongodb._tcp");
+        const merizo::dns::HostName srvSubdomain("_merizodb._tcp");
 
         const auto srvEntries =
             dns::lookupSRVRecords(srvSubdomain.resolvedIn(host).canonicalName());
@@ -416,7 +416,7 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
             return hostName;
         };
 
-        const mongo::dns::HostName domain = makeFQDN(host.parentDomain());
+        const merizo::dns::HostName domain = makeFQDN(host.parentDomain());
         servers.clear();
         using std::begin;
         using std::end;
@@ -437,7 +437,7 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
     const auto database =
         uassertStatusOKWithContext(uriDecode(databaseSD),
                                    str::stream() << "Database name cannot properly be URL "
-                                                    "decoded for mongodb:// URL: "
+                                                    "decoded for merizodb:// URL: "
                                                  << url);
 
     // 6. Validate the database contains no prohibited characters
@@ -449,7 +449,7 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
                                       NamespaceString::DollarInDbNameBehavior::Disallow)) {
         uasserted(ErrorCodes::FailedToParse,
                   str::stream() << "Database name cannot have reserved "
-                                   "characters for mongodb:// URL: "
+                                   "characters for merizodb:// URL: "
                                 << url);
     }
 
@@ -571,4 +571,4 @@ std::string MongoURI::canonicalizeURIAsString() const {
     }
     return uri.str();
 }
-}  // namespace mongo
+}  // namespace merizo

@@ -9,6 +9,6 @@ if versionAtLeast 3 4; then
 	CONFIGDB="csrs1/$CONFIGDB"
 fi
 
-exec mongos $COMMONSOPTS \
+exec merizos $COMMONSOPTS \
 	--port 40201 \
 	--configdb $CONFIGDB

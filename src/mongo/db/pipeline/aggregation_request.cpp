@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "merizo/db/pipeline/aggregation_request.h"
 
 #include <algorithm>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/query/cursor_request.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/storage/storage_options.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/command_generic_argument.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/db/query/cursor_request.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/storage/storage_options.h"
 
-namespace mongo {
+namespace merizo {
 
 constexpr StringData AggregationRequest::kCommandName;
 constexpr StringData AggregationRequest::kCursorName;
@@ -353,4 +353,4 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
     };
 }
-}  // namespace mongo
+}  // namespace merizo

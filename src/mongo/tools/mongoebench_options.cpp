@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/tools/mongoebench_options.h"
+#include "merizo/tools/merizoebench_options.h"
 
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 
-#include "mongo/base/status.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/platform/random.h"
-#include "mongo/shell/bench.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "merizo/base/status.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/platform/random.h"
+#include "merizo/shell/bench.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/options_parser/startup_options.h"
 
-namespace mongo {
+namespace merizo {
 
-MongoeBenchGlobalParams mongoeBenchGlobalParams;
+MongoeBenchGlobalParams merizoeBenchGlobalParams;
 
 void printMongoeBenchHelp(std::ostream* out) {
-    *out << "Usage: mongoebench <config file> [options]" << std::endl;
+    *out << "Usage: merizoebench <config file> [options]" << std::endl;
     *out << moe::startupOptions.helpString();
     *out << std::flush;
 }
@@ -83,10 +83,10 @@ Status storeMongoeBenchOptions(const moe::Environment& params,
     for (auto&& elem : config) {
         const auto fieldName = elem.fieldNameStringData();
         if (fieldName == "pre") {
-            mongoeBenchGlobalParams.preConfig.reset(
+            merizoeBenchGlobalParams.preConfig.reset(
                 BenchRunConfig::createFromBson(elem.wrap("ops")));
         } else if (fieldName == "ops") {
-            mongoeBenchGlobalParams.opsConfig.reset(BenchRunConfig::createFromBson(elem.wrap()));
+            merizoeBenchGlobalParams.opsConfig.reset(BenchRunConfig::createFromBson(elem.wrap()));
         } else {
             return {ErrorCodes::BadValue,
                     str::stream() << "Unrecognized key in benchRun config file: " << fieldName};
@@ -96,32 +96,32 @@ Status storeMongoeBenchOptions(const moe::Environment& params,
     int64_t seed = params.count("seed") ? static_cast<int64_t>(params["seed"].as<long>())
                                         : SecureRandom::create()->nextInt64();
 
-    if (mongoeBenchGlobalParams.preConfig) {
-        mongoeBenchGlobalParams.preConfig->randomSeed = seed;
+    if (merizoeBenchGlobalParams.preConfig) {
+        merizoeBenchGlobalParams.preConfig->randomSeed = seed;
     }
 
-    if (mongoeBenchGlobalParams.opsConfig) {
-        mongoeBenchGlobalParams.opsConfig->randomSeed = seed;
+    if (merizoeBenchGlobalParams.opsConfig) {
+        merizoeBenchGlobalParams.opsConfig->randomSeed = seed;
 
         if (params.count("threads")) {
-            mongoeBenchGlobalParams.opsConfig->parallel = params["threads"].as<unsigned>();
+            merizoeBenchGlobalParams.opsConfig->parallel = params["threads"].as<unsigned>();
         }
 
         if (params.count("time")) {
-            mongoeBenchGlobalParams.opsConfig->seconds = params["time"].as<double>();
+            merizoeBenchGlobalParams.opsConfig->seconds = params["time"].as<double>();
         }
     }
 
     if (params.count("output")) {
-        mongoeBenchGlobalParams.outputFile =
+        merizoeBenchGlobalParams.outputFile =
             boost::filesystem::path(params["output"].as<std::string>());
     } else {
         boost::filesystem::path dbpath(storageGlobalParams.dbpath);
-        mongoeBenchGlobalParams.outputFile = dbpath / kDefaultOutputFile;
+        merizoeBenchGlobalParams.outputFile = dbpath / kDefaultOutputFile;
     }
 
-    mongoeBenchGlobalParams.outputFile = mongoeBenchGlobalParams.outputFile.lexically_normal();
-    auto parentPath = mongoeBenchGlobalParams.outputFile.parent_path();
+    merizoeBenchGlobalParams.outputFile = merizoeBenchGlobalParams.outputFile.lexically_normal();
+    auto parentPath = merizoeBenchGlobalParams.outputFile.parent_path();
     if (!parentPath.empty() && !boost::filesystem::exists(parentPath)) {
         return {ErrorCodes::NonExistentPath,
                 str::stream() << "Directory containing output file must already exist, but "
@@ -132,4 +132,4 @@ Status storeMongoeBenchOptions(const moe::Environment& params,
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

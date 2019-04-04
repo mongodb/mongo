@@ -1,5 +1,5 @@
 //
-// Testing mongos with replica sets:
+// Testing merizos with replica sets:
 //  - config server should update when replica set config changes.
 //  - test insert and find commands are routed appropriately to shard primaries
 //    and secondaries.
@@ -12,7 +12,7 @@
 (function() {
     'use strict';
 
-    // The mongod secondaries are set to priority 0 and votes 0 to prevent the primaries
+    // The merizod secondaries are set to priority 0 and votes 0 to prevent the primaries
     // from stepping down during migrations on slow evergreen builders.
     var s = new ShardingTest({
         shards: 2,
@@ -226,7 +226,7 @@
     // Modify data only on the primary replica of the primary shard.
     // { x: 60 } goes to the shard of "rs", which is the primary shard.
     assert.writeOK(ts.insert({primaryOnly: true, x: 60}));
-    // Read from secondary through mongos, the doc is not there due to replication delay or fsync.
+    // Read from secondary through merizos, the doc is not there due to replication delay or fsync.
     // But we can guarantee not to read from primary.
     assert.eq(0, ts.find({primaryOnly: true, x: 60}).itcount());
     // Unlock the secondaries

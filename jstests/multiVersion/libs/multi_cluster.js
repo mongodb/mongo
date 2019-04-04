@@ -68,19 +68,19 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
     }
 
     if (options.upgradeMongos) {
-        // Upgrade all mongos hosts if specified
-        var numMongoses = this._mongos.length;
+        // Upgrade all merizos hosts if specified
+        var numMongoses = this._merizos.length;
 
         for (var i = 0; i < numMongoses; i++) {
-            var mongos = this._mongos[i];
-            MongoRunner.stopMongos(mongos);
+            var merizos = this._merizos[i];
+            MongoRunner.stopMongos(merizos);
 
-            mongos = MongoRunner.runMongos(
-                {restart: mongos, binVersion: binVersion, appendOptions: true});
+            merizos = MongoRunner.runMongos(
+                {restart: merizos, binVersion: binVersion, appendOptions: true});
 
-            this["s" + i] = this._mongos[i] = mongos;
+            this["s" + i] = this._merizos[i] = merizos;
             if (i == 0)
-                this.s = mongos;
+                this.s = merizos;
         }
 
         this.config = this.s.getDB("config");
@@ -90,17 +90,17 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
 
 ShardingTest.prototype.restartMongoses = function() {
 
-    var numMongoses = this._mongos.length;
+    var numMongoses = this._merizos.length;
 
     for (var i = 0; i < numMongoses; i++) {
-        var mongos = this._mongos[i];
+        var merizos = this._merizos[i];
 
-        MongoRunner.stopMongos(mongos);
-        mongos = MongoRunner.runMongos({restart: mongos});
+        MongoRunner.stopMongos(merizos);
+        merizos = MongoRunner.runMongos({restart: merizos});
 
-        this["s" + i] = this._mongos[i] = mongos;
+        this["s" + i] = this._merizos[i] = merizos;
         if (i == 0)
-            this.s = mongos;
+            this.s = merizos;
     }
 
     this.config = this.s.getDB("config");
@@ -108,16 +108,16 @@ ShardingTest.prototype.restartMongoses = function() {
 };
 
 ShardingTest.prototype.getMongosAtVersion = function(binVersion) {
-    var mongoses = this._mongos;
-    for (var i = 0; i < mongoses.length; i++) {
+    var merizoses = this._merizos;
+    for (var i = 0; i < merizoses.length; i++) {
         try {
-            var version = mongoses[i].getDB("admin").runCommand("serverStatus").version;
+            var version = merizoses[i].getDB("admin").runCommand("serverStatus").version;
             if (version.indexOf(binVersion) == 0) {
-                return mongoses[i];
+                return merizoses[i];
             }
         } catch (e) {
             printjson(e);
-            print(mongoses[i]);
+            print(merizoses[i]);
         }
     }
 };

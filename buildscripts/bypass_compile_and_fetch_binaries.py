@@ -86,17 +86,17 @@ def generate_bypass_expansions(project, build_variant, revision, build_id):
     expansions = {}
     # With compile bypass we need to update the URL to point to the correct name of the base commit
     # binaries.
-    expansions["mongo_binaries"] = (archive_name("{}/{}/{}/binaries/mongo-{}".format(
+    expansions["merizo_binaries"] = (archive_name("{}/{}/{}/binaries/merizo-{}".format(
         project, build_variant, revision, build_id)))
 
     # With compile bypass we need to update the URL to point to the correct name of the base commit
     # debug symbols.
-    expansions["mongo_debugsymbols"] = (archive_name("{}/{}/{}/debugsymbols/debugsymbols-{}".format(
+    expansions["merizo_debugsymbols"] = (archive_name("{}/{}/{}/debugsymbols/debugsymbols-{}".format(
         project, build_variant, revision, build_id)))
 
     # With compile bypass we need to update the URL to point to the correct name of the base commit
-    # mongo shell.
-    expansions["mongo_shell"] = (archive_name("{}/{}/{}/binaries/mongo-shell-{}".format(
+    # merizo shell.
+    expansions["merizo_shell"] = (archive_name("{}/{}/{}/binaries/merizo-shell-{}".format(
         project, build_variant, revision, build_id)))
 
     # Enable bypass compile
@@ -175,7 +175,7 @@ def parse_args():
     """Parse the program arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True,
-                        help="The Evergreen project. e.g mongodb-mongo-master")
+                        help="The Evergreen project. e.g merizodb-merizo-master")
 
     parser.add_argument("--buildVariant", required=True,
                         help="The build variant. e.g enterprise-rhel-62-64-bit")
@@ -267,9 +267,9 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
 
                 # Need to extract certain files from the pre-existing artifacts.tgz.
                 extract_files = [
-                    executable_name("mongobridge"),
-                    executable_name("mongoebench"),
-                    executable_name("mongoed"),
+                    executable_name("merizobridge"),
+                    executable_name("merizoebench"),
+                    executable_name("merizoed"),
                     executable_name("wt"),
                 ]
                 with tarfile.open(filename, "r:gz") as tar:
@@ -283,8 +283,8 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
                     print("Extracting the following files from {0}...\n{1}".format(
                         filename, "\n".join(tarinfo.name for tarinfo in subdir)))
                     tar.extractall(members=subdir)
-            elif filename.startswith("mongo-src"):
-                print("Retrieving mongo source {}".format(filename))
+            elif filename.startswith("merizo-src"):
+                print("Retrieving merizo source {}".format(filename))
                 # This is the distsrc.[tgz|zip] as referenced in evergreen.yml.
                 try:
                     urllib.urlretrieve(artifact["url"], filename)

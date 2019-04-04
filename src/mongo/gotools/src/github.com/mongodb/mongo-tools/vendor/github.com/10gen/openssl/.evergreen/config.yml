@@ -111,7 +111,7 @@ buildvariants:
   run_on:
   - linux-64-amzn-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -122,7 +122,7 @@ buildvariants:
   run_on:
   - amazon2-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -137,7 +137,7 @@ buildvariants:
   run_on:
   - debian71-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -148,7 +148,7 @@ buildvariants:
   run_on:
   - debian81-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -159,7 +159,7 @@ buildvariants:
   run_on:
   - debian92-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -174,7 +174,7 @@ buildvariants:
   run_on:
   - macos-1012
   expansions:
-    gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
+    gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/merizodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     build_tags: "openssl_pre_1.0"
   tasks:
   - name: build
@@ -189,7 +189,7 @@ buildvariants:
   run_on:
   - rhel62-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -200,7 +200,7 @@ buildvariants:
   run_on:
   - rhel70
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -215,7 +215,7 @@ buildvariants:
   run_on:
   - suse12-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -230,7 +230,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -241,7 +241,7 @@ buildvariants:
   run_on:
   - ubuntu1604-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: ""
   tasks:
   - name: build
@@ -273,7 +273,7 @@ buildvariants:
   stepback: false
   batchtime: 604800
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/merizodbtoolchain/v2/bin/aarch64-merizodb-linux-gcc'
     build_tags: ""
   tasks:
   - name: build
@@ -290,7 +290,7 @@ buildvariants:
   stepback: false
   batchtime: 604800
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/merizodbtoolchain/v2/bin/ppc64le-merizodb-linux-gcc'
     build_tags: ""
   tasks:
   - name: build
@@ -303,7 +303,7 @@ buildvariants:
   stepback: false
   batchtime: 604800
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/merizodbtoolchain/v2/bin/ppc64le-merizodb-linux-gcc'
     build_tags: ""
   tasks:
   - name: build
@@ -320,7 +320,7 @@ buildvariants:
   stepback: false
   batchtime: 604800
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/merizodbtoolchain/v2/bin/s390x-merizodb-linux-gcc'
     build_tags: ""
   tasks:
   - name: build
@@ -333,7 +333,7 @@ buildvariants:
   stepback: false
   batchtime: 604800
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/merizodbtoolchain/v2/bin/s390x-merizodb-linux-gcc'
     build_tags: ""
   tasks:
   - name: build
@@ -346,7 +346,7 @@ buildvariants:
   stepback: false
   batchtime: 604800
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/merizodbtoolchain/v2/bin/s390x-merizodb-linux-gcc'
     build_tags: ""
   tasks:
   - name: build
@@ -359,7 +359,7 @@ buildvariants:
   stepback: false
   batchtime: 604800
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/merizodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/merizodbtoolchain/v2/bin/s390x-merizodb-linux-gcc'
     build_tags: ""
   tasks:
   - name: build

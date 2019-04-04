@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,39 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/multi_index_block.h"
+#include "merizo/db/catalog/multi_index_block.h"
 
 #include <ostream>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/multi_index_block_gen.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/index/index_build_interceptor.h"
-#include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/multi_key_path_tracker.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/logger/redaction.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
-#include "mongo/util/progress_meter.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/uuid.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/multi_index_block_gen.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/index/index_build_interceptor.h"
+#include "merizo/db/index/multikey_paths.h"
+#include "merizo/db/multi_key_path_tracker.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/storage/write_unit_of_work.h"
+#include "merizo/logger/redaction.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/log.h"
+#include "merizo/util/progress_meter.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
@@ -812,4 +812,4 @@ logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& out,
     return out;
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -18,7 +18,7 @@
     try {
         assert.eq(c.find().batchSize(1).addOption(DBQuery.Option.exhaust).itcount(), docCount);
     } catch (e) {
-        // The exhaust option is not valid against mongos, ensure that this query throws the right
+        // The exhaust option is not valid against merizos, ensure that this query throws the right
         // code
         assert.eq(e.code, 18526);
     }

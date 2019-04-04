@@ -3,7 +3,7 @@
 var baseName = "jstests_auth_repl";
 var rsName = baseName + "_rs";
 var rtName = baseName + "_rt";
-var mongoOptions = {auth: null, keyFile: "jstests/libs/key1"};
+var merizoOptions = {auth: null, keyFile: "jstests/libs/key1"};
 var authErrCode = 13;
 
 var AuthReplTest = function(spec) {
@@ -173,7 +173,7 @@ var AuthReplTest = function(spec) {
 
 jsTest.log("1 test replica sets");
 var rs = new ReplSetTest({name: rsName, nodes: 2});
-var nodes = rs.startSet(mongoOptions);
+var nodes = rs.startSet(merizoOptions);
 rs.initiate();
 authutil.asCluster(nodes, "jstests/libs/key1", function() {
     rs.awaitReplication();
@@ -188,7 +188,7 @@ authReplTest.testAll();
 rs.stopSet();
 
 jsTest.log("2 test initial sync");
-rs = new ReplSetTest({name: rsName, nodes: 1, nodeOptions: mongoOptions});
+rs = new ReplSetTest({name: rsName, nodes: 1, nodeOptions: merizoOptions});
 nodes = rs.startSet();
 rs.initiate();
 authutil.asCluster(nodes, "jstests/libs/key1", function() {
@@ -201,7 +201,7 @@ var authReplTest = AuthReplTest({primaryConn: primary, secondaryConn: null});
 authReplTest.createUserAndRoles(1);
 
 // Add a secondary and wait for initial sync
-rs.add(mongoOptions);
+rs.add(merizoOptions);
 rs.reInitiate();
 rs.awaitSecondaryNodes();
 secondary = rs.getSecondary();

@@ -1,6 +1,6 @@
 /**
  * Verify that transactions can be run on the in-memory storage engine. inMemory transactions are
- * not fully supported, but should work for basic MongoDB user testing.
+ * not fully supported, but should work for basic MerizoDB user testing.
  *
  * TODO: remove this test when general transaction testing is turned on with the inMemory storage
  * engine (SERVER-36023).

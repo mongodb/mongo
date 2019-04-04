@@ -1,5 +1,5 @@
 /**
- * This test checks that mongod correctly logs report the lockStats for sub-operations. Before
+ * This test checks that merizod correctly logs report the lockStats for sub-operations. Before
  * SERVER-26854, the log for each sub-operation reported the aggregate lock wait time of all
  * preceding sub-operations.
  *
@@ -12,7 +12,7 @@
  *  2. Run the aggregation, which will get blocked on sub-operation: {'create' : 'tmp.agg_out.x'}.
  *  3. Sleep for 2 seconds.
  *  4. FsyncUnlock.
- *  5. Check the mongod logs: only that sub-operation (createCollection) and the 'parent' operation
+ *  5. Check the merizod logs: only that sub-operation (createCollection) and the 'parent' operation
  * (aggregation) should log about the 2-second long wait for the lock.
  *
  * @tags: [requires_fsync]
@@ -63,11 +63,11 @@
     dollarOutAggregationShell();
     assert.eq(db['favorite'].count(), 1);
 
-    // Stopping the mongod also waits until all of its logs have been read by the mongo shell.
+    // Stopping the merizod also waits until all of its logs have been read by the merizo shell.
     MongoRunner.stopMongod(conn);
 
-    let mongodLogs = rawMongoProgramOutput();
-    let lines = mongodLogs.split('\n');
+    let merizodLogs = rawMongoProgramOutput();
+    let lines = merizodLogs.split('\n');
     const lockWaitTimeRegex = /timeAcquiringMicros: { [wW]: ([0-9]+)/;
     let match;
     let firstOpWaitTime;

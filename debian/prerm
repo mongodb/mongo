@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for mongodb
+# prerm script for merizodb
 #
 # see: dh_installdeb(1)
 

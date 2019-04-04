@@ -1,10 +1,10 @@
 
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,17 +28,17 @@
  *    it in the license file.
  */
 
-package com.mongodb.embedded.capi;
+package com.merizodb.embedded.capi;
 
-import com.mongodb.embedded.capi.internal.CAPI;
+import com.merizodb.embedded.capi.internal.CAPI;
 
 import static java.lang.String.format;
 
 final class CAPIHelper {
 
-    static CAPI.mongo_embedded_v1_status createStatusPointer() {
+    static CAPI.merizo_embedded_v1_status createStatusPointer() {
         try {
-            return CAPI.mongo_embedded_v1_status_create();
+            return CAPI.merizo_embedded_v1_status_create();
         } catch (Throwable t) {
             throw createError("status_create", t);
         }
@@ -51,27 +51,27 @@ final class CAPIHelper {
         return new MongoEmbeddedCAPIException(format("Error from embedded server when calling '%s': %s", methodName, t.getMessage()), t);
     }
 
-    static void createErrorFromStatus(final CAPI.mongo_embedded_v1_status statusPointer) {
-        createErrorFromStatus(statusPointer, CAPI.mongo_embedded_v1_status_get_error(statusPointer));
+    static void createErrorFromStatus(final CAPI.merizo_embedded_v1_status statusPointer) {
+        createErrorFromStatus(statusPointer, CAPI.merizo_embedded_v1_status_get_error(statusPointer));
     }
 
-    static void createErrorFromStatus(final CAPI.mongo_embedded_v1_status statusPointer,
+    static void createErrorFromStatus(final CAPI.merizo_embedded_v1_status statusPointer,
                                        final int errorCode) {
         throw new MongoEmbeddedCAPIException(errorCode,
-                CAPI.mongo_embedded_v1_status_get_code(statusPointer),
-                CAPI.mongo_embedded_v1_status_get_explanation(statusPointer).toString(),
+                CAPI.merizo_embedded_v1_status_get_code(statusPointer),
+                CAPI.merizo_embedded_v1_status_get_explanation(statusPointer).toString(),
                 null);
     }
 
-    static void destroyStatusPointer(final CAPI.mongo_embedded_v1_status statusPointer) {
+    static void destroyStatusPointer(final CAPI.merizo_embedded_v1_status statusPointer) {
         try {
-            CAPI.mongo_embedded_v1_status_destroy(statusPointer);
+            CAPI.merizo_embedded_v1_status_destroy(statusPointer);
         } catch (Throwable t) {
             throw createError("status_destroy", t);
         }
     }
 
-    static void validateErrorCode(final CAPI.mongo_embedded_v1_status statusPointer, final int errorCode) {
+    static void validateErrorCode(final CAPI.merizo_embedded_v1_status statusPointer, final int errorCode) {
         if (errorCode != 0) {
             createErrorFromStatus(statusPointer, errorCode);
         }

@@ -1,8 +1,8 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -29,12 +29,12 @@
 # Document source out stage IDL file
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "merizo"
     cpp_includes:
-        - "mongo/s/chunk_version.h"
+        - "merizo/s/chunk_version.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "merizo/idl/basic_types.idl"
 
 enums:
     WriteMode:
@@ -84,7 +84,7 @@ structs:
             targetCollectionVersion:
                 type: ChunkVersion
                 optional: true
-                description: If set, the collection's ChunkVersion found when parsed on mongos. Can
+                description: If set, the collection's ChunkVersion found when parsed on merizos. Can
                              be used to check if a collection has since been dropped and re-created,
                              in which case the shard key may have changed. As of this writing, this
                              also can be used to detect if the collection has gone from unsharded to

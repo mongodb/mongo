@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/db/mongod_options.h"
-#include "mongo/db/mongod_options_general_gen.h"
-#include "mongo/db/mongod_options_replication_gen.h"
-#include "mongo/db/service_context.h"
-#include "mongo/embedded/embedded.h"
-#include "mongo/embedded/embedded_options.h"
-#include "mongo/embedded/embedded_options_helpers.h"
-#include "mongo/embedded/service_entry_point_embedded.h"
-#include "mongo/transport/service_entry_point_impl.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_layer_manager.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/signal_handlers.h"
-#include "mongo/util/text.h"
+#include "merizo/base/init.h"
+#include "merizo/db/merizod_options.h"
+#include "merizo/db/merizod_options_general_gen.h"
+#include "merizo/db/merizod_options_replication_gen.h"
+#include "merizo/db/service_context.h"
+#include "merizo/embedded/embedded.h"
+#include "merizo/embedded/embedded_options.h"
+#include "merizo/embedded/embedded_options_helpers.h"
+#include "merizo/embedded/service_entry_point_embedded.h"
+#include "merizo/transport/service_entry_point_impl.h"
+#include "merizo/transport/transport_layer.h"
+#include "merizo/transport/transport_layer_manager.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/options_parser/options_parser.h"
+#include "merizo/util/options_parser/startup_options.h"
+#include "merizo/util/signal_handlers.h"
+#include "merizo/util/text.h"
 
 #include <yaml-cpp/yaml.h>
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class ServiceEntryPointMongoe : public ServiceEntryPointImpl {
@@ -78,7 +78,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SignalProcessingStartup, ("ThreadNameInitia
     return Status::OK();
 }
 
-int mongoedMain(int argc, char* argv[], char** envp) {
+int merizoedMain(int argc, char* argv[], char** envp) {
     ServiceContext* serviceContext = nullptr;
 
     registerShutdownTask([&]() {
@@ -103,11 +103,11 @@ int mongoedMain(int argc, char* argv[], char** envp) {
 
     setupSignalHandlers();
 
-    log() << "MongoDB embedded standalone application, for testing purposes only";
+    log() << "MerizoDB embedded standalone application, for testing purposes only";
 
     try {
         optionenvironment::OptionSection startupOptions("Options");
-        // Adding all options mongod we don't have to maintain a separate set for this executable,
+        // Adding all options merizod we don't have to maintain a separate set for this executable,
         // some will be unused but that's fine as this is just an executable for testing purposes
         // anyway.
         uassertStatusOK(addMongodGeneralOptions(&startupOptions));
@@ -142,20 +142,20 @@ int mongoedMain(int argc, char* argv[], char** envp) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo
 
 #if defined(_WIN32)
 // In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
 // as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
 // WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
-// and makes them available through the argv() and envp() members.  This enables mongoDbMain()
+// and makes them available through the argv() and envp() members.  This enables merizoDbMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    return mongo::mongoedMain(argc, wcl.argv(), wcl.envp());
+    merizo::WindowsCommandLine wcl(argc, argvW, envpW);
+    return merizo::merizoedMain(argc, wcl.argv(), wcl.envp());
 }
 #else
 int main(int argc, char* argv[], char** envp) {
-    return mongo::mongoedMain(argc, argv, envp);
+    return merizo::merizoedMain(argc, argv, envp);
 }
 #endif

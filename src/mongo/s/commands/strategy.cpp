@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,65 +27,65 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/commands/strategy.h"
+#include "merizo/s/commands/strategy.h"
 
-#include "mongo/base/data_cursor.h"
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/handle_request_response.h"
-#include "mongo/db/initialize_operation_session_info.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_time_tracker.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/transaction_validation.h"
-#include "mongo/db/views/resolved_view.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
-#include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/parallel.h"
-#include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/query/cluster_find.h"
-#include "mongo/s/session_catalog_router.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/s/transaction_router.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/timer.h"
+#include "merizo/base/data_cursor.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/handle_request_response.h"
+#include "merizo/db/initialize_operation_session_info.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_session_id_helpers.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_time_tracker.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/query/getmore_request.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/transaction_validation.h"
+#include "merizo/db/views/resolved_view.h"
+#include "merizo/rpc/factory.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/metadata/logical_time_metadata.h"
+#include "merizo/rpc/metadata/tracking_metadata.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/rpc/op_msg_rpc_impls.h"
+#include "merizo/s/cannot_implicitly_create_collection_info.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/parallel.h"
+#include "merizo/s/client/shard_connection.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/commands/cluster_explain.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/query/cluster_cursor_manager.h"
+#include "merizo/s/query/cluster_find.h"
+#include "merizo/s/session_catalog_router.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/s/transaction_router.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const auto kOperationTime = "operationTime"_sd;
@@ -203,7 +203,7 @@ void execCommandClient(OperationContext* opCtx,
 
     const auto dbname = request.getDatabase();
     uassert(ErrorCodes::IllegalOperation,
-            "Can't use 'local' database through mongos",
+            "Can't use 'local' database through merizos",
             dbname != NamespaceString::kLocalDb);
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid database name: '" << dbname << "'",
@@ -397,11 +397,11 @@ void runCommand(OperationContext* opCtx,
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "read concern snapshot is not supported on mongos for the command "
+                str::stream() << "read concern snapshot is not supported on merizos for the command "
                               << commandName,
                 invocation->supportsReadConcern(readConcernArgs.getLevel()));
         uassert(ErrorCodes::InvalidOptions,
-                "read concern snapshot is not supported with atClusterTime on mongos",
+                "read concern snapshot is not supported with atClusterTime on merizos",
                 !readConcernArgs.getArgsAtClusterTime());
     }
 
@@ -588,7 +588,7 @@ void runCommand(OperationContext* opCtx,
         command->incrementCommandsFailed();
         LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
         // hasWriteConcernError is set to false because:
-        // 1. TransientTransaction error label handling for commitTransaction command in mongos is
+        // 1. TransientTransaction error label handling for commitTransaction command in merizos is
         //    delegated to the shards. Mongos simply propagates the shard's response up to the
         //    client.
         // 2. For other commands in a transaction, they shouldn't get a writeConcern error so
@@ -624,7 +624,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
 
     if (q.queryOptions & QueryOption_Exhaust) {
         uasserted(18526,
-                  str::stream() << "The 'exhaust' query option is invalid for mongos queries: "
+                  str::stream() << "The 'exhaust' query option is invalid for merizos queries: "
                                 << nss.ns()
                                 << " "
                                 << q.query.toString());
@@ -992,14 +992,14 @@ void Strategy::explainFind(OperationContext* opCtx,
         }
     }
 
-    const char* mongosStageName =
+    const char* merizosStageName =
         ClusterExplain::getStageNameForReadOp(shardResponses.size(), findCommand);
 
     uassertStatusOK(
         ClusterExplain::buildExplainResult(opCtx,
                                            ClusterExplain::downconvert(opCtx, shardResponses),
-                                           mongosStageName,
+                                           merizosStageName,
                                            millisElapsed,
                                            out));
 }
-}  // namespace mongo
+}  // namespace merizo

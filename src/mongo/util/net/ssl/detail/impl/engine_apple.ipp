@@ -1,10 +1,10 @@
 
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,7 +30,7 @@
 
 #pragma once
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "asio/detail/config.hpp"
 
@@ -38,12 +38,12 @@
 #include "asio/detail/throw_error.hpp"
 #include "asio/error.hpp"
 
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/ssl/apple.hpp"
-#include "mongo/util/net/ssl/detail/engine.hpp"
-#include "mongo/util/net/ssl/detail/stream_core.hpp"
-#include "mongo/util/net/ssl/error.hpp"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/ssl/apple.hpp"
+#include "merizo/util/net/ssl/detail/engine.hpp"
+#include "merizo/util/net/ssl/detail/stream_core.hpp"
+#include "merizo/util/net/ssl/error.hpp"
 
 namespace asio {
 namespace ssl {
@@ -63,7 +63,7 @@ public:
         const auto status = static_cast<::OSStatus>(value);
         apple::CFUniquePtr<::CFStringRef> errstr(::SecCopyErrorMessageString(status, nullptr));
         if (!errstr) {
-            return mongo::str::stream() << "Secure.Transport unknown error: "
+            return merizo::str::stream() << "Secure.Transport unknown error: "
                                         << static_cast<int>(status);
         }
         const auto len = ::CFStringGetMaximumSizeForEncoding(::CFStringGetLength(errstr.get()),
@@ -71,12 +71,12 @@ public:
         std::string ret;
         ret.resize(len + 1);
         if (!::CFStringGetCString(errstr.get(), &ret[0], len, ::kCFStringEncodingUTF8)) {
-            return mongo::str::stream() << "Secure.Transport unknown error: "
+            return merizo::str::stream() << "Secure.Transport unknown error: "
                                         << static_cast<int>(status);
         }
 
         ret.resize(strlen(ret.c_str()));
-        return mongo::str::stream() << "Secure.Transport: " << ret;
+        return merizo::str::stream() << "Secure.Transport: " << ret;
     }
 } OSStatus_category;
 
@@ -147,7 +147,7 @@ bool engine::_initSSL(stream_base::handshake_type type, asio::error_code& ec) {
     const auto side = (type == stream_base::client) ? ::kSSLClientSide : ::kSSLServerSide;
     _ssl.reset(::SSLCreateContext(nullptr, side, ::kSSLStreamType));
     if (!_ssl) {
-        mongo::error() << "Failed allocating SSLContext";
+        merizo::error() << "Failed allocating SSLContext";
         ec = errorCode(::errSSLInternal);
         return false;
     }
@@ -243,7 +243,7 @@ engine::want engine::shutdown(asio::error_code& ec) {
             ec = errorCode(status);
         }
     } else {
-        mongo::error() << "SSL connection already shut down";
+        merizo::error() << "SSL connection already shut down";
         ec = errorCode(::errSSLInternal);
     }
     return want::want_nothing;

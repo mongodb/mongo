@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/and_hash.h"
-#include "mongo/db/exec/and_sorted.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/limit.h"
-#include "mongo/db/exec/merge_sort.h"
-#include "mongo/db/exec/or.h"
-#include "mongo/db/exec/skip.h"
-#include "mongo/db/exec/sort.h"
-#include "mongo/db/exec/text.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/expression_text_base.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/base/init.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/and_hash.h"
+#include "merizo/db/exec/and_sorted.h"
+#include "merizo/db/exec/collection_scan.h"
+#include "merizo/db/exec/delete.h"
+#include "merizo/db/exec/fetch.h"
+#include "merizo/db/exec/index_scan.h"
+#include "merizo/db/exec/limit.h"
+#include "merizo/db/exec/merge_sort.h"
+#include "merizo/db/exec/or.h"
+#include "merizo/db/exec/skip.h"
+#include "merizo/db/exec/sort.h"
+#include "merizo/db/exec/text.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/index/fts_access_method.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/matcher/expression_text_base.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::string;
@@ -504,4 +504,4 @@ public:
 
 MONGO_REGISTER_TEST_COMMAND(StageDebugCmd);
 
-}  // namespace mongo
+}  // namespace merizo

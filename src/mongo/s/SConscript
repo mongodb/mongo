@@ -20,7 +20,7 @@ env.SConscript(
 # This is the main library to use for consumers of sharding. It will pull the routing and targeting
 # functionality.
 #
-# This is the only library, which should be referenced directly outside of mongo/s/ and mongo/db/s/
+# This is the only library, which should be referenced directly outside of merizo/s/ and merizo/db/s/
 env.Library(
     target='sharding_api',
     source=[
@@ -43,15 +43,15 @@ env.Library(
         'client/version_manager.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/db/lasterror',
+        '$BUILD_DIR/merizo/client/clientdriver_network',
+        '$BUILD_DIR/merizo/db/lasterror',
         'cluster_last_error_info',
         'grid',
         'sharding_router_api',
         'sharding_routing_table',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
@@ -64,16 +64,16 @@ env.Library(
         'session_catalog_router.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/merizo/db/commands/txn_cmd_request',
+        '$BUILD_DIR/merizo/db/curop',
+        '$BUILD_DIR/merizo/db/logical_session_id_helpers',
+        '$BUILD_DIR/merizo/db/repl/read_concern_args',
         'async_requests_sender',
         'common_s',
         'grid',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/merizo/db/session_catalog',
     ],
 )
 
@@ -85,11 +85,11 @@ env.Library(
         'shard_key_pattern.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/db/update/update_common',
-        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/query/query_planner',
+        '$BUILD_DIR/merizo/db/storage/key_string',
+        '$BUILD_DIR/merizo/db/update/update_common',
+        '$BUILD_DIR/merizo/util/concurrency/ticketholder',
         'chunk_writes_tracker',
         'common_s',
     ],
@@ -106,16 +106,16 @@ env.Library(
         'client/sharding_network_connection_hook.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/logical_session_cache_factory_mongos',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_impl',
-        '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
-        '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        '$BUILD_DIR/merizo/db/logical_session_cache_factory_merizos',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_catalog_impl',
+        '$BUILD_DIR/merizo/s/catalog/replset_dist_lock_manager',
+        '$BUILD_DIR/merizo/s/catalog/sharding_catalog_client_impl',
+        '$BUILD_DIR/merizo/util/periodic_runner_factory',
         'sharding_legacy_api',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/server_parameter",
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        "$BUILD_DIR/merizo/idl/server_parameter",
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor',
         'coreshard',
         'sharding_task_executor',
     ],
@@ -127,18 +127,18 @@ env.Library(
         "async_requests_sender.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/s/client/sharding_client",
-        "$BUILD_DIR/mongo/s/coreshard",
-        '$BUILD_DIR/mongo/s/client/shard_interface',
+        "$BUILD_DIR/merizo/db/query/command_request_response",
+        "$BUILD_DIR/merizo/executor/task_executor_interface",
+        "$BUILD_DIR/merizo/s/client/sharding_client",
+        "$BUILD_DIR/merizo/s/coreshard",
+        '$BUILD_DIR/merizo/s/client/shard_interface',
     ],
 )
 
 env.Library(
     target='common_s',
     source=[
-        'catalog/mongo_version_range.cpp',
+        'catalog/merizo_version_range.cpp',
         'catalog/type_changelog.cpp',
         'catalog/type_chunk.cpp',
         'catalog/type_collection.cpp',
@@ -146,7 +146,7 @@ env.Library(
         'catalog/type_database.cpp',
         'catalog/type_lockpings.cpp',
         'catalog/type_locks.cpp',
-        'catalog/type_mongos.cpp',
+        'catalog/type_merizos.cpp',
         'catalog/type_shard_collection.cpp',
         'catalog/type_shard_database.cpp',
         'catalog/type_shard.cpp',
@@ -181,12 +181,12 @@ env.Library(
         env.Idlc('request_types/clone_collection_options_from_primary_shard.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/connection_string',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/client/connection_string',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/query/query_request',
+        '$BUILD_DIR/merizo/db/repl/optime',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ]
 )
 
@@ -196,11 +196,11 @@ env.Library(
         'sharding_test_fixture_common.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
-        '$BUILD_DIR/mongo/executor/network_interface_mock',
-        '$BUILD_DIR/mongo/executor/network_test_env',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/client/remote_command_targeter_mock',
+        '$BUILD_DIR/merizo/executor/network_interface_mock',
+        '$BUILD_DIR/merizo/executor/network_test_env',
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/merizo/unittest/unittest',
     ],
 )
 
@@ -210,32 +210,32 @@ env.Library(
         'sharding_router_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_mock',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/executor/task_executor_pool',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/merizo/db/query/collation/collator_factory_mock',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/executor/task_executor_pool',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_manager_mock',
+        '$BUILD_DIR/merizo/s/catalog/sharding_catalog_client_impl',
+        '$BUILD_DIR/merizo/s/coreshard',
+        '$BUILD_DIR/merizo/transport/transport_layer_mock',
+        '$BUILD_DIR/merizo/util/clock_source_mock',
         'committed_optime_metadata_hook',
-        'sharding_egress_metadata_hook_for_mongos',
+        'sharding_egress_metadata_hook_for_merizos',
         'sharding_task_executor',
         'sharding_test_fixture_common',
     ],
 )
 
 env.Library(
-    target='sharding_mongod_test_fixture',
+    target='sharding_merizod_test_fixture',
     source=[
-        'sharding_mongod_test_fixture.cpp',
+        'sharding_merizod_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
-        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/repl/drop_pending_collection_reaper',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/s/op_observer_sharding_impl',
+        '$BUILD_DIR/merizo/db/s/sharding_runtime_d',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
         'sharding_test_fixture_common',
     ],
 )
@@ -246,9 +246,9 @@ env.Library(
         'shard_server_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
-        'sharding_mongod_test_fixture',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_catalog_mock',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_manager_mock',
+        'sharding_merizod_test_fixture',
     ],
 )
 
@@ -258,8 +258,8 @@ env.Library(
         'config_server_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/s/sharding_catalog_manager',
-        'sharding_mongod_test_fixture',
+        '$BUILD_DIR/merizo/db/s/sharding_catalog_manager',
+        'sharding_merizod_test_fixture',
     ],
 )
 
@@ -284,7 +284,7 @@ env.CppUnitTest(
         'catalog/type_database_test.cpp',
         'catalog/type_lockpings_test.cpp',
         'catalog/type_locks_test.cpp',
-        'catalog/type_mongos_test.cpp',
+        'catalog/type_merizos_test.cpp',
         'catalog/type_shard_collection_test.cpp',
         'catalog/type_shard_test.cpp',
         'catalog/type_tags_test.cpp',
@@ -292,7 +292,7 @@ env.CppUnitTest(
         'shard_id_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'common_s',
     ]
 )
@@ -322,10 +322,10 @@ env.Library(
         'sharding_task_executor.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/merizo/s/client/sharding_client',
         'cluster_last_error_info',
         'sharding_router_api',
     ],
@@ -337,13 +337,13 @@ env.CppUnitTest(
         'sharding_task_executor_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
         'sharding_task_executor',
         'shard_server_test_fixture',
     ],
 )
 
-# This library contains sharding functionality used by both mongod and mongos
+# This library contains sharding functionality used by both merizod and merizos
 env.Library(
     target='grid',
     source=[
@@ -354,15 +354,15 @@ env.Library(
         'grid.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
+        '$BUILD_DIR/merizo/client/clientdriver_network',
+        '$BUILD_DIR/merizo/db/logical_time_metadata_hook',
         'client/shard_interface',
         'query/cluster_cursor_manager',
         'sharding_routing_table',
     ],
 )
 
-# This library contains sharding functionality used by both mongod and mongos
+# This library contains sharding functionality used by both merizod and merizos
 env.Library(
     target='coreshard',
     source=[
@@ -374,7 +374,7 @@ env.Library(
         'sharding_egress_metadata_hook.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/merizo/util/concurrency/thread_pool',
         'grid',
     ],
 )
@@ -386,7 +386,7 @@ env.Benchmark(
     ],
     LIBDEPS=[
         'sharding_routing_table',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/merizo/db/s/sharding_api_d',
     ],
 )
 
@@ -411,7 +411,7 @@ env.Library(
         'chunk_writes_tracker.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -431,8 +431,8 @@ env.Library(
         'catalog_cache_test_fixture.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'coreshard',
         'sharding_router_test_fixture',
     ]
@@ -444,18 +444,18 @@ env.Library(
         'cluster_last_error_info.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/client/connection_string',
     ]
 )
 
 env.Library(
-    target='sharding_egress_metadata_hook_for_mongos',
+    target='sharding_egress_metadata_hook_for_merizos',
     source=[
-        'sharding_egress_metadata_hook_for_mongos.cpp'
+        'sharding_egress_metadata_hook_for_merizos.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/merizo/rpc/metadata',
         'cluster_last_error_info',
         'coreshard',
     ]
@@ -467,18 +467,18 @@ env.Library(
         'committed_optime_metadata_hook.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/merizo/rpc/metadata',
         'coreshard',
     ]
 )
 
 env.Library(
-    target='is_mongos',
+    target='is_merizos',
     source=[
-        'is_mongos.cpp',
+        'is_merizos.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/server_options_core',
     ],
 )
 
@@ -510,9 +510,9 @@ env.CppUnitTest(
         'client/shard_connection_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/dbtests/mocklib',
+        '$BUILD_DIR/merizo/util/net/network',
         'sharding_legacy_api',
     ]
 )

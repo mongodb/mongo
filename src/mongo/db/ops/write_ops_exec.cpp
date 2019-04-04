@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,61 +27,61 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/transaction_error.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/curop_metrics.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update_stage.h"
-#include "mongo/db/introspect.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/ops/delete_request.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/parsed_delete.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/ops/write_ops_retryability.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/retryable_writes_stats.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/server_write_concern_metrics.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
-#include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/log_and_backoff.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/transaction_error.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/curop_metrics.h"
+#include "merizo/db/exec/delete.h"
+#include "merizo/db/exec/update_stage.h"
+#include "merizo/db/introspect.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/ops/delete_request.h"
+#include "merizo/db/ops/insert.h"
+#include "merizo/db/ops/parsed_delete.h"
+#include "merizo/db/ops/parsed_update.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/ops/write_ops_exec.h"
+#include "merizo/db/ops/write_ops_gen.h"
+#include "merizo/db/ops/write_ops_retryability.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/retryable_writes_stats.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/s/operation_sharding_state.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/stats/server_write_concern_metrics.h"
+#include "merizo/db/stats/top.h"
+#include "merizo/db/storage/duplicate_key_error_info.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/cannot_implicitly_create_collection_info.h"
+#include "merizo/s/would_change_owning_shard_exception.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/log_and_backoff.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 // Convention in this file: generic helpers go in the anonymous namespace. Helpers that are for a
 // single type of operation are static functions defined above their caller.
@@ -239,7 +239,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     if (ErrorCodes::WouldChangeOwningShard == ex.code()) {
-        throw;  // Fail this write so mongos can retry
+        throw;  // Fail this write so merizos can retry
     }
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -739,7 +739,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
                 throw;
             }
 
-            logAndBackoff(::mongo::logger::LogComponent::kWrite,
+            logAndBackoff(::merizo::logger::LogComponent::kWrite,
                           logger::LogSeverity::Debug(1),
                           numAttempts,
                           str::stream()
@@ -976,4 +976,4 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     return out;
 }
 
-}  // namespace mongo
+}  // namespace merizo

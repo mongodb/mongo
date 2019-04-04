@@ -34,8 +34,8 @@
 
         // Perform administrative commands via separate shell.
         function evalCmd(cmd) {
-            const uri = 'mongodb://admin:pass@localhost:' + s1.port + '/admin';
-            const result = runMongoProgram('./mongo', uri, '--eval', cmd);
+            const uri = 'merizodb://admin:pass@localhost:' + s1.port + '/admin';
+            const result = runMongoProgram('./merizo', uri, '--eval', cmd);
             assert.eq(result, 0, "Command failed");
         }
         evalCmd('db.dropUser("user"); ');
@@ -52,19 +52,19 @@
         assert.eq(thrown.code, ErrorCodes.Unauthorized, "Threw something other than unauthorized");
     }
 
-    const mongod = MongoRunner.runMongod({auth: ''});
-    runTest(mongod, mongod);
-    MongoRunner.stopMongod(mongod);
+    const merizod = MongoRunner.runMongod({auth: ''});
+    runTest(merizod, merizod);
+    MongoRunner.stopMongod(merizod);
 
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     const st = new ShardingTest({
         shards: 1,
-        mongos: 2,
+        merizos: 2,
         config: 1,
         other: {
             keyFile: 'jstests/libs/key1',
             shardAsReplicaSet: false,
-            mongosOptions: {
+            merizosOptions: {
                 setParameter: 'userCacheInvalidationIntervalSecs=' + kInvalidationIntervalSecs,
             },
         },

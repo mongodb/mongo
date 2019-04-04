@@ -1,5 +1,5 @@
 /**
- * Tests that a mongod started with --directoryperdb will write data for database x into a directory
+ * Tests that a merizod started with --directoryperdb will write data for database x into a directory
  * named x inside the dbpath.
  *
  * This test does not make sense for in-memory storage engines, since they will not produce any data

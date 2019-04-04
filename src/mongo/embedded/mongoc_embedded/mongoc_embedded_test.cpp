@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,49 +27,49 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongoc_embedded/mongoc_embedded.h"
+#include "merizoc_embedded/merizoc_embedded.h"
 
 #include <set>
 
-#include <mongoc/mongoc.h>
+#include <merizoc/merizoc.h>
 #include <yaml-cpp/yaml.h>
 
-#include "mongo/db/server_options.h"
-#include "mongo/embedded/mongo_embedded/mongo_embedded.h"
-#include "mongo/embedded/mongoc_embedded/mongoc_embedded_test_gen.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/signal_handlers_synchronous.h"
+#include "merizo/db/server_options.h"
+#include "merizo/embedded/merizo_embedded/merizo_embedded.h"
+#include "merizo/embedded/merizoc_embedded/merizoc_embedded_test_gen.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/log.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_section.h"
+#include "merizo/util/options_parser/options_parser.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/signal_handlers_synchronous.h"
 
-namespace moe = mongo::optionenvironment;
+namespace moe = merizo::optionenvironment;
 
-mongo_embedded_v1_lib* global_lib_handle;
+merizo_embedded_v1_lib* global_lib_handle;
 
 namespace {
 
-std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
+std::unique_ptr<merizo::unittest::TempDir> globalTempDir;
 
 /**
  * WARNING: This function is an example lifted directly from the C driver
  * for use testing the connection to the c driver. It is written in C,
  * and should not be used for anything besides basic testing.
  */
-bool insert_data(mongoc_collection_t* collection) {
-    mongoc_bulk_operation_t* bulk;
+bool insert_data(merizoc_collection_t* collection) {
+    merizoc_bulk_operation_t* bulk;
     const int ndocs = 4;
     bson_t* docs[ndocs];
 
-    bulk = mongoc_collection_create_bulk_operation(collection, true, NULL);
+    bulk = merizoc_collection_create_bulk_operation(collection, true, NULL);
 
     docs[0] = BCON_NEW("x", BCON_DOUBLE(1.0), "tags", "[", "dog", "cat", "]");
     docs[1] = BCON_NEW("x", BCON_DOUBLE(2.0), "tags", "[", "cat", "]");
@@ -77,19 +77,19 @@ bool insert_data(mongoc_collection_t* collection) {
     docs[3] = BCON_NEW("x", BCON_DOUBLE(3.0), "tags", "[", "]");
 
     for (int i = 0; i < ndocs; i++) {
-        mongoc_bulk_operation_insert(bulk, docs[i]);
+        merizoc_bulk_operation_insert(bulk, docs[i]);
         bson_destroy(docs[i]);
         docs[i] = NULL;
     }
 
     bson_error_t error;
-    bool ret = mongoc_bulk_operation_execute(bulk, NULL, &error);
+    bool ret = merizoc_bulk_operation_execute(bulk, NULL, &error);
 
     if (!ret) {
-        ::mongo::log() << "Error inserting data: " << error.message;
+        ::merizo::log() << "Error inserting data: " << error.message;
     }
 
-    mongoc_bulk_operation_destroy(bulk);
+    merizoc_bulk_operation_destroy(bulk);
     return ret;
 }
 
@@ -98,7 +98,7 @@ bool insert_data(mongoc_collection_t* collection) {
  * for use testing the connection to the c driver. It is written in C,
  * and should not be used for anything besides basic testing.
  */
-bool explain(mongoc_collection_t* collection) {
+bool explain(merizoc_collection_t* collection) {
 
     bson_t* command;
     bson_t reply;
@@ -115,9 +115,9 @@ bool explain(mongoc_collection_t* collection) {
                        BCON_INT32(1),
                        "}",
                        "}");
-    res = mongoc_collection_command_simple(collection, command, NULL, &reply, &error);
+    res = merizoc_collection_command_simple(collection, command, NULL, &reply, &error);
     if (!res) {
-        ::mongo::log() << "Error with explain: " << error.message;
+        ::merizo::log() << "Error with explain: " << error.message;
         goto explain_cleanup;
     }
 
@@ -128,11 +128,11 @@ explain_cleanup:
     return res;
 }
 
-class MongodbEmbeddedTransportLayerTest : public mongo::unittest::Test {
+class MerizodbEmbeddedTransportLayerTest : public merizo::unittest::Test {
 protected:
     void setUp() {
         if (!globalTempDir) {
-            globalTempDir = std::make_unique<mongo::unittest::TempDir>("embedded_mongo");
+            globalTempDir = std::make_unique<merizo::unittest::TempDir>("embedded_merizo");
         }
 
         YAML::Emitter yaml;
@@ -146,57 +146,57 @@ protected:
 
         yaml << YAML::EndMap;
 
-        db_handle = mongo_embedded_v1_instance_create(global_lib_handle, yaml.c_str(), nullptr);
+        db_handle = merizo_embedded_v1_instance_create(global_lib_handle, yaml.c_str(), nullptr);
 
-        cd_client = mongoc_embedded_v1_client_create(db_handle);
-        mongoc_client_set_error_api(cd_client, 2);
-        cd_db = mongoc_client_get_database(cd_client, "test");
-        cd_collection = mongoc_database_get_collection(cd_db, (const char*)"things");
+        cd_client = merizoc_embedded_v1_client_create(db_handle);
+        merizoc_client_set_error_api(cd_client, 2);
+        cd_db = merizoc_client_get_database(cd_client, "test");
+        cd_collection = merizoc_database_get_collection(cd_db, (const char*)"things");
     }
 
     void tearDown() {
-        mongoc_collection_drop(cd_collection, nullptr);
+        merizoc_collection_drop(cd_collection, nullptr);
         if (cd_collection) {
-            mongoc_collection_destroy(cd_collection);
+            merizoc_collection_destroy(cd_collection);
         }
 
         if (cd_db) {
-            mongoc_database_destroy(cd_db);
+            merizoc_database_destroy(cd_db);
         }
 
         if (cd_client) {
-            mongoc_client_destroy(cd_client);
+            merizoc_client_destroy(cd_client);
         }
 
-        mongo_embedded_v1_instance_destroy(db_handle, nullptr);
+        merizo_embedded_v1_instance_destroy(db_handle, nullptr);
     }
 
-    mongo_embedded_v1_instance* getDBHandle() {
+    merizo_embedded_v1_instance* getDBHandle() {
         return db_handle;
     }
 
-    mongoc_database_t* getDB() {
+    merizoc_database_t* getDB() {
         return cd_db;
     }
-    mongoc_client_t* getClient() {
+    merizoc_client_t* getClient() {
         return cd_client;
     }
-    mongoc_collection_t* getCollection() {
+    merizoc_collection_t* getCollection() {
         return cd_collection;
     }
 
 
 private:
-    mongo_embedded_v1_instance* db_handle;
-    mongoc_database_t* cd_db;
-    mongoc_client_t* cd_client;
-    mongoc_collection_t* cd_collection;
+    merizo_embedded_v1_instance* db_handle;
+    merizoc_database_t* cd_db;
+    merizoc_client_t* cd_client;
+    merizoc_collection_t* cd_collection;
 };
 
-TEST_F(MongodbEmbeddedTransportLayerTest, CreateAndDestroyDB) {
+TEST_F(MerizodbEmbeddedTransportLayerTest, CreateAndDestroyDB) {
     // Test the setUp() and tearDown() test fixtures
 }
-TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndExplain) {
+TEST_F(MerizodbEmbeddedTransportLayerTest, InsertAndExplain) {
     auto client = getClient();
     auto collection = getCollection();
     ASSERT(client);
@@ -206,7 +206,7 @@ TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndExplain) {
 
     ASSERT(explain(collection));
 }
-TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndCount) {
+TEST_F(MerizodbEmbeddedTransportLayerTest, InsertAndCount) {
     auto client = getClient();
     auto collection = getCollection();
     ASSERT(client);
@@ -214,10 +214,10 @@ TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndCount) {
     bson_error_t err;
     int64_t count;
     ASSERT(insert_data(collection));
-    count = mongoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
+    count = merizoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
     ASSERT(count == 4);
 }
-TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndDelete) {
+TEST_F(MerizodbEmbeddedTransportLayerTest, InsertAndDelete) {
     auto client = getClient();
     auto collection = getCollection();
     ASSERT(client);
@@ -231,30 +231,30 @@ TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndDelete) {
     bson_oid_init(&oid, NULL);
     BSON_APPEND_OID(doc, "_id", &oid);
     BSON_APPEND_UTF8(doc, "hello", "world");
-    ASSERT(mongoc_collection_insert(collection, MONGOC_INSERT_NONE, doc, NULL, &err));
-    count = mongoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
+    ASSERT(merizoc_collection_insert(collection, MONGOC_INSERT_NONE, doc, NULL, &err));
+    count = merizoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
     ASSERT(1 == count);
     bson_destroy(doc);
     doc = bson_new();
     BSON_APPEND_OID(doc, "_id", &oid);
-    ASSERT(mongoc_collection_remove(collection, MONGOC_REMOVE_SINGLE_REMOVE, doc, NULL, &err));
-    ASSERT(0 == mongoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err));
+    ASSERT(merizoc_collection_remove(collection, MONGOC_REMOVE_SINGLE_REMOVE, doc, NULL, &err));
+    ASSERT(0 == merizoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err));
     bson_destroy(doc);
 }
 
 struct StatusDestroy {
-    void operator()(mongo_embedded_v1_status* const ptr) {
+    void operator()(merizo_embedded_v1_status* const ptr) {
         if (!ptr) {
-            mongo_embedded_v1_status_destroy(ptr);
+            merizo_embedded_v1_status_destroy(ptr);
         }
     }
 };
-using StatusPtr = std::unique_ptr<mongo_embedded_v1_status, StatusDestroy>;
+using StatusPtr = std::unique_ptr<merizo_embedded_v1_status, StatusDestroy>;
 }  // namespace
 
 // Define main function as an entry to these tests.
 // These test functions cannot use the main() defined for unittests because they
-// call runGlobalInitializers(). The embedded C API calls mongoDbMain() which
+// call runGlobalInitializers(). The embedded C API calls merizoDbMain() which
 // calls runGlobalInitializers().
 int main(int argc, char** argv, char** envp) {
 
@@ -263,7 +263,7 @@ int main(int argc, char** argv, char** envp) {
     moe::OptionSection options;
     std::map<std::string, std::string> env;
 
-    auto ret = mongo::embedded::addMongocEmbeddedTestOptions(&options);
+    auto ret = merizo::embedded::addMongocEmbeddedTestOptions(&options);
     if (!ret.isOK()) {
         std::cerr << ret << std::endl;
         return EXIT_FAILURE;
@@ -276,36 +276,36 @@ int main(int argc, char** argv, char** envp) {
         return EXIT_FAILURE;
     }
     if (environment.count("tempPath")) {
-        ::mongo::unittest::TempDir::setTempPath(environment["tempPath"].as<std::string>());
+        ::merizo::unittest::TempDir::setTempPath(environment["tempPath"].as<std::string>());
     }
 
-    ::mongo::clearSignalMask();
-    ::mongo::setupSynchronousSignalHandlers();
-    ::mongo::serverGlobalParams.noUnixSocket = true;
-    ::mongo::unittest::setupTestLogger();
+    ::merizo::clearSignalMask();
+    ::merizo::setupSynchronousSignalHandlers();
+    ::merizo::serverGlobalParams.noUnixSocket = true;
+    ::merizo::unittest::setupTestLogger();
 
-    StatusPtr status(mongo_embedded_v1_status_create());
-    mongoc_init();
+    StatusPtr status(merizo_embedded_v1_status_create());
+    merizoc_init();
 
-    mongo_embedded_v1_init_params params;
+    merizo_embedded_v1_init_params params;
     params.log_flags = MONGO_EMBEDDED_V1_LOG_STDOUT;
     params.log_callback = nullptr;
     params.log_user_data = nullptr;
 
-    global_lib_handle = mongo_embedded_v1_lib_init(&params, status.get());
+    global_lib_handle = merizo_embedded_v1_lib_init(&params, status.get());
     if (global_lib_handle == nullptr) {
-        std::cerr << "Error: " << mongo_embedded_v1_status_get_explanation(status.get());
+        std::cerr << "Error: " << merizo_embedded_v1_status_get_explanation(status.get());
         return EXIT_FAILURE;
     }
 
-    auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+    auto result = ::merizo::unittest::Suite::run(std::vector<std::string>(), "", 1);
 
-    if (mongo_embedded_v1_lib_fini(global_lib_handle, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
-        std::cerr << "Error: " << mongo_embedded_v1_status_get_explanation(status.get());
+    if (merizo_embedded_v1_lib_fini(global_lib_handle, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
+        std::cerr << "Error: " << merizo_embedded_v1_status_get_explanation(status.get());
         return EXIT_FAILURE;
     }
 
-    mongoc_cleanup();
+    merizoc_cleanup();
     globalTempDir.reset();
-    mongo::quickExit(result);
+    merizo::quickExit(result);
 }

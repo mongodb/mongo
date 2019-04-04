@@ -33,7 +33,7 @@
  *          specified to denote a member is an arbiter.
  *
  *        Note: A special "bridgeOptions" property can be specified in both the object and array
- *           formats to configure the options for the mongobridge corresponding to that node. These
+ *           formats to configure the options for the merizobridge corresponding to that node. These
  *           options are merged with the opts.bridgeOptions options, where the node-specific options
  *           take precedence.
  *
@@ -41,7 +41,7 @@
  *        Format for Object:
  *          { cmdline-param-with-no-arg : "",
  *            param-with-arg : arg }
- *        This turns into "mongod --cmdline-param-with-no-arg --param-with-arg arg"
+ *        This turns into "merizod --cmdline-param-with-no-arg --param-with-arg arg"
  *
  *     causallyConsistent {boolean}: Specifies whether the connections to the replica set nodes
  *        should be created with the 'causal consistency' flag enabled, which means they will gossip
@@ -53,11 +53,11 @@
  *     keyFile {string}
  *     protocolVersion {number}: protocol version of replset used by the replset initiation.
  *
- *     useBridge {boolean}: If true, then a mongobridge process is started for each node in the
+ *     useBridge {boolean}: If true, then a merizobridge process is started for each node in the
  *        replica set. Both the replica set configuration and the connections returned by startSet()
  *        will be references to the proxied connections. Defaults to false.
  *
- *     bridgeOptions {Object}: Options to apply to all mongobridge processes. Defaults to {}.
+ *     bridgeOptions {Object}: Options to apply to all merizobridge processes. Defaults to {}.
  *
  *     settings {object}: Setting used in the replica set config document.
  *        Example:
@@ -84,7 +84,7 @@ var ReplSetTest = function(opts) {
     var _alldbpaths;
     var _configSettings;
 
-    // mongobridge related variables. Only available if the bridge option is selected.
+    // merizobridge related variables. Only available if the bridge option is selected.
     var _useBridge;
     var _bridgeOptions;
     var _unbridgedPorts;
@@ -613,7 +613,7 @@ var ReplSetTest = function(opts) {
                     if (replSetGetStatus.optimes) {
                         appliedOpTimeConsensus = replSetGetStatus.optimes.appliedOpTime;
                     } else {
-                        // Older versions of mongod do not include an 'optimes' field in the
+                        // Older versions of merizod do not include an 'optimes' field in the
                         // replSetGetStatus response. We instead pull an optime from the first
                         // replica set member that includes one in its status. All we need here is
                         // any initial value that we can compare to all the other optimes.
@@ -1272,7 +1272,7 @@ var ReplSetTest = function(opts) {
                 print("AwaitLastStableRecoveryTimestamp: authenticating on separate shell " +
                       "with x509 for " + id);
                 const subShellArgs = [
-                    'mongo',
+                    'merizo',
                     '--ssl',
                     '--sslCAFile=' + masterOptions.sslCAFile,
                     '--sslPEMKeyFile=' + masterOptions.sslPEMKeyFile,
@@ -1285,7 +1285,7 @@ var ReplSetTest = function(opts) {
                 ];
 
                 const retVal = _runMongoProgram(...subShellArgs);
-                assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+                assert.eq(retVal, 0, 'merizo shell did not succeed with exit code 0');
             } else {
                 if (masterOptions.clusterAuthMode) {
                     print("AwaitLastStableRecoveryTimestamp: authenticating with " +
@@ -1338,7 +1338,7 @@ var ReplSetTest = function(opts) {
 
                 // The `lastStableCheckpointTimestamp` field was added in v4.0, then deprecated and
                 // replaced in v4.2 with `lastStableRecoveryTimestamp`. So we check it, too, for
-                // backwards compatibility with v4.0 mongods.
+                // backwards compatibility with v4.0 merizods.
                 if (res.hasOwnProperty("lastStableCheckpointTimestamp") &&
                     res.lastStableCheckpointTimestamp.getTime() === 0) {
                     print("AwaitLastStableRecoveryTimestamp: " + node.host +
@@ -1512,7 +1512,7 @@ var ReplSetTest = function(opts) {
             const db = session.getDatabase(dbName);
             const res = assert.commandWorked(db.runCommand(commandObj));
 
-            // The "capped" field in the dbHash command response is new as of MongoDB 4.0.
+            // The "capped" field in the dbHash command response is new as of MerizoDB 4.0.
             const cappedCollections = new Set(filterCapped ? res.capped : []);
 
             for (let collName of Object.keys(res.collections)) {
@@ -1528,7 +1528,7 @@ var ReplSetTest = function(opts) {
                 if (cappedCollections.has(collName) ||
                     (filterMapReduce && collName.startsWith("tmp.mr."))) {
                     delete res.collections[collName];
-                    // The "uuids" field in the dbHash command response is new as of MongoDB 4.0.
+                    // The "uuids" field in the dbHash command response is new as of MerizoDB 4.0.
                     if (res.hasOwnProperty("uuids")) {
                         delete res.uuids[collName];
                     }
@@ -1644,7 +1644,7 @@ var ReplSetTest = function(opts) {
             })
         ].map(conn => conn.getDB('test').getSession());
 
-        // getHashes() is sometimes called for versions of MongoDB earlier than 4.0 so we cannot use
+        // getHashes() is sometimes called for versions of MerizoDB earlier than 4.0 so we cannot use
         // the dbHash command directly to filter out capped collections. checkReplicatedDataHashes()
         // uses the listCollections command after awaiting replication to determine if a collection
         // is capped.
@@ -1906,7 +1906,7 @@ var ReplSetTest = function(opts) {
                 dbHashes.slaves.forEach(secondaryDBHash => {
                     assert.commandWorked(secondaryDBHash);
 
-                    var secondary = secondaryDBHash._mongo;
+                    var secondary = secondaryDBHash._merizo;
                     var secondaryCollections = Object.keys(secondaryDBHash.collections);
 
                     if (primaryCollections.length !== secondaryCollections.length) {
@@ -2045,7 +2045,7 @@ var ReplSetTest = function(opts) {
     function checkOplogs(rst, slaves, msgPrefix = 'checkOplogs') {
         slaves = slaves || rst._slaves;
         const kCappedPositionLostSentinel = Object.create(null);
-        const OplogReader = function(mongo) {
+        const OplogReader = function(merizo) {
             this._safelyPerformCursorOperation = function(name, operation, onCappedPositionLost) {
                 if (!this.cursor) {
                     throw new Error("OplogReader is not open!");
@@ -2058,7 +2058,7 @@ var ReplSetTest = function(opts) {
                 try {
                     return operation(this.cursor);
                 } catch (err) {
-                    print("Error: " + name + " threw '" + err.message + "' on " + this.mongo.host);
+                    print("Error: " + name + " threw '" + err.message + "' on " + this.merizo.host);
                     // Occasionally, the capped collection will get truncated while we are iterating
                     // over it. Since we are iterating over the collection in reverse, getting a
                     // truncated item means we've reached the end of the list, so return false.
@@ -2099,12 +2099,12 @@ var ReplSetTest = function(opts) {
             };
 
             this.getOplogColl = function() {
-                return this.mongo.getDB("local")[oplogName];
+                return this.merizo.getDB("local")[oplogName];
             };
 
             this.cursor = null;
             this._cursorExhausted = true;
-            this.mongo = mongo;
+            this.merizo = merizo;
         };
 
         function assertOplogEntriesEq(oplogEntry0, oplogEntry1, reader0, reader1, prevOplogEntry) {
@@ -2112,8 +2112,8 @@ var ReplSetTest = function(opts) {
                 const query = prevOplogEntry ? {ts: {$lte: prevOplogEntry.ts}} : {};
                 rst.nodes.forEach(node => this.dumpOplog(node, query, 100));
                 const log = msgPrefix + ", non-matching oplog entries for the following nodes: \n" +
-                    reader0.mongo.host + ": " + tojsononeline(oplogEntry0) + "\n" +
-                    reader1.mongo.host + ": " + tojsononeline(oplogEntry1);
+                    reader0.merizo.host + ": " + tojsononeline(oplogEntry0) + "\n" +
+                    reader1.merizo.host + ": " + tojsononeline(oplogEntry1);
                 assert(false, log);
             }
         }
@@ -2154,7 +2154,7 @@ var ReplSetTest = function(opts) {
             while (firstReader.hasNext()) {
                 const oplogEntry = firstReader.next();
                 if (oplogEntry === kCappedPositionLostSentinel) {
-                    // When using legacy OP_QUERY/OP_GET_MORE reads against mongos, it is
+                    // When using legacy OP_QUERY/OP_GET_MORE reads against merizos, it is
                     // possible for hasNext() to return true but for next() to throw an exception.
                     break;
                 }
@@ -2319,13 +2319,13 @@ var ReplSetTest = function(opts) {
         print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
 
         if (_useBridge && (restart === undefined || !restart)) {
-            // We leave the mongobridge process running when the mongod process is restarted so we
+            // We leave the merizobridge process running when the merizod process is restarted so we
             // don't need to start a new one.
             var bridgeOptions = Object.merge(_bridgeOptions, options.bridgeOptions || {});
             bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: this.host,
                 port: this.ports[n],
-                // The mongod processes identify themselves to mongobridge as host:port, where the
+                // The merizod processes identify themselves to merizobridge as host:port, where the
                 // host is the actual hostname of the machine and not localhost.
                 dest: getHostName() + ":" + _unbridgedPorts[n],
             });
@@ -2430,8 +2430,8 @@ var ReplSetTest = function(opts) {
     /**
      * Stops a particular node or nodes, specified by conn or id
      *
-     * If _useBridge=true, then the mongobridge process(es) corresponding to the node(s) are also
-     * terminated unless forRestart=true. The mongobridge process(es) are left running across
+     * If _useBridge=true, then the merizobridge process(es) corresponding to the node(s) are also
+     * terminated unless forRestart=true. The merizobridge process(es) are left running across
      * restarts to ensure their configuration remains intact.
      *
      * @param {number|Mongo} n the index or connection object of the replica set member to stop.
@@ -2463,18 +2463,18 @@ var ReplSetTest = function(opts) {
         n = this.getNodeId(n);
 
         var conn = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
-        print('ReplSetTest stop *** Shutting down mongod in port ' + conn.port + ' ***');
+        print('ReplSetTest stop *** Shutting down merizod in port ' + conn.port + ' ***');
         var ret = MongoRunner.stopMongod(conn, signal, opts);
 
         print('ReplSetTest stop *** Mongod in port ' + conn.port + ' shutdown with code (' + ret +
               ') ***');
 
         if (_useBridge && !forRestart) {
-            // We leave the mongobridge process running when the mongod process is being restarted.
+            // We leave the merizobridge process running when the merizod process is being restarted.
             const bridge = this.nodes[n];
-            print('ReplSetTest stop *** Shutting down mongobridge on port ' + bridge.port + ' ***');
+            print('ReplSetTest stop *** Shutting down merizobridge on port ' + bridge.port + ' ***');
             const exitCode = bridge.stop();  // calls MongoBridge#stop()
-            print('ReplSetTest stop *** mongobridge on port ' + bridge.port +
+            print('ReplSetTest stop *** merizobridge on port ' + bridge.port +
                   ' exited with code (' + exitCode + ') ***');
         }
 
@@ -2526,7 +2526,7 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * Returns whether or not this ReplSetTest uses mongobridge.
+     * Returns whether or not this ReplSetTest uses merizobridge.
      */
     this.usesBridge = function() {
         return _useBridge;
@@ -2634,7 +2634,7 @@ var ReplSetTest = function(opts) {
             _allocatePortForNode = makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset));
         } else {
             _allocatePortForBridge = function() {
-                throw new Error("Using mongobridge isn't enabled for this replica set");
+                throw new Error("Using merizobridge isn't enabled for this replica set");
             };
             _allocatePortForNode = allocatePort;
         }

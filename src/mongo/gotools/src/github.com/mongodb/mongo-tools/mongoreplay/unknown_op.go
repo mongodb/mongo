@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	mgo "github.com/10gen/llmgo"
 )
 
-// UnknownOp is not a real mongo Op but represents an unrecognized or corrupted op
+// UnknownOp is not a real merizo Op but represents an unrecognized or corrupted op
 type UnknownOp struct {
 	Header MsgHeader
 	Body   []byte

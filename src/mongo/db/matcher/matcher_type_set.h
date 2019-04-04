@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,13 +32,13 @@
 #include <set>
 #include <string>
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/stdx/unordered_map.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/stdx/unordered_map.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Represents a set of types or of type aliases in the match language. The set consists of the BSON
@@ -118,4 +118,4 @@ struct MatcherTypeSet {
     std::set<BSONType> bsonTypes;
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_manager.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -42,27 +42,27 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
-#include "mongo/base/secure_allocator.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/config.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/cidr.h"
-#include "mongo/util/net/dh_openssl.h"
-#include "mongo/util/net/private/ssl_expiration.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/text.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/init.h"
+#include "merizo/base/secure_allocator.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/config.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/transport/session.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/cidr.h"
+#include "merizo/util/net/dh_openssl.h"
+#include "merizo/util/net/private/ssl_expiration.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/net/ssl_types.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/text.h"
 
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -83,7 +83,7 @@
 #include <Security/Security.h>
 #endif
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -117,9 +117,9 @@ constexpr std::array<std::uint8_t, 384> ffdhe3072_p = {
 // Generator for Diffie-Hellman parameter 'ffdhe3072' defined in RFC 7919 (2)
 constexpr std::uint8_t ffdhe3072_g = 0x02;
 
-// Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
+// Because the hostname having a slash is used by `merizo::SockAddr` to determine if a hostname is a
 // Unix Domain Socket endpoint, this function uses the same logic.  (See
-// `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
+// `merizo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
 // Domain Socket in the present working directory, through a code path which supplies `sa_family_t`
 // as `AF_UNIX` will cause this code to lie.  This will, in turn, cause the
 // `SSLManagerInterface::parseAndValidatePeerCertificate` code to believe a socket is a host, which
@@ -422,9 +422,9 @@ public:
     int SSL_shutdown(SSLConnectionInterface* conn) final;
 
 private:
-    const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
-                                     mongodbRolesOID.shortDescription.c_str(),
-                                     mongodbRolesOID.longDescription.c_str());
+    const int _rolesNid = OBJ_create(merizodbRolesOID.identifier.c_str(),
+                                     merizodbRolesOID.shortDescription.c_str(),
+                                     merizodbRolesOID.longDescription.c_str());
     UniqueSSLContext _serverContext;  // SSL context for incoming connections
     UniqueSSLContext _clientContext;  // SSL context for outgoing connections
 
@@ -590,7 +590,7 @@ void setupFIPS() {
     }
     log() << "FIPS 140-2 mode activated";
 #else
-    severe() << "this version of mongodb was not compiled with FIPS support";
+    severe() << "this version of merizodb was not compiled with FIPS support";
     fassertFailedNoTrace(17089);
 #endif
 }
@@ -1532,7 +1532,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
         return swPeerCertificateRoles.getStatus();
     }
 
-    // If this is an SSL client context (on a MongoDB server or client)
+    // If this is an SSL client context (on a MerizoDB server or client)
     // perform hostname validation of the remote server
     if (remoteHost.empty()) {
         return boost::make_optional(
@@ -1727,4 +1727,4 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
     _flushNetworkBIO(conn);
     throwSocketError(SocketErrorKind::CONNECT_ERROR, "");
 }
-}  // namespace mongo
+}  // namespace merizo

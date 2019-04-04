@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -38,10 +38,10 @@
 #if defined(_WIN32)
 // We need to pick up a decl for CONTEXT. Forward declaring would be preferable, but it is
 // unclear that we can do so.
-#include "mongo/platform/windows_basic.h"
+#include "merizo/platform/windows_basic.h"
 #endif
 
-namespace mongo {
+namespace merizo {
 
 // Print stack trace information to "os", default to the log stream.
 void printStackTrace(std::ostream& os);
@@ -56,4 +56,4 @@ void printWindowsStackTrace(CONTEXT& context);
 int crtDebugCallback(int, char* originalMessage, int*);
 #endif
 
-}  // namespace mongo
+}  // namespace merizo

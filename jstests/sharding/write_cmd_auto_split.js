@@ -89,7 +89,7 @@
 
     assert.eq(1, configDB.chunks.find({"ns": "test.insert"}).itcount());
 
-    // Note: Estimated 'chunk size' tracked by mongos is initialized with a random value so
+    // Note: Estimated 'chunk size' tracked by merizos is initialized with a random value so
     // we are going to be conservative.
     for (var x = 0; x < 2100; x += 400) {
         var docs = [];

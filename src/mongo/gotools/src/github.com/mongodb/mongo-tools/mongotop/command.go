@@ -1,21 +1,21 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongotop
+package merizotop
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/text"
+	"github.com/merizodb/merizo-tools/common/text"
 	"sort"
 	"time"
 )
 
-// FormattableDiff represents a diff of two samples taken by mongotop,
+// FormattableDiff represents a diff of two samples taken by merizotop,
 // which can be printed to output in various formats.
 type FormattableDiff interface {
 	// Generate a JSON representation of the diff

@@ -10,8 +10,8 @@ env.Library(
         'timer_stats.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/concurrency/spin_lock',
     ],
 )
 
@@ -32,7 +32,7 @@ env.Library(
         'operation_latency_histogram.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -52,8 +52,8 @@ env.CppUnitTest(
         'operation_latency_histogram_test.cpp'
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/stats/top',
         ])
 
 env.Library(
@@ -62,8 +62,8 @@ env.Library(
         'counters.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/concurrency/spin_lock',
     ],
 )
 
@@ -76,14 +76,14 @@ env.Library(
         env.Idlc('server_write_concern_metrics.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/server_status',
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/commands/server_status',
+        '$BUILD_DIR/merizo/db/repl/read_concern_args',
+        '$BUILD_DIR/merizo/db/write_concern_options',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
@@ -93,8 +93,8 @@ env.Library(
         'fill_locker_info.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager'
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager'
     ],
 )
 
@@ -116,13 +116,13 @@ env.Library(
         'storage_stats.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/index/index_access_method',
         'fill_locker_info',
         'top',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/merizo/db/commands/server_status',
     ],
 )

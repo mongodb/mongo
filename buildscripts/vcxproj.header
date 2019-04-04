@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectName>%_TARGET_%</ProjectName>
-    <RootNamespace>mongod</RootNamespace>
+    <RootNamespace>merizod</RootNamespace>
     <PlatformToolset>v141</PlatformToolset>
     <!-- <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid> -->
     <Keyword>MakeFileProj</Keyword>
@@ -102,7 +102,7 @@
   <!-- 4.0 - change to a Makefile project to allow invocation of external build system -->
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <NMakeBuildCommandLine>ninja.exe -k 0 core</NMakeBuildCommandLine>
-    <NMakeOutput>mongod.exe</NMakeOutput>
+    <NMakeOutput>merizod.exe</NMakeOutput>
     <NMakeCleanCommandLine>ninja.exe -t clean</NMakeCleanCommandLine>
     <NMakeReBuildCommandLine>not_supported</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>MONGO_SSL;WIN32;_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
@@ -110,7 +110,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <NMakeBuildCommandLine>ninja.exe -k 0 core</NMakeBuildCommandLine>
-    <NMakeOutput>mongod.exe</NMakeOutput>
+    <NMakeOutput>merizod.exe</NMakeOutput>
     <NMakeCleanCommandLine>ninja.exe -t clean</NMakeCleanCommandLine>
     <NMakeReBuildCommandLine>not_supported</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>not_supported;WIN32;NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>

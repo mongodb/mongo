@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <map>
 #include <vector>
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/list_databases_gen.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/strategy.h"
-#include "mongo/s/grid.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/client/remote_command_targeter.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/list_databases_gen.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/commands/strategy.h"
+#include "merizo/s/grid.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class ListDatabasesCmd : public BasicCommand {
@@ -220,4 +220,4 @@ public:
 } listDatabasesCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

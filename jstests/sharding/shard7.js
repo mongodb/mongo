@@ -3,7 +3,7 @@
 
 s = new ShardingTest({name: 'shard7', shards: 2});
 
-db = s.admin._mongo.getDB('test');
+db = s.admin._merizo.getDB('test');
 c = db['foo'];
 c.drop();
 

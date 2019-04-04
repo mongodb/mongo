@@ -18,14 +18,14 @@ var db;
 
     function makePatternForDBHash(dbName) {
         return new RegExp("COMMAND.*command " + dbName +
-                              "\\.\\$cmd appName: \"MongoDB Shell\" command: db[Hh]ash",
+                              "\\.\\$cmd appName: \"MerizoDB Shell\" command: db[Hh]ash",
                           "g");
     }
 
     function makePatternForValidate(dbName, collName) {
         return new RegExp(
             "COMMAND.*command " + dbName +
-                "\\.\\$cmd appName: \"MongoDB Shell\" command: validate { validate: \"" + collName +
+                "\\.\\$cmd appName: \"MerizoDB Shell\" command: validate { validate: \"" + collName +
                 "\"",
             "g");
     }
@@ -119,7 +119,7 @@ var db;
 
     (function testShardedClusterWithOneNodeCSRS() {
         const st = new ShardingTest({
-            mongos: 1,
+            merizos: 1,
             config: 1,
             configOptions: {
                 setParameter: {logComponentVerbosity: tojson({command: 1})},
@@ -149,7 +149,7 @@ var db;
 
     (function testShardedCluster() {
         const st = new ShardingTest({
-            mongos: 1,
+            merizos: 1,
             config: 3,
             configOptions: {
                 setParameter: {logComponentVerbosity: tojson({command: 1})},

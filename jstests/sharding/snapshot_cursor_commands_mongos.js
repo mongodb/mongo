@@ -1,4 +1,4 @@
-// Tests snapshot isolation on readConcern level snapshot reads through mongos.
+// Tests snapshot isolation on readConcern level snapshot reads through merizos.
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
 (function() {
     "use strict";
@@ -61,7 +61,7 @@
             compatibleCollections: [shardedCollName, unshardedCollName],
             name: "singleShard",
             setUp: function(collName) {
-                const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+                const st = new ShardingTest({shards: 1, merizos: 1, config: 1});
                 return shardingScenarios.allScenarios.setUp(st, collName);
             }
         },
@@ -73,14 +73,14 @@
             compatibleCollections: [shardedCollName],
             name: "multiShardAllShardReads",
             setUp: function(collName) {
-                let st = new ShardingTest({shards: 3, mongos: 1, config: 1});
+                let st = new ShardingTest({shards: 3, merizos: 1, config: 1});
                 st = shardingScenarios.allScenarios.setUp(st, collName);
 
                 if (st === undefined) {
                     return;
                 }
 
-                const mongos = st.s0;
+                const merizos = st.s0;
 
                 const ns = dbName + '.' + shardedCollName;
 
@@ -88,18 +88,18 @@
                 assert.commandWorked(st.splitAt(ns, {_id: 8}));
 
                 assert.commandWorked(
-                    mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
+                    merizos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
                 assert.commandWorked(
-                    mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}));
+                    merizos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}));
                 assert.commandWorked(
-                    mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+                    merizos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
 
                 assert.eq(
-                    1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
+                    1, merizos.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
                 assert.eq(
-                    1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
+                    1, merizos.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
                 assert.eq(
-                    1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
+                    1, merizos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
 
                 flushRoutersAndRefreshShardMetadata(st, {ns});
 
@@ -114,29 +114,29 @@
             compatibleCollections: [shardedCollName],
             name: "multiShardSomeShardReads",
             setUp: function(collName) {
-                let st = new ShardingTest({shards: 3, mongos: 1, config: 1});
+                let st = new ShardingTest({shards: 3, merizos: 1, config: 1});
                 st = shardingScenarios.allScenarios.setUp(st, collName);
 
                 if (st === undefined) {
                     return;
                 }
 
-                const mongos = st.s0;
+                const merizos = st.s0;
 
                 const ns = dbName + '.' + shardedCollName;
 
                 assert.commandWorked(st.splitAt(ns, {_id: 5}));
                 assert.commandWorked(
-                    mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+                    merizos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
                 assert.commandWorked(
-                    mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+                    merizos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
 
                 assert.eq(
-                    0, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
+                    0, merizos.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
                 assert.eq(
-                    1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
+                    1, merizos.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
                 assert.eq(
-                    1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
+                    1, merizos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
 
                 flushRoutersAndRefreshShardMetadata(st, {ns});
 

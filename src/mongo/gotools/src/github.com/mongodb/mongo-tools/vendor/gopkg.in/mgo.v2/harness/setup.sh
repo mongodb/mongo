@@ -13,7 +13,7 @@ start() {
     cp -a ../harness/certs .
     echo keyfile > certs/keyfile
     chmod 600 certs/keyfile
-    if ! mongod --help | grep -q -- --ssl; then
+    if ! merizod --help | grep -q -- --ssl; then
         rm -rf daemons/db3
     fi
     COUNT=$(ls daemons | wc -l)
@@ -30,8 +30,8 @@ start() {
         UP=$(svstat daemons/* | grep ' up ' | grep -v ' [0-3] seconds' | wc -l)
         echo "$UP processes up..."
         if [ "x$COUNT" = "x$UP" ]; then
-            echo "Running init.js with mongo..."
-            mongo --nodb ../harness/mongojs/init.js
+            echo "Running init.js with merizo..."
+            merizo --nodb ../harness/merizojs/init.js
             exit 0
         fi
         sleep 1

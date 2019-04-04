@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,11 +32,11 @@
 #include <map>
 #include <set>
 
-#include "mongo/bson/bsonobj_comparator_interface.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
+#include "merizo/bson/bsonobj_comparator_interface.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/stdx/unordered_set.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * A BSONObj comparator that has simple binary compare semantics.
@@ -130,4 +130,4 @@ template <typename T>
 using SimpleBSONObjUnorderedMap = stdx::
     unordered_map<BSONObj, T, SimpleBSONObjComparator::Hasher, SimpleBSONObjComparator::EqualTo>;
 
-}  // namespace mongo
+}  // namespace merizo

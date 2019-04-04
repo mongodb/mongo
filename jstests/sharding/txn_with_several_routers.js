@@ -23,7 +23,7 @@
         removeAllDocumentsFromTestCollection();
     }
 
-    let st = new ShardingTest({shards: 3, mongos: 2, causallyConsistent: true});
+    let st = new ShardingTest({shards: 3, merizos: 2, causallyConsistent: true});
     let router0 = st.s0;
     let router1 = st.s1;
 

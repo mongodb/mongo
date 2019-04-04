@@ -1,5 +1,5 @@
 /**
- * Tests that starting a mongod with --repair after an unclean shutdown does not attempt to rebuild
+ * Tests that starting a merizod with --repair after an unclean shutdown does not attempt to rebuild
  * indexes before repairing the instance. Replication is used to get the database into a state where
  * an index has been dropped on disk, but still exists in the catalog.
  *
@@ -55,12 +55,12 @@
     // This should succeed in rebuilding the indexes, but only after the databases have been
     // repaired.
     assert.eq(
-        0, runMongoProgram("mongod", "--repair", "--port", primaryPort, "--dbpath", primaryDbpath));
+        0, runMongoProgram("merizod", "--repair", "--port", primaryPort, "--dbpath", primaryDbpath));
 
     // Restarting the replica set would roll back the index drop. Instead we want to start a
     // standalone and verify that repair rebuilt the indexes.
-    let mongod = MongoRunner.runMongod({dbpath: primaryDbpath, noCleanData: true});
-    assert.eq(3, mongod.getDB(dbName)[collName].getIndexes().length);
+    let merizod = MongoRunner.runMongod({dbpath: primaryDbpath, noCleanData: true});
+    assert.eq(3, merizod.getDB(dbName)[collName].getIndexes().length);
 
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 })();

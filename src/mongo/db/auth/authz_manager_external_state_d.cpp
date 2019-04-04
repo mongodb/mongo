@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authz_manager_external_state_d.h"
+#include "merizo/db/auth/authz_manager_external_state_d.h"
 
-#include "mongo/base/status.h"
-#include "mongo/db/auth/authz_session_external_state_d.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status.h"
+#include "merizo/db/auth/authz_session_external_state_d.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/client.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() = default;
 AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() = default;
@@ -115,7 +115,7 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
         return Status::OK();
     }
     return Status(ErrorCodes::NoMatchingDocument,
-                  mongoutils::str::stream() << "No document in " << collectionName.ns()
+                  merizoutils::str::stream() << "No document in " << collectionName.ns()
                                             << " matches "
                                             << query);
 }
@@ -125,4 +125,4 @@ MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
     return std::make_unique<AuthzManagerExternalStateMongod>();
 }
 
-}  // namespace mongo
+}  // namespace merizo

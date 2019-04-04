@@ -1,6 +1,6 @@
 (function() {
 
-    var s = new ShardingTest({name: "presplit", shards: 2, mongos: 1, other: {chunkSize: 1}});
+    var s = new ShardingTest({name: "presplit", shards: 2, merizos: 1, other: {chunkSize: 1}});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', s.shard1.shardName);

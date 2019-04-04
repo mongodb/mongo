@@ -18,7 +18,7 @@
         assert.eq(0, listCollsRes.cursor.firstBatch.length);
     };
 
-    var st = new ShardingTest({shards: 2, verbose: 1, mongos: 1, other: {chunkSize: 1}});
+    var st = new ShardingTest({shards: 2, verbose: 1, merizos: 1, other: {chunkSize: 1}});
 
     var admin = st.s0.getDB('admin');
 

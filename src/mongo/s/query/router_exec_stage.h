@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,21 +32,21 @@
 #include <boost/optional.hpp>
 #include <memory>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/s/query/cluster_query_result.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/s/query/cluster_query_result.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 
 /**
- * This is the lightweight mongoS analogue of the PlanStage abstraction used to execute queries on
- * mongoD (see mongo/db/plan_stage.h).
+ * This is the lightweight merizoS analogue of the PlanStage abstraction used to execute queries on
+ * merizoD (see merizo/db/plan_stage.h).
  *
  * Each subclass is a query execution stage which executes on the merging node. In general, the
- * execution plan on mongos could have a tree of execution stages, but currently each node has at
+ * execution plan on merizos could have a tree of execution stages, but currently each node has at
  * most one child. The leaf stage of the pipeline receives query result documents merged from the
  * shards. The pipeline may then transform the result set in various ways before being returned by
  * the root stage.
@@ -197,4 +197,4 @@ private:
     std::unique_ptr<RouterExecStage> _child;
 };
 
-}  // namespace mongo
+}  // namespace merizo

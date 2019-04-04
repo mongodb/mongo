@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kFTDC
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/procparser.h"
+#include "merizo/util/procparser.h"
 
 #include <algorithm>
 #include <array>
@@ -45,16 +45,16 @@
 #include <type_traits>
 #include <unistd.h>
 
-#include "mongo/base/parse_number.h"
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/text.h"
-namespace mongo {
+#include "merizo/base/parse_number.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/text.h"
+namespace merizo {
 
 namespace {
 
@@ -714,4 +714,4 @@ std::vector<std::string> findPhysicalDisks(StringData sysBlockPath) {
 }
 
 }  // namespace procparser
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/static_assert.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/client/constants.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/server_options.h"
-#include "mongo/rpc/message.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/bson/bson_validate.h"
+#include "merizo/client/constants.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/server_options.h"
+#include "merizo/rpc/message.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 
@@ -95,7 +95,7 @@ class OperationContext;
 
 namespace QueryResult {
 #pragma pack(1)
-/* see http://dochub.mongodb.org/core/mongowireprotocol
+/* see http://dochub.merizodb.org/core/merizowireprotocol
 */
 struct Layout {
     MsgData::Layout msgdata;
@@ -208,7 +208,7 @@ public:
 /* For the database/server protocol, these objects and functions encapsulate
    the various messages transmitted over the connection.
 
-   See http://dochub.mongodb.org/core/mongowireprotocol
+   See http://dochub.merizodb.org/core/merizowireprotocol
 */
 class DbMessage {
     // Assume sizeof(int) == 4 bytes
@@ -405,7 +405,7 @@ enum UpdateOptions {
        (Default is update a single document and stop.) */
     UpdateOption_Multi = 1 << 1,
 
-    /** flag from mongo saying this update went everywhere */
+    /** flag from merizo saying this update went everywhere */
     UpdateOption_Broadcast = 1 << 2
 };
 
@@ -418,7 +418,7 @@ enum RemoveOptions {
     /** only delete one option */
     RemoveOption_JustOne = 1 << 0,
 
-    /** flag from mongo saying this update went everywhere */
+    /** flag from merizo saying this update went everywhere */
     RemoveOption_Broadcast = 1 << 1
 };
 
@@ -505,4 +505,4 @@ DbResponse replyToQuery(int queryResultFlags,
 inline DbResponse replyToQuery(const BSONObj& obj, int queryResultFlags = 0) {
     return replyToQuery(queryResultFlags, obj.objdata(), obj.objsize(), /*nReturned*/ 1);
 }
-}  // namespace mongo
+}  // namespace merizo

@@ -141,19 +141,19 @@ function configExpandSuccess(config, test = null, opts = {}) {
     const configFile = MongoRunner.dataPath + '/configExpand.conf';
     writeFile(configFile, jsToYaml(config));
 
-    const mongod = MongoRunner.runMongod(Object.assign({
+    const merizod = MongoRunner.runMongod(Object.assign({
         configExpand: 'rest,exec',
         config: configFile,
     },
                                                        opts));
 
-    assert(mongod, "Mongod failed to start up with config: " + cat(configFile));
+    assert(merizod, "Mongod failed to start up with config: " + cat(configFile));
     removeFile(configFile);
 
     if (test) {
-        test(mongod.getDB('admin'));
+        test(merizod.getDB('admin'));
     }
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 }
 
 function configExpandFailure(config, test = null, opts = {}) {
@@ -166,7 +166,7 @@ function configExpandFailure(config, test = null, opts = {}) {
         port: allocatePort(),
     },
                                   opts);
-    let args = [MongoRunner.mongodPath];
+    let args = [MongoRunner.merizodPath];
     for (let k in options) {
         args.push('--' + k);
         if (options[k] != '') {
@@ -175,13 +175,13 @@ function configExpandFailure(config, test = null, opts = {}) {
     }
 
     clearRawMongoProgramOutput();
-    const mongod = _startMongoProgram({args: args});
+    const merizod = _startMongoProgram({args: args});
 
     assert.soon(function() {
         return rawMongoProgramOutput().match(test);
     });
-    if (mongod) {
-        stopMongoProgramByPid(mongod);
+    if (merizod) {
+        stopMongoProgramByPid(merizod);
     }
     removeFile(configFile);
 }

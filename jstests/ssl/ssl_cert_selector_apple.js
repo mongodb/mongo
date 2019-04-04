@@ -15,9 +15,9 @@ requireSSLProvider('apple', function() {
     'use strict';
 
     const CLIENT =
-        'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=Trusted Kernel Test Client';
+        'C=US,ST=New York,L=New York City,O=MerizoDB,OU=Kernel,CN=Trusted Kernel Test Client';
     const SERVER =
-        'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=Trusted Kernel Test Server';
+        'C=US,ST=New York,L=New York City,O=MerizoDB,OU=Kernel,CN=Trusted Kernel Test Server';
     const INVALID = null;
 
     const testCases = [
@@ -38,7 +38,7 @@ requireSSLProvider('apple', function() {
             setParameter: {logLevel: '1'},
         };
         clearRawMongoProgramOutput();
-        const mongod = MongoRunner.runMongod(opts);
+        const merizod = MongoRunner.runMongod(opts);
 
         assert.soon(function() {
             const log = rawMongoProgramOutput();
@@ -53,7 +53,7 @@ requireSSLProvider('apple', function() {
         }, "Starting Mongod with " + tojson(opts), 10000);
 
         try {
-            MongoRunner.stopMongod(mongod);
+            MongoRunner.stopMongod(merizod);
         } catch (e) {
             // Depending on timing, exitCode might be 0, 1, or -9.
             // All that matters is that it dies, resmoke will tell us if that failed.

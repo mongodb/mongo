@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/keys_collection_cache.h"
-#include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/keys_collection_document.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/config_server_test_fixture.h"
-#include "mongo/s/grid.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/keys_collection_cache.h"
+#include "merizo/db/keys_collection_client_sharded.h"
+#include "merizo/db/keys_collection_document.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/s/catalog/dist_lock_manager_mock.h"
+#include "merizo/s/config_server_test_fixture.h"
+#include "merizo/s/grid.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/clock_source_mock.h"
 
-namespace mongo {
+namespace merizo {
 
 class CacheTest : public ConfigServerTestFixture {
 protected:
@@ -267,4 +267,4 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

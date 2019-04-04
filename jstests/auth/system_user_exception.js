@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    // Start mongod with no authentication mechanisms enabled
+    // Start merizod with no authentication mechanisms enabled
     var m = MongoRunner.runMongod(
         {keyFile: "jstests/libs/key1", setParameter: "authenticationMechanisms=PLAIN"});
 

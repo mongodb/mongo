@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,18 +33,18 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/shim.h"
-#include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/privilege_format.h"
-#include "mongo/db/auth/role_name.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/stdx/functional.h"
+#include "merizo/base/shim.h"
+#include "merizo/base/status.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/authorization_manager_impl.h"
+#include "merizo/db/auth/privilege_format.h"
+#include "merizo/db/auth/role_name.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/stdx/functional.h"
 
-namespace mongo {
+namespace merizo {
 
 class AuthzSessionExternalState;
 class OperationContext;
@@ -52,7 +52,7 @@ class OperationContext;
 /**
  * Public interface for a class that encapsulates all the information related to system
  * state not stored in AuthorizationManager.  This is primarily to make AuthorizationManager
- * easier to test as well as to allow different implementations for mongos and mongod.
+ * easier to test as well as to allow different implementations for merizos and merizod.
  */
 class AuthzManagerExternalState {
     AuthzManagerExternalState(const AuthzManagerExternalState&) = delete;
@@ -191,7 +191,7 @@ public:
     /**
      * Returns true if you must acquire a StateLock before fetching a user description.
      *
-     * By default this returns false since only mongod actually needs to do locking at this level.
+     * By default this returns false since only merizod actually needs to do locking at this level.
      */
     virtual bool needsLockForUserName(OperationContext* opCtx, const UserName& user) {
         return false;
@@ -209,4 +209,4 @@ protected:
     bool shouldUseRolesFromConnection(OperationContext* opCtx, const UserName& username);
 };
 
-}  // namespace mongo
+}  // namespace merizo

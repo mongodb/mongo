@@ -1,4 +1,4 @@
-// mongo tool tests, very basic to start with
+// merizo tool tests, very basic to start with
 
 baseName = "jstests_tool_tool1";
 dbPath = MongoRunner.dataPath + baseName + "/";
@@ -22,50 +22,50 @@ c = m.getDB(baseName).getCollection(baseName);
 c.save({a: 1});
 assert(c.findOne());
 
-var exitCode = MongoRunner.runMongoTool("mongodump", {
+var exitCode = MongoRunner.runMongoTool("merizodump", {
     host: "127.0.0.1:" + m.port,
     out: externalPath,
 });
-assert.eq(0, exitCode, "mongodump failed to dump data from mongod");
+assert.eq(0, exitCode, "merizodump failed to dump data from merizod");
 
 c.drop();
 
-exitCode = MongoRunner.runMongoTool("mongorestore", {
+exitCode = MongoRunner.runMongoTool("merizorestore", {
     host: "127.0.0.1:" + m.port,
     dir: externalPath,
 });
-assert.eq(0, exitCode, "mongorestore failed to restore data to mongod");
+assert.eq(0, exitCode, "merizorestore failed to restore data to merizod");
 
-assert.soon("c.findOne()", "mongodump then restore has no data w/sleep");
-assert(c.findOne(), "mongodump then restore has no data");
-assert.eq(1, c.findOne().a, "mongodump then restore has no broken data");
+assert.soon("c.findOne()", "merizodump then restore has no data w/sleep");
+assert(c.findOne(), "merizodump then restore has no data");
+assert.eq(1, c.findOne().a, "merizodump then restore has no broken data");
 
 resetDbpath(externalPath);
 
-assert.eq(-1, fileSize(), "mongoexport prep invalid");
+assert.eq(-1, fileSize(), "merizoexport prep invalid");
 
-exitCode = MongoRunner.runMongoTool("mongoexport", {
+exitCode = MongoRunner.runMongoTool("merizoexport", {
     host: "127.0.0.1:" + m.port,
     db: baseName,
     collection: baseName,
     out: externalFile,
 });
 assert.eq(
-    0, exitCode, "mongoexport failed to export collection '" + c.getFullName() + "' from mongod");
+    0, exitCode, "merizoexport failed to export collection '" + c.getFullName() + "' from merizod");
 
 assert.lt(10, fileSize(), "file size changed");
 
 c.drop();
 
-exitCode = MongoRunner.runMongoTool("mongoimport", {
+exitCode = MongoRunner.runMongoTool("merizoimport", {
     host: "127.0.0.1:" + m.port,
     db: baseName,
     collection: baseName,
     file: externalFile,
 });
 assert.eq(
-    0, exitCode, "mongoimport failed to import collection '" + c.getFullName() + "' into mongod");
+    0, exitCode, "merizoimport failed to import collection '" + c.getFullName() + "' into merizod");
 
-assert.soon("c.findOne()", "mongo import json A");
-assert(c.findOne() && 1 == c.findOne().a, "mongo import json B");
+assert.soon("c.findOne()", "merizo import json A");
+assert(c.findOne() && 1 == c.findOne().a, "merizo import json B");
 MongoRunner.stopMongod(m);

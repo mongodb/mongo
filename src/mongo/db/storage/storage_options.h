@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,37 +32,37 @@
 #include <atomic>
 #include <string>
 
-#include "mongo/platform/atomic_proxy.h"
-#include "mongo/platform/atomic_word.h"
+#include "merizo/platform/atomic_proxy.h"
+#include "merizo/platform/atomic_word.h"
 
 /*
  * This file defines the storage for options that come from the command line related to data file
- * persistence.  Many executables that can access data files directly such as mongod and certain
+ * persistence.  Many executables that can access data files directly such as merizod and certain
  * tools use these variables, but each executable may have a different set of command line flags
  * that allow the user to change a different subset of these options.
  */
 
-namespace mongo {
+namespace merizo {
 
 struct StorageGlobalParams {
     StorageGlobalParams();
     void reset();
 
-    // Default data directory for mongod when running in non-config server mode.
+    // Default data directory for merizod when running in non-config server mode.
     static const char* kDefaultDbPath;
 
-    // Default data directory for mongod when running as the config database of
+    // Default data directory for merizod when running as the config database of
     // a sharded cluster.
     static const char* kDefaultConfigDbPath;
 
     // --storageEngine
-    // storage engine for this instance of mongod.
+    // storage engine for this instance of merizod.
     std::string engine;
 
     // True if --storageEngine was passed on the command line, and false otherwise.
     bool engineSetByUser;
 
-    // The directory where the mongod instance stores its data.
+    // The directory where the merizod instance stores its data.
     std::string dbpath;
 
     // --upgrade
@@ -91,7 +91,7 @@ struct StorageGlobalParams {
     bool directoryperdb;
 
     // --syncdelay
-    // Controls how much time can pass before MongoDB flushes data to the data files
+    // Controls how much time can pass before MerizoDB flushes data to the data files
     // via an fsync operation.
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
@@ -105,8 +105,8 @@ struct StorageGlobalParams {
     bool readOnly;
 
     // --groupCollections
-    // Dictate to the storage engine that it should attempt to create new MongoDB collections from
-    // an existing underlying MongoDB database level resource if possible. This can improve
+    // Dictate to the storage engine that it should attempt to create new MerizoDB collections from
+    // an existing underlying MerizoDB database level resource if possible. This can improve
     // workloads that rely heavily on creating many collections within a database.
     bool groupCollections;
 
@@ -116,4 +116,4 @@ struct StorageGlobalParams {
 
 extern StorageGlobalParams storageGlobalParams;
 
-}  // namespace mongo
+}  // namespace merizo

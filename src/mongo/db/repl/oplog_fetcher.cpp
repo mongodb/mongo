@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/oplog_fetcher.h"
+#include "merizo/db/repl/oplog_fetcher.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/stats/timer_stats.h"
-#include "mongo/rpc/metadata/oplog_query_metadata.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/counter.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/stats/timer_stats.h"
+#include "merizo/rpc/metadata/oplog_query_metadata.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
@@ -218,7 +218,7 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
  * no OplogQueryMetadata is provided then it returns boost::none.
  *
  * OplogQueryMetadata is made optional for backwards compatibility.
- * TODO (SERVER-27668): Make this non-optional in mongodb 3.8. When this stops being optional
+ * TODO (SERVER-27668): Make this non-optional in merizodb 3.8. When this stops being optional
  * we can remove the duplicated fields in both metadata types and begin to always use
  * OplogQueryMetadata's data.
  */
@@ -517,4 +517,4 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
                                     _batchSize);
 }
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

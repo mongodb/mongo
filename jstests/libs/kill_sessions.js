@@ -75,7 +75,7 @@ var _kill_sessions_api_module = (function() {
 
     /**
      * We start hanging ops by running the test command sleep with a special number of secs that's
-     * meant to be universal per test run.  In mongos, we multicast it out (to guarantee it's on all
+     * meant to be universal per test run.  In merizos, we multicast it out (to guarantee it's on all
      * of the random accessory nodes).
      */
     Fixture.prototype.startHangingOp = function() {

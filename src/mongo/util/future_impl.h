@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,22 +33,22 @@
 #include <boost/optional.hpp>
 #include <type_traits>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/stdx/utility.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/functional.h"
-#include "mongo/util/interruptible.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/type_traits.h"
+#include "merizo/stdx/utility.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/functional.h"
+#include "merizo/util/interruptible.h"
+#include "merizo/util/intrusive_counter.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 template <typename T>
 class Promise;
@@ -1225,4 +1225,4 @@ template <typename T>
 
 
 }  // namespace future_details
-}  // namespace mongo
+}  // namespace merizo

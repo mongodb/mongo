@@ -184,7 +184,7 @@
 
     const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
     if (!isMongos) {
-        // Skip commands that do not exist on mongos.
+        // Skip commands that do not exist on merizos.
 
         jsTestLog("Check that geoSearch accepts a statement ID");
         assert.writeOK(testColl.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}),

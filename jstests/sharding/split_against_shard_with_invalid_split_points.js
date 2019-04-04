@@ -14,7 +14,7 @@
 
     var chunksBefore = st.s.getDB('config').chunks.find().toArray();
 
-    // Try to do a split with invalid parameters through mongod
+    // Try to do a split with invalid parameters through merizod
     var callSplit = function(db, minKey, maxKey, splitPoints) {
         var res = assert.commandWorked(st.s.adminCommand({getShardVersion: 'TestSplitDB.Coll'}));
         return db.runCommand({

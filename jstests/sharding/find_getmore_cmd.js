@@ -1,5 +1,5 @@
 /**
- * Test issuing raw find and getMore commands to mongos using db.runCommand().
+ * Test issuing raw find and getMore commands to merizos using db.runCommand().
  */
 (function() {
     "use strict";
@@ -39,8 +39,8 @@
     assert.eq(cmdRes.cursor.firstBatch.length, 6);
 
     // Find with batchSize greater than the number of docs residing on each shard. This means that a
-    // getMore is required between mongos and the shell, but no getMores are issued between mongos
-    // and mongod.
+    // getMore is required between merizos and the shell, but no getMores are issued between merizos
+    // and merizod.
     cmdRes = db.runCommand({find: coll.getName(), batchSize: 4});
     assert.commandWorked(cmdRes);
     assert.gt(cmdRes.cursor.id, NumberLong(0));
@@ -53,7 +53,7 @@
     assert.eq(cmdRes.cursor.nextBatch.length, 2);
 
     // Find with batchSize less than the number of docs residing on each shard. This time getMores
-    // will be issued between mongos and mongod.
+    // will be issued between merizos and merizod.
     cmdRes = db.runCommand({find: coll.getName(), batchSize: 2});
     assert.commandWorked(cmdRes);
     assert.gt(cmdRes.cursor.id, NumberLong(0));
@@ -120,7 +120,7 @@
     assert.eq(cmdRes.cursor.firstBatch[4], {_id: -1});
     assert.eq(cmdRes.cursor.firstBatch[5], {_id: 5});
 
-    // Ensure textScore meta-sort works in mongos.
+    // Ensure textScore meta-sort works in merizos.
     cmdRes = db.runCommand({
         find: coll.getName(),
         filter: {$text: {$search: "foo"}},

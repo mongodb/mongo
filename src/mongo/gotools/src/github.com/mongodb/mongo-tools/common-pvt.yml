@@ -7,9 +7,9 @@ command_type: system
 # run the same task in the previous revision if the current task fails
 stepback: true
 
-mongo_tools_variables:
+merizo_tools_variables:
 
-  mongo_tools_task_lists:
+  merizo_tools_task_lists:
 
     atlas_live_test_task_list: &atlas_live_tasks
       - dist
@@ -25,7 +25,7 @@ functions:
     command: shell.exec
     type: test
     params:
-      working_dir: src/github.com/mongodb/mongo-tools
+      working_dir: src/github.com/merizodb/merizo-tools
       script: |
         set -x
         set -v
@@ -55,16 +55,16 @@ functions:
       bucket: mciuploads
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/github.com/mongodb/mongo-tools/bin/${tool}${extension}
-      remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
+      local_file: src/github.com/merizodb/merizo-tools/bin/${tool}${extension}
+      remote_file: merizo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
 
   "upload tool":
     command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/github.com/mongodb/mongo-tools/bin/${tool}
-      remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
+      local_file: src/github.com/merizodb/merizo-tools/bin/${tool}
+      remote_file: merizo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
       bucket: mciuploads
       permissions: public-read
       content_type: application/octet-stream
@@ -77,16 +77,16 @@ functions:
           set -x
           set -v
           set -e
-          mkdir -p src/github.com/mongodb
+          mkdir -p src/github.com/merizodb
     - command: git.get_project
       params:
-        directory: src/github.com/mongodb/mongo-tools
+        directory: src/github.com/merizodb/merizo-tools
     - command: git.apply_patch
       params:
-        directory: src/github.com/mongodb/mongo-tools
+        directory: src/github.com/merizodb/merizo-tools
     - command: shell.exec
       params:
-        working_dir: src/github.com/mongodb/mongo-tools
+        working_dir: src/github.com/merizodb/merizo-tools
         script: |
           set -x
           set -v
@@ -97,13 +97,13 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: src/github.com/mongodb/mongo-tools
+        working_dir: src/github.com/merizodb/merizo-tools
         script: |
           set -x
           set -v
           set -e
-          chmod +x ./bin/mongodump
-          ./bin/mongodump --uri="${uri}" -v
+          chmod +x ./bin/merizodump
+          ./bin/merizodump --uri="${uri}" -v
 
 timeout:
   - command: shell.exec
@@ -115,7 +115,7 @@ timeout:
         # don't attempt to abort on any distro which has a special way of
         # killing everything (i.e. using taskkill on Windows)
         if [ "${killall_mci}" = "" ]; then
-          all_tools="bsondump mongodump mongoexport mongofiles mongoimport mongorestore mongostat mongotop"
+          all_tools="bsondump merizodump merizoexport merizofiles merizoimport merizorestore merizostat merizotop"
           # send SIGABRT to print a stacktrace for any hung tool
           pkill -ABRT "^($(echo -n $all_tools | tr ' ' '|'))\$"
           # git the processes a second or two to dump their stacks
@@ -128,19 +128,19 @@ tasks:
     depends_on:
     commands:
       - func: "fetch source"
-      # mongodump
+      # merizodump
       - func: "build tool"
         vars:
-          tool: mongodump
+          tool: merizodump
       - func: "upload tool"
         vars:
-          tool: mongodump
+          tool: merizodump
 
   - name: test_atlas_free
     commands:
       - func: "fetch tool"
         vars:
-          tool: mongodump
+          tool: merizodump
       - func: test_atlas_dump
         vars:
           uri: '${atlas_free}'
@@ -150,7 +150,7 @@ tasks:
     commands:
       - func: "fetch tool"
         vars:
-          tool: mongodump
+          tool: merizodump
       - func: test_atlas_dump
         vars:
           uri: '${atlas_replica}'
@@ -160,7 +160,7 @@ tasks:
     commands:
       - func: "fetch tool"
         vars:
-          tool: mongodump
+          tool: merizodump
       - func: test_atlas_dump
         vars:
           uri: '${atlas_sharded}'
@@ -170,7 +170,7 @@ tasks:
     commands:
       - func: "fetch tool"
         vars:
-          tool: mongodump
+          tool: merizodump
       - func: test_atlas_dump
         vars:
           uri: '${atlas_tls11}'
@@ -180,7 +180,7 @@ tasks:
     commands:
       - func: "fetch tool"
         vars:
-          tool: mongodump
+          tool: merizodump
       - func: test_atlas_dump
         vars:
           uri: '${atlas_tls12}'

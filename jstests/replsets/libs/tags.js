@@ -1,7 +1,7 @@
 /**
  * Sets up a test for replica set tags sets.
  *
- * https://docs.mongodb.com/v3.0/tutorial/configure-replica-set-tag-sets/
+ * https://docs.merizodb.com/v3.0/tutorial/configure-replica-set-tag-sets/
  */
 var TagsTest = function(options) {
     'use strict';

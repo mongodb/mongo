@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/plan_cache.h"
+#include "merizo/db/query/plan_cache.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -40,22 +40,22 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/base/string_data_comparator_interface.h"
-#include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/base/string_data_comparator_interface.h"
+#include "merizo/db/matcher/expression_array.h"
+#include "merizo/db/matcher/expression_geo.h"
+#include "merizo/db/query/canonical_query_encoder.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/db/query/plan_ranker.h"
+#include "merizo/db/query/planner_ixselect.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_solution.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 // Delimiters for cache key encoding.
@@ -677,4 +677,4 @@ std::vector<BSONObj> PlanCache::getMatchingStats(
     return results;
 }
 
-}  // namespace mongo
+}  // namespace merizo

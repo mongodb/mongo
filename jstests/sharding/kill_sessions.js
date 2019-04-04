@@ -17,7 +17,7 @@ load("jstests/libs/kill_sessions.js");
             other.keyFile = 'jstests/libs/key1';
         }
 
-        var st = new ShardingTest({shards: 2, mongos: 1, config: 1, other: other});
+        var st = new ShardingTest({shards: 2, merizos: 1, config: 1, other: other});
 
         var forExec = st.s0;
 

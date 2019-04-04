@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/exec/subplan.h"
+#include "merizo/db/exec/subplan.h"
 
 #include <memory>
 #include <vector>
 
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/planner_access.h"
-#include "mongo/db/query/planner_analysis.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/stage_builder.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/db/exec/multi_plan.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/query/planner_access.h"
+#include "merizo/db/query/planner_analysis.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/db/query/stage_builder.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 using std::unique_ptr;
@@ -125,7 +125,7 @@ Status SubplanStage::planSubqueries() {
         // Turn the i-th child into its own query.
         auto statusWithCQ = CanonicalQuery::canonicalize(getOpCtx(), *_query, orChild);
         if (!statusWithCQ.isOK()) {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             ss << "Can't canonicalize subchild " << orChild->debugString() << " "
                << statusWithCQ.getStatus().reason();
             return Status(ErrorCodes::BadValue, ss);
@@ -158,7 +158,7 @@ Status SubplanStage::planSubqueries() {
             invariant(branchResult->solutions.empty());
             auto solutions = QueryPlanner::plan(*branchResult->canonicalQuery, _plannerParams);
             if (!solutions.isOK()) {
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
                    << solutions.getStatus().reason();
                 return Status(ErrorCodes::BadValue, ss);
@@ -169,7 +169,7 @@ Status SubplanStage::planSubqueries() {
 
             if (0 == branchResult->solutions.size()) {
                 // If one child doesn't have an indexed solution, bail out.
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "No solutions for subchild " << branchResult->canonicalQuery->toString();
                 return Status(ErrorCodes::BadValue, ss);
             }
@@ -194,13 +194,13 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
     // We want a well-formed *indexed* solution.
     if (NULL == branchCacheData) {
         // For example, we don't cache things for 2d indices.
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "No cache data for subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
 
     if (SolutionCacheData::USE_INDEX_TAGS_SOLN != branchCacheData->solnType) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "No indexed cache data for subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
@@ -210,7 +210,7 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
         QueryPlanner::tagAccordingToCache(orChild, branchCacheData->tree.get(), indexMap);
 
     if (!tagStatus.isOK()) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "Failed to extract indices from subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
@@ -290,7 +290,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             }
 
             if (!multiPlanStage->bestPlanChosen()) {
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "Failed to pick best plan for subchild "
                    << branchResult->canonicalQuery->toString();
                 return Status(ErrorCodes::BadValue, ss);
@@ -301,13 +301,13 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             // Check that we have good cache data. For example, we don't cache things
             // for 2d indices.
             if (NULL == bestSoln->cacheData.get()) {
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "No cache data for subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
 
             if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "No indexed cache data for subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
@@ -317,7 +317,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
                 orChild, bestSoln->cacheData->tree.get(), _indexMap);
 
             if (!tagStatus.isOK()) {
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "Failed to extract indices from subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
@@ -334,7 +334,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         *_query, std::move(_orExpression), _plannerParams.indices, _plannerParams));
 
     if (!solnRoot) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "Failed to build indexed data path for subplanned query\n";
         return Status(ErrorCodes::BadValue, ss);
     }
@@ -346,7 +346,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         QueryPlannerAnalysis::analyzeDataAccess(*_query, _plannerParams, std::move(solnRoot));
 
     if (NULL == _compositeSolution.get()) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "Failed to analyze subplanned query";
         return Status(ErrorCodes::BadValue, ss);
     }
@@ -496,4 +496,4 @@ const SpecificStats* SubplanStage::getSpecificStats() const {
     return NULL;
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -5,7 +5,7 @@
  * This test validates part of SERVER-4243 ticket. Allow reading on secondaries with fsyncLock
  * mode enabled. Previously oplog application would cause blocking.
  * The corresponding commit :
- * https://github.com/mongodb/mongo/commit/73aa870d129bd7d51de946b91c16cc056aaacbc7
+ * https://github.com/merizodb/merizo/commit/73aa870d129bd7d51de946b91c16cc056aaacbc7
  */
 
 /*
@@ -27,7 +27,7 @@
     load("jstests/replsets/rslib.js");
 
     var replTest = new ReplSetTest({name: 'testSet', nodes: 2, oplogSize: 5});
-    // Start each mongod in the replica set. Returns a list of nodes
+    // Start each merizod in the replica set. Returns a list of nodes
     var nodes = replTest.startSet();
     // This will wait for initiation
     replTest.initiate();

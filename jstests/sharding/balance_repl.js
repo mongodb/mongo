@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    // The mongod secondaries are set to priority 0 and votes 0 to prevent the primaries
+    // The merizod secondaries are set to priority 0 and votes 0 to prevent the primaries
     // from stepping down during migrations on slow evergreen builders.
     var s = new ShardingTest({
         shards: 2,

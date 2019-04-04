@@ -1,6 +1,6 @@
 # -*- mode: python; -*-
 
-# This SConscript describes build rules for the "mongo" project.
+# This SConscript describes build rules for the "merizo" project.
 
 import itertools
 import os
@@ -166,7 +166,7 @@ if env.TargetOSIs('windows'):
 module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODULES'] ])
 
 # This generates a numeric representation of the version string so that
-# you can easily compare versions of MongoDB without having to parse
+# you can easily compare versions of MerizoDB without having to parse
 # the version string.
 #
 # The rules for this are
@@ -217,13 +217,13 @@ buildInfoInitializer = '{{ {0} }}'.format(', '.join(buildInfoInitializer))
 generatedVersionFile = env.Substfile(
     'util/version_constants.h.in',
     SUBST_DICT=[
-        ('@mongo_version@', env['MONGO_VERSION']),
-        ('@mongo_version_major@', version_parts[0]),
-        ('@mongo_version_minor@', version_parts[1]),
-        ('@mongo_version_patch@', version_parts[2]),
-        ('@mongo_version_extra@', version_parts[3]),
-        ('@mongo_version_extra_str@', version_extra),
-        ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
+        ('@merizo_version@', env['MONGO_VERSION']),
+        ('@merizo_version_major@', version_parts[0]),
+        ('@merizo_version_minor@', version_parts[1]),
+        ('@merizo_version_patch@', version_parts[2]),
+        ('@merizo_version_extra@', version_parts[3]),
+        ('@merizo_version_extra_str@', version_extra),
+        ('@merizo_git_hash@', env['MONGO_GIT_HASH']),
         ('@buildinfo_js_engine@', js_engine_ver),
         ('@buildinfo_allocator@', env['MONGO_ALLOCATOR']),
         ('@buildinfo_modules@', module_list),
@@ -236,35 +236,35 @@ if env.TargetOSIs('windows'):
     generatedResourceConstantFile = enterpriseEnv.Substfile(
         'util/resource_constants.h.in',
         SUBST_DICT=[
-            ('@mongo_version@', env['MONGO_VERSION']),
-            ('@mongo_version_major@', version_parts[0]),
-            ('@mongo_version_minor@', version_parts[1]),
-            ('@mongo_version_patch@', version_parts[2]),
-            ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
+            ('@merizo_version@', env['MONGO_VERSION']),
+            ('@merizo_version_major@', version_parts[0]),
+            ('@merizo_version_minor@', version_parts[1]),
+            ('@merizo_version_patch@', version_parts[2]),
+            ('@merizo_git_hash@', env['MONGO_GIT_HASH']),
         ])
     env.Alias('generated-sources', generatedResourceConstantFile)
 
 config_header_substs = (
-    ('@mongo_config_altivec_vec_vbpermq_output_index@', 'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
-    ('@mongo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
-    ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
-    ('@mongo_config_have_ssl_set_ecdh_auto@', 'MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
-    ('@mongo_config_have_ssl_ec_key_new@', 'MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
-    ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
-    ('@mongo_config_have_fips_mode_set@', 'MONGO_CONFIG_HAVE_FIPS_MODE_SET'),
-    ('@mongo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
-    ('@mongo_config_have_memset_s@', 'MONGO_CONFIG_HAVE_MEMSET_S'),
-    ('@mongo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
-    ('@mongo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
-    ('@mongo_config_have_std_enable_if_t@', 'MONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
-    ('@mongo_config_have_std_make_unique@', 'MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
-    ('@mongo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
-    ('@mongo_config_max_extended_alignment@', 'MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
-    ('@mongo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
-    ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
-    ('@mongo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
-    ('@mongo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
-    ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
+    ('@merizo_config_altivec_vec_vbpermq_output_index@', 'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
+    ('@merizo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
+    ('@merizo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
+    ('@merizo_config_have_ssl_set_ecdh_auto@', 'MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
+    ('@merizo_config_have_ssl_ec_key_new@', 'MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
+    ('@merizo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
+    ('@merizo_config_have_fips_mode_set@', 'MONGO_CONFIG_HAVE_FIPS_MODE_SET'),
+    ('@merizo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
+    ('@merizo_config_have_memset_s@', 'MONGO_CONFIG_HAVE_MEMSET_S'),
+    ('@merizo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
+    ('@merizo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
+    ('@merizo_config_have_std_enable_if_t@', 'MONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
+    ('@merizo_config_have_std_make_unique@', 'MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
+    ('@merizo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
+    ('@merizo_config_max_extended_alignment@', 'MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
+    ('@merizo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
+    ('@merizo_config_ssl@', 'MONGO_CONFIG_SSL'),
+    ('@merizo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
+    ('@merizo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
+    ('@merizo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
 )
 
 def makeConfigHeaderDefine(self, key):
@@ -281,16 +281,16 @@ generateConfigHeaderFile = env.Substfile(
 env.Alias('generated-sources', generateConfigHeaderFile)
 
 env.Library(
-    target="mongod_options_init",
+    target="merizod_options_init",
     source=[
-        "db/mongod_options_init.cpp",
+        "db/merizod_options_init.cpp",
     ],
     LIBDEPS=[
         'base',
     ],
     LIBDEPS_PRIVATE=[
-        'db/mongod_options',
-        '$BUILD_DIR/mongo/util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
+        'db/merizod_options',
+        '$BUILD_DIR/merizo/util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
     ]
 )
 
@@ -298,18 +298,18 @@ if env.TargetOSIs('windows'):
     generatedDbManifest = env.Substfile(
         'db/db.manifest.in',
         SUBST_DICT=[
-            ('@mongo_version_major@', version_parts[0]),
-            ('@mongo_version_minor@', version_parts[1]),
-            ('@mongo_version_patch@', version_parts[2]),
-            ('@mongo_version_extra@', version_parts[3]),
-            ('@mongo_version_extra_str@', version_extra),
+            ('@merizo_version_major@', version_parts[0]),
+            ('@merizo_version_minor@', version_parts[1]),
+            ('@merizo_version_patch@', version_parts[2]),
+            ('@merizo_version_extra@', version_parts[3]),
+            ('@merizo_version_extra_str@', version_extra),
         ])
 
     env.Alias('generated-sources', generatedDbManifest)
     env.Depends("db/db.res", generatedDbManifest)
 
-mongod = env.Program(
-    target="mongod",
+merizod = env.Program(
+    target="merizod",
     source=[
         "db/db.cpp",
     ] + env.WindowsResourceFile("db/db.rc"),
@@ -317,7 +317,7 @@ mongod = env.Program(
         '$BUILD_DIR/third_party/shim_snappy',
         'base',
         'db/auth/auth_op_observer',
-        'db/auth/authmongod',
+        'db/auth/authmerizod',
         'db/background',
         'db/bson/dotted_path_support',
         'db/catalog/catalog_impl',
@@ -327,8 +327,8 @@ mongod = env.Program(
         'db/catalog/index_key_validate',
         'db/cloner',
         'db/collection_index_usage_tracker',
-        'db/commands/mongod',
-        'db/commands/mongod_fcv',
+        'db/commands/merizod',
+        'db/commands/merizod_fcv',
         'db/commands/server_status_servers',
         'db/common',
         'db/concurrency/lock_manager',
@@ -339,26 +339,26 @@ mongod = env.Program(
         'db/dbdirectclient',
         'db/dbhelpers',
         'db/exec/working_set',
-        'db/free_mon/free_mon_mongod',
-        'db/ftdc/ftdc_mongod',
-        'db/fts/ftsmongod',
+        'db/free_mon/free_mon_merizod',
+        'db/ftdc/ftdc_merizod',
+        'db/fts/ftsmerizod',
         'db/index/index_access_method',
         'db/index/index_descriptor',
-        'db/index_builds_coordinator_mongod',
+        'db/index_builds_coordinator_merizod',
         'db/initialize_snmp',
         'db/introspect',
         'db/keys_collection_client_direct',
         'db/kill_sessions_local',
-        'db/logical_session_cache_factory_mongod',
+        'db/logical_session_cache_factory_merizod',
         'db/logical_time_metadata_hook',
-        'db/matcher/expressions_mongod_only',
-        'db/mongod_options',
-        'db/mongodandmongos',
+        'db/matcher/expressions_merizod_only',
+        'db/merizod_options',
+        'db/merizodandmerizos',
         'db/ops/write_ops_parsers',
         'db/periodic_runner_job_abort_expired_transactions',
         'db/periodic_runner_job_decrease_snapshot_cache_pressure',
         'db/pipeline/aggregation',
-        'db/pipeline/process_interface_factory_mongod',
+        'db/pipeline/process_interface_factory_merizod',
         'db/query_exec',
         'db/read_concern_d_impl',
         'db/repair_database_and_check_version',
@@ -383,7 +383,7 @@ mongod = env.Program(
         'db/s/op_observer_sharding_impl',
         'db/s/sharding_runtime_d',
         'db/service_context_d',
-        'db/startup_warnings_mongod',
+        'db/startup_warnings_merizod',
         'db/stats/counters',
         'db/stats/serveronly_stats',
         'db/stats/top',
@@ -403,10 +403,10 @@ mongod = env.Program(
         'db/ttl_d',
         'db/update/update_driver',
         'db/update_index_data',
-        'db/views/views_mongod',
+        'db/views/views_merizod',
         'db/windows_options' if env.TargetOSIs('windows') else [],
         'executor/network_interface_factory',
-        'mongod_options_init',
+        'merizod_options_init',
         'rpc/rpc',
         's/catalog/sharding_catalog_client_impl',
         's/commands/shared_cluster_commands',
@@ -433,30 +433,30 @@ mongod = env.Program(
 hygienic = get_option('install-mode') == 'hygienic'
 
 if hygienic:
-    env.Default('$INSTALL_DIR/bin/mongod$PROGSUFFIX')
+    env.Default('$INSTALL_DIR/bin/merizod$PROGSUFFIX')
 else:
-    env.Default(env.Install('#/', mongod))
+    env.Default(env.Install('#/', merizod))
 
 # tools
-rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles" ]
+rewrittenTools = [ "merizodump", "merizorestore", "merizoexport", "merizoimport", "merizostat", "merizotop", "bsondump", "merizofiles" ]
 
 if env.TargetOSIs('windows'):
     generatedServerManifest = env.Substfile(
         's/server.manifest.in',
         SUBST_DICT=[
-            ('@mongo_version_major@', version_parts[0]),
-            ('@mongo_version_minor@', version_parts[1]),
-            ('@mongo_version_patch@', version_parts[2]),
-            ('@mongo_version_extra@', version_parts[3]),
-            ('@mongo_version_extra_str@', version_extra),
+            ('@merizo_version_major@', version_parts[0]),
+            ('@merizo_version_minor@', version_parts[1]),
+            ('@merizo_version_patch@', version_parts[2]),
+            ('@merizo_version_extra@', version_parts[3]),
+            ('@merizo_version_extra_str@', version_extra),
         ])
 
     env.Alias('generated-sources', generatedServerManifest)
     env.Depends("s/server.res", generatedServerManifest)
 
 
-mongotrafficreader = env.Program(
-    target="mongotrafficreader",
+merizotrafficreader = env.Program(
+    target="merizotrafficreader",
     source=[
         "db/traffic_reader_main.cpp"
     ],
@@ -469,32 +469,32 @@ mongotrafficreader = env.Program(
 )
 
 if not hygienic:
-    env.Install('#/', mongotrafficreader)
+    env.Install('#/', merizotrafficreader)
 
-# mongos
-mongos = env.Program(
-    target='mongos',
+# merizos
+merizos = env.Program(
+    target='merizos',
     source=[
         's/cluster_cursor_stats.cpp',
-        's/mongos_options.cpp',
-        's/mongos_options_init.cpp',
-        env.Idlc('s/mongos_options.idl')[0],
+        's/merizos_options.cpp',
+        's/merizos_options_init.cpp',
+        env.Idlc('s/merizos_options.idl')[0],
         's/s_sharding_server_status.cpp',
         's/server.cpp',
-        's/service_entry_point_mongos.cpp',
+        's/service_entry_point_merizos.cpp',
         's/sharding_uptime_reporter.cpp',
-        's/version_mongos.cpp',
+        's/version_merizos.cpp',
     ] + env.WindowsResourceFile("s/server.rc"),
     LIBDEPS=[
         'db/audit',
-        'db/auth/authmongos',
+        'db/auth/authmerizos',
         'db/commands/server_status',
         'db/commands/server_status_core',
         'db/commands/server_status_servers',
         'db/curop',
-        'db/ftdc/ftdc_mongos',
+        'db/ftdc/ftdc_merizos',
         'db/logical_time_metadata_hook',
-        'db/mongodandmongos',
+        'db/merizodandmerizos',
         'db/server_options',
         'db/server_options_base',
         'db/startup_warnings_common',
@@ -504,8 +504,8 @@ mongos = env.Program(
         's/commands/shared_cluster_commands',
         's/committed_optime_metadata_hook',
         's/coreshard',
-        's/is_mongos',
-        's/sharding_egress_metadata_hook_for_mongos',
+        's/is_merizos',
+        's/sharding_egress_metadata_hook_for_merizos',
         's/sharding_initialization',
         's/sharding_router_api',
         's/query/cluster_cursor_cleanup_job',
@@ -528,7 +528,7 @@ mongos = env.Program(
 )
 
 if not hygienic:
-    env.Install('#/', mongos)
+    env.Install('#/', merizos)
 
 env.Library("linenoise_utf8",
     source=[
@@ -545,7 +545,7 @@ if not has_option('noshell') and usemozjs:
                 source=[
                     "shell/linenoise.cpp",
                     "shell/mk_wcwidth.cpp",
-                    "shell/mongo-server.cpp",
+                    "shell/merizo-server.cpp",
                     "shell/shell_options.cpp",
                     "shell/shell_utils.cpp",
                     "shell/shell_utils_extended.cpp",
@@ -555,7 +555,7 @@ if not has_option('noshell') and usemozjs:
                     'client/clientdriver_network',
                     'db/catalog/index_key_validate',
                     'db/logical_session_id_helpers',
-                    'db/mongohasher',
+                    'db/merizohasher',
                     'db/query/command_request_response',
                     'db/query/query_request',
                     'db/server_options_core',
@@ -564,7 +564,7 @@ if not has_option('noshell') and usemozjs:
                     'rpc/protocol',
                     'scripting/scripting',
                     'shell/benchrun',
-                    'shell/mongojs',
+                    'shell/merizojs',
                     'shell/shell_options_storage',
                     'transport/message_compressor',
                     'transport/transport_layer_manager',
@@ -592,20 +592,20 @@ if not has_option('noshell') and usemozjs:
         generatedMongoManifest = shellEnv.Substfile(
                 'shell/shell.manifest.in',
                 SUBST_DICT=[
-                    ('@mongo_version_major@', version_parts[0]),
-                    ('@mongo_version_minor@', version_parts[1]),
-                    ('@mongo_version_patch@', version_parts[2]),
-                    ('@mongo_version_extra@', version_parts[3]),
-                    ('@mongo_version_extra_str@', version_extra),
+                    ('@merizo_version_major@', version_parts[0]),
+                    ('@merizo_version_minor@', version_parts[1]),
+                    ('@merizo_version_patch@', version_parts[2]),
+                    ('@merizo_version_extra@', version_parts[3]),
+                    ('@merizo_version_extra_str@', version_extra),
                 ])
         shellEnv.Alias('generated-sources', generatedMongoManifest)
         shellEnv.Depends("shell/shell.res", generatedMongoManifest)
 
-    mongo_shell = shellEnv.Program(
-        "mongo",
+    merizo_shell = shellEnv.Program(
+        "merizo",
         [
             "shell/dbshell.cpp",
-            "shell/mongodbcr.cpp",
+            "shell/merizodbcr.cpp",
             "shell/shell_options_init.cpp",
         ] + env.WindowsResourceFile("shell/shell.rc"),
         LIBDEPS=[
@@ -613,15 +613,15 @@ if not has_option('noshell') and usemozjs:
             "shell_core",
             "db/server_options_core",
             "client/clientdriver_network",
-            "$BUILD_DIR/mongo/util/password",
-            '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
-            "$BUILD_DIR/mongo/db/views/resolved_view",
+            "$BUILD_DIR/merizo/util/password",
+            '$BUILD_DIR/merizo/db/storage/duplicate_key_error_info',
+            "$BUILD_DIR/merizo/db/views/resolved_view",
         ],
         LIBDEPS_PRIVATE=[
             'shell/shell_options_register',
             'transport/message_compressor_options_client',
-            "$BUILD_DIR/mongo/client/connection_string",
-            '$BUILD_DIR/mongo/util/net/ssl_options_client' if get_option('ssl') == 'on' else '',
+            "$BUILD_DIR/merizo/client/connection_string",
+            '$BUILD_DIR/merizo/util/net/ssl_options_client' if get_option('ssl') == 'on' else '',
         ],
         INSTALL_ALIAS=[
             'shell',
@@ -630,7 +630,7 @@ if not has_option('noshell') and usemozjs:
     )
 
     if not hygienic:
-        shellEnv.Install( '#/', mongo_shell )
+        shellEnv.Install( '#/', merizo_shell )
 else:
     shellEnv = None
 
@@ -718,31 +718,31 @@ def installExternalBinary( e, name_str ):
 # It is required for "dist" but optional for "install"
 if has_option("use-new-tools"):
 
-    env.Append(MODULE_BANNERS=[env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools')])
+    env.Append(MODULE_BANNERS=[env.File('#/src/merizo-tools/distsrc/THIRD-PARTY-NOTICES.gotools')])
 
-    toolsRoot = "src/mongo-tools"
+    toolsRoot = "src/merizo-tools"
 
     for t in rewrittenTools:
         installExternalBinary(env, "%s/%s" % (toolsRoot, t))
-    if has_option("build-mongoreplay") and get_option("build-mongoreplay") == "true":
-        installExternalBinary(env, "%s/%s" % (toolsRoot, "mongoreplay"))
+    if has_option("build-merizoreplay") and get_option("build-merizoreplay") == "true":
+        installExternalBinary(env, "%s/%s" % (toolsRoot, "merizoreplay"))
 
 # legacy tools
 if not hygienic:
-    env.Alias("tools", "#/" + add_exe("mongobridge"))
+    env.Alias("tools", "#/" + add_exe("merizobridge"))
 
-installBinary( env, "mongod" )
-installBinary( env, "mongos" )
+installBinary( env, "merizod" )
+installBinary( env, "merizos" )
 
 if shellEnv is not None:
-    installBinary( shellEnv, "mongo" )
+    installBinary( shellEnv, "merizo" )
     if not hygienic:
-        env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ) ] ] )
+        env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "merizo" ) ] ] )
 
 if not hygienic:
-    env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongod" ), add_exe( "mongos" ) ] ] )
+    env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "merizod" ), add_exe( "merizos" ) ] ] )
 
-# Stage the top-level mongodb banners
+# Stage the top-level merizodb banners
 distsrc = env.Dir('#distsrc')
 env.Append(MODULE_BANNERS = [distsrc.File('README'),
                              distsrc.File('THIRD-PARTY-NOTICES'),
@@ -767,7 +767,7 @@ module_banner_dirs = set([Dir('#').rel_path(f.get_dir()) for f in env['MODULE_BA
 module_banner_transforms = ["--transform %s=$SERVER_DIST_BASENAME" % d for d in module_banner_dirs]
 
 # Allow modules to map original file name directories to subdirectories
-# within the archive (e.g. { "src/mongo/db/modules/enterprise/docs": "snmp"})
+# within the archive (e.g. { "src/merizo/db/modules/enterprise/docs": "snmp"})
 archive_addition_transforms = []
 for full_dir, archive_dir in env["ARCHIVE_ADDITION_DIR_MAP"].items():
   archive_addition_transforms.append("--transform \"%s=$SERVER_DIST_BASENAME/%s\"" %
@@ -790,7 +790,7 @@ compass_python_interpreter = '/usr/bin/env python2'
 if env.TargetOSIs('darwin'):
     compass_python_interpreter = '/usr/bin/env python'
 
-compass_installer = env.Substfile('#/src/mongo/installer/compass/' + compass_script,
+compass_installer = env.Substfile('#/src/merizo/installer/compass/' + compass_script,
                                   SUBST_DICT=[
                                       ('@compass_type@', compass_type),
                                       ('@python_interpreter@', compass_python_interpreter),
@@ -825,13 +825,13 @@ if has_option("use-new-tools"):
             archive_addition_transforms +
             module_banner_transforms +
             [
-                '--transform $BUILD_DIR/mongo/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
-                '--transform $BUILD_DIR/mongo/stripped/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
-                '--transform $BUILD_DIR/mongo/stripped=$SERVER_DIST_BASENAME/bin',
-                '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME/bin',
-                '--transform $BUILD_DIR/mongo/stripped/src/mongo-tools=$SERVER_DIST_BASENAME/bin',
-                '--transform src/mongo-tools=$SERVER_DIST_BASENAME/bin',
-                '--transform src/mongo/installer/compass=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/merizo/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/merizo/stripped/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/merizo/stripped=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/merizo=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/merizo/stripped/src/merizo-tools=$SERVER_DIST_BASENAME/bin',
+                '--transform src/merizo-tools=$SERVER_DIST_BASENAME/bin',
+                '--transform src/merizo/installer/compass=$SERVER_DIST_BASENAME/bin',
                 '${TEMPFILE(SOURCES[1:])}'
             ],
         ),
@@ -852,8 +852,8 @@ debug_symbols_dist = env.Command(
     action=' '.join(
         [
             '$PYTHON ${SOURCES[0]} -o $TARGET',
-            '--transform $BUILD_DIR/mongo/db/modules/enterprise=$SERVER_DIST_BASENAME',
-            '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME',
+            '--transform $BUILD_DIR/merizo/db/modules/enterprise=$SERVER_DIST_BASENAME',
+            '--transform $BUILD_DIR/merizo=$SERVER_DIST_BASENAME',
             '${TEMPFILE(SOURCES[1:])}',
         ]
     ),

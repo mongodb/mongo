@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <cmath>
 #include <cstdint>
 #include <limits>
 
-#include "mongo/base/parse_number.h"
-#include "mongo/base/status.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"  // for str::stream()!
+#include "merizo/base/parse_number.h"
+#include "merizo/base/status.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/merizoutils/str.h"  // for str::stream()!
 
 #define ASSERT_PARSES(TYPE, INPUT_STRING, EXPECTED_VALUE)    \
     do {                                                     \
@@ -52,7 +52,7 @@
         ASSERT_EQUALS(static_cast<TYPE>(EXPECTED_VALUE), v);              \
     } while (false)
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 template <typename _NumberType>
@@ -147,7 +147,7 @@ public:
     }
 
     static void TestParsingLimits() {
-        using namespace mongoutils;
+        using namespace merizoutils;
         NumberType ignored;
         ASSERT_PARSES(NumberType, std::string(str::stream() << Limits::max()), Limits::max());
         ASSERT_PARSES(NumberType, std::string(str::stream() << Limits::min()), Limits::min());
@@ -226,7 +226,7 @@ TEST(ParseNumber, Int8) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("900", &ignored));
 
     for (int32_t i = -128; i <= 127; ++i)
-        ASSERT_PARSES(int8_t, std::string(mongoutils::str::stream() << i), i);
+        ASSERT_PARSES(int8_t, std::string(merizoutils::str::stream() << i), i);
 }
 
 TEST(ParseNumber, UInt8) {
@@ -238,7 +238,7 @@ TEST(ParseNumber, UInt8) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("+900", &ignored));
 
     for (uint32_t i = 0; i <= 255; ++i)
-        ASSERT_PARSES(uint8_t, std::string(mongoutils::str::stream() << i), i);
+        ASSERT_PARSES(uint8_t, std::string(merizoutils::str::stream() << i), i);
 }
 
 TEST(ParseNumber, TestParsingOverflow) {
@@ -345,4 +345,4 @@ TEST(Double, TestParsingNormal) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

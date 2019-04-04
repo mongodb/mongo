@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,15 +32,15 @@
 #include <boost/optional.hpp>
 #include <vector>
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/exchange_spec_gen.h"
-#include "mongo/db/pipeline/runtime_constants_gen.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/db/write_concern_options.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/exchange_spec_gen.h"
+#include "merizo/db/pipeline/runtime_constants_gen.h"
+#include "merizo/db/query/explain_options.h"
+#include "merizo/db/write_concern_options.h"
 
-namespace mongo {
+namespace merizo {
 
 template <typename T>
 class StatusWith;
@@ -141,7 +141,7 @@ public:
     }
 
     /**
-     * Returns true if this request originated from a mongoS.
+     * Returns true if this request originated from a merizoS.
      */
     bool isFromMongos() const {
         return _fromMongos;
@@ -156,15 +156,15 @@ public:
     }
 
     /**
-     * Returns true if this request is a change stream pipeline which originated from a mongoS that
+     * Returns true if this request is a change stream pipeline which originated from a merizoS that
      * can merge based on the documents' raw resume tokens and the 'postBatchResumeToken' field. If
-     * not, then the mongoD will need to produce the old {ts, uuid, docKey} $sortKey format instead.
+     * not, then the merizoD will need to produce the old {ts, uuid, docKey} $sortKey format instead.
      * TODO SERVER-38539: this flag is no longer necessary in 4.4, since all change streams will be
      * merged using raw resume tokens and PBRTs. This mechanism was chosen over FCV for two reasons:
      * first, because this code is intended for backport to 4.0, where the same issue exists but FCV
-     * cannot be leveraged. Secondly, FCV can be changed at any point during runtime, but mongoS
+     * cannot be leveraged. Secondly, FCV can be changed at any point during runtime, but merizoS
      * cannot dynamically switch from one $sortKey format to another mid-stream. The 'mergeByPBRT'
-     * flag allows the mongoS to dictate which $sortKey format will be used, and it will stay
+     * flag allows the merizoS to dictate which $sortKey format will be used, and it will stay
      * consistent for the entire duration of the stream.
      */
     bool mergeByPBRT() const {
@@ -319,9 +319,9 @@ private:
 
     BSONObj _readConcern;
 
-    // The unwrapped readPreference object, if one was given to us by the mongos command processor.
+    // The unwrapped readPreference object, if one was given to us by the merizos command processor.
     // This object will be empty when no readPreference is specified or if the request does not
-    // originate from mongos.
+    // originate from merizos.
     BSONObj _unwrappedReadPref;
 
     // The explain mode to use, or boost::none if this is not a request for an aggregation explain.
@@ -348,4 +348,4 @@ private:
     // $$NOW).
     boost::optional<RuntimeConstants> _runtimeConstants;
 };
-}  // namespace mongo
+}  // namespace merizo

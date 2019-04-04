@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/update_driver.h"
+#include "merizo/db/update/update_driver.h"
 
 
 #include <map>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/json.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/update_index_data.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonelement_comparator.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/mutable_bson_test_utils.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/json.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/db/query/query_test_service_context.h"
+#include "merizo/db/update_index_data.h"
+#include "merizo/unittest/unittest.h"
 
 #define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
     try {                                                                          \
         EXPRESSION;                                                                \
     } catch (const AssertionException& e) {                                        \
-        ::mongoutils::str::stream err;                                             \
+        ::merizoutils::str::stream err;                                             \
         err << "Threw an exception incorrectly: " << e.toString();                 \
-        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
+        ::merizo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
     }
 
-namespace mongo {
+namespace merizo {
 namespace {
 
-using mongoutils::str::stream;
+using merizoutils::str::stream;
 using unittest::assertGet;
 
 TEST(Parse, Normal) {
@@ -172,7 +172,7 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
 // NONGOAL: Testing all query parsing and nesting combinations
 //
 
-class CreateFromQueryFixture : public mongo::unittest::Test {
+class CreateFromQueryFixture : public merizo::unittest::Test {
 public:
     CreateFromQueryFixture()
         : _opCtx(_serviceContext.makeOperationContext()),
@@ -221,7 +221,7 @@ static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
                                  &SimpleStringDataComparator::kInstance);
     if (elA.type() != elB.type() || (!elA.isABSONObj() && eltCmp.evaluate(elA != elB))) {
         FAIL(stream() << "element " << elA << " not equal to " << elB);
-    } else if (elA.type() == mongo::Array) {
+    } else if (elA.type() == merizo::Array) {
         std::vector<BSONElement> elsA = elA.Array();
         std::vector<BSONElement> elsB = elB.Array();
         if (elsA.size() != elsB.size())
@@ -232,7 +232,7 @@ static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
         for (; arrItA != elsA.end(); ++arrItA, ++arrItB) {
             assertSameElements(*arrItA, *arrItB);
         }
-    } else if (elA.type() == mongo::Object) {
+    } else if (elA.type() == merizo::Object) {
         assertSameFields(elA.Obj(), elB.Obj());
     }
 }
@@ -529,7 +529,7 @@ TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
         driverRepl().populateDocumentWithQueryFields(opCtx(), query, immutablePaths, doc()));
 }
 
-class ModifiedPathsTestFixture : public mongo::unittest::Test {
+class ModifiedPathsTestFixture : public merizo::unittest::Test {
 public:
     std::string getModifiedPaths(mutablebson::Document* doc,
                                  BSONObj updateSpec,
@@ -629,4 +629,4 @@ TEST_F(ModifiedPathsTestFixture, ArrayFilterThatMatchesNoElements) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

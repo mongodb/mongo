@@ -155,18 +155,18 @@ class Process(object):
         """Terminate the process."""
         if sys.platform == "win32":
 
-            # Attempt to cleanly shutdown mongod.
-            if not kill and self.args and self.args[0].find("mongod") != -1:
-                mongo_signal_handle = None
+            # Attempt to cleanly shutdown merizod.
+            if not kill and self.args and self.args[0].find("merizod") != -1:
+                merizo_signal_handle = None
                 try:
-                    mongo_signal_handle = win32event.OpenEvent(
+                    merizo_signal_handle = win32event.OpenEvent(
                         win32event.EVENT_MODIFY_STATE, False,
                         "Global\\Mongo_" + str(self._process.pid))
 
-                    if not mongo_signal_handle:
+                    if not merizo_signal_handle:
                         # The process has already died.
                         return
-                    win32event.SetEvent(mongo_signal_handle)
+                    win32event.SetEvent(merizo_signal_handle)
                     # Wait 60 seconds for the program to exit.
                     status = win32event.WaitForSingleObject(self._process._handle, 60 * 1000)
                     if status == win32event.WAIT_OBJECT_0:
@@ -180,7 +180,7 @@ class Process(object):
                     if err[0] not in (2, 5, 6):
                         raise
                 finally:
-                    win32api.CloseHandle(mongo_signal_handle)
+                    win32api.CloseHandle(merizo_signal_handle)
 
                 print "Failed to cleanly exit the program, calling TerminateProcess() on PID: " +\
                     str(self._process.pid)

@@ -40,7 +40,7 @@ assert.eq(r(xs), t.find().sort({x: 1}).returnKey().toArray());
 if (FixtureHelpers.numberOfShardsForCollection(t) === 1) {
     // With only one shard we can reliably assert on the order of results with a hint, since they
     // will come straight off the index. However, without a sort specified, we cannot make this
-    // assertion when there are multiple shards, since mongos can merge results from each shard in
+    // assertion when there are multiple shards, since merizos can merge results from each shard in
     // whatever order it likes.
     assert.eq(r(xs), t.find().hint({x: 1}).returnKey().toArray());
     assert.commandWorked(t.createIndex({_id: 1, x: 1}));

@@ -2,12 +2,12 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 2});
+    var st = new ShardingTest({shards: 2, merizos: 2});
 
     assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
     st.ensurePrimaryShard('test', st.shard1.shardName);
 
-    // "test.foo" - sharded (by mongos 0)
+    // "test.foo" - sharded (by merizos 0)
     assert.commandWorked(st.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 
     // "test.existing" - unsharded
@@ -15,7 +15,7 @@
     assert.eq(1, st.s0.getDB('test').existing.count({_id: 1}));
     assert.eq(1, st.s1.getDB('test').existing.count({_id: 1}));
 
-    // "test.existing" - unsharded to sharded (by mongos 1)
+    // "test.existing" - unsharded to sharded (by merizos 1)
     assert.commandWorked(st.s1.adminCommand({shardcollection: "test.existing", key: {_id: 1}}));
     assert.commandWorked(st.s1.adminCommand({split: "test.existing", middle: {_id: 5}}));
     assert.commandWorked(

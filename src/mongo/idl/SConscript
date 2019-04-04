@@ -9,8 +9,8 @@ env.Library(
         'idl_parser.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/command_generic_argument',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/command_generic_argument',
     ]
 )
 
@@ -22,9 +22,9 @@ env.CppUnitTest(
         env.Idlc('unittest.idl')[0],
 	],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ],
 )
 
@@ -35,10 +35,10 @@ env.Library(
         'server_parameter_with_storage.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ],
 )
 
@@ -64,8 +64,8 @@ env.CppUnitTest(
         env.Idlc('config_option_test.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/cmdline_utils/cmdline_utils',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ],
 )

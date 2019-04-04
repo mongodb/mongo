@@ -7,16 +7,16 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 // TODO: SERVER-33597 remove shardAsReplicaSet: false
 var st = new ShardingTest(
-    {shards: 3, mongos: 1, other: {mongosOptions: {verbose: 2}, shardAsReplicaSet: false}});
+    {shards: 3, merizos: 1, other: {merizosOptions: {verbose: 2}, shardAsReplicaSet: false}});
 
 // Stop balancer, we're doing our own manual chunk distribution
 st.stopBalancer();
 
-var mongos = st.s;
-var admin = mongos.getDB("admin");
+var merizos = st.s;
+var admin = merizos.getDB("admin");
 
-var collOneShard = mongos.getCollection("foo.collOneShard");
-var collAllShards = mongos.getCollection("foo.collAllShards");
+var collOneShard = merizos.getCollection("foo.collOneShard");
+var collAllShards = merizos.getCollection("foo.collAllShards");
 
 printjson(admin.runCommand({enableSharding: collOneShard.getDB() + ""}));
 printjson(admin.runCommand({movePrimary: collOneShard.getDB() + "", to: st.shard0.shardName}));

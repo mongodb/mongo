@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,24 +33,24 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/catalog/index_builds_manager.h"
-#include "mongo/db/collection_index_builds_tracker.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/database_index_builds_tracker.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl_index_build_state.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/future.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/uuid.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/commit_quorum_options.h"
+#include "merizo/db/catalog/index_builds_manager.h"
+#include "merizo/db/collection_index_builds_tracker.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/database_index_builds_tracker.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repl_index_build_state.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/concurrency/with_lock.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/future.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 class ServiceContext;
@@ -522,4 +522,4 @@ MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildSecondDrain);
 MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildDumpsInsertsFromBulk);
 
-}  // namespace mongo
+}  // namespace merizo

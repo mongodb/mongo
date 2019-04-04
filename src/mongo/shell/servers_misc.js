@@ -18,7 +18,7 @@ ToolTest.prototype.startDB = function(coll) {
 
     Object.extend(options, this.options);
 
-    this.m = startMongoProgram.apply(null, MongoRunner.arrOptions("mongod", options));
+    this.m = startMongoProgram.apply(null, MongoRunner.arrOptions("merizod", options));
     this.db = this.m.getDB(this.baseName);
     if (coll)
         return this.db.getCollection(coll);
@@ -36,7 +36,7 @@ ToolTest.prototype.stop = function() {
 };
 
 ToolTest.prototype.runTool = function() {
-    var a = ["mongo" + arguments[0]];
+    var a = ["merizo" + arguments[0]];
 
     var hasdbpath = false;
     var hasDialTimeout = false;
@@ -63,7 +63,7 @@ ToolTest.prototype.runTool = function() {
 };
 
 /**
- * Returns a port number that has not been given out to any other caller from the same mongo shell.
+ * Returns a port number that has not been given out to any other caller from the same merizo shell.
  */
 var allocatePort;
 
@@ -71,8 +71,8 @@ var allocatePort;
  * Resets the range of ports which have already been given out to callers of allocatePort().
  *
  * This function can be used to allow a test to allocate a large number of ports as part of starting
- * many MongoDB deployments without worrying about hitting the configured maximum. Callers of this
- * function should take care to ensure MongoDB deployments started earlier have been terminated and
+ * many MerizoDB deployments without worrying about hitting the configured maximum. Callers of this
+ * function should take care to ensure MerizoDB deployments started earlier have been terminated and
  * won't be reused.
  */
 var resetAllocatedPorts;
@@ -104,7 +104,7 @@ var resetAllocatedPorts;
 
 /**
  * Returns a list of 'numPorts' port numbers that have not been given out to any other caller from
- * the same mongo shell.
+ * the same merizo shell.
  */
 allocatePorts = function(numPorts) {
     var ports = [];
@@ -116,7 +116,7 @@ allocatePorts = function(numPorts) {
 };
 
 function startParallelShell(jsCode, port, noConnect) {
-    var shellPath = MongoRunner.mongoShellPath;
+    var shellPath = MongoRunner.merizoShellPath;
     var args = [shellPath];
 
     if (typeof db == "object") {

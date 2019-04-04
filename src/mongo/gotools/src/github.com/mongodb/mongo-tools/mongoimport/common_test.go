@@ -1,20 +1,20 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoimport
+package merizoimport
 
 import (
 	"fmt"
 	"io"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/tomb.v2"
@@ -346,12 +346,12 @@ func TestTokensToBSON(t *testing.T) {
 				{"b", new(FieldAutoParser), pgAutoCast, "auto"},
 				{"c", new(FieldAutoParser), pgAutoCast, "auto"},
 			}
-			tokens := []string{"1", "2", "hello", "mongodb", "user"}
+			tokens := []string{"1", "2", "hello", "merizodb", "user"}
 			expectedDocument := bson.D{
 				{"a", int32(1)},
 				{"b", int32(2)},
 				{"c", "hello"},
-				{"field3", "mongodb"},
+				{"field3", "merizodb"},
 				{"field4", "user"},
 			}
 			bsonD, err := tokensToBSON(colSpecs, tokens, uint64(0), false)
@@ -364,7 +364,7 @@ func TestTokensToBSON(t *testing.T) {
 				{"b", new(FieldAutoParser), pgAutoCast, "auto"},
 				{"field3", new(FieldAutoParser), pgAutoCast, "auto"},
 			}
-			tokens := []string{"1", "2", "hello", "mongodb", "user"}
+			tokens := []string{"1", "2", "hello", "merizodb", "user"}
 			_, err := tokensToBSON(colSpecs, tokens, uint64(0), false)
 			So(err, ShouldNotBeNil)
 		})

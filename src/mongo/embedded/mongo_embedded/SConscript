@@ -10,7 +10,7 @@ env = env.Clone()
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'share/doc/mongo_embedded',
+        'share/doc/merizo_embedded',
         source=[
             '#/LICENSE-Community.txt',
             '#/distsrc/THIRD-PARTY-NOTICES',
@@ -21,32 +21,32 @@ if get_option('install-mode') == 'hygienic':
         ],
     )
 
-mongoEmbeddedEnv = env.Clone()
-mongoEmbeddedEnv.AppendUnique(
+merizoEmbeddedEnv = env.Clone()
+merizoEmbeddedEnv.AppendUnique(
     CPPDEFINES=[
         'MONGO_EMBEDDED_COMPILING',
     ],
 )
 
 if get_option('link-model') == 'static':
-    mongoEmbeddedEnv.AppendUnique(
+    merizoEmbeddedEnv.AppendUnique(
         CPPDEFINES=[
             'MONGO_EMBEDDED_STATIC',
         ],
     )
 elif get_option('link-model') == 'dynamic-sdk':
-    mongoEmbeddedEnv['LIBDEPS_SHLIBEMITTER'] = libdeps.make_libdeps_emitter(
+    merizoEmbeddedEnv['LIBDEPS_SHLIBEMITTER'] = libdeps.make_libdeps_emitter(
         'SharedArchive',
         libdeps.dependency_visibility_honored
     )
 
-mongoEmbeddedEnv.AppendUnique(
+merizoEmbeddedEnv.AppendUnique(
     SHLINKFLAGS=[
         '$MONGO_EXPORT_FILE_SHLINKFLAGS',
     ],
 )
 
-if mongoEmbeddedEnv.TargetOSIs('darwin'):
+if merizoEmbeddedEnv.TargetOSIs('darwin'):
     # The current version and compatibility are the *minor* ABI
     # version metadata. If you extend (but do not break) the ABI, you
     # should increment current_version but leave compatibiity_version
@@ -54,7 +54,7 @@ if mongoEmbeddedEnv.TargetOSIs('darwin'):
     # v1 to v2, in which case you would then reset both
     # current_version and compatibility_version to 1. You should never
     # need to set compatibility_version to anything but 1.
-    mongoEmbeddedEnv.AppendUnique(
+    merizoEmbeddedEnv.AppendUnique(
         SHLINKFLAGS=[
             '-Wl,-current_version,1',
             '-Wl,-compatibility_version,1',
@@ -62,16 +62,16 @@ if mongoEmbeddedEnv.TargetOSIs('darwin'):
     )
 
 
-mongoEmbeddedTargets = mongoEmbeddedEnv.Library(
-    target='mongo_embedded',
+merizoEmbeddedTargets = merizoEmbeddedEnv.Library(
+    target='merizo_embedded',
     source=[
-        'mongo_embedded.cpp',
+        'merizo_embedded.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/rpc/protocol',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        '$BUILD_DIR/mongo/embedded/embedded',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/rpc/protocol',
+        '$BUILD_DIR/merizo/transport/transport_layer_mock',
+        '$BUILD_DIR/merizo/embedded/embedded',
     ],
     INSTALL_ALIAS=[
         'embedded-dev',
@@ -80,8 +80,8 @@ mongoEmbeddedTargets = mongoEmbeddedEnv.Library(
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'include/mongo_embedded/v1/mongo_embedded',
-        source=['mongo_embedded.h'],
+        'include/merizo_embedded/v1/merizo_embedded',
+        source=['merizo_embedded.h'],
         INSTALL_ALIAS=[
             'embedded-dev',
         ],
@@ -91,28 +91,28 @@ yamlEnv = env.Clone()
 yamlEnv.InjectThirdParty(libraries=['yaml'])
 
 if get_option('link-model') != 'dynamic-sdk':
-    mongoEmbeddedTest = yamlEnv.Program(
-        target='mongo_embedded_test',
+    merizoEmbeddedTest = yamlEnv.Program(
+        target='merizo_embedded_test',
         source=[
-            'mongo_embedded_test.cpp',
-            env.Idlc('mongo_embedded_test.idl')[0],
+            'merizo_embedded_test.cpp',
+            env.Idlc('merizo_embedded_test.idl')[0],
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-            '$BUILD_DIR/mongo/db/server_options_core',
-            '$BUILD_DIR/mongo/rpc/protocol',
-            '$BUILD_DIR/mongo/unittest/unittest',
-            '$BUILD_DIR/mongo/util/net/network',
-            '$BUILD_DIR/mongo/util/options_parser/options_parser',
-            'mongo_embedded',
+            '$BUILD_DIR/merizo/base',
+            '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/merizo/db/server_options_core',
+            '$BUILD_DIR/merizo/rpc/protocol',
+            '$BUILD_DIR/merizo/unittest/unittest',
+            '$BUILD_DIR/merizo/util/net/network',
+            '$BUILD_DIR/merizo/util/options_parser/options_parser',
+            'merizo_embedded',
         ],
         INSTALL_ALIAS=[
             'embedded-test',
         ],
     )
 
-    env.RegisterUnitTest(mongoEmbeddedTest[0])
+    env.RegisterUnitTest(merizoEmbeddedTest[0])
 
 # Frameworkization craziness begins here. Honestly, we should do this
 # better in the future in some re-usable way, but we need to get this
@@ -125,7 +125,7 @@ if get_option('link-model') != 'dynamic-sdk':
 if get_option('link-model') != 'dynamic-sdk' or get_option('install-mode') != 'hygienic' or not env.TargetOSIs('darwin') or env.TargetOSIs('macOS'):
     Return()
 
-frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/mongo_embedded.framework')
+frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/merizo_embedded.framework')
 env.Alias('install-embedded-dev', frameworkDir)
 
 resourceDir = frameworkDir
@@ -140,26 +140,26 @@ env.Install(
             'LICENSE-Embedded.txt',
             'THIRD-PARTY-NOTICES',
         ],
-        directory=env.Dir('$INSTALL_DIR/share/doc/mongo_embedded'),
+        directory=env.Dir('$INSTALL_DIR/share/doc/merizo_embedded'),
     ),
 )
 
 env.Install(
     target=frameworkDir.Dir('Headers'),
-    source=env.File('mongo_embedded.h')
+    source=env.File('merizo_embedded.h')
 )
 
 env.InstallAs(
     target=frameworkDir.File('Modules/module.modulemap'),
-    source="mongo_embedded.modulemap"
+    source="merizo_embedded.modulemap"
 )
 
-mongoEmbeddedPlist = env.Substfile(
+merizoEmbeddedPlist = env.Substfile(
     target="Info.plist",
     source='../Info.plist.in',
     SUBST_DICT=[
-        ('@CFBundleExecutable@', 'mongo_embedded'),
-        ('@CFBundleIdentifier@', 'org.mongodb.mongo-embedded'),
+        ('@CFBundleExecutable@', 'merizo_embedded'),
+        ('@CFBundleIdentifier@', 'org.merizodb.merizo-embedded'),
         ('@CFBundleVersion@', env['PLIST_MONGO_BUNDLE_VERSION']),
         ('@CFBundleShortVersionString@', env['PLIST_MONGO_BUNDLE_VERSION']),
         ('@MinimumOSVersion@', env['PLIST_MINIMUM_OS_VERSION'])
@@ -168,35 +168,35 @@ mongoEmbeddedPlist = env.Substfile(
 
 env.Install(
     target=resourceDir,
-    source=mongoEmbeddedPlist,
+    source=merizoEmbeddedPlist,
 )
 
-mongoEmbeddedFwLib = env.InstallAs(
-    target=frameworkDir.File('mongo_embedded'),
-    source=mongoEmbeddedTargets[0],
+merizoEmbeddedFwLib = env.InstallAs(
+    target=frameworkDir.File('merizo_embedded'),
+    source=merizoEmbeddedTargets[0],
 )
 
 env.AddPostAction(
-    files=mongoEmbeddedFwLib,
+    files=merizoEmbeddedFwLib,
     action=[
         "install_name_tool -delete_rpath @loader_path/../lib $TARGET",
-        "install_name_tool -id @rpath/mongo_embedded.framework/mongo_embedded $TARGET",
+        "install_name_tool -id @rpath/merizo_embedded.framework/merizo_embedded $TARGET",
     ]
 )
 
-mongoEmbeddedDSYM = getattr(mongoEmbeddedTargets[0].attributes, "separate_debug_file", None)
-if mongoEmbeddedDSYM:
-    frameworkDSYMDir = '$INSTALL_DIR/Frameworks/mongo_embedded.framework.dSYM'
+merizoEmbeddedDSYM = getattr(merizoEmbeddedTargets[0].attributes, "separate_debug_file", None)
+if merizoEmbeddedDSYM:
+    frameworkDSYMDir = '$INSTALL_DIR/Frameworks/merizo_embedded.framework.dSYM'
     env.Alias('install-embedded-dev', frameworkDSYMDir)
 
     env.InstallAs(
         target=frameworkDSYMDir,
-        source=mongoEmbeddedDSYM,
+        source=merizoEmbeddedDSYM,
     )
 
-mongoEmbeddedBCSymbolMap = getattr(mongoEmbeddedTargets[0].attributes, "bcsymbolmap_file", None)
-if mongoEmbeddedBCSymbolMap:
+merizoEmbeddedBCSymbolMap = getattr(merizoEmbeddedTargets[0].attributes, "bcsymbolmap_file", None)
+if merizoEmbeddedBCSymbolMap:
     env.Install(
         target=frameworkDir.Dir('BCSymbolMaps'),
-        source=mongoEmbeddedBCSymbolMap,
+        source=merizoEmbeddedBCSymbolMap,
     )

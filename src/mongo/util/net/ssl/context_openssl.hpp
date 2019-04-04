@@ -19,8 +19,8 @@
 
 #include "asio/buffer.hpp"
 #include "asio/io_context.hpp"
-#include "mongo/util/net/ssl/context_base.hpp"
-#include "mongo/util/net/ssl/detail/openssl_types.hpp"
+#include "merizo/util/net/ssl/context_base.hpp"
+#include "merizo/util/net/ssl/detail/openssl_types.hpp"
 #include <string>
 
 #include "asio/detail/push_options.hpp"
@@ -86,7 +86,7 @@ private:
 #include "asio/detail/pop_options.hpp"
 
 #if defined(ASIO_HEADER_ONLY)
-#include "mongo/util/net/ssl/impl/context_openssl.ipp"
+#include "merizo/util/net/ssl/impl/context_openssl.ipp"
 #endif  // defined(ASIO_HEADER_ONLY)
 
 #endif  // ASIO_SSL_CONTEXT_OPENSSL_HPP

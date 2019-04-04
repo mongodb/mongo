@@ -142,11 +142,11 @@
      * for the command, runs that after the command is run. The post-command function is run
      * regardless of whether the command response was overridden or not.
      */
-    const mongoRunCommandOriginal = Mongo.prototype.runCommand;
+    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
     Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
         const cmdName = Object.keys(cmdObj)[0];
         if (runCommandOverrideBlacklistedCommands.includes(cmdName)) {
-            return mongoRunCommandOriginal.apply(this, arguments);
+            return merizoRunCommandOriginal.apply(this, arguments);
         }
 
         if (cmdResponseOverrides.hasOwnProperty(cmdName)) {
@@ -164,7 +164,7 @@
             return cmdResponse.responseObj;
         }
 
-        const res = mongoRunCommandOriginal.apply(this, arguments);
+        const res = merizoRunCommandOriginal.apply(this, arguments);
         print("Unittest received: " + tojsononeline(res) + ", running: " + tojsononeline(cmdObj));
         runPostCommandFunc(cmdName);
         return res;
@@ -221,7 +221,7 @@
             data["writeConcernError"] = writeConcernError;
         }
 
-        assert.commandWorked(mongoRunCommandOriginal.apply(
+        assert.commandWorked(merizoRunCommandOriginal.apply(
             failpointConn,
             ['admin', {configureFailPoint: "failCommand", mode: mode, data: data}, 0]));
     }
@@ -230,7 +230,7 @@
      * Turns off the failCommand failpoint completely.
      */
     function stopFailingCommands() {
-        assert.commandWorked(mongoRunCommandOriginal.apply(
+        assert.commandWorked(merizoRunCommandOriginal.apply(
             failpointConn, ['admin', {configureFailPoint: "failCommand", mode: "off"}, 0]));
     }
 
@@ -247,7 +247,7 @@
      */
     function abortCurrentTransaction() {
         const session = testDB.getSession();
-        assert.commandWorked(mongoRunCommandOriginal.apply(testDB.getMongo(), [
+        assert.commandWorked(merizoRunCommandOriginal.apply(testDB.getMongo(), [
             'admin',
             {
               abortTransaction: 1,
@@ -1013,7 +1013,7 @@
         //       // as if the transaction were being retried on a different node.
         //       attachPostCmdFunction("commitTransaction", function() {
         //           abortCurrentTransaction();
-        //           assert.commandWorked(mongoRunCommandOriginal.apply(
+        //           assert.commandWorked(merizoRunCommandOriginal.apply(
         //               testDB.getMongo(), [dbName, {drop: collName2}, 0]));
         //       });
         //       failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster,

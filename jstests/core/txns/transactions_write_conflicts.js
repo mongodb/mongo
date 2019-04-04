@@ -15,7 +15,7 @@
  * write to a document already written to by T1 this will cause T2's write to fail with a
  * "WriteConflict" error, and transaction T2 will be aborted.
  *
- * In MongoDB, a "write" by a transaction is any insert, update, or delete to a document. This means
+ * In MerizoDB, a "write" by a transaction is any insert, update, or delete to a document. This means
  * that all of these operation types can produce write conflicts with each other as a result of
  * running in concurrent transactions. The test cases below illustrate the possible write conflict
  * types for both single and multi-document writes.

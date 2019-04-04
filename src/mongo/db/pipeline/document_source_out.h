@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_out_gen.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/chunk_version.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_out_gen.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/s/chunk_version.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Manipulates the state of the OperationContext so that while this object is in scope, reads and
@@ -89,8 +89,8 @@ public:
         }
 
         bool allowedToPassthroughFromMongos() const final {
-            // Do not allow passthrough from mongos even if the source collection is unsharded. This
-            // ensures that the unique index verification happens once on mongos and can be bypassed
+            // Do not allow passthrough from merizos even if the source collection is unsharded. This
+            // ensures that the unique index verification happens once on merizos and can be bypassed
             // on the shards.
             return false;
         }
@@ -134,7 +134,7 @@ public:
         // because either choice will work correctly, we are simply applying a heuristic
         // optimization.
         auto hostTypeRequirement = HostTypeRequirement::kPrimaryShard;
-        if (pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs) &&
+        if (pExpCtx->merizoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs) &&
             _mode != WriteModeEnum::kModeReplaceCollection) {
             hostTypeRequirement = HostTypeRequirement::kAnyShard;
         }
@@ -162,7 +162,7 @@ public:
         // Note that this decision is inherently racy and subject to become stale. This is okay
         // because either choice will work correctly, we are simply applying a heuristic
         // optimization.
-        if (pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs)) {
+        if (pExpCtx->merizoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs)) {
             return boost::none;
         }
         // {shardsStage, mergingStage, sortPattern}
@@ -224,7 +224,7 @@ public:
     virtual void spill(BatchedObjects&& batch) {
         OutStageWriteBlock writeBlock(pExpCtx->opCtx);
 
-        pExpCtx->mongoProcessInterface->insert(
+        pExpCtx->merizoProcessInterface->insert(
             pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern, _targetEpoch());
     };
 
@@ -279,7 +279,7 @@ private:
 
     /**
      * Ensures that 'spec' contains a uniqueKey which has a supporting index - either because the
-     * uniqueKey was sent from mongos or because there is a corresponding unique index. Returns the
+     * uniqueKey was sent from merizos or because there is a corresponding unique index. Returns the
      * target ChunkVersion already attached to 'spec', but verifies that this node's cached routing
      * table agrees on the epoch for that version before returning. Throws a StaleConfigException if
      * not.
@@ -304,4 +304,4 @@ private:
     bool _uniqueKeyIncludesId;
 };
 
-}  // namespace mongo
+}  // namespace merizo

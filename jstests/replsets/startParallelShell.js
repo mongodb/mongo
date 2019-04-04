@@ -13,9 +13,9 @@ var db;
 
     const url = replSet.getURL();
     print("* Connecting to " + url);
-    const mongo = new Mongo(url);
-    db = mongo.getDB('admin');
-    assert.eq(url, mongo.host, "replSet.getURL() should match active connection string");
+    const merizo = new Mongo(url);
+    db = merizo.getDB('admin');
+    assert.eq(url, merizo.host, "replSet.getURL() should match active connection string");
 
     print("* Starting parallel shell on --host " + db.getMongo().host);
     var awaitShell = startParallelShell('db.coll0.insert({test: "connString only"});');

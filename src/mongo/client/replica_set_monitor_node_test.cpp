@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_internal.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/client/replica_set_monitor_internal.h"
+#include "merizo/unittest/unittest.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 using std::set;
 
 // Pull nested types to top-level scope
@@ -175,11 +175,11 @@ TEST(ReplSetMonitorNode, PriNodeCompatibleTag) {
 
     TagSet tags(BSONArray(builder.done()));
 
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::Nearest, tags));
 }
 
 TEST(ReplSetMonitorNode, SecNodeCompatibleTag) {
@@ -195,11 +195,11 @@ TEST(ReplSetMonitorNode, SecNodeCompatibleTag) {
 
     TagSet tags(BSONArray(builder.done()));
 
-    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::Nearest, tags));
 }
 
 TEST(ReplSetMonitorNode, PriNodeNotCompatibleTag) {
@@ -215,11 +215,11 @@ TEST(ReplSetMonitorNode, PriNodeNotCompatibleTag) {
 
     TagSet tags(BSONArray(builder.done()));
 
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::Nearest, tags));
 }
 
 TEST(ReplSetMonitorNode, SecNodeNotCompatibleTag) {
@@ -235,11 +235,11 @@ TEST(ReplSetMonitorNode, SecNodeNotCompatibleTag) {
 
     TagSet tags(BSONArray(builder.done()));
 
-    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::Nearest, tags));
 }
 
 TEST(ReplSetMonitorNode, PriNodeCompatiblMultiTag) {
@@ -259,11 +259,11 @@ TEST(ReplSetMonitorNode, PriNodeCompatiblMultiTag) {
 
     TagSet tags(BSONArray(builder.done()));
 
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::Nearest, tags));
 }
 
 TEST(ReplSetMonitorNode, SecNodeCompatibleMultiTag) {
@@ -283,11 +283,11 @@ TEST(ReplSetMonitorNode, SecNodeCompatibleMultiTag) {
 
     TagSet tags(BSONArray(builder.done()));
 
-    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::Nearest, tags));
 }
 
 TEST(ReplSetMonitorNode, PriNodeNotCompatibleMultiTag) {
@@ -307,11 +307,11 @@ TEST(ReplSetMonitorNode, PriNodeNotCompatibleMultiTag) {
 
     TagSet tags(BSONArray(builder.done()));
 
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, merizo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::Nearest, tags));
 }
 
 TEST(ReplSetMonitorNode, SecNodeNotCompatibleMultiTag) {
@@ -331,11 +331,11 @@ TEST(ReplSetMonitorNode, SecNodeNotCompatibleMultiTag) {
 
     TagSet tags(BSONArray(builder.done()));
 
-    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-    ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(!isCompatible(node, merizo::ReadPreference::Nearest, tags));
 }
 
 }  // namespace

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/exec/index_scan.h"
+#include "merizo/db/exec/index_scan.h"
 
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/exec/filter.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/exec/working_set_computed_data.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/query/index_bounds_builder.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
 namespace {
 
@@ -55,7 +55,7 @@ int sgn(int i) {
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 // static
 const char* IndexScan::kStageType = "IXSCAN";
@@ -285,4 +285,4 @@ const SpecificStats* IndexScan::getSpecificStats() const {
     return &_specificStats;
 }
 
-}  // namespace mongo
+}  // namespace merizo

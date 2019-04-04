@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,17 +31,17 @@
 
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/repl/member_data.h"
-#include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/sync_source_selector.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/repl/member_data.h"
+#include "merizo/db/repl/member_state.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/sync_source_selector.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObj;
 class BSONObjBuilder;
@@ -886,4 +886,4 @@ protected:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

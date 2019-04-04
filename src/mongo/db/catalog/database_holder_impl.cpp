@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/database_holder_impl.h"
+#include "merizo/db/catalog/database_holder_impl.h"
 
-#include "mongo/db/audit.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_impl.h"
-#include "mongo/db/catalog/namespace_uuid_cache.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/util/log.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/background.h"
+#include "merizo/db/catalog/collection_impl.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/database_impl.h"
+#include "merizo/db/catalog/namespace_uuid_cache.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/stats/top.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 StringData _todb(StringData ns) {
@@ -295,4 +295,4 @@ std::unique_ptr<Collection> DatabaseHolderImpl::makeCollection(
     return std::make_unique<CollectionImpl>(opCtx, fullNS, uuid, details, recordStore, dbce);
 }
 
-}  // namespace mongo
+}  // namespace merizo

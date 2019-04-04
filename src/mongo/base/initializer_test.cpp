@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,11 +31,11 @@
  * Unit tests of the Initializer type.
  */
 
-#include "mongo/base/init.h"
-#include "mongo/base/initializer.h"
-#include "mongo/base/initializer_dependency_graph.h"
-#include "mongo/base/make_string_vector.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/init.h"
+#include "merizo/base/initializer.h"
+#include "merizo/base/initializer_dependency_graph.h"
+#include "merizo/base/make_string_vector.h"
+#include "merizo/unittest/unittest.h"
 
 /*
  * Unless otherwise specified, all tests herein use the following
@@ -76,7 +76,7 @@
         ASSERT_ADD_INITIALIZER(_graph_, "n8", FN8, ("n5", "n6", "n7"), MONGO_NO_DEPENDENTS);     \
     } while (false)
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 int globalCounts[9];
@@ -193,4 +193,4 @@ TEST(InitializerTest, Step5Misimplemented) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

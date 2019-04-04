@@ -23,7 +23,7 @@ req_extensions = v3_req
 C = US
 ST = New York
 L = New York City
-O = MongoDB
+O = MerizoDB
 OU = Kernel Users
 CN = Kernel Users
 

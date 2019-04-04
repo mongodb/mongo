@@ -39,7 +39,7 @@
     const subShellCommand = function(hosts) {
         var Ms = [];
         for (var i = 0; i < 10; i++) {
-            Ms.push(new Mongo("mongodb://" + hosts[0] + "," + hosts[1] +
+            Ms.push(new Mongo("merizodb://" + hosts[0] + "," + hosts[1] +
                               "/?ssl=true&replicaSet=sslSet"));
         }
 
@@ -70,14 +70,14 @@
     const subShellArgs = [
         "env",
         "SSL_CERT_FILE=jstests/libs/trusted-ca.pem",
-        './mongo',
+        './merizo',
         '--nodb',
         '--eval',
         subShellCommandFormatter(rst)
     ];
 
     const retVal = _runMongoProgram(...subShellArgs);
-    assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+    assert.eq(retVal, 0, 'merizo shell did not succeed with exit code 0');
 
     rst.stopSet();
 }());

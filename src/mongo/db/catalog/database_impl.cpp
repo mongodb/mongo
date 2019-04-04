@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/database_impl.h"
+#include "merizo/db/catalog/database_impl.h"
 
 #include <algorithm>
 #include <memory>
@@ -39,47 +39,47 @@
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/base/init.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/drop_indexes.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/namespace_uuid_cache.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/introspect.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/system_index.h"
-#include "mongo/db/views/view_catalog.h"
-#include "mongo/platform/random.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
+#include "merizo/base/init.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/background.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/collection_impl.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/drop_indexes.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/namespace_uuid_cache.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/introspect.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/operation_sharding_state.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/stats/top.h"
+#include "merizo/db/storage/recovery_unit.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/storage/storage_engine_init.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/system_index.h"
+#include "merizo/db/views/view_catalog.h"
+#include "merizo/platform/random.h"
+#include "merizo/s/cannot_implicitly_create_collection_info.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
@@ -192,7 +192,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
     // At construction time of the viewCatalog, the UUIDCatalog map wasn't initialized yet, so no
     // system.views collection would be found. Now we're sufficiently initialized, signal a version
     // change. Also force a reload, so if there are problems with the catalog contents as might be
-    // caused by incorrect mongod versions or similar, they are found right away.
+    // caused by incorrect merizod versions or similar, they are found right away.
     auto views = ViewCatalog::get(this);
     views->invalidate();
     Status reloadStatus = views->reloadIfNeeded(opCtx);
@@ -565,7 +565,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
     invariant(!collToRename->getIndexCatalog()->haveAnyIndexesInProgress(),
-              mongoutils::str::stream()
+              merizoutils::str::stream()
                   << "cannot perform operation: an index build is currently running for "
                      "collection "
                   << fromNSS);
@@ -573,7 +573,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     Collection* toColl = getCollection(opCtx, toNSS);
     if (toColl) {
         invariant(!toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
-                  mongoutils::str::stream()
+                  merizoutils::str::stream()
                       << "cannot perform operation: an index build is currently running for "
                          "collection "
                       << toNSS);
@@ -877,7 +877,7 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         log() << "WARNING: the collection '" << collectionName << "' lacks a unique index on _id."
               << " This index is needed for replication to function properly" << startupWarningsLog;
         log() << "\t To fix this, you need to create a unique index on _id."
-              << " See http://dochub.mongodb.org/core/build-replica-set-indexes"
+              << " See http://dochub.merizodb.org/core/build-replica-set-indexes"
               << startupWarningsLog;
     }
 }
@@ -981,4 +981,4 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

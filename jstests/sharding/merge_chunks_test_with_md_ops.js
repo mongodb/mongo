@@ -5,9 +5,9 @@
 
     var st = new ShardingTest({shards: 2});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var coll = mongos.getCollection("foo.bar");
+    var merizos = st.s0;
+    var admin = merizos.getDB("admin");
+    var coll = merizos.getCollection("foo.bar");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
@@ -22,7 +22,7 @@
         assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
         assert.commandWorked(
             admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
-        printjson(mongos.getDB("config").chunks.find().toArray());
+        printjson(merizos.getDB("config").chunks.find().toArray());
     }
 
     // Move the first chunk to the other shard
@@ -38,7 +38,7 @@
         assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
         assert.commandWorked(
             admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
-        printjson(mongos.getDB("config").chunks.find().toArray());
+        printjson(merizos.getDB("config").chunks.find().toArray());
     }
 
     // Move the chunk back to the original shard

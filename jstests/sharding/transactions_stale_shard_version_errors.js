@@ -1,4 +1,4 @@
-// Tests mongos behavior on stale shard version errors received in a transaction.
+// Tests merizos behavior on stale shard version errors received in a transaction.
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
 (function() {
@@ -18,7 +18,7 @@
     const collName = "foo";
     const ns = dbName + '.' + collName;
 
-    const st = new ShardingTest({shards: 3, mongos: 2, config: 1});
+    const st = new ShardingTest({shards: 3, merizos: 2, config: 1});
 
     enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
@@ -65,7 +65,7 @@
     // Stale shard version on first overall command should succeed.
     //
 
-    // Move a chunk in the first collection from Shard0 to Shard1 through the main mongos, so Shard1
+    // Move a chunk in the first collection from Shard0 to Shard1 through the main merizos, so Shard1
     // is stale but not the router.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
@@ -84,7 +84,7 @@
 
     expectChunks(st, ns, [1, 1, 0]);
 
-    // Move a chunk in the other collection from Shard0 to Shard1 through the main mongos, so Shard1
+    // Move a chunk in the other collection from Shard0 to Shard1 through the main merizos, so Shard1
     // is stale for the other collection but not the router.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: otherNs, find: {_id: 5}, to: st.shard1.shardName}));
@@ -114,7 +114,7 @@
 
     expectChunks(st, ns, [1, 1, 0]);
 
-    // Move a chunk for the other collection from Shard1 to Shard0 through the main mongos, so
+    // Move a chunk for the other collection from Shard1 to Shard0 through the main merizos, so
     // Shard0 is stale for it and the router is not.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: otherNs, find: {_id: 5}, to: st.shard0.shardName}));
@@ -131,11 +131,11 @@
     session.commitTransaction();
 
     //
-    // Stale mongos aborts on old shard.
+    // Stale merizos aborts on old shard.
     //
 
-    // Move a chunk in the first collection from Shard1 to Shard0 through the other mongos, so
-    // Shard1 and the main mongos are stale for it.
+    // Move a chunk in the first collection from Shard1 to Shard0 through the other merizos, so
+    // Shard1 and the main merizos are stale for it.
     const otherMongos = st.s1;
     assert.commandWorked(
         otherMongos.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard0.shardName}));
@@ -163,7 +163,7 @@
     // More than one stale shard version error.
     //
 
-    // Move chunks for the first ns from Shard0 to Shard1 and Shard2 through the main mongos, so
+    // Move chunks for the first ns from Shard0 to Shard1 and Shard2 through the main merizos, so
     // both are stale but not the router.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard2.shardName}));
@@ -243,7 +243,7 @@
     // Target Shard2, to verify the transaction on it is aborted implicitly later.
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
-    // Targets all shards. Shard0 is stale and won't refresh its metadata, so mongos should exhaust
+    // Targets all shards. Shard0 is stale and won't refresh its metadata, so merizos should exhaust
     // its retries and implicitly abort the transaction.
     res = assert.commandFailedWithCode(sessionDB.runCommand({find: collName}),
                                        ErrorCodes.StaleConfig);

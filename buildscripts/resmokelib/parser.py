@@ -9,7 +9,7 @@ import sys
 
 import datetime
 import optparse
-import pymongo.uri_parser
+import pymerizo.uri_parser
 
 from . import config as _config
 from . import utils
@@ -57,7 +57,7 @@ def _make_parser():  # pylint: disable=too-many-statements
                             " of 0 indicates there is no limit."))
 
     parser.add_option("--basePort", dest="base_port", metavar="PORT",
-                      help=("The starting port number to use for mongod and mongos processes"
+                      help=("The starting port number to use for merizod and merizos processes"
                             " spawned by resmoke.py or the tests themselves. Each fixture and Job"
                             " allocates a contiguous range of ports."))
 
@@ -68,7 +68,7 @@ def _make_parser():  # pylint: disable=too-many-statements
                       help="Executes all tests in all suites, even if some of them fail.")
 
     parser.add_option("--dbpathPrefix", dest="dbpath_prefix", metavar="PATH",
-                      help=("The directory which will contain the dbpaths of any mongod's started"
+                      help=("The directory which will contain the dbpaths of any merizod's started"
                             " by resmoke.py or the tests themselves."))
 
     parser.add_option("--dbtest", dest="dbtest_executable", metavar="PATH",
@@ -109,38 +109,38 @@ def _make_parser():  # pylint: disable=too-many-statements
 
     parser.add_option("-j", "--jobs", type="int", dest="jobs", metavar="JOBS",
                       help=("The number of Job instances to use. Each instance will receive its"
-                            " own MongoDB deployment to dispatch tests to."))
+                            " own MerizoDB deployment to dispatch tests to."))
 
     parser.add_option("-l", "--listSuites", action="store_true", dest="list_suites",
                       help="Lists the names of the suites available to execute.")
 
-    parser.add_option("--mongo", dest="mongo_executable", metavar="PATH",
-                      help="The path to the mongo shell executable for resmoke.py to use.")
+    parser.add_option("--merizo", dest="merizo_executable", metavar="PATH",
+                      help="The path to the merizo shell executable for resmoke.py to use.")
 
-    parser.add_option("--mongod", dest="mongod_executable", metavar="PATH",
-                      help="The path to the mongod executable for resmoke.py to use.")
+    parser.add_option("--merizod", dest="merizod_executable", metavar="PATH",
+                      help="The path to the merizod executable for resmoke.py to use.")
 
-    parser.add_option("--mongodSetParameters", dest="mongod_set_parameters",
+    parser.add_option("--merizodSetParameters", dest="merizod_set_parameters",
                       metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-                      help=("Passes one or more --setParameter options to all mongod processes"
+                      help=("Passes one or more --setParameter options to all merizod processes"
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
                             " i.e. JSON with support for single quoted and unquoted keys."))
 
-    parser.add_option("--mongoebench", dest="mongoebench_executable", metavar="PATH",
-                      help=("The path to the mongoebench (benchrun embedded) executable for"
+    parser.add_option("--merizoebench", dest="merizoebench_executable", metavar="PATH",
+                      help=("The path to the merizoebench (benchrun embedded) executable for"
                             " resmoke.py to use."))
 
-    parser.add_option("--mongos", dest="mongos_executable", metavar="PATH",
-                      help="The path to the mongos executable for resmoke.py to use.")
+    parser.add_option("--merizos", dest="merizos_executable", metavar="PATH",
+                      help="The path to the merizos executable for resmoke.py to use.")
 
-    parser.add_option("--mongosSetParameters", dest="mongos_set_parameters",
+    parser.add_option("--merizosSetParameters", dest="merizos_set_parameters",
                       metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-                      help=("Passes one or more --setParameter options to all mongos processes"
+                      help=("Passes one or more --setParameter options to all merizos processes"
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
                             " i.e. JSON with support for single quoted and unquoted keys."))
 
     parser.add_option("--nojournal", action="store_true", dest="no_journal",
-                      help="Disables journaling for all mongod's.")
+                      help="Disables journaling for all merizod's.")
 
     parser.add_option("--numClientsPerFixture", type="int", dest="num_clients_per_fixture",
                       help="Number of clients running tests per fixture.")
@@ -149,14 +149,14 @@ def _make_parser():  # pylint: disable=too-many-statements
                       help="Writes a JSON file with performance test results.")
 
     parser.add_option("--shellConnString", dest="shell_conn_string", metavar="CONN_STRING",
-                      help="Overrides the default fixture and connects with a mongodb:// connection"
-                      " string to an existing MongoDB cluster instead. This is useful for"
-                      " connecting to a MongoDB deployment started outside of resmoke.py including"
+                      help="Overrides the default fixture and connects with a merizodb:// connection"
+                      " string to an existing MerizoDB cluster instead. This is useful for"
+                      " connecting to a MerizoDB deployment started outside of resmoke.py including"
                       " one running in a debugger.")
 
     parser.add_option("--shellPort", dest="shell_port", metavar="PORT",
                       help="Convenience form of --shellConnString for connecting to an"
-                      " existing MongoDB cluster with the URL mongodb://localhost:[PORT]."
+                      " existing MerizoDB cluster with the URL merizodb://localhost:[PORT]."
                       " This is useful for connecting to a server running in a debugger.")
 
     parser.add_option("--repeat", "--repeatSuites", type="int", dest="repeat_suites", metavar="N",
@@ -206,11 +206,11 @@ def _make_parser():  # pylint: disable=too-many-statements
 
     parser.add_option("--shellReadMode", type="choice", action="store", dest="shell_read_mode",
                       choices=("commands", "compatibility", "legacy"), metavar="READ_MODE",
-                      help="The read mode used by the mongo shell.")
+                      help="The read mode used by the merizo shell.")
 
     parser.add_option("--shellWriteMode", type="choice", action="store", dest="shell_write_mode",
                       choices=("commands", "compatibility", "legacy"), metavar="WRITE_MODE",
-                      help="The write mode used by the mongo shell.")
+                      help="The write mode used by the merizo shell.")
 
     parser.add_option("--shuffle", action="store_const", const="on", dest="shuffle",
                       help=("Randomizes the order in which tests are executed. This is equivalent"
@@ -237,19 +237,19 @@ def _make_parser():  # pylint: disable=too-many-statements
 
     parser.add_option("--storageEngineCacheSizeGB", dest="storage_engine_cache_size_gb",
                       metavar="CONFIG", help="Sets the storage engine cache size configuration"
-                      " setting for all mongod's.")
+                      " setting for all merizod's.")
 
     parser.add_option("--tagFile", dest="tag_file", metavar="OPTIONS",
                       help="A YAML file that associates tests and tags.")
 
     parser.add_option("--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
-                      help="Sets the WiredTiger collection configuration setting for all mongod's.")
+                      help="Sets the WiredTiger collection configuration setting for all merizod's.")
 
     parser.add_option("--wiredTigerEngineConfigString", dest="wt_engine_config", metavar="CONFIG",
-                      help="Sets the WiredTiger engine configuration setting for all mongod's.")
+                      help="Sets the WiredTiger engine configuration setting for all merizod's.")
 
     parser.add_option("--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
-                      help="Sets the WiredTiger index configuration setting for all mongod's.")
+                      help="Sets the WiredTiger index configuration setting for all merizod's.")
 
     parser.add_option("--executor", dest="executor_file",
                       help="OBSOLETE: Superceded by --suites; specify --suites=SUITE path/to/test"
@@ -535,12 +535,12 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
-    _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
-    _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
-    _config.MONGOD_SET_PARAMETERS = config.pop("mongod_set_parameters")
-    _config.MONGOEBENCH_EXECUTABLE = _expand_user(config.pop("mongoebench_executable"))
-    _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
-    _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
+    _config.MONGO_EXECUTABLE = _expand_user(config.pop("merizo_executable"))
+    _config.MONGOD_EXECUTABLE = _expand_user(config.pop("merizod_executable"))
+    _config.MONGOD_SET_PARAMETERS = config.pop("merizod_set_parameters")
+    _config.MONGOEBENCH_EXECUTABLE = _expand_user(config.pop("merizoebench_executable"))
+    _config.MONGOS_EXECUTABLE = _expand_user(config.pop("merizos_executable"))
+    _config.MONGOS_SET_PARAMETERS = config.pop("merizos_set_parameters")
     _config.NO_JOURNAL = config.pop("no_journal")
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
     _config.PERF_REPORT_FILE = config.pop("perf_report_file")
@@ -602,14 +602,14 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     port = config.pop("shell_port")
 
     if port is not None:
-        conn_string = "mongodb://localhost:" + port
+        conn_string = "merizodb://localhost:" + port
 
     if conn_string is not None:
-        # The --shellConnString command line option must be a MongoDB connection URI, which means it
-        # must specify the mongodb:// or mongodb+srv:// URI scheme. pymongo.uri_parser.parse_uri()
-        # raises an exception if the connection string specified isn't considered a valid MongoDB
+        # The --shellConnString command line option must be a MerizoDB connection URI, which means it
+        # must specify the merizodb:// or merizodb+srv:// URI scheme. pymerizo.uri_parser.parse_uri()
+        # raises an exception if the connection string specified isn't considered a valid MerizoDB
         # connection URI.
-        pymongo.uri_parser.parse_uri(conn_string)
+        pymerizo.uri_parser.parse_uri(conn_string)
         _config.SHELL_CONN_STRING = conn_string
 
     if config:

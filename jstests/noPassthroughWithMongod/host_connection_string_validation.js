@@ -1,35 +1,35 @@
 // Test --host.
 (function() {
-    // This "inner_mode" method of spawning a mongod and re-running was copied from
+    // This "inner_mode" method of spawning a merizod and re-running was copied from
     // ipv6_connection_string_validation.js
     if ("undefined" == typeof inner_mode) {
-        // Start a mongod with --ipv6
-        jsTest.log("Outer mode test starting mongod with --ipv6");
+        // Start a merizod with --ipv6
+        jsTest.log("Outer mode test starting merizod with --ipv6");
         // NOTE: bind_ip arg is present to test if it can parse ipv6 addresses (::1 in this case).
         // Unfortunately, having bind_ip = ::1 won't work in the test framework (But does work when
-        // tested manually), so 127.0.0.1 is also present so the test mongo shell can connect
+        // tested manually), so 127.0.0.1 is also present so the test merizo shell can connect
         // with that address.
-        var mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
-        if (mongod == null) {
+        var merizod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
+        if (merizod == null) {
             jsTest.log("Unable to run test because ipv6 is not on machine, see BF-10990");
             return;
         }
         var args = [
-            "mongo",
+            "merizo",
             "--nodb",
             "--ipv6",
             "--host",
             "::1",
             "--port",
-            mongod.port,
+            merizod.port,
             "--eval",
-            "inner_mode=true;port=" + mongod.port + ";",
+            "inner_mode=true;port=" + merizod.port + ";",
             "jstests/noPassthroughWithMongod/host_connection_string_validation.js"
         ];
         var exitCode = _runMongoProgram.apply(null, args);
         jsTest.log("Inner mode test finished, exit code was " + exitCode);
 
-        MongoRunner.stopMongod(mongod);
+        MongoRunner.stopMongod(merizod);
         // Pass the inner test's exit code back as the outer test's exit code
         if (exitCode != 0) {
             doassert("inner test failed with exit code " + exitCode);
@@ -38,7 +38,7 @@
     }
 
     var testHost = function(host, shouldSucceed) {
-        var exitCode = runMongoProgram('mongo', '--ipv6', '--eval', ';', '--host', host);
+        var exitCode = runMongoProgram('merizo', '--ipv6', '--eval', ';', '--host', host);
         if (shouldSucceed) {
             if (exitCode !== 0) {
                 doassert("failed to connect with `--host " + host +
@@ -61,7 +61,7 @@
     ];
 
     var goodSocketStrings = [
-        "/tmp/mongodb-27999.sock",
+        "/tmp/merizodb-27999.sock",
     ];
 
     var badStrings = [
@@ -94,8 +94,8 @@
         print("Testing " + (isGood ? "good" : "bad") + " connection string " + i + "...");
         print("    * testing " + connectionString);
         testHost(connectionString, isGood);
-        print("    * testing mongodb://" + encodeURIComponent(connectionString));
-        testHost("mongodb://" + encodeURIComponent(connectionString), isGood);
+        print("    * testing merizodb://" + encodeURIComponent(connectionString));
+        testHost("merizodb://" + encodeURIComponent(connectionString), isGood);
     }
 
     var i;

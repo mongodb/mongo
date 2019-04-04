@@ -7,7 +7,7 @@ selector:
   # Skip until SERVER-25618 is resolved.
   - jstests/auth/repl.js
 
-# Auth tests start their own mongod's.
+# Auth tests start their own merizod's.
 executor:
   config:
     shell_options:

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,7 +29,7 @@
 
 #pragma once
 
-namespace mongo {
+namespace merizo {
 namespace mutablebson {
 
 inline Element Element::operator[](size_t n) const {
@@ -41,79 +41,79 @@ inline Element Element::operator[](StringData name) const {
 }
 
 inline double Element::getValueDouble() const {
-    dassert(hasValue() && isType(mongo::NumberDouble));
+    dassert(hasValue() && isType(merizo::NumberDouble));
     return getValue()._numberDouble();
 }
 
 inline StringData Element::getValueString() const {
-    dassert(hasValue() && isType(mongo::String));
+    dassert(hasValue() && isType(merizo::String));
     return getValueStringOrSymbol();
 }
 
 inline BSONObj Element::getValueObject() const {
-    dassert(hasValue() && isType(mongo::Object));
+    dassert(hasValue() && isType(merizo::Object));
     return getValue().Obj();
 }
 
 inline BSONArray Element::getValueArray() const {
-    dassert(hasValue() && isType(mongo::Array));
+    dassert(hasValue() && isType(merizo::Array));
     return BSONArray(getValue().Obj());
 }
 
 inline bool Element::isValueUndefined() const {
-    return isType(mongo::Undefined);
+    return isType(merizo::Undefined);
 }
 
 inline OID Element::getValueOID() const {
-    dassert(hasValue() && isType(mongo::jstOID));
+    dassert(hasValue() && isType(merizo::jstOID));
     return getValue().__oid();
 }
 
 inline bool Element::getValueBool() const {
-    dassert(hasValue() && isType(mongo::Bool));
+    dassert(hasValue() && isType(merizo::Bool));
     return getValue().boolean();
 }
 
 inline Date_t Element::getValueDate() const {
-    dassert(hasValue() && isType(mongo::Date));
+    dassert(hasValue() && isType(merizo::Date));
     return getValue().date();
 }
 
 inline bool Element::isValueNull() const {
-    return isType(mongo::jstNULL);
+    return isType(merizo::jstNULL);
 }
 
 inline StringData Element::getValueSymbol() const {
-    dassert(hasValue() && isType(mongo::Symbol));
+    dassert(hasValue() && isType(merizo::Symbol));
     return getValueStringOrSymbol();
 }
 
 inline int32_t Element::getValueInt() const {
-    dassert(hasValue() && isType(mongo::NumberInt));
+    dassert(hasValue() && isType(merizo::NumberInt));
     return getValue()._numberInt();
 }
 
 inline Timestamp Element::getValueTimestamp() const {
-    dassert(hasValue() && isType(mongo::bsonTimestamp));
+    dassert(hasValue() && isType(merizo::bsonTimestamp));
     return getValue().timestamp();
 }
 
 inline int64_t Element::getValueLong() const {
-    dassert(hasValue() && isType(mongo::NumberLong));
+    dassert(hasValue() && isType(merizo::NumberLong));
     return getValue()._numberLong();
 }
 
 inline Decimal128 Element::getValueDecimal() const {
-    dassert(hasValue() && isType(mongo::NumberDecimal));
+    dassert(hasValue() && isType(merizo::NumberDecimal));
     return getValue()._numberDecimal();
 }
 
 inline bool Element::isValueMinKey() const {
-    return isType(mongo::MinKey);
+    return isType(merizo::MinKey);
 }
 
 inline bool Element::isValueMaxKey() const {
-    return isType(mongo::MaxKey);
+    return isType(merizo::MaxKey);
 }
 
 inline bool Element::ok() const {
@@ -158,4 +158,4 @@ inline bool operator!=(const Element& l, const Element& r) {
 
 
 }  // namespace mutablebson
-}  // namespace mongo
+}  // namespace merizo

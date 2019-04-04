@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2015-present.
+// Copyright (C) MerizoDB, Inc. 2015-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -411,7 +411,7 @@ func (e *encoder) addElem(name string, v reflect.Value, minSize bool) {
 			}
 
 		case time.Time:
-			// MongoDB handles timestamps as milliseconds.
+			// MerizoDB handles timestamps as milliseconds.
 			e.addElemName('\x09', name)
 			e.addInt64(s.Unix()*1000 + int64(s.Nanosecond()/1e6))
 

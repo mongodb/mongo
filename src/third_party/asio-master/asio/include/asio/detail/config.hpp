@@ -11,14 +11,14 @@
 #ifndef ASIO_DETAIL_CONFIG_HPP
 #define ASIO_DETAIL_CONFIG_HPP
 
-// MongoDB modification. We want this standalone, and we want separate
+// MerizoDB modification. We want this standalone, and we want separate
 // compilation for what we can to cut down on compile times.
 // We cannot set these outside of the ASIO drop, because a system copy of ASIO might not have been
 // built with ASIO_SEPARATE_COMPILATION.
 // TODO: Remove this once we have a mechanism for injecting third party includes and CPPDEFINES into
 // individual scons objects.
-# define ASIO_STANDALONE // MongoDB
-# define ASIO_SEPARATE_COMPILATION // MongoDB
+# define ASIO_STANDALONE // MerizoDB
+# define ASIO_SEPARATE_COMPILATION // MerizoDB
 
 #if defined(ASIO_STANDALONE)
 # define ASIO_DISABLE_BOOST_ARRAY 1

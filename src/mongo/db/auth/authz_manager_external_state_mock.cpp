@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "merizo/db/auth/authz_manager_external_state_mock.h"
 
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/update/update_driver.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/db/auth/authz_session_external_state_mock.h"
+#include "merizo/db/auth/privilege_parser.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/update/update_driver.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/map_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
 ()->std::unique_ptr<AuthzManagerExternalState> {
@@ -81,7 +81,7 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
             fassert(17179,
                     warningsElement.appendString(
                         "",
-                        std::string(mongoutils::str::stream()
+                        std::string(merizoutils::str::stream()
                                     << "Skipped privileges on resource "
                                     << privileges[i].getResourcePattern().toString()
                                     << ". Reason: "
@@ -317,4 +317,4 @@ Status AuthzManagerExternalStateMock::_queryVector(
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

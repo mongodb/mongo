@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/process_interface_shardsvr.h"
+#include "merizo/db/pipeline/process_interface_shardsvr.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/pipeline/sharded_agg_helpers.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/write_ops/cluster_write.h"
-#include "mongo/util/log.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/ops/write_ops_exec.h"
+#include "merizo/db/ops/write_ops_gen.h"
+#include "merizo/db/pipeline/sharded_agg_helpers.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/query/document_source_merge_cursors.h"
+#include "merizo/s/write_ops/cluster_write.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 using std::shared_ptr;
@@ -206,4 +206,4 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
     return MongoInterfaceStandalone::attachCursorSourceToPipeline(expCtx, pipeline.release());
 }
 
-}  // namespace mongo
+}  // namespace merizo

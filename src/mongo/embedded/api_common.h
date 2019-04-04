@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,10 +29,10 @@
 
 #include <string>
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * A status object for use with C APIs that call into C++ code. When using StatusForAPI for error
@@ -127,7 +127,7 @@ private:
 public:
     ReentrancyGuard() {
         uassert(ErrorCodes::ReentrancyNotAllowed,
-                mongoutils::str::stream() << "Reentry into library is not allowed",
+                merizoutils::str::stream() << "Reentry into library is not allowed",
                 !inLibrary());
         inLibrary() = true;
     }
@@ -198,10 +198,10 @@ public:
 
 template <typename Status, typename Callable>
 auto enterCXX(Status* const statusPtr, Callable&& c) noexcept
-    -> decltype(mongo::enterCXXImpl<Status, Callable>::call(std::forward<Callable>(c),
+    -> decltype(merizo::enterCXXImpl<Status, Callable>::call(std::forward<Callable>(c),
                                                             *statusPtr)) {
-    return mongo::enterCXXImpl<Status, Callable>::call(std::forward<Callable>(c),
+    return merizo::enterCXXImpl<Status, Callable>::call(std::forward<Callable>(c),
                                                        StatusGuard<Status>(statusPtr));
 }
 
-}  // namespace mongo
+}  // namespace merizo

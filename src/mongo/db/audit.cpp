@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,46 +27,46 @@
  *    it in the license file.
  */
 
-#include "mongo/db/audit.h"
+#include "merizo/db/audit.h"
 
 #if !MONGO_ENTERPRISE_AUDIT
 
-void mongo::audit::logAuthentication(Client* client,
+void merizo::audit::logAuthentication(Client* client,
                                      StringData mechanism,
                                      const UserName& user,
                                      ErrorCodes::Error result) {}
 
-void mongo::audit::logCommandAuthzCheck(Client* client,
+void merizo::audit::logCommandAuthzCheck(Client* client,
                                         const OpMsgRequest& cmdObj,
                                         const CommandInterface& command,
                                         ErrorCodes::Error result) {}
 
-void mongo::audit::logDeleteAuthzCheck(Client* client,
+void merizo::audit::logDeleteAuthzCheck(Client* client,
                                        const NamespaceString& ns,
                                        const BSONObj& pattern,
                                        ErrorCodes::Error result) {}
 
-void mongo::audit::logGetMoreAuthzCheck(Client* client,
+void merizo::audit::logGetMoreAuthzCheck(Client* client,
                                         const NamespaceString& ns,
                                         long long cursorId,
                                         ErrorCodes::Error result) {}
 
-void mongo::audit::logInsertAuthzCheck(Client* client,
+void merizo::audit::logInsertAuthzCheck(Client* client,
                                        const NamespaceString& ns,
                                        const BSONObj& insertedObj,
                                        ErrorCodes::Error result) {}
 
-void mongo::audit::logKillCursorsAuthzCheck(Client* client,
+void merizo::audit::logKillCursorsAuthzCheck(Client* client,
                                             const NamespaceString& ns,
                                             long long cursorId,
                                             ErrorCodes::Error result) {}
 
-void mongo::audit::logQueryAuthzCheck(Client* client,
+void merizo::audit::logQueryAuthzCheck(Client* client,
                                       const NamespaceString& ns,
                                       const BSONObj& query,
                                       ErrorCodes::Error result) {}
 
-void mongo::audit::logUpdateAuthzCheck(Client* client,
+void merizo::audit::logUpdateAuthzCheck(Client* client,
                                        const NamespaceString& ns,
                                        const BSONObj& query,
                                        const BSONObj& updateObj,
@@ -74,100 +74,100 @@ void mongo::audit::logUpdateAuthzCheck(Client* client,
                                        bool isMulti,
                                        ErrorCodes::Error result) {}
 
-void mongo::audit::logCreateUser(Client* client,
+void merizo::audit::logCreateUser(Client* client,
                                  const UserName& username,
                                  bool password,
                                  const BSONObj* customData,
                                  const std::vector<RoleName>& roles,
                                  const boost::optional<BSONArray>& restrictions) {}
 
-void mongo::audit::logDropUser(Client* client, const UserName& username) {}
+void merizo::audit::logDropUser(Client* client, const UserName& username) {}
 
-void mongo::audit::logDropAllUsersFromDatabase(Client* client, StringData dbname) {}
+void merizo::audit::logDropAllUsersFromDatabase(Client* client, StringData dbname) {}
 
-void mongo::audit::logUpdateUser(Client* client,
+void merizo::audit::logUpdateUser(Client* client,
                                  const UserName& username,
                                  bool password,
                                  const BSONObj* customData,
                                  const std::vector<RoleName>* roles,
                                  const boost::optional<BSONArray>& restrictions) {}
 
-void mongo::audit::logGrantRolesToUser(Client* client,
+void merizo::audit::logGrantRolesToUser(Client* client,
                                        const UserName& username,
                                        const std::vector<RoleName>& roles) {}
 
-void mongo::audit::logRevokeRolesFromUser(Client* client,
+void merizo::audit::logRevokeRolesFromUser(Client* client,
                                           const UserName& username,
                                           const std::vector<RoleName>& roles) {}
 
-void mongo::audit::logCreateRole(Client* client,
+void merizo::audit::logCreateRole(Client* client,
                                  const RoleName& role,
                                  const std::vector<RoleName>& roles,
                                  const PrivilegeVector& privileges,
                                  const boost::optional<BSONArray>& restrictions) {}
 
-void mongo::audit::logUpdateRole(Client* client,
+void merizo::audit::logUpdateRole(Client* client,
                                  const RoleName& role,
                                  const std::vector<RoleName>* roles,
                                  const PrivilegeVector* privileges,
                                  const boost::optional<BSONArray>& restrictions) {}
 
-void mongo::audit::logDropRole(Client* client, const RoleName& role) {}
+void merizo::audit::logDropRole(Client* client, const RoleName& role) {}
 
-void mongo::audit::logDropAllRolesFromDatabase(Client* client, StringData dbname) {}
+void merizo::audit::logDropAllRolesFromDatabase(Client* client, StringData dbname) {}
 
-void mongo::audit::logGrantRolesToRole(Client* client,
+void merizo::audit::logGrantRolesToRole(Client* client,
                                        const RoleName& role,
                                        const std::vector<RoleName>& roles) {}
 
-void mongo::audit::logRevokeRolesFromRole(Client* client,
+void merizo::audit::logRevokeRolesFromRole(Client* client,
                                           const RoleName& role,
                                           const std::vector<RoleName>& roles) {}
 
-void mongo::audit::logGrantPrivilegesToRole(Client* client,
+void merizo::audit::logGrantPrivilegesToRole(Client* client,
                                             const RoleName& role,
                                             const PrivilegeVector& privileges) {}
 
-void mongo::audit::logRevokePrivilegesFromRole(Client* client,
+void merizo::audit::logRevokePrivilegesFromRole(Client* client,
                                                const RoleName& role,
                                                const PrivilegeVector& privileges) {}
 
-void mongo::audit::logReplSetReconfig(Client* client,
+void merizo::audit::logReplSetReconfig(Client* client,
                                       const BSONObj* oldConfig,
                                       const BSONObj* newConfig) {}
 
-void mongo::audit::logApplicationMessage(Client* client, StringData msg) {}
+void merizo::audit::logApplicationMessage(Client* client, StringData msg) {}
 
-void mongo::audit::logShutdown(Client* client) {}
+void merizo::audit::logShutdown(Client* client) {}
 
-void mongo::audit::logCreateIndex(Client* client,
+void merizo::audit::logCreateIndex(Client* client,
                                   const BSONObj* indexSpec,
                                   StringData indexname,
                                   StringData nsname) {}
 
-void mongo::audit::logCreateCollection(Client* client, StringData nsname) {}
+void merizo::audit::logCreateCollection(Client* client, StringData nsname) {}
 
-void mongo::audit::logCreateDatabase(Client* client, StringData dbname) {}
+void merizo::audit::logCreateDatabase(Client* client, StringData dbname) {}
 
 
-void mongo::audit::logDropIndex(Client* client, StringData indexname, StringData nsname) {}
+void merizo::audit::logDropIndex(Client* client, StringData indexname, StringData nsname) {}
 
-void mongo::audit::logDropCollection(Client* client, StringData nsname) {}
+void merizo::audit::logDropCollection(Client* client, StringData nsname) {}
 
-void mongo::audit::logDropDatabase(Client* client, StringData dbname) {}
+void merizo::audit::logDropDatabase(Client* client, StringData dbname) {}
 
-void mongo::audit::logRenameCollection(Client* client, StringData source, StringData target) {}
+void merizo::audit::logRenameCollection(Client* client, StringData source, StringData target) {}
 
-void mongo::audit::logEnableSharding(Client* client, StringData dbname) {}
+void merizo::audit::logEnableSharding(Client* client, StringData dbname) {}
 
-void mongo::audit::logAddShard(Client* client,
+void merizo::audit::logAddShard(Client* client,
                                StringData name,
                                const std::string& servers,
                                long long maxSize) {}
 
-void mongo::audit::logRemoveShard(Client* client, StringData shardname) {}
+void merizo::audit::logRemoveShard(Client* client, StringData shardname) {}
 
-void mongo::audit::logShardCollection(Client* client,
+void merizo::audit::logShardCollection(Client* client,
                                       StringData ns,
                                       const BSONObj& keyPattern,
                                       bool unique) {}

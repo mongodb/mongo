@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "merizo/rpc/metadata/client_metadata_ismaster.h"
 
 #include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/db/client.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -125,4 +125,4 @@ void ClientMetadataIsMasterState::writeToMetadata(OperationContext* opCtx,
     builder->append(ClientMetadata::fieldName(), clientMetadata.get().getDocument());
 }
 
-}  // namespace mongo
+}  // namespace merizo

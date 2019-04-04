@@ -2,7 +2,7 @@ var db;
 (function() {
     "use strict";
     const conn = MongoRunner.runMongod();
-    assert.neq(null, conn, "mongod failed to start.");
+    assert.neq(null, conn, "merizod failed to start.");
     db = conn.getDB("test");
 
     const t = db.foo;

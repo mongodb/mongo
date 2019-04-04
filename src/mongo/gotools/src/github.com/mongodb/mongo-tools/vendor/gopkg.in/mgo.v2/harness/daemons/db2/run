@@ -2,6 +2,6 @@
 
 . ../.env
 
-exec mongod $COMMONDOPTS \
+exec merizod $COMMONDOPTS \
 	--port 40002 \
 	--auth

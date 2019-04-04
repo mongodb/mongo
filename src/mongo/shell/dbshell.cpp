@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
@@ -39,38 +39,38 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "mongo/base/init.h"
-#include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
-#include "mongo/client/mongo_uri.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/client.h"
-#include "mongo/db/log_process_details.h"
-#include "mongo/db/server_options.h"
-#include "mongo/logger/console_appender.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/shell/linenoise.h"
-#include "mongo/shell/shell_options.h"
-#include "mongo/shell/shell_utils.h"
-#include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/stdx/utility.h"
-#include "mongo/transport/transport_layer_asio.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/file.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/password.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/signal_handlers.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/startup_test.h"
-#include "mongo/util/stringutils.h"
-#include "mongo/util/text.h"
-#include "mongo/util/version.h"
+#include "merizo/base/init.h"
+#include "merizo/base/initializer.h"
+#include "merizo/base/status.h"
+#include "merizo/client/merizo_uri.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/db/client.h"
+#include "merizo/db/log_process_details.h"
+#include "merizo/db/server_options.h"
+#include "merizo/logger/console_appender.h"
+#include "merizo/logger/logger.h"
+#include "merizo/logger/message_event_utf8_encoder.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/shell/linenoise.h"
+#include "merizo/shell/shell_options.h"
+#include "merizo/shell/shell_utils.h"
+#include "merizo/shell/shell_utils_launcher.h"
+#include "merizo/stdx/utility.h"
+#include "merizo/transport/transport_layer_asio.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/file.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/password.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/signal_handlers.h"
+#include "merizo/util/stacktrace.h"
+#include "merizo/util/startup_test.h"
+#include "merizo/util/stringutils.h"
+#include "merizo/util/text.h"
+#include "merizo/util/version.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -82,7 +82,7 @@
 #endif
 
 using namespace std::literals::string_literals;
-using namespace mongo;
+using namespace merizo;
 
 bool gotInterrupted = false;
 bool inMultiLine = false;
@@ -91,16 +91,16 @@ static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
 namespace {
 const std::string kDefaultMongoHost = "127.0.0.1"s;
 const std::string kDefaultMongoPort = "27017"s;
-const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoPort;
+const std::string kDefaultMongoURL = "merizodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoPort;
 
-// Initialize the featureCompatibilityVersion server parameter since the mongo shell does not have a
+// Initialize the featureCompatibilityVersion server parameter since the merizo shell does not have a
 // featureCompatibilityVersion document from which to initialize the parameter. The parameter is set
-// to the latest version because there is no feature gating that currently occurs at the mongo shell
+// to the latest version because there is no feature gating that currently occurs at the merizo shell
 // level. The server is responsible for rejecting usages of new features if its
 // featureCompatibilityVersion is lower.
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion42, ("EndStartupOptionSetup"))
 (InitializerContext* context) {
-    mongo::serverGlobalParams.featureCompatibility.setVersion(
+    merizo::serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     return Status::OK();
 }
@@ -153,7 +153,7 @@ private:
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 enum ShellExitCode : int {
     kDBException = 1,
@@ -246,7 +246,7 @@ void killOps() {
 
     sleepmillis(10);  // give current op a chance to finish
 
-    mongo::shell_utils::connectionRegistry.killOperationsOnAllConnections(
+    merizo::shell_utils::connectionRegistry.killOperationsOnAllConnections(
         !shellGlobalParams.autoKillOp);
 }
 
@@ -283,14 +283,14 @@ std::string getURIFromArgs(const std::string& arg,
         return kDefaultMongoURL;
     }
 
-    if ((str::startsWith(arg, "mongodb://") || str::startsWith(arg, "mongodb+srv://")) &&
+    if ((str::startsWith(arg, "merizodb://") || str::startsWith(arg, "merizodb+srv://")) &&
         host.empty() && port.empty()) {
-        // mongo mongodb://blah
+        // merizo merizodb://blah
         return arg;
     }
-    if ((str::startsWith(host, "mongodb://") || str::startsWith(host, "mongodb+srv://")) &&
+    if ((str::startsWith(host, "merizodb://") || str::startsWith(host, "merizodb+srv://")) &&
         arg.empty() && port.empty()) {
-        // mongo --host mongodb://blah
+        // merizo --host merizodb://blah
         return host;
     }
 
@@ -309,7 +309,7 @@ std::string getURIFromArgs(const std::string& arg,
         const auto hasReplSet = (slashPos > 0) && (slashPos != std::string::npos);
 
         std::ostringstream ss;
-        ss << "mongodb://";
+        ss << "merizodb://";
 
         // Handle each sub-element of the connection string individually.
         // Comma separated list of host elements.
@@ -546,7 +546,7 @@ bool isBalanced(const std::string& code) {
     return curlyBrackets == 0 && squareBrackets == 0 && parens == 0 && !danglingOp;
 }
 
-struct BalancedTest : public mongo::StartupTest {
+struct BalancedTest : public merizo::StartupTest {
 public:
     void run() {
         verify(isBalanced("x = 5"));
@@ -611,7 +611,7 @@ std::string finishCode(std::string code) {
     return code;
 }
 
-bool execPrompt(mongo::Scope& scope, const char* promptFunction, std::string& prompt) {
+bool execPrompt(merizo::Scope& scope, const char* promptFunction, std::string& prompt) {
     std::string execStatement = std::string("__promptWrapper__(") + promptFunction + ");";
     scope.exec("delete __prompt__;", "", false, false, false, 0);
     scope.exec(execStatement, "", false, false, false, 0);
@@ -685,12 +685,12 @@ static void edit(const std::string& whatToEdit) {
 #ifdef _WIN32
         char tempFolder[MAX_PATH];
         GetTempPathA(sizeof tempFolder, tempFolder);
-        sb << tempFolder << "mongo_edit" << time(0) + i << ".js";
+        sb << tempFolder << "merizo_edit" << time(0) + i << ".js";
 #else
-        sb << "/tmp/mongo_edit" << time(0) + i << ".js";
+        sb << "/tmp/merizo_edit" << time(0) + i << ".js";
 #endif
         filename = sb.str();
-        if (!::mongo::shell_utils::fileExists(filename))
+        if (!::merizo::shell_utils::fileExists(filename))
             break;
     }
     if (i == maxAttempts) {
@@ -794,7 +794,7 @@ bool mechanismRequiresPassword(const MongoURI& uri) {
 int _main(int argc, char* argv[], char** envp) {
     registerShutdownTask([] {
         // NOTE: This function may be called at any time. It must not
-        // depend on the prior execution of mongo initializers or the
+        // depend on the prior execution of merizo initializers or the
         // existence of threads.
         ::killOps();
         ::shellHistoryDone();
@@ -807,9 +807,9 @@ int _main(int argc, char* argv[], char** envp) {
     logger::globalLogManager()->getGlobalDomain()->attachAppender(
         std::make_unique<ShellConsoleAppender>(
             std::make_unique<logger::MessageEventDetailsEncoder>()));
-    mongo::shell_utils::RecordMyLocation(argv[0]);
+    merizo::shell_utils::RecordMyLocation(argv[0]);
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    merizo::runGlobalInitializersOrDie(argc, argv, envp);
     setGlobalServiceContext(ServiceContext::make());
     // TODO This should use a TransportLayerManager or TransportLayerFactory
     auto serviceContext = getGlobalServiceContext();
@@ -828,10 +828,10 @@ int _main(int argc, char* argv[], char** envp) {
 
     ErrorExtraInfo::invariantHaveAllParsers();
 
-    if (!mongo::serverGlobalParams.quiet.load())
-        std::cout << mongoShellVersion(VersionInfoInterface::instance()) << std::endl;
+    if (!merizo::serverGlobalParams.quiet.load())
+        std::cout << merizoShellVersion(VersionInfoInterface::instance()) << std::endl;
 
-    mongo::StartupTest::runTests();
+    merizo::StartupTest::runTests();
 
     logger::globalLogManager()
         ->getNamedDomain("javascriptOutput")
@@ -857,14 +857,14 @@ int _main(int argc, char* argv[], char** envp) {
         std::stringstream ss;
         ss << "DB.prototype._defaultAuthenticationMechanism = \"" << escape(authMechanisms.get())
            << "\";" << std::endl;
-        mongo::shell_utils::dbConnect += ss.str();
+        merizo::shell_utils::dbConnect += ss.str();
     }
 
     if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
         std::stringstream ss;
         ss << "DB.prototype._defaultGssapiServiceName = \"" << escape(gssapiServiveName.get())
            << "\";" << std::endl;
-        mongo::shell_utils::dbConnect += ss.str();
+        merizo::shell_utils::dbConnect += ss.str();
     }
 
     if (!shellGlobalParams.nodb) {  // connect to db
@@ -879,7 +879,7 @@ int _main(int argc, char* argv[], char** envp) {
             if (!shellGlobalParams.password.empty()) {
                 parsedURI.setPassword(stdx::as_const(shellGlobalParams.password));
             } else {
-                parsedURI.setPassword(mongo::askPassword());
+                parsedURI.setPassword(merizo::askPassword());
             }
         }
 
@@ -888,7 +888,7 @@ int _main(int argc, char* argv[], char** envp) {
         }
 
         std::stringstream ss;
-        if (mongo::serverGlobalParams.quiet.load()) {
+        if (merizo::serverGlobalParams.quiet.load()) {
             ss << "__quiet = true;" << std::endl;
         }
 
@@ -901,37 +901,37 @@ int _main(int argc, char* argv[], char** envp) {
             ss << "db = db.getMongo().startSession().getDatabase(db.getName());" << std::endl;
         }
 
-        mongo::shell_utils::dbConnect += ss.str();
+        merizo::shell_utils::dbConnect += ss.str();
     }
 
-    mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
-    mongo::ScriptEngine::setup();
-    mongo::getGlobalScriptEngine()->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
-    mongo::getGlobalScriptEngine()->setScopeInitCallback(mongo::shell_utils::initScope);
-    mongo::getGlobalScriptEngine()->enableJIT(!shellGlobalParams.nojit);
-    mongo::getGlobalScriptEngine()->enableJavaScriptProtection(
+    merizo::ScriptEngine::setConnectCallback(merizo::shell_utils::onConnect);
+    merizo::ScriptEngine::setup();
+    merizo::getGlobalScriptEngine()->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
+    merizo::getGlobalScriptEngine()->setScopeInitCallback(merizo::shell_utils::initScope);
+    merizo::getGlobalScriptEngine()->enableJIT(!shellGlobalParams.nojit);
+    merizo::getGlobalScriptEngine()->enableJavaScriptProtection(
         shellGlobalParams.javascriptProtection);
 
     auto poolGuard = makeGuard([] { ScriptEngine::dropScopeCache(); });
 
-    std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
+    std::unique_ptr<merizo::Scope> scope(merizo::getGlobalScriptEngine()->newScope());
     shellMainScope = scope.get();
 
-    if (shellGlobalParams.runShell && !mongo::serverGlobalParams.quiet.load())
+    if (shellGlobalParams.runShell && !merizo::serverGlobalParams.quiet.load())
         std::cout << "type \"help\" for help" << std::endl;
 
-    // Load and execute /etc/mongorc.js before starting shell
+    // Load and execute /etc/merizorc.js before starting shell
     std::string rcGlobalLocation;
 #ifndef _WIN32
-    rcGlobalLocation = "/etc/mongorc.js";
+    rcGlobalLocation = "/etc/merizorc.js";
 #else
     wchar_t programDataPath[MAX_PATH];
     if (S_OK == SHGetFolderPathW(NULL, CSIDL_COMMON_APPDATA, NULL, 0, programDataPath)) {
         rcGlobalLocation = str::stream() << toUtf8String(programDataPath)
-                                         << "\\MongoDB\\mongorc.js";
+                                         << "\\MerizoDB\\merizorc.js";
     }
 #endif
-    if (!rcGlobalLocation.empty() && ::mongo::shell_utils::fileExists(rcGlobalLocation)) {
+    if (!rcGlobalLocation.empty() && ::merizo::shell_utils::fileExists(rcGlobalLocation)) {
         if (!scope->execFile(rcGlobalLocation, false, true)) {
             std::cout << "The \"" << rcGlobalLocation << "\" file could not be executed"
                       << std::endl;
@@ -939,7 +939,7 @@ int _main(int argc, char* argv[], char** envp) {
     }
 
     if (!shellGlobalParams.script.empty()) {
-        mongo::shell_utils::MongoProgramScope s;
+        merizo::shell_utils::MongoProgramScope s;
         if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false)) {
             error() << "exiting with code " << static_cast<int>(kEvalError);
             return kEvalError;
@@ -948,7 +948,7 @@ int _main(int argc, char* argv[], char** envp) {
     }
 
     for (size_t i = 0; i < shellGlobalParams.files.size(); ++i) {
-        mongo::shell_utils::MongoProgramScope s;
+        merizo::shell_utils::MongoProgramScope s;
 
         if (shellGlobalParams.files.size() > 1)
             std::cout << "loading file: " << shellGlobalParams.files[i] << std::endl;
@@ -960,7 +960,7 @@ int _main(int argc, char* argv[], char** envp) {
         }
 
         // Check if the process left any running child processes.
-        std::vector<ProcessId> pids = mongo::shell_utils::getRunningMongoChildProcessIds();
+        std::vector<ProcessId> pids = merizo::shell_utils::getRunningMongoChildProcessIds();
 
         if (!pids.empty()) {
             std::cout << "terminating the following processes started by "
@@ -968,7 +968,7 @@ int _main(int argc, char* argv[], char** envp) {
             std::copy(pids.begin(), pids.end(), std::ostream_iterator<ProcessId>(std::cout, " "));
             std::cout << std::endl;
 
-            if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
+            if (merizo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
                 severe() << "one more more child processes exited with an error during "
                          << shellGlobalParams.files[i];
                 error() << "exiting with code " << static_cast<int>(kProcessTerminationError);
@@ -998,24 +998,24 @@ int _main(int argc, char* argv[], char** envp) {
 
     bool lastLineSuccessful = true;
     if (shellGlobalParams.runShell) {
-        mongo::shell_utils::MongoProgramScope s;
+        merizo::shell_utils::MongoProgramScope s;
         // If they specify norc, assume it's not their first time
         bool hasMongoRC = shellGlobalParams.norc;
         std::string rcLocation;
         if (!shellGlobalParams.norc) {
 #ifndef _WIN32
             if (getenv("HOME") != NULL)
-                rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js";
+                rcLocation = str::stream() << getenv("HOME") << "/.merizorc.js";
 #else
             if (getenv("HOMEDRIVE") != NULL && getenv("HOMEPATH") != NULL)
                 rcLocation = str::stream() << toUtf8String(_wgetenv(L"HOMEDRIVE"))
                                            << toUtf8String(_wgetenv(L"HOMEPATH"))
-                                           << "\\.mongorc.js";
+                                           << "\\.merizorc.js";
 #endif
-            if (!rcLocation.empty() && ::mongo::shell_utils::fileExists(rcLocation)) {
+            if (!rcLocation.empty() && ::merizo::shell_utils::fileExists(rcLocation)) {
                 hasMongoRC = true;
                 if (!scope->execFile(rcLocation, false, true)) {
-                    severe() << "The \".mongorc.js\" file located in your home folder could not be "
+                    severe() << "The \".merizorc.js\" file located in your home folder could not be "
                                 "executed";
                     error() << "exiting with code " << static_cast<int>(kMongorcError);
                     return kMongorcError;
@@ -1025,16 +1025,16 @@ int _main(int argc, char* argv[], char** envp) {
 
         if (!hasMongoRC && isatty(fileno(stdin))) {
             std::cout
-                << "Welcome to the MongoDB shell.\n"
+                << "Welcome to the MerizoDB shell.\n"
                    "For interactive help, type \"help\".\n"
-                   "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
-                   "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user"
+                   "For more comprehensive documentation, see\n\thttp://docs.merizodb.org/\n"
+                   "Questions? Try the support group\n\thttp://groups.google.com/group/merizodb-user"
                 << std::endl;
             File f;
-            f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
+            f.open(rcLocation.c_str(), false);  // Create empty .merizorc.js file
         }
 
-        if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet.load() &&
+        if (!shellGlobalParams.nodb && !merizo::serverGlobalParams.quiet.load() &&
             isatty(fileno(stdin))) {
             scope->exec(
                 "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings)", false, true, false);
@@ -1079,7 +1079,7 @@ int _main(int argc, char* argv[], char** envp) {
             }
 
             if (!linePtr || (strlen(linePtr) == 4 && strstr(linePtr, "exit"))) {
-                if (!mongo::serverGlobalParams.quiet.load())
+                if (!merizo::serverGlobalParams.quiet.load())
                     std::cout << "bye" << std::endl;
                 if (line)
                     free(line);
@@ -1189,7 +1189,7 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     try {
         WindowsCommandLine wcl(argc, argvW, envpW);
         returnCode = _main(argc, wcl.argv(), wcl.envp());
-    } catch (mongo::DBException& e) {
+    } catch (merizo::DBException& e) {
         severe() << "exception: " << e.what();
         error() << "exiting with code " << static_cast<int>(kDBException);
         returnCode = kDBException;
@@ -1201,7 +1201,7 @@ int main(int argc, char* argv[], char** envp) {
     int returnCode;
     try {
         returnCode = _main(argc, argv, envp);
-    } catch (mongo::DBException& e) {
+    } catch (merizo::DBException& e) {
         severe() << "exception: " << e.what();
         error() << "exiting with code " << static_cast<int>(kDBException);
         returnCode = kDBException;

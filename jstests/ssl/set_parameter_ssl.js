@@ -44,8 +44,8 @@ function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
         return;
     }
 
-    let uri = `mongodb://localhost:${conn.port}/admin`;
-    let exitCode = runMongoProgram("mongo", uri, "--eval", "assert.commandWorked(db.isMaster())");
+    let uri = `merizodb://localhost:${conn.port}/admin`;
+    let exitCode = runMongoProgram("merizo", uri, "--eval", "assert.commandWorked(db.isMaster())");
     assert.neq(exitCode, 0, "Was able to connect without SSL when SSLMode was requireSSL");
     MongoRunner.stopMongod(conn);
 }

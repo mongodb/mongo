@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_change_stream_transform.h"
+#include "merizo/db/pipeline/document_source_change_stream_transform.h"
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/bson/bson_helper.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/pipeline/change_stream_constants.h"
-#include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_check_resume_token.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/resume_token.h"
-#include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/db/bson/bson_helper.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/commands/feature_compatibility_version_documentation.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/pipeline/change_stream_constants.h"
+#include "merizo/db/pipeline/document_path_support.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_change_stream.h"
+#include "merizo/db/pipeline/document_source_check_resume_token.h"
+#include "merizo/db/pipeline/document_source_limit.h"
+#include "merizo/db/pipeline/document_source_lookup_change_post_image.h"
+#include "merizo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/expression.h"
+#include "merizo/db/pipeline/lite_parsed_document_source.h"
+#include "merizo/db/pipeline/resume_token.h"
+#include "merizo/db/repl/bson_extract_optime.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/oplog_entry_gen.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/transaction_history_iterator.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -171,17 +171,17 @@ ResumeTokenData DocumentSourceChangeStreamTransform::getResumeToken(Value ts,
 }
 
 Document DocumentSourceChangeStreamTransform::applyTransformation(const Document& input) {
-    // If we're executing a change stream pipeline that was forwarded from mongos, then we expect it
+    // If we're executing a change stream pipeline that was forwarded from merizos, then we expect it
     // to "need merge"---we expect to be executing the shards part of a split pipeline. It is never
-    // correct for mongos to pass through the change stream without splitting into into a merging
-    // part executed on mongos and a shards part.
+    // correct for merizos to pass through the change stream without splitting into into a merging
+    // part executed on merizos and a shards part.
     //
-    // This is necessary so that mongos can correctly handle "invalidate" and "retryNeeded" change
+    // This is necessary so that merizos can correctly handle "invalidate" and "retryNeeded" change
     // notifications. See SERVER-31978 for an example of why the pipeline must be split.
     //
     // We have to check this invariant at run-time of the change stream rather than parse time,
-    // since a mongos may forward a change stream in an invalid position (e.g. in a nested $lookup
-    // or $facet pipeline). In this case, mongod is responsible for parsing the pipeline and
+    // since a merizos may forward a change stream in an invalid position (e.g. in a nested $lookup
+    // or $facet pipeline). In this case, merizod is responsible for parsing the pipeline and
     // throwing an error without ever executing the change stream.
     if (pExpCtx->fromMongos) {
         invariant(pExpCtx->needsMerge);
@@ -214,7 +214,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         auto it = _documentKeyCache.find(uuid.getUuid());
         if (it == _documentKeyCache.end() || !it->second.isFinal) {
             auto docKeyFields =
-                pExpCtx->mongoProcessInterface->collectDocumentKeyFieldsForHostedCollection(
+                pExpCtx->merizoProcessInterface->collectDocumentKeyFieldsForHostedCollection(
                     pExpCtx->opCtx, nss, uuid.getUuid());
             if (it == _documentKeyCache.end() || docKeyFields.second) {
                 _documentKeyCache[uuid.getUuid()] = DocumentKeyCacheEntry(docKeyFields);
@@ -340,7 +340,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // We set the resume token as the document's sort key in both the sharded and non-sharded cases,
     // since we will subsequently rely upon it to generate a correct postBatchResumeToken.
     // TODO SERVER-38539: when returning results for merging, we first check whether 'mergeByPBRT'
-    // has been set. If not, then the request was sent from an older mongoS which cannot merge by
+    // has been set. If not, then the request was sent from an older merizoS which cannot merge by
     // raw resume tokens, and we must use the old sort key format. This check, and the 'mergeByPBRT'
     // flag, are no longer necessary in 4.4; all change streams will be merged by resume token.
     if (pExpCtx->needsMerge && !pExpCtx->mergeByPBRT) {
@@ -371,8 +371,8 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
 Value DocumentSourceChangeStreamTransform::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     Document changeStreamOptions(_changeStreamSpec);
-    // If we're on a mongos and no other start time is specified, we want to start at the current
-    // cluster time on the mongos.  This ensures all shards use the same start time.
+    // If we're on a merizos and no other start time is specified, we want to start at the current
+    // cluster time on the merizos.  This ensures all shards use the same start time.
     if (pExpCtx->inMongos &&
         changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterFieldName].missing() &&
         changeStreamOptions[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName]
@@ -382,7 +382,7 @@ Value DocumentSourceChangeStreamTransform::serialize(
 
         // Use the current cluster time plus 1 tick since the oplog query will include all
         // operations/commands equal to or greater than the 'startAtOperationTime' timestamp. In
-        // particular, avoid including the last operation that went through mongos in an attempt to
+        // particular, avoid including the last operation that went through merizos in an attempt to
         // match the behavior of a replica set more closely.
         auto clusterTime = LogicalClock::get(pExpCtx->opCtx)->getClusterTime();
         clusterTime.addTicks(1);
@@ -441,7 +441,7 @@ void DocumentSourceChangeStreamTransform::initializeTransactionContext(const Doc
         uassertStatusOK(bsonExtractOpTimeField(input.toBson(), "prevOpTime", &opTime));
 
         auto applyOpsEntry =
-            pExpCtx->mongoProcessInterface->lookUpOplogEntryByOpTime(pExpCtx->opCtx, opTime);
+            pExpCtx->merizoProcessInterface->lookUpOplogEntryByOpTime(pExpCtx->opCtx, opTime);
         invariant(applyOpsEntry.isCommand() &&
                   (repl::OplogEntry::CommandType::kApplyOps == applyOpsEntry.getCommandType()));
         invariant(applyOpsEntry.shouldPrepare());
@@ -461,7 +461,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::getNext() {
     pExpCtx->checkForInterrupt();
 
     uassert(50988,
-            "Illegal attempt to execute an internal change stream stage on mongos. A $changeStream "
+            "Illegal attempt to execute an internal change stream stage on merizos. A $changeStream "
             "stage must be the first stage in a pipeline",
             !pExpCtx->inMongos);
 
@@ -535,4 +535,4 @@ boost::optional<Document> DocumentSourceChangeStreamTransform::extractNextApplyO
     return boost::none;
 }
 
-}  // namespace mongo
+}  // namespace merizo

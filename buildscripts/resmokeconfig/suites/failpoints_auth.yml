@@ -12,7 +12,7 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/fail_point/*[aA]uth*.js
 
-# Failpoint tests start their own mongod's.
+# Failpoint tests start their own merizod's.
 executor:
   config:
     shell_options:

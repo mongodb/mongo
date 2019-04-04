@@ -1,10 +1,10 @@
 /**
- * Test that mongos times out when the config server replica set only contains nodes that
+ * Test that merizos times out when the config server replica set only contains nodes that
  * are behind the majority opTime.
  */
 
-// Checking UUID consistency involves mongos being able to do a read from the config server, but
-// this test is designed to make mongos time out when reading from the config server.
+// Checking UUID consistency involves merizos being able to do a read from the config server, but
+// this test is designed to make merizos time out when reading from the config server.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 (function() {
@@ -27,13 +27,13 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     delayedConfigSecondary.getDB('admin').adminCommand(
         {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
-    // Do one metadata write in order to bump the optime on mongos
+    // Do one metadata write in order to bump the optime on merizos
     assert.writeOK(st.getDB('config').TestConfigColl.insert({TestKey: 'Test value'}));
 
     st.configRS.stopMaster();
     MongoRunner.stopMongod(configSecondaryToKill);
 
-    // Clears all cached info so mongos will be forced to query from the config.
+    // Clears all cached info so merizos will be forced to query from the config.
     st.s.adminCommand({flushRouterConfig: 1});
 
     print('Attempting read on a sharded collection...');

@@ -5,9 +5,9 @@
 (function() {
     "use strict";
 
-    const mongodOptions = {};
-    const conn = MongoRunner.runMongod(mongodOptions);
-    assert.neq(null, conn, "mongod failed to start with options " + tojson(mongodOptions));
+    const merizodOptions = {};
+    const conn = MongoRunner.runMongod(merizodOptions);
+    assert.neq(null, conn, "merizod failed to start with options " + tojson(merizodOptions));
 
     const testDB = conn.getDB("test");
     const coll = testDB[jsTest.name];

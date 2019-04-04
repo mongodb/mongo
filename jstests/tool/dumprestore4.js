@@ -1,12 +1,12 @@
 // dumprestore4.js -- see SERVER-2186
 
-// The point of this test is to ensure that mongorestore successfully
+// The point of this test is to ensure that merizorestore successfully
 // constructs indexes when the database being restored into has a
 // different name than the database dumped from.  There are 2
 // issues here: (1) if you dumped from database "A" and restore into
 // database "B", B should have exactly the right indexes; (2) if for
 // some reason you have another database called "A" at the time of the
-// restore, mongorestore shouldn't touch it.
+// restore, merizorestore shouldn't touch it.
 
 t = new ToolTest("dumprestore4");
 

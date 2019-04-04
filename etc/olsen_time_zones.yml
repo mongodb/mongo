@@ -19,7 +19,7 @@ functions:
         local_files_include_filter:
          - src/src/third_party/timelib-*/zones/timezonedb-*.zip
         remote_file: olson_tz_db/
-        bucket: downloads.mongodb.org
+        bucket: downloads.merizodb.org
         permissions: public-read
         content_type: application/zip
         display_name: timezonedb.zip

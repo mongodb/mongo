@@ -11,8 +11,8 @@ env.Library(
         'element.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/safe_num',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/util/safe_num',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -22,8 +22,8 @@ env.Library(
         'mutable_bson_test_utils.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/unittest/unittest',
         'mutable_bson',
     ],
 )
@@ -45,7 +45,7 @@ env.CppUnitTest(
         'mutable_bson_algo_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
         'mutable_bson',
         'mutable_bson_test_utils',
     ],

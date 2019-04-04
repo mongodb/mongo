@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,15 +33,15 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/unordered_set.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/aggregation_request.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/unordered_set.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * A lightly parsed version of a DocumentSource. It is not executable and not guaranteed to return a
@@ -115,7 +115,7 @@ public:
     }
 
     /**
-     * Returns true if this stage may be forwarded to shards from a mongos.
+     * Returns true if this stage may be forwarded to shards from a merizos.
      */
     virtual bool allowedToForwardFromMongos() const {
         return true;
@@ -194,4 +194,4 @@ protected:
 private:
     PrivilegeVector _requiredPrivileges;
 };
-}  // namespace mongo
+}  // namespace merizo

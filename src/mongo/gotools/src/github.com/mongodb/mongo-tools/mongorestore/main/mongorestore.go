@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Main package for the mongorestore tool.
+// Main package for the merizorestore tool.
 package main
 
 import (
@@ -12,13 +12,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongorestore"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/signals"
+	"github.com/merizodb/merizo-tools/common/util"
+	"github.com/merizodb/merizo-tools/merizorestore"
 )
 
 const (
@@ -28,20 +28,20 @@ const (
 
 func main() {
 	// initialize command-line opts
-	opts := options.New("mongorestore", mongorestore.Usage,
+	opts := options.New("merizorestore", merizorestore.Usage,
 		options.EnabledOptions{Auth: true, Connection: true, URI: true})
-	nsOpts := &mongorestore.NSOptions{}
+	nsOpts := &merizorestore.NSOptions{}
 	opts.AddOptions(nsOpts)
-	inputOpts := &mongorestore.InputOptions{}
+	inputOpts := &merizorestore.InputOptions{}
 	opts.AddOptions(inputOpts)
-	outputOpts := &mongorestore.OutputOptions{}
+	outputOpts := &merizorestore.OutputOptions{}
 	opts.AddOptions(outputOpts)
 	opts.URI.AddKnownURIParameters(options.KnownURIOptionsWriteConcern)
 
 	extraArgs, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
-		log.Logvf(log.Always, "try 'mongorestore --help' for more information")
+		log.Logvf(log.Always, "try 'merizorestore --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -66,7 +66,7 @@ func main() {
 	targetDir, err := getTargetDirFromArgs(extraArgs, inputOpts.Directory)
 	if err != nil {
 		log.Logvf(log.Always, "%v", err)
-		log.Logvf(log.Always, "try 'mongorestore --help' for more information")
+		log.Logvf(log.Always, "try 'merizorestore --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 	targetDir = util.ToUniversalPath(targetDir)
@@ -87,7 +87,7 @@ func main() {
 	progressManager.Start()
 	defer progressManager.Stop()
 
-	restore := mongorestore.MongoRestore{
+	restore := merizorestore.MongoRestore{
 		ToolOptions:     opts,
 		OutputOptions:   outputOpts,
 		InputOptions:    inputOpts,

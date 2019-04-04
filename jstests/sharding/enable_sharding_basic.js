@@ -5,9 +5,9 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({mongos: 2, shards: 2});
+    var st = new ShardingTest({merizos: 2, shards: 2});
 
-    // enableSharding can run only on mongos.
+    // enableSharding can run only on merizos.
     assert.commandFailedWithCode(
         st.rs0.getPrimary().getDB('admin').runCommand({enableSharding: 'db'}),
         ErrorCodes.CommandNotFound);
@@ -50,7 +50,7 @@
     assert.writeOK(st.s0.getDB('TestDB').TestColl.insert({_id: 0}));
     assert.writeOK(st.s1.getDB('TestDB').TestColl.insert({_id: 1}));
 
-    // Calling 'enableSharding' on one mongos and 'shardCollection' through another must work
+    // Calling 'enableSharding' on one merizos and 'shardCollection' through another must work
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
     assert.commandWorked(st.s1.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));
     assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));

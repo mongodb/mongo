@@ -9,7 +9,7 @@ var db;
 (function() {
     "use strict";
     var shardingTest = new ShardingTest(
-        {name: "shell_commands", shards: 1, mongos: 1, other: {enableBalancer: true}});
+        {name: "shell_commands", shards: 1, merizos: 1, other: {enableBalancer: true}});
     db = shardingTest.getDB("test");
 
     assert(sh.getBalancerState(), "Balancer should have been enabled during cluster setup");

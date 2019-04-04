@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,13 +31,13 @@
 
 #include <memory>
 
-#include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/repl/dbcheck_gen.h"
-#include "mongo/util/md5.hpp"
+#include "merizo/db/catalog/health_log_gen.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/repl/dbcheck_gen.h"
+#include "merizo/util/md5.hpp"
 
-namespace mongo {
+namespace merizo {
 
 // Forward declarations.
 class Collection;

@@ -11,17 +11,17 @@ env.Library(
         env.Idlc('cluster_query_knobs.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
-        '$BUILD_DIR/mongo/db/query/query_common',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/curop',
+        '$BUILD_DIR/merizo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/merizo/db/query/query_common',
+        '$BUILD_DIR/merizo/s/sharding_router_api',
         "cluster_client_cursor",
         "cluster_cursor_cleanup_job",
         "store_possible_cursor",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
@@ -31,12 +31,12 @@ env.Library(
         'cluster_aggregate.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
-        '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
-        '$BUILD_DIR/mongo/db/pipeline/mongos_process_interface',
-        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
-        '$BUILD_DIR/mongo/db/views/views',
+        '$BUILD_DIR/merizo/db/pipeline/pipeline',
+        '$BUILD_DIR/merizo/s/query/cluster_aggregation_planner',
+        '$BUILD_DIR/merizo/s/query/cluster_client_cursor',
+        '$BUILD_DIR/merizo/db/pipeline/merizos_process_interface',
+        '$BUILD_DIR/merizo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/merizo/db/views/views',
         'cluster_query',
     ]
 )
@@ -58,9 +58,9 @@ env.CppUnitTest(
         "cluster_aggregation_planner_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/saslauth',
-        '$BUILD_DIR/mongo/s/commands/cluster_command_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/auth/saslauth',
+        '$BUILD_DIR/merizo/s/commands/cluster_command_test_fixture',
         'cluster_aggregate',
     ],
 )
@@ -87,7 +87,7 @@ env.Library(
         'router_stage_skip.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/merizo/db/pipeline/pipeline',
         'async_results_merger',
     ],
 )
@@ -101,7 +101,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'router_exec_stage',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
     ],
 )
 
@@ -114,12 +114,12 @@ env.Library(
         env.Idlc('async_results_merger_params.idl')[0],
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/query_common",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/s/client/sharding_client",
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
-        "$BUILD_DIR/mongo/s/sharding_router_api",
+        "$BUILD_DIR/merizo/db/query/command_request_response",
+        "$BUILD_DIR/merizo/db/query/query_common",
+        "$BUILD_DIR/merizo/executor/task_executor_interface",
+        "$BUILD_DIR/merizo/s/client/sharding_client",
+        '$BUILD_DIR/merizo/s/catalog/sharding_catalog_client_impl',
+        "$BUILD_DIR/merizo/s/sharding_router_api",
     ],
 )
 
@@ -129,7 +129,7 @@ env.Library(
         "cluster_client_cursor_mock.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -143,10 +143,10 @@ env.CppUnitTest(
     LIBDEPS=[
         'async_results_merger',
         'cluster_client_cursor',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/query/query_request',
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/merizo/s/sharding_router_test_fixture',
     ],
 )
 
@@ -157,9 +157,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'async_results_merger',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/query/query_request',
+        '$BUILD_DIR/merizo/s/sharding_router_test_fixture',
     ],
 )
 env.Library(
@@ -168,9 +168,9 @@ env.Library(
         "store_possible_cursor.cpp"
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/curop",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/db/curop",
+        "$BUILD_DIR/merizo/db/query/command_request_response",
         "cluster_client_cursor",
         "cluster_cursor_manager",
     ],
@@ -183,9 +183,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'store_possible_cursor',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/util/clock_source_mock',
     ],
 )
 
@@ -195,13 +195,13 @@ env.Library(
         "cluster_cursor_manager.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/generic_cursor',
-        '$BUILD_DIR/mongo/db/kill_sessions',
-        '$BUILD_DIR/mongo/db/logical_session_cache',
-        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/generic_cursor',
+        '$BUILD_DIR/merizo/db/kill_sessions',
+        '$BUILD_DIR/merizo/db/logical_session_cache',
+        '$BUILD_DIR/merizo/db/logical_session_id',
     ],
 )
 
@@ -211,9 +211,9 @@ env.CppUnitTest(
         "cluster_cursor_manager_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/logical_session_id",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "$BUILD_DIR/merizo/db/logical_session_id",
+        "$BUILD_DIR/merizo/db/service_context_test_fixture",
+        "$BUILD_DIR/merizo/util/clock_source_mock",
         "cluster_client_cursor_mock",
         "cluster_cursor_manager",
     ],
@@ -225,9 +225,9 @@ env.Library(
         "cluster_cursor_cleanup_job.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/cursor_server_params",
-        "$BUILD_DIR/mongo/s/coreshard",
-        "$BUILD_DIR/mongo/util/background_job",
+        "$BUILD_DIR/merizo/db/cursor_server_params",
+        "$BUILD_DIR/merizo/s/coreshard",
+        "$BUILD_DIR/merizo/util/background_job",
     ],
 )
 
@@ -238,7 +238,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'cluster_client_cursor',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )

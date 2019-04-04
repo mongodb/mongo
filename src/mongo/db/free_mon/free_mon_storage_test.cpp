@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/free_mon/free_mon_storage.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/lock_manager_defs.h"
+#include "merizo/db/free_mon/free_mon_storage.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/repl/storage_interface_impl.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/executor/network_interface_mock.h"
+#include "merizo/executor/thread_pool_task_executor.h"
+#include "merizo/executor/thread_pool_task_executor_test_fixture.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class FreeMonStorageTest : public ServiceContextMongoDTest {
@@ -267,4 +267,4 @@ TEST_F(FreeMonStorageTest, TestClusterManagerStorage) {
     ASSERT_FALSE(FreeMonStorage::readClusterManagerState(_opCtx.get()).is_initialized());
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

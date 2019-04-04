@@ -1,4 +1,4 @@
-// mgo - MongoDB driver for Go
+// mgo - MerizoDB driver for Go
 //
 // Copyright (c) 2014 - Gustavo Niemeyer <gustavo@niemeyer.net>
 //

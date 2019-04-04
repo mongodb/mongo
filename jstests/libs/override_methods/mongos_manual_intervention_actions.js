@@ -1,5 +1,5 @@
 /**
- * If the config primary steps down during a metadata command, mongos will internally retry the
+ * If the config primary steps down during a metadata command, merizos will internally retry the
  * command. On the retry, the command may fail with the error "ManualInterventionRequired" if
  * the earlier try left the config database in an inconsistent state.
  *
@@ -13,37 +13,37 @@ var ManualInterventionActions = (function() {
      * Remove all the chunk documents from the given namespace. Deletes are performed one at a
      * time to bypass auto_retry_on_network_error.js multi remove check.
      */
-    let removeChunks = function(mongosConn, ns) {
+    let removeChunks = function(merizosConn, ns) {
         let stillHasChunks = true;
 
         while (stillHasChunks) {
-            let writeRes = assert.writeOK(mongosConn.getDB('config').chunks.remove(
+            let writeRes = assert.writeOK(merizosConn.getDB('config').chunks.remove(
                 {ns: ns}, {justOne: true, writeConcern: {w: 'majority'}}));
             stillHasChunks = writeRes.nRemoved > 0;
         }
     };
 
-    this.removePartiallyWrittenChunks = function(mongosConn, ns, cmdObj, numAttempts) {
+    this.removePartiallyWrittenChunks = function(merizosConn, ns, cmdObj, numAttempts) {
         print("command " + tojson(cmdObj) + " failed after " + numAttempts +
               " attempts due to seeing partially written chunks for collection " + ns +
               ", probably due to a previous failed shardCollection attempt. Manually" +
               " deleting chunks for " + ns + " from config.chunks and retrying the command.");
 
-        removeChunks(mongosConn, ns);
+        removeChunks(merizosConn, ns);
     };
 
     this.removePartiallyWrittenChunksAndDropCollection = function(
-        mongosConn, ns, cmdObj, numAttempts) {
+        merizosConn, ns, cmdObj, numAttempts) {
         print("command " + tojson(cmdObj) + " failed after " + numAttempts +
               " attempts due to seeing partially written chunks for collection " + ns +
               ", probably due to a previous failed shardCollection attempt. Manually" +
               " deleting chunks for " + ns + " from config.chunks" +
               ", dropping the collection, and retrying the command.");
 
-        removeChunks(mongosConn, ns);
+        removeChunks(merizosConn, ns);
         const[dbName, collName] = ns.split(".");
         assert.commandWorked(
-            mongosConn.getDB(dbName).runCommand({"drop": collName, writeConcern: {w: "majority"}}));
+            merizosConn.getDB(dbName).runCommand({"drop": collName, writeConcern: {w: "majority"}}));
     };
 
     return this;
@@ -51,7 +51,7 @@ var ManualInterventionActions = (function() {
 
 (function() {
 
-    const mongoRunCommandOriginal = Mongo.prototype.runCommand;
+    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
 
     Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
         const cmdName = Object.keys(cmdObj)[0];
@@ -59,7 +59,7 @@ var ManualInterventionActions = (function() {
             new Set(["mapReduce", "mapreduce", "shardCollection", "shardcollection"]);
 
         if (!commandsToRetry.has(cmdName)) {
-            return mongoRunCommandOriginal.apply(this, arguments);
+            return merizoRunCommandOriginal.apply(this, arguments);
         }
 
         const maxAttempts = 10;
@@ -67,7 +67,7 @@ var ManualInterventionActions = (function() {
         let res;
 
         while (numAttempts < maxAttempts) {
-            res = mongoRunCommandOriginal.apply(this, arguments);
+            res = merizoRunCommandOriginal.apply(this, arguments);
             ++numAttempts;
 
             if (res.ok === 1 || res.code !== ErrorCodes.ManualInterventionRequired ||

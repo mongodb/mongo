@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <algorithm>
 #include <cmath>
@@ -39,24 +39,24 @@
 #include <typeinfo>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/bson/bsonobj_comparator.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/config.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/timer.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/bson/bsonobj_comparator.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/config.h"
+#include "merizo/db/storage/key_string.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/future.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/timer.h"
 
 using std::string;
-using namespace mongo;
+using namespace merizo;
 
 BSONObj toBson(const KeyString& ks, Ordering ord) {
     return KeyString::toBson(ks.getBuffer(), ks.getSize(), ord, ks.getTypeBits());
@@ -75,10 +75,10 @@ Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 Ordering ONE_ASCENDING = Ordering::make(BSON("a" << 1));
 Ordering ONE_DESCENDING = Ordering::make(BSON("a" << -1));
 
-class KeyStringTest : public mongo::unittest::Test {
+class KeyStringTest : public merizo::unittest::Test {
 public:
     void run() {
-        auto base = static_cast<mongo::unittest::Test*>(this);
+        auto base = static_cast<merizo::unittest::Test*>(this);
         try {
             version = KeyString::Version::V0;
             base->run();
@@ -86,7 +86,7 @@ public:
             base->run();
         } catch (...) {
             log() << "exception while testing KeyString version "
-                  << mongo::KeyString::versionToString(version);
+                  << merizo::KeyString::versionToString(version);
             throw;
         }
     }
@@ -1508,7 +1508,7 @@ void perfTest(KeyString::Version version, const Numbers& numbers) {
         numbers.begin(), numbers.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
 
     log() << 1E3 * micros / static_cast<double>(iters * numbers.size()) << " ns per "
-          << mongo::KeyString::versionToString(version) << " roundtrip"
+          << merizo::KeyString::versionToString(version) << " roundtrip"
           << (kDebugBuild ? " (DEBUG BUILD!)" : "") << " min " << (*minmax.first)[""] << ", max"
           << (*minmax.second)[""];
 }

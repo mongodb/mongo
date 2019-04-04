@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,13 +32,13 @@
 #include <boost/preprocessor/facilities/overload.hpp>
 #include <string>
 
-#include "mongo/platform/compiler.h"
-#include "mongo/util/debug_util.h"
+#include "merizo/platform/compiler.h"
+#include "merizo/util/debug_util.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
- * This include exists so that mongo/base/status_with.h can use the invariant macro without causing
+ * This include exists so that merizo/base/status_with.h can use the invariant macro without causing
  * a circular include chain. It should never be included directly in any other file other than that
  * one (and assert_util.h).
  */
@@ -58,7 +58,7 @@ MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
 //       Invariant failure !condition some/file.cpp 528
 //
 #define MONGO_invariant_1(Expression) \
-    ::mongo::invariantWithLocation((Expression), #Expression, __FILE__, __LINE__)
+    ::merizo::invariantWithLocation((Expression), #Expression, __FILE__, __LINE__)
 
 template <typename T>
 inline void invariantWithLocation(const T& testOK,
@@ -66,7 +66,7 @@ inline void invariantWithLocation(const T& testOK,
                                   const char* file,
                                   unsigned line) {
     if (MONGO_unlikely(!testOK)) {
-        ::mongo::invariantFailed(expr, file, line);
+        ::merizo::invariantFailed(expr, file, line);
     }
 }
 
@@ -83,7 +83,7 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
 //       Invariant failure !condition "hello!" some/file.cpp 528
 //
 #define MONGO_invariant_2(Expression, contextExpr)                                           \
-    ::mongo::invariantWithContextAndLocation((Expression),                                   \
+    ::merizo::invariantWithContextAndLocation((Expression),                                   \
                                              #Expression,                                    \
                                              [&]() -> std::string { return (contextExpr); }, \
                                              __FILE__,                                       \
@@ -93,7 +93,7 @@ template <typename T, typename ContextExpr>
 inline void invariantWithContextAndLocation(
     const T& testOK, const char* expr, ContextExpr&& contextExpr, const char* file, unsigned line) {
     if (MONGO_unlikely(!testOK)) {
-        ::mongo::invariantFailedWithMsg(expr, contextExpr(), file, line);
+        ::merizo::invariantFailedWithMsg(expr, contextExpr(), file, line);
     }
 }
 
@@ -111,4 +111,4 @@ inline void invariantWithContextAndLocation(
 
 #define dassert MONGO_dassert
 
-}  // namespace mongo
+}  // namespace merizo

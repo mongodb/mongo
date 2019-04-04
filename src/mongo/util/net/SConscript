@@ -19,12 +19,12 @@ env.Library(
         env.Idlc('hostandport.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
-        '$BUILD_DIR/mongo/util/winutil',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/util/concurrency/spin_lock',
+        '$BUILD_DIR/merizo/util/winutil',
     ],
 )
 
@@ -34,11 +34,11 @@ env.Library(
         "ssl_options.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ]
 )
 
@@ -49,11 +49,11 @@ env.Library(
         env.Idlc('ssl_options_client.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'ssl_options',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ]
 )
 
@@ -64,12 +64,12 @@ env.Library(
         env.Idlc('ssl_options_server.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'ssl_options',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ]
 )
 
@@ -80,10 +80,10 @@ env.Library(
         "sock.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/merizo/util/fail_point',
         'network',
     ]
 )
@@ -94,10 +94,10 @@ env.Library(
         "ssl_types.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/merizo/transport/transport_layer_common',
         'ssl_options',
     ]
 )
@@ -114,8 +114,8 @@ if not get_option('ssl') == 'off':
             env.Idlc('ssl_parameters.idl')[0],
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/auth/auth',
+            '$BUILD_DIR/merizo/base',
+            '$BUILD_DIR/merizo/db/auth/auth',
             '$BUILD_DIR/third_party/shim_asio',
             'network',
             'socket',
@@ -123,15 +123,15 @@ if not get_option('ssl') == 'off':
             'ssl_types',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/base/secure_allocator',
-            '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
-            '$BUILD_DIR/mongo/db/commands/server_status',
-            '$BUILD_DIR/mongo/db/server_options_core',
-            '$BUILD_DIR/mongo/db/service_context',
-            '$BUILD_DIR/mongo/idl/server_parameter',
-            '$BUILD_DIR/mongo/util/background_job',
-            '$BUILD_DIR/mongo/util/icu',
-            '$BUILD_DIR/mongo/util/winutil',
+            '$BUILD_DIR/merizo/base/secure_allocator',
+            '$BUILD_DIR/merizo/crypto/sha_block_${MONGO_CRYPTO}',
+            '$BUILD_DIR/merizo/db/commands/server_status',
+            '$BUILD_DIR/merizo/db/server_options_core',
+            '$BUILD_DIR/merizo/db/service_context',
+            '$BUILD_DIR/merizo/idl/server_parameter',
+            '$BUILD_DIR/merizo/util/background_job',
+            '$BUILD_DIR/merizo/util/icu',
+            '$BUILD_DIR/merizo/util/winutil',
         ],
     )
 
@@ -143,9 +143,9 @@ if not get_option('ssl') == 'off':
         ],
         LIBDEPS_PRIVATE=[
             'ssl_options',
-            '$BUILD_DIR/mongo/client/authentication',
-            '$BUILD_DIR/mongo/db/server_options_core',
-            '$BUILD_DIR/mongo/idl/server_parameter',
+            '$BUILD_DIR/merizo/client/authentication',
+            '$BUILD_DIR/merizo/db/server_options_core',
+            '$BUILD_DIR/merizo/idl/server_parameter',
         ],
     )
 else:
@@ -155,7 +155,7 @@ else:
             "ssl_manager_none.cpp",
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/merizo/base',
             'ssl_options',
         ],
     )
@@ -166,7 +166,7 @@ else:
             "ssl_parameters_auth_none.cpp",
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/merizo/base',
         ],
     )
 
@@ -177,7 +177,7 @@ if http_client == "off":
             'http_client_none.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/merizo/base',
         ],
     )
 else:
@@ -187,7 +187,7 @@ else:
             'http_client_winhttp.cpp' if env.TargetOSIs('windows') else 'http_client_curl.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/merizo/base',
         ],
         SYSLIBDEPS=[
             'winhttp' if env.TargetOSIs('windows') else 'curl',
@@ -218,8 +218,8 @@ if get_option('ssl') == 'on':
             'socket',
             'ssl_manager',
             'ssl_options_server',
-            '$BUILD_DIR/mongo/db/server_options_servers',
-            '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
-            '$BUILD_DIR/mongo/util/fail_point',
+            '$BUILD_DIR/merizo/db/server_options_servers',
+            '$BUILD_DIR/merizo/util/cmdline_utils/cmdline_utils',
+            '$BUILD_DIR/merizo/util/fail_point',
         ],
     )

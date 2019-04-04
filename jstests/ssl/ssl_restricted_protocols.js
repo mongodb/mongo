@@ -16,7 +16,7 @@
             sslDisabledProtocols: disabledProtocols
         });
 
-        const exitStatus = runMongoProgram('mongo',
+        const exitStatus = runMongoProgram('merizo',
                                            '--ssl',
                                            '--sslAllowInvalidHostnames',
                                            '--sslPEMKeyFile',

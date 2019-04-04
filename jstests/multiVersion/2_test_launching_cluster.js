@@ -24,9 +24,9 @@ load('./jstests/multiVersion/libs/verify_versions.js');
     // Set up a multi-version cluster
     var st = new ShardingTest({
         shards: 2,
-        mongos: 2,
+        merizos: 2,
         other: {
-            mongosOptions: {binVersion: versionsToCheckMongos},
+            merizosOptions: {binVersion: versionsToCheckMongos},
             configOptions: {binVersion: versionsToCheckConfig},
             shardOptions: {binVersion: versionsToCheck},
             enableBalancer: true,
@@ -35,7 +35,7 @@ load('./jstests/multiVersion/libs/verify_versions.js');
     });
 
     var shards = [st.shard0, st.shard1];
-    var mongoses = [st.s0, st.s1];
+    var merizoses = [st.s0, st.s1];
     var configs = [st.config0, st.config1, st.config2];
 
     // Make sure we have hosts of all the different versions
@@ -46,8 +46,8 @@ load('./jstests/multiVersion/libs/verify_versions.js');
     assert.allBinVersions(versionsToCheck, versionsFound);
 
     versionsFound = [];
-    for (var j = 0; j < mongoses.length; j++)
-        versionsFound.push(mongoses[j].getBinVersion());
+    for (var j = 0; j < merizoses.length; j++)
+        versionsFound.push(merizoses[j].getBinVersion());
 
     assert.allBinVersions(versionsToCheckMongos, versionsFound);
 

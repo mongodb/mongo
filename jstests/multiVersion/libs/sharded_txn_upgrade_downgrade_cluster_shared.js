@@ -14,7 +14,7 @@ function setUpTwoShardClusterWithBinVersion(dbName, collName, binVersion) {
     const st = new ShardingTest({
         shards: 2,
         other: {
-            mongosOptions: {binVersion},
+            merizosOptions: {binVersion},
             configOptions: {binVersion},
             rsOptions: {binVersion},
         },
@@ -102,7 +102,7 @@ function assertMultiShardRetryableWriteCanBeRetried(testDB, collName, {lsid, txn
 // Recreates unique indexes in the FCV 4.0 format to allow for a binary downgrade form 4.2 to 4.0.
 //
 // Taken from:
-// https://docs.mongodb.com/master/release-notes/4.2-downgrade-sharded-cluster/#remove-backwards-incompatible-persisted-features
+// https://docs.merizodb.com/master/release-notes/4.2-downgrade-sharded-cluster/#remove-backwards-incompatible-persisted-features
 function downgradeUniqueIndexesScript(db) {
     var unique_idx_v1 = [];
     var unique_idx_v2 = [];

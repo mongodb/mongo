@@ -13,7 +13,7 @@
     // We are testing coordinateCommitTransaction, which requires the nodes to be started with
     // --shardsvr.
     const st = new ShardingTest(
-        {config: 1, mongos: 1, shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}});
+        {config: 1, merizos: 1, shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}});
     const rst = st.rs0;
 
     const primary = rst.getPrimary();

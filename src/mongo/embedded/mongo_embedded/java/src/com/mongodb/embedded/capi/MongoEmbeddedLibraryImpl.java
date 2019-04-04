@@ -1,10 +1,10 @@
 
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,11 +28,11 @@
  *    it in the license file.
  */
 
-package com.mongodb.embedded.capi;
+package com.merizodb.embedded.capi;
 
-import com.mongodb.embedded.capi.internal.CAPI;
-import com.mongodb.embedded.capi.internal.logging.Logger;
-import com.mongodb.embedded.capi.internal.logging.Loggers;
+import com.merizodb.embedded.capi.internal.CAPI;
+import com.merizodb.embedded.capi.internal.logging.Logger;
+import com.merizodb.embedded.capi.internal.logging.Loggers;
 import com.sun.jna.Pointer;
 
 import static java.lang.String.format;
@@ -43,19 +43,19 @@ class MongoEmbeddedLibraryImpl implements MongoEmbeddedLibrary {
     private static final Logger LOGGER = Loggers.getLogger();
     private static final LogCallback LOG_CALLBACK = new LogCallback();
 
-    private final CAPI.mongo_embedded_v1_status status;
-    private final CAPI.mongo_embedded_v1_lib lib;
+    private final CAPI.merizo_embedded_v1_status status;
+    private final CAPI.merizo_embedded_v1_lib lib;
 
     MongoEmbeddedLibraryImpl(final String yamlConfig, final LogLevel logLevel) {
         status = CAPIHelper.createStatusPointer();
-        CAPI.mongo_embedded_v1_init_params.ByReference initParams = new CAPI.mongo_embedded_v1_init_params.ByReference();
+        CAPI.merizo_embedded_v1_init_params.ByReference initParams = new CAPI.merizo_embedded_v1_init_params.ByReference();
         initParams.yaml_config = new CAPI.cstring(yamlConfig != null ? yamlConfig : "");
         initParams.log_flags = logLevel != null ? logLevel.getLevel() : LogLevel.LOGGER.getLevel();
         if (logLevel == LogLevel.LOGGER) {
             initParams.log_callback = LOG_CALLBACK;
         }
 
-        lib =  CAPI.mongo_embedded_v1_lib_init(initParams, status);
+        lib =  CAPI.merizo_embedded_v1_lib_init(initParams, status);
         if (lib == null) {
             CAPIHelper.createErrorFromStatus(status);
         }
@@ -69,14 +69,14 @@ class MongoEmbeddedLibraryImpl implements MongoEmbeddedLibrary {
     @Override
     public void close() {
         try {
-            CAPIHelper.validateErrorCode(status, CAPI.mongo_embedded_v1_lib_fini(lib, status));
+            CAPIHelper.validateErrorCode(status, CAPI.merizo_embedded_v1_lib_fini(lib, status));
         } catch (Throwable t) {
             throw CAPIHelper.createError("fini", t);
         }
         CAPIHelper.destroyStatusPointer(status);
     }
 
-    static class LogCallback implements CAPI.mongo_embedded_v1_log_callback {
+    static class LogCallback implements CAPI.merizo_embedded_v1_log_callback {
 
         // CHECKSTYLE:OFF
         @Override

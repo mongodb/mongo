@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
+#include "merizo/db/storage/kv/kv_engine_test_harness.h"
 
 #include <memory>
 #include <string>
 
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/repl/read_concern_level.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/service_context_test_fixture.h"
+#include "merizo/db/storage/kv/kv_engine.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/db/storage/snapshot_manager.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/clock_source_mock.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class SnapshotManagerTests : public unittest::Test, public ScopedGlobalServiceContextForTest {
@@ -433,4 +433,4 @@ TEST_F(SnapshotManagerTests, UpdateAndDeleteOnLocalSnapshot) {
     ASSERT_EQ(itCountLocal(), 0);
     ASSERT(!readRecordLocal(id));
 }
-}  // namespace mongo
+}  // namespace merizo

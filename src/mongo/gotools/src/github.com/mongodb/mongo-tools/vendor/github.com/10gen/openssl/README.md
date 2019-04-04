@@ -36,9 +36,9 @@ limitations under the License.
 
 2.  Set the `CGO_CPP_FLAGS`, `CGO_CFLAGS` and `CGO_LDFLAGS` as necessary to
     provide `-I`, `-L` and other options to the compiler.  E.g. on darwin,
-    MongoDB's darwin build servers use the native libssl, but provide the
+    MerizoDB's darwin build servers use the native libssl, but provide the
     missing headers in a custom directory, so it the build hosts set
-    `CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include`
+    `CGO_CPPFLAGS=-I/opt/merizodbtoolchain/v2/include`
 
 ### Installing on Windows
 

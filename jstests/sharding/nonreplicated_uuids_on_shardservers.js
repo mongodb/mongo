@@ -3,12 +3,12 @@
 (function() {
     "use strict";
     load("jstests/libs/check_uuids.js");
-    let st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
-    let mongos = st.s;
+    let st = new ShardingTest({shards: 1, rs: {nodes: 1}, merizos: 1});
+    let merizos = st.s;
     let rs = st.rs0;
 
     // Create `test.coll`.
-    mongos.getDB("test").coll.insert({_id: 1, x: 1});
+    merizos.getDB("test").coll.insert({_id: 1, x: 1});
 
     // Add a node with --shardsvr to the replica set.
     let newNode = rs.add({'shardsvr': '', rsConfig: {priority: 0, votes: 0}});

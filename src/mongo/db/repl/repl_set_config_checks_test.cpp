@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/repl_set_config_checks.h"
-#include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/db/repl/replication_coordinator_external_state_mock.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/status.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/repl_set_config_checks.h"
+#include "merizo/db/repl/replication_coordinator_external_state.h"
+#include "merizo/db/repl/replication_coordinator_external_state_mock.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/service_context_test_fixture.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 namespace {
 
@@ -1211,4 +1211,4 @@ TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsSelfPresent) {
 
 }  // namespace
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

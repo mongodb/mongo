@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/text.h"
+#include "merizo/db/exec/text.h"
 
 #include <vector>
 
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/or.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/text_match.h"
-#include "mongo/db/exec/text_or.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/fts/fts_index_format.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/db/exec/fetch.h"
+#include "merizo/db/exec/filter.h"
+#include "merizo/db/exec/index_scan.h"
+#include "merizo/db/exec/or.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/exec/text_match.h"
+#include "merizo/db/exec/text_or.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/fts/fts_index_format.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::unique_ptr;
@@ -150,4 +150,4 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
     return textMatchStage;
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/text_or.h"
+#include "merizo/db/exec/text_or.h"
 
 #include <map>
 #include <vector>
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/record_id.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/exec/filter.h"
+#include "merizo/db/exec/index_scan.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/exec/working_set_computed_data.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/record_id.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::vector;
@@ -204,7 +204,7 @@ PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
         // failed, in which case 'id' is valid.  If ID is invalid, we
         // create our own error message.
         if (WorkingSet::INVALID_ID == id) {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             ss << "TEXT_OR stage failed to read in results from child";
             Status status(ErrorCodes::InternalError, ss);
             *out = WorkingSetCommon::allocateStatusMember(_ws, status);
@@ -313,4 +313,4 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
     return NEED_TIME;
 }
 
-}  // namespace mongo
+}  // namespace merizo

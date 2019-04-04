@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,18 +34,18 @@
 #include <map>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/config.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/lock_request_list.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/config.h"
+#include "merizo/db/concurrency/lock_manager_defs.h"
+#include "merizo/db/concurrency/lock_request_list.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/platform/compiler.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/concurrency/mutex.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Entry point for the lock manager scheduling functionality. Don't use it directly, but
@@ -216,4 +216,4 @@ private:
     static const unsigned _numPartitions;
     Partition* _partitions;
 };
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 namespace executor {
 
 /**
@@ -60,7 +60,7 @@ struct ConnectionStatsPer {
 struct ConnectionPoolStats {
     void updateStatsForHost(std::string pool, HostAndPort host, ConnectionStatsPer newStats);
 
-    void appendToBSON(mongo::BSONObjBuilder& result);
+    void appendToBSON(merizo::BSONObjBuilder& result);
 
     size_t totalInUse = 0u;
     size_t totalAvailable = 0u;
@@ -74,4 +74,4 @@ struct ConnectionPoolStats {
 };
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace merizo

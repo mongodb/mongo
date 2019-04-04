@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,20 +31,20 @@
 
 #include <utility>
 
-#include "mongo/db/catalog/util/partitioned.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/cursor_id.h"
-#include "mongo/db/generic_cursor.h"
-#include "mongo/db/kill_sessions.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/session_killer.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/duration.h"
+#include "merizo/db/catalog/util/partitioned.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/cursor_id.h"
+#include "merizo/db/generic_cursor.h"
+#include "merizo/db/kill_sessions.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/record_id.h"
+#include "merizo/db/session_killer.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/duration.h"
 
-namespace mongo {
+namespace merizo {
 
 class AuthorizationSession;
 class OperationContext;
@@ -56,7 +56,7 @@ class PlanExecutor;
  * ClientCursors. It is also responsible for allocating the cursor ids that are passed back to
  * clients.
  *
- * There is a process-global CursorManager on every mongod which is responsible for managing all
+ * There is a process-global CursorManager on every merizod which is responsible for managing all
  * open cursors on the node. No lock manager locks are required to access this global cursor
  * manager. The CursorManager is internally synchronized, and unless otherwise noted its public
  * methods are thread-safe. For scalability in circumstances where many threads may be concurrently
@@ -212,4 +212,4 @@ private:
     std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>>
         _cursorMap;
 };
-}  // namespace mongo
+}  // namespace merizo

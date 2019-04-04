@@ -1,6 +1,6 @@
 # Section that is ignored by resmoke.py.
 config_variables:
-- &keyFile src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
+- &keyFile src/merizo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
 
 test_kind: js_test
 
@@ -8,7 +8,7 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # Transactions are not supported on MongoDB standalone nodes.
+  # Transactions are not supported on MerizoDB standalone nodes.
   - jstests/core/txns/**/*.js
 executor:
   archive:
@@ -27,7 +27,7 @@ executor:
     n: 20
   fixture:
     class: MongoDFixture
-    mongod_options:
+    merizod_options:
       enableEncryption: ''
       encryptionKeyFile: *keyFile
       set_parameters:

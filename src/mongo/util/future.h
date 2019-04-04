@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,20 +30,20 @@
 #pragma once
 
 // Keeping this first to ensure it compiles by itself
-#include "mongo/util/future_impl.h"
+#include "merizo/util/future_impl.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <type_traits>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/interruptible.h"
-#include "mongo/util/intrusive_counter.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/stdx/type_traits.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/interruptible.h"
+#include "merizo/util/intrusive_counter.h"
 
-namespace mongo {
+namespace merizo {
 /**
  * Future<T> is logically a possibly-deferred StatusWith<T> (or Status when T is void).
  *
@@ -119,20 +119,20 @@ public:
      * to get another batch.
      */
     static Future<T> makeReady(T_unless_void val) {  // TODO emplace?
-        return mongo::Future(Impl::makeReady(std::move(val)));
+        return merizo::Future(Impl::makeReady(std::move(val)));
     }
 
     static Future<T> makeReady(Status status) {
-        return mongo::Future(Impl::makeReady(std::move(status)));
+        return merizo::Future(Impl::makeReady(std::move(status)));
     }
 
     static Future<T> makeReady(StatusWith<T_unless_void> val) {
-        return mongo::Future(Impl::makeReady(std::move(val)));
+        return merizo::Future(Impl::makeReady(std::move(val)));
     }
 
     template <typename U = T, typename = std::enable_if_t<std::is_void_v<U>>>
     static Future<void> makeReady() {  // TODO emplace?
-        return mongo::Future(Impl::makeReady());
+        return merizo::Future(Impl::makeReady());
     }
 
     /**
@@ -252,7 +252,7 @@ public:
      */
     template <typename Func>
         auto then(Func&& func) && noexcept {
-        return mongo::Future(std::move(_impl).then(std::forward<Func>(func)));
+        return merizo::Future(std::move(_impl).then(std::forward<Func>(func)));
     }
 
     /**
@@ -264,7 +264,7 @@ public:
      */
     template <typename Func>
         auto onCompletion(Func&& func) && noexcept {
-        return mongo::Future(std::move(_impl).onCompletion(std::forward<Func>(func)));
+        return merizo::Future(std::move(_impl).onCompletion(std::forward<Func>(func)));
     }
 
     /**
@@ -279,7 +279,7 @@ public:
      */
     template <typename Func>
         Future<T> onError(Func&& func) && noexcept {
-        return mongo::Future(std::move(_impl).onError(std::forward<Func>(func)));
+        return merizo::Future(std::move(_impl).onError(std::forward<Func>(func)));
     }
 
     /**
@@ -288,7 +288,7 @@ public:
      */
     template <ErrorCodes::Error code, typename Func>
         Future<T> onError(Func&& func) && noexcept {
-        return mongo::Future(std::move(_impl).template onError<code>(std::forward<Func>(func)));
+        return merizo::Future(std::move(_impl).template onError<code>(std::forward<Func>(func)));
     }
 
     /**
@@ -297,7 +297,7 @@ public:
      */
     template <ErrorCategory category, typename Func>
         Future<T> onErrorCategory(Func&& func) && noexcept {
-        return mongo::Future(
+        return merizo::Future(
             std::move(_impl).template onErrorCategory<category>(std::forward<Func>(func)));
     }
 
@@ -321,7 +321,7 @@ public:
      */
     template <typename Func>
         Future<T> tap(Func&& func) && noexcept {
-        return mongo::Future(std::move(_impl).tap(std::forward<Func>(func)));
+        return merizo::Future(std::move(_impl).tap(std::forward<Func>(func)));
     }
 
     /**
@@ -331,7 +331,7 @@ public:
      */
     template <typename Func>
         Future<T> tapError(Func&& func) && noexcept {
-        return mongo::Future(std::move(_impl).tapError(std::forward<Func>(func)));
+        return merizo::Future(std::move(_impl).tapError(std::forward<Func>(func)));
     }
 
     /**
@@ -347,7 +347,7 @@ public:
      */
     template <typename Func>
         Future<T> tapAll(Func&& func) && noexcept {
-        return mongo::Future(std::move(_impl).tapAll(std::forward<Func>(func)));
+        return merizo::Future(std::move(_impl).tapAll(std::forward<Func>(func)));
     }
 
     /**
@@ -358,7 +358,7 @@ public:
      * Equivalent to then([](auto&&){});
      */
     Future<void> ignoreValue() && noexcept {
-        return mongo::Future(std::move(_impl).ignoreValue());
+        return merizo::Future(std::move(_impl).ignoreValue());
     }
 
 private:
@@ -774,4 +774,4 @@ template <typename T>
     return Out(SharedStateHolder<FakeVoidToVoid<T>>(std::move(_shared)));
 }
 
-}  // namespace mongo
+}  // namespace merizo

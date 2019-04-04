@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
+#include "merizo/bson/bsonobjbuilder.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * The 'WireVersion' captures all "protocol events" the write protocol went through.  A
@@ -39,7 +39,7 @@ namespace mongo {
  * existing messages. We may also add "logical" entries for releases, although that's not
  * mandatory.
  *
- * We use the wire version to determine if two agents (a driver, a mongos, or a mongod) can
+ * We use the wire version to determine if two agents (a driver, a merizos, or a merizod) can
  * interact. Each agent carries two versions, a 'max' and a 'min' one. If the two agents
  * are on the same 'max' number, they stricly speak the same wire protocol and it is safe
  * to allow them to communicate. If two agents' ranges do not intersect, they should not be
@@ -61,7 +61,7 @@ enum WireVersion {
     // support SCRAM-SHA1, listIndexes, listCollections, new explain
     RELEASE_2_7_7 = 3,
 
-    // Support find and getMore commands, as well as OP_COMMAND in mongod (but not mongos).
+    // Support find and getMore commands, as well as OP_COMMAND in merizod (but not merizos).
     FIND_COMMAND = 4,
 
     // Supports all write commands take a write concern.
@@ -128,7 +128,7 @@ struct WireSpec {
     // incomingInternalClient.maxWireVersion otherwise. However, in 3.6, this needs to be
     // RELEASE_2_4_AND_BEFORE when the featureCompatibilityVersion is equal to the downgrade version
     // due to a bug in 3.4, where if the receiving node says it supports wire version range
-    // [COMMANDS_ACCEPT_WRITE_CONCERN, SUPPORTS_OP_MSG] and it is a mongod, the initiating node will
+    // [COMMANDS_ACCEPT_WRITE_CONCERN, SUPPORTS_OP_MSG] and it is a merizod, the initiating node will
     // think it only supports OP_QUERY.
 
     // incomingInternalClient.maxWireVersion - Latest version that the server accepts on incoming
@@ -140,15 +140,15 @@ struct WireSpec {
     // equal to the downgrade version, and outgoing.maxWireVersion otherwise. However, in 3.6, this
     // needs to be RELEASE_2_4_AND_BEFORE when the featureCompatibilityVersion is equal to the
     // downgrade version due to a bug in 3.4, where if the receiving node says it supports wire
-    // version range [COMMANDS_ACCEPT_WRITE_CONCERN, SUPPORTS_OP_MSG] and it is a mongod, the
+    // version range [COMMANDS_ACCEPT_WRITE_CONCERN, SUPPORTS_OP_MSG] and it is a merizod, the
     // initiating node will think it only supports OP_QUERY.
 
     // outgoing.maxWireVersion - Latest version allowed on remote nodes when the server sends
     // requests.
     WireVersionInfo outgoing = {RELEASE_2_4_AND_BEFORE, LATEST_WIRE_VERSION};
 
-    // Set to true if the client is internal to the cluster---this is a mongod or mongos connecting
-    // to another mongod.
+    // Set to true if the client is internal to the cluster---this is a merizod or merizos connecting
+    // to another merizod.
     bool isInternalClient = false;
 
 private:
@@ -156,4 +156,4 @@ private:
 };
 
 
-}  // namespace mongo
+}  // namespace merizo

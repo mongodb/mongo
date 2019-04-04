@@ -5,9 +5,9 @@
 (function() {
     "use strict";
 
-    // Start a single mongoD using MongoRunner.
+    // Start a single merizoD using MongoRunner.
     const conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
 
     // Create the test DB and collection.
     const testDB = conn.getDB("currentop_yield");

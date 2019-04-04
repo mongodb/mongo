@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,16 +31,16 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/pipeline/lookup_set_cache.h"
-#include "mongo/db/pipeline/value_comparator.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/document_source_sequential_document_cache.h"
+#include "merizo/db/pipeline/document_source_unwind.h"
+#include "merizo/db/pipeline/expression.h"
+#include "merizo/db/pipeline/lite_parsed_pipeline.h"
+#include "merizo/db/pipeline/lookup_set_cache.h"
+#include "merizo/db/pipeline/value_comparator.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Queries separate collection for equality matches with documents in the pipeline collection.
@@ -330,4 +330,4 @@ private:
     boost::optional<Document> _nextValue;
 };
 
-}  // namespace mongo
+}  // namespace merizo

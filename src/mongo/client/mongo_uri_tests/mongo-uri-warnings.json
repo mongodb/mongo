@@ -2,7 +2,7 @@
   "tests": [
     {
       "description": "Unrecognized option keys are ignored",
-      "uri": "mongodb://example.com/?foo=bar",
+      "uri": "merizodb://example.com/?foo=bar",
       "valid": true,
       "warning": true,
       "hosts": [
@@ -19,7 +19,7 @@
     },
     {
       "description": "Unsupported option values are ignored",
-      "uri": "mongodb://example.com/?fsync=ifPossible",
+      "uri": "merizodb://example.com/?fsync=ifPossible",
       "valid": true,
       "warning": true,
       "hosts": [
@@ -36,7 +36,7 @@
     },
     {
       "description": "Deprecated (or unknown) options are ignored if replacement exists",
-      "uri": "mongodb://example.com/?wtimeout=5&wtimeoutMS=10",
+      "uri": "merizodb://example.com/?wtimeout=5&wtimeoutMS=10",
       "valid": true,
       "warning": true,
       "hosts": [

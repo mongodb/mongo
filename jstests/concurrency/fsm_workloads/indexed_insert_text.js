@@ -42,7 +42,7 @@ var $config = (function() {
     }
 
     var text = [
-        'We’re truly excited to announce the availability of the first MongoDB',
+        'We’re truly excited to announce the availability of the first MerizoDB',
         '2.8 release candidate (rc0), headlined by improved concurrency (including',
         'document-level locking), compression, and pluggable storage engines.',
 
@@ -50,8 +50,8 @@ var $config = (function() {
         'the coming weeks optimizing and tuning some of the new features. Now it’s',
         'your turn to help ensure the quality of this important release. Over the',
         'next three weeks, we challenge you to test and uncover any lingering issues',
-        'by participating in our MongoDB 2.8 Bug Hunt. Winners are entitled to some',
-        'great prizes (details below).  MongoDB 2.8 RC0',
+        'by participating in our MerizoDB 2.8 Bug Hunt. Winners are entitled to some',
+        'great prizes (details below).  MerizoDB 2.8 RC0',
 
         'In future posts we’ll share more information about all the features that',
         'make up the 2.8 release. We will begin today with our three headliners:',
@@ -59,15 +59,15 @@ var $config = (function() {
         'Pluggable Storage Engines',
 
         'The new pluggable storage API allows external parties to build custom storage',
-        'engines that seamlessly integrate with MongoDB. This opens the door for the',
-        'MongoDB Community to develop a wide array of storage engines designed for',
+        'engines that seamlessly integrate with MerizoDB. This opens the door for the',
+        'MerizoDB Community to develop a wide array of storage engines designed for',
         'specific workloads, hardware optimizations, or deployment architectures.',
 
-        'Pluggable storage engines are first-class players in the MongoDB',
-        'ecosystem. MongoDB 2.8 ships with two storage engines, both of which',
+        'Pluggable storage engines are first-class players in the MerizoDB',
+        'ecosystem. MerizoDB 2.8 ships with two storage engines, both of which',
         'use the pluggable storage API. Our original storage engine, now named',
         '“MMAPv1”, remains as the default. We are also introducing a new',
-        'storage engine, WiredTiger, that fulfills our desire to make MongoDB',
+        'storage engine, WiredTiger, that fulfills our desire to make MerizoDB',
         'burn through write-heavy workloads and be more resource efficient.',
 
         'WiredTiger was created by the lead engineers of Berkeley DB and',
@@ -78,13 +78,13 @@ var $config = (function() {
         'delivering the other two features we’re highlighting today.',
         'Improved Concurrency',
 
-        'MongoDB 2.8 includes significant improvements to concurrency, resulting',
+        'MerizoDB 2.8 includes significant improvements to concurrency, resulting',
         'in greater utilization of available hardware resources, and vastly better',
         'throughput for write-heavy workloads, including those that mix reading',
         'and writing.',
 
-        'Prior to 2.8, MongoDB’s concurrency model supported database',
-        'level locking. MongoDB 2.8 introduces document-level locking with',
+        'Prior to 2.8, MerizoDB’s concurrency model supported database',
+        'level locking. MerizoDB 2.8 introduces document-level locking with',
         'the new WiredTiger storage engine, and brings collection-level',
         'locking to MMAPv1. As a result, concurrency will improve for all',
         'workloads with a simple version upgrade. For highly concurrent',
@@ -92,13 +92,13 @@ var $config = (function() {
         'operations, migrating to the WiredTiger storage engine will',
         'dramatically improve throughput and performance.',
 
-        'The improved concurrency also means that MongoDB will more',
+        'The improved concurrency also means that MerizoDB will more',
         'fully utilize available hardware resources. So whereas CPU',
-        'usage in MongoDB has been traditionally fairly low, it will',
+        'usage in MerizoDB has been traditionally fairly low, it will',
         'now correspond more directly to system throughput.',
         'Compression',
 
-        'The WiredTiger storage engine in MongoDB 2.8 provides',
+        'The WiredTiger storage engine in MerizoDB 2.8 provides',
         'on-disk compression, reducing disk I/O and storage footprint by',
         '30-80%. Compression is configured individually for each collection and',
         'index, so users can choose the compression algorithm most appropriate',

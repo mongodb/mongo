@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/read_preference.h"
+#include "merizo/client/read_preference.h"
 
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const char kModeFieldName[] = "mode";
@@ -170,7 +170,7 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
     TagSet tags;
     BSONElement tagsElem;
     auto tagExtractStatus =
-        bsonExtractTypedField(readPrefObj, kTagsFieldName, mongo::Array, &tagsElem);
+        bsonExtractTypedField(readPrefObj, kTagsFieldName, merizo::Array, &tagsElem);
     if (tagExtractStatus.isOK()) {
         tags = TagSet{BSONArray(tagsElem.Obj().getOwned())};
 
@@ -233,10 +233,10 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
 }
 
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONElement& elem) {
-    if (elem.type() != mongo::Object) {
+    if (elem.type() != merizo::Object) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "$readPreference has incorrect type: expected "
-                                    << mongo::Object
+                                    << merizo::Object
                                     << " but got "
                                     << elem.type());
     }
@@ -265,4 +265,4 @@ std::string ReadPreferenceSetting::toString() const {
     return toInnerBSON().toString();
 }
 
-}  // namespace mongo
+}  // namespace merizo

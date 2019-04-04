@@ -13,10 +13,10 @@ env.Library(
         'storage_validation.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
     ],
 )
 
@@ -36,7 +36,7 @@ env.CppUnitTest(
         'log_builder_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson_test_utils',
         'update_common',
     ],
 )
@@ -47,9 +47,9 @@ env.CppUnitTest(
         'path_support_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'update_common',
     ],
 )
@@ -58,9 +58,9 @@ env.CppUnitTest(
     target='push_sorter_test',
     source='push_sorter_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
     ],
 )
 
@@ -90,8 +90,8 @@ env.Library(
         'update_object_node.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/db/update_index_data',
+        '$BUILD_DIR/merizo/db/logical_clock',
+        '$BUILD_DIR/merizo/db/update_index_data',
         'update_common',
     ],
 )
@@ -116,11 +116,11 @@ env.CppUnitTest(
         'update_object_node_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/logical_clock',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'update',
     ],
 )
@@ -139,10 +139,10 @@ env.Library(
         'update_driver.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/query/query_planner',
         'update',
     ],
 )
@@ -154,9 +154,9 @@ env.CppUnitTest(
         'update_serialization_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
-        '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/merizo/db/query/query_planner',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'update_driver',
     ],
 )

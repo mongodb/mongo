@@ -1,10 +1,10 @@
-MongoDB uses third-party libraries or other resources that may
-be distributed under licenses different than the MongoDB software.
+MerizoDB uses third-party libraries or other resources that may
+be distributed under licenses different than the MerizoDB software.
 
 In the event that we accidentally failed to list a required notice,
 please bring it to our attention through any of the ways detailed here :
 
-           mongodb-dev@googlegroups.com
+           merizodb-dev@googlegroups.com
 
 The attached notices are provided for information only.
 
@@ -214,7 +214,7 @@ License notice for github.com/10gen/llmgo
       of your accepting any such warranty or additional liability.
 
 
-License notice for github.com/3rf/mongo-lint
+License notice for github.com/3rf/merizo-lint
 ------------------------------------------------------------
 
 Copyright (c) 2013 The Go Authors. All rights reserved.
@@ -1120,7 +1120,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 License notice for gopkg.in/mgo.v2
 ------------------------------------------------------------
 
-mgo - MongoDB driver for Go
+mgo - MerizoDB driver for Go
 
 Copyright (c) 2010-2013 - Gustavo Niemeyer <gustavo@niemeyer.net>
 

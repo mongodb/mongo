@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,17 +33,17 @@
 #include <memory>
 #include <set>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/multikey_metadata_access_stats.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/sorter/sorter.h"
-#include "mongo/db/storage/sorted_data_interface.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index/multikey_metadata_access_stats.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/record_id.h"
+#include "merizo/db/sorter/sorter.h"
+#include "merizo/db/storage/sorted_data_interface.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObjBuilder;
 class MatchExpression;
@@ -225,7 +225,7 @@ public:
 
     class BulkBuilder {
     public:
-        using Sorter = mongo::Sorter<BSONObj, RecordId>;
+        using Sorter = merizo::Sorter<BSONObj, RecordId>;
 
         virtual ~BulkBuilder() = default;
 
@@ -594,4 +594,4 @@ private:
     const std::unique_ptr<SortedDataInterface> _newInterface;
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,17 +29,17 @@
 
 /**
  * This module describes free functions for logging various operations of interest to a
- * party interested in generating logs of user activity in a MongoDB server instance.
+ * party interested in generating logs of user activity in a MerizoDB server instance.
  */
 
 #pragma once
 
-#include "mongo/base/error_codes.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/rpc/op_msg.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/rpc/op_msg.h"
 
-namespace mongo {
+namespace merizo {
 
 class AuthorizationSession;
 class BSONObj;
@@ -56,7 +56,7 @@ class Document;
 namespace audit {
 
 /**
- * Narrow API for the parts of mongo::Command used by the audit library.
+ * Narrow API for the parts of merizo::Command used by the audit library.
  */
 class CommandInterface {
 public:
@@ -315,4 +315,4 @@ void logRemoveShard(Client* client, StringData shardname);
 void logShardCollection(Client* client, StringData ns, const BSONObj& keyPattern, bool unique);
 
 }  // namespace audit
-}  // namespace mongo
+}  // namespace merizo

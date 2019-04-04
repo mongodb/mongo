@@ -110,7 +110,7 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
 
 // x86, PowerPC, and ARM64 can simply do these loads and stores native.
 
-// MongoDB customization: Prefer memcpy on all architectures. Using reinterpret_cast is undefined
+// MerizoDB customization: Prefer memcpy on all architectures. Using reinterpret_cast is undefined
 // behavior.
 #if 0 && defined(__i386__) || defined(__x86_64__) || defined(__powerpc__) || \
     defined(__aarch64__)
@@ -141,7 +141,7 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
 // we can tell it that a _struct_ is unaligned, which has the same effect,
 // so we do that.
 
-// MongoDB customization: See memcpy notes above
+// MerizoDB customization: See memcpy notes above
 #elif 0 && defined(__arm__) && \
       !defined(__ARM_ARCH_4__) && \
       !defined(__ARM_ARCH_4T__) && \

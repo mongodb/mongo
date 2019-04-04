@@ -1,15 +1,15 @@
 //
-// Tests that merging chunks via mongos works/doesn't work with different chunk configurations
+// Tests that merging chunks via merizos works/doesn't work with different chunk configurations
 //
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 2});
+    var st = new ShardingTest({shards: 2, merizos: 2});
 
-    var mongos = st.s0;
+    var merizos = st.s0;
     var staleMongos = st.s1;
-    var admin = mongos.getDB("admin");
-    var coll = mongos.getCollection("foo.bar");
+    var admin = merizos.getDB("admin");
+    var coll = merizos.getCollection("foo.bar");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard('foo', st.shard0.shardName);

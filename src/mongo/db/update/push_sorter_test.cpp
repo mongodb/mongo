@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/push_sorter.h"
+#include "merizo/db/update/push_sorter.h"
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
-using mongo::mutablebson::Element;
-using mongo::mutablebson::sortChildren;
+using merizo::mutablebson::Element;
+using merizo::mutablebson::sortChildren;
 
-class ObjectArray : public mongo::unittest::Test {
+class ObjectArray : public merizo::unittest::Test {
 public:
     ObjectArray() : _doc(), _size(0) {}
 
@@ -59,7 +59,7 @@ public:
         _objs[_size] = obj;
         _size++;
 
-        ASSERT_OK(_doc.root()["x"].appendObject(mongo::StringData(), obj));
+        ASSERT_OK(_doc.root()["x"].appendObject(merizo::StringData(), obj));
     }
 
     BSONObj getOrigObj(size_t i) {
@@ -198,4 +198,4 @@ TEST_F(ObjectArray, SortRespectsCollation) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

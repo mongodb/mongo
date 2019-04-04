@@ -10,18 +10,18 @@ env.Library(
         'bench.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/db/logical_session_id',
-        '$BUILD_DIR/mongo/scripting/bson_template_evaluator',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/client/clientdriver_minimal',
+        '$BUILD_DIR/merizo/db/logical_session_id',
+        '$BUILD_DIR/merizo/scripting/bson_template_evaluator',
     ]
 )
 
 generateJSErrorCodes = env.Command(
     target=['error_codes.js'],
     source=[
-        '$BUILD_DIR/mongo/base/generate_error_codes.py',
-        '$BUILD_DIR/mongo/base/error_codes.err',
+        '$BUILD_DIR/merizo/base/generate_error_codes.py',
+        '$BUILD_DIR/merizo/base/error_codes.err',
         'error_codes.tpl.js',
     ],
     action=['$PYTHON ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[2]}=${TARGETS[0]}'])
@@ -29,7 +29,7 @@ env.Alias('generated-sources', generateJSErrorCodes)
 
 # Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
 js_header = env.JSHeader(
-    target="mongo.cpp",
+    target="merizo.cpp",
     source=[
         "assert.js",
         "bulk_api.js",
@@ -39,7 +39,7 @@ js_header = env.JSHeader(
         "error_codes.js",
         "explainable.js",
         "explain_query.js",
-        "mongo.js",
+        "merizo.js",
         "mr.js",
         "query.js",
         "session.js",
@@ -55,7 +55,7 @@ env.Alias('generated-sources', js_header)
 # Files added here need to be added in shell/shell_utils.cpp and buildscripts/vcxproj.header as
 # well.
 env.JSHeader(
-    target="mongo-server.cpp",
+    target="merizo-server.cpp",
     source=[
         "servers.js",
         "shardingtest.js",
@@ -65,15 +65,15 @@ env.JSHeader(
     ],
 )
 
-env.Alias('generated-sources', "mongo-server.cpp")
+env.Alias('generated-sources', "merizo-server.cpp")
 
 env.Library(
-    target='mongojs',
+    target='merizojs',
     source=[
-        'mongo.cpp',
+        'merizo.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -83,11 +83,11 @@ env.Library(
         'shell_options_storage.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/client/connection_string',
-        '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+        '$BUILD_DIR/merizo/client/connection_string',
+        '$BUILD_DIR/merizo/util/cmdline_utils/cmdline_utils',
     ],
 )
 
@@ -98,10 +98,10 @@ env.Library(
     ],
     LIBDEPS=[
         'shell_options_storage',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ],
 )
 

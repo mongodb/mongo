@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,12 +31,12 @@
 
 #include <cstdint>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/util/safe_num.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/util/safe_num.h"
 
-namespace mongo {
+namespace merizo {
 namespace mutablebson {
 
 /** For an overview of mutable BSON, please see the file document.h in this directory. */
@@ -388,7 +388,7 @@ public:
     void writeTo(BSONObjBuilder* builder) const;
 
     /** Write this Element to the provided array builder. This Element must be of type
-     *  mongo::Array.
+     *  merizo::Array.
      */
     void writeArrayTo(BSONArrayBuilder* builder) const;
 
@@ -415,7 +415,7 @@ public:
     Status setValueArray(const BSONObj& value);
 
     /** Set the value of this Element to the given binary data. */
-    Status setValueBinary(uint32_t len, mongo::BinDataType binType, const void* data);
+    Status setValueBinary(uint32_t len, merizo::BinDataType binType, const void* data);
 
     /** Set the value of this Element to Undefined. */
     Status setValueUndefined();
@@ -546,14 +546,14 @@ public:
     /** Append the provided binary data as a new field with the provided name. */
     Status appendBinary(StringData fieldName,
                         uint32_t len,
-                        mongo::BinDataType binType,
+                        merizo::BinDataType binType,
                         const void* data);
 
     /** Append an undefined value as a new field with the provided name. */
     Status appendUndefined(StringData fieldName);
 
     /** Append the provided OID as a new field with the provided name. */
-    Status appendOID(StringData fieldName, mongo::OID value);
+    Status appendOID(StringData fieldName, merizo::OID value);
 
     /** Append the provided bool as a new field with the provided name. */
     Status appendBool(StringData fieldName, bool value);
@@ -568,7 +568,7 @@ public:
     Status appendRegex(StringData fieldName, StringData re, StringData flags);
 
     /** Append the provided DBRef data as a new field with the provided name. */
-    Status appendDBRef(StringData fieldName, StringData ns, mongo::OID oid);
+    Status appendDBRef(StringData fieldName, StringData ns, merizo::OID oid);
 
     /** Append the provided code data as a new field with the iven name. */
     Status appendCode(StringData fieldName, StringData value);
@@ -640,6 +640,6 @@ inline bool operator==(const Element& l, const Element& r);
 inline bool operator!=(const Element& l, const Element& r);
 
 }  // namespace mutablebson
-}  // namespace mongo
+}  // namespace merizo
 
-#include "mongo/bson/mutable/element-inl.h"
+#include "merizo/bson/mutable/element-inl.h"

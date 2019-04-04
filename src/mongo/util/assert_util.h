@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,17 +33,17 @@
 #include <string>
 #include <typeinfo>
 
-#include "mongo/base/status.h"  // NOTE: This is safe as utils depend on base
-#include "mongo/base/status_with.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/debug_util.h"
+#include "merizo/base/status.h"  // NOTE: This is safe as utils depend on base
+#include "merizo/base/status_with.h"
+#include "merizo/platform/compiler.h"
+#include "merizo/util/concurrency/thread_name.h"
+#include "merizo/util/debug_util.h"
 
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
-#include "mongo/util/invariant.h"
+#include "merizo/util/invariant.h"
 #undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 
-namespace mongo {
+namespace merizo {
 
 class AssertionCount {
 public:
@@ -65,7 +65,7 @@ class DBException;
 std::string causedBy(const DBException& e);
 std::string causedBy(const std::string& e);
 
-/** Most mongo exceptions inherit from this; this is commonly caught in most threads */
+/** Most merizo exceptions inherit from this; this is commonly caught in most threads */
 class DBException : public std::exception {
 public:
     const char* what() const throw() final {
@@ -229,21 +229,21 @@ MONGO_COMPILER_NORETURN void invariantOKFailedWithMsg(const char* expr,
                                                       unsigned line) noexcept;
 
 #define fassertFailed MONGO_fassertFailed
-#define MONGO_fassertFailed(...) ::mongo::fassertFailedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+#define MONGO_fassertFailed(...) ::merizo::fassertFailedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 MONGO_COMPILER_NORETURN void fassertFailedWithLocation(int msgid,
                                                        const char* file,
                                                        unsigned line) noexcept;
 
 #define fassertFailedNoTrace MONGO_fassertFailedNoTrace
 #define MONGO_fassertFailedNoTrace(...) \
-    ::mongo::fassertFailedNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+    ::merizo::fassertFailedNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 MONGO_COMPILER_NORETURN void fassertFailedNoTraceWithLocation(int msgid,
                                                               const char* file,
                                                               unsigned line) noexcept;
 
 #define fassertFailedWithStatus MONGO_fassertFailedWithStatus
 #define MONGO_fassertFailedWithStatus(...) \
-    ::mongo::fassertFailedWithStatusWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+    ::merizo::fassertFailedWithStatusWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
                                                                  const Status& status,
                                                                  const char* file,
@@ -251,7 +251,7 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
 
 #define fassertFailedWithStatusNoTrace MONGO_fassertFailedWithStatusNoTrace
 #define MONGO_fassertFailedWithStatusNoTrace(...) \
-    ::mongo::fassertFailedWithStatusNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+    ::merizo::fassertFailedWithStatusNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgid,
                                                                         const Status& status,
                                                                         const char* file,
@@ -267,7 +267,7 @@ std::string causedBy(const std::string* e);
 std::string causedBy(const Status& e);
 
 #define fassert MONGO_fassert
-#define MONGO_fassert(...) ::mongo::fassertWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+#define MONGO_fassert(...) ::merizo::fassertWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 
 /** aborts on condition failure */
 inline void fassertWithLocation(int msgid, bool testOK, const char* file, unsigned line) {
@@ -292,7 +292,7 @@ inline void fassertWithLocation(int msgid, const Status& status, const char* fil
 
 #define fassertNoTrace MONGO_fassertNoTrace
 #define MONGO_fassertNoTrace(...) \
-    ::mongo::fassertNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+    ::merizo::fassertNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 inline void fassertNoTraceWithLocation(int msgid, bool testOK, const char* file, unsigned line) {
     if (MONGO_unlikely(!testOK)) {
         fassertFailedNoTraceWithLocation(msgid, file, line);
@@ -346,7 +346,7 @@ Status makeStatus(ErrorDetail&& detail, StringLike&& message) {
 #define MONGO_BASE_ASSERT_FAILED(fail_func, code, msg)                                    \
     do {                                                                                  \
         [&]() MONGO_COMPILER_COLD_FUNCTION {                                              \
-            fail_func(::mongo::error_details::makeStatus(code, msg), __FILE__, __LINE__); \
+            fail_func(::merizo::error_details::makeStatus(code, msg), __FILE__, __LINE__); \
         }();                                                                              \
         MONGO_COMPILER_UNREACHABLE;                                                       \
     } while (false)
@@ -362,15 +362,15 @@ Status makeStatus(ErrorDetail&& detail, StringLike&& message) {
  * "user assert".  if asserts, user did something wrong, not our code.
  * On failure, throws an exception.
  */
-#define uasserted(msgid, msg) MONGO_BASE_ASSERT_FAILED(::mongo::uassertedWithLocation, msgid, msg)
+#define uasserted(msgid, msg) MONGO_BASE_ASSERT_FAILED(::merizo::uassertedWithLocation, msgid, msg)
 #define uassert(msgid, msg, expr) \
-    MONGO_BASE_ASSERT(::mongo::uassertedWithLocation, msgid, msg, expr)
+    MONGO_BASE_ASSERT(::merizo::uassertedWithLocation, msgid, msg, expr)
 
 MONGO_COMPILER_NORETURN void uassertedWithLocation(const Status& status,
                                                    const char* file,
                                                    unsigned line);
 
-#define uassertStatusOK(...) ::mongo::uassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+#define uassertStatusOK(...) ::merizo::uassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 inline void uassertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
         uassertedWithLocation(status, file, line);
@@ -389,7 +389,7 @@ inline T uassertStatusOKWithLocation(StatusWith<T> sw, const char* file, unsigne
  * evaluated if the status is not OK.
  */
 #define uassertStatusOKWithContext(status, contextExpr) \
-    ::mongo::uassertStatusOKWithContextAndLocation(     \
+    ::merizo::uassertStatusOKWithContextAndLocation(     \
         status, [&]() -> std::string { return (contextExpr); }, __FILE__, __LINE__)
 template <typename ContextExpr>
 inline void uassertStatusOKWithContextAndLocation(const Status& status,
@@ -416,15 +416,15 @@ inline T uassertStatusOKWithContextAndLocation(StatusWith<T> sw,
  * massert is like uassert but it logs the message before throwing.
  */
 #define massert(msgid, msg, expr) \
-    MONGO_BASE_ASSERT(::mongo::msgassertedWithLocation, msgid, msg, expr)
+    MONGO_BASE_ASSERT(::merizo::msgassertedWithLocation, msgid, msg, expr)
 
 #define msgasserted(msgid, msg) \
-    MONGO_BASE_ASSERT_FAILED(::mongo::msgassertedWithLocation, msgid, msg)
+    MONGO_BASE_ASSERT_FAILED(::merizo::msgassertedWithLocation, msgid, msg)
 MONGO_COMPILER_NORETURN void msgassertedWithLocation(const Status& status,
                                                      const char* file,
                                                      unsigned line);
 
-#define massertStatusOK(...) ::mongo::massertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+#define massertStatusOK(...) ::merizo::massertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 inline void massertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
         msgassertedWithLocation(status, file, line);
@@ -438,7 +438,7 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
 #define MONGO_verify(_Expression)                                    \
     do {                                                             \
         if (MONGO_unlikely(!(_Expression))) {                        \
-            ::mongo::verifyFailed(#_Expression, __FILE__, __LINE__); \
+            ::merizo::verifyFailed(#_Expression, __FILE__, __LINE__); \
         }                                                            \
     } while (false)
 
@@ -447,7 +447,7 @@ inline void invariantWithLocation(const Status& status,
                                   const char* file,
                                   unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
-        ::mongo::invariantOKFailed(expr, status, file, line);
+        ::merizo::invariantOKFailed(expr, status, file, line);
     }
 }
 
@@ -457,7 +457,7 @@ inline T invariantWithLocation(StatusWith<T> sw,
                                const char* file,
                                unsigned line) {
     if (MONGO_unlikely(!sw.isOK())) {
-        ::mongo::invariantOKFailed(expr, sw.getStatus(), file, line);
+        ::merizo::invariantOKFailed(expr, sw.getStatus(), file, line);
     }
     return std::move(sw.getValue());
 }
@@ -469,7 +469,7 @@ inline void invariantWithContextAndLocation(const Status& status,
                                             const char* file,
                                             unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
-        ::mongo::invariantOKFailedWithMsg(
+        ::merizo::invariantOKFailedWithMsg(
             expr, status, std::forward<ContextExpr>(contextExpr)(), file, line);
     }
 }
@@ -481,7 +481,7 @@ inline T invariantWithContextAndLocation(StatusWith<T> sw,
                                          const char* file,
                                          unsigned line) {
     if (MONGO_unlikely(!sw.isOK())) {
-        ::mongo::invariantOKFailedWithMsg(expr, sw.getStatus(), contextExpr(), file, line);
+        ::merizo::invariantOKFailedWithMsg(expr, sw.getStatus(), contextExpr(), file, line);
     }
     return std::move(sw.getValue());
 }
@@ -515,7 +515,7 @@ std::string demangleName(const std::type_info& typeinfo);
  */
 Status exceptionToStatus() noexcept;
 
-}  // namespace mongo
+}  // namespace merizo
 
 #define MONGO_ASSERT_ON_EXCEPTION(expression)                                         \
     try {                                                                             \
@@ -551,4 +551,4 @@ Status exceptionToStatus() noexcept;
  *         MONGO_UNREACHABLE;
  */
 
-#define MONGO_UNREACHABLE ::mongo::invariantFailed("Hit a MONGO_UNREACHABLE!", __FILE__, __LINE__);
+#define MONGO_UNREACHABLE ::merizo::invariantFailed("Hit a MONGO_UNREACHABLE!", __FILE__, __LINE__);

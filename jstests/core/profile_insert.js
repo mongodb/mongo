@@ -47,7 +47,7 @@
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("ts"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("client"), tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "MerizoDB Shell", tojson(profileObj));
 
     //
     // Test multi-insert.
@@ -68,12 +68,12 @@
     if (isWriteCommand) {
         assert.eq(profileObj.ninserted, 2, tojson(profileObj));
         assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
-        assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+        assert.eq(profileObj.appName, "MerizoDB Shell", tojson(profileObj));
     } else {
         // Documents were inserted one at a time.
         assert.eq(profileObj.ninserted, 1, tojson(profileObj));
         assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
-        assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+        assert.eq(profileObj.appName, "MerizoDB Shell", tojson(profileObj));
     }
 
     //
@@ -90,6 +90,6 @@
         assert.eq(profileObj.command.ordered, false, tojson(profileObj));
         assert.eq(profileObj.command.writeConcern.w, 1, tojson(profileObj));
         assert.eq(profileObj.command.writeConcern.wtimeout, wtimeout, tojson(profileObj));
-        assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+        assert.eq(profileObj.appName, "MerizoDB Shell", tojson(profileObj));
     }
 })();

@@ -5,9 +5,9 @@
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
-    const mongosDB = st.s.getDB(jsTestName());
-    const sourceColl = mongosDB["source"];
-    const targetColl = mongosDB["target"];
+    const merizosDB = st.s.getDB(jsTestName());
+    const sourceColl = merizosDB["source"];
+    const targetColl = merizosDB["target"];
 
     function setAggHang(mode) {
         assert.commandWorked(st.shard0.adminCommand(
@@ -37,8 +37,8 @@
         // Wait for the parallel shell to hit the failpoint.
         assert.soon(
             () =>
-                mongosDB.currentOp({op: "command", "command.comment": comment}).inprog.length == 1,
-            () => tojson(mongosDB.currentOp().inprog));
+                merizosDB.currentOp({op: "command", "command.comment": comment}).inprog.length == 1,
+            () => tojson(merizosDB.currentOp().inprog));
 
         // Migrate the chunk on shard1 to shard0.
         assert.commandWorked(st.s.adminCommand(
@@ -70,8 +70,8 @@
         // Wait for the parallel shell to hit the failpoint.
         assert.soon(
             () =>
-                mongosDB.currentOp({op: "command", "command.comment": comment}).inprog.length == 1,
-            () => tojson(mongosDB.currentOp().inprog));
+                merizosDB.currentOp({op: "command", "command.comment": comment}).inprog.length == 1,
+            () => tojson(merizosDB.currentOp().inprog));
 
         assert.commandWorked(st.s.adminCommand(
             {moveChunk: shardedColl.getFullName(), find: {shardKey: -1}, to: st.shard1.shardName}));
@@ -93,7 +93,7 @@
     }
 
     // Shard the source collection with shard key {shardKey: 1} and split into 2 chunks.
-    st.shardColl(sourceColl.getName(), {shardKey: 1}, {shardKey: 0}, false, mongosDB.getName());
+    st.shardColl(sourceColl.getName(), {shardKey: 1}, {shardKey: 0}, false, merizosDB.getName());
 
     // Write a document to each chunk of the source collection.
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
@@ -107,7 +107,7 @@
     sourceColl.drop();
 
     // Shard the output collection with shard key {shardKey: 1} and split into 2 chunks.
-    st.shardColl(targetColl.getName(), {shardKey: 1}, {shardKey: 0}, false, mongosDB.getName());
+    st.shardColl(targetColl.getName(), {shardKey: 1}, {shardKey: 0}, false, merizosDB.getName());
 
     // Write two documents in the source collection that should target the two chunks in the target
     // collection.

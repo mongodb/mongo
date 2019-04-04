@@ -34,7 +34,7 @@ TestData.skipCheckDBHashes = true;
     // A 'latest' binary standalone should default to 'latestFCV'.
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
     assert.neq(
-        null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+        null, conn, "merizod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
 
@@ -102,7 +102,7 @@ TestData.skipCheckDBHashes = true;
     // featureCompatibilityVersion is durable.
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
     assert.neq(
-        null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+        null, conn, "merizod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
@@ -112,7 +112,7 @@ TestData.skipCheckDBHashes = true;
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
     assert.neq(null,
                conn,
-               "mongod was unable to start up with binary version=" + latest +
+               "merizod was unable to start up with binary version=" + latest +
                    " and last-stable featureCompatibilityVersion");
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
@@ -123,7 +123,7 @@ TestData.skipCheckDBHashes = true;
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastStable});
     assert.neq(null,
                conn,
-               "mongod was unable to start up with version=" + lastStable + " and no data files");
+               "merizod was unable to start up with version=" + lastStable + " and no data files");
     assert.writeOK(conn.getDB("test").coll.insert({a: 5}));
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
@@ -132,17 +132,17 @@ TestData.skipCheckDBHashes = true;
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
     assert.neq(null,
                conn,
-               "mongod was unable to start up with binary version=" + latest +
+               "merizod was unable to start up with binary version=" + latest +
                    " and featureCompatibilityVersion=" + lastStableFCV);
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
     MongoRunner.stopMongod(conn);
 
-    // A 'latest' binary mongod started with --shardsvr and clean data files defaults to
+    // A 'latest' binary merizod started with --shardsvr and clean data files defaults to
     // 'lastStableFCV'.
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, shardsvr: ""});
     assert.neq(
-        null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+        null, conn, "merizod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
     MongoRunner.stopMongod(conn);
@@ -277,7 +277,7 @@ TestData.skipCheckDBHashes = true;
     //
 
     let st;
-    let mongosAdminDB;
+    let merizosAdminDB;
     let configPrimaryAdminDB;
     let shardPrimaryAdminDB;
 
@@ -286,7 +286,7 @@ TestData.skipCheckDBHashes = true;
         shards: {rs0: {nodes: [{binVersion: latest}, {binVersion: latest}]}},
         other: {useBridge: true}
     });
-    mongosAdminDB = st.s.getDB("admin");
+    merizosAdminDB = st.s.getDB("admin");
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
     shardPrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
 
@@ -294,24 +294,24 @@ TestData.skipCheckDBHashes = true;
     checkFCV(shardPrimaryAdminDB, latestFCV);
 
     jsTestLog(
-        "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to invalid value on mongos");
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: 5}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "4.4"}));
+        "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to invalid value on merizos");
+    assert.commandFailed(merizosAdminDB.runCommand({setFeatureCompatibilityVersion: 5}));
+    assert.commandFailed(merizosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
+    assert.commandFailed(merizosAdminDB.runCommand({setFeatureCompatibilityVersion: "4.4"}));
 
-    jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion rejects unknown fields on mongos");
+    jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion rejects unknown fields on merizos");
     assert.commandFailed(
-        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, unknown: 1}));
+        merizosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, unknown: 1}));
 
     jsTestLog(
-        "EXPECTED TO FAIL: setFeatureCompatibilityVersion can only be run on the admin database on mongos");
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion can only be run on the admin database on merizos");
     assert.commandFailed(
         st.s.getDB("test").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 
     jsTestLog(
-        "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set via setParameter on mongos");
+        "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set via setParameter on merizos");
     assert.commandFailed(
-        mongosAdminDB.runCommand({setParameter: 1, featureCompatibilityVersion: lastStableFCV}));
+        merizosAdminDB.runCommand({setParameter: 1, featureCompatibilityVersion: lastStableFCV}));
 
     // Prevent the shard primary from receiving messages from the config server primary. When we try
     // to set FCV to 'lastStableFCV', the command should fail because the shard cannot be contacted.
@@ -319,16 +319,16 @@ TestData.skipCheckDBHashes = true;
     jsTestLog(
         "EXPECTED TO FAIL: setFeatureCompatibilityVersion cannot be set because the shard primary is not reachable");
     assert.commandFailed(
-        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 1000}));
+        merizosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 1000}));
     checkFCV(
         configPrimaryAdminDB, lastStableFCV, lastStableFCV /* indicates downgrade in progress */);
     st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 0.0);
 
-    // FCV can be set to 'lastStableFCV' on mongos.
+    // FCV can be set to 'lastStableFCV' on merizos.
     // This is run through assert.soon() because we've just caused a network interruption
     // by discarding messages in the bridge.
     assert.soon(function() {
-        res = mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV});
+        res = merizosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV});
         if (res.ok == 0) {
             print("Failed to set feature compatibility version: " + tojson(res));
             return false;
@@ -351,11 +351,11 @@ TestData.skipCheckDBHashes = true;
     latestShard.initiate();
     let latestShardPrimaryAdminDB = latestShard.getPrimary().getDB("admin");
     checkFCV(latestShardPrimaryAdminDB, lastStableFCV);
-    assert.commandWorked(mongosAdminDB.runCommand({addShard: latestShard.getURL()}));
+    assert.commandWorked(merizosAdminDB.runCommand({addShard: latestShard.getURL()}));
     checkFCV(latestShardPrimaryAdminDB, lastStableFCV);
 
-    // FCV can be set to 'latestFCV' on mongos.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    // FCV can be set to 'latestFCV' on merizos.
+    assert.commandWorked(merizosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(st.configRS.getPrimary().getDB("admin"), latestFCV);
     checkFCV(shardPrimaryAdminDB, latestFCV);
     checkFCV(latestShardPrimaryAdminDB, latestFCV);
@@ -365,10 +365,10 @@ TestData.skipCheckDBHashes = true;
     st.stop();
     latestShard.stopSet();
 
-    // Create cluster with a 'lastStable' binary mongos so that we can add 'lastStable' binary
+    // Create cluster with a 'lastStable' binary merizos so that we can add 'lastStable' binary
     // shards.
-    st = new ShardingTest({shards: 0, other: {mongosOptions: {binVersion: lastStable}}});
-    mongosAdminDB = st.s.getDB("admin");
+    st = new ShardingTest({shards: 0, other: {merizosOptions: {binVersion: lastStable}}});
+    merizosAdminDB = st.s.getDB("admin");
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
     checkFCV(configPrimaryAdminDB, lastStableFCV);
 
@@ -381,7 +381,7 @@ TestData.skipCheckDBHashes = true;
     });
     lastStableShard.startSet();
     lastStableShard.initiate();
-    assert.commandWorked(mongosAdminDB.runCommand({addShard: lastStableShard.getURL()}));
+    assert.commandWorked(merizosAdminDB.runCommand({addShard: lastStableShard.getURL()}));
     checkFCV(lastStableShard.getPrimary().getDB("admin"), lastStableFCV);
 
     // call ShardingTest.stop before shutting down lastStableShard, so that the UUID check in

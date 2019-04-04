@@ -1,7 +1,7 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
 // @tags: [assumes_no_implicit_collection_creation_after_drop, requires_capped,
-//         assumes_against_mongod_not_mongos]
+//         assumes_against_merizod_not_merizos]
 
 // Tests for the "create" command.
 (function() {

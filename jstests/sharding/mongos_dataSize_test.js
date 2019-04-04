@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    let s = new ShardingTest({shards: 2, mongos: 1});
+    let s = new ShardingTest({shards: 2, merizos: 1});
     let db = s.getDB("test");
     assert.commandWorked(s.s0.adminCommand({enableSharding: "test"}));
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));

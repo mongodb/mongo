@@ -7,17 +7,17 @@
 
     const MONGOS_COUNT = 2;
 
-    var st = new ShardingTest({shards: 1, mongos: MONGOS_COUNT, config: 1});
+    var st = new ShardingTest({shards: 1, merizos: MONGOS_COUNT, config: 1});
 
     var standalone = MongoRunner.runMongod();
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
+    var merizos = st.s0;
+    var admin = merizos.getDB("admin");
 
-    // Wait for the background thread from the mongos to insert their entries before beginning
+    // Wait for the background thread from the merizos to insert their entries before beginning
     // the tests.
     assert.soon(function() {
-        return MONGOS_COUNT == mongos.getDB('config').mongos.count();
+        return MONGOS_COUNT == merizos.getDB('config').merizos.count();
     });
 
     function grabStatusOutput(configdb, verbose) {
@@ -59,8 +59,8 @@
         assertPresentInOutput(output, "shards:", "section header");
         assertPresentInOutput(output, "databases:", "section header");
         assertPresentInOutput(output, "balancer:", "section header");
-        assertPresentInOutput(output, "active mongoses:", "section header");
-        assertNotPresentInOutput(output, "most recently active mongoses:", "section header");
+        assertPresentInOutput(output, "active merizoses:", "section header");
+        assertNotPresentInOutput(output, "most recently active merizoses:", "section header");
 
         assertPresentInOutput(output, dbName, "database");
         assertPresentInOutput(output, collName, "collection");
@@ -68,24 +68,24 @@
     }
 
     function testBasicNormalOnly(output) {
-        assertPresentInOutput(output, tojson(version) + " : 2\n", "active mongos version");
+        assertPresentInOutput(output, tojson(version) + " : 2\n", "active merizos version");
     }
 
     function testBasicVerboseOnly(output) {
         assertPresentInOutput(
-            output, '"mongoVersion" : ' + tojson(version), "active mongos version");
-        assertPresentInOutput(output, '"_id" : ' + tojson(s1Host), "active mongos hostname");
-        assertPresentInOutput(output, '"_id" : ' + tojson(s2Host), "active mongos hostname");
+            output, '"merizoVersion" : ' + tojson(version), "active merizos version");
+        assertPresentInOutput(output, '"_id" : ' + tojson(s1Host), "active merizos hostname");
+        assertPresentInOutput(output, '"_id" : ' + tojson(s2Host), "active merizos hostname");
     }
 
-    var buildinfo = assert.commandWorked(mongos.adminCommand("buildinfo"));
-    var serverStatus1 = assert.commandWorked(mongos.adminCommand("serverStatus"));
+    var buildinfo = assert.commandWorked(merizos.adminCommand("buildinfo"));
+    var serverStatus1 = assert.commandWorked(merizos.adminCommand("serverStatus"));
     var serverStatus2 = assert.commandWorked(st.s1.adminCommand("serverStatus"));
     var version = buildinfo.version;
     var s1Host = serverStatus1.host;
     var s2Host = serverStatus2.host;
 
-    // Normal, active mongoses
+    // Normal, active merizoses
     var outputNormal = grabStatusOutput(st.config, false);
     testBasic(outputNormal);
     testBasicNormalOnly(outputNormal);
@@ -96,7 +96,7 @@
 
     // Take a copy of the config db, in order to test the harder-to-setup cases below.
     // Copy into a standalone to also test running printShardingStatus() against a config dump.
-    var config = mongos.getDB("config");
+    var config = merizos.getDB("config");
     var configCopy = standalone.getDB("configCopy");
     config.getCollectionInfos().forEach(function(c) {
         // Create collection with options.
@@ -115,48 +115,48 @@
         });
     });
 
-    // Inactive mongoses
+    // Inactive merizoses
     // Make the first ping be older than now by 1 second more than the threshold
     // Make the second ping be older still by the same amount again
     var pingAdjustMs = 60000 + 1000;
     var then = new Date();
     then.setTime(then.getTime() - pingAdjustMs);
-    configCopy.mongos.update({_id: s1Host}, {$set: {ping: then}});
+    configCopy.merizos.update({_id: s1Host}, {$set: {ping: then}});
     then.setTime(then.getTime() - pingAdjustMs);
-    configCopy.mongos.update({_id: s2Host}, {$set: {ping: then}});
+    configCopy.merizos.update({_id: s2Host}, {$set: {ping: then}});
 
     var output = grabStatusOutput(configCopy, false);
-    assertPresentInOutput(output, "most recently active mongoses:", "section header");
-    assertPresentInOutput(output, tojson(version) + " : 1\n", "recent mongos version");
+    assertPresentInOutput(output, "most recently active merizoses:", "section header");
+    assertPresentInOutput(output, tojson(version) + " : 1\n", "recent merizos version");
 
     var output = grabStatusOutput(configCopy, true);
-    assertPresentInOutput(output, "most recently active mongoses:", "section header");
-    assertPresentInOutput(output, '"_id" : ' + tojson(s1Host), "recent mongos hostname");
-    assertNotPresentInOutput(output, '"_id" : ' + tojson(s2Host), "old mongos hostname");
+    assertPresentInOutput(output, "most recently active merizoses:", "section header");
+    assertPresentInOutput(output, '"_id" : ' + tojson(s1Host), "recent merizos hostname");
+    assertNotPresentInOutput(output, '"_id" : ' + tojson(s2Host), "old merizos hostname");
 
-    // Older mongoses
-    configCopy.mongos.remove({_id: s1Host});
+    // Older merizoses
+    configCopy.merizos.remove({_id: s1Host});
 
     var output = grabStatusOutput(configCopy, false);
-    assertPresentInOutput(output, "most recently active mongoses:", "section header");
-    assertPresentInOutput(output, tojson(version) + " : 1\n", "recent mongos version");
+    assertPresentInOutput(output, "most recently active merizoses:", "section header");
+    assertPresentInOutput(output, tojson(version) + " : 1\n", "recent merizos version");
 
     var output = grabStatusOutput(configCopy, true);
-    assertPresentInOutput(output, "most recently active mongoses:", "section header");
-    assertNotPresentInOutput(output, '"_id" : ' + tojson(s1Host), "removed mongos hostname");
-    assertPresentInOutput(output, '"_id" : ' + tojson(s2Host), "recent mongos hostname");
+    assertPresentInOutput(output, "most recently active merizoses:", "section header");
+    assertNotPresentInOutput(output, '"_id" : ' + tojson(s1Host), "removed merizos hostname");
+    assertPresentInOutput(output, '"_id" : ' + tojson(s2Host), "recent merizos hostname");
 
-    // No mongoses at all
-    configCopy.mongos.remove({});
+    // No merizoses at all
+    configCopy.merizos.remove({});
 
     var output = grabStatusOutput(configCopy, false);
-    assertPresentInOutput(output, "most recently active mongoses:\n        none", "no mongoses");
+    assertPresentInOutput(output, "most recently active merizoses:\n        none", "no merizoses");
 
     var output = grabStatusOutput(configCopy, true);
     assertPresentInOutput(
-        output, "most recently active mongoses:\n        none", "no mongoses (verbose)");
+        output, "most recently active merizoses:\n        none", "no merizoses (verbose)");
 
-    assert(mongos.getDB(dbName).dropDatabase());
+    assert(merizos.getDB(dbName).dropDatabase());
 
     ////////////////////////
     // Extended tests
@@ -180,11 +180,11 @@
         assert.commandWorked(admin.runCommand(cmdObj));
 
         if (args.hasOwnProperty("unique")) {
-            assert.writeOK(mongos.getDB("config").collections.update(
+            assert.writeOK(merizos.getDB("config").collections.update(
                 {_id: collName}, {$set: {"unique": args.unique}}));
         }
         if (args.hasOwnProperty("noBalance")) {
-            assert.writeOK(mongos.getDB("config").collections.update(
+            assert.writeOK(merizos.getDB("config").collections.update(
                 {_id: collName}, {$set: {"noBalance": args.noBalance}}));
         }
 
@@ -217,10 +217,10 @@
         }
 
         try {
-            mongos.getCollection(collName).drop();
+            merizos.getCollection(collName).drop();
         } catch (e) {
             // Ignore drop errors because they are from the illegal values in the collection entry
-            assert.writeOK(mongos.getDB("config").collections.remove({_id: collName}));
+            assert.writeOK(merizos.getDB("config").collections.remove({_id: collName}));
         }
 
         testCollDetailsNum++;
@@ -245,7 +245,7 @@
     testCollDetails({unique: "", noBalance: ""});
     testCollDetails({unique: 0, noBalance: 0});
 
-    assert(mongos.getDB("test").dropDatabase());
+    assert(merizos.getDB("test").dropDatabase());
 
     MongoRunner.stopMongod(standalone);
 

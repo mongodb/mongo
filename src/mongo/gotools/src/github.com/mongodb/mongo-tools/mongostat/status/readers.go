@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -12,8 +12,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/text"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/text"
+	"github.com/merizodb/merizo-tools/common/util"
 )
 
 type ReaderConfig struct {
@@ -149,11 +149,11 @@ func getStorageEngine(stat *ServerStatus) string {
 	return val
 }
 
-// mongosProcessRE matches mongos not followed by any slashes before next whitespace
-var mongosProcessRE = regexp.MustCompile(`^.*\bmongos\b[^\\\/]*(\s.*)?$`)
+// merizosProcessRE matches merizos not followed by any slashes before next whitespace
+var merizosProcessRE = regexp.MustCompile(`^.*\bmerizos\b[^\\\/]*(\s.*)?$`)
 
 func IsMongos(stat *ServerStatus) bool {
-	return stat.ShardCursorType != nil || mongosProcessRE.MatchString(stat.Process)
+	return stat.ShardCursorType != nil || merizosProcessRE.MatchString(stat.Process)
 }
 
 func HasLocks(stat *ServerStatus) bool {

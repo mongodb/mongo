@@ -4,7 +4,7 @@ selector:
   roots:
   - jstests/sslSpecial/*.js
 
-# ssl tests start their own mongod's.
+# ssl tests start their own merizod's.
 executor:
   config:
     shell_options:

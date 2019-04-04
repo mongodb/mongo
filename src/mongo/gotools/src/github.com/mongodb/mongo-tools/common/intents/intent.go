@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -11,9 +11,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mongodb/mongo-tools/common"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -42,7 +42,7 @@ type FileNeedsIOBuffer interface {
 	ReleaseIOBuffer()
 }
 
-// mongorestore first scans the directory to generate a list
+// merizorestore first scans the directory to generate a list
 // of all files to restore and what they map to. TODO comments
 type Intent struct {
 	// Destination namespace info
@@ -61,7 +61,7 @@ type Intent struct {
 	// Collection options
 	Options *bson.D
 
-	// UUID (for MongoDB 3.6+) as a big-endian hex string
+	// UUID (for MerizoDB 3.6+) as a big-endian hex string
 	UUID string
 
 	// File/collection size, for some prioritizer implementations.
@@ -154,16 +154,16 @@ func (existing *Intent) MergeIntent(intent *Intent) {
 type Manager struct {
 	// intents are for all of the regular user created collections
 	intents map[string]*Intent
-	// special intents are for all of the collections that are created by mongod
+	// special intents are for all of the collections that are created by merizod
 	// and require special handling
 	specialIntents map[string]*Intent
 
-	// legacy mongorestore works in the order that paths are discovered,
+	// legacy merizorestore works in the order that paths are discovered,
 	// so we need an ordered data structure to preserve this behavior.
 	intentsByDiscoveryOrder []*Intent
 
 	// we need different scheduling order depending on the target
-	// mongod/mongos and whether or not we are multi threading;
+	// merizod/merizos and whether or not we are multi threading;
 	// the IntentPrioritizer interface encapsulates this.
 	prioritizer IntentPrioritizer
 
@@ -420,7 +420,7 @@ func (manager *Manager) Peek() *Intent {
 	return &intentCopy
 }
 
-// Finish tells the prioritizer that mongorestore is done restoring
+// Finish tells the prioritizer that merizorestore is done restoring
 // the given collection intent.
 func (manager *Manager) Finish(intent *Intent) {
 	manager.prioritizer.Finish(intent)

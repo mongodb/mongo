@@ -66,7 +66,7 @@ executor:
     n: 20
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1
     # This suite requires w="majority" writes to be applied on all secondaries. By using a 2-node

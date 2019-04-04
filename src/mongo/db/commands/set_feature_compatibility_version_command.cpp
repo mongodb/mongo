@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,41 +27,41 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/database_version_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/coll_mod.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/feature_compatibility_version.h"
+#include "merizo/db/commands/feature_compatibility_version_command_parser.h"
+#include "merizo/db/commands/feature_compatibility_version_documentation.h"
+#include "merizo/db/commands/feature_compatibility_version_parser.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/s/config/sharding_catalog_manager.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/catalog/type_collection.h"
+#include "merizo/s/database_version_helpers.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -140,7 +140,7 @@ void forEachSessionWithCheckout(
 
 /**
  * Removes all documents from config.transactions with a "state" field because they may point to
- * oplog entries in a format a 4.0 mongod cannot process.
+ * oplog entries in a format a 4.0 merizod cannot process.
  */
 void downgradeTransactionTable(OperationContext* opCtx) {
     // In FCV 4.0, all transaction table entries associated with a transaction have a "state" field.
@@ -398,4 +398,4 @@ public:
 } setFeatureCompatibilityVersionCommand;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

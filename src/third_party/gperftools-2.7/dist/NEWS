@@ -331,7 +331,7 @@ Here are major changes since 2.4:
   unless profiling is started.
 
 * Andrew Morrow has contributed support for obtaining cache size of the
-  current thread and softer idling (for use in MongoDB).
+  current thread and softer idling (for use in MerizoDB).
 
 * we've implemented few minor performance improvements, particularly
   on malloc fast-path.

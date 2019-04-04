@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,9 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo_embedded/mongo_embedded.h"
+#include "merizo_embedded/merizo_embedded.h"
 
 #include <cstring>
 #include <exception>
@@ -37,19 +37,19 @@
 #include <vector>
 
 #include "api_common.h"
-#include "mongo/db/client.h"
-#include "mongo/db/service_context.h"
-#include "mongo/embedded/embedded.h"
-#include "mongo/embedded/embedded_log_appender.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/rpc/message.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/transport_layer_mock.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/shared_buffer.h"
+#include "merizo/db/client.h"
+#include "merizo/db/service_context.h"
+#include "merizo/embedded/embedded.h"
+#include "merizo/embedded/embedded_log_appender.h"
+#include "merizo/logger/logger.h"
+#include "merizo/logger/message_event_utf8_encoder.h"
+#include "merizo/rpc/message.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/transport/service_entry_point.h"
+#include "merizo/transport/transport_layer_mock.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/shared_buffer.h"
 
 #if defined(_WIN32)
 #define MONGO_API_CALL __cdecl
@@ -57,8 +57,8 @@
 #define MONGO_API_CALL
 #endif
 
-namespace mongo {
-using MongoEmbeddedStatusImpl = StatusForAPI<mongo_embedded_v1_error>;
+namespace merizo {
+using MongoEmbeddedStatusImpl = StatusForAPI<merizo_embedded_v1_error>;
 
 /**
  * C interfaces that use enterCXX() must provide a translateException() function that converts any
@@ -71,15 +71,15 @@ static MongoEmbeddedStatusImpl translateException(
     return {MONGO_EMBEDDED_V1_ERROR_REENTRANCY_NOT_ALLOWED, ex.code(), ex.what()};
 } catch (const DBException& ex) {
     return {MONGO_EMBEDDED_V1_ERROR_EXCEPTION, ex.code(), ex.what()};
-} catch (const ExceptionForAPI<mongo_embedded_v1_error>& ex) {
-    return {ex.statusCode(), mongo::ErrorCodes::InternalError, ex.what()};
+} catch (const ExceptionForAPI<merizo_embedded_v1_error>& ex) {
+    return {ex.statusCode(), merizo::ErrorCodes::InternalError, ex.what()};
 } catch (const std::bad_alloc& ex) {
-    return {MONGO_EMBEDDED_V1_ERROR_ENOMEM, mongo::ErrorCodes::InternalError, ex.what()};
+    return {MONGO_EMBEDDED_V1_ERROR_ENOMEM, merizo::ErrorCodes::InternalError, ex.what()};
 } catch (const std::exception& ex) {
-    return {MONGO_EMBEDDED_V1_ERROR_UNKNOWN, mongo::ErrorCodes::InternalError, ex.what()};
+    return {MONGO_EMBEDDED_V1_ERROR_UNKNOWN, merizo::ErrorCodes::InternalError, ex.what()};
 } catch (...) {
     return {MONGO_EMBEDDED_V1_ERROR_UNKNOWN,
-            mongo::ErrorCodes::InternalError,
+            merizo::ErrorCodes::InternalError,
             "Unknown error encountered in performing requested stitch_support_v1 operation"};
 }
 
@@ -97,112 +97,112 @@ static void translateExceptionFallback(MongoEmbeddedStatusImpl& status) noexcept
     status.exception_code = -1;
     setErrorMessageNoAlloc(status.what);
 }
-}  // namespace mongo
+}  // namespace merizo
 
-struct mongo_embedded_v1_status {
-    mongo::MongoEmbeddedStatusImpl statusImpl;
+struct merizo_embedded_v1_status {
+    merizo::MongoEmbeddedStatusImpl statusImpl;
 };
 
-struct mongo_embedded_v1_lib {
-    ~mongo_embedded_v1_lib() {
+struct merizo_embedded_v1_lib {
+    ~merizo_embedded_v1_lib() {
         invariant(this->databaseCount.load() == 0);
 
         if (this->logCallbackHandle) {
-            using mongo::logger::globalLogDomain;
+            using merizo::logger::globalLogDomain;
             globalLogDomain()->detachAppender(this->logCallbackHandle);
             this->logCallbackHandle.reset();
         }
     }
 
-    mongo_embedded_v1_lib(const mongo_embedded_v1_lib&) = delete;
-    void operator=(const mongo_embedded_v1_lib) = delete;
+    merizo_embedded_v1_lib(const merizo_embedded_v1_lib&) = delete;
+    void operator=(const merizo_embedded_v1_lib) = delete;
 
-    mongo_embedded_v1_lib() = default;
+    merizo_embedded_v1_lib() = default;
 
-    mongo::AtomicWord<int> databaseCount;
+    merizo::AtomicWord<int> databaseCount;
 
-    mongo::logger::ComponentMessageLogDomain::AppenderHandle logCallbackHandle;
+    merizo::logger::ComponentMessageLogDomain::AppenderHandle logCallbackHandle;
 
-    std::unique_ptr<mongo_embedded_v1_instance> onlyDB;
+    std::unique_ptr<merizo_embedded_v1_instance> onlyDB;
 };
 
-namespace mongo {
+namespace merizo {
 namespace {
-MongoEmbeddedStatusImpl* getStatusImpl(mongo_embedded_v1_status* status) {
+MongoEmbeddedStatusImpl* getStatusImpl(merizo_embedded_v1_status* status) {
     return status ? &status->statusImpl : nullptr;
 }
 
-using MobileException = ExceptionForAPI<mongo_embedded_v1_error>;
+using MobileException = ExceptionForAPI<merizo_embedded_v1_error>;
 
 struct ServiceContextDestructor {
-    void operator()(mongo::ServiceContext* const serviceContext) const noexcept {
-        ::mongo::embedded::shutdown(serviceContext);
+    void operator()(merizo::ServiceContext* const serviceContext) const noexcept {
+        ::merizo::embedded::shutdown(serviceContext);
     }
 };
 
-using EmbeddedServiceContextPtr = std::unique_ptr<mongo::ServiceContext, ServiceContextDestructor>;
+using EmbeddedServiceContextPtr = std::unique_ptr<merizo::ServiceContext, ServiceContextDestructor>;
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo
 
-struct mongo_embedded_v1_instance {
-    ~mongo_embedded_v1_instance() {
+struct merizo_embedded_v1_instance {
+    ~merizo_embedded_v1_instance() {
         invariant(this->clientCount.load() == 0);
         this->parentLib->databaseCount.subtractAndFetch(1);
     }
 
-    mongo_embedded_v1_instance(const mongo_embedded_v1_instance&) = delete;
-    mongo_embedded_v1_instance& operator=(const mongo_embedded_v1_instance&) = delete;
+    merizo_embedded_v1_instance(const merizo_embedded_v1_instance&) = delete;
+    merizo_embedded_v1_instance& operator=(const merizo_embedded_v1_instance&) = delete;
 
-    explicit mongo_embedded_v1_instance(mongo_embedded_v1_lib* const p,
+    explicit merizo_embedded_v1_instance(merizo_embedded_v1_lib* const p,
                                         const char* const yaml_config)
         : parentLib(p),
-          serviceContext(::mongo::embedded::initialize(yaml_config)),
+          serviceContext(::merizo::embedded::initialize(yaml_config)),
           // creating mock transport layer to be able to create sessions
-          transportLayer(std::make_unique<mongo::transport::TransportLayerMock>()) {
+          transportLayer(std::make_unique<merizo::transport::TransportLayerMock>()) {
         if (!this->serviceContext) {
-            throw ::mongo::MobileException{
+            throw ::merizo::MobileException{
                 MONGO_EMBEDDED_V1_ERROR_DB_INITIALIZATION_FAILED,
-                "The MongoDB Embedded Library Failed to initialize the Service Context"};
+                "The MerizoDB Embedded Library Failed to initialize the Service Context"};
         }
 
         this->parentLib->databaseCount.addAndFetch(1);
     }
 
-    mongo_embedded_v1_lib* parentLib;
-    mongo::AtomicWord<int> clientCount;
+    merizo_embedded_v1_lib* parentLib;
+    merizo::AtomicWord<int> clientCount;
 
-    mongo::EmbeddedServiceContextPtr serviceContext;
-    std::unique_ptr<mongo::transport::TransportLayerMock> transportLayer;
+    merizo::EmbeddedServiceContextPtr serviceContext;
+    std::unique_ptr<merizo::transport::TransportLayerMock> transportLayer;
 };
 
-struct mongo_embedded_v1_client {
-    ~mongo_embedded_v1_client() {
+struct merizo_embedded_v1_client {
+    ~merizo_embedded_v1_client() {
         this->parent_db->clientCount.subtractAndFetch(1);
     }
 
-    explicit mongo_embedded_v1_client(mongo_embedded_v1_instance* const db)
+    explicit merizo_embedded_v1_client(merizo_embedded_v1_instance* const db)
         : parent_db(db),
           client(db->serviceContext->makeClient("embedded", db->transportLayer->createSession())) {
         this->parent_db->clientCount.addAndFetch(1);
     }
 
-    mongo_embedded_v1_client(const mongo_embedded_v1_client&) = delete;
-    mongo_embedded_v1_client& operator=(const mongo_embedded_v1_client&) = delete;
+    merizo_embedded_v1_client(const merizo_embedded_v1_client&) = delete;
+    merizo_embedded_v1_client& operator=(const merizo_embedded_v1_client&) = delete;
 
-    mongo_embedded_v1_instance* const parent_db;
-    mongo::ServiceContext::UniqueClient client;
+    merizo_embedded_v1_instance* const parent_db;
+    merizo::ServiceContext::UniqueClient client;
 
     std::vector<unsigned char> output;
-    mongo::DbResponse response;
+    merizo::DbResponse response;
 };
 
-namespace mongo {
+namespace merizo {
 namespace {
 
-std::unique_ptr<mongo_embedded_v1_lib> library;
+std::unique_ptr<merizo_embedded_v1_lib> library;
 
-void registerLogCallback(mongo_embedded_v1_lib* const lib,
-                         const mongo_embedded_v1_log_callback logCallback,
+void registerLogCallback(merizo_embedded_v1_lib* const lib,
+                         const merizo_embedded_v1_log_callback logCallback,
                          void* const logUserData) {
     using logger::globalLogDomain;
     using logger::MessageEventEphemeral;
@@ -213,14 +213,14 @@ void registerLogCallback(mongo_embedded_v1_lib* const lib,
             logCallback, logUserData, std::make_unique<MessageEventUnadornedEncoder>()));
 }
 
-mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params) try {
+merizo_embedded_v1_lib* capi_lib_init(merizo_embedded_v1_init_params const* params) try {
     if (library) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_LIBRARY_ALREADY_INITIALIZED,
-            "Cannot initialize the MongoDB Embedded Library when it is already initialized."};
+            "Cannot initialize the MerizoDB Embedded Library when it is already initialized."};
     }
 
-    auto lib = std::make_unique<mongo_embedded_v1_lib>();
+    auto lib = std::make_unique<merizo_embedded_v1_lib>();
 
     // TODO(adam.martin): Fold all of this log initialization into the ctor of lib.
     if (params) {
@@ -255,22 +255,22 @@ mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params
     throw;
 }
 
-void capi_lib_fini(mongo_embedded_v1_lib* const lib) {
+void capi_lib_fini(merizo_embedded_v1_lib* const lib) {
     if (!lib) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
-            "Cannot close a `NULL` pointer referencing a MongoDB Embedded Library Instance"};
+            "Cannot close a `NULL` pointer referencing a MerizoDB Embedded Library Instance"};
     }
 
     if (!library) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-            "Cannot close the MongoDB Embedded Library when it is not initialized"};
+            "Cannot close the MerizoDB Embedded Library when it is not initialized"};
     }
 
     if (library.get() != lib) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
-                              "Invalid MongoDB Embedded Library handle."};
+                              "Invalid MerizoDB Embedded Library handle."};
     }
 
     // This check is not possible to 100% guarantee.  It is a best effort.  The documentation of
@@ -279,98 +279,98 @@ void capi_lib_fini(mongo_embedded_v1_lib* const lib) {
     if (lib->databaseCount.load() > 0) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_HAS_DB_HANDLES_OPEN,
-            "Cannot close the MongoDB Embedded Library when it has database handles still open."};
+            "Cannot close the MerizoDB Embedded Library when it has database handles still open."};
     }
 
     library = nullptr;
 }
 
-mongo_embedded_v1_instance* instance_new(mongo_embedded_v1_lib* const lib,
+merizo_embedded_v1_instance* instance_new(merizo_embedded_v1_lib* const lib,
                                          const char* const yaml_config) {
     if (!library) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-                              "Cannot create a new database handle when the MongoDB Embedded "
+                              "Cannot create a new database handle when the MerizoDB Embedded "
                               "Library is not yet initialized."};
     }
 
     if (library.get() != lib) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
-                              "Cannot create a new database handle when the MongoDB Embedded "
+                              "Cannot create a new database handle when the MerizoDB Embedded "
                               "Library is not yet initialized."};
     }
 
     if (lib->onlyDB) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_DB_MAX_OPEN,
-                              "The maximum number of permitted database handles for the MongoDB "
+                              "The maximum number of permitted database handles for the MerizoDB "
                               "Embedded Library have been opened."};
     }
 
-    lib->onlyDB = std::make_unique<mongo_embedded_v1_instance>(lib, yaml_config);
+    lib->onlyDB = std::make_unique<merizo_embedded_v1_instance>(lib, yaml_config);
 
     return lib->onlyDB.get();
 }
 
-void instance_destroy(mongo_embedded_v1_instance* const db) {
+void instance_destroy(merizo_embedded_v1_instance* const db) {
     if (!library) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-                              "Cannot destroy a database handle when the MongoDB Embedded Library "
+                              "Cannot destroy a database handle when the MerizoDB Embedded Library "
                               "is not yet initialized."};
     }
 
     if (!db) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
-            "Cannot close a `NULL` pointer referencing a MongoDB Embedded Database"};
+            "Cannot close a `NULL` pointer referencing a MerizoDB Embedded Database"};
     }
 
     if (db != library->onlyDB.get()) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
-            "Cannot close the specified MongoDB Embedded Database, as it is not a valid instance."};
+            "Cannot close the specified MerizoDB Embedded Database, as it is not a valid instance."};
     }
 
     if (db->clientCount.load() > 0) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_DB_CLIENTS_OPEN,
-            "Cannot close a MongoDB Embedded Database instance while it has open clients"};
+            "Cannot close a MerizoDB Embedded Database instance while it has open clients"};
     }
 
     library->onlyDB = nullptr;
 }
 
-mongo_embedded_v1_client* client_new(mongo_embedded_v1_instance* const db) {
+merizo_embedded_v1_client* client_new(merizo_embedded_v1_instance* const db) {
     if (!library) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-                              "Cannot create a new client handle when the MongoDB Embedded Library "
+                              "Cannot create a new client handle when the MerizoDB Embedded Library "
                               "is not yet initialized."};
     }
 
     if (!db) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
-                              "Cannot use a `NULL` pointer referencing a MongoDB Embedded Database "
+                              "Cannot use a `NULL` pointer referencing a MerizoDB Embedded Database "
                               "when creating a new client"};
     }
 
     if (db != library->onlyDB.get()) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
-                              "The specified MongoDB Embedded Database instance cannot be used to "
+                              "The specified MerizoDB Embedded Database instance cannot be used to "
                               "create a new client because it is invalid."};
     }
 
-    return new mongo_embedded_v1_client(db);
+    return new merizo_embedded_v1_client(db);
 }
 
-void client_destroy(mongo_embedded_v1_client* const client) {
+void client_destroy(merizo_embedded_v1_client* const client) {
     if (!library) {
         throw MobileException(MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-                              "Cannot destroy a database handle when the MongoDB Embedded Library "
+                              "Cannot destroy a database handle when the MerizoDB Embedded Library "
                               "is not yet initialized.");
     }
 
     if (!client) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_CLIENT_HANDLE,
-            "Cannot destroy a `NULL` pointer referencing a MongoDB Embedded Database Client"};
+            "Cannot destroy a `NULL` pointer referencing a MerizoDB Embedded Database Client"};
     }
 
     delete client;
@@ -381,19 +381,19 @@ class ClientGuard {
     void operator=(const ClientGuard&) = delete;
 
 public:
-    explicit ClientGuard(mongo_embedded_v1_client* const client) : _client(client) {
-        mongo::Client::setCurrent(std::move(client->client));
+    explicit ClientGuard(merizo_embedded_v1_client* const client) : _client(client) {
+        merizo::Client::setCurrent(std::move(client->client));
     }
 
     ~ClientGuard() {
-        _client->client = mongo::Client::releaseCurrent();
+        _client->client = merizo::Client::releaseCurrent();
     }
 
 private:
-    mongo_embedded_v1_client* const _client;
+    merizo_embedded_v1_client* const _client;
 };
 
-void client_wire_protocol_rpc(mongo_embedded_v1_client* const client,
+void client_wire_protocol_rpc(merizo_embedded_v1_client* const client,
                               const void* input,
                               const size_t input_size,
                               void** const output,
@@ -435,89 +435,89 @@ void client_wire_protocol_rpc(mongo_embedded_v1_client* const client,
     }
 }
 
-int capi_status_get_error(const mongo_embedded_v1_status* const status) noexcept {
+int capi_status_get_error(const merizo_embedded_v1_status* const status) noexcept {
     invariant(status);
     return status->statusImpl.error;
 }
 
-const char* capi_status_get_what(const mongo_embedded_v1_status* const status) noexcept {
+const char* capi_status_get_what(const merizo_embedded_v1_status* const status) noexcept {
     invariant(status);
     return status->statusImpl.what.c_str();
 }
 
-int capi_status_get_code(const mongo_embedded_v1_status* const status) noexcept {
+int capi_status_get_code(const merizo_embedded_v1_status* const status) noexcept {
     invariant(status);
     return status->statusImpl.exception_code;
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo
 
 extern "C" {
-mongo_embedded_v1_lib* MONGO_API_CALL mongo_embedded_v1_lib_init(
-    const mongo_embedded_v1_init_params* const params, mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr),
-                    [&]() { return mongo::capi_lib_init(params); });
+merizo_embedded_v1_lib* MONGO_API_CALL merizo_embedded_v1_lib_init(
+    const merizo_embedded_v1_init_params* const params, merizo_embedded_v1_status* const statusPtr) {
+    return enterCXX(merizo::getStatusImpl(statusPtr),
+                    [&]() { return merizo::capi_lib_init(params); });
 }
 
-int MONGO_API_CALL mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* const lib,
-                                              mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() { return mongo::capi_lib_fini(lib); });
+int MONGO_API_CALL merizo_embedded_v1_lib_fini(merizo_embedded_v1_lib* const lib,
+                                              merizo_embedded_v1_status* const statusPtr) {
+    return enterCXX(merizo::getStatusImpl(statusPtr), [&]() { return merizo::capi_lib_fini(lib); });
 }
 
-mongo_embedded_v1_instance* MONGO_API_CALL
-mongo_embedded_v1_instance_create(mongo_embedded_v1_lib* lib,
+merizo_embedded_v1_instance* MONGO_API_CALL
+merizo_embedded_v1_instance_create(merizo_embedded_v1_lib* lib,
                                   const char* const yaml_config,
-                                  mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr),
-                    [&]() { return mongo::instance_new(lib, yaml_config); });
+                                  merizo_embedded_v1_status* const statusPtr) {
+    return enterCXX(merizo::getStatusImpl(statusPtr),
+                    [&]() { return merizo::instance_new(lib, yaml_config); });
 }
 
-int MONGO_API_CALL mongo_embedded_v1_instance_destroy(mongo_embedded_v1_instance* const db,
-                                                      mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() { return mongo::instance_destroy(db); });
+int MONGO_API_CALL merizo_embedded_v1_instance_destroy(merizo_embedded_v1_instance* const db,
+                                                      merizo_embedded_v1_status* const statusPtr) {
+    return enterCXX(merizo::getStatusImpl(statusPtr), [&]() { return merizo::instance_destroy(db); });
 }
 
-mongo_embedded_v1_client* MONGO_API_CALL mongo_embedded_v1_client_create(
-    mongo_embedded_v1_instance* const db, mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() { return mongo::client_new(db); });
+merizo_embedded_v1_client* MONGO_API_CALL merizo_embedded_v1_client_create(
+    merizo_embedded_v1_instance* const db, merizo_embedded_v1_status* const statusPtr) {
+    return enterCXX(merizo::getStatusImpl(statusPtr), [&]() { return merizo::client_new(db); });
 }
 
-int MONGO_API_CALL mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* const client,
-                                                    mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr),
-                    [&]() { return mongo::client_destroy(client); });
+int MONGO_API_CALL merizo_embedded_v1_client_destroy(merizo_embedded_v1_client* const client,
+                                                    merizo_embedded_v1_status* const statusPtr) {
+    return enterCXX(merizo::getStatusImpl(statusPtr),
+                    [&]() { return merizo::client_destroy(client); });
 }
 
-int MONGO_API_CALL mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* const client,
+int MONGO_API_CALL merizo_embedded_v1_client_invoke(merizo_embedded_v1_client* const client,
                                                    const void* input,
                                                    const size_t input_size,
                                                    void** const output,
                                                    size_t* const output_size,
-                                                   mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() {
-        return mongo::client_wire_protocol_rpc(client, input, input_size, output, output_size);
+                                                   merizo_embedded_v1_status* const statusPtr) {
+    return enterCXX(merizo::getStatusImpl(statusPtr), [&]() {
+        return merizo::client_wire_protocol_rpc(client, input, input_size, output, output_size);
     });
 }
 
 int MONGO_API_CALL
-mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* const status) {
-    return mongo::capi_status_get_error(status);
+merizo_embedded_v1_status_get_error(const merizo_embedded_v1_status* const status) {
+    return merizo::capi_status_get_error(status);
 }
 
 const char* MONGO_API_CALL
-mongo_embedded_v1_status_get_explanation(const mongo_embedded_v1_status* const status) {
-    return mongo::capi_status_get_what(status);
+merizo_embedded_v1_status_get_explanation(const merizo_embedded_v1_status* const status) {
+    return merizo::capi_status_get_what(status);
 }
 
-int MONGO_API_CALL mongo_embedded_v1_status_get_code(const mongo_embedded_v1_status* const status) {
-    return mongo::capi_status_get_code(status);
+int MONGO_API_CALL merizo_embedded_v1_status_get_code(const merizo_embedded_v1_status* const status) {
+    return merizo::capi_status_get_code(status);
 }
 
-mongo_embedded_v1_status* MONGO_API_CALL mongo_embedded_v1_status_create(void) {
-    return new mongo_embedded_v1_status;
+merizo_embedded_v1_status* MONGO_API_CALL merizo_embedded_v1_status_create(void) {
+    return new merizo_embedded_v1_status;
 }
 
-void MONGO_API_CALL mongo_embedded_v1_status_destroy(mongo_embedded_v1_status* const status) {
+void MONGO_API_CALL merizo_embedded_v1_status_destroy(merizo_embedded_v1_status* const status) {
     delete status;
 }
 

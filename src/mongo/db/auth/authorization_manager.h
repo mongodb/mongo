@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,26 +34,26 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/secure_allocator.h"
-#include "mongo/base/shim.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/bson/oid.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/privilege_format.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/role_graph.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/server_options.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
+#include "merizo/base/secure_allocator.h"
+#include "merizo/base/shim.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/bson/oid.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/privilege_format.h"
+#include "merizo/db/auth/resource_pattern.h"
+#include "merizo/db/auth/role_graph.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/server_options.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_map.h"
 
-namespace mongo {
+namespace merizo {
 
 class AuthorizationSession;
 class AuthzManagerExternalState;
@@ -114,8 +114,8 @@ public:
     static const NamespaceString usersBackupCollectionNamespace;
     static const NamespaceString usersCollectionNamespace;
     static const NamespaceString versionCollectionNamespace;
-    static const NamespaceString defaultTempUsersCollectionNamespace;  // for mongorestore
-    static const NamespaceString defaultTempRolesCollectionNamespace;  // for mongorestore
+    static const NamespaceString defaultTempUsersCollectionNamespace;  // for merizorestore
+    static const NamespaceString defaultTempRolesCollectionNamespace;  // for merizorestore
 
     /**
      * Status to be returned when authentication fails. Being consistent about our returned Status
@@ -140,25 +140,25 @@ public:
     static const int schemaVersionInvalid = 0;
 
     /**
-     * Auth schema version for MongoDB v2.4 and prior.
+     * Auth schema version for MerizoDB v2.4 and prior.
      */
     static const int schemaVersion24 = 1;
 
     /**
-     * Auth schema version for MongoDB v2.6 during the upgrade process.  Same as
+     * Auth schema version for MerizoDB v2.6 during the upgrade process.  Same as
      * schemaVersion26Final, except that user documents are found in admin.new.users, and user
      * management commands are disabled.
      */
     static const int schemaVersion26Upgrade = 2;
 
     /**
-     * Auth schema version for MongoDB 2.6 and 3.0 MONGODB-CR/SCRAM mixed auth mode.
+     * Auth schema version for MerizoDB 2.6 and 3.0 MONGODB-CR/SCRAM mixed auth mode.
      * Users are stored in admin.system.users, roles in admin.system.roles.
      */
     static const int schemaVersion26Final = 3;
 
     /**
-     * Auth schema version for MongoDB 3.0 SCRAM only mode.
+     * Auth schema version for MerizoDB 3.0 SCRAM only mode.
      * Users are stored in admin.system.users, roles in admin.system.roles.
      * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
      */
@@ -327,4 +327,4 @@ public:
     virtual void setInUserManagementCommand(OperationContext* opCtx, bool val) = 0;
 };
 
-}  // namespace mongo
+}  // namespace merizo

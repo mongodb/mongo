@@ -55,7 +55,7 @@ post:
           # these default values in the distro config in evergreen.
 
           if [ -d "${scons_cache_path}" ]; then
-              /opt/mongodbtoolchain/v3/bin/python2 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+              /opt/merizodbtoolchain/v3/bin/python2 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
 
 functions:
@@ -71,7 +71,7 @@ functions:
         workloads: ${workloads_rev}
         wtdevelop: ${wtdevelop_rev}
 
-  "compile mongodb":
+  "compile merizodb":
     # We create a virtual environment with the Python dependencies for compiling the server
     # installed.
     - command: shell.exec
@@ -81,7 +81,7 @@ functions:
           set -o errexit
           set -o verbose
 
-          /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python2 "${workdir}/venv"
+          /opt/merizodbtoolchain/v3/bin/virtualenv --python /opt/merizodbtoolchain/v3/bin/python2 "${workdir}/venv"
           source "${workdir}/venv/bin/activate"
 
           python2 -m pip install -r etc/pip/compile-requirements.txt
@@ -118,7 +118,7 @@ functions:
         file: src/compile_expansions.yml
     - command: shell.exec
       params:
-        working_dir: src/src/mongo/gotools/src/github.com/mongodb/mongo-tools
+        working_dir: src/src/merizo/gotools/src/github.com/merizodb/merizo-tools
         script: |
           set -o verbose
           set -o errexit
@@ -130,13 +130,13 @@ functions:
           . ./set_goenv.sh
           GOROOT="" set_goenv || exit
           go version
-          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
-          if [ "${build_mongoreplay}" = "true" ]; then
-              build_tools="$build_tools mongoreplay"
+          build_tools="bsondump merizostat merizofiles merizoexport merizoimport merizorestore merizodump merizotop"
+          if [ "${build_merizoreplay}" = "true" ]; then
+              build_tools="$build_tools merizoreplay"
           fi
           for i in $build_tools; do
-              go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../mongo-tools/$i${exe|}" $i/main/$i.go
-              "../../../../../../mongo-tools/$i${exe|}" --version
+              go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../merizo-tools/$i${exe|}" $i/main/$i.go
+              "../../../../../../merizo-tools/$i${exe|}" --version
           done
     - command: shell.exec
       params:
@@ -145,38 +145,38 @@ functions:
           set -o errexit
           set -o verbose
           source "${workdir}/venv/bin/activate"
-          python2 ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} --use-new-tools mongod${extension} mongos${extension} MONGO_VERSION=${version}
-          mkdir -p mongodb/bin
-          mkdir -p mongodb/jstests/hooks
-          mv mongo${extension|} mongodb/bin
-          mv mongod${extension|} mongodb/bin
-          mv mongos${extension|} mongodb/bin
-          mv src/mongo-tools/* mongodb/bin
+          python2 ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} merizo${extension} --use-new-tools merizod${extension} merizos${extension} MONGO_VERSION=${version}
+          mkdir -p merizodb/bin
+          mkdir -p merizodb/jstests/hooks
+          mv merizo${extension|} merizodb/bin
+          mv merizod${extension|} merizodb/bin
+          mv merizos${extension|} merizodb/bin
+          mv src/merizo-tools/* merizodb/bin
           if [ -d jstests/hooks ]
           then
             echo "Fetching JS test DB correctness checks from directory jstests"
-            cp -a jstests/* mongodb/jstests
+            cp -a jstests/* merizodb/jstests
 
             echo "Now adding our own special run_validate_collections.js wrapper"
-            mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
+            mv merizodb/jstests/hooks/run_validate_collections.js merizodb/jstests/hooks/run_validate_collections.actual.js
 
-            cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
+            cat << EOF > merizodb/jstests/hooks/run_validate_collections.js
             print("NOTE: run_validate_collections.js will skip the oplog!");
             TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
             load('jstests/hooks/run_validate_collections.actual.js');
           EOF
           fi
-          tar czf mongodb${compile-variant|}.tar.gz mongodb
+          tar czf merizodb${compile-variant|}.tar.gz merizodb
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb${compile-variant|}.tar.gz
-        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz
+        local_file: src/merizodb${compile-variant|}.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/merizodb${compile-variant|}-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb${compile-variant|}.tar.gz
+        display_name: merizodb${compile-variant|}.tar.gz
 
   "use WiredTiger develop":
     command: shell.exec
@@ -201,7 +201,7 @@ functions:
           mkdir src
           mkdir work
     - command: manifest.load
-    # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
+    # Calling the git.get_project command here will clone the merizodb/merizo repository, as well as
     # the repositories defined in the build variant's "modules" section.
     - *git_get_project
     - command: shell.exec
@@ -211,11 +211,11 @@ functions:
           cat > bootstrap.yml <<EOF
           infrastructure_provisioning: ${cluster}
           platform: ${platform}
-          mongodb_setup: ${setup}
+          merizodb_setup: ${setup}
           storageEngine: ${storageEngine}
           test_control: ${test}
           production: true
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz"
+          merizodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/merizodb${compile-variant|}-${version_id}.tar.gz"
           workloads_dir: ../src/workloads/workloads
           ycsb_dir: ../src/YCSB/YCSB
           linkbench_dir: ../src/linkbench/linkbench
@@ -296,7 +296,7 @@ functions:
           source ./dsienv.sh
           ../src/dsi/dsi/run-dsi infrastructure_provisioning.py
           ../src/dsi/dsi/run-dsi workload_setup.py
-          ../src/dsi/dsi/run-dsi mongodb_setup.py
+          ../src/dsi/dsi/run-dsi merizodb_setup.py
 
   "run test":
     - command: shell.exec
@@ -365,7 +365,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "use WiredTiger develop" # noop if ${compile-variant|} is not "-wtdevelop"
-    - func: "compile mongodb"
+    - func: "compile merizodb"
 
 - name: linkbench
   priority: 5
@@ -583,22 +583,22 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: mongos_workloads
+- name: merizos_workloads
   priority: 5
   commands:
     - func: "prepare environment"
       vars:
-        test: "mongos"
+        test: "merizos"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
 
-- name: mongos_large_catalog_workloads
+- name: merizos_large_catalog_workloads
   priority: 5
   commands:
     - func: "prepare environment"
       vars:
-        test: "mongos_large_catalog"
+        test: "merizos_large_catalog"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -628,7 +628,7 @@ tasks:
   commands:
     - func: "prepare environment"
       vars:
-        # Unfortunately the dash/underscore style is different for mongodb_setup and test_control
+        # Unfortunately the dash/underscore style is different for merizodb_setup and test_control
         test: "secondary_performance"
         setup: "secondary-performance"
     - func: "deploy cluster"
@@ -687,12 +687,12 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: change_streams_multi_mongos
+- name: change_streams_multi_merizos
   priority: 5
   commands:
     - func: "prepare environment"
       vars:
-        test: "change_streams_multi_mongos"
+        test: "change_streams_multi_merizos"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -729,8 +729,8 @@ modules:
   branch: master
 
 - name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
+  repo: git@github.com:10gen/merizo-enterprise-modules.git
+  prefix: src/merizo/db/modules
   branch: master
 
 #######################################
@@ -750,7 +750,7 @@ buildvariants:
       MONGO_DISTMOD=linux-64-amzn-build
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     platform: linux
     project_dir: &project_dir dsi
     tooltags: ""
@@ -781,7 +781,7 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     compile-variant: -enterprise
   run_on:
       - "amazon2-build"
@@ -954,11 +954,11 @@ buildvariants:
     - name: map_reduce_workloads
     - name: smoke_test
     - name: industry_benchmarks_wmajority
-    - name: mongos_workloads
-    - name: mongos_large_catalog_workloads
+    - name: merizos_workloads
+    - name: merizos_large_catalog_workloads
     - name: change_streams_throughput
     - name: change_streams_latency
-    - name: change_streams_multi_mongos
+    - name: change_streams_multi_merizos
 
 - name: linux-shard-lite
   display_name: Linux Shard Lite Cluster
@@ -986,8 +986,8 @@ buildvariants:
     - name: industry_benchmarks_wmajority
     - name: linkbench
     - name: mixed_workloads
-    - name: mongos_workloads
-    - name: mongos_large_catalog_workloads
+    - name: merizos_workloads
+    - name: merizos_large_catalog_workloads
     - name: move_chunk_workloads
     - name: move_chunk_waiting_workloads
     - name: retryable_writes_workloads
@@ -1023,7 +1023,7 @@ buildvariants:
     - name: smoke_test
     - name: retryable_writes_workloads
     - name: industry_benchmarks_wmajority
-    - name: secondary_performance # Uses a special 2 node mongodb setup
+    - name: secondary_performance # Uses a special 2 node merizodb setup
     - name: non_sharded_workloads
     - name: bestbuy_agg
     - name: bestbuy_agg_out

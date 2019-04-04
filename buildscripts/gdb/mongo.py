@@ -1,4 +1,4 @@
-"""GDB commands for MongoDB."""
+"""GDB commands for MerizoDB."""
 from __future__ import print_function
 
 import os
@@ -11,7 +11,7 @@ import gdb
 try:
     # Try to find and load the C++ pretty-printer library.
     import glob
-    pp = glob.glob("/opt/mongodbtoolchain/v3/share/gcc-*/python/libstdcxx/v6/printers.py")
+    pp = glob.glob("/opt/merizodbtoolchain/v3/share/gcc-*/python/libstdcxx/v6/printers.py")
     printers = pp[0]
     path = os.path.dirname(os.path.dirname(os.path.dirname(printers)))
     sys.path.insert(0, path)
@@ -62,7 +62,7 @@ def get_current_thread_name():
     fallback_name = '"%s"' % (gdb.selected_thread().name or '')
     try:
         # This goes through the pretty printer for StringData which adds "" around the name.
-        name = str(gdb.parse_and_eval("mongo::for_debuggers::threadName"))
+        name = str(gdb.parse_and_eval("merizo::for_debuggers::threadName"))
         if name == '""':
             return fallback_name
         return name
@@ -72,7 +72,7 @@ def get_current_thread_name():
 
 def get_global_service_context():
     """Return the global ServiceContext object."""
-    return gdb.parse_and_eval("'mongo::(anonymous namespace)::globalServiceContext'").dereference()
+    return gdb.parse_and_eval("'merizo::(anonymous namespace)::globalServiceContext'").dereference()
 
 
 def get_session_catalog():
@@ -81,7 +81,7 @@ def get_session_catalog():
     Returns None if no SessionCatalog could be found.
     """
     # The SessionCatalog is a decoration on the ServiceContext.
-    session_catalog_dec = get_decoration(get_global_service_context(), "mongo::SessionCatalog")
+    session_catalog_dec = get_decoration(get_global_service_context(), "merizo::SessionCatalog")
     if session_catalog_dec is None:
         return None
     return session_catalog_dec[1]
@@ -96,13 +96,13 @@ def get_decorations(obj):
     TODO: De-duplicate the logic between here and DecorablePrinter. This code was copied from there.
     """
     type_name = str(obj.type).replace("class", "").replace(" ", "")
-    decorable = obj.cast(gdb.lookup_type("mongo::Decorable<{}>".format(type_name)))
+    decorable = obj.cast(gdb.lookup_type("merizo::Decorable<{}>".format(type_name)))
     decl_vector = decorable["_decorations"]["_registry"]["_decorationInfo"]
     start = decl_vector["_M_impl"]["_M_start"]
     finish = decl_vector["_M_impl"]["_M_finish"]
 
     decorable_t = decorable.type.template_argument(0)
-    decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
+    decinfo_t = gdb.lookup_type('merizo::DecorationRegistry<{}>::DecorationInfo'.format(
         str(decorable_t).replace("class", "").strip()))
     count = long((long(finish) - long(start)) / decinfo_t.sizeof)
 
@@ -114,7 +114,7 @@ def get_decorations(obj):
         type_name = type_name[0:len(type_name) - 1]
         type_name = type_name[0:type_name.rindex(">")]
         type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
-        # get_unique_ptr should be loaded from 'mongo_printers.py'.
+        # get_unique_ptr should be loaded from 'merizo_printers.py'.
         decoration_data = get_unique_ptr(decorable["_decorations"]["_decorationData"])  # pylint: disable=undefined-variable
 
         if type_name.endswith('*'):
@@ -166,19 +166,19 @@ def get_field_names(value):
 
 
 class RegisterMongoCommand(object):
-    """Class to register mongo commands with GDB."""
+    """Class to register merizo commands with GDB."""
 
     _MONGO_COMMANDS = {}  # type: ignore
 
     @classmethod
     def register(cls, obj, name, command_class):
-        """Register a command with no completer as a mongo command."""
+        """Register a command with no completer as a merizo command."""
         gdb.Command.__init__(obj, name, command_class)
         cls._MONGO_COMMANDS[name] = obj.__doc__
 
     @classmethod
     def print_commands(cls):
-        """Print the registered mongo commands."""
+        """Print the registered merizo commands."""
         print("Command - Description")
         for key in cls._MONGO_COMMANDS:
             print("%s - %s" % (key, cls._MONGO_COMMANDS[key]))
@@ -189,11 +189,11 @@ class DumpGlobalServiceContext(gdb.Command):
 
     def __init__(self):
         """Initialize DumpGlobalServiceContext."""
-        RegisterMongoCommand.register(self, "mongodb-service-context", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "merizodb-service-context", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
         """Invoke GDB command to print the Global Service Context."""
-        gdb.execute("print *('mongo::(anonymous namespace)::globalServiceContext')")
+        gdb.execute("print *('merizo::(anonymous namespace)::globalServiceContext')")
 
 
 # Register command
@@ -204,14 +204,14 @@ class GetMongoDecoration(gdb.Command):
     """
     Search for a decoration on an object by typename and print it e.g.
 
-    (gdb) mongo-decoration opCtx ReadConcernArgs
+    (gdb) merizo-decoration opCtx ReadConcernArgs
 
     would print out a decoration on opCtx whose type name contains the string "ReadConcernArgs".
     """
 
     def __init__(self):
         """Initialize GetMongoDecoration."""
-        RegisterMongoCommand.register(self, "mongo-decoration", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "merizo-decoration", gdb.COMMAND_DATA)
 
     def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use
         """Invoke GetMongoDecoration."""
@@ -236,7 +236,7 @@ GetMongoDecoration()
 
 
 class DumpMongoDSessionCatalog(gdb.Command):
-    """Print out the mongod SessionCatalog, which maintains a table of all Sessions.
+    """Print out the merizod SessionCatalog, which maintains a table of all Sessions.
 
     Prints out interesting information from TransactionParticipants too, which are decorations on
     the Session. If no arguments are provided, dumps out all sessions. Can optionally provide a
@@ -249,7 +249,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
 
     def __init__(self):
         """Initialize DumpMongoDSessionCatalog."""
-        RegisterMongoCommand.register(self, "mongod-dump-sessions", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "merizod-dump-sessions", gdb.COMMAND_DATA)
 
     def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches
         """Invoke DumpMongoDSessionCatalog."""
@@ -332,7 +332,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
                 if val:
                     locker_addr = val["_locker"]["_M_t"]['_M_head_impl']
                     locker_obj = locker_addr.dereference().cast(
-                        gdb.lookup_type("mongo::LockerImpl"))
+                        gdb.lookup_type("merizo::LockerImpl"))
                     print('_txnResourceStash._locker', "@", locker_addr)
                     print("_txnResourceStash._locker._id", "=", locker_obj["_id"])
                 else:
@@ -345,38 +345,38 @@ class DumpMongoDSessionCatalog(gdb.Command):
 DumpMongoDSessionCatalog()
 
 
-class MongoDBDumpLocks(gdb.Command):
-    """Dump locks in mongod process."""
+class MerizoDBDumpLocks(gdb.Command):
+    """Dump locks in merizod process."""
 
     def __init__(self):
-        """Initialize MongoDBDumpLocks."""
-        RegisterMongoCommand.register(self, "mongodb-dump-locks", gdb.COMMAND_DATA)
+        """Initialize MerizoDBDumpLocks."""
+        RegisterMongoCommand.register(self, "merizodb-dump-locks", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
-        """Invoke MongoDBDumpLocks."""
-        print("Running Hang Analyzer Supplement - MongoDBDumpLocks")
+        """Invoke MerizoDBDumpLocks."""
+        print("Running Hang Analyzer Supplement - MerizoDBDumpLocks")
 
         main_binary_name = get_process_name()
-        if main_binary_name == 'mongod':
-            self.dump_mongod_locks()
+        if main_binary_name == 'merizod':
+            self.dump_merizod_locks()
         else:
-            print("Not invoking mongod lock dump for: %s" % (main_binary_name))
+            print("Not invoking merizod lock dump for: %s" % (main_binary_name))
 
     @staticmethod
-    def dump_mongod_locks():
+    def dump_merizod_locks():
         """GDB in-process python supplement."""
 
         try:
-            # Call into mongod, and dump the state of lock manager
-            # Note that output will go to mongod's standard output, not the debugger output window
-            gdb.execute("call ('mongo::(anonymous namespace)::globalLockManager').dump()",
+            # Call into merizod, and dump the state of lock manager
+            # Note that output will go to merizod's standard output, not the debugger output window
+            gdb.execute("call ('merizo::(anonymous namespace)::globalLockManager').dump()",
                         from_tty=False, to_string=False)
         except gdb.error as gdberr:
-            print("Ignoring error '%s' in dump_mongod_locks" % str(gdberr))
+            print("Ignoring error '%s' in dump_merizod_locks" % str(gdberr))
 
 
 # Register command
-MongoDBDumpLocks()
+MerizoDBDumpLocks()
 
 
 class BtIfActive(gdb.Command):
@@ -384,12 +384,12 @@ class BtIfActive(gdb.Command):
 
     def __init__(self):
         """Initialize BtIfActive."""
-        RegisterMongoCommand.register(self, "mongodb-bt-if-active", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "merizodb-bt-if-active", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
         """Invoke GDB to print stack trace."""
         try:
-            idle_location = gdb.parse_and_eval("mongo::for_debuggers::idleThreadLocation")
+            idle_location = gdb.parse_and_eval("merizo::for_debuggers::idleThreadLocation")
         except gdb.error:
             idle_location = None  # If unsure, print a stack trace.
 
@@ -403,14 +403,14 @@ class BtIfActive(gdb.Command):
 BtIfActive()
 
 
-class MongoDBUniqueStack(gdb.Command):
+class MerizoDBUniqueStack(gdb.Command):
     """Print unique stack traces of all threads in current process."""
 
     _HEADER_FORMAT = "Thread {gdb_thread_num}: {name} (Thread {pthread} (LWP {lwpid})):"
 
     def __init__(self):
-        """Initialize MongoDBUniqueStack."""
-        RegisterMongoCommand.register(self, "mongodb-uniqstack", gdb.COMMAND_DATA)
+        """Initialize MerizoDBUniqueStack."""
+        RegisterMongoCommand.register(self, "merizodb-uniqstack", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
         """Invoke GDB to dump stacks."""
@@ -489,22 +489,22 @@ class MongoDBUniqueStack(gdb.Command):
 
 
 # Register command
-MongoDBUniqueStack()
+MerizoDBUniqueStack()
 
 
-class MongoDBJavaScriptStack(gdb.Command):
-    """Print the JavaScript stack from a MongoDB process."""
+class MerizoDBJavaScriptStack(gdb.Command):
+    """Print the JavaScript stack from a MerizoDB process."""
 
     def __init__(self):
-        """Initialize MongoDBJavaScriptStack."""
-        RegisterMongoCommand.register(self, "mongodb-javascript-stack", gdb.COMMAND_STATUS)
+        """Initialize MerizoDBJavaScriptStack."""
+        RegisterMongoCommand.register(self, "merizodb-javascript-stack", gdb.COMMAND_STATUS)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Invoke GDB to dump JS stacks."""
         print("Running Print JavaScript Stack Supplement")
 
         main_binary_name = get_process_name()
-        if main_binary_name.endswith('mongod') or main_binary_name.endswith('mongo'):
+        if main_binary_name.endswith('merizod') or main_binary_name.endswith('merizo'):
             self.javascript_stack()
         else:
             print("No JavaScript stack print done for: %s" % (main_binary_name))
@@ -525,10 +525,10 @@ class MongoDBJavaScriptStack(gdb.Command):
 
             try:
                 if gdb.parse_and_eval(
-                        'mongo::mozjs::kCurrentScope && mongo::mozjs::kCurrentScope->_inOp'):
+                        'merizo::mozjs::kCurrentScope && merizo::mozjs::kCurrentScope->_inOp'):
                     gdb.execute('thread', from_tty=False, to_string=False)
                     gdb.execute('printf "%s\\n", ' +
-                                'mongo::mozjs::kCurrentScope->buildStackString().c_str()',
+                                'merizo::mozjs::kCurrentScope->buildStackString().c_str()',
                                 from_tty=False, to_string=False)
             except gdb.error as err:
                 print("Ignoring GDB error '%s' in javascript_stack" % str(err))
@@ -536,22 +536,22 @@ class MongoDBJavaScriptStack(gdb.Command):
 
 
 # Register command
-MongoDBJavaScriptStack()
+MerizoDBJavaScriptStack()
 
 
-class MongoDBHelp(gdb.Command):
-    """Dump list of mongodb commands."""
+class MerizoDBHelp(gdb.Command):
+    """Dump list of merizodb commands."""
 
     def __init__(self):
-        """Initialize MongoDBHelp."""
-        gdb.Command.__init__(self, "mongodb-help", gdb.COMMAND_SUPPORT)
+        """Initialize MerizoDBHelp."""
+        gdb.Command.__init__(self, "merizodb-help", gdb.COMMAND_SUPPORT)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
-        """Register the mongo print commands."""
+        """Register the merizo print commands."""
         RegisterMongoCommand.print_commands()
 
 
 # Register command
-MongoDBHelp()
+MerizoDBHelp()
 
-print("MongoDB GDB commands loaded, run 'mongodb-help' for list of commands")
+print("MerizoDB GDB commands loaded, run 'merizodb-help' for list of commands")

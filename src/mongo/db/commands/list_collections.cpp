@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,41 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/cursor_request.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/views/view_catalog.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/list_collections_filter.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/cursor_manager.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/queued_data_stage.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/query/cursor_request.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/views/view_catalog.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::stringstream;
@@ -256,7 +256,7 @@ public:
         // Check for 'filter' argument.
         BSONElement filterElt = jsobj["filter"];
         if (!filterElt.eoo()) {
-            if (filterElt.type() != mongo::Object) {
+            if (filterElt.type() != merizo::Object) {
                 uasserted(ErrorCodes::BadValue, "\"filter\" must be an object");
             }
             // The collator is null because collection objects are compared using binary comparison.
@@ -343,7 +343,7 @@ public:
                 }
 
                 // Skipping views is only necessary for internal cloning operations.
-                bool skipViews = filterElt.type() == mongo::Object &&
+                bool skipViews = filterElt.type() == merizo::Object &&
                     SimpleBSONObjComparator::kInstance.evaluate(
                         filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
                 if (!skipViews) {
@@ -403,4 +403,4 @@ public:
 } cmdListCollections;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -12,7 +12,7 @@ env.Library(
         env.Idlc('test_commands_enabled.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
         "server_status_core",
     ]
 )
@@ -24,7 +24,7 @@ env.Library(
         'server_status_metric.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
@@ -34,15 +34,15 @@ env.Library(
         'server_status.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/merizo/db/commands',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/util/processinfo',
-        '$BUILD_DIR/mongo/util/net/http_client',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/stats/counters',
+        '$BUILD_DIR/merizo/util/processinfo',
+        '$BUILD_DIR/merizo/util/net/http_client',
         'server_status_core',
     ],
 )
@@ -53,10 +53,10 @@ env.Library(
         'server_status_servers.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/transport/message_compressor',
-        '$BUILD_DIR/mongo/transport/service_executor',
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/merizo/db/stats/counters',
+        '$BUILD_DIR/merizo/transport/message_compressor',
+        '$BUILD_DIR/merizo/transport/service_executor',
+        '$BUILD_DIR/merizo/util/net/ssl_manager',
         'server_status',
         'server_status_core',
     ],
@@ -68,11 +68,11 @@ env.Library(
         "write_commands/write_commands_common.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/ops/write_ops_parsers',
     ],
 )
 
@@ -83,9 +83,9 @@ env.Library(
         "feature_compatibility_version_command_parser.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/command_generic_argument',
-        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/command_generic_argument',
+        '$BUILD_DIR/merizo/db/namespace_string',
     ],
 )
 
@@ -109,26 +109,26 @@ env.Library(
         "start_session_command.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/kill_sessions',
-        '$BUILD_DIR/mongo/db/logical_session_cache',
-        '$BUILD_DIR/mongo/db/logical_session_cache_impl',
-        '$BUILD_DIR/mongo/db/logical_session_id',
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
-        '$BUILD_DIR/mongo/db/mongohasher',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/logger/parse_log_component_settings',
-        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/kill_sessions',
+        '$BUILD_DIR/merizo/db/logical_session_cache',
+        '$BUILD_DIR/merizo/db/logical_session_cache_impl',
+        '$BUILD_DIR/merizo/db/logical_session_id',
+        '$BUILD_DIR/merizo/db/logical_session_id_helpers',
+        '$BUILD_DIR/merizo/db/merizohasher',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/idl/server_parameter',
+        '$BUILD_DIR/merizo/logger/parse_log_component_settings',
+        '$BUILD_DIR/merizo/rpc/protocol',
     ],
 )
 
-# Commands available in all mongodb server processes (mongod, mongos, etc.)
+# Commands available in all merizodb server processes (merizod, merizos, etc.)
 env.Library(
     target="servers",
     source=[
@@ -147,50 +147,50 @@ env.Library(
         "user_management_commands_common.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/auth/sasl_options',
-        '$BUILD_DIR/mongo/db/auth/user_document_parser',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/log_process_details',
-        '$BUILD_DIR/mongo/db/logical_session_cache',
-        '$BUILD_DIR/mongo/db/logical_session_cache_impl',
-        '$BUILD_DIR/mongo/db/logical_session_id',
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
-        '$BUILD_DIR/mongo/db/repl/isself',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
-        '$BUILD_DIR/mongo/db/traffic_recorder',
-        '$BUILD_DIR/mongo/executor/task_executor_pool',
-        '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/s/sharding_legacy_api',
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/scripting/scripting_common',
-        '$BUILD_DIR/mongo/util/ntservice',
+        '$BUILD_DIR/merizo/client/clientdriver_minimal',
+        '$BUILD_DIR/merizo/db/audit',
+        '$BUILD_DIR/merizo/db/auth/sasl_options',
+        '$BUILD_DIR/merizo/db/auth/user_document_parser',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/log_process_details',
+        '$BUILD_DIR/merizo/db/logical_session_cache',
+        '$BUILD_DIR/merizo/db/logical_session_cache_impl',
+        '$BUILD_DIR/merizo/db/logical_session_id',
+        '$BUILD_DIR/merizo/db/logical_session_id_helpers',
+        '$BUILD_DIR/merizo/db/repl/isself',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/executor/egress_tag_closer_manager',
+        '$BUILD_DIR/merizo/db/traffic_recorder',
+        '$BUILD_DIR/merizo/executor/task_executor_pool',
+        '$BUILD_DIR/merizo/rpc/client_metadata',
+        '$BUILD_DIR/merizo/s/sharding_legacy_api',
+        '$BUILD_DIR/merizo/s/coreshard',
+        '$BUILD_DIR/merizo/scripting/scripting_common',
+        '$BUILD_DIR/merizo/util/ntservice',
         'core',
         'feature_compatibility_parsers',
     ]
 )
 
 env.Library(
-    target="mongod_fsync",
+    target="merizod_fsync",
     source=[
         "fsync.cpp",
     ],
     LIBDEPS_PRIVATE=[
-	'$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
+	'$BUILD_DIR/merizo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/merizo/db/curop',
+        '$BUILD_DIR/merizo/db/storage/backup_cursor_hooks',
         'fsync_locked',
     ]
 )
 
 env.Library(
-    target="mongod_fcv",
+    target="merizod_fcv",
     source=[
         "feature_compatibility_version.cpp",
         env.Idlc('feature_compatibility_version.idl')[0],
@@ -199,11 +199,11 @@ env.Library(
         'feature_compatibility_parsers',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/kill_sessions_local',
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/dbdirectclient',
+        '$BUILD_DIR/merizo/db/kill_sessions_local',
+        '$BUILD_DIR/merizo/idl/server_parameter',
+        '$BUILD_DIR/merizo/executor/egress_tag_closer_manager',
     ],
 )
 
@@ -222,12 +222,12 @@ env.Library(
         env.Idlc('list_databases.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ],
 )
 
-# Commands that are present in both mongod and embedded
+# Commands that are present in both merizod and embedded
 env.Library(
     target="standalone",
     source=[
@@ -263,25 +263,25 @@ env.Library(
         env.Idlc('enable_coordinator_for_create_indexes_command.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
-        '$BUILD_DIR/mongo/db/catalog/multi_index_block',
-        '$BUILD_DIR/mongo/db/command_can_run_here',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/db/pipeline/mongo_process_interface',
-        '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
-        '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
-        '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/db/views/views_mongod',
-        '$BUILD_DIR/mongo/util/net/http_client',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/merizo/db/catalog/index_key_validate',
+        '$BUILD_DIR/merizo/db/catalog/multi_index_block',
+        '$BUILD_DIR/merizo/db/command_can_run_here',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/merizo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/merizo/db/ops/write_ops_exec',
+        '$BUILD_DIR/merizo/db/pipeline/merizo_process_interface',
+        '$BUILD_DIR/merizo/db/query_exec',
+        '$BUILD_DIR/merizo/db/repl/replica_set_messages',
+        '$BUILD_DIR/merizo/db/rw_concern_d',
+        '$BUILD_DIR/merizo/db/stats/counters',
+        '$BUILD_DIR/merizo/db/stats/server_read_concern_write_concern_metrics',
+        '$BUILD_DIR/merizo/db/storage/storage_engine_common',
+        '$BUILD_DIR/merizo/db/transaction',
+        '$BUILD_DIR/merizo/db/views/views_merizod',
+        '$BUILD_DIR/merizo/util/net/http_client',
         'core',
         'current_op_common',
         'fsync_locked',
@@ -301,9 +301,9 @@ env.Library(
         "whats_my_uri_cmd.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/merizo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/merizo/db/catalog/collection',
+        '$BUILD_DIR/merizo/db/commands',
         'test_commands_enabled',
     ],
 )
@@ -314,15 +314,15 @@ env.Library(
         env.Idlc('set_index_commit_quorum.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
-        '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/db/catalog/commit_quorum_options',
+        '$BUILD_DIR/merizo/db/rw_concern_d',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ],
 )
 
-# Commands that should only be present in mongod
+# Commands that should only be present in merizod
 env.Library(
-    target="mongod",
+    target="merizod",
     source=[
         "apply_ops_cmd.cpp",
         "clone_collection.cpp",
@@ -355,36 +355,36 @@ env.Library(
         'txn_cmd_request',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/auth/role_graph',
-        '$BUILD_DIR/mongo/db/auth/sasl_options',
-        '$BUILD_DIR/mongo/db/auth/user_document_parser',
-        '$BUILD_DIR/mongo/db/auth/user',
-        '$BUILD_DIR/mongo/db/background',
-        '$BUILD_DIR/mongo/db/catalog/catalog_control',
-        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
-        '$BUILD_DIR/mongo/db/cloner',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/exec/stagedebug_cmd',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/dbcheck',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/s/sharding_legacy_api',
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/client/clientdriver_minimal',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/auth/role_graph',
+        '$BUILD_DIR/merizo/db/auth/sasl_options',
+        '$BUILD_DIR/merizo/db/auth/user_document_parser',
+        '$BUILD_DIR/merizo/db/auth/user',
+        '$BUILD_DIR/merizo/db/background',
+        '$BUILD_DIR/merizo/db/catalog/catalog_control',
+        '$BUILD_DIR/merizo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/merizo/db/catalog/index_key_validate',
+        '$BUILD_DIR/merizo/db/cloner',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/merizo/db/dbhelpers',
+        '$BUILD_DIR/merizo/db/exec/stagedebug_cmd',
+        '$BUILD_DIR/merizo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/dbcheck',
+        '$BUILD_DIR/merizo/db/repl/oplog',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/rw_concern_d',
+        '$BUILD_DIR/merizo/db/s/sharding_runtime_d',
+        '$BUILD_DIR/merizo/idl/idl_parser',
+        '$BUILD_DIR/merizo/s/sharding_legacy_api',
+        '$BUILD_DIR/merizo/util/net/ssl_manager',
         'core',
         'kill_common',
-        'mongod_fcv',
-        'mongod_fsync',
+        'merizod_fcv',
+        'merizod_fsync',
         'profile_common',
         'servers',
         'set_index_commit_quorum_idl',
@@ -401,11 +401,11 @@ env.Library(
         'kill_op_cmd_base.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/merizo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/audit',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/merizo/db/query/command_request_response',
     ],
 )
 
@@ -415,13 +415,13 @@ env.Library(
         'current_op_common.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/merizo/db/commands',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation_request',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/pipeline/aggregation_request',
+        '$BUILD_DIR/merizo/db/query/command_request_response',
+        '$BUILD_DIR/merizo/db/service_context',
         'test_commands_enabled'
     ],
 )
@@ -433,12 +433,12 @@ env.Library(
         env.Idlc('profile.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/merizo/db/commands',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/server_options_core',
     ],
 )
 
@@ -448,7 +448,7 @@ env.Library(
         'list_collections_filter.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -458,7 +458,7 @@ env.CppUnitTest(
         "list_collections_filter_test.cpp"
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+        '$BUILD_DIR/merizo/db/commands/list_collections_filter',
     ],
 )
 
@@ -468,10 +468,10 @@ env.CppUnitTest(
         "index_filter_commands_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/query_planner",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_d",
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        "$BUILD_DIR/merizo/db/query/query_planner",
+        "$BUILD_DIR/merizo/db/query/query_test_service_context",
+        "$BUILD_DIR/merizo/db/service_context_d",
         "standalone",
     ],
 )
@@ -482,13 +482,13 @@ env.CppUnitTest(
         "mr_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "mongod",
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        "$BUILD_DIR/merizo/db/repl/drop_pending_collection_reaper",
+        "$BUILD_DIR/merizo/db/repl/replmocks",
+        "$BUILD_DIR/merizo/db/repl/storage_interface_impl",
+        "$BUILD_DIR/merizo/db/service_context_d",
+        "$BUILD_DIR/merizo/db/service_context_d_test_fixture",
+        "merizod",
         "servers",
     ],
 )
@@ -499,10 +499,10 @@ env.CppUnitTest(
         "plan_cache_commands_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/query_planner",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_d",
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        "$BUILD_DIR/merizo/db/query/query_planner",
+        "$BUILD_DIR/merizo/db/query/query_test_service_context",
+        "$BUILD_DIR/merizo/db/service_context_d",
         "standalone",
     ],
 )
@@ -514,8 +514,8 @@ env.Library(
         env.Idlc("txn_two_phase_commit_cmds.idl")[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ]
 )
 
@@ -528,10 +528,10 @@ if has_option('use-cpu-profiler'):
             'cpuprofile.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/commands',
-            '$BUILD_DIR/mongo/db/db_raii',
+            '$BUILD_DIR/merizo/db/commands',
+            '$BUILD_DIR/merizo/db/db_raii',
         ],
         PROGDEPS_DEPENDENTS=[
-            '$BUILD_DIR/mongo/mongod',
+            '$BUILD_DIR/merizo/merizod',
         ],
     )

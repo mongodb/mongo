@@ -97,7 +97,7 @@
     // or 'config' databases.
     const filteredDBs = ["admin", "local", "config"];
     filteredDBs.forEach(dbName => {
-        // Not allowed to use 'local' db through mongos.
+        // Not allowed to use 'local' db through merizos.
         if (FixtureHelpers.isMongos(db) && dbName == "local")
             return;
 

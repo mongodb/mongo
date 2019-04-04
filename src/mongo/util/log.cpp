@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/log.h"
+#include "merizo/util/log.h"
 
-#include "mongo/logger/console_appender.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/logger/ramlog.h"
-#include "mongo/logger/rotatable_file_manager.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/time_support.h"
+#include "merizo/logger/console_appender.h"
+#include "merizo/logger/message_event_utf8_encoder.h"
+#include "merizo/logger/ramlog.h"
+#include "merizo/logger/rotatable_file_manager.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/thread_name.h"
+#include "merizo/util/stacktrace.h"
+#include "merizo/util/time_support.h"
 
 // TODO: Win32 unicode console writing (in logger/console_appender?).
 // TODO: Extra log context appending, and re-enable log_user_*.js
 // TODO: Eliminate cout/cerr.
 
-namespace mongo {
+namespace merizo {
 
 static logger::ExtraLogContextFn _appendExtraLogContext;
 
@@ -94,4 +94,4 @@ void setPlainConsoleLogger() {
 Tee* const warnings = RamLog::get("warnings");  // Things put here go in serverStatus
 Tee* const startupWarningsLog = RamLog::get("startupWarnings");  // intentionally leaked
 
-}  // namespace mongo
+}  // namespace merizo

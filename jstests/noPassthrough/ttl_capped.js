@@ -14,7 +14,7 @@
         noCleanData: true,
         setParameter: "ttlMonitorSleepSecs=1",
     });
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
 
     var testDB = conn.getDB("test");
 

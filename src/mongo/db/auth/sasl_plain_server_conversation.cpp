@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <string>
 
-#include "mongo/db/auth/sasl_plain_server_conversation.h"
+#include "merizo/db/auth/sasl_plain_server_conversation.h"
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/db/auth/sasl_mechanism_registry.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/password_digest.h"
-#include "mongo/util/text.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/db/auth/sasl_mechanism_registry.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/password_digest.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 template <typename HashBlock>
 StatusWith<bool> trySCRAM(const User::CredentialData& credentials, StringData pwd) {
@@ -120,7 +120,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
         }
     } catch (std::out_of_range&) {
         return Status(ErrorCodes::AuthenticationFailed,
-                      mongoutils::str::stream() << "Incorrectly formatted PLAIN client message");
+                      merizoutils::str::stream() << "Incorrectly formatted PLAIN client message");
     }
 
     // The authentication database is also the source database for the user.
@@ -160,4 +160,4 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
 namespace {
 GlobalSASLMechanismRegisterer<PLAINServerFactory> plainRegisterer;
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

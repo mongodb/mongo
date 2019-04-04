@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/optional.hpp>
@@ -39,155 +39,155 @@
 #include <signal.h>
 #include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
-#include "mongo/client/global_conn_pool.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/config.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/auth_op_observer.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_holder_impl.h"
-#include "mongo/db/catalog/health_log.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/feature_compatibility_version_gen.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/free_mon/free_mon_mongod.h"
-#include "mongo/db/ftdc/ftdc_mongod.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/initialize_server_security_state.h"
-#include "mongo/db/initialize_snmp.h"
-#include "mongo/db/introspect.h"
-#include "mongo/db/json.h"
-#include "mongo/db/keys_collection_client_direct.h"
-#include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/kill_sessions.h"
-#include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/log_process_details.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_cache_factory_mongod.h"
-#include "mongo/db/logical_time_metadata_hook.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/mongod_options.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
-#include "mongo/db/periodic_runner_job_decrease_snapshot_cache_pressure.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repair_database_and_check_version.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_external_state_impl.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/repl_set_member_in_standalone_mode.h"
-#include "mongo/db/s/balancer/balancer.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/config_server_op_observer.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
-#include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_state_recovery.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_entry_point_mongod.h"
-#include "mongo/db/session_killer.h"
-#include "mongo/db/startup_warnings_mongod.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/backup_cursor_hooks.h"
-#include "mongo/db/storage/encryption_hooks.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/storage/storage_engine_lock_file.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/system_index.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/ttl.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/platform/process_id.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_initialization.h"
-#include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/transport_layer_manager.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/background.h"
-#include "mongo/util/cmdline_utils/censor_cmdline.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/exception_filter_win32.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/fast_clock_source_factory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/ntservice.h"
-#include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/periodic_runner_factory.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/ramlog.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/sequence_util.h"
-#include "mongo/util/signal_handlers.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/startup_test.h"
-#include "mongo/util/text.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/version.h"
+#include "merizo/base/init.h"
+#include "merizo/base/initializer.h"
+#include "merizo/base/status.h"
+#include "merizo/client/global_conn_pool.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/config.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/auth_op_observer.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/create_collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/database_holder_impl.h"
+#include "merizo/db/catalog/health_log.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/index_key_validate.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands/feature_compatibility_version.h"
+#include "merizo/db/commands/feature_compatibility_version_gen.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/lock_state.h"
+#include "merizo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/dbmessage.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/free_mon/free_mon_merizod.h"
+#include "merizo/db/ftdc/ftdc_merizod.h"
+#include "merizo/db/global_settings.h"
+#include "merizo/db/index_builds_coordinator_merizod.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/initialize_server_global_state.h"
+#include "merizo/db/initialize_server_security_state.h"
+#include "merizo/db/initialize_snmp.h"
+#include "merizo/db/introspect.h"
+#include "merizo/db/json.h"
+#include "merizo/db/keys_collection_client_direct.h"
+#include "merizo/db/keys_collection_client_sharded.h"
+#include "merizo/db/keys_collection_manager.h"
+#include "merizo/db/kill_sessions.h"
+#include "merizo/db/kill_sessions_local.h"
+#include "merizo/db/log_process_details.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_session_cache.h"
+#include "merizo/db/logical_session_cache_factory_merizod.h"
+#include "merizo/db/logical_time_metadata_hook.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/merizod_options.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/periodic_runner_job_abort_expired_transactions.h"
+#include "merizo/db/periodic_runner_job_decrease_snapshot_cache_pressure.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repair_database_and_check_version.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/replication_consistency_markers_impl.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_external_state_impl.h"
+#include "merizo/db/repl/replication_coordinator_impl.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/replication_recovery.h"
+#include "merizo/db/repl/storage_interface_impl.h"
+#include "merizo/db/repl/topology_coordinator.h"
+#include "merizo/db/repl_set_member_in_standalone_mode.h"
+#include "merizo/db/s/balancer/balancer.h"
+#include "merizo/db/s/config/sharding_catalog_manager.h"
+#include "merizo/db/s/config_server_op_observer.h"
+#include "merizo/db/s/op_observer_sharding_impl.h"
+#include "merizo/db/s/shard_server_op_observer.h"
+#include "merizo/db/s/sharding_initialization_merizod.h"
+#include "merizo/db/s/sharding_state_recovery.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/service_entry_point_merizod.h"
+#include "merizo/db/session_killer.h"
+#include "merizo/db/startup_warnings_merizod.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/storage/backup_cursor_hooks.h"
+#include "merizo/db/storage/encryption_hooks.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/storage/storage_engine_init.h"
+#include "merizo/db/storage/storage_engine_lock_file.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/system_index.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/ttl.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/executor/network_connection_hook.h"
+#include "merizo/executor/network_interface_factory.h"
+#include "merizo/executor/network_interface_thread_pool.h"
+#include "merizo/executor/thread_pool_task_executor.h"
+#include "merizo/platform/process_id.h"
+#include "merizo/rpc/metadata/egress_metadata_hook_list.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/sharding_initialization.h"
+#include "merizo/scripting/dbdirectclient_factory.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/stdx/future.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/transport/transport_layer_manager.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/background.h"
+#include "merizo/util/cmdline_utils/censor_cmdline.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/concurrency/thread_name.h"
+#include "merizo/util/exception_filter_win32.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/fast_clock_source_factory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/ntservice.h"
+#include "merizo/util/options_parser/startup_options.h"
+#include "merizo/util/periodic_runner.h"
+#include "merizo/util/periodic_runner_factory.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/ramlog.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/sequence_util.h"
+#include "merizo/util/signal_handlers.h"
+#include "merizo/util/stacktrace.h"
+#include "merizo/util/startup_test.h"
+#include "merizo/util/text.h"
+#include "merizo/util/time_support.h"
+#include "merizo/util/version.h"
 
-#include "mongo/db/storage/flow_control.h"
+#include "merizo/db/storage/flow_control.h"
 
 #ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl_options.h"
+#include "merizo/util/net/ssl_options.h"
 #endif
 
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
 
-namespace mongo {
+namespace merizo {
 
 using logger::LogComponent;
 using std::endl;
@@ -198,7 +198,7 @@ const NamespaceString startupLogCollectionName("local.startup_log");
 
 #ifdef _WIN32
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
-    L"MongoDB", L"MongoDB", L"MongoDB Server"};
+    L"MerizoDB", L"MerizoDB", L"MerizoDB Server"};
 #endif
 
 void logStartup(OperationContext* opCtx) {
@@ -223,7 +223,7 @@ void logStartup(OperationContext* opCtx) {
     BSONObj o = toLog.obj();
 
     Lock::GlobalWrite lk(opCtx);
-    AutoGetOrCreateDb autoDb(opCtx, startupLogCollectionName.db(), mongo::MODE_X);
+    AutoGetOrCreateDb autoDb(opCtx, startupLogCollectionName.db(), merizo::MODE_X);
     Database* db = autoDb.getDb();
     Collection* collection = db->getCollection(opCtx, startupLogCollectionName);
     WriteUnitOfWork wunit(opCtx);
@@ -292,7 +292,7 @@ ExitCode _initAndListen(int listenPort) {
     {
         ProcessId pid = ProcessId::getCurrent();
         LogstreamBuilder l = log(LogComponent::kControl);
-        l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
+        l << "MerizoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
           << " dbpath=" << storageGlobalParams.dbpath;
 
         const bool is32bit = sizeof(int*) == 4;
@@ -395,7 +395,7 @@ ExitCode _initAndListen(int listenPort) {
         ss << "*********************************************************************" << endl;
         ss << " ERROR: dbpath (" << storageGlobalParams.dbpath << ") does not exist." << endl;
         ss << " Create this directory or give existing directory in --dbpath." << endl;
-        ss << " See http://dochub.mongodb.org/core/startingandstoppingmongo" << endl;
+        ss << " See http://dochub.merizodb.org/core/startingandstoppingmerizo" << endl;
         ss << "*********************************************************************" << endl;
         uassert(10296, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
@@ -406,7 +406,7 @@ ExitCode _initAndListen(int listenPort) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
     }
 
-    if (mongodGlobalParams.scriptingEnabled) {
+    if (merizodGlobalParams.scriptingEnabled) {
         ScriptEngine::setup();
     }
 
@@ -481,10 +481,10 @@ ExitCode _initAndListen(int listenPort) {
 
         if (foundSchemaVersion <= AuthorizationManager::schemaVersion26Final) {
             log() << "This server is using MONGODB-CR, an authentication mechanism which "
-                  << "has been removed from MongoDB 4.0. In order to upgrade the auth schema, "
-                  << "first downgrade MongoDB binaries to version 3.6 and then run the "
+                  << "has been removed from MerizoDB 4.0. In order to upgrade the auth schema, "
+                  << "first downgrade MerizoDB binaries to version 3.6 and then run the "
                   << "authSchemaUpgrade command. "
-                  << "See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1";
+                  << "See http://dochub.merizodb.org/core/3.0-upgrade-to-scram-sha-1";
             exitCleanly(EXIT_NEED_UPGRADE);
         }
     } else if (globalAuthzManager->isAuthEnabled()) {
@@ -564,7 +564,7 @@ ExitCode _initAndListen(int listenPort) {
         replCoord->startup(startupOpCtx.get());
         if (getReplSetMemberInStandaloneMode(serviceContext)) {
             log() << startupWarningsLog;
-            log() << "** WARNING: mongod started without --replSet yet document(s) are present in "
+            log() << "** WARNING: merizod started without --replSet yet document(s) are present in "
                   << NamespaceString::kSystemReplSetNamespace << "." << startupWarningsLog;
             log() << "**          Database contents may appear inconsistent with the oplog and may "
                      "appear to not contain"
@@ -578,7 +578,7 @@ ExitCode _initAndListen(int listenPort) {
             log() << "**          The TTL collection monitor will not start because of this."
                   << startupWarningsLog;
             log() << "**         ";
-            log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
+            log() << " For more info see http://dochub.merizodb.org/core/ttlcollections";
             log() << startupWarningsLog;
         } else {
             startTTLBackgroundJob();
@@ -647,7 +647,7 @@ ExitCode _initAndListen(int listenPort) {
     serviceContext->notifyStartupComplete();
 
 #ifndef _WIN32
-    mongo::signalForkSuccess();
+    merizo::signalForkSuccess();
 #else
     if (ntservice::shouldStartService()) {
         ntservice::reportStatus(SERVICE_RUNNING);
@@ -690,7 +690,7 @@ ExitCode initService() {
 
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
-    mongo::forkServerOrDie();
+    merizo::forkServerOrDie();
     return Status::OK();
 }
 
@@ -701,7 +701,7 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
  */
 void startupConfigActions(const std::vector<std::string>& args) {
     // The "command" option is deprecated.  For backward compatibility, still support the "run"
-    // and "dbppath" command.  The "run" command is the same as just running mongod, so just
+    // and "dbppath" command.  The "run" command is the same as just running merizod, so just
     // falls through.
     if (moe::startupOptionsParsed.count("command")) {
         const auto command = moe::startupOptionsParsed["command"].as<std::vector<std::string>>();
@@ -854,7 +854,7 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManage
 #endif
 
 // NOTE: This function may be called at any time after registerShutdownTask is called below. It
-// must not depend on the prior execution of mongo initializers or the existence of threads.
+// must not depend on the prior execution of merizo initializers or the existence of threads.
 void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // This client initiation pattern is only to be used here, with plans to eliminate this pattern
     // down the line.
@@ -1014,14 +1014,14 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     audit::logShutdown(client);
 }
 
-int mongoDbMain(int argc, char* argv[], char** envp) {
+int merizoDbMain(int argc, char* argv[], char** envp) {
     registerShutdownTask(shutdownTask);
 
     setupSignalHandlers();
 
     srand(static_cast<unsigned>(curTimeMicros64()));
 
-    Status status = mongo::runGlobalInitializers(argc, argv, envp);
+    Status status = merizo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
         severe(LogComponent::kControl) << "Failed global initialization: " << status;
         quickExit(EXIT_FAILURE);
@@ -1069,22 +1069,22 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo
 
 #if defined(_WIN32)
 // In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
 // as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
 // WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
-// and makes them available through the argv() and envp() members.  This enables mongoDbMain()
+// and makes them available through the argv() and envp() members.  This enables merizoDbMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    int exitCode = mongo::mongoDbMain(argc, wcl.argv(), wcl.envp());
-    mongo::quickExit(exitCode);
+    merizo::WindowsCommandLine wcl(argc, argvW, envpW);
+    int exitCode = merizo::merizoDbMain(argc, wcl.argv(), wcl.envp());
+    merizo::quickExit(exitCode);
 }
 #else
 int main(int argc, char* argv[], char** envp) {
-    int exitCode = mongo::mongoDbMain(argc, argv, envp);
-    mongo::quickExit(exitCode);
+    int exitCode = merizo::merizoDbMain(argc, argv, envp);
+    merizo::quickExit(exitCode);
 }
 #endif

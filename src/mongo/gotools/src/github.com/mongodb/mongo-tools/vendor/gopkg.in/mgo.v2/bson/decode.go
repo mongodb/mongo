@@ -570,7 +570,7 @@ func (d *decoder) readElemTo(out reflect.Value, kind byte) (good bool) {
 	case 0x08: // Bool
 		in = d.readBool()
 	case 0x09: // Timestamp
-		// MongoDB handles timestamps as milliseconds.
+		// MerizoDB handles timestamps as milliseconds.
 		i := d.readInt64()
 		if i == -62135596800000 {
 			in = time.Time{} // In UTC for convenience.

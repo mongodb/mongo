@@ -1,7 +1,7 @@
 //
 // Tests sharding-related batch write protocol functionality
 // NOTE: Basic write functionality is tested via the passthrough tests, this file should contain
-// *only* mongos-specific tests.
+// *only* merizos-specific tests.
 //
 
 // Checking UUID consistency involves talking to the config server primary, but there is no config
@@ -11,11 +11,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, merizos: 1});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var config = mongos.getDB("config");
+    var merizos = st.s0;
+    var admin = merizos.getDB("admin");
+    var config = merizos.getDB("config");
     var configConnStr = st._configDB;
 
     jsTest.log("Starting sharding batch write tests...");
@@ -29,7 +29,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     //
     // Mongos _id autogeneration tests for sharded collections
 
-    var coll = mongos.getCollection("foo.bar");
+    var coll = merizos.getCollection("foo.bar");
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));
     st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
     assert.commandWorked(admin.runCommand({shardCollection: coll.toString(), key: {_id: 1}}));
@@ -105,10 +105,10 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     //
     // Stale config progress tests
     // Set up a new collection across two shards, then revert the chunks to an earlier state to put
-    // mongos and mongod permanently out of sync.
+    // merizos and merizod permanently out of sync.
 
     // START SETUP
-    var brokenColl = mongos.getCollection("broken.coll");
+    var brokenColl = merizos.getCollection("broken.coll");
     assert.commandWorked(admin.runCommand({enableSharding: brokenColl.getDB().toString()}));
     st.ensurePrimaryShard(brokenColl.getDB().toString(), st.shard0.shardName);
     assert.commandWorked(admin.runCommand({shardCollection: brokenColl.toString(), key: {_id: 1}}));
@@ -116,7 +116,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     var oldChunks = config.chunks.find().toArray();
 
-    // Start a new mongos and bring it up-to-date with the chunks so far
+    // Start a new merizos and bring it up-to-date with the chunks so far
 
     var staleMongos = MongoRunner.runMongos({configdb: configConnStr});
     brokenColl = staleMongos.getCollection(brokenColl.toString());
@@ -137,7 +137,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // Ensure that the inserts have propagated to all secondary nodes
     st.configRS.awaitReplication();
 
-    // Stale mongos can no longer bring itself up-to-date!
+    // Stale merizos can no longer bring itself up-to-date!
     // END SETUP
 
     //

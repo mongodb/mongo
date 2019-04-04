@@ -4,7 +4,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 3, mongos: 2});
+    var st = new ShardingTest({shards: 3, merizos: 2});
 
     var admin = st.s0.getDB("admin");
     var coll = st.s0.getCollection("foo.bar");
@@ -36,7 +36,7 @@
     assert.neq(null, st.shard1.getCollection(coll.toString()).findOne({updated: true}));
     assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({updated: true}));
 
-    // _id update works, and goes to all shards even on the stale mongos
+    // _id update works, and goes to all shards even on the stale merizos
     var staleColl = st.s1.getCollection('foo.bar');
     assert.writeOK(staleColl.update({_id: 0}, {$set: {updatedById: true}}, {multi: false}));
 

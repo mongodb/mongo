@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "merizo/db/matcher/schema/json_schema_parser.h"
 
 #include <boost/container/flat_set.hpp>
 
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/unordered_fields_bsonelement_comparator.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/matcher_type_set.h"
-#include "mongo/db/matcher/schema/encrypt_schema_gen.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/matcher/schema/json_pointer.h"
-#include "mongo/logger/log_component_settings.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/string_map.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/bson/unordered_fields_bsonelement_comparator.h"
+#include "merizo/db/matcher/expression_always_boolean.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/matcher/matcher_type_set.h"
+#include "merizo/db/matcher/schema/encrypt_schema_gen.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_cond.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_eq.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_fmod.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_match_array_index.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_max_items.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_max_properties.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_min_length.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_min_properties.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_object_match.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_unique_items.h"
+#include "merizo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "merizo/db/matcher/schema/json_pointer.h"
+#include "merizo/logger/log_component_settings.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/string_map.h"
 
-namespace mongo {
+namespace merizo {
 
 using PatternSchema = InternalSchemaAllowedPropertiesMatchExpression::PatternSchema;
 using Pattern = InternalSchemaAllowedPropertiesMatchExpression::Pattern;
@@ -91,7 +91,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
 /**
  * Constructs and returns a match expression to evaluate a JSON Schema restriction keyword.
  *
- * This handles semantic differences between the MongoDB query language and JSON Schema. MongoDB
+ * This handles semantic differences between the MerizoDB query language and JSON Schema. MerizoDB
  * match expressions which apply to a particular type will reject non-matching types, whereas JSON
  * Schema restriction keywords allow non-matching types. As an example, consider the maxItems
  * keyword. This keyword only applies in JSON Schema if the type is an array, whereas the
@@ -357,7 +357,7 @@ StatusWithMatchExpression parseEnum(StringData path, BSONElement enumElement) {
 
         // 'enum' at the top-level implies a literal object match on the root document.
         if (path.empty()) {
-            // Top-level non-object enum values can be safely ignored, since MongoDB only stores
+            // Top-level non-object enum values can be safely ignored, since MerizoDB only stores
             // objects, not scalars or arrays.
             if (arrayElem.type() == BSONType::Object) {
                 auto rootDocEq = stdx::make_unique<InternalSchemaRootDocEqMatchExpression>(
@@ -1591,4 +1591,4 @@ StatusWithMatchExpression JSONSchemaParser::parse(BSONObj schema, bool ignoreUnk
         return {ex.toStatus()};
     }
 }
-}  // namespace mongo
+}  // namespace merizo

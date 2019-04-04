@@ -1,5 +1,5 @@
 global: 
-  cpp_namespace: "mongo" 
+  cpp_namespace: "merizo" 
  
 server_parameters: 
   enableLocalhostAuthBypass: 

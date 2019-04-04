@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   # This test performs queries with index filters set up. Since index filters are local to a
- *   # mongod, and do not replicate, this test must issue all of its commands against the same
+ *   # merizod, and do not replicate, this test must issue all of its commands against the same
  *   # node.
  *   assumes_read_preference_unchanged,
  *   does_not_support_stepdowns,

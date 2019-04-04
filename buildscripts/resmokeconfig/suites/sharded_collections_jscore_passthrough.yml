@@ -8,7 +8,7 @@ selector:
   - jstests/core/txns/**/*.js
 
   # The following tests fail because a certain command or functionality is not supported by
-  # mongos. This command or functionality is placed in a comment next to the failing test.
+  # merizos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
   - jstests/core/apitest_db_profile_level.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
@@ -23,7 +23,7 @@ selector:
   - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
-  - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/diagdata.js # Command not supported in merizos
   - jstests/core/do_txn*.js  # doTxn
   - jstests/core/dropdb_race.js  # syncdelay.
   - jstests/core/fsync.js  # uses fsync.
@@ -44,13 +44,13 @@ selector:
   - jstests/core/tailable_getmore_batch_size.js # capped collections.
   - jstests/core/tailable_skip_limit.js # capped collections.
   - jstests/core/top.js  # top.
-  # The following tests fail because mongos behaves differently from mongod when testing certain
+  # The following tests fail because merizos behaves differently from merizod when testing certain
   # functionality. The differences are in a comment next to the failing test.
-  - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos, SERVER-18047.
+  - jstests/core/explain_missing_database.js  # Behavior with no db different on merizos, SERVER-18047.
   - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
   - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-  - jstests/core/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
+  - jstests/core/operation_latency_histogram.js  # Stats are counted differently on merizos, SERVER-24880.
   # Test expects to run against a standalone, but shards in this passthrough are repl sets.
   - jstests/core/read_after_optime.js
   # The following tests fail because they count indexes. These counts do not take into account the
@@ -89,7 +89,7 @@ selector:
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
   exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
+  - assumes_against_merizod_not_merizos
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation
@@ -114,9 +114,9 @@ executor:
     class: ShardedClusterFixture
     num_shards: 2
     enable_balancer: false
-    mongos_options:
+    merizos_options:
       set_parameters:
         enableTestCommands: 1
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1

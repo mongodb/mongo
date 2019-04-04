@@ -38,6 +38,6 @@ runTest(conn);
 MongoRunner.stopMongod(conn);
 
 // run all tests sharded
-conn = new ShardingTest({shards: 2, mongos: 1, config: 3});
+conn = new ShardingTest({shards: 2, merizos: 1, config: 3});
 runTest(conn);
 conn.stop();

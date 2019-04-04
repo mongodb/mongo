@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/sync_tail_test_fixture.h"
+#include "merizo/db/repl/sync_tail_test_fixture.h"
 
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/replication_consistency_markers_mock.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery_mock.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_impl.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/replication_consistency_markers_mock.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/replication_recovery_mock.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/repl/storage_interface_impl.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 void SyncTailOpObserver::onInserts(OperationContext* opCtx,
@@ -250,4 +250,4 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
 
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

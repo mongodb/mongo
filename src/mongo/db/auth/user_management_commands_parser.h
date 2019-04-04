@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,17 +32,17 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_format.h"
-#include "mongo/db/auth/role_name.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/jsobj.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/privilege_format.h"
+#include "merizo/db/auth/role_name.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/jsobj.h"
 
-namespace mongo {
+namespace merizo {
 namespace auth {
 
 struct CreateOrUpdateUserArgs {
@@ -218,11 +218,11 @@ struct MergeAuthzCollectionsArgs {
  * parses out the name of the temporary collections to use for user and role data, whether or
  * not to drop the existing users/roles, the database if this is a for a db-specific restore.
  * Returns ErrorCodes::OutdatedClient if the "db" field is missing, as that likely indicates
- * the command was sent by an outdated (pre 2.6.4) version of mongorestore.
+ * the command was sent by an outdated (pre 2.6.4) version of merizorestore.
  * Returns other codes indicating missing or incorrectly typed fields.
  */
 Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
                                          MergeAuthzCollectionsArgs* parsedArgs);
 
 }  // namespace auth
-}  // namespace mongo
+}  // namespace merizo

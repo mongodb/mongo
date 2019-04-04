@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/pipeline/document_source_list_local_sessions.h"
-#include "mongo/db/pipeline/document_source_list_sessions_gen.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/logical_session_id_helpers.h"
+#include "merizo/db/pipeline/document_source_list_local_sessions.h"
+#include "merizo/db/pipeline/document_source_list_sessions_gen.h"
 
-namespace mongo {
+namespace merizo {
 
 REGISTER_DOCUMENT_SOURCE(listLocalSessions,
                          DocumentSourceListLocalSessions::LiteParsed::parse,
@@ -107,9 +107,9 @@ bool operator==(const ListSessionsUser& user1, const ListSessionsUser& user2) {
 }
 }  // namespace
 
-}  // namespace mongo
+}  // namespace merizo
 
-std::vector<mongo::SHA256Block> mongo::listSessionsUsersToDigests(
+std::vector<merizo::SHA256Block> merizo::listSessionsUsersToDigests(
     const std::vector<ListSessionsUser>& users) {
     std::vector<SHA256Block> ret;
     ret.reserve(users.size());
@@ -119,7 +119,7 @@ std::vector<mongo::SHA256Block> mongo::listSessionsUsersToDigests(
     return ret;
 }
 
-mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(const ListSessionsSpec& spec) {
+merizo::PrivilegeVector merizo::listSessionsRequiredPrivileges(const ListSessionsSpec& spec) {
     const auto needsPrivs = ([spec]() {
         if (spec.getAllUsers()) {
             return true;
@@ -141,7 +141,7 @@ mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(const ListSessionsS
     }
 }
 
-mongo::ListSessionsSpec mongo::listSessionsParseSpec(StringData stageName,
+merizo::ListSessionsSpec merizo::listSessionsParseSpec(StringData stageName,
                                                      const BSONElement& spec) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << stageName << " options must be specified in an object, but found: "

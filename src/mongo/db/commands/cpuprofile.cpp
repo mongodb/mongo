@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,11 +29,11 @@
 
 /**
  * This module provides commands for starting and stopping the Google perftools
- * cpu profiler linked into mongod.
+ * cpu profiler linked into merizod.
  *
  * The following command enables the not-currently-enabled profiler, and writes
  * the profile data to the specified "profileFilename."
- *     { _cpuProfilerStart: { profileFilename: '/path/on/mongod-host.prof' } }
+ *     { _cpuProfilerStart: { profileFilename: '/path/on/merizod-host.prof' } }
  *
  * The following command disables the already-enabled profiler:
  *     { _cpuProfilerStop: 1}
@@ -46,22 +46,22 @@
  *     scons --release --use-cpu-profiler
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include "gperftools/profiler.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/jsobj.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 /**
@@ -162,4 +162,4 @@ bool CpuProfilerStopCommand::errmsgRun(OperationContext* opCtx,
 
 }  // namespace
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/bson_depth.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_comparator.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/dbtests/dbtests.h"
+#include "merizo/bson/bson_depth.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_comparator.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/db/pipeline/value_comparator.h"
+#include "merizo/dbtests/dbtests.h"
 
 namespace DocumentTests {
 
@@ -46,8 +46,8 @@ using std::numeric_limits;
 using std::string;
 using std::vector;
 
-mongo::Document::FieldPair getNthField(mongo::Document doc, size_t index) {
-    mongo::FieldIterator it(doc);
+merizo::Document::FieldPair getNthField(merizo::Document doc, size_t index) {
+    merizo::FieldIterator it(doc);
     while (index--)  // advance index times
         it.next();
     return it.next();
@@ -55,7 +55,7 @@ mongo::Document::FieldPair getNthField(mongo::Document doc, size_t index) {
 
 namespace Document {
 
-using mongo::Document;
+using merizo::Document;
 
 BSONObj toBson(const Document& document) {
     return document.toBson();
@@ -447,7 +447,7 @@ public:
 
         // can't use append any more since arrBuilder is done
         objBuilder << "mega array" << arr;
-        docBuilder["mega array"] = mongo::Value(values);
+        docBuilder["mega array"] = merizo::Value(values);
 
         const BSONObj obj = objBuilder.obj();
         const Document doc = docBuilder.freeze();
@@ -478,11 +478,11 @@ public:
     void append(const char* name, const T& thing) {
         objBuilder << name << thing;
         arrBuilder << thing;
-        docBuilder[name] = mongo::Value(thing);
-        values.push_back(mongo::Value(thing));
+        docBuilder[name] = merizo::Value(thing);
+        values.push_back(merizo::Value(thing));
     }
 
-    vector<mongo::Value> values;
+    vector<merizo::Value> values;
     MutableDocument docBuilder;
     BSONObjBuilder objBuilder;
     BSONArrayBuilder arrBuilder;
@@ -490,7 +490,7 @@ public:
 }  // namespace Document
 
 namespace MetaFields {
-using mongo::Document;
+using merizo::Document;
 TEST(MetaFields, TextScoreBasics) {
     // Documents should not have a text score until it is set.
     ASSERT_FALSE(Document().hasTextScore());
@@ -596,7 +596,7 @@ TEST(MetaFields, BadSerialization) {
 
 namespace Value {
 
-using mongo::Value;
+using merizo::Value;
 
 BSONObj toBson(const Value& value) {
     if (value.missing())
@@ -671,7 +671,7 @@ public:
     void run() {
         Value value = Value("foo"_sd);
         ASSERT_EQUALS("foo", value.getString());
-        ASSERT_EQUALS(mongo::String, value.getType());
+        ASSERT_EQUALS(merizo::String, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -695,7 +695,7 @@ public:
     void run() {
         Value value = Value(Date_t::fromMillisSinceEpoch(999));
         ASSERT_EQUALS(999, value.getDate().toMillisSinceEpoch());
-        ASSERT_EQUALS(mongo::Date, value.getType());
+        ASSERT_EQUALS(merizo::Date, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -706,12 +706,12 @@ public:
     void run() {
         Value value = Value(Timestamp(777));
         ASSERT(Timestamp(777) == value.getTimestamp());
-        ASSERT_EQUALS(mongo::bsonTimestamp, value.getType());
+        ASSERT_EQUALS(merizo::bsonTimestamp, value.getType());
         assertRoundTrips(value);
 
         value = Value(Timestamp(~0U, 3));
         ASSERT(Timestamp(~0U, 3) == value.getTimestamp());
-        ASSERT_EQUALS(mongo::bsonTimestamp, value.getType());
+        ASSERT_EQUALS(merizo::bsonTimestamp, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -720,7 +720,7 @@ public:
 class EmptyDocument {
 public:
     void run() {
-        mongo::Document document = mongo::Document();
+        merizo::Document document = merizo::Document();
         Value value = Value(document);
         ASSERT_EQUALS(document.getPtr(), value.getDocument().getPtr());
         ASSERT_EQUALS(Object, value.getType());
@@ -732,11 +732,11 @@ public:
 class Document {
 public:
     void run() {
-        mongo::MutableDocument md;
+        merizo::MutableDocument md;
         md.addField("a", Value(5));
         md.addField("apple", Value("rrr"_sd));
         md.addField("banana", Value(-.3));
-        mongo::Document document = md.freeze();
+        merizo::Document document = md.freeze();
 
         Value value = Value(document);
         // Check document pointers are equal.
@@ -781,7 +781,7 @@ public:
         ASSERT_EQUALS(5, array2[0].getInt());
         ASSERT_EQUALS("lala", array2[1].getString());
         ASSERT_EQUALS(3.14, array2[2].getDouble());
-        ASSERT_EQUALS(mongo::Array, value.getType());
+        ASSERT_EQUALS(merizo::Array, value.getType());
         ASSERT_EQUALS(3U, value.getArrayLength());
         assertRoundTrips(value);
     }
@@ -804,7 +804,7 @@ public:
     void run() {
         Value value = fromBson(BSON("" << true));
         ASSERT_EQUALS(true, value.getBool());
-        ASSERT_EQUALS(mongo::Bool, value.getType());
+        ASSERT_EQUALS(merizo::Bool, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -826,7 +826,7 @@ public:
     void run() {
         Value value(BSONSymbol("FOOBAR"));
         ASSERT_EQUALS("FOOBAR", value.getSymbol());
-        ASSERT_EQUALS(mongo::Symbol, value.getType());
+        ASSERT_EQUALS(merizo::Symbol, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -836,7 +836,7 @@ class Undefined {
 public:
     void run() {
         Value value = Value(BSONUndefined);
-        ASSERT_EQUALS(mongo::Undefined, value.getType());
+        ASSERT_EQUALS(merizo::Undefined, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -857,7 +857,7 @@ public:
     void run() {
         Value value = Value(true);
         ASSERT_EQUALS(true, value.getBool());
-        ASSERT_EQUALS(mongo::Bool, value.getType());
+        ASSERT_EQUALS(merizo::Bool, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -868,7 +868,7 @@ public:
     void run() {
         Value value = Value(false);
         ASSERT_EQUALS(false, value.getBool());
-        ASSERT_EQUALS(mongo::Bool, value.getType());
+        ASSERT_EQUALS(merizo::Bool, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -984,7 +984,7 @@ class StringToBool : public ToBoolTrue {
 /** Coerce {} to bool. */
 class ObjectToBool : public ToBoolTrue {
     Value value() {
-        return Value(mongo::Document());
+        return Value(merizo::Document());
     }
 };
 
@@ -1407,7 +1407,7 @@ class UndefinedToString : public ToStringBase {
 class DocumentToString {
 public:
     void run() {
-        ASSERT_THROWS(Value(mongo::Document()).coerceToString(), AssertionException);
+        ASSERT_THROWS(Value(merizo::Document()).coerceToString(), AssertionException);
     }
 };
 
@@ -1435,7 +1435,7 @@ public:
 class GetWidestNumeric {
 public:
     void run() {
-        using mongo::Undefined;
+        using merizo::Undefined;
 
         // Numeric types.
         assertWidest(NumberInt, NumberInt, NumberInt);
@@ -1459,8 +1459,8 @@ public:
         assertWidest(Undefined, Undefined, Undefined);
 
         // Other types (result Undefined).
-        assertWidest(Undefined, NumberInt, mongo::Bool);
-        assertWidest(Undefined, mongo::String, NumberDouble);
+        assertWidest(Undefined, NumberInt, merizo::Bool);
+        assertWidest(Undefined, merizo::String, NumberDouble);
     }
 
 private:
@@ -1592,7 +1592,7 @@ public:
         assertComparison(1, Timestamp(~0U, 2), Timestamp(0, 3));
 
         // Cross-type comparisons. Listed in order of canonical types.
-        assertComparison(-1, Value(mongo::MINKEY), Value());
+        assertComparison(-1, Value(merizo::MINKEY), Value());
         assertComparison(0, Value(), Value());
         assertComparison(0, Value(), Value(BSONUndefined));
         assertComparison(-1, Value(BSONUndefined), Value(BSONNULL));
@@ -1601,18 +1601,18 @@ public:
         assertComparison(0, Value(1), Value(1.0));
         assertComparison(-1, Value(1), Value("string"_sd));
         assertComparison(0, Value("string"_sd), Value(BSONSymbol("string")));
-        assertComparison(-1, Value("string"_sd), Value(mongo::Document()));
-        assertComparison(-1, Value(mongo::Document()), Value(vector<Value>()));
+        assertComparison(-1, Value("string"_sd), Value(merizo::Document()));
+        assertComparison(-1, Value(merizo::Document()), Value(vector<Value>()));
         assertComparison(-1, Value(vector<Value>()), Value(BSONBinData("", 0, MD5Type)));
-        assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(mongo::OID()));
-        assertComparison(-1, Value(mongo::OID()), Value(false));
+        assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(merizo::OID()));
+        assertComparison(-1, Value(merizo::OID()), Value(false));
         assertComparison(-1, Value(false), Value(Date_t()));
         assertComparison(-1, Value(Date_t()), Value(Timestamp()));
         assertComparison(-1, Value(Timestamp()), Value(BSONRegEx("")));
-        assertComparison(-1, Value(BSONRegEx("")), Value(BSONDBRef("", mongo::OID())));
-        assertComparison(-1, Value(BSONDBRef("", mongo::OID())), Value(BSONCode("")));
+        assertComparison(-1, Value(BSONRegEx("")), Value(BSONDBRef("", merizo::OID())));
+        assertComparison(-1, Value(BSONDBRef("", merizo::OID())), Value(BSONCode("")));
         assertComparison(-1, Value(BSONCode("")), Value(BSONCodeWScope("", BSONObj())));
-        assertComparison(-1, Value(BSONCodeWScope("", BSONObj())), Value(mongo::MAXKEY));
+        assertComparison(-1, Value(BSONCodeWScope("", BSONObj())), Value(merizo::MAXKEY));
     }
 
 private:
@@ -1642,7 +1642,7 @@ private:
         assertComparison(expectedResult, fromBson(a), fromBson(b));
     }
     void assertComparison(int expectedResult, const Value& a, const Value& b) {
-        mongo::unittest::log() << "testing " << a.toString() << " and " << b.toString();
+        merizo::unittest::log() << "testing " << a.toString() << " and " << b.toString();
 
         // reflexivity
         ASSERT_EQUALS(0, cmp(a, a));
@@ -1679,27 +1679,27 @@ public:
         const Value val = fromBson(fromjson("{'': {a: [{x:1, b:[1, {y:1, c:1234, z:1}, 1]}]}}"));
         // ^ this outer object is removed by fromBson
 
-        ASSERT(val.getType() == mongo::Object);
+        ASSERT(val.getType() == merizo::Object);
 
         ASSERT(val[999].missing());
         ASSERT(val["missing"].missing());
-        ASSERT(val["a"].getType() == mongo::Array);
+        ASSERT(val["a"].getType() == merizo::Array);
 
         ASSERT(val["a"][999].missing());
         ASSERT(val["a"]["missing"].missing());
-        ASSERT(val["a"][0].getType() == mongo::Object);
+        ASSERT(val["a"][0].getType() == merizo::Object);
 
         ASSERT(val["a"][0][999].missing());
         ASSERT(val["a"][0]["missing"].missing());
-        ASSERT(val["a"][0]["b"].getType() == mongo::Array);
+        ASSERT(val["a"][0]["b"].getType() == merizo::Array);
 
         ASSERT(val["a"][0]["b"][999].missing());
         ASSERT(val["a"][0]["b"]["missing"].missing());
-        ASSERT(val["a"][0]["b"][1].getType() == mongo::Object);
+        ASSERT(val["a"][0]["b"][1].getType() == merizo::Object);
 
         ASSERT(val["a"][0]["b"][1][999].missing());
         ASSERT(val["a"][0]["b"][1]["missing"].missing());
-        ASSERT(val["a"][0]["b"][1]["c"].getType() == mongo::NumberInt);
+        ASSERT(val["a"][0]["b"][1]["c"].getType() == merizo::NumberInt);
         ASSERT_EQUALS(val["a"][0]["b"][1]["c"].getInt(), 1234);
     }
 };

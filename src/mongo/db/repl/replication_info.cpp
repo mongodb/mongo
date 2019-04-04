@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,41 +26,41 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kFTDC
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <list>
 #include <vector>
 
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/db/auth/sasl_mechanism_registry.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplogreader.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/util/map_util.h"
+#include "merizo/client/connpool.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/db/auth/sasl_mechanism_registry.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/server_status.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/is_master_response.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplogreader.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/executor/network_interface.h"
+#include "merizo/rpc/metadata/client_metadata.h"
+#include "merizo/rpc/metadata/client_metadata_ismaster.h"
+#include "merizo/util/map_util.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::list;
@@ -279,7 +279,7 @@ public:
         }
 
         // Parse the optional 'internalClient' field. This is provided by incoming connections from
-        // mongod and mongos.
+        // merizod and merizos.
         auto internalClientElement = cmdObj["internalClient"];
         if (internalClientElement) {
             sessionTagsToSet |= transport::Session::kInternalClient;
@@ -304,7 +304,7 @@ public:
                                           << typeName(elem.type()),
                             elem.type() == BSONType::NumberInt);
 
-                    // All incoming connections from mongod/mongos of earlier versions should be
+                    // All incoming connections from merizod/merizos of earlier versions should be
                     // closed if the featureCompatibilityVersion is bumped to 3.6.
                     if (elem.numberInt() >=
                         WireSpec::instance().incomingInternalClient.maxWireVersion) {
@@ -335,7 +335,7 @@ public:
         if (session) {
             session->mutateTags(
                 [sessionTagsToSet, sessionTagsToUnset](transport::Session::TagMask originalTags) {
-                    // After a mongos sends the initial "isMaster" command with its mongos client
+                    // After a merizos sends the initial "isMaster" command with its merizos client
                     // information, it sometimes sends another "isMaster" command that is forwarded
                     // from its client. Once kInternalClient has been set, we assume that any future
                     // "isMaster" commands are forwarded in this manner, and we do not update the
@@ -399,4 +399,4 @@ OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", 
 }  // namespace
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

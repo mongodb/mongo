@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/s/client/shard.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/rpc/metadata/metadata_hook.h"
+#include "merizo/s/client/shard.h"
 
-namespace mongo {
+namespace merizo {
 namespace rpc {
 
 /**
@@ -52,8 +52,8 @@ public:
 
 protected:
     /**
-     * On mongod this is a no-op.
-     * On mongos it looks for $gleStats in a command's reply metadata, and fills in the
+     * On merizod this is a no-op.
+     * On merizos it looks for $gleStats in a command's reply metadata, and fills in the
      * ClusterLastErrorInfo for this thread's associated Client with the data, if found.
      * This data will be used by subsequent GLE calls, to ensure we look for the correct write on
      * the correct PRIMARY.
@@ -68,7 +68,7 @@ protected:
 
     /**
      * On config servers this is a no-op.
-     * On shards and mongoses this advances the Grid's stored config server optime based on the
+     * On shards and merizoses this advances the Grid's stored config server optime based on the
      * metadata in the response object from running a command.
      */
     virtual Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj);
@@ -77,4 +77,4 @@ protected:
 };
 
 }  // namespace rpc
-}  // namespace mongo
+}  // namespace merizo

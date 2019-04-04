@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
 
-#include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/bsonobj_comparator.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/bsonelement_comparator.h"
+#include "merizo/bson/bsonobj_comparator.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/unittest/unittest.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 
 TEST(CollatorInterfaceMockSelfTest, MocksOfSameTypeAreEqual) {
     CollatorInterfaceMock reverseMock1(CollatorInterfaceMock::MockType::kReverseString);
@@ -164,16 +164,16 @@ TEST(CollatorInterfaceMockSelfTest, WoCompareStringsWithMockCollator) {
 }
 
 TEST(CollatorInterfaceMockSelfTest, WoCompareNestedObjectsWithMockCollator) {
-    BSONObj left = mongo::fromjson("{a: {a: 'a', b: 'xyz', c: 'c'}}");
-    BSONObj right = mongo::fromjson("{a: {a: 'a', b: 'zyx', c: 'c'}}");
+    BSONObj left = merizo::fromjson("{a: {a: 'a', b: 'xyz', c: 'c'}}");
+    BSONObj right = merizo::fromjson("{a: {a: 'a', b: 'zyx', c: 'c'}}");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ASSERT_GT(left.woCompare(right, BSONObj(), true, &collator), 0);
     ASSERT_LT(right.woCompare(left, BSONObj(), true, &collator), 0);
 }
 
 TEST(CollatorInterfaceMockSelfTest, WoCompareNestedArraysWithMockCollator) {
-    BSONObj left = mongo::fromjson("{a: ['a', 'xyz', 'c']}");
-    BSONObj right = mongo::fromjson("{a: ['a', 'zyx', 'c']}");
+    BSONObj left = merizo::fromjson("{a: ['a', 'xyz', 'c']}");
+    BSONObj right = merizo::fromjson("{a: ['a', 'zyx', 'c']}");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ASSERT_GT(left.woCompare(right, BSONObj(), true, &collator), 0);
     ASSERT_LT(right.woCompare(left, BSONObj(), true, &collator), 0);

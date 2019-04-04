@@ -19,7 +19,7 @@ function authAllNodes() {
     }
 }
 
-// The mongo shell cannot authenticate as the internal __system user in tests that use x509 for
+// The merizo shell cannot authenticate as the internal __system user in tests that use x509 for
 // cluster authentication. Choosing the default value for wcMajorityJournalDefault in
 // ReplSetTest cannot be done automatically without the shell performing such authentication, so
 // in this test we must make the choice explicitly, based on the global test options.
@@ -90,7 +90,7 @@ var rstConn3 = rst.getPrimary();
 rstConn3.getDB("test").a.insert({a: 3, str: "PEASandCARROTS"});
 assert.eq(3, rstConn3.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
-var canConnectSSL = runMongoProgram("mongo",
+var canConnectSSL = runMongoProgram("merizo",
                                     "--port",
                                     rst.ports[0],
                                     "--ssl",
@@ -121,7 +121,7 @@ rst.awaitReplication();
 assert.eq(4, rstConn4.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
 // Test that an ssl connection can still be made
-var canConnectSSL = runMongoProgram("mongo",
+var canConnectSSL = runMongoProgram("merizo",
                                     "--port",
                                     rst.ports[0],
                                     "--ssl",

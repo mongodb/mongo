@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/exec/update_stage.h"
+#include "merizo/db/exec/update_stage.h"
 
 #include <algorithm>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bson_comparator_interface_base.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/write_stage_common.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/update/path_support.h"
-#include "mongo/db/update/storage_validation.h"
-#include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bson_comparator_interface_base.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/exec/write_stage_common.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/duplicate_key_error_info.h"
+#include "merizo/db/update/path_support.h"
+#include "merizo/db/update/storage_validation.h"
+#include "merizo/s/would_change_owning_shard_exception.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpsertPerformsInsert);
 
@@ -926,4 +926,4 @@ void UpdateStage::assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
             metadata->keyBelongsToMe(newShardKey));
 }
 
-}  // namespace mongo
+}  // namespace merizo

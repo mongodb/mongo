@@ -113,10 +113,10 @@ done
 #
 # Examples:
 #
-# /var/www-org/repo.consolidated/yum/redhat/5/mongodb-org/unstable -> 2.5
-# /var/www-org/repo.consolidated/yum/redhat/6/mongodb-org/unstable -> 2.5
-# /var/www-org/repo.consolidated/apt/ubuntu/dists/precise/mongodb-org/unstable -> 2.5
-# /var/www-org/repo.consolidated/apt/debian/dists/wheezy/mongodb-org/unstable -> 2.5
+# /var/www-org/repo.consolidated/yum/redhat/5/merizodb-org/unstable -> 2.5
+# /var/www-org/repo.consolidated/yum/redhat/6/merizodb-org/unstable -> 2.5
+# /var/www-org/repo.consolidated/apt/ubuntu/dists/precise/merizodb-org/unstable -> 2.5
+# /var/www-org/repo.consolidated/apt/debian/dists/wheezy/merizodb-org/unstable -> 2.5
 #
 for unstable_branch_dir in "$repodir"/yum/redhat/*/*/$unstable_branch "$repodir"/yum/amazon/*/*/$unstable_branch "$repodir"/apt/debian/dists/*/*/$unstable_branch "$repodir"/apt/ubuntu/dists/*/*/$unstable_branch "$repodir"/zypper/suse/*/*/$unstable_branch
 do

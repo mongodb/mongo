@@ -3,8 +3,8 @@
     'use strict';
     var dbpath = MongoRunner.dataPath + jsTest.name();
     resetDbpath(dbpath);
-    var mongod = MongoRunner.runMongod({dbpath: dbpath});
-    var coll = mongod.getDB("test").getCollection(jsTest.name());
+    var merizod = MongoRunner.runMongod({dbpath: dbpath});
+    var coll = merizod.getDB("test").getCollection(jsTest.name());
 
     // Configure the server so that queries are expected to yield after every 10 work cycles, or
     // after every 500 milliseconds (whichever comes first). In addition, enable a failpoint that
@@ -41,5 +41,5 @@
     // result set to be returned in a single batch.
     assert.gt(explainRes.executionStats.executionStages.saveState, 4 / 2, tojson(explainRes));
     assert.lt(explainRes.executionStats.executionStages.saveState, 4 * 2, tojson(explainRes));
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 })();

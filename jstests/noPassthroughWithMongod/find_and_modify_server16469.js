@@ -3,7 +3,7 @@
 //
 // Note that this test sets the server parameter "internalQueryExecMaxBlockingSortBytes", and
 // restores the original value of the parameter before exiting.  As a result, this test cannot run
-// in the sharding passthrough (because mongos does not have this parameter), and cannot run in the
+// in the sharding passthrough (because merizos does not have this parameter), and cannot run in the
 // parallel suite (because the change of the parameter value would interfere with other tests).
 
 var coll = db.find_and_modify_server16469;

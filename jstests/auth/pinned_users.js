@@ -10,7 +10,7 @@
 (function() {
     'use strict';
     jsTest.setOption("enableTestCommands", true);
-    // Start a mongod with the user cache size set to zero, so we know that users who have
+    // Start a merizod with the user cache size set to zero, so we know that users who have
     // logged out always get fetched cleanly from disk.
     const rs = new ReplSetTest({
         nodes: 3,
@@ -20,8 +20,8 @@
 
     rs.startSet();
     rs.initiate();
-    const mongod = rs.getPrimary();
-    const admin = mongod.getDB("admin");
+    const merizod = rs.getPrimary();
+    const admin = merizod.getDB("admin");
 
     admin.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     admin.auth("admin", "admin");
@@ -38,7 +38,7 @@
 
     admin.createUser({user: "admin2", pwd: "admin", roles: ["root"]});
 
-    let secondConn = new Mongo(mongod.host);
+    let secondConn = new Mongo(merizod.host);
     let secondAdmin = secondConn.getDB("admin");
     secondAdmin.auth("admin2", "admin");
 
@@ -69,7 +69,7 @@
         assert.eq(db.getSiblingDB("admin").auth("admin", "admin"), 1);
         assert.commandFailed(db.adminCommand(
             {sleep: 1, secs: 500, lock: "r", lockTarget: "admin", $comment: "Read lock sleep"}));
-    }, mongod.port);
+    }, merizod.port);
 
     // Wait for that command to appear in currentOp
     const readID = waitForCommand(
@@ -83,7 +83,7 @@
         assert.eq(db.getSiblingDB("admin").auth("admin", "admin"), 1);
         assert.commandFailed(db.adminCommand(
             {sleep: 1, secs: 500, lock: "w", lockTarget: "admin", $comment: "Write lock sleep"}));
-    }, mongod.port);
+    }, merizod.port);
 
     // Wait for that to appear in currentOp
     const writeID = waitForCommand(
@@ -111,11 +111,11 @@
 (function() {
     'use strict';
     jsTest.setOption("enableTestCommands", true);
-    // Start a mongod with the user cache size set to zero, so we know that users who have
+    // Start a merizod with the user cache size set to zero, so we know that users who have
     // logged out always get fetched cleanly from disk.
-    const mongod =
+    const merizod =
         MongoRunner.runMongod({auth: "", setParameter: "authorizationManagerCacheSize=0"});
-    let admin = mongod.getDB("admin");
+    let admin = merizod.getDB("admin");
 
     admin.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     admin.auth("admin", "admin");
@@ -142,5 +142,5 @@
           tojson(admin.aggregate([{$listCachedAndActiveUsers: {}}]).toArray()));
 
     assert.eq(admin.auth("admin2", "admin"), 0);
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 })();

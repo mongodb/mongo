@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/initializer_dependency_graph.h"
+#include "merizo/base/initializer_dependency_graph.h"
 
 #include <algorithm>
 #include <iterator>
 #include <sstream>
 
-namespace mongo {
+namespace merizo {
 
 InitializerDependencyGraph::InitializerDependencyGraph() {}
 InitializerDependencyGraph::~InitializerDependencyGraph() {}
@@ -162,4 +162,4 @@ Status InitializerDependencyGraph::recursiveTopSort(
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_geo_near_cursor.h"
+#include "merizo/db/pipeline/document_source_geo_near_cursor.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 #include <list>
 #include <memory>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/plan_executor.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_source_cursor.h"
+#include "merizo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/query/plan_executor.h"
 
-namespace mongo {
+namespace merizo {
 constexpr const char* DocumentSourceGeoNearCursor::kStageName;
 
 boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::create(
@@ -111,4 +111,4 @@ Document DocumentSourceGeoNearCursor::transformBSONObjToDocument(const BSONObj& 
 
     return output.freeze();
 }
-}  // namespace mongo
+}  // namespace merizo

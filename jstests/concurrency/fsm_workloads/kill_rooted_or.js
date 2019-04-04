@@ -73,7 +73,7 @@ var $config = (function() {
 
     function populateIndexes(coll, indexSpecs) {
         indexSpecs.forEach(indexSpec => {
-            // In sharded configurations, there's a limit to how many times mongos can retry an
+            // In sharded configurations, there's a limit to how many times merizos can retry an
             // operation that fails because it wants to implicitly create a collection that is
             // concurrently dropped. Normally, that's fine, but if some jerk keeps dropping our
             // collection (as in the 'dropCollection' state of this test), then we run out of

@@ -8,7 +8,7 @@ else
 	BINDIP="127.0.0.1,::1"
 fi
 
-exec mongod $COMMONDOPTSNOIP \
+exec merizod $COMMONDOPTSNOIP \
 	--shardsvr \
 	--bind_ip=$BINDIP \
 	--port 40001 \

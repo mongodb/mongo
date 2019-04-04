@@ -9,10 +9,10 @@
     // implicit sessions.
     TestData.disableImplicitSessions = true;
 
-    function runListAllLocalSessionsTest(mongod) {
-        assert(mongod);
-        const admin = mongod.getDB("admin");
-        const db = mongod.getDB("test");
+    function runListAllLocalSessionsTest(merizod) {
+        assert(merizod);
+        const admin = merizod.getDB("admin");
+        const db = merizod.getDB("test");
 
         const pipeline = [{'$listLocalSessions': {allUsers: true}}];
         function listAllLocalSessions() {
@@ -45,14 +45,14 @@
         assert.eq(0, bsonWoCompare({x: cacheid}, {x: myid}));
     }
 
-    const mongod = MongoRunner.runMongod({auth: ""});
-    runListAllLocalSessionsTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    const merizod = MongoRunner.runMongod({auth: ""});
+    runListAllLocalSessionsTest(merizod);
+    MongoRunner.stopMongod(merizod);
 
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     const st = new ShardingTest({
         shards: 1,
-        mongos: 1,
+        merizos: 1,
         config: 1,
         other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
     });

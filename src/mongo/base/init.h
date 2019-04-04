@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -35,21 +35,21 @@
  * Initializers are arranged in an acyclic directed dependency graph.  Declaring
  * a cycle will lead to a runtime error.
  *
- * Initializer functions take a parameter of type ::mongo::InitializerContext*, and return
+ * Initializer functions take a parameter of type ::merizo::InitializerContext*, and return
  * a Status.  Any status other than Status::OK() is considered a failure that will stop further
  * intializer processing.
  */
 
 #pragma once
 
-#include "mongo/base/deinitializer_context.h"
-#include "mongo/base/global_initializer.h"
-#include "mongo/base/global_initializer_registerer.h"
-#include "mongo/base/initializer.h"
-#include "mongo/base/initializer_context.h"
-#include "mongo/base/initializer_function.h"
-#include "mongo/base/make_string_vector.h"
-#include "mongo/base/status.h"
+#include "merizo/base/deinitializer_context.h"
+#include "merizo/base/global_initializer.h"
+#include "merizo/base/global_initializer_registerer.h"
+#include "merizo/base/initializer.h"
+#include "merizo/base/initializer_context.h"
+#include "merizo/base/initializer_function.h"
+#include "merizo/base/make_string_vector.h"
+#include "merizo/base/status.h"
 
 /**
  * Convenience parameter representing an empty set of prerequisites for an initializer function.
@@ -73,7 +73,7 @@
  * See MONGO_INITIALIZER_GENERAL.
  *
  * Usage:
- *     MONGO_INITIALIZER(myModule)(::mongo::InitializerContext* context) {
+ *     MONGO_INITIALIZER(myModule)(::merizo::InitializerContext* context) {
  *         ...
  *     }
  */
@@ -89,7 +89,7 @@
  * Usage:
  *     MONGO_INITIALIZER_WITH_PREREQUISITES(myGlobalStateChecker,
  *                                         ("globalStateInitialized", "stacktraces"))(
- *            ::mongo::InitializerContext* context) {
+ *            ::merizo::InitializerContext* context) {
  *    }
  */
 #define MONGO_INITIALIZER_WITH_PREREQUISITES(NAME, PREREQUISITES) \
@@ -104,14 +104,14 @@
  * DEPENDENTS is a tuple of 0 or more std::string literals.
  *
  * At run time, the full set of prerequisites for NAME will be computed as the union of the
- * explicit PREREQUISITES and the set of all other mongo initializers that name NAME in their
+ * explicit PREREQUISITES and the set of all other merizo initializers that name NAME in their
  * list of dependents.
  *
  * Usage:
  *    MONGO_INITIALIZER_GENERAL(myInitializer,
  *                             ("myPrereq1", "myPrereq2", ...),
  *                             ("myDependent1", "myDependent2", ...))(
- *            ::mongo::InitializerContext* context) {
+ *            ::merizo::InitializerContext* context) {
  *    }
  *
  * TODO: May want to be able to name the initializer separately from the function name.
@@ -119,15 +119,15 @@
  * of the function to declare would be options.
  */
 #define MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)                        \
-    ::mongo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)(::mongo::InitializerContext*); \
+    ::merizo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)(::merizo::InitializerContext*); \
     namespace {                                                                           \
-    ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer_##NAME(              \
+    ::merizo::GlobalInitializerRegisterer _merizoInitializerRegisterer_##NAME(              \
         std::string(#NAME),                                                               \
         MONGO_MAKE_STRING_VECTOR PREREQUISITES,                                           \
         MONGO_MAKE_STRING_VECTOR DEPENDENTS,                                              \
-        mongo::InitializerFunction(MONGO_INITIALIZER_FUNCTION_NAME_(NAME)));              \
+        merizo::InitializerFunction(MONGO_INITIALIZER_FUNCTION_NAME_(NAME)));              \
     }                                                                                     \
-    ::mongo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)
+    ::merizo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)
 
 /**
  * Macro to define an initializer group.
@@ -137,12 +137,12 @@
  * global parameters initialized".
  */
 #define MONGO_INITIALIZER_GROUP(NAME, PREREQUISITES, DEPENDENTS)                               \
-    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(::mongo::InitializerContext*) { \
-        return ::mongo::Status::OK();                                                          \
+    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(::merizo::InitializerContext*) { \
+        return ::merizo::Status::OK();                                                          \
     }
 
 /**
- * Macro to produce a name for a mongo initializer function for an initializer operation
+ * Macro to produce a name for a merizo initializer function for an initializer operation
  * named "NAME".
  */
-#define MONGO_INITIALIZER_FUNCTION_NAME_(NAME) _mongoInitializerFunction_##NAME
+#define MONGO_INITIALIZER_FUNCTION_NAME_(NAME) _merizoInitializerFunction_##NAME

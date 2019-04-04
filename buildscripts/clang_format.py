@@ -2,7 +2,7 @@
 """Clang format script that provides the following.
 
 1. Ability to grab binaries where possible from LLVM.
-2. Ability to download binaries from MongoDB cache for clang-format.
+2. Ability to download binaries from MerizoDB cache for clang-format.
 3. Validates clang-format is the right version.
 4. Has support for checking which files are to be checked.
 5. Supports validating and updating a set of files to the right coding style.
@@ -84,7 +84,7 @@ def extract_clang_format(tar_path):
 
 
 def get_clang_format_from_cache_and_extract(url, tarball_ext):
-    """Get clang-format from mongodb's cache and extract the tarball."""
+    """Get clang-format from merizodb's cache and extract the tarball."""
     dest_dir = tempfile.gettempdir()
     temp_tar_file = os.path.join(dest_dir, "temp.tar" + tarball_ext)
 
@@ -117,7 +117,7 @@ def get_clang_format_from_darwin_cache(dest_file):
 
 
 def get_clang_format_from_linux_cache(dest_file):
-    """Get clang-format from mongodb's cache."""
+    """Get clang-format from merizodb's cache."""
     get_clang_format_from_cache_and_extract(CLANG_FORMAT_HTTP_LINUX_CACHE, ".gz")
 
     # Destination Path
@@ -281,7 +281,7 @@ def is_interesting_file(file_name):
     """Return true if this file should be checked."""
     return ((file_name.startswith("jstests") or file_name.startswith("src"))
             and not file_name.startswith("src/third_party/")
-            and not file_name.startswith("src/mongo/gotools/")) and FILES_RE.search(file_name)
+            and not file_name.startswith("src/merizo/gotools/")) and FILES_RE.search(file_name)
 
 
 def get_list_from_lines(lines):
@@ -367,7 +367,7 @@ def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-ma
         raise ValueError("reformat-branch must be run from the repo root")
 
     if not os.path.exists("buildscripts/clang_format.py"):
-        raise ValueError("reformat-branch is only supported in the mongo repo")
+        raise ValueError("reformat-branch is only supported in the merizo repo")
 
     repo = git.Repo(git.get_base_dir())
 

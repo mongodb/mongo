@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,10 +33,10 @@
 #include <iosfwd>
 #include <string>
 
-#include "mongo/base/string_data.h"
-#include "mongo/platform/compiler.h"
+#include "merizo/base/string_data.h"
+#include "merizo/platform/compiler.h"
 
-namespace mongo {
+namespace merizo {
 
 class Status;
 
@@ -61,10 +61,10 @@ enum class ErrorCategory {
 
 /**
  * This is a generated class containing a table of error codes and their corresponding error
- * strings. The class is derived from the definitions in src/mongo/base/error_codes.err file and the
- * src/mongo/base/error_codes.tpl.h template.
+ * strings. The class is derived from the definitions in src/merizo/base/error_codes.err file and the
+ * src/merizo/base/error_codes.tpl.h template.
  *
- * Do not update this file directly. Update src/mongo/base/error_codes.err instead.
+ * Do not update this file directly. Update src/merizo/base/error_codes.err instead.
  */
 class ErrorCodes {
 public:
@@ -188,4 +188,4 @@ using ErrorExtraInfoFor = typename ErrorExtraInfoForImpl<code>::type;
 
 }  // namespace error_details
 
-}  // namespace mongo
+}  // namespace merizo

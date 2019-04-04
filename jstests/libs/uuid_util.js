@@ -4,8 +4,8 @@
  * Reads the collection entry for 'nss' from config.collections, asserts that such an entry exists,
  * and returns its 'uuid' field, which may be undefined.
  */
-function getUUIDFromConfigCollections(mongosConn, nss) {
-    let collEntry = mongosConn.getDB("config").collections.findOne({_id: nss});
+function getUUIDFromConfigCollections(merizosConn, nss) {
+    let collEntry = merizosConn.getDB("config").collections.findOne({_id: nss});
     assert.neq(undefined, collEntry);
     return collEntry.uuid;
 }

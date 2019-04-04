@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/query/async_results_merger.h"
+#include "merizo/s/query/async_results_merger.h"
 
-#include "mongo/db/json.h"
-#include "mongo/db/pipeline/change_stream_constants.h"
-#include "mongo/db/pipeline/resume_token.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/query/results_merger_test_fixture.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/json.h"
+#include "merizo/db/pipeline/change_stream_constants.h"
+#include "merizo/db/pipeline/resume_token.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/getmore_request.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/query/results_merger_test_fixture.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -2008,4 +2008,4 @@ TEST_F(AsyncResultsMergerTest, ShouldNotScheduleGetMoresWithoutAnOperationContex
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

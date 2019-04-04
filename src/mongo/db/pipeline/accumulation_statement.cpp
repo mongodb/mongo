@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <string>
 
-#include "mongo/db/pipeline/accumulation_statement.h"
+#include "merizo/db/pipeline/accumulation_statement.h"
 
-#include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/string_map.h"
+#include "merizo/db/pipeline/accumulator.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/string_map.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 using std::string;
@@ -102,4 +102,4 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             AccumulationStatement::getFactory(accName)};
 }
 
-}  // namespace mongo
+}  // namespace merizo

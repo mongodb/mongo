@@ -1,13 +1,13 @@
 ## On requirements (`*-requirements.txt`) files
 
-MongoDB requires multiple pypa projects installed to build and test. To that end, we provide our own
+MerizoDB requires multiple pypa projects installed to build and test. To that end, we provide our own
 `*-requirements.txt` files for specific domains of use. Inside each requirements file, there are
 only include statements for component files. These files are the bare requirements for specific
 components of our python environment. This separation allows us to avoid repetition and conflict in
 our requirements across components.
 
 For most developers, if you pip-install `dev-requirements.txt`, you have the python requirements to
-lint, build, and test MongoDB.
+lint, build, and test MerizoDB.
 
 ## On the constraints (`constraints.txt`) file
 
@@ -15,7 +15,7 @@ Our requirements files are *minimally* constrained. For the majority of pypa pro
 given requirements file will install the newest version of the project. For increased stability,
 there is a `constraints.txt` file with explicit versions for each required project. This file
 represents a _somewhat_ portable manifest of the latest acceptable pypa projects version according
-to a set of local python environments. It is also used to install the site-packages in the MongoDB
+to a set of local python environments. It is also used to install the site-packages in the MerizoDB
 internal toolchain-builder.
 
 Please note that the `verify_pip` task in evergreen confirms that `constraints.txt` satisfies
@@ -25,9 +25,9 @@ constraints file.
 ## How to modify a pypa project requirement in a component
 
 The most common edit of our requirements is likely a change to the constraints on a pypa project
-that we already use. For example, say that we currently require `pymongo >= 3.0, < 3.6.0` in the
+that we already use. For example, say that we currently require `pymerizo >= 3.0, < 3.6.0` in the
 component `core`. You would like to use PyMongo 3.7, so you instead modify the line in
-`etc/pip/components/core.req` to read `pymongo >= 3.0, != 3.6.0`. Since this is a modification to an
+`etc/pip/components/core.req` to read `pymerizo >= 3.0, != 3.6.0`. Since this is a modification to an
 existing component, you do not need to modify any requirements file. However, you do need to
 regenerate the constraints file. The workflow will usually look like:
 

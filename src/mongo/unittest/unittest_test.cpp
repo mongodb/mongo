@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,31 +31,31 @@
  * Unit tests of the unittest framework itself.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <limits>
 #include <string>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
 
 namespace {
-namespace stdx = mongo::stdx;
+namespace stdx = merizo::stdx;
 
 bool containsPattern(const std::string& pattern, const std::string& value) {
     return value.find(pattern) != std::string::npos;
 }
 
 #define ASSERT_TEST_FAILS(TEST_STMT) \
-    ASSERT_THROWS([&] { TEST_STMT; }(), mongo::unittest::TestAssertionFailureException)
+    ASSERT_THROWS([&] { TEST_STMT; }(), merizo::unittest::TestAssertionFailureException)
 
 #define ASSERT_TEST_FAILS_MATCH(TEST_STMT, PATTERN)     \
     ASSERT_THROWS_WITH_CHECK(                           \
         [&] { TEST_STMT; }(),                           \
-        mongo::unittest::TestAssertionFailureException, \
+        merizo::unittest::TestAssertionFailureException, \
         ([&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.getMessage(), (PATTERN)); }))
 
 TEST(UnitTestSelfTest, DoNothing) {}
@@ -188,54 +188,54 @@ TEST(UnitTestSelfTest, BSONObjGTE) {
 }
 
 TEST(UnitTestSelfTest, BSONElementEQ) {
-    mongo::BSONObj obj1 = BSON("foo"
+    merizo::BSONObj obj1 = BSON("foo"
                                << "bar");
-    mongo::BSONObj obj2 = BSON("foo"
+    merizo::BSONObj obj2 = BSON("foo"
                                << "bar");
     ASSERT_BSONELT_EQ(obj1.firstElement(), obj2.firstElement());
 }
 
 TEST(UnitTestSelfTest, BSONElementNE) {
-    mongo::BSONObj obj1 = BSON("foo"
+    merizo::BSONObj obj1 = BSON("foo"
                                << "bar");
-    mongo::BSONObj obj2 = BSON("foo"
+    merizo::BSONObj obj2 = BSON("foo"
                                << "baz");
     ASSERT_BSONELT_NE(obj1.firstElement(), obj2.firstElement());
 }
 
 TEST(UnitTestSelfTest, BSONElementLT) {
-    mongo::BSONObj obj1 = BSON("foo"
+    merizo::BSONObj obj1 = BSON("foo"
                                << "bar");
-    mongo::BSONObj obj2 = BSON("foo"
+    merizo::BSONObj obj2 = BSON("foo"
                                << "baz");
     ASSERT_BSONELT_LT(obj1.firstElement(), obj2.firstElement());
 }
 
 TEST(UnitTestSelfTest, BSONElementLTE) {
-    mongo::BSONObj obj1 = BSON("foo"
+    merizo::BSONObj obj1 = BSON("foo"
                                << "bar");
-    mongo::BSONObj obj2 = BSON("foo"
+    merizo::BSONObj obj2 = BSON("foo"
                                << "bar");
-    mongo::BSONObj obj3 = BSON("foo"
+    merizo::BSONObj obj3 = BSON("foo"
                                << "baz");
     ASSERT_BSONELT_LTE(obj1.firstElement(), obj2.firstElement());
     ASSERT_BSONELT_LTE(obj1.firstElement(), obj3.firstElement());
 }
 
 TEST(UnitTestSelfTest, BSONElementGT) {
-    mongo::BSONObj obj1 = BSON("foo"
+    merizo::BSONObj obj1 = BSON("foo"
                                << "bar");
-    mongo::BSONObj obj2 = BSON("foo"
+    merizo::BSONObj obj2 = BSON("foo"
                                << "baz");
     ASSERT_BSONELT_GT(obj2.firstElement(), obj1.firstElement());
 }
 
 TEST(UnitTestSelfTest, BSONElementGTE) {
-    mongo::BSONObj obj1 = BSON("foo"
+    merizo::BSONObj obj1 = BSON("foo"
                                << "bar");
-    mongo::BSONObj obj2 = BSON("foo"
+    merizo::BSONObj obj2 = BSON("foo"
                                << "bar");
-    mongo::BSONObj obj3 = BSON("foo"
+    merizo::BSONObj obj3 = BSON("foo"
                                << "baz");
     ASSERT_BSONELT_GTE(obj3.firstElement(), obj2.firstElement());
     ASSERT_BSONELT_GTE(obj2.firstElement(), obj1.firstElement());
@@ -245,11 +245,11 @@ DEATH_TEST(DeathTestSelfTest, TestDeath, "Invariant failure false") {
     invariant(false);
 }
 
-class DeathTestSelfTestFixture : public ::mongo::unittest::Test {
+class DeathTestSelfTestFixture : public ::merizo::unittest::Test {
 public:
     void setUp() override {}
     void tearDown() override {
-        mongo::unittest::log() << "Died in tear-down";
+        merizo::unittest::log() << "Died in tear-down";
         invariant(false);
     }
 };
@@ -261,7 +261,7 @@ TEST(UnitTestSelfTest, StackTraceForAssertion) {
     std::string stacktrace;
     try {
         ASSERT_EQ(0, 1);
-    } catch (mongo::unittest::TestAssertionFailureException& ae) {
+    } catch (merizo::unittest::TestAssertionFailureException& ae) {
         stacktrace = ae.getStacktrace();
         threw = true;
     }

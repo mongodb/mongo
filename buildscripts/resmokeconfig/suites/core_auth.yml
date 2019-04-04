@@ -14,7 +14,7 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # Transactions are not supported on MongoDB standalone nodes.
+  # Transactions are not supported on MerizoDB standalone nodes.
   - jstests/core/txns/**/*.js
   # Skip any tests that run with auth explicitly.
   - jstests/core/**/*[aA]uth*.js
@@ -53,7 +53,7 @@ executor:
     n: 20
   fixture:
     class: MongoDFixture
-    mongod_options:
+    merizod_options:
       auth: ''
       keyFile: *keyFile
       set_parameters:

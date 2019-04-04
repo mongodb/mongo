@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/transaction_coordinator_util.h"
+#include "merizo/db/s/transaction_coordinator_util.h"
 
-#include "mongo/client/remote_command_retry_scheduler.h"
-#include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
+#include "merizo/client/remote_command_retry_scheduler.h"
+#include "merizo/db/commands/txn_cmds_gen.h"
+#include "merizo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace txn {
 namespace {
 
@@ -671,4 +671,4 @@ Future<void> sendDecisionToShard(ServiceContext* service,
 }
 
 }  // namespace txn
-}  // namespace mongo
+}  // namespace merizo

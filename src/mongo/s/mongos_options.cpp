@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,33 +27,33 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/mongos_options.h"
+#include "merizo/s/merizos_options.h"
 
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/config.h"
-#include "mongo/db/server_options_base.h"
-#include "mongo/db/server_options_server_helpers.h"
-#include "mongo/s/version_mongos.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/startup_test.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/config.h"
+#include "merizo/db/server_options_base.h"
+#include "merizo/db/server_options_server_helpers.h"
+#include "merizo/s/version_merizos.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/options_parser/startup_options.h"
+#include "merizo/util/startup_test.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
-MongosGlobalParams mongosGlobalParams;
+MongosGlobalParams merizosGlobalParams;
 
 void printMongosHelp(const moe::OptionSection& options) {
     std::cout << options.helpString() << std::endl;
@@ -70,8 +70,8 @@ bool handlePreValidationMongosOptions(const moe::Environment& params,
         return false;
     }
     if (params.count("test") && params["test"].as<bool>() == true) {
-        ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-            ::mongo::logger::LogSeverity::Debug(5));
+        ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+            ::merizo::logger::LogSeverity::Debug(5));
         StartupTest::runTests();
         return false;
     }
@@ -111,7 +111,7 @@ Status storeMongosOptions(const moe::Environment& params) {
     }
 
     if (params.count("noscripting") || params.count("security.javascriptEnabled")) {
-        warning() << "The Javascript enabled/disabled options are not supported for mongos. "
+        warning() << "The Javascript enabled/disabled options are not supported for merizos. "
                      "(\"noscripting\" and/or \"security.javascriptEnabled\" are set.)";
     }
 
@@ -152,12 +152,12 @@ Status storeMongosOptions(const moe::Environment& params) {
         }
     }
 
-    mongosGlobalParams.configdbs =
+    merizosGlobalParams.configdbs =
         ConnectionString{configdbConnectionString.getValue().type(),
                          seedServers,
                          configdbConnectionString.getValue().getSetName()};
 
-    if (mongosGlobalParams.configdbs.getServers().size() < 3) {
+    if (merizosGlobalParams.configdbs.getServers().size() < 3) {
         warning() << "Running a sharded cluster with fewer than 3 config servers should only be "
                      "done for testing purposes and is not recommended for production.";
     }
@@ -165,4 +165,4 @@ Status storeMongosOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

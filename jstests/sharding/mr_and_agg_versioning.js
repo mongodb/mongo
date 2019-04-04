@@ -2,7 +2,7 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2, mongos: 3});
+    var st = new ShardingTest({shards: 2, merizos: 3});
 
     var dbName = jsTest.name();
     var collName = dbName + ".coll";
@@ -13,7 +13,7 @@
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
     st.s.adminCommand({shardCollection: collName, key: {key: 1}});
 
-    // Load chunk data to the stale mongoses before moving a chunk
+    // Load chunk data to the stale merizoses before moving a chunk
     var staleMongos1 = st.s1;
     var staleMongos2 = st.s2;
     staleMongos1.getCollection(collName).find().itcount();

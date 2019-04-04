@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_session_impl.h"
+#include "merizo/db/auth/authorization_session_impl.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authz_session_external_state.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/restriction_environment.h"
-#include "mongo/db/auth/security_key.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_request.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authz_session_external_state.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/restriction_environment.h"
+#include "merizo/db/auth/security_key.h"
+#include "merizo/db/auth/user_management_commands_parser.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/client.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/pipeline/aggregation_request.h"
+#include "merizo/db/pipeline/lite_parsed_pipeline.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 using std::vector;
 
 MONGO_REGISTER_SHIM(AuthorizationSession::create)
@@ -256,7 +256,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
     const NamespaceString& nss, const BSONObj& cmdObj, bool isMongos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
-                      mongoutils::str::stream() << "Invalid input namespace, " << nss.ns());
+                      merizoutils::str::stream() << "Invalid input namespace, " << nss.ns());
     }
 
     PrivilegeVector privileges;
@@ -1049,4 +1049,4 @@ auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

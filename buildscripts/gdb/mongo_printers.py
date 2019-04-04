@@ -1,4 +1,4 @@
-"""GDB Pretty-printers for MongoDB."""
+"""GDB Pretty-printers for MerizoDB."""
 from __future__ import print_function
 
 import re
@@ -15,7 +15,7 @@ try:
     from bson.codec_options import CodecOptions
 except ImportError as err:
     print("Warning: Could not load bson library for Python '" + str(sys.version) + "'.")
-    print("Check with the pip command if pymongo 3.x is installed.")
+    print("Check with the pip command if pymerizo 3.x is installed.")
     bson = None
 
 if sys.version_info[0] >= 3:
@@ -38,7 +38,7 @@ def get_unique_ptr(obj):
 
 
 class StatusPrinter(object):
-    """Pretty-printer for mongo::Status."""
+    """Pretty-printer for merizo::Status."""
 
     def __init__(self, val):
         """Initialize StatusPrinter."""
@@ -50,7 +50,7 @@ class StatusPrinter(object):
             return 'Status::OK()'
 
         code = self.val['_error']['code']
-        # Remove the mongo::ErrorCodes:: prefix. Does nothing if not a real ErrorCode.
+        # Remove the merizo::ErrorCodes:: prefix. Does nothing if not a real ErrorCode.
         code = str(code).split('::')[-1]
 
         info = self.val['_error'].dereference()
@@ -59,7 +59,7 @@ class StatusPrinter(object):
 
 
 class StatusWithPrinter(object):
-    """Pretty-printer for mongo::StatusWith<>."""
+    """Pretty-printer for merizo::StatusWith<>."""
 
     def __init__(self, val):
         """Initialize StatusWithPrinter."""
@@ -72,7 +72,7 @@ class StatusWithPrinter(object):
 
         code = self.val['_status']['_error']['code']
 
-        # Remove the mongo::ErrorCodes:: prefix. Does nothing if not a real ErrorCode.
+        # Remove the merizo::ErrorCodes:: prefix. Does nothing if not a real ErrorCode.
         code = str(code).split('::')[-1]
 
         info = self.val['_status']['_error'].dereference()
@@ -81,7 +81,7 @@ class StatusWithPrinter(object):
 
 
 class StringDataPrinter(object):
-    """Pretty-printer for mongo::StringData."""
+    """Pretty-printer for merizo::StringData."""
 
     def __init__(self, val):
         """Initialize StringDataPrinter."""
@@ -101,7 +101,7 @@ class StringDataPrinter(object):
 
 
 class BSONObjPrinter(object):
-    """Pretty-printer for mongo::BSONObj."""
+    """Pretty-printer for merizo::BSONObj."""
 
     def __init__(self, val):
         """Initialize BSONObjPrinter."""
@@ -155,7 +155,7 @@ class BSONObjPrinter(object):
 
 
 class UUIDPrinter(object):
-    """Pretty-printer for mongo::UUID."""
+    """Pretty-printer for merizo::UUID."""
 
     def __init__(self, val):
         """Initialize UUIDPrinter."""
@@ -174,7 +174,7 @@ class UUIDPrinter(object):
 
 
 class DecorablePrinter(object):
-    """Pretty-printer for mongo::Decorable<>."""
+    """Pretty-printer for merizo::Decorable<>."""
 
     def __init__(self, val):
         """Initialize DecorablePrinter."""
@@ -185,7 +185,7 @@ class DecorablePrinter(object):
         self.start = decl_vector["_M_impl"]["_M_start"]
         finish = decl_vector["_M_impl"]["_M_finish"]
         decorable_t = val.type.template_argument(0)
-        decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
+        decinfo_t = gdb.lookup_type('merizo::DecorationRegistry<{}>::DecorationInfo'.format(
             str(decorable_t).replace("class", "").strip()))
         self.count = long((long(finish) - long(self.start)) / decinfo_t.sizeof)
 
@@ -514,14 +514,14 @@ class MongoSubPrettyPrinter(gdb.printing.SubPrettyPrinter):
 
 
 class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
-    """MongoDB-specific printer printer collection that ignores subtypes.
+    """MerizoDB-specific printer printer collection that ignores subtypes.
 
     It will match 'HashTable<T> but not 'HashTable<T>::iterator' when asked for 'HashTable'.
     """
 
     def __init__(self):
         """Initialize MongoPrettyPrinterCollection."""
-        super(MongoPrettyPrinterCollection, self).__init__("mongo", [])
+        super(MongoPrettyPrinterCollection, self).__init__("merizo", [])
 
     def add(self, name, prefix, is_template, printer):
         """Add a subprinter."""
@@ -556,16 +556,16 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
 def build_pretty_printer():
     """Build a pretty printer."""
     pp = MongoPrettyPrinterCollection()
-    pp.add('BSONObj', 'mongo::BSONObj', False, BSONObjPrinter)
-    pp.add('Decorable', 'mongo::Decorable', True, DecorablePrinter)
-    pp.add('Status', 'mongo::Status', False, StatusPrinter)
-    pp.add('StatusWith', 'mongo::StatusWith', True, StatusWithPrinter)
-    pp.add('StringData', 'mongo::StringData', False, StringDataPrinter)
+    pp.add('BSONObj', 'merizo::BSONObj', False, BSONObjPrinter)
+    pp.add('Decorable', 'merizo::Decorable', True, DecorablePrinter)
+    pp.add('Status', 'merizo::Status', False, StatusPrinter)
+    pp.add('StatusWith', 'merizo::StatusWith', True, StatusWithPrinter)
+    pp.add('StringData', 'merizo::StringData', False, StringDataPrinter)
     pp.add('node_hash_map', 'absl::node_hash_map', True, AbslNodeHashMapPrinter)
     pp.add('node_hash_set', 'absl::node_hash_set', True, AbslNodeHashSetPrinter)
     pp.add('flat_hash_map', 'absl::flat_hash_map', True, AbslFlatHashMapPrinter)
     pp.add('flat_hash_set', 'absl::flat_hash_set', True, AbslFlatHashSetPrinter)
-    pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
+    pp.add('UUID', 'merizo::UUID', False, UUIDPrinter)
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
     pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
@@ -578,7 +578,7 @@ def build_pretty_printer():
 #
 ###################################################################################################
 
-# Register pretty-printers, replace existing mongo printers
+# Register pretty-printers, replace existing merizo printers
 gdb.printing.register_pretty_printer(gdb.current_objfile(), build_pretty_printer(), True)
 
-print("MongoDB GDB pretty-printers loaded")
+print("MerizoDB GDB pretty-printers loaded")

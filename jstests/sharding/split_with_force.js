@@ -6,13 +6,13 @@ var options = {
     chunkSize: 1,  // MB
 };
 
-var st = new ShardingTest({shards: 1, mongos: 1, other: options});
+var st = new ShardingTest({shards: 1, merizos: 1, other: options});
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
+var merizos = st.s0;
+var admin = merizos.getDB("admin");
+var config = merizos.getDB("config");
 var shardAdmin = st.shard0.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
+var coll = merizos.getCollection("foo.bar");
 
 assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
 assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);

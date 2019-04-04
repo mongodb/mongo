@@ -11,9 +11,9 @@
 
     // TODO (SERVER-38673): Remove this once BACKPORT-3428, BACKPORT-3429 are completed.
     if (!jsTestOptions().enableMajorityReadConcern &&
-        jsTestOptions().mongosBinVersion === 'last-stable') {
+        jsTestOptions().merizosBinVersion === 'last-stable') {
         jsTestLog(
-            "Skipping test since 'last-stable' mongos doesn't support speculative majority update lookup queries.");
+            "Skipping test since 'last-stable' merizos doesn't support speculative majority update lookup queries.");
         return;
     }
 
@@ -32,20 +32,20 @@
         }
     });
 
-    const mongosDB = st.s0.getDB(jsTestName());
-    const mongosColl = mongosDB[jsTestName()];
+    const merizosDB = st.s0.getDB(jsTestName());
+    const merizosColl = merizosDB[jsTestName()];
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.rs0.getURL());
 
     const caseInsensitive = {locale: "en_US", strength: 2};
     assert.commandWorked(
-        mongosDB.runCommand({create: mongosColl.getName(), collation: caseInsensitive}));
+        merizosDB.runCommand({create: merizosColl.getName(), collation: caseInsensitive}));
 
     // Shard the test collection on 'shardKey'. The shard key must use the simple collation.
-    assert.commandWorked(mongosDB.adminCommand({
-        shardCollection: mongosColl.getFullName(),
+    assert.commandWorked(merizosDB.adminCommand({
+        shardCollection: merizosColl.getFullName(),
         key: {shardKey: 1},
         collation: {locale: "simple"}
     }));
@@ -54,11 +54,11 @@
     // documents in each chunk that will have the same shard key according to the collection's
     // default collation, but not according to the simple collation (e.g. "abc" and "ABC").
     assert.commandWorked(
-        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: "aBC"}}));
+        merizosDB.adminCommand({split: merizosColl.getFullName(), middle: {shardKey: "aBC"}}));
 
     // Move the [MinKey, 'aBC') chunk to st.shard1.shardName.
-    assert.commandWorked(mongosDB.adminCommand(
-        {moveChunk: mongosColl.getFullName(), find: {shardKey: "ABC"}, to: st.rs1.getURL()}));
+    assert.commandWorked(merizosDB.adminCommand(
+        {moveChunk: merizosColl.getFullName(), find: {shardKey: "ABC"}, to: st.rs1.getURL()}));
 
     // Make sure that "ABC" and "abc" go to different shards - we rely on that to make sure the _ids
     // are unique on each shard.
@@ -69,31 +69,31 @@
     // know the update lookup will use both the _id and the shard key, and we want to make sure it
     // is only targeting a single shard. Also note that _id is a string, since we want to make sure
     // the _id index can only be used if we are using the collection's default collation.
-    assert.writeOK(mongosColl.insert({_id: "abc_1", shardKey: "ABC"}));
-    assert.writeOK(mongosColl.insert({_id: "abc_2", shardKey: "ABC"}));
-    assert.writeOK(mongosColl.insert({_id: "abc_1", shardKey: "abc"}));
-    assert.writeOK(mongosColl.insert({_id: "abc_2", shardKey: "abc"}));
+    assert.writeOK(merizosColl.insert({_id: "abc_1", shardKey: "ABC"}));
+    assert.writeOK(merizosColl.insert({_id: "abc_2", shardKey: "ABC"}));
+    assert.writeOK(merizosColl.insert({_id: "abc_1", shardKey: "abc"}));
+    assert.writeOK(merizosColl.insert({_id: "abc_2", shardKey: "abc"}));
 
     // Verify that the post-change lookup uses the simple collation to target to a single shard,
     // then uses the collection-default collation to perform the lookup on the shard.
-    const changeStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}]);
+    const changeStream = merizosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}]);
 
     // Be sure to include the collation in the updates so that each can be targeted to exactly one
     // shard - this is important to ensure each update only updates one document (since with the
     // default collation their documentKeys are identical). If each operation updates only one, the
-    // clusterTime sent from mongos will ensure that each corresponding oplog entry has a distinct
+    // clusterTime sent from merizos will ensure that each corresponding oplog entry has a distinct
     // timestamp and so will appear in the change stream in the order we expect.
-    let updateResult = mongosColl.updateOne({shardKey: "abc", _id: "abc_1"},
+    let updateResult = merizosColl.updateOne({shardKey: "abc", _id: "abc_1"},
                                             {$set: {updatedCount: 1}},
                                             {collation: {locale: "simple"}});
     assert.eq(1, updateResult.modifiedCount);
-    updateResult = mongosColl.updateOne({shardKey: "ABC", _id: "abc_1"},
+    updateResult = merizosColl.updateOne({shardKey: "ABC", _id: "abc_1"},
                                         {$set: {updatedCount: 1}},
                                         {collation: {locale: "simple"}});
     assert.eq(1, updateResult.modifiedCount);
 
     function numIdIndexUsages(host) {
-        return host.getCollection(mongosColl.getFullName())
+        return host.getCollection(merizosColl.getFullName())
             .aggregate([{$indexStats: {}}, {$match: {name: "_id_"}}])
             .toArray()[0]
             .accesses.ops;
@@ -124,25 +124,25 @@
 
     // Insert some documents that might be confused with existing documents under the change
     // stream's collation, but should not be confused during the update lookup.
-    assert.writeOK(mongosColl.insert({_id: "abç_1", shardKey: "ABÇ"}));
-    assert.writeOK(mongosColl.insert({_id: "abç_2", shardKey: "ABÇ"}));
-    assert.writeOK(mongosColl.insert({_id: "abç_1", shardKey: "abç"}));
-    assert.writeOK(mongosColl.insert({_id: "abç_2", shardKey: "abç"}));
+    assert.writeOK(merizosColl.insert({_id: "abç_1", shardKey: "ABÇ"}));
+    assert.writeOK(merizosColl.insert({_id: "abç_2", shardKey: "ABÇ"}));
+    assert.writeOK(merizosColl.insert({_id: "abç_1", shardKey: "abç"}));
+    assert.writeOK(merizosColl.insert({_id: "abç_2", shardKey: "abç"}));
 
-    assert.eq(mongosColl.find({shardKey: "abc"}).collation(strengthOneCollation).itcount(), 8);
+    assert.eq(merizosColl.find({shardKey: "abc"}).collation(strengthOneCollation).itcount(), 8);
 
-    const strengthOneChangeStream = mongosColl.aggregate(
+    const strengthOneChangeStream = merizosColl.aggregate(
         [
           {$changeStream: {fullDocument: "updateLookup"}},
           {$match: {"fullDocument.shardKey": "abc"}}
         ],
         {collation: strengthOneCollation});
 
-    updateResult = mongosColl.updateOne({shardKey: "ABC", _id: "abc_1"},
+    updateResult = merizosColl.updateOne({shardKey: "ABC", _id: "abc_1"},
                                         {$set: {updatedCount: 2}},
                                         {collation: {locale: "simple"}});
     assert.eq(1, updateResult.modifiedCount);
-    updateResult = mongosColl.updateOne({shardKey: "abc", _id: "abc_1"},
+    updateResult = merizosColl.updateOne({shardKey: "abc", _id: "abc_1"},
                                         {$set: {updatedCount: 2}},
                                         {collation: {locale: "simple"}});
     assert.eq(1, updateResult.modifiedCount);

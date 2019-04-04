@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,18 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream_gen.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/resume_token.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_change_stream_gen.h"
+#include "merizo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/document_source_single_document_transformation.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/pipeline/resume_token.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * The $changeStream stage is an alias for a cursor on oplog followed by a $match stage and a
- * transform stage on mongod.
+ * transform stage on merizod.
  */
 class DocumentSourceChangeStream final {
 public:
@@ -149,7 +149,7 @@ public:
     static constexpr StringData kRenameCollectionOpType = "rename"_sd;
     static constexpr StringData kDropDatabaseOpType = "dropDatabase"_sd;
     static constexpr StringData kInvalidateOpType = "invalidate"_sd;
-    // Internal op type to signal mongos to open cursors on new shards.
+    // Internal op type to signal merizos to open cursors on new shards.
     static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
 
     enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
@@ -234,4 +234,4 @@ private:
     DocumentSourceOplogMatch(BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 };
 
-}  // namespace mongo
+}  // namespace merizo

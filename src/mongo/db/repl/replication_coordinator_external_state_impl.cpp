@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,87 +27,87 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/replication_coordinator_external_state_impl.h"
+#include "merizo/db/repl/replication_coordinator_external_state_impl.h"
 
 #include <string>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/free_mon/free_mon_mongod.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time_metadata_hook.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/isself.h"
-#include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/noop_writer.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_applier_impl.h"
-#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/s/balancer/balancer.h"
-#include "mongo/db/s/chunk_splitter.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/periodic_balancer_config_refresher.h"
-#include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_state_recovery.h"
-#include "mongo/db/s/transaction_coordinator_service.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/system_index.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/grid.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/oid.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/coll_mod.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/feature_compatibility_version.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/free_mon/free_mon_merizod.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/kill_sessions_local.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_time_metadata_hook.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/repl/bgsync.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/isself.h"
+#include "merizo/db/repl/last_vote.h"
+#include "merizo/db/repl/member_state.h"
+#include "merizo/db/repl/noop_writer.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_applier_impl.h"
+#include "merizo/db/repl/oplog_buffer_blocking_queue.h"
+#include "merizo/db/repl/repl_server_parameters_gen.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/s/balancer/balancer.h"
+#include "merizo/db/s/chunk_splitter.h"
+#include "merizo/db/s/config/sharding_catalog_manager.h"
+#include "merizo/db/s/periodic_balancer_config_refresher.h"
+#include "merizo/db/s/sharding_initialization_merizod.h"
+#include "merizo/db/s/sharding_state_recovery.h"
+#include "merizo/db/s/transaction_coordinator_service.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/system_index.h"
+#include "merizo/executor/network_connection_hook.h"
+#include "merizo/executor/network_interface.h"
+#include "merizo/executor/network_interface_factory.h"
+#include "merizo/executor/thread_pool_task_executor.h"
+#include "merizo/rpc/metadata/egress_metadata_hook_list.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/catalog_cache_loader.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_identity_loader.h"
+#include "merizo/s/grid.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/transport/service_entry_point.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/thread_pool.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 namespace {
 
@@ -418,7 +418,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                            });
 
         // Update unique index format version for all non-replicated collections. It is possible
-        // for MongoDB to have a "clean startup", i.e., no non-local databases, but still have
+        // for MerizoDB to have a "clean startup", i.e., no non-local databases, but still have
         // unique indexes on collections in the local database. On clean startup,
         // setFeatureCompatibilityVersion (which updates the unique index format version of
         // collections) is not called, so any pre-existing collections are upgraded here. We exclude
@@ -951,4 +951,4 @@ void ReplicationCoordinatorExternalStateImpl::setupNoopWriter(Seconds waitTime) 
     _noopWriter = stdx::make_unique<NoopWriter>(waitTime);
 }
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

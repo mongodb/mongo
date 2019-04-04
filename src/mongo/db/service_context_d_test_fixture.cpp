@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "merizo/db/service_context_d_test_fixture.h"
 
 #include <memory>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/db/catalog/catalog_control.h"
-#include "mongo/db/catalog/database_holder_impl.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/service_entry_point_mongod.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/periodic_runner_factory.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/db/catalog/catalog_control.h"
+#include "merizo/db/catalog/database_holder_impl.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/index_builds_coordinator_merizod.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/service_entry_point_merizod.h"
+#include "merizo/db/storage/storage_engine_init.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/periodic_runner_factory.h"
 
-namespace mongo {
+namespace merizo {
 
 ServiceContextMongoDTest::ServiceContextMongoDTest()
     : ServiceContextMongoDTest("ephemeralForTest") {}
@@ -109,4 +109,4 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);
 }
 
-}  // namespace mongo
+}  // namespace merizo

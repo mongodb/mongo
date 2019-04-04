@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,15 +31,15 @@
 
 #include <vector>
 
-#include "mongo/client/read_preference.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/future.h"
-#include "mongo/util/time_support.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/s/shard_id.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/future.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 namespace txn {
 
 /**
@@ -382,4 +382,4 @@ Future<FutureContinuationResult<LoopBodyFn>> doWhile(AsyncWorkScheduler& schedul
 }
 
 }  // namespace txn
-}  // namespace mongo
+}  // namespace merizo

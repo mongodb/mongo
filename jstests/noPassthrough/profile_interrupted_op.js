@@ -11,7 +11,7 @@
     load("jstests/libs/check_log.js");  // For checkLog.
 
     //
-    // Start mongo with profiling disabled, create an empty database, and populate it with a
+    // Start merizo with profiling disabled, create an empty database, and populate it with a
     // collection that has one document.
     //
     let standalone = MongoRunner.runMongod({profile: "0"});
@@ -23,7 +23,7 @@
     assert.commandWorked(coll.insert({a: 1}));
 
     //
-    // Stop the mongod and then restart it, this time with profiling enabled. Note that enabling
+    // Stop the merizod and then restart it, this time with profiling enabled. Note that enabling
     // profiling on a running database would create the 'system.profile' collection, which we don't
     // yet want created for this test.
     //
@@ -59,13 +59,13 @@
     db.setProfilingLevel(0);
 
     //
-    // The mongod should print out a warning to indicate the potential need for a manually created
+    // The merizod should print out a warning to indicate the potential need for a manually created
     // 'system.profile' collection.
     //
     checkLog.contains(standalone, "Manually create profile collection");
 
     //
-    // The mongod should not create the 'system.profile' collection automatically.
+    // The merizod should not create the 'system.profile' collection automatically.
     //
     const res = db.runCommand({listCollections: 1, filter: {name: "system.profile"}});
     assert.commandWorked(res);

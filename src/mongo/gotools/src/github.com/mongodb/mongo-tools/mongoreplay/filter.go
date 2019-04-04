@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// FilterCommand stores settings for the mongoreplay 'filter' subcommand
+// FilterCommand stores settings for the merizoreplay 'filter' subcommand
 type FilterCommand struct {
 	GlobalOpts      *Options `no-flag:"true"`
 	PlaybackFile    string   `description:"path to the playback file to read from" short:"p" long:"playback-file" required:"yes"`

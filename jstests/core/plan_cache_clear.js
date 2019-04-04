@@ -74,12 +74,12 @@
 
     //
     // Query Plan Revision
-    // http://docs.mongodb.org/manual/core/query-plans/#query-plan-revision
+    // http://docs.merizodb.org/manual/core/query-plans/#query-plan-revision
     // As collections change over time, the query optimizer deletes the query plan and re-evaluates
     // after any of the following events:
     // - The reIndex rebuilds the index.
     // - You add or drop an index.
-    // - The mongod process restarts.
+    // - The merizod process restarts.
     //
 
     // Case 1: The reIndex rebuilds the index.
@@ -106,6 +106,6 @@
     t.ensureIndex({b: 1});
     assert.eq(0, getShapes().length, 'plan cache should be empty after adding index');
 
-    // Case 3: The mongod process restarts
+    // Case 3: The merizod process restarts
     // Not applicable.
 })();

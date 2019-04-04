@@ -4,7 +4,7 @@
  *
  * Using the collection block compressor option will result in all new collections made during
  * that process lifetime to use that compression setting. WiredTiger perfectly supports different
- * tables using different block compressors. This test will start up MongoDB once for each block
+ * tables using different block compressors. This test will start up MerizoDB once for each block
  * compressor setting and a create a new collection. Then after all collections are created, check
  * creation string passed to WT via the collStats command.
  *
@@ -17,36 +17,36 @@
 (function() {
     'use strict';
 
-    // On the first iteration, start a mongod. Subsequent iterations will close and restart on the
+    // On the first iteration, start a merizod. Subsequent iterations will close and restart on the
     // same dbpath.
     let firstIteration = true;
     let compressors = ['none', 'snappy', 'zlib', 'zstd'];
-    let mongo;
+    let merizo;
     for (let compressor of compressors) {
         jsTestLog({"Starting with compressor": compressor});
         if (firstIteration) {
-            mongo = MongoRunner.runMongod({
+            merizo = MongoRunner.runMongod({
                 wiredTigerCollectionBlockCompressor: compressor,
                 wiredTigerJournalCompressor: compressor
             });
             firstIteration = false;
         } else {
-            MongoRunner.stopMongod(mongo);
-            mongo = MongoRunner.runMongod({
+            MongoRunner.stopMongod(merizo);
+            merizo = MongoRunner.runMongod({
                 restart: true,
-                dbpath: mongo.dbpath,
+                dbpath: merizo.dbpath,
                 cleanData: false,
                 wiredTigerCollectionBlockCompressor: compressor
             });
         }
-        mongo.getDB('db')[compressor].insert({});
+        merizo.getDB('db')[compressor].insert({});
     }
 
     for (let compressor of compressors) {
         jsTestLog({"Asserting collection compressor": compressor});
-        let stats = mongo.getDB('db')[compressor].stats();
+        let stats = merizo.getDB('db')[compressor].stats();
         assert(stats['wiredTiger']['creationString'].search('block_compressor=' + compressor) > -1);
     }
 
-    MongoRunner.stopMongod(mongo);
+    MongoRunner.stopMongod(merizo);
 }());

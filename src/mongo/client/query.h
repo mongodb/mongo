@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/bson/json.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/rpc/message.h"
+#include "merizo/bson/json.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/rpc/message.h"
 
 
-namespace mongo {
+namespace merizo {
 
 /** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a
  * Query object.
@@ -95,7 +95,7 @@ public:
 
     /** Return explain information about execution of this query instead of the actual query
      * results.
-     *  Normally it is easier to use the mongo shell to run db.find(...).explain().
+     *  Normally it is easier to use the merizo shell to run db.find(...).explain().
      */
     Query& explain();
 
@@ -175,6 +175,6 @@ void assembleQueryRequest(const std::string& ns,
 /** Typically one uses the QUERY(...) macro to construct a Query object.
 Example: QUERY( "age" << 33 << "school" << "UCLA" )
 */
-#define QUERY(x) ::mongo::Query(BSON(x))
+#define QUERY(x) ::merizo::Query(BSON(x))
 
-}  // namespace mongo
+}  // namespace merizo

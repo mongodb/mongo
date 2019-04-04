@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,52 +27,52 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/embedded/embedded.h"
+#include "merizo/embedded/embedded.h"
 
-#include "mongo/base/initializer.h"
-#include "mongo/config.h"
-#include "mongo/db/catalog/database_holder_impl.h"
-#include "mongo/db/catalog/health_log.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/op_observer_impl.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/repair_database_and_check_version.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/session_killer.h"
-#include "mongo/db/storage/encryption_hooks.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/ttl.h"
-#include "mongo/embedded/index_builds_coordinator_embedded.h"
-#include "mongo/embedded/logical_session_cache_factory_embedded.h"
-#include "mongo/embedded/periodic_runner_embedded.h"
-#include "mongo/embedded/replication_coordinator_embedded.h"
-#include "mongo/embedded/service_entry_point_embedded.h"
-#include "mongo/logger/log_component.h"
-#include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/util/background.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/periodic_runner_factory.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/initializer.h"
+#include "merizo/config.h"
+#include "merizo/db/catalog/database_holder_impl.h"
+#include "merizo/db/catalog/health_log.h"
+#include "merizo/db/catalog/index_key_validate.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/feature_compatibility_version.h"
+#include "merizo/db/commands/fsync_locked.h"
+#include "merizo/db/concurrency/lock_state.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/global_settings.h"
+#include "merizo/db/kill_sessions_local.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/op_observer_impl.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/repair_database_and_check_version.h"
+#include "merizo/db/repl/storage_interface_impl.h"
+#include "merizo/db/session_killer.h"
+#include "merizo/db/storage/encryption_hooks.h"
+#include "merizo/db/storage/storage_engine_init.h"
+#include "merizo/db/ttl.h"
+#include "merizo/embedded/index_builds_coordinator_embedded.h"
+#include "merizo/embedded/logical_session_cache_factory_embedded.h"
+#include "merizo/embedded/periodic_runner_embedded.h"
+#include "merizo/embedded/replication_coordinator_embedded.h"
+#include "merizo/embedded/service_entry_point_embedded.h"
+#include "merizo/logger/log_component.h"
+#include "merizo/scripting/dbdirectclient_factory.h"
+#include "merizo/util/background.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/periodic_runner_factory.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/time_support.h"
 
 #include <boost/filesystem.hpp>
 
 
-namespace mongo {
+namespace merizo {
 namespace embedded {
 namespace {
 void initWireSpec() {
@@ -175,7 +175,7 @@ void shutdown(ServiceContext* srvContext) {
                 shutdownGlobalStorageEngineCleanly(serviceContext);
             }
 
-            Status status = mongo::runGlobalDeinitializers();
+            Status status = merizo::runGlobalDeinitializers();
             uassertStatusOKWithContext(status, "Global deinitilization failed");
         }
     }
@@ -192,7 +192,7 @@ ServiceContext* initialize(const char* yaml_config) {
     // existed. If it is nullptr then use 0 count which will be interpreted as empty string.
     const char* argv[2] = {yaml_config, nullptr};
 
-    Status status = mongo::runGlobalInitializers(yaml_config ? 1 : 0, argv, nullptr);
+    Status status = merizo::runGlobalInitializers(yaml_config ? 1 : 0, argv, nullptr);
     uassertStatusOKWithContext(status, "Global initilization failed");
     setGlobalServiceContext(ServiceContext::make());
 
@@ -215,7 +215,7 @@ ServiceContext* initialize(const char* yaml_config) {
     {
         ProcessId pid = ProcessId::getCurrent();
         LogstreamBuilder l = log(LogComponent::kControl);
-        l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
+        l << "MerizoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
           << " dbpath=" << storageGlobalParams.dbpath;
 
         const bool is32bit = sizeof(int*) == 4;
@@ -259,7 +259,7 @@ ServiceContext* initialize(const char* yaml_config) {
         ss << "*********************************************************************" << endl;
         ss << " ERROR: dbpath (" << storageGlobalParams.dbpath << ") does not exist." << endl;
         ss << " Create this directory or give existing directory in --dbpath." << endl;
-        ss << " See http://dochub.mongodb.org/core/startingandstoppingmongo" << endl;
+        ss << " See http://dochub.merizodb.org/core/startingandstoppingmerizo" << endl;
         ss << "*********************************************************************" << endl;
         uassert(50677, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
@@ -317,4 +317,4 @@ ServiceContext* initialize(const char* yaml_config) {
     return serviceContext;
 }
 }  // namespace embedded
-}  // namespace mongo
+}  // namespace merizo

@@ -1,5 +1,5 @@
 /**
- * Tests that the mongo shell gossips the greater of the client's clusterTime and the session's
+ * Tests that the merizo shell gossips the greater of the client's clusterTime and the session's
  * clusterTime.
  * @tags: [requires_replication]
  */
@@ -21,20 +21,20 @@
     const coll = db.shell_gossip_cluster_time;
 
     function testCommandGossipedWithClusterTime(func, expectedClusterTime) {
-        const mongoRunCommandOriginal = Mongo.prototype.runCommand;
+        const merizoRunCommandOriginal = Mongo.prototype.runCommand;
 
         const sentinel = {};
         let cmdObjSeen = sentinel;
 
         Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
             cmdObjSeen = cmdObj;
-            return mongoRunCommandOriginal.apply(this, arguments);
+            return merizoRunCommandOriginal.apply(this, arguments);
         };
 
         try {
             assert.doesNotThrow(func);
         } finally {
-            Mongo.prototype.runCommand = mongoRunCommandOriginal;
+            Mongo.prototype.runCommand = merizoRunCommandOriginal;
         }
 
         if (cmdObjSeen === sentinel) {

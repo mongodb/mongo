@@ -1,20 +1,20 @@
 #!/bin/bash
 set -e
 
-if ! [ -a mongotop ]
+if ! [ -a merizotop ]
 then
-    echo "need a mongotop binary in the same directory as the smoke script"
+    echo "need a merizotop binary in the same directory as the smoke script"
     exit 1
 fi
 
-chmod 755 mongotop
+chmod 755 merizotop
 
-./mongotop > output.out &
-mongotop_pid=$!
+./merizotop > output.out &
+merizotop_pid=$!
 
 sleep 5
 
-kill $mongotop_pid
+kill $merizotop_pid
 
 headers=( "ns" "total" "read" "write" )
 for header in "${headers[@]}"

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/s/sharding_state_lock.h"
-#include "mongo/s/database_version_gen.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/s/sharding_migration_critical_section.h"
+#include "merizo/db/s/sharding_state_lock.h"
+#include "merizo/s/database_version_gen.h"
 
-namespace mongo {
+namespace merizo {
 
 class MovePrimarySourceManager;
 class OperationContext;
@@ -141,4 +141,4 @@ private:
     MovePrimarySourceManager* _sourceMgr{nullptr};
 };
 
-}  // namespace mongo
+}  // namespace merizo

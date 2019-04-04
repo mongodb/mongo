@@ -205,12 +205,12 @@
     print("Testing sharded cluster");
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     var st = new ShardingTest({
-        mongos: 2,
+        merizos: 2,
         config: 3,
         shard: 1,
         keyFile: keyfile,
         other: {
-            mongosOptions: {bind_ip_all: "", auth: null},
+            merizosOptions: {bind_ip_all: "", auth: null},
             configOptions: {auth: null},
             shardOptions: {auth: null},
             shardAsReplicaSet: false
@@ -220,7 +220,7 @@
                    st.s1,
                    function() {},
                    function() {
-                       sleep(40 * 1000);  // Wait for mongos user cache invalidation
+                       sleep(40 * 1000);  // Wait for merizos user cache invalidation
                    });
     st.stop();
 

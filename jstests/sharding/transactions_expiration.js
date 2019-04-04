@@ -1,6 +1,6 @@
 // Tests that a transaction expires and is then aborted by the server. Uses the server parameter
 // 'transactionLifetimeLimitSeconds' to lower the transaction lifetime for quicker transaction
-// expiration. This is the mongos version for: jstests/core/txns/abort_expired_transaction.js.
+// expiration. This is the merizos version for: jstests/core/txns/abort_expired_transaction.js.
 //
 // @tags: [uses_transactions, uses_multi_shard_transaction]
 

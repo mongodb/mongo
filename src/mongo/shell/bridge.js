@@ -1,12 +1,12 @@
 /**
- * Wrapper around a mongobridge process. Construction of a MongoBridge instance will start a new
- * mongobridge process that listens on 'options.port' and forwards messages to 'options.dest'.
+ * Wrapper around a merizobridge process. Construction of a MongoBridge instance will start a new
+ * merizobridge process that listens on 'options.port' and forwards messages to 'options.dest'.
  *
  * @param {Object} options
  * @param {string} options.dest - The host:port to forward messages to.
  * @param {string} [options.hostName=localhost] - The hostname to specify when connecting to the
- * mongobridge process.
- * @param {number} [options.port=allocatePort()] - The port number the mongobridge should listen on.
+ * merizobridge process.
+ * @param {number} [options.port=allocatePort()] - The port number the merizobridge should listen on.
  *
  * @returns {Proxy} Acts as a typical connection object to options.hostName:options.port that has
  * additional functions exposed to shape network traffic from other processes.
@@ -28,21 +28,21 @@ function MongoBridge(options) {
     this.dest = options.dest;
     this.port = options.port || allocatePort();
 
-    // The connection used by a test for running commands against the mongod or mongos process.
+    // The connection used by a test for running commands against the merizod or merizos process.
     var userConn;
 
-    // A separate (hidden) connection for configuring the mongobridge process.
+    // A separate (hidden) connection for configuring the merizobridge process.
     var controlConn;
 
-    // Start the mongobridge on port 'this.port' routing network traffic to 'this.dest'.
-    var args = ['mongobridge', '--port', this.port, '--dest', this.dest];
+    // Start the merizobridge on port 'this.port' routing network traffic to 'this.dest'.
+    var args = ['merizobridge', '--port', this.port, '--dest', this.dest];
     var keysToSkip = [
         'dest',
         'hostName',
         'port',
     ];
 
-    // Append any command line arguments that are optional for mongobridge.
+    // Append any command line arguments that are optional for merizobridge.
     Object.keys(options).forEach(function(key) {
         if (Array.contains(keysToSkip, key)) {
             return;
@@ -63,14 +63,14 @@ function MongoBridge(options) {
     var pid = _startMongoProgram.apply(null, args);
 
     /**
-     * Initializes the mongo shell's connections to the mongobridge process. Throws an error if the
-     * mongobridge process stopped running or if a connection cannot be made.
+     * Initializes the merizo shell's connections to the merizobridge process. Throws an error if the
+     * merizobridge process stopped running or if a connection cannot be made.
      *
-     * The mongod or mongos process corresponding to this mongobridge process may need to connect to
-     * itself through the mongobridge process, e.g. when running the _isSelf command. This means
-     * the mongobridge process needs to be running prior to the other process. However, to avoid
-     * spurious failures during situations where the mongod or mongos process is not ready to accept
-     * connections, connections to the mongobridge process should only be made after the other
+     * The merizod or merizos process corresponding to this merizobridge process may need to connect to
+     * itself through the merizobridge process, e.g. when running the _isSelf command. This means
+     * the merizobridge process needs to be running prior to the other process. However, to avoid
+     * spurious failures during situations where the merizod or merizos process is not ready to accept
+     * connections, connections to the merizobridge process should only be made after the other
      * process is known to be reachable:
      *
      *     var bridge = new MongoBridge(...);
@@ -92,8 +92,8 @@ function MongoBridge(options) {
                 return false;
             }
             return true;
-        }, 'failed to connect to the mongobridge on port ' + this.port);
-        assert(!failedToStart, 'mongobridge failed to start on port ' + this.port);
+        }, 'failed to connect to the merizobridge on port ' + this.port);
+        assert(!failedToStart, 'merizobridge failed to start on port ' + this.port);
 
         // The MongoRunner.runMongoXX() functions define a 'name' property on the returned
         // connection object that is equivalent to its 'host' property. Certain functions in
@@ -110,7 +110,7 @@ function MongoBridge(options) {
     };
 
     /**
-     * Terminates the mongobridge process.
+     * Terminates the merizobridge process.
      */
     this.stop = function stop() {
         return _stopMongoProgram(this.port);
@@ -123,13 +123,13 @@ function MongoBridge(options) {
         }
     }
 
-    // Runs a command intended to configure the mongobridge.
+    // Runs a command intended to configure the merizobridge.
     function runBridgeCommand(conn, cmdName, cmdArgs) {
-        // The wire version of this mongobridge is detected as the wire version of the corresponding
-        // mongod or mongos process because the message is simply forwarded to that process.
-        // Commands to configure the mongobridge process must support being sent as an OP_QUERY
-        // message in order to handle when the mongobridge is a proxy for a mongos process or when
-        // --readMode=legacy is passed to the mongo shell. Create a new Object with 'cmdName' as the
+        // The wire version of this merizobridge is detected as the wire version of the corresponding
+        // merizod or merizos process because the message is simply forwarded to that process.
+        // Commands to configure the merizobridge process must support being sent as an OP_QUERY
+        // message in order to handle when the merizobridge is a proxy for a merizos process or when
+        // --readMode=legacy is passed to the merizo shell. Create a new Object with 'cmdName' as the
         // first key and $forBridge=true.
         var cmdObj = {};
         cmdObj[cmdName] = 1;
@@ -192,7 +192,7 @@ function MongoBridge(options) {
         bridges.forEach(bridge => {
             var res = runBridgeCommand(controlConn, 'acceptConnectionsFrom', {host: bridge.dest});
             assert.commandWorked(res,
-                                 'failed to configure the mongobridge listening on port ' +
+                                 'failed to configure the merizobridge listening on port ' +
                                      this.port + ' to accept new connections from ' + bridge.dest);
         });
     };
@@ -212,7 +212,7 @@ function MongoBridge(options) {
         bridges.forEach(bridge => {
             var res = runBridgeCommand(controlConn, 'rejectConnectionsFrom', {host: bridge.dest});
             assert.commandWorked(res,
-                                 'failed to configure the mongobridge listening on port ' +
+                                 'failed to configure the merizobridge listening on port ' +
                                      this.port + ' to hang up connections from ' + bridge.dest);
         });
     };
@@ -236,7 +236,7 @@ function MongoBridge(options) {
                 delay: delay,
             });
             assert.commandWorked(res,
-                                 'failed to configure the mongobridge listening on port ' +
+                                 'failed to configure the merizobridge listening on port ' +
                                      this.port + ' to delay messages from ' + bridge.dest + ' by ' +
                                      delay + ' milliseconds');
         });
@@ -261,7 +261,7 @@ function MongoBridge(options) {
                 loss: lossProbability,
             });
             assert.commandWorked(res,
-                                 'failed to configure the mongobridge listening on port ' +
+                                 'failed to configure the merizobridge listening on port ' +
                                      this.port + ' to discard messages from ' + bridge.dest +
                                      ' with probability ' + lossProbability);
         });
@@ -300,6 +300,6 @@ function MongoBridge(options) {
 }
 
 // The number of ports that ReplSetTest and ShardingTest should stagger the port number of the
-// mongobridge process and its corresponding mongod/mongos process by. The resulting port number of
-// the mongod/mongos process is MongoBridge#port + MongoBridge.kBridgeOffset.
+// merizobridge process and its corresponding merizod/merizos process by. The resulting port number of
+// the merizod/merizos process is MongoBridge#port + MongoBridge.kBridgeOffset.
 MongoBridge.kBridgeOffset = 10;

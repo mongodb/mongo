@@ -1,5 +1,5 @@
-snmp/mongod.conf.master
-snmp/mongod.conf.subagent
+snmp/merizod.conf.master
+snmp/merizod.conf.subagent
 snmp/README-snmp.txt
 snmp/MONGOD-MIB.txt
 snmp/MONGODBINC-MIB.txt

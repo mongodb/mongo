@@ -1,20 +1,20 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongodump
+package merizodump
 
 import (
 	"fmt"
 	"io"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/bsonutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -38,7 +38,7 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOut
 	meta := Metadata{
 		// We have to initialize Indexes to an empty slice, not nil, so that an empty
 		// array is marshalled into json instead of null. That is, {indexes:[]} is okay
-		// but {indexes:null} will cause assertions in our legacy C++ mongotools
+		// but {indexes:null} will cause assertions in our legacy C++ merizotools
 		Indexes: []interface{}{},
 	}
 

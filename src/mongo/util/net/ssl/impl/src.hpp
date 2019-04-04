@@ -21,22 +21,22 @@
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
 
-#include "mongo/util/net/ssl/detail/impl/engine_schannel.ipp"
-#include "mongo/util/net/ssl/detail/impl/schannel.ipp"
-#include "mongo/util/net/ssl/impl/context_schannel.ipp"
-#include "mongo/util/net/ssl/impl/error.ipp"
+#include "merizo/util/net/ssl/detail/impl/engine_schannel.ipp"
+#include "merizo/util/net/ssl/detail/impl/schannel.ipp"
+#include "merizo/util/net/ssl/impl/context_schannel.ipp"
+#include "merizo/util/net/ssl/impl/error.ipp"
 
 
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 
-#include "mongo/util/net/ssl/detail/impl/engine_openssl.ipp"
-#include "mongo/util/net/ssl/impl/context_openssl.ipp"
-#include "mongo/util/net/ssl/impl/error.ipp"
+#include "merizo/util/net/ssl/detail/impl/engine_openssl.ipp"
+#include "merizo/util/net/ssl/impl/context_openssl.ipp"
+#include "merizo/util/net/ssl/impl/error.ipp"
 
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
 
-#include "mongo/util/net/ssl/detail/impl/engine_apple.ipp"
-#include "mongo/util/net/ssl/impl/error.ipp"
+#include "merizo/util/net/ssl/detail/impl/engine_apple.ipp"
+#include "merizo/util/net/ssl/impl/error.ipp"
 
 #else
 #error "Unknown SSL Provider"

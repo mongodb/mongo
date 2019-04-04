@@ -135,11 +135,11 @@
 
         // Regex email pattern.
         assert.commandWorked(
-            coll.insert({_id: 1, text: "Some field text with email mongo@mongodb.com"}));
+            coll.insert({_id: 1, text: "Some field text with email merizo@merizodb.com"}));
         testRegexFindAggForKey(
             1,
             {input: "$text", regex: "([a-zA-Z0-9._-]+)@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+"},
-            [{"match": "mongo@mongodb.com", "idx": 27, "captures": ["mongo"]}]);
+            [{"match": "merizo@merizodb.com", "idx": 27, "captures": ["merizo"]}]);
 
         // Regex digits.
         assert.commandWorked(coll.insert({_id: 5, text: "Text with 02 digits"}));

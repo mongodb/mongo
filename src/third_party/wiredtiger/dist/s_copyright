@@ -58,7 +58,7 @@ trap 'rm -f $c1 $c2 $c3 $c4 $c5' 0 1 2 3 13 15
 year=`date +%Y`
 
 cat > $c1 <<ENDOFTEXT
- * Copyright (c) 2014-$year MongoDB, Inc.
+ * Copyright (c) 2014-$year MerizoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -67,14 +67,14 @@ ENDOFTEXT
 
 # Copyright for files WiredTiger does not own.
 cat > $c2 <<ENDOFTEXT
- * Public Domain 2014-$year MongoDB, Inc.
+ * Public Domain 2014-$year MerizoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
 ENDOFTEXT
 
 cat > $c3 <<ENDOFTEXT
-# Copyright (c) 2014-$year MongoDB, Inc.
+# Copyright (c) 2014-$year MerizoDB, Inc.
 # Copyright (c) 2008-2014 WiredTiger, Inc.
 #	All rights reserved.
 #
@@ -82,14 +82,14 @@ cat > $c3 <<ENDOFTEXT
 ENDOFTEXT
 
 cat > $c4 <<ENDOFTEXT
-# Public Domain 2014-$year MongoDB, Inc.
+# Public Domain 2014-$year MerizoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 ENDOFTEXT
 
 cat > $c5 <<ENDOFTEXT
- * Copyright (c) 2014-$year MongoDB, Inc.
+ * Copyright (c) 2014-$year MerizoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -131,11 +131,11 @@ fi
 
 # A few special cases: LICENSE, documentation, wt utility, some of which have
 # more than one copyright notice in the file. For files that have only a single
-# copyright notice, we give it to MongoDB, from 2008 to now.
-string1="Copyright \(c\) 2014-$year MongoDB, Inc."
-string2="Copyright \(c\) 2008-$year MongoDB, Inc."
-string3="printf.*Copyright \(c\) 2008-$year MongoDB, Inc."
-string4="Public Domain 2014-$year MongoDB, Inc."
+# copyright notice, we give it to MerizoDB, from 2008 to now.
+string1="Copyright \(c\) 2014-$year MerizoDB, Inc."
+string2="Copyright \(c\) 2008-$year MerizoDB, Inc."
+string3="printf.*Copyright \(c\) 2008-$year MerizoDB, Inc."
+string4="Public Domain 2014-$year MerizoDB, Inc."
 special_copyright()
 {
 	cnt=`egrep "$3" ../$1 | wc -l`

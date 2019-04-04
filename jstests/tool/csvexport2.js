@@ -5,7 +5,7 @@ t = new ToolTest("csvexport2");
 c = t.startDB("foo");
 
 // This test is designed to test exporting of a CodeWithScope object.
-// However, due to SERVER-3391, it is not possible to create a CodeWithScope object in the mongo
+// However, due to SERVER-3391, it is not possible to create a CodeWithScope object in the merizo
 // shell,
 // therefore this test does not work.  Once SERVER-3391 is resolved, this test should be
 // un-commented out

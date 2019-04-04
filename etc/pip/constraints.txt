@@ -31,7 +31,7 @@ pycparser==2.19
 pydocstyle==2.1.1
 PyJWT==1.7.1
 pylint==1.9.3
-pymongo==3.5.1
+pymerizo==3.5.1
 python-dateutil==2.8.0
 PyYAML==3.13
 regex==2019.2.21

@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package tlsgo implements connection to MongoDB with Go native TLS.
+// Package tlsgo implements connection to MerizoDB with Go native TLS.
 package tlsgo
 
 import (
@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db/kerberos"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/db/kerberos"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2"
 )
 

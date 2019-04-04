@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,19 +29,19 @@
 
 #pragma once
 
-namespace mongo {
+namespace merizo {
 
 /**
  * If true, then testing commands are available. Defaults to false.
  *
  * Testing commands should conditionally register themselves by using
- * MONGO_REGISTER_TEST_COMMAND (in src/mongo/db/commands.h), which consults this flag:
+ * MONGO_REGISTER_TEST_COMMAND (in src/merizo/db/commands.h), which consults this flag:
  *
  *     class MyTestCommand ...;
  *     MONGO_REGISTER_TEST_COMMAND(MyTestCommand);
  *
  * To make testing commands available by default, change the value to true before running any
- * mongo initializers:
+ * merizo initializers:
  *
  *     int myMain(int argc, char** argv, char** envp) {
  *         setTestCommandsEnabled(true);
@@ -53,4 +53,4 @@ namespace mongo {
 bool getTestCommandsEnabled();
 void setTestCommandsEnabled(bool b);
 
-}  // namespace mongo
+}  // namespace merizo

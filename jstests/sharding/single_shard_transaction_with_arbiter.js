@@ -22,17 +22,17 @@
         }
     });
 
-    const mongos = shardingTest.s;
-    const mongosDB = mongos.getDB(dbName);
-    const mongosColl = mongosDB[collName];
+    const merizos = shardingTest.s;
+    const merizosDB = merizos.getDB(dbName);
+    const merizosColl = merizosDB[collName];
 
     // Create and shard collection beforehand.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
-    assert.commandWorked(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(merizosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
-    const session = mongos.startSession();
+    const session = merizos.startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
 

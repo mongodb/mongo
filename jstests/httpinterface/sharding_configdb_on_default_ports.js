@@ -1,9 +1,9 @@
-// This test confirms that mongos interprets host names passed to it via the
+// This test confirms that merizos interprets host names passed to it via the
 // --configdb command line argument *without* a port number as referring to
 // processes listening on the config server port (27019) rather than the default
-// mongod port of 27017.
+// merizod port of 27017.
 //
-// That is, mongos --configdb=localhost should look for a config server on port 27019,
+// That is, merizos --configdb=localhost should look for a config server on port 27019,
 // not port 27017.
 //
 // The test confirms this behavior for 1-node config servers, SCCC config servers and

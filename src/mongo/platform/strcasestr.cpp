@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/strcasestr.h"
+#include "merizo/platform/strcasestr.h"
 
 #if defined(__sun)
 #include <dlfcn.h>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
 #endif
 
 #if defined(_WIN32) || defined(__sun)
@@ -49,7 +49,7 @@
 #define STRCASESTR_EMULATION_NAME strcasestr
 #endif
 
-namespace mongo {
+namespace merizo {
 namespace pal {
 
 /**
@@ -77,7 +77,7 @@ const char* STRCASESTR_EMULATION_NAME(const char* haystack, const char* needle) 
 #if defined(__sun)
 
 typedef const char* (*StrCaseStrFunc)(const char* haystack, const char* needle);
-static StrCaseStrFunc strcasestr_switcher = mongo::pal::strcasestr_emulation;
+static StrCaseStrFunc strcasestr_switcher = merizo::pal::strcasestr_emulation;
 
 const char* strcasestr(const char* haystack, const char* needle) {
     return strcasestr_switcher(haystack, needle);
@@ -86,13 +86,13 @@ const char* strcasestr(const char* haystack, const char* needle) {
 #endif  // #if defined(__sun)
 
 }  // namespace pal
-}  // namespace mongo
+}  // namespace merizo
 
 #endif  // #if defined(_WIN32) || defined(__sun)
 
 #if defined(__sun)
 
-namespace mongo {
+namespace merizo {
 
 // 'strcasestr()' on Solaris will call the emulation if the symbol is not found
 //
@@ -100,12 +100,12 @@ MONGO_INITIALIZER_GENERAL(SolarisStrCaseCmp, MONGO_NO_PREREQUISITES, ("default")
 (InitializerContext* context) {
     void* functionAddress = dlsym(RTLD_DEFAULT, "strcasestr");
     if (functionAddress != NULL) {
-        mongo::pal::strcasestr_switcher =
-            reinterpret_cast<mongo::pal::StrCaseStrFunc>(functionAddress);
+        merizo::pal::strcasestr_switcher =
+            reinterpret_cast<merizo::pal::StrCaseStrFunc>(functionAddress);
     }
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo
 
 #endif  // __sun

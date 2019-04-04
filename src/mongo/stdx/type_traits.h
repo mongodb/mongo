@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,32 +31,32 @@
 
 #include <type_traits>
 
-#include "mongo/config.h"
+#include "merizo/config.h"
 
 #if defined(MONGO_CONFIG_HAVE_STD_ENABLE_IF_T)
 
-namespace mongo {
+namespace merizo {
 namespace stdx {
 
 using ::std::enable_if_t;
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace merizo
 
 #else
 
-namespace mongo {
+namespace merizo {
 namespace stdx {
 
 template <bool B, class T = void>
 using enable_if_t = typename std::enable_if<B, T>::type;
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace merizo
 #endif
 
 // TODO: Deal with importing this from C++20, when the time comes.
-namespace mongo {
+namespace merizo {
 namespace stdx {
 
 template <typename T>
@@ -68,12 +68,12 @@ template <typename T>
 using type_identity_t = stdx::type_identity<T>;
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace merizo
 
 
 // TODO: Re-evaluate which of these we need when making the cutover to C++17.
 
-namespace mongo {
+namespace merizo {
 namespace stdx {
 
 namespace detail {
@@ -140,4 +140,4 @@ struct is_invocable_r
           stdx::type_identity<R>(), std::declval<Func>(), std::declval<Args>()...)) {};
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace merizo

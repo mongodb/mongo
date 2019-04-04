@@ -1,4 +1,4 @@
-// In MongoDB 3.4, $graphLookup was introduced. In this file, we test some complex graphs.
+// In MerizoDB 3.4, $graphLookup was introduced. In this file, we test some complex graphs.
 
 (function() {
     "use strict";

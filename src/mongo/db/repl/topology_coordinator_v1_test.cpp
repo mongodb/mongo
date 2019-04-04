@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <iostream>
 
-#include "mongo/bson/json.h"
-#include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/repl/heartbeat_response_action.h"
-#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
-#include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/repl_set_request_votes_args.h"
-#include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/server_options.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/logger/logger.h"
-#include "mongo/rpc/metadata/oplog_query_metadata.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
+#include "merizo/bson/json.h"
+#include "merizo/db/catalog/commit_quorum_options.h"
+#include "merizo/db/repl/heartbeat_response_action.h"
+#include "merizo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "merizo/db/repl/repl_set_heartbeat_response.h"
+#include "merizo/db/repl/repl_set_request_votes_args.h"
+#include "merizo/db/repl/topology_coordinator.h"
+#include "merizo/db/server_options.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/logger/logger.h"
+#include "merizo/rpc/metadata/oplog_query_metadata.h"
+#include "merizo/rpc/metadata/repl_set_metadata.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/time_support.h"
 
 #define ASSERT_NO_ACTION(EXPRESSION) \
-    ASSERT_EQUALS(mongo::repl::HeartbeatResponseAction::NoAction, (EXPRESSION))
+    ASSERT_EQUALS(merizo::repl::HeartbeatResponseAction::NoAction, (EXPRESSION))
 
 using std::unique_ptr;
-using mongo::rpc::ReplSetMetadata;
-using mongo::rpc::OplogQueryMetadata;
+using merizo::rpc::ReplSetMetadata;
+using merizo::rpc::OplogQueryMetadata;
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 namespace {
 
@@ -70,7 +70,7 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
 }
 
-class TopoCoordTest : public mongo::unittest::Test {
+class TopoCoordTest : public merizo::unittest::Test {
 public:
     virtual void setUp() {
         _options = TopologyCoordinator::Options{};
@@ -6199,4 +6199,4 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1,
 
 }  // namespace
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

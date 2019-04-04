@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/index_bounds.h"
+#include "merizo/db/query/index_bounds.h"
 
 #include <algorithm>
 #include <tuple>
 #include <utility>
 
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::vector;
@@ -127,7 +127,7 @@ bool IndexBounds::operator!=(const IndexBounds& other) const {
 }
 
 string OrderedIntervalList::toString() const {
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     ss << "['" << name << "']: ";
     for (size_t j = 0; j < intervals.size(); ++j) {
         ss << intervals[j].toString();
@@ -297,7 +297,7 @@ void OrderedIntervalList::complement() {
 }
 
 string IndexBounds::toString() const {
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     if (isSimpleRange) {
         if (IndexBounds::isStartIncludedInBound(boundInclusion)) {
             ss << "[";
@@ -749,4 +749,4 @@ IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
     return where;
 }
 
-}  // namespace mongo
+}  // namespace merizo

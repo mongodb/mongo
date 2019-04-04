@@ -1,7 +1,7 @@
 (function() {
 
-    var s1 = new ShardingTest({name: "count2", shards: 2, mongos: 2});
-    var s2 = s1._mongos[1];
+    var s1 = new ShardingTest({name: "count2", shards: 2, merizos: 2});
+    var s2 = s1._merizos[1];
 
     s1.adminCommand({enablesharding: "test"});
     s1.ensurePrimaryShard('test', s1.shard1.shardName);
@@ -21,8 +21,8 @@
 
     s1.adminCommand({split: "test.foo", middle: {name: "ddd"}});
 
-    assert.eq(3, db1.count({name: {$gte: "aaa", $lt: "ddd"}}), "initial count mongos1");
-    assert.eq(3, db2.count({name: {$gte: "aaa", $lt: "ddd"}}), "initial count mongos2");
+    assert.eq(3, db1.count({name: {$gte: "aaa", $lt: "ddd"}}), "initial count merizos1");
+    assert.eq(3, db2.count({name: {$gte: "aaa", $lt: "ddd"}}), "initial count merizos2");
 
     s1.printChunks("test.foo");
 
@@ -33,14 +33,14 @@
         _waitForDelete: true
     });
 
-    assert.eq(3, db1.count({name: {$gte: "aaa", $lt: "ddd"}}), "post count mongos1");
+    assert.eq(3, db1.count({name: {$gte: "aaa", $lt: "ddd"}}), "post count merizos1");
 
-    // The second mongos still thinks its shard mapping is valid and accepts a cound
+    // The second merizos still thinks its shard mapping is valid and accepts a cound
     print("before sleep: " + Date());
     sleep(2000);
     print("after  sleep: " + Date());
     s1.printChunks("test.foo");
-    assert.eq(3, db2.find({name: {$gte: "aaa", $lt: "ddd"}}).count(), "post count mongos2");
+    assert.eq(3, db2.find({name: {$gte: "aaa", $lt: "ddd"}}).count(), "post count merizos2");
 
     db2.findOne();
 

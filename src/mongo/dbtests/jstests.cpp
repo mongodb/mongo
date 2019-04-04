@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <iostream>
 #include <limits>
 
-#include "mongo/base/parse_number.h"
-#include "mongo/db/client.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/json.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/shell/shell_utils.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/future.h"
-#include "mongo/util/log.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
+#include "merizo/base/parse_number.h"
+#include "merizo/db/client.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/hasher.h"
+#include "merizo/db/json.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/shell/shell_utils.h"
+#include "merizo/util/concurrency/thread_name.h"
+#include "merizo/util/future.h"
+#include "merizo/util/log.h"
+#include "merizo/util/time_support.h"
+#include "merizo/util/timer.h"
 
 using std::cout;
 using std::endl;
@@ -169,10 +169,10 @@ class LogRecordingScope {
 public:
     LogRecordingScope()
         : _logged(false),
-          _threadName(mongo::getThreadName().toString()),
-          _handle(mongo::logger::globalLogDomain()->attachAppender(std::make_unique<Tee>(this))) {}
+          _threadName(merizo::getThreadName().toString()),
+          _handle(merizo::logger::globalLogDomain()->attachAppender(std::make_unique<Tee>(this))) {}
     ~LogRecordingScope() {
-        mongo::logger::globalLogDomain()->detachAppender(_handle);
+        merizo::logger::globalLogDomain()->detachAppender(_handle);
     }
     /** @return most recent log entry. */
     bool logged() const {
@@ -180,13 +180,13 @@ public:
     }
 
 private:
-    class Tee : public mongo::logger::MessageLogDomain::EventAppender {
+    class Tee : public merizo::logger::MessageLogDomain::EventAppender {
     public:
         Tee(LogRecordingScope* scope) : _scope(scope) {}
         virtual ~Tee() {}
         virtual Status append(const logger::MessageEventEphemeral& event) {
             // Don't want to consider logging by background threads.
-            if (mongo::getThreadName() == _scope->_threadName) {
+            if (merizo::getThreadName() == _scope->_threadName) {
                 _scope->_logged = true;
             }
             return Status::OK();
@@ -197,7 +197,7 @@ private:
     };
     bool _logged;
     const string _threadName;
-    mongo::logger::MessageLogDomain::AppenderHandle _handle;
+    merizo::logger::MessageLogDomain::AppenderHandle _handle;
 };
 
 /** Error logging in Scope::exec(). */
@@ -417,11 +417,11 @@ public:
 
         BSONObj out;
 
-        ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), mongo::AssertionException);
-        ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), mongo::AssertionException);
-        ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), mongo::AssertionException);
-        ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), mongo::AssertionException);
-        ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), mongo::AssertionException);
+        ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), merizo::AssertionException);
+        ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), merizo::AssertionException);
+        ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), merizo::AssertionException);
+        ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), merizo::AssertionException);
+        ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), merizo::AssertionException);
 
         // read-only object itself can be overwritten
         s->invoke("blah = {}", 0, 0);
@@ -683,11 +683,11 @@ public:
         BSONObj in = b.obj();
         s->setObject("a", in);
         BSONObj out = s->getObject("a");
-        ASSERT_EQUALS(mongo::NumberLong, out.firstElement().type());
+        ASSERT_EQUALS(merizo::NumberLong, out.firstElement().type());
 
         ASSERT(s->exec("b = {b:a.a}", "foo", false, true, false));
         out = s->getObject("b");
-        ASSERT_EQUALS(mongo::NumberLong, out.firstElement().type());
+        ASSERT_EQUALS(merizo::NumberLong, out.firstElement().type());
         if (val != out.firstElement().numberLong()) {
             cout << val << endl;
             cout << out.firstElement().numberLong() << endl;
@@ -727,7 +727,7 @@ public:
 
         ASSERT(s->exec("w = {w:z.z}", "foo", false, true, false));
         out = s->getObject("w");
-        ASSERT_EQUALS(mongo::NumberLong, out.firstElement().type());
+        ASSERT_EQUALS(merizo::NumberLong, out.firstElement().type());
         ASSERT_EQUALS(4, out.firstElement().numberLong());
     }
 };
@@ -773,11 +773,11 @@ public:
         BSONObj in = b.obj();
         s->setObject("a", in);
         BSONObj out = s->getObject("a");
-        ASSERT_EQUALS(mongo::NumberLong, out.firstElement().type());
+        ASSERT_EQUALS(merizo::NumberLong, out.firstElement().type());
 
         ASSERT(s->exec("b = {b:a.a}", "foo", false, true, false));
         out = s->getObject("b");
-        ASSERT_EQUALS(mongo::NumberLong, out.firstElement().type());
+        ASSERT_EQUALS(merizo::NumberLong, out.firstElement().type());
         if (val != out.firstElement().numberLong()) {
             cout << val << endl;
             cout << out.firstElement().numberLong() << endl;
@@ -820,12 +820,12 @@ public:
 
         // Test the scope object
         BSONObj out = s->getObject("a");
-        ASSERT_EQUALS(mongo::NumberDecimal, out.firstElement().type());
+        ASSERT_EQUALS(merizo::NumberDecimal, out.firstElement().type());
         ASSERT_TRUE(val.isEqual(out.firstElement().numberDecimal()));
 
         ASSERT(s->exec("b = {b:a.a}", "foo", false, true, false));
         out = s->getObject("b");
-        ASSERT_EQUALS(mongo::NumberDecimal, out.firstElement().type());
+        ASSERT_EQUALS(merizo::NumberDecimal, out.firstElement().type());
         ASSERT_TRUE(val.isEqual(out.firstElement().numberDecimal()));
 
         // Test that the appropriate string output is generated
@@ -1421,7 +1421,7 @@ public:
 template <ScopeFactory scopeFactory>
 class ConvertShardKeyToHashed {
 public:
-    void check(shared_ptr<Scope> s, const mongo::BSONObj& o) {
+    void check(shared_ptr<Scope> s, const merizo::BSONObj& o) {
         s->setObject("o", o, true);
         s->invoke("return convertShardKeyToHashed(o);", 0, 0);
         const auto scopeShardKey = s->getNumber("__returnValue");
@@ -1430,12 +1430,12 @@ public:
         const auto wrapO = BSON("" << o);
         const auto e = wrapO[""];
         const auto trueShardKey =
-            mongo::BSONElementHasher::hash64(e, mongo::BSONElementHasher::DEFAULT_HASH_SEED);
+            merizo::BSONElementHasher::hash64(e, merizo::BSONElementHasher::DEFAULT_HASH_SEED);
 
         ASSERT_EQUALS(scopeShardKey, trueShardKey);
     }
 
-    void checkWithSeed(shared_ptr<Scope> s, const mongo::BSONObj& o, int seed) {
+    void checkWithSeed(shared_ptr<Scope> s, const merizo::BSONObj& o, int seed) {
         s->setObject("o", o, true);
         s->setNumber("seed", seed);
         s->invoke("return convertShardKeyToHashed(o, seed);", 0, 0);
@@ -1444,7 +1444,7 @@ public:
         // Wrapping to form a proper element
         const auto wrapO = BSON("" << o);
         const auto e = wrapO[""];
-        const auto trueShardKey = mongo::BSONElementHasher::hash64(e, seed);
+        const auto trueShardKey = merizo::BSONElementHasher::hash64(e, seed);
 
         ASSERT_EQUALS(scopeShardKey, trueShardKey);
     }
@@ -1453,13 +1453,13 @@ public:
         s->invoke("return convertShardKeyToHashed();", 0, 0);
     }
 
-    void checkWithExtraArg(shared_ptr<Scope> s, const mongo::BSONObj& o, int seed) {
+    void checkWithExtraArg(shared_ptr<Scope> s, const merizo::BSONObj& o, int seed) {
         s->setObject("o", o, true);
         s->setNumber("seed", seed);
         s->invoke("return convertShardKeyToHashed(o, seed, 1);", 0, 0);
     }
 
-    void checkWithBadSeed(shared_ptr<Scope> s, const mongo::BSONObj& o) {
+    void checkWithBadSeed(shared_ptr<Scope> s, const merizo::BSONObj& o) {
         s->setObject("o", o, true);
         s->setString("seed", "sunflower");
         s->invoke("return convertShardKeyToHashed(o, seed);", 0, 0);
@@ -1476,8 +1476,8 @@ public:
               BSON(""
                    << "Shardy"));
         check(s, BSON("" << BSON_ARRAY(1 << 2 << 3)));
-        check(s, BSON("" << mongo::jstNULL));
-        check(s, BSON("" << mongo::BSONObj()));
+        check(s, BSON("" << merizo::jstNULL));
+        check(s, BSON("" << merizo::BSONObj()));
         check(s,
               BSON("A" << 1 << "B"
                        << "Shardy"));
@@ -1486,7 +1486,7 @@ public:
         checkWithSeed(s,
                       BSON(""
                            << "Shardy"),
-                      mongo::BSONElementHasher::DEFAULT_HASH_SEED);
+                      merizo::BSONElementHasher::DEFAULT_HASH_SEED);
         checkWithSeed(s,
                       BSON(""
                            << "Shardy"),
@@ -1496,9 +1496,9 @@ public:
                            << "Shardy"),
                       -1);
 
-        ASSERT_THROWS(checkNoArgs(s), mongo::DBException);
-        ASSERT_THROWS(checkWithExtraArg(s, BSON("" << 10.0), 0), mongo::DBException);
-        ASSERT_THROWS(checkWithBadSeed(s, BSON("" << 1)), mongo::DBException);
+        ASSERT_THROWS(checkNoArgs(s), merizo::DBException);
+        ASSERT_THROWS(checkWithExtraArg(s, BSON("" << 10.0), 0), merizo::DBException);
+        ASSERT_THROWS(checkWithBadSeed(s, BSON("" << 1)), merizo::DBException);
     }
 };
 

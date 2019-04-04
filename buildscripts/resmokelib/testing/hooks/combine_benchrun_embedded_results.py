@@ -31,7 +31,7 @@ class CombineBenchrunEmbeddedResults(cbr.CombineBenchmarkResults):
         self.report_root = _config.BENCHRUN_REPORT_ROOT
 
     def before_test(self, test, test_report):
-        """Remove any existing mongoebench reports for this test."""
+        """Remove any existing merizoebench reports for this test."""
         for bm_report in self._test_result_files(test):
             os.remove(bm_report)
 
@@ -72,14 +72,14 @@ class CombineBenchrunEmbeddedResults(cbr.CombineBenchmarkResults):
     def _test_result_files(self, test):
         """Return a list of existing test result files based on the test.short_name()."""
         return glob.glob(
-            os.path.join(self.report_root, test.short_name(), "**", "mongoebench[.]*[.]json"))
+            os.path.join(self.report_root, test.short_name(), "**", "merizoebench[.]*[.]json"))
 
     def _parse_report_name(self, report_path):
-        """Parse mongoebench report path and return thread_count.
+        """Parse merizoebench report path and return thread_count.
 
-        The format of the mongoebench report file name is defined in
+        The format of the merizoebench report file name is defined in
         ../testing/testcases/benchrun_embedded_test.py
-        as self.report_root/<test_name>/thread<num threads>/mongoebench.<iteration num>.json
+        as self.report_root/<test_name>/thread<num threads>/merizoebench.<iteration num>.json
         """
         _, report_subpath = report_path.split(self.report_root + os.sep)
         _, thread_name, _ = report_subpath.split(os.sep)
@@ -93,7 +93,7 @@ class _BenchrunEmbeddedThreadsReport(object):
     benchmark test. Each report is designed to correspond to one graph
     in the Evergreen perf plugin.
 
-    A raw mongoebench report looks like the following:
+    A raw merizoebench report looks like the following:
     {
         "note" : "values per second",
         "errCount" : { "$numberLong" : "0" },

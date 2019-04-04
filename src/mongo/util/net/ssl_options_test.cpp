@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/config.h"
+#include "merizo/config.h"
 
-#include "mongo/util/net/ssl_options.h"
+#include "merizo/util/net/ssl_options.h"
 
 #include <boost/range/size.hpp>
 #include <ostream>
 
-#include "mongo/base/global_initializer.h"
-#include "mongo/base/init.h"
-#include "mongo/base/initializer.h"
-#include "mongo/db/server_options_base.h"
-#include "mongo/db/server_options_server_helpers.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/cmdline_utils/censor_cmdline_test.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "merizo/base/global_initializer.h"
+#include "merizo/base/init.h"
+#include "merizo/base/initializer.h"
+#include "merizo/db/server_options_base.h"
+#include "merizo/db/server_options_server_helpers.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/cmdline_utils/censor_cmdline_test.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_section.h"
+#include "merizo/util/options_parser/options_parser.h"
+#include "merizo/util/options_parser/startup_options.h"
 
-namespace moe = mongo::optionenvironment;
+namespace moe = merizo::optionenvironment;
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 MONGO_INITIALIZER(ServerLogRedirection)(InitializerContext*) {
@@ -140,7 +140,7 @@ class OptionsParserTester : public moe::OptionsParser {
 public:
     Status readConfigFile(const std::string& filename, std::string* config) {
         if (filename != _filename) {
-            ::mongo::StringBuilder sb;
+            ::merizo::StringBuilder sb;
             sb << "Parser using filename: " << filename
                << " which does not match expected filename: " << _filename;
             return Status(ErrorCodes::InternalError, sb.str());
@@ -162,7 +162,7 @@ TEST(SetupOptions, tlsModeDisabled) {
     moe::startupOptions = moe::OptionSection();
     moe::startupOptionsParsed = moe::Environment();
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&moe::startupOptions));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&moe::startupOptions));
     ASSERT_OK(addSSLServerOptions());
 
     std::vector<std::string> argv;
@@ -174,14 +174,14 @@ TEST(SetupOptions, tlsModeDisabled) {
     OptionsParserTester parser;
     ASSERT_OK(parser.run(moe::startupOptions, argv, env_map, &moe::startupOptionsParsed));
     ASSERT_OK(storeSSLServerOptions());
-    ASSERT_EQ(::mongo::sslGlobalParams.sslMode.load(), ::mongo::sslGlobalParams.SSLMode_disabled);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslMode.load(), ::merizo::sslGlobalParams.SSLMode_disabled);
 }
 
 TEST(SetupOptions, sslModeDisabled) {
     moe::startupOptions = moe::OptionSection();
     moe::startupOptionsParsed = moe::Environment();
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&moe::startupOptions));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&moe::startupOptions));
     ASSERT_OK(addSSLServerOptions());
 
     std::vector<std::string> argv;
@@ -193,14 +193,14 @@ TEST(SetupOptions, sslModeDisabled) {
     OptionsParserTester parser;
     ASSERT_OK(parser.run(moe::startupOptions, argv, env_map, &moe::startupOptionsParsed));
     ASSERT_OK(storeSSLServerOptions());
-    ASSERT_EQ(::mongo::sslGlobalParams.sslMode.load(), ::mongo::sslGlobalParams.SSLMode_disabled);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslMode.load(), ::merizo::sslGlobalParams.SSLMode_disabled);
 }
 
 TEST(SetupOptions, tlsModeRequired) {
     moe::startupOptions = moe::OptionSection();
     moe::startupOptionsParsed = moe::Environment();
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&moe::startupOptions));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&moe::startupOptions));
     ASSERT_OK(addSSLServerOptions());
 
     std::string sslPEMKeyFile = "jstests/libs/server.pem";
@@ -238,36 +238,36 @@ TEST(SetupOptions, tlsModeRequired) {
     ASSERT_OK(parser.run(moe::startupOptions, argv, env_map, &moe::startupOptionsParsed));
     ASSERT_OK(storeSSLServerOptions());
 
-    ASSERT_EQ(::mongo::sslGlobalParams.sslMode.load(), ::mongo::sslGlobalParams.SSLMode_requireSSL);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslPEMKeyFile.substr(
-                  ::mongo::sslGlobalParams.sslPEMKeyFile.length() - sslPEMKeyFile.length()),
+    ASSERT_EQ(::merizo::sslGlobalParams.sslMode.load(), ::merizo::sslGlobalParams.SSLMode_requireSSL);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslPEMKeyFile.substr(
+                  ::merizo::sslGlobalParams.sslPEMKeyFile.length() - sslPEMKeyFile.length()),
               sslPEMKeyFile);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslCAFile.substr(
-                  ::mongo::sslGlobalParams.sslCAFile.length() - sslCAFFile.length()),
+    ASSERT_EQ(::merizo::sslGlobalParams.sslCAFile.substr(
+                  ::merizo::sslGlobalParams.sslCAFile.length() - sslCAFFile.length()),
               sslCAFFile);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslCRLFile.substr(
-                  ::mongo::sslGlobalParams.sslCRLFile.length() - sslCRLFile.length()),
+    ASSERT_EQ(::merizo::sslGlobalParams.sslCRLFile.substr(
+                  ::merizo::sslGlobalParams.sslCRLFile.length() - sslCRLFile.length()),
               sslCRLFile);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslClusterFile.substr(
-                  ::mongo::sslGlobalParams.sslClusterFile.length() - sslClusterFile.length()),
+    ASSERT_EQ(::merizo::sslGlobalParams.sslClusterFile.substr(
+                  ::merizo::sslGlobalParams.sslClusterFile.length() - sslClusterFile.length()),
               sslClusterFile);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslAllowInvalidHostnames, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslAllowInvalidCertificates, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslWeakCertificateValidation, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslFIPSMode, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslPEMKeyPassword, "pw1");
-    ASSERT_EQ(::mongo::sslGlobalParams.sslClusterPassword, "pw2");
-    ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.sslDisabledProtocols.back()),
-              static_cast<int>(::mongo::SSLParams::Protocols::TLS1_1));
-    ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.tlsLogVersions.back()),
-              static_cast<int>(::mongo::SSLParams::Protocols::TLS1_2));
+    ASSERT_EQ(::merizo::sslGlobalParams.sslAllowInvalidHostnames, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslAllowInvalidCertificates, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslWeakCertificateValidation, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslFIPSMode, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslPEMKeyPassword, "pw1");
+    ASSERT_EQ(::merizo::sslGlobalParams.sslClusterPassword, "pw2");
+    ASSERT_EQ(static_cast<int>(::merizo::sslGlobalParams.sslDisabledProtocols.back()),
+              static_cast<int>(::merizo::SSLParams::Protocols::TLS1_1));
+    ASSERT_EQ(static_cast<int>(::merizo::sslGlobalParams.tlsLogVersions.back()),
+              static_cast<int>(::merizo::SSLParams::Protocols::TLS1_2));
 }
 
 TEST(SetupOptions, sslModeRequired) {
     moe::startupOptions = moe::OptionSection();
     moe::startupOptionsParsed = moe::Environment();
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&moe::startupOptions));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&moe::startupOptions));
     ASSERT_OK(addSSLServerOptions());
 
     std::string sslPEMKeyFile = "jstests/libs/server.pem";
@@ -305,29 +305,29 @@ TEST(SetupOptions, sslModeRequired) {
     ASSERT_OK(parser.run(moe::startupOptions, argv, env_map, &moe::startupOptionsParsed));
     ASSERT_OK(storeSSLServerOptions());
 
-    ASSERT_EQ(::mongo::sslGlobalParams.sslMode.load(), ::mongo::sslGlobalParams.SSLMode_requireSSL);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslPEMKeyFile.substr(
-                  ::mongo::sslGlobalParams.sslPEMKeyFile.length() - sslPEMKeyFile.length()),
+    ASSERT_EQ(::merizo::sslGlobalParams.sslMode.load(), ::merizo::sslGlobalParams.SSLMode_requireSSL);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslPEMKeyFile.substr(
+                  ::merizo::sslGlobalParams.sslPEMKeyFile.length() - sslPEMKeyFile.length()),
               sslPEMKeyFile);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslCAFile.substr(
-                  ::mongo::sslGlobalParams.sslCAFile.length() - sslCAFFile.length()),
+    ASSERT_EQ(::merizo::sslGlobalParams.sslCAFile.substr(
+                  ::merizo::sslGlobalParams.sslCAFile.length() - sslCAFFile.length()),
               sslCAFFile);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslCRLFile.substr(
-                  ::mongo::sslGlobalParams.sslCRLFile.length() - sslCRLFile.length()),
+    ASSERT_EQ(::merizo::sslGlobalParams.sslCRLFile.substr(
+                  ::merizo::sslGlobalParams.sslCRLFile.length() - sslCRLFile.length()),
               sslCRLFile);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslClusterFile.substr(
-                  ::mongo::sslGlobalParams.sslClusterFile.length() - sslClusterFile.length()),
+    ASSERT_EQ(::merizo::sslGlobalParams.sslClusterFile.substr(
+                  ::merizo::sslGlobalParams.sslClusterFile.length() - sslClusterFile.length()),
               sslClusterFile);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslAllowInvalidHostnames, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslAllowInvalidCertificates, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslWeakCertificateValidation, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslFIPSMode, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslPEMKeyPassword, "pw1");
-    ASSERT_EQ(::mongo::sslGlobalParams.sslClusterPassword, "pw2");
-    ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.sslDisabledProtocols.back()),
-              static_cast<int>(::mongo::SSLParams::Protocols::TLS1_1));
-    ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.tlsLogVersions.back()),
-              static_cast<int>(::mongo::SSLParams::Protocols::TLS1_0));
+    ASSERT_EQ(::merizo::sslGlobalParams.sslAllowInvalidHostnames, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslAllowInvalidCertificates, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslWeakCertificateValidation, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslFIPSMode, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslPEMKeyPassword, "pw1");
+    ASSERT_EQ(::merizo::sslGlobalParams.sslClusterPassword, "pw2");
+    ASSERT_EQ(static_cast<int>(::merizo::sslGlobalParams.sslDisabledProtocols.back()),
+              static_cast<int>(::merizo::SSLParams::Protocols::TLS1_1));
+    ASSERT_EQ(static_cast<int>(::merizo::sslGlobalParams.tlsLogVersions.back()),
+              static_cast<int>(::merizo::SSLParams::Protocols::TLS1_0));
 }
 
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
@@ -335,7 +335,7 @@ TEST(SetupOptions, tlsModeRequiredCertificateSelector) {
     moe::startupOptions = moe::OptionSection();
     moe::startupOptionsParsed = moe::Environment();
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&moe::startupOptions));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&moe::startupOptions));
     ASSERT_OK(addSSLServerOptions());
 
     std::vector<std::string> argv;
@@ -352,16 +352,16 @@ TEST(SetupOptions, tlsModeRequiredCertificateSelector) {
     ASSERT_OK(parser.run(moe::startupOptions, argv, env_map, &moe::startupOptionsParsed));
     ASSERT_OK(storeSSLServerOptions());
 
-    ASSERT_EQ(::mongo::sslGlobalParams.sslMode.load(), ::mongo::sslGlobalParams.SSLMode_requireSSL);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslCertificateSelector.subject, "Subject 1");
-    ASSERT_EQ(::mongo::sslGlobalParams.sslClusterCertificateSelector.subject, "Subject 2");
+    ASSERT_EQ(::merizo::sslGlobalParams.sslMode.load(), ::merizo::sslGlobalParams.SSLMode_requireSSL);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslCertificateSelector.subject, "Subject 1");
+    ASSERT_EQ(::merizo::sslGlobalParams.sslClusterCertificateSelector.subject, "Subject 2");
 }
 
 TEST(SetupOptions, sslModeRequiredCertificateSelector) {
     moe::startupOptions = moe::OptionSection();
     moe::startupOptionsParsed = moe::Environment();
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&moe::startupOptions));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&moe::startupOptions));
     ASSERT_OK(addSSLServerOptions());
 
     std::vector<std::string> argv;
@@ -378,9 +378,9 @@ TEST(SetupOptions, sslModeRequiredCertificateSelector) {
     ASSERT_OK(parser.run(moe::startupOptions, argv, env_map, &moe::startupOptionsParsed));
     ASSERT_OK(storeSSLServerOptions());
 
-    ASSERT_EQ(::mongo::sslGlobalParams.sslMode.load(), ::mongo::sslGlobalParams.SSLMode_requireSSL);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslCertificateSelector.subject, "Subject 1");
-    ASSERT_EQ(::mongo::sslGlobalParams.sslClusterCertificateSelector.subject, "Subject 2");
+    ASSERT_EQ(::merizo::sslGlobalParams.sslMode.load(), ::merizo::sslGlobalParams.SSLMode_requireSSL);
+    ASSERT_EQ(::merizo::sslGlobalParams.sslCertificateSelector.subject, "Subject 1");
+    ASSERT_EQ(::merizo::sslGlobalParams.sslClusterCertificateSelector.subject, "Subject 2");
 }
 #endif
 
@@ -389,7 +389,7 @@ TEST(SetupOptions, disableNonSSLConnectionLoggingFalse) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -398,9 +398,9 @@ TEST(SetupOptions, disableNonSSLConnectionLoggingFalse) {
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    ASSERT_OK(mongo::storeServerOptions(environment));
+    ASSERT_OK(merizo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::sslGlobalParams.disableNonSSLConnectionLogging, false);
+    ASSERT_EQ(::merizo::sslGlobalParams.disableNonSSLConnectionLogging, false);
 }
 
 TEST(SetupOptions, disableNonTLSConnectionLoggingFalse) {
@@ -408,8 +408,8 @@ TEST(SetupOptions, disableNonTLSConnectionLoggingFalse) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ::mongo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ::merizo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -418,9 +418,9 @@ TEST(SetupOptions, disableNonTLSConnectionLoggingFalse) {
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    Status storeRet = mongo::storeServerOptions(environment);
+    Status storeRet = merizo::storeServerOptions(environment);
 
-    ASSERT_EQ(::mongo::sslGlobalParams.disableNonSSLConnectionLogging, false);
+    ASSERT_EQ(::merizo::sslGlobalParams.disableNonSSLConnectionLogging, false);
 }
 
 TEST(SetupOptions, disableNonSSLConnectionLoggingTrue) {
@@ -428,8 +428,8 @@ TEST(SetupOptions, disableNonSSLConnectionLoggingTrue) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ::mongo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ::merizo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -438,9 +438,9 @@ TEST(SetupOptions, disableNonSSLConnectionLoggingTrue) {
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    Status storeRet = mongo::storeServerOptions(environment);
+    Status storeRet = merizo::storeServerOptions(environment);
 
-    ASSERT_EQ(::mongo::sslGlobalParams.disableNonSSLConnectionLogging, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.disableNonSSLConnectionLogging, true);
 }
 
 TEST(SetupOptions, disableNonTLSConnectionLoggingTrue) {
@@ -448,8 +448,8 @@ TEST(SetupOptions, disableNonTLSConnectionLoggingTrue) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ::mongo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ::merizo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -458,9 +458,9 @@ TEST(SetupOptions, disableNonTLSConnectionLoggingTrue) {
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    Status storeRet = mongo::storeServerOptions(environment);
+    Status storeRet = merizo::storeServerOptions(environment);
 
-    ASSERT_EQ(::mongo::sslGlobalParams.disableNonSSLConnectionLogging, true);
+    ASSERT_EQ(::merizo::sslGlobalParams.disableNonSSLConnectionLogging, true);
 }
 
 TEST(SetupOptions, disableNonTLSConnectionLoggingInvalid) {
@@ -468,7 +468,7 @@ TEST(SetupOptions, disableNonTLSConnectionLoggingInvalid) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -479,11 +479,11 @@ TEST(SetupOptions, disableNonTLSConnectionLoggingInvalid) {
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    ASSERT_NOT_OK(mongo::storeServerOptions(environment));
+    ASSERT_NOT_OK(merizo::storeServerOptions(environment));
 }
 
 TEST(SetupOptions, RedactionSingleName) {
-    const std::vector<std::string> argv({"mongod",
+    const std::vector<std::string> argv({"merizod",
                                          "--tlsMode",
                                          "requireTLS",
                                          "--tlsCertificateKeyFilePassword=qwerty",
@@ -492,7 +492,7 @@ TEST(SetupOptions, RedactionSingleName) {
                                          "--sslPEMKeyPassword=qwerty",
                                          "--sslClusterPassword=qwerty"});
 
-    const std::vector<std::string> expected({"mongod",
+    const std::vector<std::string> expected({"merizod",
                                              "--tlsMode",
                                              "requireTLS",
                                              "--tlsCertificateKeyFilePassword=<password>",
@@ -502,7 +502,7 @@ TEST(SetupOptions, RedactionSingleName) {
                                              "--sslClusterPassword=<password>"});
 
     ASSERT_EQ(expected.size(), argv.size());
-    ::mongo::test::censoringVector(expected, argv);
+    ::merizo::test::censoringVector(expected, argv);
 }
 
 TEST(SetupOptions, RedactionDottedName) {
@@ -539,4 +539,4 @@ TEST(SetupOptions, RedactionDottedName) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -6,7 +6,7 @@
 
     if (!_isWindows()) {
         clearRawMongoProgramOutput();
-        var rc = runProgram("./mongo", "--nodb", "--quiet", "--eval", "print(isInteractive())");
+        var rc = runProgram("./merizo", "--nodb", "--quiet", "--eval", "print(isInteractive())");
         assert.eq(rc, 0);
         var output = rawMongoProgramOutput();
         var response = (output.split('\n').slice(-2)[0]).split(' ')[1];
@@ -14,7 +14,7 @@
         // now try interactive
         clearRawMongoProgramOutput();
         rc = runProgram(
-            "./mongo", "--nodb", "--quiet", "--shell", "--eval", "print(isInteractive()); quit()");
+            "./merizo", "--nodb", "--quiet", "--shell", "--eval", "print(isInteractive()); quit()");
         assert.eq(rc, 0);
         output = rawMongoProgramOutput();
         response = (output.split('\n').slice(-2)[0]).split(' ')[1];

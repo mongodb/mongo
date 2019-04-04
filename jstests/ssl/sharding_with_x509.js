@@ -1,5 +1,5 @@
 // Tests basic sharding with x509 cluster auth. The purpose is to verify the connectivity between
-// mongos and the shards.
+// merizos and the shards.
 (function() {
     'use strict';
 
@@ -18,11 +18,11 @@
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     var st = new ShardingTest({
         shards: 2,
-        mongos: 1,
+        merizos: 1,
         other: {
             enableBalancer: true,
             configOptions: x509_options,
-            mongosOptions: x509_options,
+            merizosOptions: x509_options,
             rsOptions: x509_options,
             shardOptions: x509_options,
             shardAsReplicaSet: false

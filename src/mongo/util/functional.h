@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,10 +32,10 @@
 #include <functional>
 #include <type_traits>
 
-#include "mongo/stdx/type_traits.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/stdx/type_traits.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 template <typename Function>
 class unique_function;
 
@@ -112,8 +112,8 @@ public:
         return static_cast<bool>(this->impl);
     }
 
-    // Needed to make `std::is_convertible<mongo::unique_function<...>, std::function<...>>` be
-    // `std::false_type`.  `mongo::unique_function` objects are not convertible to any kind of
+    // Needed to make `std::is_convertible<merizo::unique_function<...>, std::function<...>>` be
+    // `std::false_type`.  `merizo::unique_function` objects are not convertible to any kind of
     // `std::function` object, since the latter requires a copy constructor, which the former does
     // not provide.  If you see a compiler error which references this line, you have tried to
     // assign a `unique_function` object to a `std::function` object which is impossible -- please
@@ -186,4 +186,4 @@ template <typename Signature>
 bool operator!=(std::nullptr_t, const unique_function<Signature>& rhs) noexcept {
     return static_cast<bool>(rhs);
 }
-}  // namespace mongo
+}  // namespace merizo

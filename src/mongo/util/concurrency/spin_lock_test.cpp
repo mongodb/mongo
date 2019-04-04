@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/spin_lock.h"
-#include "mongo/util/timer.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/concurrency/spin_lock.h"
+#include "merizo/util/timer.h"
 
 namespace {
 
-using mongo::SpinLock;
-using mongo::Timer;
+using merizo::SpinLock;
+using merizo::Timer;
 
-namespace stdx = mongo::stdx;
+namespace stdx = merizo::stdx;
 
 class LockTester {
 public:
@@ -106,7 +106,7 @@ TEST(Concurrency, ConcurrentIncs) {
     }
 
     int ms = timer.millis();
-    mongo::unittest::log() << "spinlock ConcurrentIncs time: " << ms << std::endl;
+    merizo::unittest::log() << "spinlock ConcurrentIncs time: " << ms << std::endl;
 
     ASSERT_EQUALS(counter, threads * incs);
 }

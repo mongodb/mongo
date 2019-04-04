@@ -2,16 +2,16 @@
     // Include helpers for analyzing explain output.
     load("jstests/libs/analyze_plan.js");
 
-    var s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: {enableBalancer: true}});
+    var s = new ShardingTest({name: "shard3", shards: 2, merizos: 2, other: {enableBalancer: true}});
 
-    s2 = s._mongos[1];
+    s2 = s._merizos[1];
 
     db = s.getDB("test");
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', s.shard1.shardName);
     s.adminCommand({shardcollection: "test.foo", key: {num: 1}});
 
-    // Ensure that the second mongos will see the movePrimary
+    // Ensure that the second merizos will see the movePrimary
     s.configRS.awaitLastOpCommitted();
 
     assert(sh.getBalancerState(), "A1");

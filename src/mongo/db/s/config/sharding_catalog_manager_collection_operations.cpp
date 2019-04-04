@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,52 +27,52 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "merizo/db/s/config/sharding_catalog_manager.h"
 
 #include <iomanip>
 #include <set>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/config/initial_split_policy.h"
-#include "mongo/db/s/sharding_logging.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/set_shard_version_request.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/shard_util.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/client/remote_command_targeter.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/s/config/initial_split_policy.h"
+#include "merizo/db/s/sharding_logging.h"
+#include "merizo/executor/network_interface.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/catalog/sharding_catalog_client_impl.h"
+#include "merizo/s/catalog/type_collection.h"
+#include "merizo/s/catalog/type_database.h"
+#include "merizo/s/catalog/type_tags.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/request_types/set_shard_version_request.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/s/shard_util.h"
+#include "merizo/s/write_ops/batched_command_request.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using CollectionUUID = UUID;
 using std::string;
@@ -434,7 +434,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
     invariant(!shard->isConfig());
 
-    // Tell the primary mongod to refresh its data
+    // Tell the primary merizod to refresh its data
     SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
         shardRegistry->getConfigServerConnectionString(),
         dbPrimaryShardId,
@@ -550,4 +550,4 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 }
 
-}  // namespace mongo
+}  // namespace merizo

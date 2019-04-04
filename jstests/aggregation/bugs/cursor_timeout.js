@@ -9,7 +9,7 @@
 (function() {
     'use strict';
 
-    // Cursor timeout on mongod is handled by a single thread/timer that will sleep for
+    // Cursor timeout on merizod is handled by a single thread/timer that will sleep for
     // "clientCursorMonitorFrequencySecs" and add the sleep value to each operation's duration when
     // it wakes up, timing out those whose "now() - last accessed since" time exceeds. A cursor
     // timeout of 2 seconds with a monitor frequency of 1 second means an effective timeout period
@@ -30,11 +30,11 @@
         }
     };
     const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+    assert.neq(null, conn, 'merizod was unable to start up with options: ' + tojson(options));
 
     const testDB = conn.getDB('test');
 
-    // We use a batch size of 2 to ensure that the mongo shell does not exhaust the cursor on its
+    // We use a batch size of 2 to ensure that the merizo shell does not exhaust the cursor on its
     // first batch.
     const batchSize = 2;
     const numMatches = 5;

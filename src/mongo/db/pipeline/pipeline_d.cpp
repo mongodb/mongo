@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,67 +27,67 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/pipeline_d.h"
+#include "merizo/db/pipeline/pipeline_d.h"
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/multi_iterator.h"
-#include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/exec/shard_filter.h"
-#include "mongo/db/exec/trial_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/document_source_geo_near.h"
-#include "mongo/db/pipeline/document_source_geo_near_cursor.h"
-#include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_sample.h"
-#include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/write_ops/cluster_write.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/time_support.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/collection_scan.h"
+#include "merizo/db/exec/fetch.h"
+#include "merizo/db/exec/multi_iterator.h"
+#include "merizo/db/exec/queued_data_stage.h"
+#include "merizo/db/exec/shard_filter.h"
+#include "merizo/db/exec/trial_stage.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/ops/write_ops_exec.h"
+#include "merizo/db/ops/write_ops_gen.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_change_stream.h"
+#include "merizo/db/pipeline/document_source_cursor.h"
+#include "merizo/db/pipeline/document_source_geo_near.h"
+#include "merizo/db/pipeline/document_source_geo_near_cursor.h"
+#include "merizo/db/pipeline/document_source_group.h"
+#include "merizo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/document_source_sample.h"
+#include "merizo/db/pipeline/document_source_sample_from_random_cursor.h"
+#include "merizo/db/pipeline/document_source_single_document_transformation.h"
+#include "merizo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/pipeline.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/s/operation_sharding_state.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/stats/top.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/db/storage/sorted_data_interface.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/rpc/metadata/client_metadata_ismaster.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/chunk_manager.h"
+#include "merizo/s/chunk_version.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/query/document_source_merge_cursors.h"
+#include "merizo/s/write_ops/cluster_write.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 using std::shared_ptr;
@@ -885,4 +885,4 @@ void PipelineD::getPlanSummaryStats(const Pipeline* pipeline, PlanSummaryStats* 
     statsOut->usedDisk = usedDisk;
 }
 
-}  // namespace mongo
+}  // namespace merizo

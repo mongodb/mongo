@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,23 +32,23 @@
 #include <map>
 #include <string>
 
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/storage/journal_listener.h"
-#include "mongo/db/storage/kv/kv_catalog.h"
-#include "mongo/db/storage/kv/kv_database_catalog_entry_base.h"
-#include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/periodic_runner.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/storage/journal_listener.h"
+#include "merizo/db/storage/kv/kv_catalog.h"
+#include "merizo/db/storage/kv/kv_database_catalog_entry_base.h"
+#include "merizo/db/storage/kv/kv_drop_pending_ident_reaper.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/storage/temporary_record_store.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/periodic_runner.h"
 
-namespace mongo {
+namespace merizo {
 
 class KVCatalog;
 class KVEngine;
@@ -76,7 +76,7 @@ public:
 
 /*
  * The actual definition for this function is in
- * `src/mongo/db/storage/kv/kv_database_catalog_entry.cpp` This unusual forward declaration is to
+ * `src/merizo/db/storage/kv/kv_database_catalog_entry.cpp` This unusual forward declaration is to
  * facilitate better linker error messages.  Tests need to pass a mock construction factory, whereas
  * main implementations should pass the `default...` factory which is linked in with the main
  * `KVDatabaseCatalogEntry` code.
@@ -437,4 +437,4 @@ private:
     using DBMap = std::map<std::string, KVDatabaseCatalogEntryBase*>;
     DBMap _dbs;
 };
-}  // namespace mongo
+}  // namespace merizo

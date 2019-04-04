@@ -1,5 +1,5 @@
-// In MongoDB 3.4, $graphLookup was introduced. In this file, we test $graphLookup as applied to the
-// Socialite schema example available here: https://github.com/mongodb-labs/socialite
+// In MerizoDB 3.4, $graphLookup was introduced. In this file, we test $graphLookup as applied to the
+// Socialite schema example available here: https://github.com/merizodb-labs/socialite
 
 (function() {
     "use strict";

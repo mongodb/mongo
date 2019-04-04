@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/concurrency/lock_state.h"
+#include "merizo/db/concurrency/lock_state.h"
 
 #include <vector>
 
-#include "mongo/db/concurrency/flow_control_ticketholder.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/flow_control.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/new.h"
-#include "mongo/util/background.h"
-#include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/concurrency/flow_control_ticketholder.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/flow_control.h"
+#include "merizo/platform/compiler.h"
+#include "merizo/stdx/new.h"
+#include "merizo/util/background.h"
+#include "merizo/util/concurrency/ticketholder.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DEFINE(failNonIntentLocksIfWaitNeeded);
 
@@ -996,4 +996,4 @@ const ResourceId resourceIdParallelBatchWriterMode =
     ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_PARALLEL_BATCH_WRITER_MODE);
 const ResourceId resourceIdReplicationStateTransitionLock =
     ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_REPLICATION_STATE_TRANSITION_LOCK);
-}  // namespace mongo
+}  // namespace merizo

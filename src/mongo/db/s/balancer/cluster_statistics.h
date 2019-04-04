@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,9 +34,9 @@
 #include <string>
 #include <vector>
 
-#include "mongo/s/client/shard.h"
+#include "merizo/s/client/shard.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObj;
 class OperationContext;
@@ -63,7 +63,7 @@ public:
                         uint64_t currSizeMB,
                         bool isDraining,
                         std::set<std::string> shardTags,
-                        std::string mongoVersion);
+                        std::string merizoVersion);
 
         /**
          * Returns true if a shard is not allowed to receive any new chunks because it has reached
@@ -91,8 +91,8 @@ public:
         // Set of tags for the shard
         std::set<std::string> shardTags;
 
-        // Version of mongod, which runs on this shard's primary
-        std::string mongoVersion;
+        // Version of merizod, which runs on this shard's primary
+        std::string merizoVersion;
     };
 
     virtual ~ClusterStatistics();
@@ -107,4 +107,4 @@ protected:
     ClusterStatistics();
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/sync_source_resolver.h"
+#include "merizo/db/repl/sync_source_resolver.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/sync_source_selector.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/sync_source_selector.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/destructor_guard.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 const NamespaceString SyncSourceResolver::kLocalOplogNss("local.oplog.rs");
@@ -541,4 +541,4 @@ Status SyncSourceResolver::_finishCallback(const SyncSourceResolverResponse& res
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

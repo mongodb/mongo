@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 #include <set>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/views/durable_view_catalog.h"
-#include "mongo/db/views/view.h"
-#include "mongo/db/views/view_catalog.h"
-#include "mongo/db/views/view_graph.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/query_test_service_context.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/storage_interface_mock.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/views/durable_view_catalog.h"
+#include "merizo/db/views/view.h"
+#include "merizo/db/views/view_catalog.h"
+#include "merizo/db/views/view_graph.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 constexpr auto kLargeString =
@@ -579,4 +579,4 @@ TEST_F(ViewCatalogFixture, InvalidateThenReload) {
     ASSERT_EQ(2, durableViewCatalog->getIterateCount());
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

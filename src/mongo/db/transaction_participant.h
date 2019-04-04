@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,29 +33,29 @@
 #include <iostream>
 #include <map>
 
-#include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/multi_key_path_tracker.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/session.h"
-#include "mongo/db/session_catalog.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/single_transaction_stats.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/transaction_metrics_observer.h"
-#include "mongo/idl/mutable_observer_registry.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/commands/txn_cmds_gen.h"
+#include "merizo/db/concurrency/locker.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/multi_key_path_tracker.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/session.h"
+#include "merizo/db/session_catalog.h"
+#include "merizo/db/session_txn_record_gen.h"
+#include "merizo/db/single_transaction_stats.h"
+#include "merizo/db/storage/recovery_unit.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/transaction_metrics_observer.h"
+#include "merizo/idl/mutable_observer_registry.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/with_lock.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 
@@ -930,4 +930,4 @@ private:
     } _p;
 };
 
-}  // namespace mongo
+}  // namespace merizo

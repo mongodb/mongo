@@ -18,7 +18,7 @@
     // Build an array of malformed strings to test
     var malformedStrings = ["\u0000000", "\0,", "bl\0ah", "split_pct=30,\0split_pct=35,"];
 
-    // Start up a mongod.
+    // Start up a merizod.
     // Test that collection and index creation with malformed creation strings fail gracefully.
     runTest();
 
@@ -26,12 +26,12 @@
         var dbpath = MongoRunner.dataPath + 'wt_malformed_creation_string';
         resetDbpath(dbpath);
 
-        // Start a mongod
+        // Start a merizod
         var conn = MongoRunner.runMongod({
             dbpath: dbpath,
             noCleanData: true,
         });
-        assert.neq(null, conn, 'mongod was unable to start up');
+        assert.neq(null, conn, 'merizod was unable to start up');
 
         var testDB = conn.getDB('test');
 

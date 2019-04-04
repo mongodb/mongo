@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2019 MongoDB, Inc.
+# Public Domain 2014-2019 MerizoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -373,7 +373,7 @@ class WTBuildExt(setuptools.command.build_ext.build_ext):
 setup(
     name = 'wiredtiger',
     version = wt_full_ver,
-    author = 'The WiredTiger Development Team, part of MongoDB',
+    author = 'The WiredTiger Development Team, part of MerizoDB',
     author_email = 'info@wiredtiger.com',
     description = short_description,
     license='GPL2,GPL3,Commercial',

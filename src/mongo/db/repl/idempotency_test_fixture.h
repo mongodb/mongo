@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,20 +33,20 @@
 #include <ostream>
 #include <string>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobj_comparator_interface.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/sync_tail_test_fixture.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/uuid.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobj_comparator_interface.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/sync_tail_test_fixture.h"
+#include "merizo/util/duration.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 
 class Collection;
 
@@ -180,4 +180,4 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
     StmtId stmtId,
     boost::optional<OpTime> prevOpTime = boost::none);
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

@@ -8,7 +8,7 @@ var db = st.s.getDB("test");
 var coll = db.sharding_system_namespaces;
 
 // This test relies on the wiredTiger storage engine being compiled
-// into the server. Must check shard member for WT as it is not built into mongos.
+// into the server. Must check shard member for WT as it is not built into merizos.
 
 var storageEngines = st.shard0.getDB("local").serverBuildInfo().storageEngines;
 
@@ -49,6 +49,6 @@ if (Array.contains(storageEngines, "wiredTiger")) {
 
     checkCollectionOptions(anotherShard.getDB("test"));
 } else {
-    print("Skipping test. wiredTiger engine not supported by mongod binary.");
+    print("Skipping test. wiredTiger engine not supported by merizod binary.");
 }
 st.stop();

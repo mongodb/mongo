@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,17 +31,17 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/s/shard_id.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/logical_time.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/executor/remote_command_response.h"
+#include "merizo/s/shard_id.h"
 
-namespace mongo {
+namespace merizo {
 
 class BatchedCommandRequest;
 class BatchedCommandResponse;
@@ -320,4 +320,4 @@ private:
     const ShardId _id;
 };
 
-}  // namespace mongo
+}  // namespace merizo

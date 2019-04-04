@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/client/sasl_client_authenticate.h"
+#include "merizo/client/sasl_client_authenticate.h"
 
 #include <string>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
-using namespace mongoutils;
+using namespace merizoutils;
 
 Future<void> (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
                                        const HostAndPort& hostname,
@@ -73,4 +73,4 @@ Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType*
 
     return Status::OK();
 }
-}  // namespace mongo
+}  // namespace merizo

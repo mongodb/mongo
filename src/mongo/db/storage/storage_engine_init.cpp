@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/storage_engine_init.h"
+#include "merizo/db/storage/storage_engine_init.h"
 
 #include <map>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/storage_engine_lock_file.h"
-#include "mongo/db/storage/storage_engine_metadata.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/unclean_shutdown.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/concurrency/lock_state.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/storage/storage_engine_lock_file.h"
+#include "merizo/db/storage/storage_engine_metadata.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/storage/storage_repair_observer.h"
+#include "merizo/db/unclean_shutdown.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 /**
@@ -80,7 +80,7 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
         } else if (repairObserver->isIncomplete()) {
             severe()
                 << "An incomplete repair has been detected! This is likely because a repair "
-                   "operation unexpectedly failed before completing. MongoDB will not start up "
+                   "operation unexpectedly failed before completing. MerizoDB will not start up "
                    "again without --repair.";
             fassertFailedNoTrace(50922);
         }
@@ -95,7 +95,7 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
             log() << "**          removed in version 4.2. Please plan to migrate to the wiredTiger"
                   << startupWarningsLog;
             log() << "**          storage engine." << startupWarningsLog;
-            log() << "**          See http://dochub.mongodb.org/core/deprecated-mmapv1";
+            log() << "**          See http://dochub.merizodb.org/core/deprecated-mmapv1";
             log() << startupWarningsLog;
         }
 
@@ -124,12 +124,12 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
             storageGlobalParams.engine = *existingStorageEngine;
         }
     } else if (!storageGlobalParams.engineSetByUser) {
-        // Ensure the default storage engine is available with this build of mongod.
+        // Ensure the default storage engine is available with this build of merizod.
         uassert(28663,
                 str::stream()
                     << "Cannot start server. The default storage engine '"
                     << storageGlobalParams.engine
-                    << "' is not available with this build of mongod. Please specify a different"
+                    << "' is not available with this build of merizod. Please specify a different"
                     << " storage engine explicitly, e.g. --storageEngine=mmapv1.",
                 isRegisteredStorageEngine(service, storageGlobalParams.engine));
     } else if (storageGlobalParams.engineSetByUser && storageGlobalParams.engine == "mmapv1") {
@@ -140,7 +140,7 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
               << startupWarningsLog;
         log() << "**          storage engine has been deprecated and will be removed in"
               << startupWarningsLog;
-        log() << "**          version 4.2. See http://dochub.mongodb.org/core/deprecated-mmapv1";
+        log() << "**          version 4.2. See http://dochub.merizodb.org/core/deprecated-mmapv1";
         log() << startupWarningsLog;
     }
 
@@ -289,7 +289,7 @@ Status validateStorageOptions(
     while (storageIt.more()) {
         BSONElement storageElement = storageIt.next();
         StringData storageEngineName = storageElement.fieldNameStringData();
-        if (storageElement.type() != mongo::Object) {
+        if (storageElement.type() != merizo::Object) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "'storageEngine." << storageElement.fieldNameStringData()
                                         << "' has to be an embedded document.");
@@ -360,4 +360,4 @@ ServiceContext::ConstructorActionRegisterer registerStorageClientObserverConstru
     }};
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

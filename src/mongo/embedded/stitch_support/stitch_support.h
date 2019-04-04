@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -340,14 +340,14 @@ typedef struct stitch_support_v1_projection stitch_support_v1_projection;
 /**
  * Creates a stitch_support_v1_projection object, which is used to apply a projection to a BSON
  * document. The projection specification is also represented as a BSON document, which is passed in
- * the 'specBSON' argument. The syntax used for projection is the same as a MongoDB "find" command
+ * the 'specBSON' argument. The syntax used for projection is the same as a MerizoDB "find" command
  * (i.e., not an aggregation $project stage).
  *
  * This function will fail if the projection specification is invalid, returning NULL and populating
  * 'status' with information about the error.
  *
  * If the projection specification includes a positional ($) operator, then the caller must pass a
- * mongo_embedded_v1_matcher. The 'matcher' argument is unnecessary if the specification has no
+ * merizo_embedded_v1_matcher. The 'matcher' argument is unnecessary if the specification has no
  * positional operator and it can be NULL.
  *
  * The 'collator' argument, a pointer to a stitch_support_v1_collator, will cause the projection to

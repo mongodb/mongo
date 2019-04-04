@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,58 +27,58 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/commands/mr.h"
+#include "merizo/db/commands/mr.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/client/connpool.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/parallel.h"
-#include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/client/connpool.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/index_key_validate.h"
+#include "merizo/db/client.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index_builds_coordinator.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/ops/insert.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/collection_sharding_runtime.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/parallel.h"
+#include "merizo/s/client/shard_connection.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::set;
 using std::shared_ptr;
@@ -89,7 +89,7 @@ using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 namespace mr {
 namespace {
@@ -583,8 +583,8 @@ void State::prepTempCollection() {
         CollectionOptions options = finalOptions;
         options.temp = true;
 
-        // If a UUID for the final output collection was sent by mongos (i.e., the final output
-        // collection is sharded), use the UUID mongos sent when creating the temp collection.
+        // If a UUID for the final output collection was sent by merizos (i.e., the final output
+        // collection is sharded), use the UUID merizos sent when creating the temp collection.
         // When the temp collection is renamed to the final output collection, the UUID will be
         // preserved.
         options.uuid.emplace(_config.finalOutputCollUUID ? *_config.finalOutputCollUUID
@@ -1390,8 +1390,8 @@ public:
 
     std::string help() const override {
         return "Run a map/reduce operation on the server.\n"
-               "Note this is used for aggregation, not querying, in MongoDB.\n"
-               "http://dochub.mongodb.org/core/mapreduce";
+               "Note this is used for aggregation, not querying, in MerizoDB.\n"
+               "http://dochub.merizodb.org/core/mapreduce";
     }
 
 
@@ -1857,4 +1857,4 @@ public:
 } mapReduceFinishCommand;
 
 }  // namespace mr
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/fts/fts_spec.h"
+#include "merizo/db/fts/fts_spec.h"
 
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/fts/fts_element_iterator.h"
-#include "mongo/db/fts/fts_tokenizer.h"
-#include "mongo/db/fts/fts_util.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/fts/fts_element_iterator.h"
+#include "merizo/db/fts/fts_tokenizer.h"
+#include "merizo/db/fts/fts_util.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace fts {
 
 using std::map;
 using std::string;
-using namespace mongoutils;
-namespace dps = ::mongo::dotted_path_support;
+using namespace merizoutils;
+namespace dps = ::merizo::dotted_path_support;
 
 const double DEFAULT_WEIGHT = 1;
 const double MAX_WEIGHT = 1000000000;
@@ -106,11 +106,11 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
     auto swl = FTSLanguage::make(indexLanguage, _textIndexVersion);
 
     // This can fail if the user originally created the text index under an instance of
-    // MongoDB that supports different languages then the current instance
+    // MerizoDB that supports different languages then the current instance
     // TODO: consder propagating the index ns to here to improve the error message
     uassert(28682,
             str::stream() << "Unrecognized language " << indexLanguage
-                          << " found for text index. Verify mongod was started with the"
+                          << " found for text index. Verify merizod was started with the"
                              " correct options.",
             swl.getStatus().isOK());
     _defaultLanguage = swl.getValue();
@@ -168,7 +168,7 @@ const FTSLanguage* FTSSpec::_getLanguageToUseV2(const BSONObj& userDoc,
     }
     uassert(17261,
             "found language override field in document with non-string type",
-            e.type() == mongo::String);
+            e.type() == merizo::String);
     StatusWithFTSLanguage swl = FTSLanguage::make(e.String(), getTextIndexVersion());
     uassert(17262, "language override unsupported: " + e.String(), swl.getStatus().isOK());
     return swl.getValue();

@@ -185,7 +185,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq(res.raw[st.shard0.host].ok, 0, tojson(res));
     assert.eq(res.code, res.raw[st.shard0.host].code, tojson(res));
     assert.eq(res.codeName, res.raw[st.shard0.host].codeName, tojson(res));
-    // We might see 'HostUnreachable' the first time if the mongos's ReplicaSetMonitor does not yet
+    // We might see 'HostUnreachable' the first time if the merizos's ReplicaSetMonitor does not yet
     // know that the shard is down.
     assert(res.code === ErrorCodes.HostUnreachable ||
                res.code === ErrorCodes.FailedToSatisfyReadPreference,
@@ -203,7 +203,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq(res.code, res.raw[st.shard0.host].code, tojson(res));
     assert.eq(res.codeName, res.raw[st.shard0.host].codeName, tojson(res));
     // We can expect to see 'FailedToSatisfyReadPreference' this time, because after the previous
-    // createIndexes attempt, mongos's ReplicaSetMonitor should have been updated.
+    // createIndexes attempt, merizos's ReplicaSetMonitor should have been updated.
     assert.eq(res.code, ErrorCodes.FailedToSatisfyReadPreference, tojson(res));
     assert.eq("FailedToSatisfyReadPreference", res.codeName, tojson(res));
     assert.neq(null, res.errmsg, tojson(res));

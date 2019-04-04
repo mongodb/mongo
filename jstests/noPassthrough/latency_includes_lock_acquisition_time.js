@@ -31,7 +31,7 @@
     let padding = hangMillis / 10;
 
     let conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
     let testDB = conn.getDB("test");
     let testColl = testDB.lock_acquisition_time;
 

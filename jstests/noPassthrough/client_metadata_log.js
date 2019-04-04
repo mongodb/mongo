@@ -24,7 +24,7 @@
     // Test MongoD
     let testMongoD = function() {
         let conn = MongoRunner.runMongod({useLogFiles: true});
-        assert.neq(null, conn, 'mongod was unable to start up');
+        assert.neq(null, conn, 'merizod was unable to start up');
 
         checkLog(conn);
 
@@ -34,29 +34,29 @@
     // Test MongoS
     let testMongoS = function() {
         let options = {
-            mongosOptions: {useLogFiles: true},
+            merizosOptions: {useLogFiles: true},
         };
 
-        let st = new ShardingTest({shards: 1, mongos: 1, other: options});
+        let st = new ShardingTest({shards: 1, merizos: 1, other: options});
 
         checkLog(st.s0);
 
-        // Validate db.currentOp() contains mongos information
+        // Validate db.currentOp() contains merizos information
         let curOp = st.s0.adminCommand({currentOp: 1});
         print(tojson(curOp));
 
         var inprogSample = null;
         for (let inprog of curOp.inprog) {
             if (inprog.hasOwnProperty("clientMetadata") &&
-                inprog.clientMetadata.hasOwnProperty("mongos")) {
+                inprog.clientMetadata.hasOwnProperty("merizos")) {
                 inprogSample = inprog;
                 break;
             }
         }
 
-        assert.neq(inprogSample.clientMetadata.mongos.host, "unknown");
-        assert.neq(inprogSample.clientMetadata.mongos.client, "unknown");
-        assert.neq(inprogSample.clientMetadata.mongos.version, "unknown");
+        assert.neq(inprogSample.clientMetadata.merizos.host, "unknown");
+        assert.neq(inprogSample.clientMetadata.merizos.client, "unknown");
+        assert.neq(inprogSample.clientMetadata.merizos.version, "unknown");
 
         st.stop();
     };

@@ -82,7 +82,7 @@
     jsTest.log("Test completed with " + numAborted + " aborted transactions in " + elapsedTime +
                " ms");
 
-    // Check whether we should expect aborts. If the parameter doesn't exist (mongos) don't check.
+    // Check whether we should expect aborts. If the parameter doesn't exist (merizos) don't check.
     const getParamRes = db.adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1});
     if (getParamRes.ok && elapsedTime < getParamRes.transactionLifetimeLimitSeconds)
         assert.eq(numAborted,

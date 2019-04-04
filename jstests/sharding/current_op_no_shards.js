@@ -1,6 +1,6 @@
 /**
  * Test that running a $currentOp aggregation on a cluster with no shards returns an empty result
- * set, and does not cause the mongoS floating point failure described in SERVER-30084.
+ * set, and does not cause the merizoS floating point failure described in SERVER-30084.
  */
 (function() {
     const st = new ShardingTest({shards: 0, config: 1});

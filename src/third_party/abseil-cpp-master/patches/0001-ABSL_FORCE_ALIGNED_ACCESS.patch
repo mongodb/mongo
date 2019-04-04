@@ -1,5 +1,5 @@
 From 1596d50ad9770171539f1e07643bf1fd401a8872 Mon Sep 17 00:00:00 2001
-From: Billy Donahue <billy.donahue@mongodb.com>
+From: Billy Donahue <billy.donahue@merizodb.com>
 Date: Wed, 19 Dec 2018 11:16:51 -0500
 Subject: [PATCH] ABSL_FORCE_ALIGNED_ACCESS
 

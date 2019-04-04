@@ -6,7 +6,7 @@
     "use strict";
 
     startParallelShell = function(jsCode, port, noConnect) {
-        throw new Error("Cowardly fail if startParallelShell is run with a mongod that had" +
+        throw new Error("Cowardly fail if startParallelShell is run with a merizod that had" +
                         " an unclean shutdown.");
     };
 })();

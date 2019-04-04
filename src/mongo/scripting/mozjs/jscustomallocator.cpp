@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <cstddef>
 #include <jscustomallocator.h>
 #include <type_traits>
 
-#include "mongo/config.h"
-#include "mongo/scripting/mozjs/implscope.h"
+#include "merizo/config.h"
+#include "merizo/scripting/mozjs/implscope.h"
 
 #ifdef __linux__
 #include <malloc.h>
@@ -52,7 +52,7 @@
 
 /**
  * This shim interface (which controls dynamic allocation within SpiderMonkey),
- * consciously uses std::malloc and friends over mongoMalloc. It does this
+ * consciously uses std::malloc and friends over merizoMalloc. It does this
  * because SpiderMonkey has some plausible options in the event of OOM,
  * specifically it can begin aggressive garbage collection. It would also be
  * reasonable to go the other route and fail, but for the moment I erred on the
@@ -63,7 +63,7 @@
  * waiting for the OS to OOM us.
  */
 
-namespace mongo {
+namespace merizo {
 namespace sm {
 
 namespace {
@@ -117,7 +117,7 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
     size_t tb = get_total_bytes();
 
     if (mb && (tb + bytes > mb)) {
-        auto scope = mongo::mozjs::MozJSImplScope::getThreadScope();
+        auto scope = merizo::mozjs::MozJSImplScope::getThreadScope();
         if (scope)
             scope->setOOM();
 
@@ -138,7 +138,7 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
 
 #if __has_feature(address_sanitizer)
     {
-        auto handles = mongo::mozjs::MozJSImplScope::ASANHandles::getThreadASANHandles();
+        auto handles = merizo::mozjs::MozJSImplScope::ASANHandles::getThreadASANHandles();
 
         if (handles) {
             if (bytes) {
@@ -194,20 +194,20 @@ size_t get_current(void* ptr) {
 }
 
 }  // namespace sm
-}  // namespace mongo
+}  // namespace merizo
 
 void* js_malloc(size_t bytes) {
-    return mongo::sm::wrap_alloc(
+    return merizo::sm::wrap_alloc(
         [](void* ptr, size_t b) { return std::malloc(b); }, nullptr, bytes);
 }
 
 void* js_calloc(size_t bytes) {
-    return mongo::sm::wrap_alloc(
+    return merizo::sm::wrap_alloc(
         [](void* ptr, size_t b) { return std::calloc(b, 1); }, nullptr, bytes);
 }
 
 void* js_calloc(size_t nmemb, size_t size) {
-    return mongo::sm::wrap_alloc(
+    return merizo::sm::wrap_alloc(
         [](void* ptr, size_t b) { return std::calloc(b, 1); }, nullptr, nmemb * size);
 }
 
@@ -215,14 +215,14 @@ void js_free(void* p) {
     if (!p)
         return;
 
-    size_t current = mongo::sm::get_current(p);
-    size_t tb = mongo::sm::get_total_bytes();
+    size_t current = merizo::sm::get_current(p);
+    size_t tb = merizo::sm::get_total_bytes();
 
     if (tb >= current) {
-        mongo::sm::total_bytes = tb - current;
+        merizo::sm::total_bytes = tb - current;
     }
 
-    mongo::sm::wrap_alloc(
+    merizo::sm::wrap_alloc(
         [](void* ptr, size_t b) {
             std::free(ptr);
             return nullptr;
@@ -241,19 +241,19 @@ void* js_realloc(void* p, size_t bytes) {
         return nullptr;
     }
 
-    size_t current = mongo::sm::get_current(p);
+    size_t current = merizo::sm::get_current(p);
 
     if (current >= bytes) {
         return p;
     }
 
-    size_t tb = mongo::sm::total_bytes;
+    size_t tb = merizo::sm::total_bytes;
 
     if (tb >= current) {
-        mongo::sm::total_bytes = tb - current;
+        merizo::sm::total_bytes = tb - current;
     }
 
-    return mongo::sm::wrap_alloc(
+    return merizo::sm::wrap_alloc(
         [](void* ptr, size_t b) { return std::realloc(ptr, b); }, p, bytes);
 }
 

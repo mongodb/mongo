@@ -115,13 +115,13 @@ def main():
 
     device_options.add_option(
         "--dbDir", dest="db_dir",
-        help=("The remote dbpath directory used by mongoebench."
+        help=("The remote dbpath directory used by merizoebench."
               " Will be created if it does not exist. Defaults to '%default'."),
         default=posixpath.join(benchrun_root, "db"))
 
     device_options.add_option(
         "--resultsDir", dest="results_dir",
-        help=("The remote directory to store the mongoebench results."
+        help=("The remote directory to store the merizoebench results."
               " Will be created if it does not exist. Defaults to '%default'."),
         default=posixpath.join(benchrun_root, "results"))
 
@@ -135,10 +135,10 @@ def main():
                               " Defaults to '%default'.", default=posixpath.join(
                                   benchrun_root, "testcases"))
 
-    sdk_url = "https://s3.amazonaws.com/mciuploads/mongodb-mongo-master/embedded-sdk-test/embedded-sdk-android-arm64-latest.tgz"
+    sdk_url = "https://s3.amazonaws.com/mciuploads/merizodb-merizo-master/embedded-sdk-test/embedded-sdk-android-arm64-latest.tgz"
     sdk_options.add_option(
         "--sdkUrl", dest="sdk_url",
-        help=("The embedded SDK test URL. This tarball must contain mongoebench and"
+        help=("The embedded SDK test URL. This tarball must contain merizoebench and"
               " any required shared object (.so) libraries. Defaults to '%default'."),
         default=sdk_url)
 
@@ -152,7 +152,7 @@ def main():
               " Only used if the embedded SDK tarball is downloaded. Note - this will delete"
               " the existing directory."), default=None)
 
-    json_url = "https://s3.amazonaws.com/mciuploads/mongodb-mongo-master/benchrun_embedded/benchrun_json_files.tgz"
+    json_url = "https://s3.amazonaws.com/mciuploads/merizodb-merizo-master/benchrun_embedded/benchrun_json_files.tgz"
     json_options.add_option(
         "--benchrunJsonUrl", dest="json_url",
         help=("The benchrun JSON files URL. This tarball must contain all the JSON"

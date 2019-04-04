@@ -1,20 +1,20 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongorestore
+package merizorestore
 
-// Usage describes basic usage of mongorestore
+// Usage describes basic usage of merizorestore
 var Usage = `<options> <directory or file to restore>
 
-Restore backups generated with mongodump to a running server.
+Restore backups generated with merizodump to a running server.
 
 Specify a database with -d to restore a single database from the target directory,
 or use -d and -c to restore a single collection from a single .bson file.
 
-See http://docs.mongodb.org/manual/reference/program/mongorestore/ for more information.`
+See http://docs.merizodb.org/manual/reference/program/merizorestore/ for more information.`
 
 // InputOptions defines the set of options to use in configuring the restore process.
 type InputOptions struct {
@@ -38,7 +38,7 @@ type OutputOptions struct {
 	Drop   bool `long:"drop" description:"drop each collection before import"`
 	DryRun bool `long:"dryRun" description:"view summary without importing anything. recommended with verbosity"`
 
-	// By default mongorestore uses a write concern of 'majority'.
+	// By default merizorestore uses a write concern of 'majority'.
 	// Cannot be used simultaneously with write concern options in a URI.
 	WriteConcern             string `long:"writeConcern" value-name:"<write-concern>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
 	NoIndexRestore           bool   `long:"noIndexRestore" description:"don't restore indexes"`

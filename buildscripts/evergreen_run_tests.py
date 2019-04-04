@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Command line utility for executing MongoDB tests in Evergreen."""
+"""Command line utility for executing MerizoDB tests in Evergreen."""
 
 from __future__ import absolute_import
 

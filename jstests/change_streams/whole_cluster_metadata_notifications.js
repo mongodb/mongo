@@ -141,7 +141,7 @@
 
             collToInvalidate = testDB[collName];
 
-            // Test renaming a collection to a different database. Do not run this in the mongos
+            // Test renaming a collection to a different database. Do not run this in the merizos
             // passthrough suites since we cannot guarantee the primary shard of the target database
             // and renameCollection requires the source and destination to be on the same shard.
             if (!FixtureHelpers.isMongos(testDB)) {

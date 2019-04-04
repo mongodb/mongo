@@ -4,16 +4,16 @@
 // ]
 // Legacy write mode test also available at jstests/gle.
 
-var mongo = new Mongo(db.getMongo().host);
+var merizo = new Mongo(db.getMongo().host);
 
-var newdb = mongo.getDB(db.toString());
+var newdb = merizo.getDB(db.toString());
 
 var t = newdb.opcounters;
 var opCounters;
 var res;
 
 //
-// Count ops attempted in write commands in mongod and mongos
+// Count ops attempted in write commands in merizod and merizos
 //
 
 //

@@ -6,7 +6,7 @@ var RetryableWritesUtil = (function() {
      * Returns true if the error code is retryable, assuming the command is idempotent.
      *
      * TODO SERVER-34666: Expose the isRetryableCode() function that's defined in
-     * src/mongo/shell/session.js and use it here.
+     * src/merizo/shell/session.js and use it here.
      */
     function isRetryableCode(code) {
         return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotMasterError(code) ||

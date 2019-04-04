@@ -24,18 +24,18 @@
 
         if (commandName === "count" && (!commandObjUnwrapped.hasOwnProperty("query") ||
                                         Object.keys(commandObjUnwrapped["query"]).length === 0)) {
-            throw new Error("Cowardly fail if fastcount is run with a mongod that had an unclean" +
+            throw new Error("Cowardly fail if fastcount is run with a merizod that had an unclean" +
                             " shutdown: " + tojson(commandObjUnwrapped));
         }
 
         if (commandName === "dataSize" && !commandObjUnwrapped.hasOwnProperty("min") &&
             !commandObjUnwrapped.hasOwnProperty("max")) {
-            throw new Error("Cowardly fail if unbounded dataSize is run with a mongod that had an" +
+            throw new Error("Cowardly fail if unbounded dataSize is run with a merizod that had an" +
                             " unclean shutdown: " + tojson(commandObjUnwrapped));
         }
 
         if (commandName === "collStats" || commandName === "dbStats") {
-            throw new Error("Cowardly fail if " + commandName + " is run with a mongod that had" +
+            throw new Error("Cowardly fail if " + commandName + " is run with a merizod that had" +
                             " an unclean shutdown: " + tojson(commandObjUnwrapped));
         }
 

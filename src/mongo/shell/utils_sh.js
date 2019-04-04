@@ -5,7 +5,7 @@ sh = function() {
 sh._checkMongos = function() {
     var x = db.runCommand("ismaster");
     if (x.msg != "isdbgrid")
-        throw Error("not connected to a mongos");
+        throw Error("not connected to a merizos");
 };
 
 sh._checkFullName = function(fullName) {
@@ -67,7 +67,7 @@ sh.help = function() {
     print("\tsh.enableSharding(dbname)                 enables sharding on the database dbname");
     print("\tsh.getBalancerState()                     returns whether the balancer is enabled");
     print(
-        "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos");
+        "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any merizos");
     print(
         "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
     print("\tsh.removeShardFromZone(shard,zone)      removes the shard from zone");
@@ -205,7 +205,7 @@ sh.getShouldAutoSplit = function(configDB) {
 
 sh.waitForPingChange = function(activePings, timeout, interval) {
     var isPingChanged = function(activePing) {
-        var newPing = sh._getConfigDB().mongos.findOne({_id: activePing._id});
+        var newPing = sh._getConfigDB().merizos.findOne({_id: activePing._id});
         return !newPing || newPing.ping + "" != activePing.ping + "";
     };
 
@@ -289,7 +289,7 @@ sh.enableBalancing = function(coll) {
 
 /*
  * Can call _lastMigration( coll ), _lastMigration( db ), _lastMigration( st ), _lastMigration(
- * mongos )
+ * merizos )
  */
 sh._lastMigration = function(ns) {
 
@@ -543,7 +543,7 @@ function printShardingStatus(configDB, verbose) {
     var version = configDB.getCollection("version").findOne();
     if (version == null) {
         print(
-            "printShardingStatus: this db does not have sharding enabled. be sure you are connecting to a mongos from the shell and not to a mongod.");
+            "printShardingStatus: this db does not have sharding enabled. be sure you are connecting to a merizos from the shell and not to a merizod.");
         return;
     }
 
@@ -559,22 +559,22 @@ function printShardingStatus(configDB, verbose) {
         output(2, tojsononeline(z));
     });
 
-    // (most recently) active mongoses
-    var mongosActiveThresholdMs = 60000;
-    var mostRecentMongos = configDB.mongos.find().sort({ping: -1}).limit(1);
+    // (most recently) active merizoses
+    var merizosActiveThresholdMs = 60000;
+    var mostRecentMongos = configDB.merizos.find().sort({ping: -1}).limit(1);
     var mostRecentMongosTime = null;
-    var mongosAdjective = "most recently active";
+    var merizosAdjective = "most recently active";
     if (mostRecentMongos.hasNext()) {
         mostRecentMongosTime = mostRecentMongos.next().ping;
         // Mongoses older than the threshold are the most recent, but cannot be
-        // considered "active" mongoses. (This is more likely to be an old(er)
-        // configdb dump, or all the mongoses have been stopped.)
-        if (mostRecentMongosTime.getTime() >= Date.now() - mongosActiveThresholdMs) {
-            mongosAdjective = "active";
+        // considered "active" merizoses. (This is more likely to be an old(er)
+        // configdb dump, or all the merizoses have been stopped.)
+        if (mostRecentMongosTime.getTime() >= Date.now() - merizosActiveThresholdMs) {
+            merizosAdjective = "active";
         }
     }
 
-    output(1, mongosAdjective + " mongoses:");
+    output(1, merizosAdjective + " merizoses:");
     if (mostRecentMongosTime === null) {
         output(2, "none");
     } else {
@@ -582,21 +582,21 @@ function printShardingStatus(configDB, verbose) {
             ping: {
                 $gt: (function() {
                     var d = mostRecentMongosTime;
-                    d.setTime(d.getTime() - mongosActiveThresholdMs);
+                    d.setTime(d.getTime() - merizosActiveThresholdMs);
                     return d;
                 })()
             }
         };
 
         if (verbose) {
-            configDB.mongos.find(recentMongosQuery).sort({ping: -1}).forEach(function(z) {
+            configDB.merizos.find(recentMongosQuery).sort({ping: -1}).forEach(function(z) {
                 output(2, tojsononeline(z));
             });
         } else {
-            configDB.mongos
+            configDB.merizos
                 .aggregate([
                     {$match: recentMongosQuery},
-                    {$group: {_id: "$mongoVersion", num: {$sum: 1}}},
+                    {$group: {_id: "$merizoVersion", num: {$sum: 1}}},
                     {$sort: {num: -1}}
                 ])
                 .forEach(function(z) {

@@ -36,7 +36,7 @@ from buildscripts.client import evergreen as evergreen_client
 # pylint: enable=wrong-import-position
 
 API_REST_PREFIX = "/rest/v1/"
-API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
+API_SERVER_DEFAULT = "https://evergreen.merizodb.com"
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
 # The executor_file and suite_files defaults are required to make the suite resolver work
@@ -148,8 +148,8 @@ def validate_options(parser, options):
 def find_last_activated_task(revisions, variant, branch_name):
     """Get the git hash of the most recently activated build before this one."""
 
-    project = "mongodb-mongo-" + branch_name
-    build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace("-", "_")
+    project = "merizodb-merizo-" + branch_name
+    build_prefix = "merizodb_merizo_" + branch_name + "_" + variant.replace("-", "_")
 
     evg_cfg = evergreen_client.read_evg_config()
     if evg_cfg is not None and "api_server_host" in evg_cfg:

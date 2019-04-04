@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -36,18 +36,18 @@
 #include <boost/filesystem/path.hpp>
 #include <wiredtiger.h>
 
-#include "mongo/bson/ordering.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/elapsed_tracker.h"
+#include "merizo/bson/ordering.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/storage/kv/kv_engine.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/elapsed_tracker.h"
 
-namespace mongo {
+namespace merizo {
 
 class ClockSource;
 class JournalListener;
@@ -267,7 +267,7 @@ public:
      * An oplog manager is always accessible, but this method will start the background thread to
      * control oplog entry visibility for reads.
      *
-     * On mongod, the background thread will be started when the first oplog record store is
+     * On merizod, the background thread will be started when the first oplog record store is
      * created, and stopped when the last oplog record store is destroyed, at shutdown time. For
      * unit tests, the background thread may be started and stopped multiple times as tests create
      * and destroy oplog record stores.
@@ -324,7 +324,7 @@ public:
     /**
      * Returns the minimum possible Timestamp value in the oplog that replication may need for
      * recovery in the event of a rollback. This value depends on the timestamp passed to
-     * `setStableTimestamp` and on the set of active MongoDB transactions. Returns an error if it
+     * `setStableTimestamp` and on the set of active MerizoDB transactions. Returns an error if it
      * times out querying the active transctions.
      */
     StatusWith<Timestamp> getOplogNeededForRollback() const;

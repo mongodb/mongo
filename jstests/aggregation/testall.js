@@ -396,7 +396,7 @@
     testDB.p11.drop();
     testDB.p11.save({
         _id: 5,
-        name: 'MongoDB',
+        name: 'MerizoDB',
         items: {authors: ['jay', 'vivek', 'bjornar'], dbg: [17, 42]},
         favorites: ['pickles', 'ice cream', 'kettle chips']
     });
@@ -413,9 +413,9 @@
     });
 
     let p11result = [
-        {"_id": 5, "name": "MongoDB", "author": "bjornar"},
-        {"_id": 5, "name": "MongoDB", "author": "jay"},
-        {"_id": 5, "name": "MongoDB", "author": "vivek"},
+        {"_id": 5, "name": "MerizoDB", "author": "bjornar"},
+        {"_id": 5, "name": "MerizoDB", "author": "jay"},
+        {"_id": 5, "name": "MerizoDB", "author": "vivek"},
     ];
 
     assert.docEq(p11.cursor.firstBatch, p11result, 'p11 failed');

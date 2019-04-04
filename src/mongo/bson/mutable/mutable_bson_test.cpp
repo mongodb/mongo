@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/mutable/document.h"
+#include "merizo/bson/mutable/document.h"
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/damage_vector.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/damage_vector.h"
+#include "merizo/bson/mutable/mutable_bson_test_utils.h"
+#include "merizo/db/json.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
 
 namespace {
 
-using namespace mongo;
-namespace mmb = mongo::mutablebson;
+using namespace merizo;
+namespace mmb = merizo::mutablebson;
 
 TEST(TopologyBuilding, TopDownFromScratch) {
     /*
@@ -70,11 +70,11 @@ TEST(TopologyBuilding, TopDownFromScratch) {
     mmb::Element e4 = doc.makeElementObject("e4");
     mmb::Element e5 = doc.makeElementObject("e5");
 
-    ASSERT_EQUALS(e0.pushBack(e1), mongo::Status::OK());
-    ASSERT_EQUALS(e0.pushBack(e2), mongo::Status::OK());
-    ASSERT_EQUALS(e2.pushBack(e3), mongo::Status::OK());
-    ASSERT_EQUALS(e3.pushBack(e4), mongo::Status::OK());
-    ASSERT_EQUALS(e3.pushBack(e5), mongo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e1), merizo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e2), merizo::Status::OK());
+    ASSERT_EQUALS(e2.pushBack(e3), merizo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e4), merizo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e5), merizo::Status::OK());
 
     ASSERT_EQUALS("e0", e0.getFieldName());
     ASSERT_EQUALS("e1", e0.leftChild().getFieldName());
@@ -114,10 +114,10 @@ TEST(TopologyBuilding, AddSiblingAfter) {
     mmb::Element e3 = doc.makeElementObject("e3");
     mmb::Element e4 = doc.makeElementObject("e4");
 
-    ASSERT_EQUALS(e0.pushBack(e1), mongo::Status::OK());
-    ASSERT_EQUALS(e0.pushBack(e2), mongo::Status::OK());
-    ASSERT_EQUALS(e2.pushBack(e3), mongo::Status::OK());
-    ASSERT_EQUALS(e3.addSiblingRight(e4), mongo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e1), merizo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e2), merizo::Status::OK());
+    ASSERT_EQUALS(e2.pushBack(e3), merizo::Status::OK());
+    ASSERT_EQUALS(e3.addSiblingRight(e4), merizo::Status::OK());
 
     ASSERT_EQUALS("e4", e3.rightSibling().getFieldName());
     ASSERT_EQUALS("e3", e4.leftSibling().getFieldName());
@@ -146,11 +146,11 @@ TEST(TopologyBuilding, AddSiblingBefore) {
     mmb::Element e6 = doc.makeElementObject("e6");
     mmb::Element e7 = doc.makeElementObject("e7");
 
-    ASSERT_EQUALS(e2.pushBack(e3), mongo::Status::OK());
-    ASSERT_EQUALS(e2.pushBack(e4), mongo::Status::OK());
-    ASSERT_EQUALS(e3.pushBack(e5), mongo::Status::OK());
-    ASSERT_EQUALS(e5.addSiblingRight(e6), mongo::Status::OK());
-    ASSERT_EQUALS(e5.addSiblingLeft(e7), mongo::Status::OK());
+    ASSERT_EQUALS(e2.pushBack(e3), merizo::Status::OK());
+    ASSERT_EQUALS(e2.pushBack(e4), merizo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e5), merizo::Status::OK());
+    ASSERT_EQUALS(e5.addSiblingRight(e6), merizo::Status::OK());
+    ASSERT_EQUALS(e5.addSiblingLeft(e7), merizo::Status::OK());
 
     ASSERT_EQUALS("e5", e7.rightSibling().getFieldName());
     ASSERT_EQUALS("e7", e5.leftSibling().getFieldName());
@@ -187,12 +187,12 @@ TEST(TopologyBuilding, AddSubtreeBottomUp) {
     mmb::Element e9 = doc.makeElementObject("e9");
     mmb::Element e10 = doc.makeElementObject("e10");
 
-    ASSERT_EQUALS(e3.pushBack(e4), mongo::Status::OK());
-    ASSERT_EQUALS(e3.pushBack(e5), mongo::Status::OK());
-    ASSERT_EQUALS(e3.pushBack(e6), mongo::Status::OK());
-    ASSERT_EQUALS(e8.pushBack(e9), mongo::Status::OK());
-    ASSERT_EQUALS(e8.pushBack(e10), mongo::Status::OK());
-    ASSERT_EQUALS(e5.pushBack(e8), mongo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e4), merizo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e5), merizo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e6), merizo::Status::OK());
+    ASSERT_EQUALS(e8.pushBack(e9), merizo::Status::OK());
+    ASSERT_EQUALS(e8.pushBack(e10), merizo::Status::OK());
+    ASSERT_EQUALS(e5.pushBack(e8), merizo::Status::OK());
 
     ASSERT_EQUALS("e8", e9.parent().getFieldName());
     ASSERT_EQUALS("e8", e10.parent().getFieldName());
@@ -218,9 +218,9 @@ TEST(TopologyBuilding, RemoveLeafNode) {
     mmb::Element e1 = doc.makeElementObject("e1");
     mmb::Element e2 = doc.makeElementObject("e2");
 
-    ASSERT_EQUALS(e0.pushBack(e1), mongo::Status::OK());
-    ASSERT_EQUALS(e0.pushBack(e2), mongo::Status::OK());
-    ASSERT_EQUALS(e1.remove(), mongo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e1), merizo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e2), merizo::Status::OK());
+    ASSERT_EQUALS(e1.remove(), merizo::Status::OK());
 
     ASSERT_EQUALS("e2", e0.leftChild().getFieldName());
     ASSERT_EQUALS("e2", e0.rightChild().getFieldName());
@@ -249,14 +249,14 @@ TEST(TopologyBuilding, RemoveSubtree) {
     mmb::Element e9 = doc.makeElementObject("e9");
     mmb::Element e10 = doc.makeElementObject("e10");
 
-    ASSERT_EQUALS(e3.pushBack(e4), mongo::Status::OK());
-    ASSERT_EQUALS(e3.pushBack(e5), mongo::Status::OK());
-    ASSERT_EQUALS(e5.addSiblingRight(e6), mongo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e4), merizo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e5), merizo::Status::OK());
+    ASSERT_EQUALS(e5.addSiblingRight(e6), merizo::Status::OK());
 
-    ASSERT_EQUALS(e8.pushBack(e9), mongo::Status::OK());
-    ASSERT_EQUALS(e8.pushBack(e10), mongo::Status::OK());
-    ASSERT_EQUALS(e5.pushBack(e8), mongo::Status::OK());
-    ASSERT_EQUALS(e5.remove(), mongo::Status::OK());
+    ASSERT_EQUALS(e8.pushBack(e9), merizo::Status::OK());
+    ASSERT_EQUALS(e8.pushBack(e10), merizo::Status::OK());
+    ASSERT_EQUALS(e5.pushBack(e8), merizo::Status::OK());
+    ASSERT_EQUALS(e5.remove(), merizo::Status::OK());
 
     ASSERT_EQUALS("e3", e4.parent().getFieldName());
     ASSERT_EQUALS("e3", e6.parent().getFieldName());
@@ -279,9 +279,9 @@ TEST(TopologyBuilding, RenameNode) {
     mmb::Element e1 = doc.makeElementObject("e1");
     mmb::Element e2 = doc.makeElementObject("e2");
 
-    ASSERT_EQUALS(e0.pushBack(e1), mongo::Status::OK());
-    ASSERT_EQUALS(e0.pushBack(e2), mongo::Status::OK());
-    ASSERT_EQUALS(e0.rename("f0"), mongo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e1), merizo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e2), merizo::Status::OK());
+    ASSERT_EQUALS(e0.rename("f0"), merizo::Status::OK());
     ASSERT_EQUALS("f0", e0.getFieldName());
 }
 
@@ -308,11 +308,11 @@ TEST(TopologyBuilding, MoveNode) {
     mmb::Element e4 = doc.makeElementObject("e4");
     mmb::Element e5 = doc.makeElementObject("e5");
 
-    ASSERT_EQUALS(e0.pushBack(e1), mongo::Status::OK());
-    ASSERT_EQUALS(e0.pushBack(e2), mongo::Status::OK());
-    ASSERT_EQUALS(e2.pushBack(e3), mongo::Status::OK());
-    ASSERT_EQUALS(e3.pushBack(e4), mongo::Status::OK());
-    ASSERT_EQUALS(e3.pushBack(e5), mongo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e1), merizo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e2), merizo::Status::OK());
+    ASSERT_EQUALS(e2.pushBack(e3), merizo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e4), merizo::Status::OK());
+    ASSERT_EQUALS(e3.pushBack(e5), merizo::Status::OK());
 
     ASSERT_EQUALS("e0", e0.getFieldName());
     ASSERT_EQUALS("e1", e0.leftChild().getFieldName());
@@ -328,8 +328,8 @@ TEST(TopologyBuilding, MoveNode) {
     ASSERT_EQUALS("e5", e4.rightSibling().getFieldName());
     ASSERT_EQUALS("e4", e5.leftSibling().getFieldName());
 
-    ASSERT_EQUALS(e3.remove(), mongo::Status::OK());
-    ASSERT_EQUALS(e0.pushBack(e3), mongo::Status::OK());
+    ASSERT_EQUALS(e3.remove(), merizo::Status::OK());
+    ASSERT_EQUALS(e0.pushBack(e3), merizo::Status::OK());
 
     ASSERT_EQUALS("e0", e3.parent().getFieldName());
     ASSERT_EQUALS("e1", e0.leftChild().getFieldName());
@@ -484,12 +484,12 @@ TEST(ArrayAPI, SimpleNumericArray) {
     mmb::Element e7 = doc.makeElementInt("", 0);
     ASSERT_EQUALS(0, e7.getValueInt());
 
-    ASSERT_EQUALS(e1.pushBack(e2), mongo::Status::OK());
-    ASSERT_EQUALS(e1.pushBack(e3), mongo::Status::OK());
-    ASSERT_EQUALS(e1.pushBack(e4), mongo::Status::OK());
-    ASSERT_EQUALS(e1.pushBack(e5), mongo::Status::OK());
-    ASSERT_EQUALS(e1.pushFront(e6), mongo::Status::OK());
-    ASSERT_EQUALS(e1.pushFront(e7), mongo::Status::OK());
+    ASSERT_EQUALS(e1.pushBack(e2), merizo::Status::OK());
+    ASSERT_EQUALS(e1.pushBack(e3), merizo::Status::OK());
+    ASSERT_EQUALS(e1.pushBack(e4), merizo::Status::OK());
+    ASSERT_EQUALS(e1.pushBack(e5), merizo::Status::OK());
+    ASSERT_EQUALS(e1.pushFront(e6), merizo::Status::OK());
+    ASSERT_EQUALS(e1.pushFront(e7), merizo::Status::OK());
 
     ASSERT_EQUALS(size_t(6), mmb::countChildren(e1));
     ASSERT_EQUALS(0, e1[0].getValueInt());
@@ -499,7 +499,7 @@ TEST(ArrayAPI, SimpleNumericArray) {
     ASSERT_EQUALS(30, e1[4].getValueInt());
     ASSERT_EQUALS(40, e1[5].getValueInt());
     ASSERT_EQUALS(40, e1.rightChild().getValueInt());
-    ASSERT_EQUALS(e1.popBack(), mongo::Status::OK());
+    ASSERT_EQUALS(e1.popBack(), merizo::Status::OK());
 
     ASSERT_EQUALS(size_t(5), mmb::countChildren(e1));
     ASSERT_EQUALS(0, e1[0].getValueInt());
@@ -508,7 +508,7 @@ TEST(ArrayAPI, SimpleNumericArray) {
     ASSERT_EQUALS(20, e1[3].getValueInt());
     ASSERT_EQUALS(30, e1[4].getValueInt());
     ASSERT_EQUALS(0, e1.leftChild().getValueInt());
-    ASSERT_EQUALS(e1.popFront(), mongo::Status::OK());
+    ASSERT_EQUALS(e1.popFront(), merizo::Status::OK());
 
     ASSERT_EQUALS(size_t(4), mmb::countChildren(e1));
     ASSERT_EQUALS(5, e1[0].getValueInt());
@@ -516,29 +516,29 @@ TEST(ArrayAPI, SimpleNumericArray) {
     ASSERT_EQUALS(20, e1[2].getValueInt());
     ASSERT_EQUALS(30, e1[3].getValueInt());
     ASSERT_EQUALS(5, e1.leftChild().getValueInt());
-    ASSERT_EQUALS(e1.popFront(), mongo::Status::OK());
+    ASSERT_EQUALS(e1.popFront(), merizo::Status::OK());
 
     ASSERT_EQUALS(size_t(3), mmb::countChildren(e1));
     ASSERT_EQUALS(10, e1[0].getValueInt());
     ASSERT_EQUALS(20, e1[1].getValueInt());
     ASSERT_EQUALS(30, e1[2].getValueInt());
     ASSERT_EQUALS(30, e1.rightChild().getValueInt());
-    ASSERT_EQUALS(e1.popBack(), mongo::Status::OK());
+    ASSERT_EQUALS(e1.popBack(), merizo::Status::OK());
 
     ASSERT_EQUALS(size_t(2), mmb::countChildren(e1));
     ASSERT_EQUALS(10, e1[0].getValueInt());
     ASSERT_EQUALS(20, e1[1].getValueInt());
     ASSERT_EQUALS(10, e1.leftChild().getValueInt());
-    ASSERT_EQUALS(e1.popFront(), mongo::Status::OK());
+    ASSERT_EQUALS(e1.popFront(), merizo::Status::OK());
 
     ASSERT_EQUALS(size_t(1), mmb::countChildren(e1));
     ASSERT_EQUALS(20, e1[0].getValueInt());
 
-    ASSERT_EQUALS(e1[0].setValueInt(100), mongo::Status::OK());
+    ASSERT_EQUALS(e1[0].setValueInt(100), merizo::Status::OK());
     ASSERT_EQUALS(100, e1[0].getValueInt());
     ASSERT_EQUALS(100, e1.leftChild().getValueInt());
     ASSERT_EQUALS(size_t(1), mmb::countChildren(e1));
-    ASSERT_EQUALS(e1.popFront(), mongo::Status::OK());
+    ASSERT_EQUALS(e1.popFront(), merizo::Status::OK());
 
     ASSERT_EQUALS(size_t(0), mmb::countChildren(e1));
     ASSERT_FALSE(e1[0].ok());
@@ -571,38 +571,38 @@ TEST(Element, setters) {
     mmb::Element t0 = doc.makeElementNull("t0");
 
     t0.setValueBool(true).transitional_ignore();
-    ASSERT_EQUALS(mongo::Bool, t0.getType());
+    ASSERT_EQUALS(merizo::Bool, t0.getType());
 
     t0.setValueInt(12345).transitional_ignore();
-    ASSERT_EQUALS(mongo::NumberInt, t0.getType());
+    ASSERT_EQUALS(merizo::NumberInt, t0.getType());
 
     t0.setValueLong(12345LL).transitional_ignore();
-    ASSERT_EQUALS(mongo::NumberLong, t0.getType());
+    ASSERT_EQUALS(merizo::NumberLong, t0.getType());
 
-    t0.setValueTimestamp(mongo::Timestamp()).transitional_ignore();
-    ASSERT_EQUALS(mongo::bsonTimestamp, t0.getType());
+    t0.setValueTimestamp(merizo::Timestamp()).transitional_ignore();
+    ASSERT_EQUALS(merizo::bsonTimestamp, t0.getType());
 
-    t0.setValueDate(mongo::Date_t::fromMillisSinceEpoch(12345LL)).transitional_ignore();
-    ASSERT_EQUALS(mongo::Date, t0.getType());
+    t0.setValueDate(merizo::Date_t::fromMillisSinceEpoch(12345LL)).transitional_ignore();
+    ASSERT_EQUALS(merizo::Date, t0.getType());
 
     t0.setValueDouble(123.45).transitional_ignore();
-    ASSERT_EQUALS(mongo::NumberDouble, t0.getType());
+    ASSERT_EQUALS(merizo::NumberDouble, t0.getType());
 
-    t0.setValueDecimal(mongo::Decimal128("123.45E1234")).transitional_ignore();
-    ASSERT_EQUALS(mongo::NumberDecimal, t0.getType());
+    t0.setValueDecimal(merizo::Decimal128("123.45E1234")).transitional_ignore();
+    ASSERT_EQUALS(merizo::NumberDecimal, t0.getType());
 
-    t0.setValueOID(mongo::OID("47cc67093475061e3d95369d")).transitional_ignore();
-    ASSERT_EQUALS(mongo::jstOID, t0.getType());
+    t0.setValueOID(merizo::OID("47cc67093475061e3d95369d")).transitional_ignore();
+    ASSERT_EQUALS(merizo::jstOID, t0.getType());
 
     t0.setValueRegex("[a-zA-Z]?", "").transitional_ignore();
-    ASSERT_EQUALS(mongo::RegEx, t0.getType());
+    ASSERT_EQUALS(merizo::RegEx, t0.getType());
 
     t0.setValueString("foo bar baz").transitional_ignore();
-    ASSERT_EQUALS(mongo::String, t0.getType());
+    ASSERT_EQUALS(merizo::String, t0.getType());
 }
 
 TEST(Element, toString) {
-    mongo::BSONObj obj = mongo::fromjson("{ a : 1, b : [1, 2, 3], c : { x : 'x' } }");
+    merizo::BSONObj obj = merizo::fromjson("{ a : 1, b : [1, 2, 3], c : { x : 'x' } }");
     mmb::Document doc(obj);
 
     // Deserialize the 'c' but keep its value the same.
@@ -612,7 +612,7 @@ TEST(Element, toString) {
     ASSERT_OK(c.popBack());
 
     // 'a'
-    mongo::BSONObjIterator iter(obj);
+    merizo::BSONObjIterator iter(obj);
     mmb::Element docChild = doc.root().leftChild();
     ASSERT_TRUE(docChild.ok());
     ASSERT_EQUALS(iter.next().toString(), docChild.toString());
@@ -638,80 +638,80 @@ TEST(Element, toString) {
 TEST(DecimalType, createElement) {
     mmb::Document doc;
 
-    mmb::Element d0 = doc.makeElementDecimal("d0", mongo::Decimal128("12345"));
-    ASSERT_TRUE(mongo::Decimal128("12345").isEqual(d0.getValueDecimal()));
+    mmb::Element d0 = doc.makeElementDecimal("d0", merizo::Decimal128("12345"));
+    ASSERT_TRUE(merizo::Decimal128("12345").isEqual(d0.getValueDecimal()));
 }
 
 TEST(DecimalType, setElement) {
     mmb::Document doc;
 
-    mmb::Element d0 = doc.makeElementDecimal("d0", mongo::Decimal128("128"));
-    d0.setValueDecimal(mongo::Decimal128("123456")).transitional_ignore();
-    ASSERT_TRUE(mongo::Decimal128("123456").isEqual(d0.getValueDecimal()));
+    mmb::Element d0 = doc.makeElementDecimal("d0", merizo::Decimal128("128"));
+    d0.setValueDecimal(merizo::Decimal128("123456")).transitional_ignore();
+    ASSERT_TRUE(merizo::Decimal128("123456").isEqual(d0.getValueDecimal()));
 
     d0.setValueDouble(0.1).transitional_ignore();
     ASSERT_EQUALS(0.1, d0.getValueDouble());
-    d0.setValueDecimal(mongo::Decimal128("23")).transitional_ignore();
-    ASSERT_TRUE(mongo::Decimal128("23").isEqual(d0.getValueDecimal()));
+    d0.setValueDecimal(merizo::Decimal128("23")).transitional_ignore();
+    ASSERT_TRUE(merizo::Decimal128("23").isEqual(d0.getValueDecimal()));
 }
 
 TEST(DecimalType, appendElement) {
     mmb::Document doc;
 
     mmb::Element d0 = doc.makeElementObject("e0");
-    d0.appendDecimal("precision", mongo::Decimal128(34)).transitional_ignore();
+    d0.appendDecimal("precision", merizo::Decimal128(34)).transitional_ignore();
 
     mmb::Element it = mmb::findFirstChildNamed(d0, "precision");
     ASSERT_TRUE(it.ok());
-    ASSERT_TRUE(mongo::Decimal128(34).isEqual(it.getValueDecimal()));
+    ASSERT_TRUE(merizo::Decimal128(34).isEqual(it.getValueDecimal()));
 }
 
 TEST(TimestampType, createElement) {
     mmb::Document doc;
 
-    mmb::Element t0 = doc.makeElementTimestamp("t0", mongo::Timestamp());
-    ASSERT(mongo::Timestamp() == t0.getValueTimestamp());
+    mmb::Element t0 = doc.makeElementTimestamp("t0", merizo::Timestamp());
+    ASSERT(merizo::Timestamp() == t0.getValueTimestamp());
 
-    mmb::Element t1 = doc.makeElementTimestamp("t1", mongo::Timestamp(123, 456));
-    ASSERT(mongo::Timestamp(123, 456) == t1.getValueTimestamp());
+    mmb::Element t1 = doc.makeElementTimestamp("t1", merizo::Timestamp(123, 456));
+    ASSERT(merizo::Timestamp(123, 456) == t1.getValueTimestamp());
 }
 
 TEST(TimestampType, setElement) {
     mmb::Document doc;
 
-    mmb::Element t0 = doc.makeElementTimestamp("t0", mongo::Timestamp());
-    t0.setValueTimestamp(mongo::Timestamp(123, 456)).transitional_ignore();
-    ASSERT(mongo::Timestamp(123, 456) == t0.getValueTimestamp());
+    mmb::Element t0 = doc.makeElementTimestamp("t0", merizo::Timestamp());
+    t0.setValueTimestamp(merizo::Timestamp(123, 456)).transitional_ignore();
+    ASSERT(merizo::Timestamp(123, 456) == t0.getValueTimestamp());
 
     // Try setting to other types and back to Timestamp
     t0.setValueLong(1234567890).transitional_ignore();
     ASSERT_EQUALS(1234567890LL, t0.getValueLong());
-    t0.setValueTimestamp(mongo::Timestamp(789, 321)).transitional_ignore();
-    ASSERT(mongo::Timestamp(789, 321) == t0.getValueTimestamp());
+    t0.setValueTimestamp(merizo::Timestamp(789, 321)).transitional_ignore();
+    ASSERT(merizo::Timestamp(789, 321) == t0.getValueTimestamp());
 
     t0.setValueString("foo bar baz").transitional_ignore();
     ASSERT_EQUALS("foo bar baz", t0.getValueString());
-    t0.setValueTimestamp(mongo::Timestamp(9876, 5432)).transitional_ignore();
-    ASSERT(mongo::Timestamp(9876, 5432) == t0.getValueTimestamp());
+    t0.setValueTimestamp(merizo::Timestamp(9876, 5432)).transitional_ignore();
+    ASSERT(merizo::Timestamp(9876, 5432) == t0.getValueTimestamp());
 }
 
 TEST(TimestampType, appendElement) {
     mmb::Document doc;
 
     mmb::Element t0 = doc.makeElementObject("e0");
-    t0.appendTimestamp("a timestamp field", mongo::Timestamp(1352151971, 471))
+    t0.appendTimestamp("a timestamp field", merizo::Timestamp(1352151971, 471))
         .transitional_ignore();
 
     mmb::Element it = mmb::findFirstChildNamed(t0, "a timestamp field");
     ASSERT_TRUE(it.ok());
-    ASSERT(mongo::Timestamp(1352151971, 471) == it.getValueTimestamp());
+    ASSERT(merizo::Timestamp(1352151971, 471) == it.getValueTimestamp());
 }
 
 TEST(SafeNumType, createElement) {
     mmb::Document doc;
 
-    mmb::Element t0 = doc.makeElementSafeNum("t0", mongo::SafeNum(123.456));
-    ASSERT_EQUALS(mongo::SafeNum(123.456), t0.getValueSafeNum());
+    mmb::Element t0 = doc.makeElementSafeNum("t0", merizo::SafeNum(123.456));
+    ASSERT_EQUALS(merizo::SafeNum(123.456), t0.getValueSafeNum());
 }
 
 // Try getting SafeNums from different types.
@@ -720,7 +720,7 @@ TEST(SafeNumType, getSafeNum) {
 
     mmb::Element t0 = doc.makeElementInt("t0", 1234567890);
     ASSERT_EQUALS(1234567890, t0.getValueInt());
-    mongo::SafeNum num = t0.getValueSafeNum();
+    merizo::SafeNum num = t0.getValueSafeNum();
     ASSERT_EQUALS(num, static_cast<int64_t>(1234567890));
 
     t0.setValueLong(1234567890LL).transitional_ignore();
@@ -733,65 +733,65 @@ TEST(SafeNumType, getSafeNum) {
     num = t0.getValueSafeNum();
     ASSERT_EQUALS(num, 123.456789);
 
-    t0.setValueDecimal(mongo::Decimal128("12345678.1234")).transitional_ignore();
-    ASSERT_TRUE(mongo::Decimal128("12345678.1234").isEqual(t0.getValueDecimal()));
+    t0.setValueDecimal(merizo::Decimal128("12345678.1234")).transitional_ignore();
+    ASSERT_TRUE(merizo::Decimal128("12345678.1234").isEqual(t0.getValueDecimal()));
     num = t0.getValueSafeNum();
-    ASSERT_EQUALS(num, mongo::Decimal128("12345678.1234"));
+    ASSERT_EQUALS(num, merizo::Decimal128("12345678.1234"));
 }
 
 TEST(SafeNumType, setSafeNum) {
     mmb::Document doc;
 
-    mmb::Element t0 = doc.makeElementSafeNum("t0", mongo::SafeNum(123456));
-    t0.setValueSafeNum(mongo::SafeNum(654321)).transitional_ignore();
-    ASSERT_EQUALS(mongo::SafeNum(654321), t0.getValueSafeNum());
+    mmb::Element t0 = doc.makeElementSafeNum("t0", merizo::SafeNum(123456));
+    t0.setValueSafeNum(merizo::SafeNum(654321)).transitional_ignore();
+    ASSERT_EQUALS(merizo::SafeNum(654321), t0.getValueSafeNum());
 
     // Try setting to other types and back to SafeNum
     t0.setValueLong(1234567890).transitional_ignore();
     ASSERT_EQUALS(1234567890LL, t0.getValueLong());
-    t0.setValueSafeNum(mongo::SafeNum(1234567890)).transitional_ignore();
-    ASSERT_EQUALS(mongo::SafeNum(1234567890), t0.getValueSafeNum());
+    t0.setValueSafeNum(merizo::SafeNum(1234567890)).transitional_ignore();
+    ASSERT_EQUALS(merizo::SafeNum(1234567890), t0.getValueSafeNum());
 
     t0.setValueString("foo bar baz").transitional_ignore();
 
-    mongo::StringData left = "foo bar baz";
-    mongo::StringData right = t0.getValueString();
+    merizo::StringData left = "foo bar baz";
+    merizo::StringData right = t0.getValueString();
     ASSERT_EQUALS(left, right);
 
-    ASSERT_EQUALS(mongo::StringData("foo bar baz"), t0.getValueString());
-    t0.setValueSafeNum(mongo::SafeNum(12345)).transitional_ignore();
-    ASSERT_EQUALS(mongo::SafeNum(12345), t0.getValueSafeNum());
+    ASSERT_EQUALS(merizo::StringData("foo bar baz"), t0.getValueString());
+    t0.setValueSafeNum(merizo::SafeNum(12345)).transitional_ignore();
+    ASSERT_EQUALS(merizo::SafeNum(12345), t0.getValueSafeNum());
 }
 
 TEST(SafeNumType, appendElement) {
     mmb::Document doc;
 
     mmb::Element t0 = doc.makeElementObject("e0");
-    t0.appendSafeNum("a timestamp field", mongo::SafeNum(static_cast<int64_t>(1352151971LL)))
+    t0.appendSafeNum("a timestamp field", merizo::SafeNum(static_cast<int64_t>(1352151971LL)))
         .transitional_ignore();
 
     mmb::Element it = findFirstChildNamed(t0, "a timestamp field");
     ASSERT_TRUE(it.ok());
-    ASSERT_EQUALS(mongo::SafeNum(static_cast<int64_t>(1352151971LL)), it.getValueSafeNum());
+    ASSERT_EQUALS(merizo::SafeNum(static_cast<int64_t>(1352151971LL)), it.getValueSafeNum());
 }
 
 TEST(OIDType, getOidValue) {
     mmb::Document doc;
     mmb::Element t0 = doc.makeElementObject("e0");
-    const mongo::OID generated = mongo::OID::gen();
+    const merizo::OID generated = merizo::OID::gen();
     t0.appendOID("myOid", generated).transitional_ignore();
     mmb::Element it = findFirstChildNamed(t0, "myOid");
-    const mongo::OID recovered = mongo::OID(it.getValueOID());
+    const merizo::OID recovered = merizo::OID(it.getValueOID());
     ASSERT_EQUALS(generated, recovered);
 }
 
 TEST(OIDType, nullOID) {
     mmb::Document doc;
     mmb::Element t0 = doc.makeElementObject("e0");
-    const mongo::OID withNull("50a9c82263e413ad0028faad");
+    const merizo::OID withNull("50a9c82263e413ad0028faad");
     t0.appendOID("myOid", withNull).transitional_ignore();
     mmb::Element it = findFirstChildNamed(t0, "myOid");
-    const mongo::OID recovered = mongo::OID(it.getValueOID());
+    const merizo::OID recovered = merizo::OID(it.getValueOID());
     ASSERT_EQUALS(withNull, recovered);
 }
 
@@ -829,59 +829,59 @@ static const char jsonSampleWithDecimal[] =
     "lastfield:\"last\"}";
 
 TEST(Serialization, RoundTrip) {
-    mongo::BSONObj obj;
-    obj = mongo::fromjson(jsonSampleWithDecimal);
+    merizo::BSONObj obj;
+    obj = merizo::fromjson(jsonSampleWithDecimal);
     mmb::Document doc(obj.copy());
-    mongo::BSONObj built = doc.getObject();
+    merizo::BSONObj built = doc.getObject();
     ASSERT_BSONOBJ_EQ(obj, built);
 }
 
 TEST(Documentation, Example1) {
     // Create a new document
     mmb::Document doc;
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{}"), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{}"), doc.getObject());
 
     // Get the root of the document.
     mmb::Element root = doc.root();
 
-    // Create a new mongo::NumberInt typed Element to represent life, the universe, and
+    // Create a new merizo::NumberInt typed Element to represent life, the universe, and
     // everything, then push that Element into the root object, making it a child of root.
     mmb::Element e0 = doc.makeElementInt("ltuae", 42);
     ASSERT_OK(root.pushBack(e0));
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42 }"), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ ltuae : 42 }"), doc.getObject());
 
-    // Create a new empty mongo::Object-typed Element named 'magic', and push it back as a
+    // Create a new empty merizo::Object-typed Element named 'magic', and push it back as a
     // child of the root, making it a sibling of e0.
     mmb::Element e1 = doc.makeElementObject("magic");
     ASSERT_OK(root.pushBack(e1));
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, magic : {} }"), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ ltuae : 42, magic : {} }"), doc.getObject());
 
-    // Create a new mongo::NumberDouble typed Element to represent Pi, and insert it as child
+    // Create a new merizo::NumberDouble typed Element to represent Pi, and insert it as child
     // of the new object we just created.
     mmb::Element e3 = doc.makeElementDouble("pi", 3.14);
     ASSERT_OK(e1.pushBack(e3));
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, magic : { pi : 3.14 } }"), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ ltuae : 42, magic : { pi : 3.14 } }"), doc.getObject());
 
-    // Create a new mongo::NumberDouble to represent Plancks constant in electrovolt
+    // Create a new merizo::NumberDouble to represent Plancks constant in electrovolt
     // micrometers, and add it as a child of the 'magic' object.
     mmb::Element e4 = doc.makeElementDouble("hbar", 1.239);
     ASSERT_OK(e1.pushBack(e4));
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, magic : { pi : 3.14, hbar : 1.239 } }"),
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ ltuae : 42, magic : { pi : 3.14, hbar : 1.239 } }"),
                       doc.getObject());
 
     // Rename the parent element of 'hbar' to be 'constants'.
     ASSERT_OK(e4.parent().rename("constants"));
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, constants : { pi : 3.14, hbar : 1.239 } }"),
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ ltuae : 42, constants : { pi : 3.14, hbar : 1.239 } }"),
                       doc.getObject());
 
     // Rename 'ltuae' to 'answer' by accessing it as the root objects left child.
     ASSERT_OK(doc.root().leftChild().rename("answer"));
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ answer : 42, constants : { pi : 3.14, hbar : 1.239 } }"),
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ answer : 42, constants : { pi : 3.14, hbar : 1.239 } }"),
                       doc.getObject());
 
     // Sort the constants by name.
     mmb::sortChildren(doc.root().rightChild(), mmb::FieldNameLessThan());
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ answer : 42, constants : { hbar : 1.239, pi : 3.14 } }"),
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ answer : 42, constants : { hbar : 1.239, pi : 3.14 } }"),
                       doc.getObject());
 }
 
@@ -891,7 +891,7 @@ TEST(Documentation, Example2) {
         "  'whale': { 'alive': true, 'dv': -9.8, 'height': 50.0, attrs : [ 'big' ] },"
         "  'petunias': { 'alive': true, 'dv': -9.8, 'height': 50.0 } "
         "}";
-    mongo::BSONObj obj = mongo::fromjson(inJson);
+    merizo::BSONObj obj = merizo::fromjson(inJson);
 
     // Create a new document representing BSONObj with the above contents.
     mmb::Document doc(obj);
@@ -925,7 +925,7 @@ TEST(Documentation, Example2) {
     ASSERT_OK(petunias_height.setValueDouble(0));
 
     // Replace the whale by its wreckage, saving only its attributes:
-    // Construct a new mongo::Object element for the ex-whale.
+    // Construct a new merizo::Object element for the ex-whale.
     mmb::Element ex_whale = doc.makeElementObject("ex-whale");
     ASSERT_OK(doc.root().pushBack(ex_whale));
     // Find the attributes of the old 'whale' element.
@@ -943,13 +943,13 @@ TEST(Documentation, Example2) {
         "    'ex-whale': { 'attrs': [ 'big' ] } })"
         "}";
 
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     doc.writeTo(&builder);
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), doc.getObject());
 }
 
 namespace {
-void apply(mongo::BSONObj* obj, const mmb::DamageVector& damages, const char* source) {
+void apply(merizo::BSONObj* obj, const mmb::DamageVector& damages, const char* source) {
     const mmb::DamageVector::const_iterator end = damages.end();
     mmb::DamageVector::const_iterator where = damages.begin();
     char* const target = const_cast<char*>(obj->objdata());
@@ -967,8 +967,8 @@ TEST(Documentation, Example2InPlaceWithDamageVector) {
         "}";
 
     // Make the object, and make a copy for reference.
-    mongo::BSONObj obj = mongo::fromjson(inJson);
-    const mongo::BSONObj copyOfObj = obj.getOwned();
+    merizo::BSONObj obj = merizo::fromjson(inJson);
+    const merizo::BSONObj copyOfObj = obj.getOwned();
     ASSERT_BSONOBJ_EQ(obj, copyOfObj);
 
     // Create a new document representing BSONObj with the above contents.
@@ -1031,13 +1031,13 @@ TEST(Documentation, Example2InPlaceWithDamageVector) {
         "  'whale': { 'alive': false, 'dv': 0, 'height': 0, attrs : [ 'big' ] },"
         "  'petunias': { 'alive': true, 'dv': 0, 'height': 0 } "
         "}";
-    mongo::BSONObj outObj = mongo::fromjson(outJson);
+    merizo::BSONObj outObj = merizo::fromjson(outJson);
 
     ASSERT_EQUALS(outObj, doc);
 
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     doc.writeTo(&builder);
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), doc.getObject());
 }
 
 TEST(Documentation, Example3) {
@@ -1046,7 +1046,7 @@ TEST(Documentation, Example3) {
         "  'xs': { 'x' : 'x', 'X' : 'X' },"
         "  'ys': { 'y' : 'y' }"
         "}";
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
 
     mmb::Document doc(inObj);
     mmb::Element xs = doc.root().leftChild();
@@ -1060,14 +1060,14 @@ TEST(Documentation, Example3) {
     mmb::Element pun = doc.makeElementArray("why");
     ASSERT_OK(ys.pushBack(pun));
     pun.appendString("na", "not").transitional_ignore();
-    mongo::BSONObj outObj = doc.getObject();
+    merizo::BSONObj outObj = doc.getObject();
 
     static const char outJson[] =
         "{"
         "  'xs': { 'x' : 'x', 'X' : 'X' },"
         "  'ys': { 'y' : 'y', 'Y' : 'Y', 'why' : ['not'] }"
         "}";
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), outObj);
 }
 
 TEST(Document, LifecycleConstructDefault) {
@@ -1075,7 +1075,7 @@ TEST(Document, LifecycleConstructDefault) {
     mmb::Document doc;
     ASSERT_TRUE(doc.root().ok());
     ASSERT_TRUE(const_cast<const mmb::Document&>(doc).root().ok());
-    ASSERT_TRUE(doc.root().isType(mongo::Object));
+    ASSERT_TRUE(doc.root().isType(merizo::Object));
     ASSERT_FALSE(doc.root().leftSibling().ok());
     ASSERT_FALSE(doc.root().rightSibling().ok());
     ASSERT_FALSE(doc.root().leftChild().ok());
@@ -1087,11 +1087,11 @@ TEST(Document, LifecycleConstructDefault) {
 TEST(Document, LifecycleConstructEmptyBSONObj) {
     // Verify the state of a newly created empty Document where the construction argument
     // is an empty BSONObj.
-    mongo::BSONObj obj;
+    merizo::BSONObj obj;
     mmb::Document doc(obj);
     ASSERT_TRUE(doc.root().ok());
     ASSERT_TRUE(const_cast<const mmb::Document&>(doc).root().ok());
-    ASSERT_TRUE(doc.root().isType(mongo::Object));
+    ASSERT_TRUE(doc.root().isType(merizo::Object));
     ASSERT_FALSE(doc.root().leftSibling().ok());
     ASSERT_FALSE(doc.root().rightSibling().ok());
     ASSERT_FALSE(doc.root().leftChild().ok());
@@ -1103,13 +1103,13 @@ TEST(Document, LifecycleConstructEmptyBSONObj) {
 TEST(Document, LifecycleConstructSimpleBSONObj) {
     // Verify the state of a newly created Document where the construction argument is a
     // simple (flat) BSONObj.
-    mongo::BSONObj obj = mongo::fromjson("{ e1: 1, e2: 'hello', e3: false }");
+    merizo::BSONObj obj = merizo::fromjson("{ e1: 1, e2: 'hello', e3: false }");
     mmb::Document doc(obj);
 
     // Check the state of the root.
     ASSERT_TRUE(doc.root().ok());
     ASSERT_TRUE(const_cast<const mmb::Document&>(doc).root().ok());
-    ASSERT_TRUE(doc.root().isType(mongo::Object));
+    ASSERT_TRUE(doc.root().isType(merizo::Object));
     ASSERT_FALSE(doc.root().parent().ok());
     ASSERT_FALSE(doc.root().leftSibling().ok());
     ASSERT_FALSE(doc.root().rightSibling().ok());
@@ -1125,7 +1125,7 @@ TEST(Document, LifecycleConstructSimpleBSONObj) {
     ASSERT_FALSE(e1Child.rightChild().ok());
 
     // Check the type, name, and value of 'e1'.
-    ASSERT_TRUE(e1Child.isType(mongo::NumberInt));
+    ASSERT_TRUE(e1Child.isType(merizo::NumberInt));
     ASSERT_EQUALS("e1", e1Child.getFieldName());
     ASSERT_TRUE(e1Child.hasValue());
     ASSERT_EQUALS(int32_t(1), e1Child.getValueInt());
@@ -1141,7 +1141,7 @@ TEST(Document, LifecycleConstructSimpleBSONObj) {
     ASSERT_FALSE(e2Child.rightChild().ok());
 
     // Check the type, name and value of 'e2'.
-    ASSERT_TRUE(e2Child.isType(mongo::String));
+    ASSERT_TRUE(e2Child.isType(merizo::String));
     ASSERT_EQUALS("e2", e2Child.getFieldName());
     ASSERT_TRUE(e2Child.hasValue());
     ASSERT_EQUALS("hello", e2Child.getValueString());
@@ -1157,7 +1157,7 @@ TEST(Document, LifecycleConstructSimpleBSONObj) {
     ASSERT_FALSE(e2Child.rightChild().ok());
 
     // Check the type, name and value of 'e3'.
-    ASSERT_TRUE(e3Child.isType(mongo::Bool));
+    ASSERT_TRUE(e3Child.isType(merizo::Bool));
     ASSERT_EQUALS("e3", e3Child.getFieldName());
     ASSERT_TRUE(e3Child.hasValue());
     ASSERT_EQUALS(false, e3Child.getValueBool());
@@ -1170,7 +1170,7 @@ TEST(Document, RenameDeserialization) {
         "{"
         "  'a' : { 'b' : { 'c' : { 'd' : 4 } } }"
         "}";
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
 
     mmb::Document doc(inObj);
     mmb::Element a = doc.root().leftChild();
@@ -1180,12 +1180,12 @@ TEST(Document, RenameDeserialization) {
     mmb::Element c = b.leftChild();
     ASSERT_TRUE(c.ok());
     c.rename("C").transitional_ignore();
-    mongo::BSONObj outObj = doc.getObject();
+    merizo::BSONObj outObj = doc.getObject();
     static const char outJson[] =
         "{"
         "  'a' : { 'b' : { 'C' : { 'd' : 4 } } }"
         "}";
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), outObj);
 }
 
 TEST(Document, CantRenameRootElement) {
@@ -1203,7 +1203,7 @@ TEST(Document, RemoveElementWithOpaqueRightSibling) {
         "  'a' : 1, 'b' : 2, 'c' : 3"
         "}";
 
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
     mmb::Document doc(inObj);
 
     mmb::Element a = doc.root().leftChild();
@@ -1214,8 +1214,8 @@ TEST(Document, RemoveElementWithOpaqueRightSibling) {
         "{"
         "  'b' : 2, 'c' : 3"
         "}";
-    mongo::BSONObj outObj = doc.getObject();
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
+    merizo::BSONObj outObj = doc.getObject();
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), outObj);
 }
 
 TEST(Document, AddRightSiblingToElementWithOpaqueRightSibling) {
@@ -1227,7 +1227,7 @@ TEST(Document, AddRightSiblingToElementWithOpaqueRightSibling) {
         "  'a' : 1, 'b' : 2, 'c' : 3"
         "}";
 
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
     mmb::Document doc(inObj);
 
     mmb::Element a = doc.root().leftChild();
@@ -1239,8 +1239,8 @@ TEST(Document, AddRightSiblingToElementWithOpaqueRightSibling) {
         "{"
         "  'a' : 1, 'X' : 'X', 'b' : 2, 'c' : 3"
         "}";
-    mongo::BSONObj outObj = doc.getObject();
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
+    merizo::BSONObj outObj = doc.getObject();
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), outObj);
 }
 
 TEST(Document, ArrayIndexedAccessFromJson) {
@@ -1249,23 +1249,23 @@ TEST(Document, ArrayIndexedAccessFromJson) {
         " a : 1, b : [{ c : 1 }]"
         "}";
 
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
     mmb::Document doc(inObj);
 
     mmb::Element a = doc.root().leftChild();
     ASSERT_TRUE(a.ok());
     ASSERT_EQUALS("a", a.getFieldName());
-    ASSERT_EQUALS(mongo::NumberInt, a.getType());
+    ASSERT_EQUALS(merizo::NumberInt, a.getType());
 
     mmb::Element b = a.rightSibling();
     ASSERT_TRUE(b.ok());
     ASSERT_EQUALS("b", b.getFieldName());
-    ASSERT_EQUALS(mongo::Array, b.getType());
+    ASSERT_EQUALS(merizo::Array, b.getType());
 
     mmb::Element b0 = b[0];
     ASSERT_TRUE(b0.ok());
     ASSERT_EQUALS("0", b0.getFieldName());
-    ASSERT_EQUALS(mongo::Object, b0.getType());
+    ASSERT_EQUALS(merizo::Object, b0.getType());
 }
 
 TEST(Document, ArrayIndexedAccessFromManuallyBuilt) {
@@ -1286,17 +1286,17 @@ TEST(Document, ArrayIndexedAccessFromManuallyBuilt) {
     mmb::Element a = doc.root().leftChild();
     ASSERT_TRUE(a.ok());
     ASSERT_EQUALS("a", a.getFieldName());
-    ASSERT_EQUALS(mongo::NumberInt, a.getType());
+    ASSERT_EQUALS(merizo::NumberInt, a.getType());
 
     mmb::Element b = a.rightSibling();
     ASSERT_TRUE(b.ok());
     ASSERT_EQUALS("b", b.getFieldName());
-    ASSERT_EQUALS(mongo::Array, b.getType());
+    ASSERT_EQUALS(merizo::Array, b.getType());
 
     mmb::Element b0 = b[0];
     ASSERT_TRUE(b0.ok());
     ASSERT_EQUALS("ignored", b0.getFieldName());
-    ASSERT_EQUALS(mongo::Object, b0.getType());
+    ASSERT_EQUALS(merizo::Object, b0.getType());
 }
 
 TEST(Document, EndElement) {
@@ -1342,14 +1342,14 @@ TEST(Element, PopulatedDocHasChildren) {
 
 TEST(Element, LazyEmptyDocHasNoChildren) {
     static const char inJson[] = "{}";
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
     mmb::Document doc(inObj);
     ASSERT_FALSE(doc.root().hasChildren());
 }
 
 TEST(Element, LazySingletonDocHasChildren) {
     static const char inJson[] = "{ a : 1 }";
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
     mmb::Document doc(inObj);
     ASSERT_TRUE(doc.root().hasChildren());
     ASSERT_FALSE(doc.root().leftChild().hasChildren());
@@ -1357,7 +1357,7 @@ TEST(Element, LazySingletonDocHasChildren) {
 
 TEST(Element, LazyConstDoubletonDocHasChildren) {
     static const char inJson[] = "{ a : 1, b : 2 }";
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
     const mmb::Document doc(inObj);
     ASSERT_TRUE(doc.root().hasChildren());
     ASSERT_FALSE(doc.root().leftChild().hasChildren());
@@ -1366,7 +1366,7 @@ TEST(Element, LazyConstDoubletonDocHasChildren) {
 }
 
 TEST(Document, AddChildToEmptyOpaqueSubobject) {
-    mongo::BSONObj inObj = mongo::fromjson("{a: {}}");
+    merizo::BSONObj inObj = merizo::fromjson("{a: {}}");
     mmb::Document doc(inObj);
 
     mmb::Element elem = doc.root()["a"];
@@ -1399,7 +1399,7 @@ TEST(Element, IsNumeric) {
     elt = doc.makeElementDouble("dummy", 42.0);
     ASSERT_TRUE(elt.isNumeric());
 
-    elt = doc.makeElementDecimal("dummy", mongo::Decimal128(20));
+    elt = doc.makeElementDecimal("dummy", merizo::Decimal128(20));
     ASSERT_TRUE(elt.isNumeric());
 }
 
@@ -1421,7 +1421,7 @@ TEST(Element, IsIntegral) {
     elt = doc.makeElementDouble("dummy", 42.0);
     ASSERT_FALSE(elt.isIntegral());
 
-    elt = doc.makeElementDecimal("dummy", mongo::Decimal128(20));
+    elt = doc.makeElementDecimal("dummy", merizo::Decimal128(20));
     ASSERT_FALSE(elt.isIntegral());
 }
 
@@ -1431,7 +1431,7 @@ TEST(Document, ArraySerialization) {
         " 'a' : { 'b' : [ 'c', 'd' ] } "
         "}";
 
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
     mmb::Document doc(inObj);
 
     mmb::Element root = doc.root();
@@ -1447,48 +1447,48 @@ TEST(Document, ArraySerialization) {
         " 'a' : { 'b' : [ 'c', 'd', [ 'e' ] ] } "
         "}";
 
-    const mongo::BSONObj outObj = doc.getObject();
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
+    const merizo::BSONObj outObj = doc.getObject();
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), outObj);
 }
 
 TEST(Document, SetValueBSONElementFieldNameHandling) {
     static const char inJson[] = "{ a : 4 }";
-    mongo::BSONObj inObj = mongo::fromjson(inJson);
+    merizo::BSONObj inObj = merizo::fromjson(inJson);
     mmb::Document doc(inObj);
 
     static const char inJson2[] = "{ b : 5 }";
-    mongo::BSONObj inObj2 = mongo::fromjson(inJson2);
-    mongo::BSONObjIterator iterator(inObj2);
+    merizo::BSONObj inObj2 = merizo::fromjson(inJson2);
+    merizo::BSONObjIterator iterator(inObj2);
 
     ASSERT_TRUE(iterator.more());
-    const mongo::BSONElement b = iterator.next();
+    const merizo::BSONElement b = iterator.next();
 
     mmb::Element a = doc.root().leftChild();
     a.setValueBSONElement(b).transitional_ignore();
 
     static const char outJson[] = "{ a : 5 }";
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), doc.getObject());
 }
 
 TEST(Document, SetValueElementFromSeparateDocument) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : 4 }");
     mmb::Document doc1(inObj);
 
-    mongo::BSONObj inObj2 = mongo::fromjson("{ b : 5 }");
+    merizo::BSONObj inObj2 = merizo::fromjson("{ b : 5 }");
     const mmb::Document doc2(inObj2);
 
     auto setTo = doc1.root().leftChild();
     auto setFrom = doc2.root().leftChild();
     ASSERT_OK(setTo.setValueElement(setFrom));
 
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ a : 5 }"), doc1.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ a : 5 }"), doc1.getObject());
 
     // Doc containing the 'setFrom' element should be unchanged.
     ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
 }
 
 TEST(Document, SetValueElementIsNoopWhenSetToSelf) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : 4 }");
     mmb::Document doc(inObj);
 
     auto element = doc.root().leftChild();
@@ -1498,7 +1498,7 @@ TEST(Document, SetValueElementIsNoopWhenSetToSelf) {
 }
 
 TEST(Document, SetValueElementIsNoopWhenSetToSelfFromCopy) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : 4 }");
     mmb::Document doc(inObj);
 
     auto element = doc.root().leftChild();
@@ -1509,7 +1509,7 @@ TEST(Document, SetValueElementIsNoopWhenSetToSelfFromCopy) {
 }
 
 TEST(Document, SetValueElementIsNoopWhenSetToSelfNonRootElement) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : { b : { c: 4 } } }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : { b : { c: 4 } } }");
     mmb::Document doc(inObj);
 
     auto element = doc.root().leftChild().leftChild().leftChild();
@@ -1520,27 +1520,27 @@ TEST(Document, SetValueElementIsNoopWhenSetToSelfNonRootElement) {
 }
 
 TEST(Document, SetValueElementSetToNestedObject) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : 4 }");
     mmb::Document doc1(inObj);
 
-    mongo::BSONObj inObj2 = mongo::fromjson("{ b : { c : 5, d : 6 } }");
+    merizo::BSONObj inObj2 = merizo::fromjson("{ b : { c : 5, d : 6 } }");
     const mmb::Document doc2(inObj2);
 
     auto setTo = doc1.root().leftChild();
     auto setFrom = doc2.root().leftChild();
     ASSERT_OK(setTo.setValueElement(setFrom));
 
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ a : { c : 5, d : 6 } }"), doc1.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ a : { c : 5, d : 6 } }"), doc1.getObject());
 
     // Doc containing the 'setFrom' element should be unchanged.
     ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
 }
 
 TEST(Document, SetValueElementNonRootElements) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : { b : 5, c : 6 } }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : { b : 5, c : 6 } }");
     mmb::Document doc1(inObj);
 
-    mongo::BSONObj inObj2 = mongo::fromjson("{ d : { e : 8, f : 9 } }");
+    merizo::BSONObj inObj2 = merizo::fromjson("{ d : { e : 8, f : 9 } }");
     const mmb::Document doc2(inObj2);
 
     auto setTo = doc1.root().leftChild().rightChild();
@@ -1549,14 +1549,14 @@ TEST(Document, SetValueElementNonRootElements) {
     ASSERT_EQ("e", setFrom.getFieldName());
     ASSERT_OK(setTo.setValueElement(setFrom));
 
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ a : { b : 5, c : 8 } }"), doc1.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ a : { b : 5, c : 8 } }"), doc1.getObject());
 
     // Doc containing the 'setFrom' element should be unchanged.
     ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
 }
 
 TEST(Document, SetValueElementSetRootToSelfErrors) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : 4 }");
     mmb::Document doc(inObj);
 
     auto element = doc.root();
@@ -1565,10 +1565,10 @@ TEST(Document, SetValueElementSetRootToSelfErrors) {
 }
 
 TEST(Document, SetValueElementSetRootToAnotherDocRootErrors) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : 4 }");
     mmb::Document doc1(inObj);
 
-    mongo::BSONObj inObj2 = mongo::fromjson("{ b : 5 }");
+    merizo::BSONObj inObj2 = merizo::fromjson("{ b : 5 }");
     const mmb::Document doc2(inObj2);
 
     auto setTo = doc1.root();
@@ -1580,7 +1580,7 @@ TEST(Document, SetValueElementSetRootToAnotherDocRootErrors) {
 }
 
 TEST(Document, SetValueElementSetRootToNotRootInSelfErrors) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : 4 }");
     mmb::Document doc(inObj);
 
     auto setTo = doc.root();
@@ -1590,10 +1590,10 @@ TEST(Document, SetValueElementSetRootToNotRootInSelfErrors) {
 }
 
 TEST(Document, SetValueElementSetRootToNotRootInAnotherDocErrors) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : 4 }");
     mmb::Document doc1(inObj);
 
-    mongo::BSONObj inObj2 = mongo::fromjson("{ b : 5 }");
+    merizo::BSONObj inObj2 = merizo::fromjson("{ b : 5 }");
     const mmb::Document doc2(inObj2);
 
     auto setTo = doc1.root();
@@ -1605,7 +1605,7 @@ TEST(Document, SetValueElementSetRootToNotRootInAnotherDocErrors) {
 }
 
 TEST(Document, SetValueElementSetToOwnRootErrors) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : { b : 4 } }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : { b : 4 } }");
     mmb::Document doc(inObj);
 
     auto setTo = doc.root().leftChild().leftChild();
@@ -1617,10 +1617,10 @@ TEST(Document, SetValueElementSetToOwnRootErrors) {
 }
 
 TEST(Document, SetValueElementSetToOtherDocRoot) {
-    mongo::BSONObj inObj = mongo::fromjson("{ a : { b : 4 } }");
+    merizo::BSONObj inObj = merizo::fromjson("{ a : { b : 4 } }");
     mmb::Document doc1(inObj);
 
-    mongo::BSONObj inObj2 = mongo::fromjson("{ c : 5 } }");
+    merizo::BSONObj inObj2 = merizo::fromjson("{ c : 5 } }");
     mmb::Document doc2(inObj2);
 
     auto setTo = doc1.root().leftChild().leftChild();
@@ -1628,36 +1628,36 @@ TEST(Document, SetValueElementSetToOtherDocRoot) {
     auto setFrom = doc2.root();
 
     ASSERT_OK(setTo.setValueElement(setFrom));
-    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ a : { b : { c : 5 } } }"), doc1.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson("{ a : { b : { c : 5 } } }"), doc1.getObject());
     ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
 }
 
 TEST(Document, CreateElementWithEmptyFieldName) {
     mmb::Document doc;
-    mmb::Element noname = doc.makeElementObject(mongo::StringData());
+    mmb::Element noname = doc.makeElementObject(merizo::StringData());
     ASSERT_TRUE(noname.ok());
-    ASSERT_EQUALS(mongo::StringData(), noname.getFieldName());
+    ASSERT_EQUALS(merizo::StringData(), noname.getFieldName());
 }
 
 TEST(Document, CreateElementFromBSONElement) {
-    mongo::BSONObj obj = mongo::fromjson("{a:1}}");
+    merizo::BSONObj obj = merizo::fromjson("{a:1}}");
     mmb::Document doc;
     ASSERT_OK(doc.root().appendElement(obj["a"]));
 
     mmb::Element newElem = doc.root()["a"];
     ASSERT_TRUE(newElem.ok());
-    ASSERT_EQUALS(newElem.getType(), mongo::NumberInt);
+    ASSERT_EQUALS(newElem.getType(), merizo::NumberInt);
     ASSERT_EQUALS(newElem.getValueInt(), 1);
 }
 
 TEST(Document, toStringEmpty) {
-    mongo::BSONObj obj;
+    merizo::BSONObj obj;
     mmb::Document doc;
     ASSERT_EQUALS(obj.toString(), doc.toString());
 }
 
 TEST(Document, toStringComplex) {
-    mongo::BSONObj obj = mongo::fromjson("{a : 1, b : [1, 2, 3], c : 'c'}");
+    merizo::BSONObj obj = merizo::fromjson("{a : 1, b : [1, 2, 3], c : 'c'}");
     mmb::Document doc(obj);
     ASSERT_EQUALS(obj.toString(), doc.toString());
 }
@@ -1668,7 +1668,7 @@ TEST(Document, toStringEphemeralObject) {
     ASSERT_OK(doc.root().pushBack(e));
     ASSERT_OK(e.appendDouble("d", 1.0));
     ASSERT_OK(e.appendString("s", "str"));
-    ASSERT_EQUALS(mongo::fromjson("{ foo: { d : 1.0, s : 'str' } }").firstElement().toString(),
+    ASSERT_EQUALS(merizo::fromjson("{ foo: { d : 1.0, s : 'str' } }").firstElement().toString(),
                   e.toString());
 }
 
@@ -1676,64 +1676,64 @@ TEST(Document, toStringEphemeralArray) {
     mmb::Document doc;
     mmb::Element e = doc.makeElementArray("foo");
     ASSERT_OK(doc.root().pushBack(e));
-    ASSERT_OK(e.appendDouble(mongo::StringData(), 1.0));
-    ASSERT_OK(e.appendString(mongo::StringData(), "str"));
-    ASSERT_EQUALS(mongo::fromjson("{ foo: [ 1.0, 'str' ] }").firstElement().toString(),
+    ASSERT_OK(e.appendDouble(merizo::StringData(), 1.0));
+    ASSERT_OK(e.appendString(merizo::StringData(), "str"));
+    ASSERT_EQUALS(merizo::fromjson("{ foo: [ 1.0, 'str' ] }").firstElement().toString(),
                   e.toString());
 }
 
 TEST(Document, ElementCloningToDifferentDocument) {
     const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
 
-    mmb::Document source(mongo::fromjson(initial));
+    mmb::Document source(merizo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
     source.root()["d"]
-        .pushBack(source.makeElementInt(mongo::StringData(), 7))
+        .pushBack(source.makeElementInt(merizo::StringData(), 7))
         .transitional_ignore();
 
     mmb::Document target;
 
     mmb::Element newElement = target.makeElement(source.root()["d"]);
     ASSERT_TRUE(newElement.ok());
-    mongo::Status status = target.root().pushBack(newElement);
+    merizo::Status status = target.root().pushBack(newElement);
     ASSERT_OK(status);
     const char* expected = "{ d : [ 4, 5, 6, 7 ] }";
-    ASSERT_EQUALS(mongo::fromjson(expected), target);
+    ASSERT_EQUALS(merizo::fromjson(expected), target);
 
     newElement = target.makeElement(source.root()["b"]);
     ASSERT_TRUE(newElement.ok());
     status = target.root().pushBack(newElement);
     ASSERT_OK(status);
     expected = "{ d : [ 4, 5, 6, 7 ], b : [ 1, 2, 3 ] }";
-    ASSERT_EQUALS(mongo::fromjson(expected), target);
+    ASSERT_EQUALS(merizo::fromjson(expected), target);
 
     newElement = target.makeElementWithNewFieldName("C", source.root()["c"]);
     ASSERT_TRUE(newElement.ok());
     status = target.root().pushBack(newElement);
     ASSERT_OK(status);
     expected = "{ d : [ 4, 5, 6, 7 ], b : [ 1, 2, 3 ], C : { 'c' : 'c' } }";
-    ASSERT_EQUALS(mongo::fromjson(expected), target);
+    ASSERT_EQUALS(merizo::fromjson(expected), target);
 }
 
 TEST(Document, ElementCloningToSameDocument) {
     const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
 
-    mmb::Document doc(mongo::fromjson(initial));
+    mmb::Document doc(merizo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7)).transitional_ignore();
+    doc.root()["d"].pushBack(doc.makeElementInt(merizo::StringData(), 7)).transitional_ignore();
 
     mmb::Element newElement = doc.makeElement(doc.root()["d"]);
     ASSERT_TRUE(newElement.ok());
-    mongo::Status status = doc.root().pushBack(newElement);
+    merizo::Status status = doc.root().pushBack(newElement);
     ASSERT_OK(status);
     const char* expected =
         "{ "
         " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
         " d : [ 4, 5, 6, 7 ] "
         "}";
-    ASSERT_EQUALS(mongo::fromjson(expected), doc);
+    ASSERT_EQUALS(merizo::fromjson(expected), doc);
 
     newElement = doc.makeElement(doc.root()["b"]);
     ASSERT_TRUE(newElement.ok());
@@ -1745,7 +1745,7 @@ TEST(Document, ElementCloningToSameDocument) {
         " d : [ 4, 5, 6, 7 ], "
         " b : [ 1, 2, 3 ] "
         "}";
-    ASSERT_EQUALS(mongo::fromjson(expected), doc);
+    ASSERT_EQUALS(merizo::fromjson(expected), doc);
 
     newElement = doc.makeElementWithNewFieldName("C", doc.root()["c"]);
     ASSERT_TRUE(newElement.ok());
@@ -1758,40 +1758,40 @@ TEST(Document, ElementCloningToSameDocument) {
         " b : [ 1, 2, 3 ], "
         " C : { 'c' : 'c' } "
         "}";
-    ASSERT_EQUALS(mongo::fromjson(expected), doc);
+    ASSERT_EQUALS(merizo::fromjson(expected), doc);
 }
 
 TEST(Document, RootCloningToDifferentDocument) {
     const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
 
-    mmb::Document source(mongo::fromjson(initial));
+    mmb::Document source(merizo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
     source.root()["d"]
-        .pushBack(source.makeElementInt(mongo::StringData(), 7))
+        .pushBack(source.makeElementInt(merizo::StringData(), 7))
         .transitional_ignore();
 
     mmb::Document target;
 
     mmb::Element newElement = target.makeElementWithNewFieldName("X", source.root());
-    mongo::Status status = target.root().pushBack(newElement);
+    merizo::Status status = target.root().pushBack(newElement);
     ASSERT_OK(status);
     const char expected[] =
         "{ X : { a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ] } }";
 
-    ASSERT_EQUALS(mongo::fromjson(expected), target);
+    ASSERT_EQUALS(merizo::fromjson(expected), target);
 }
 
 TEST(Document, RootCloningToSameDocument) {
     const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
 
-    mmb::Document doc(mongo::fromjson(initial));
+    mmb::Document doc(merizo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7)).transitional_ignore();
+    doc.root()["d"].pushBack(doc.makeElementInt(merizo::StringData(), 7)).transitional_ignore();
 
     mmb::Element newElement = doc.makeElementWithNewFieldName("X", doc.root());
-    mongo::Status status = doc.root().pushBack(newElement);
+    merizo::Status status = doc.root().pushBack(newElement);
     ASSERT_OK(status);
     const char expected[] =
         "{ "
@@ -1799,7 +1799,7 @@ TEST(Document, RootCloningToSameDocument) {
         "X : { a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ] }"
         "}";
 
-    ASSERT_EQUALS(mongo::fromjson(expected), doc);
+    ASSERT_EQUALS(merizo::fromjson(expected), doc);
 }
 
 TEST(Element, PopOpsOnEmpty) {
@@ -1812,7 +1812,7 @@ TEST(Element, PopOpsOnEmpty) {
 TEST(Document, NameOfRootElementIsEmpty) {
     mmb::Document doc;
     // NOTE: You really shouldn't rely on this behavior; this test is mostly for coverage.
-    ASSERT_EQUALS(mongo::StringData(), doc.root().getFieldName());
+    ASSERT_EQUALS(merizo::StringData(), doc.root().getFieldName());
 }
 
 TEST(Document, SetValueOnRootFails) {
@@ -1827,13 +1827,13 @@ TEST(Document, ValueOfEphemeralObjectElementIsEmpty) {
     ASSERT_OK(root.pushBack(ephemeralObject));
     ASSERT_FALSE(ephemeralObject.hasValue());
     // NOTE: You really shouldn't rely on this behavior; this test is mostly for coverage.
-    ASSERT_BSONELT_EQ(mongo::BSONElement(), ephemeralObject.getValue());
+    ASSERT_BSONELT_EQ(merizo::BSONElement(), ephemeralObject.getValue());
 }
 
 TEST(Element, RemovingRemovedElementFails) {
     // Once an Element is removed, you can't remove it again until you re-attach it
     // somewhere. However, its children are still manipulable.
-    mmb::Document doc(mongo::fromjson("{ a : { b : 'c' } }"));
+    mmb::Document doc(merizo::fromjson("{ a : { b : 'c' } }"));
     mmb::Element a = doc.root().leftChild();
     ASSERT_TRUE(a.ok());
     ASSERT_OK(a.remove());
@@ -1847,7 +1847,7 @@ TEST(Element, RemovingRemovedElementFails) {
 
 namespace {
 // Checks that two BSONElements are byte-for-byte identical.
-bool identical(const mongo::BSONElement& lhs, const mongo::BSONElement& rhs) {
+bool identical(const merizo::BSONElement& lhs, const merizo::BSONElement& rhs) {
     if (lhs.size() != rhs.size())
         return false;
     return std::memcmp(lhs.rawdata(), rhs.rawdata(), lhs.size()) == 0;
@@ -1855,13 +1855,13 @@ bool identical(const mongo::BSONElement& lhs, const mongo::BSONElement& rhs) {
 }  // namespace
 
 TEST(TypeSupport, EncodingEquivalenceDouble) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const double value1 = 3.1415926;
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::NumberDouble);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::NumberDouble);
 
     mmb::Document doc;
 
@@ -1869,7 +1869,7 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
     ASSERT_OK(doc.root().appendDouble(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::NumberDouble);
+    ASSERT_EQUALS(a.getType(), merizo::NumberDouble);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueDouble());
 
@@ -1877,7 +1877,7 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::NumberDouble);
+    ASSERT_EQUALS(b.getType(), merizo::NumberDouble);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -1885,7 +1885,7 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueDouble(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::NumberDouble);
+    ASSERT_EQUALS(c.getType(), merizo::NumberDouble);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -1895,13 +1895,13 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceString) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const std::string value1 = "value1";
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::String);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::String);
 
     mmb::Document doc;
 
@@ -1909,7 +1909,7 @@ TEST(TypeSupport, EncodingEquivalenceString) {
     ASSERT_OK(doc.root().appendString(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::String);
+    ASSERT_EQUALS(a.getType(), merizo::String);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueString());
 
@@ -1917,7 +1917,7 @@ TEST(TypeSupport, EncodingEquivalenceString) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::String);
+    ASSERT_EQUALS(b.getType(), merizo::String);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -1925,7 +1925,7 @@ TEST(TypeSupport, EncodingEquivalenceString) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueString(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::String);
+    ASSERT_EQUALS(c.getType(), merizo::String);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -1935,13 +1935,13 @@ TEST(TypeSupport, EncodingEquivalenceString) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceObject) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
-    const mongo::BSONObj value1 = mongo::fromjson("{ a : 1, b : 2.0, c : 'hello' }");
+    const merizo::BSONObj value1 = merizo::fromjson("{ a : 1, b : 2.0, c : 'hello' }");
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Object);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::Object);
 
     mmb::Document doc;
 
@@ -1949,7 +1949,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     ASSERT_OK(doc.root().appendObject(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Object);
+    ASSERT_EQUALS(a.getType(), merizo::Object);
     ASSERT_TRUE(a.hasValue());
     ASSERT_BSONOBJ_EQ(value1, mmb::ConstElement(a).getValueObject());
 
@@ -1957,7 +1957,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Object);
+    ASSERT_EQUALS(b.getType(), merizo::Object);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -1965,7 +1965,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueObject(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Object);
+    ASSERT_EQUALS(c.getType(), merizo::Object);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -1975,14 +1975,14 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceArray) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
-    const mongo::BSONObj dummy = (mongo::fromjson("{ x : [ 1, 2.0, 'hello' ] } "));
-    const mongo::BSONArray value1(dummy.firstElement().embeddedObject());
+    const merizo::BSONObj dummy = (merizo::fromjson("{ x : [ 1, 2.0, 'hello' ] } "));
+    const merizo::BSONArray value1(dummy.firstElement().embeddedObject());
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Array);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::Array);
 
     mmb::Document doc;
 
@@ -1990,7 +1990,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     ASSERT_OK(doc.root().appendArray(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Array);
+    ASSERT_EQUALS(a.getType(), merizo::Array);
     ASSERT_TRUE(a.hasValue());
     ASSERT_BSONOBJ_EQ(value1, mmb::ConstElement(a).getValueArray());
 
@@ -1998,7 +1998,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Array);
+    ASSERT_EQUALS(b.getType(), merizo::Array);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2006,7 +2006,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueArray(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Array);
+    ASSERT_EQUALS(c.getType(), merizo::Array);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2016,9 +2016,9 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceBinary) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
-    const mongo::BinDataType value1 = mongo::newUUID;
+    const merizo::BinDataType value1 = merizo::newUUID;
     const unsigned char value2[] = {0x00,
                                     0x9D,
                                     0x15,
@@ -2036,9 +2036,9 @@ TEST(TypeSupport, EncodingEquivalenceBinary) {
                                     0x87,
                                     0x0C};
     builder.appendBinData(name, sizeof(value2), value1, &value2[0]);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::BinData);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::BinData);
 
     mmb::Document doc;
 
@@ -2046,14 +2046,14 @@ TEST(TypeSupport, EncodingEquivalenceBinary) {
     ASSERT_OK(doc.root().appendBinary(name, sizeof(value2), value1, &value2[0]));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::BinData);
+    ASSERT_EQUALS(a.getType(), merizo::BinData);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::BinData);
+    ASSERT_EQUALS(b.getType(), merizo::BinData);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2061,7 +2061,7 @@ TEST(TypeSupport, EncodingEquivalenceBinary) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueBinary(sizeof(value2), value1, &value2[0]).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::BinData);
+    ASSERT_EQUALS(c.getType(), merizo::BinData);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2071,12 +2071,12 @@ TEST(TypeSupport, EncodingEquivalenceBinary) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceUndefined) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     builder.appendUndefined(name);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Undefined);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::Undefined);
 
     mmb::Document doc;
 
@@ -2084,7 +2084,7 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
     ASSERT_OK(doc.root().appendUndefined(name));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Undefined);
+    ASSERT_EQUALS(a.getType(), merizo::Undefined);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(mmb::ConstElement(a).isValueUndefined());
 
@@ -2092,7 +2092,7 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Undefined);
+    ASSERT_EQUALS(b.getType(), merizo::Undefined);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2100,7 +2100,7 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueUndefined().transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Undefined);
+    ASSERT_EQUALS(c.getType(), merizo::Undefined);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2110,13 +2110,13 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceOID) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
-    const mongo::OID value1 = mongo::OID::gen();
+    const merizo::OID value1 = merizo::OID::gen();
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::jstOID);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::jstOID);
 
     mmb::Document doc;
 
@@ -2124,7 +2124,7 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
     ASSERT_OK(doc.root().appendOID(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::jstOID);
+    ASSERT_EQUALS(a.getType(), merizo::jstOID);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueOID());
 
@@ -2132,7 +2132,7 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::jstOID);
+    ASSERT_EQUALS(b.getType(), merizo::jstOID);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2140,7 +2140,7 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueOID(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::jstOID);
+    ASSERT_EQUALS(c.getType(), merizo::jstOID);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2150,13 +2150,13 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceBoolean) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const bool value1 = true;
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Bool);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::Bool);
 
     mmb::Document doc;
 
@@ -2164,7 +2164,7 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
     ASSERT_OK(doc.root().appendBool(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Bool);
+    ASSERT_EQUALS(a.getType(), merizo::Bool);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueBool());
 
@@ -2172,7 +2172,7 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Bool);
+    ASSERT_EQUALS(b.getType(), merizo::Bool);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2180,7 +2180,7 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueBool(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Bool);
+    ASSERT_EQUALS(c.getType(), merizo::Bool);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2190,13 +2190,13 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceDate) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
-    const mongo::Date_t value1 = mongo::jsTime();
+    const merizo::Date_t value1 = merizo::jsTime();
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Date);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::Date);
 
     mmb::Document doc;
 
@@ -2204,7 +2204,7 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
     ASSERT_OK(doc.root().appendDate(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Date);
+    ASSERT_EQUALS(a.getType(), merizo::Date);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueDate());
 
@@ -2212,7 +2212,7 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Date);
+    ASSERT_EQUALS(b.getType(), merizo::Date);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2220,7 +2220,7 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueDate(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Date);
+    ASSERT_EQUALS(c.getType(), merizo::Date);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2230,12 +2230,12 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceNull) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     builder.appendNull(name);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::jstNULL);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::jstNULL);
 
     mmb::Document doc;
 
@@ -2243,7 +2243,7 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::jstNULL);
+    ASSERT_EQUALS(a.getType(), merizo::jstNULL);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(mmb::ConstElement(a).isValueNull());
 
@@ -2251,7 +2251,7 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::jstNULL);
+    ASSERT_EQUALS(b.getType(), merizo::jstNULL);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2259,7 +2259,7 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueNull().transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::jstNULL);
+    ASSERT_EQUALS(c.getType(), merizo::jstNULL);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2269,14 +2269,14 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceRegex) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const std::string value1 = "some_regex_data";
     const std::string value2 = "flags";
     builder.appendRegex(name, value1, value2);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::RegEx);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::RegEx);
 
     mmb::Document doc;
 
@@ -2284,14 +2284,14 @@ TEST(TypeSupport, EncodingEquivalenceRegex) {
     ASSERT_OK(doc.root().appendRegex(name, value1, value2));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::RegEx);
+    ASSERT_EQUALS(a.getType(), merizo::RegEx);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::RegEx);
+    ASSERT_EQUALS(b.getType(), merizo::RegEx);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2299,7 +2299,7 @@ TEST(TypeSupport, EncodingEquivalenceRegex) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueRegex(value1, value2).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::RegEx);
+    ASSERT_EQUALS(c.getType(), merizo::RegEx);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2309,14 +2309,14 @@ TEST(TypeSupport, EncodingEquivalenceRegex) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceDBRef) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const std::string value1 = "some_ns";
-    const mongo::OID value2 = mongo::OID::gen();
+    const merizo::OID value2 = merizo::OID::gen();
     builder.appendDBRef(name, value1, value2);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::DBRef);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::DBRef);
 
     mmb::Document doc;
 
@@ -2324,14 +2324,14 @@ TEST(TypeSupport, EncodingEquivalenceDBRef) {
     ASSERT_OK(doc.root().appendDBRef(name, value1, value2));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::DBRef);
+    ASSERT_EQUALS(a.getType(), merizo::DBRef);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::DBRef);
+    ASSERT_EQUALS(b.getType(), merizo::DBRef);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2339,7 +2339,7 @@ TEST(TypeSupport, EncodingEquivalenceDBRef) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueDBRef(value1, value2).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::DBRef);
+    ASSERT_EQUALS(c.getType(), merizo::DBRef);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2349,13 +2349,13 @@ TEST(TypeSupport, EncodingEquivalenceDBRef) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceCode) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const std::string value1 = "{ print 4; }";
     builder.appendCode(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Code);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::Code);
 
     mmb::Document doc;
 
@@ -2363,14 +2363,14 @@ TEST(TypeSupport, EncodingEquivalenceCode) {
     ASSERT_OK(doc.root().appendCode(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Code);
+    ASSERT_EQUALS(a.getType(), merizo::Code);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Code);
+    ASSERT_EQUALS(b.getType(), merizo::Code);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2378,7 +2378,7 @@ TEST(TypeSupport, EncodingEquivalenceCode) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueCode(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Code);
+    ASSERT_EQUALS(c.getType(), merizo::Code);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2388,13 +2388,13 @@ TEST(TypeSupport, EncodingEquivalenceCode) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceSymbol) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const std::string value1 = "#symbol";
     builder.appendSymbol(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Symbol);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::Symbol);
 
     mmb::Document doc;
 
@@ -2402,7 +2402,7 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
     ASSERT_OK(doc.root().appendSymbol(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Symbol);
+    ASSERT_EQUALS(a.getType(), merizo::Symbol);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueSymbol());
 
@@ -2410,7 +2410,7 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Symbol);
+    ASSERT_EQUALS(b.getType(), merizo::Symbol);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2418,7 +2418,7 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueSymbol(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Symbol);
+    ASSERT_EQUALS(c.getType(), merizo::Symbol);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2428,14 +2428,14 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceCodeWithScope) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const std::string value1 = "print x;";
-    const mongo::BSONObj value2 = mongo::fromjson("{ x : 4 }");
+    const merizo::BSONObj value2 = merizo::fromjson("{ x : 4 }");
     builder.appendCodeWScope(name, value1, value2);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::CodeWScope);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::CodeWScope);
 
     mmb::Document doc;
 
@@ -2443,14 +2443,14 @@ TEST(TypeSupport, EncodingEquivalenceCodeWithScope) {
     ASSERT_OK(doc.root().appendCodeWithScope(name, value1, value2));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::CodeWScope);
+    ASSERT_EQUALS(a.getType(), merizo::CodeWScope);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::CodeWScope);
+    ASSERT_EQUALS(b.getType(), merizo::CodeWScope);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2458,7 +2458,7 @@ TEST(TypeSupport, EncodingEquivalenceCodeWithScope) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueCodeWithScope(value1, value2).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::CodeWScope);
+    ASSERT_EQUALS(c.getType(), merizo::CodeWScope);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2468,13 +2468,13 @@ TEST(TypeSupport, EncodingEquivalenceCodeWithScope) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceInt) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const int value1 = true;
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::NumberInt);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::NumberInt);
 
     mmb::Document doc;
 
@@ -2482,7 +2482,7 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
     ASSERT_OK(doc.root().appendInt(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::NumberInt);
+    ASSERT_EQUALS(a.getType(), merizo::NumberInt);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueInt());
 
@@ -2490,7 +2490,7 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::NumberInt);
+    ASSERT_EQUALS(b.getType(), merizo::NumberInt);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2498,7 +2498,7 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueInt(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::NumberInt);
+    ASSERT_EQUALS(c.getType(), merizo::NumberInt);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2508,13 +2508,13 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceTimestamp) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
-    const mongo::Timestamp value1 = mongo::Timestamp(mongo::jsTime());
+    const merizo::Timestamp value1 = merizo::Timestamp(merizo::jsTime());
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::bsonTimestamp);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::bsonTimestamp);
 
     mmb::Document doc;
 
@@ -2522,7 +2522,7 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
     ASSERT_OK(doc.root().appendTimestamp(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::bsonTimestamp);
+    ASSERT_EQUALS(a.getType(), merizo::bsonTimestamp);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(value1 == mmb::ConstElement(a).getValueTimestamp());
 
@@ -2530,7 +2530,7 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::bsonTimestamp);
+    ASSERT_EQUALS(b.getType(), merizo::bsonTimestamp);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2538,7 +2538,7 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueTimestamp(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::bsonTimestamp);
+    ASSERT_EQUALS(c.getType(), merizo::bsonTimestamp);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2548,13 +2548,13 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceLong) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     const long long value1 = 420000000000000LL;
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::NumberLong);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::NumberLong);
 
     mmb::Document doc;
 
@@ -2562,7 +2562,7 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
     ASSERT_OK(doc.root().appendLong(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::NumberLong);
+    ASSERT_EQUALS(a.getType(), merizo::NumberLong);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueLong());
 
@@ -2570,7 +2570,7 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::NumberLong);
+    ASSERT_EQUALS(b.getType(), merizo::NumberLong);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2578,7 +2578,7 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueLong(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::NumberLong);
+    ASSERT_EQUALS(c.getType(), merizo::NumberLong);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2588,13 +2588,13 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceDecimal) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
-    const mongo::Decimal128 value1 = mongo::Decimal128(2);
+    const merizo::Decimal128 value1 = merizo::Decimal128(2);
     builder.append(name, value1);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::NumberDecimal);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::NumberDecimal);
 
     mmb::Document doc;
 
@@ -2602,7 +2602,7 @@ TEST(TypeSupport, EncodingEquivalenceDecimal) {
     ASSERT_OK(doc.root().appendDecimal(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::NumberDecimal);
+    ASSERT_EQUALS(a.getType(), merizo::NumberDecimal);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(value1.isEqual(mmb::ConstElement(a).getValueDecimal()));
 
@@ -2610,7 +2610,7 @@ TEST(TypeSupport, EncodingEquivalenceDecimal) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::NumberDecimal);
+    ASSERT_EQUALS(b.getType(), merizo::NumberDecimal);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call
@@ -2618,7 +2618,7 @@ TEST(TypeSupport, EncodingEquivalenceDecimal) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueDecimal(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::NumberDecimal);
+    ASSERT_EQUALS(c.getType(), merizo::NumberDecimal);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2628,12 +2628,12 @@ TEST(TypeSupport, EncodingEquivalenceDecimal) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceMinKey) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     builder.appendMinKey(name);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::MinKey);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::MinKey);
 
     mmb::Document doc;
 
@@ -2641,7 +2641,7 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
     ASSERT_OK(doc.root().appendMinKey(name));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::MinKey);
+    ASSERT_EQUALS(a.getType(), merizo::MinKey);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(mmb::ConstElement(a).isValueMinKey());
 
@@ -2649,7 +2649,7 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::MinKey);
+    ASSERT_EQUALS(b.getType(), merizo::MinKey);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2657,7 +2657,7 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueMinKey().transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::MinKey);
+    ASSERT_EQUALS(c.getType(), merizo::MinKey);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2667,12 +2667,12 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
 }
 
 TEST(TypeSupport, EncodingEquivalenceMaxKey) {
-    mongo::BSONObjBuilder builder;
+    merizo::BSONObjBuilder builder;
     const char name[] = "thing";
     builder.appendMaxKey(name);
-    mongo::BSONObj source = builder.done();
-    const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::MaxKey);
+    merizo::BSONObj source = builder.done();
+    const merizo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == merizo::MaxKey);
 
     mmb::Document doc;
 
@@ -2680,7 +2680,7 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     ASSERT_OK(doc.root().appendMaxKey(name));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::MaxKey);
+    ASSERT_EQUALS(a.getType(), merizo::MaxKey);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(mmb::ConstElement(a).isValueMaxKey());
 
@@ -2688,7 +2688,7 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::MaxKey);
+    ASSERT_EQUALS(b.getType(), merizo::MaxKey);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2696,7 +2696,7 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueMaxKey().transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::MaxKey);
+    ASSERT_EQUALS(c.getType(), merizo::MaxKey);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2711,7 +2711,7 @@ TEST(Document, ManipulateComplexObjInLeafHeap) {
     // freely.
     mmb::Document doc;
     static const char inJson[] = "{ a: 1, b: 2, d : ['w', 'x', 'y', 'z'] }";
-    mmb::Element embedded = doc.makeElementObject("embedded", mongo::fromjson(inJson));
+    mmb::Element embedded = doc.makeElementObject("embedded", merizo::fromjson(inJson));
     ASSERT_OK(doc.root().pushBack(embedded));
     mmb::Element free = doc.makeElementObject("free");
     ASSERT_OK(doc.root().pushBack(free));
@@ -2744,7 +2744,7 @@ TEST(Document, ManipulateComplexObjInLeafHeap) {
 
     static const char outJson[] =
         "{ embedded: { a: 1, b: 2, c: 2.0, d : ['w', 'y', 'z'] }, free: {} }";
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), doc.getObject());
 }
 
 TEST(DocumentInPlace, EphemeralDocumentsDoNotUseInPlaceMode) {
@@ -2753,7 +2753,7 @@ TEST(DocumentInPlace, EphemeralDocumentsDoNotUseInPlaceMode) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsHonored1) {
-    mongo::BSONObj obj;
+    merizo::BSONObj obj;
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     doc.disableInPlaceUpdates();
@@ -2761,7 +2761,7 @@ TEST(DocumentInPlace, InPlaceModeIsHonored1) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsHonored2) {
-    mongo::BSONObj obj;
+    merizo::BSONObj obj;
     mmb::Document doc(obj, mmb::Document::kInPlaceDisabled);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     doc.disableInPlaceUpdates();
@@ -2769,7 +2769,7 @@ TEST(DocumentInPlace, InPlaceModeIsHonored2) {
 }
 
 TEST(DocumentInPlace, InPlaceModeWorksWithNoMutations) {
-    mongo::BSONObj obj;
+    merizo::BSONObj obj;
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     const char* source = NULL;
@@ -2782,7 +2782,7 @@ TEST(DocumentInPlace, InPlaceModeWorksWithNoMutations) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsDisabledByAddSiblingLeft) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     mmb::Element newElt = doc.makeElementInt("bar", 42);
@@ -2792,7 +2792,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByAddSiblingLeft) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsDisabledByAddSiblingRight) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     mmb::Element newElt = doc.makeElementInt("bar", 42);
@@ -2802,7 +2802,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByAddSiblingRight) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsDisabledByRemove) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_OK(doc.root().leftChild().remove());
@@ -2812,7 +2812,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByRemove) {
 // NOTE: Someday, we may do in-place renames, but renaming 'foo' to 'foobar' will never
 // work because the sizes don't match. Validate that this disables in-place updates.
 TEST(DocumentInPlace, InPlaceModeIsDisabledByRename) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_OK(doc.root().leftChild().rename("foobar"));
@@ -2820,7 +2820,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByRename) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsDisabledByPushFront) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     mmb::Element newElt = doc.makeElementInt("bar", 42);
@@ -2830,7 +2830,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByPushFront) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsDisabledByPushBack) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     mmb::Element newElt = doc.makeElementInt("bar", 42);
@@ -2840,7 +2840,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByPushBack) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsDisabledByPopFront) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_OK(doc.root().popFront());
@@ -2848,7 +2848,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByPopFront) {
 }
 
 TEST(DocumentInPlace, InPlaceModeIsDisabledByPopBack) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_OK(doc.root().popBack());
@@ -2856,7 +2856,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByPopBack) {
 }
 
 TEST(DocumentInPlace, ReserveDamageEventsIsAlwaysSafeToCall) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     doc.reserveDamageEvents(10);
@@ -2866,7 +2866,7 @@ TEST(DocumentInPlace, ReserveDamageEventsIsAlwaysSafeToCall) {
 }
 
 TEST(DocumentInPlace, GettingInPlaceUpdatesWhenDisabledClearsArguments) {
-    mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+    merizo::BSONObj obj = merizo::fromjson("{ foo : 'foo' }");
     mmb::Document doc(obj, mmb::Document::kInPlaceDisabled);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2891,7 +2891,7 @@ TEST(DocumentInPlace, GettingInPlaceUpdatesWhenDisabledClearsArguments) {
 // and incompatible sets, but since all setValueX calls decay to the internal setValue, we
 // can be pretty sure that this will at least check the logic somewhat.
 TEST(DocumentInPlace, InPlaceModeIsDisabledByIncompatibleSetValue) {
-    mongo::BSONObj obj(mongo::fromjson("{ foo : false }"));
+    merizo::BSONObj obj(merizo::fromjson("{ foo : false }"));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     mmb::Element foo = doc.root().leftChild();
@@ -2901,7 +2901,7 @@ TEST(DocumentInPlace, InPlaceModeIsDisabledByIncompatibleSetValue) {
 }
 
 TEST(DocumentInPlace, DisablingInPlaceDoesNotDiscardUpdates) {
-    mongo::BSONObj obj(mongo::fromjson("{ foo : false, bar : true }"));
+    merizo::BSONObj obj(merizo::fromjson("{ foo : false, bar : true }"));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -2919,11 +2919,11 @@ TEST(DocumentInPlace, DisablingInPlaceDoesNotDiscardUpdates) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
     static const char outJson[] = "{ foo : true, bar : false, baz : 'baz' }";
-    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(merizo::fromjson(outJson), doc.getObject());
 }
 
 TEST(DocumentInPlace, StringLifecycle) {
-    mongo::BSONObj obj(mongo::fromjson("{ x : 'foo' }"));
+    merizo::BSONObj obj(merizo::fromjson("{ x : 'foo' }"));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -2936,7 +2936,7 @@ TEST(DocumentInPlace, StringLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::String));
+    ASSERT_TRUE(x.isType(merizo::String));
     ASSERT_EQUALS("bar", x.getValueString());
 
     // TODO: When in-place updates for leaf elements is implemented, add tests here.
@@ -2946,10 +2946,10 @@ TEST(DocumentInPlace, BinDataLifecycle) {
     const char kData1[] = "\x01\x02\x03\x04\x05\x06";
     const char kData2[] = "\x10\x20\x30\x40\x50\x60";
 
-    const mongo::BSONBinData binData1(kData1, sizeof(kData1) - 1, mongo::BinDataGeneral);
-    const mongo::BSONBinData binData2(kData2, sizeof(kData2) - 1, mongo::bdtCustom);
+    const merizo::BSONBinData binData1(kData1, sizeof(kData1) - 1, merizo::BinDataGeneral);
+    const merizo::BSONBinData binData2(kData2, sizeof(kData2) - 1, merizo::bdtCustom);
 
-    mongo::BSONObj obj(BSON("x" << binData1));
+    merizo::BSONObj obj(BSON("x" << binData1));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -2962,9 +2962,9 @@ TEST(DocumentInPlace, BinDataLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::BinData));
+    ASSERT_TRUE(x.isType(merizo::BinData));
 
-    mongo::BSONElement value = x.getValue();
+    merizo::BSONElement value = x.getValue();
     ASSERT_EQUALS(binData2.type, value.binDataType());
     int len = 0;
     const char* const data = value.binDataClean(len);
@@ -2975,11 +2975,11 @@ TEST(DocumentInPlace, BinDataLifecycle) {
 }
 
 TEST(DocumentInPlace, OIDLifecycle) {
-    const mongo::OID oid1 = mongo::OID::gen();
-    const mongo::OID oid2 = mongo::OID::gen();
+    const merizo::OID oid1 = merizo::OID::gen();
+    const merizo::OID oid2 = merizo::OID::gen();
     ASSERT_NOT_EQUALS(oid1, oid2);
 
-    mongo::BSONObj obj(BSON("x" << oid1));
+    merizo::BSONObj obj(BSON("x" << oid1));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -2992,14 +2992,14 @@ TEST(DocumentInPlace, OIDLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::jstOID));
+    ASSERT_TRUE(x.isType(merizo::jstOID));
     ASSERT_EQUALS(oid2, x.getValueOID());
 
     // TODO: When in-place updates for leaf elements is implemented, add tests here.
 }
 
 TEST(DocumentInPlace, BooleanLifecycle) {
-    mongo::BSONObj obj(mongo::fromjson("{ x : false }"));
+    merizo::BSONObj obj(merizo::fromjson("{ x : false }"));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -3012,7 +3012,7 @@ TEST(DocumentInPlace, BooleanLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::Bool));
+    ASSERT_TRUE(x.isType(merizo::Bool));
     ASSERT_EQUALS(false, x.getValueBool());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3020,12 +3020,12 @@ TEST(DocumentInPlace, BooleanLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::Bool));
+    // ASSERT_TRUE(x.isType(merizo::Bool));
     // ASSERT_EQUALS(true, x.getValueBool());
 }
 
 TEST(DocumentInPlace, DateLifecycle) {
-    mongo::BSONObj obj(BSON("x" << mongo::Date_t::fromMillisSinceEpoch(1000)));
+    merizo::BSONObj obj(BSON("x" << merizo::Date_t::fromMillisSinceEpoch(1000)));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -3033,13 +3033,13 @@ TEST(DocumentInPlace, DateLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueDate(mongo::Date_t::fromMillisSinceEpoch(20000)).transitional_ignore();
+    x.setValueDate(merizo::Date_t::fromMillisSinceEpoch(20000)).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::Date));
-    ASSERT_EQUALS(mongo::Date_t::fromMillisSinceEpoch(20000), x.getValueDate());
+    ASSERT_TRUE(x.isType(merizo::Date));
+    ASSERT_EQUALS(merizo::Date_t::fromMillisSinceEpoch(20000), x.getValueDate());
 
     // TODO: When in-place updates for leaf elements is implemented, add tests here.
 }
@@ -3047,7 +3047,7 @@ TEST(DocumentInPlace, DateLifecycle) {
 TEST(DocumentInPlace, NumberIntLifecycle) {
     const int value1 = 42;
     const int value2 = 3;
-    mongo::BSONObj obj(BSON("x" << value1));
+    merizo::BSONObj obj(BSON("x" << value1));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -3060,7 +3060,7 @@ TEST(DocumentInPlace, NumberIntLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberInt));
+    ASSERT_TRUE(x.isType(merizo::NumberInt));
     ASSERT_EQUALS(value2, x.getValueInt());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3068,12 +3068,12 @@ TEST(DocumentInPlace, NumberIntLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberInt));
+    // ASSERT_TRUE(x.isType(merizo::NumberInt));
     // ASSERT_EQUALS(value1, x.getValueInt());
 }
 
 TEST(DocumentInPlace, TimestampLifecycle) {
-    mongo::BSONObj obj(BSON("x" << mongo::Timestamp(mongo::Date_t::fromMillisSinceEpoch(1000))));
+    merizo::BSONObj obj(BSON("x" << merizo::Timestamp(merizo::Date_t::fromMillisSinceEpoch(1000))));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -3081,14 +3081,14 @@ TEST(DocumentInPlace, TimestampLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueTimestamp(mongo::Timestamp(mongo::Date_t::fromMillisSinceEpoch(20000)))
+    x.setValueTimestamp(merizo::Timestamp(merizo::Date_t::fromMillisSinceEpoch(20000)))
         .transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::bsonTimestamp));
-    ASSERT_TRUE(mongo::Timestamp(20000U) == x.getValueTimestamp());
+    ASSERT_TRUE(x.isType(merizo::bsonTimestamp));
+    ASSERT_TRUE(merizo::Timestamp(20000U) == x.getValueTimestamp());
 
     // TODO: When in-place updates for leaf elements is implemented, add tests here.
 }
@@ -3097,7 +3097,7 @@ TEST(DocumentInPlace, NumberLongLifecycle) {
     const long long value1 = 42;
     const long long value2 = 3;
 
-    mongo::BSONObj obj(BSON("x" << value1));
+    merizo::BSONObj obj(BSON("x" << value1));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -3110,7 +3110,7 @@ TEST(DocumentInPlace, NumberLongLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberLong));
+    ASSERT_TRUE(x.isType(merizo::NumberLong));
     ASSERT_EQUALS(value2, x.getValueLong());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3118,7 +3118,7 @@ TEST(DocumentInPlace, NumberLongLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberLong));
+    // ASSERT_TRUE(x.isType(merizo::NumberLong));
     // ASSERT_EQUALS(value1, x.getValueLong());
 }
 
@@ -3126,7 +3126,7 @@ TEST(DocumentInPlace, NumberDoubleLifecycle) {
     const double value1 = 32.0;
     const double value2 = 2.0;
 
-    mongo::BSONObj obj(BSON("x" << value1));
+    merizo::BSONObj obj(BSON("x" << value1));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -3139,7 +3139,7 @@ TEST(DocumentInPlace, NumberDoubleLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberDouble));
+    ASSERT_TRUE(x.isType(merizo::NumberDouble));
     ASSERT_EQUALS(value2, x.getValueDouble());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3147,15 +3147,15 @@ TEST(DocumentInPlace, NumberDoubleLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberDouble));
+    // ASSERT_TRUE(x.isType(merizo::NumberDouble));
     // ASSERT_EQUALS(value1, x.getValueDouble());
 }
 
 TEST(DocumentInPlace, NumberDecimalLifecycle) {
-    const mongo::Decimal128 value1 = mongo::Decimal128(32);
-    const mongo::Decimal128 value2 = mongo::Decimal128(2);
+    const merizo::Decimal128 value1 = merizo::Decimal128(32);
+    const merizo::Decimal128 value2 = merizo::Decimal128(2);
 
-    mongo::BSONObj obj(BSON("x" << value1));
+    merizo::BSONObj obj(BSON("x" << value1));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -3168,7 +3168,7 @@ TEST(DocumentInPlace, NumberDecimalLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberDecimal));
+    ASSERT_TRUE(x.isType(merizo::NumberDecimal));
     ASSERT_TRUE(value2.isEqual(x.getValueDecimal()));
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3176,7 +3176,7 @@ TEST(DocumentInPlace, NumberDecimalLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberDecimal));
+    // ASSERT_TRUE(x.isType(merizo::NumberDecimal));
     // ASSERT_TRUE(value1.isEqual(x.getValueDecimal()));
 }
 
@@ -3186,7 +3186,7 @@ TEST(DocumentInPlace, DoubleToLongAndBack) {
     const double value1 = 32.0;
     const long long value2 = 42;
 
-    mongo::BSONObj obj(BSON("x" << value1));
+    merizo::BSONObj obj(BSON("x" << value1));
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
     mmb::Element x = doc.root().leftChild();
@@ -3200,7 +3200,7 @@ TEST(DocumentInPlace, DoubleToLongAndBack) {
     ASSERT_EQUALS(2U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberLong));
+    ASSERT_TRUE(x.isType(merizo::NumberLong));
     ASSERT_EQUALS(value2, x.getValueLong());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3208,13 +3208,13 @@ TEST(DocumentInPlace, DoubleToLongAndBack) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberDouble));
+    // ASSERT_TRUE(x.isType(merizo::NumberDouble));
     // ASSERT_EQUALS(value1, x.getValueDouble());
 }
 
 TEST(DocumentComparison, SimpleComparison) {
-    const mongo::BSONObj obj =
-        mongo::fromjson("{ a : 'a', b : ['b', 'b', 'b'], c : { one : 1.0 } }");
+    const merizo::BSONObj obj =
+        merizo::fromjson("{ a : 'a', b : ['b', 'b', 'b'], c : { one : 1.0 } }");
 
     const mmb::Document doc1(obj.getOwned());
     ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj, nullptr));
@@ -3224,8 +3224,8 @@ TEST(DocumentComparison, SimpleComparison) {
 }
 
 TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
-    const mongo::BSONObj obj =
-        mongo::fromjson("{ a : 'a', b : ['b', 'b', 'b'], c : { one : 1.0 } }");
+    const merizo::BSONObj obj =
+        merizo::fromjson("{ a : 'a', b : ['b', 'b', 'b'], c : { one : 1.0 } }");
 
     // Perform an operation on 'b' that doesn't change the serialized value, but
     // deserializes the node.
@@ -3265,9 +3265,9 @@ TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
 }
 
 TEST(DocumentComparison, DocumentCompareWithRespectsCollation) {
-    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
-    const mmb::Document doc2(mongo::fromjson("{a: 'bar'}"));
+    merizo::CollatorInterfaceMock collator(merizo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(merizo::fromjson("{a: 'foo'}"));
+    const mmb::Document doc2(merizo::fromjson("{a: 'bar'}"));
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
     ASSERT_NE(0, doc1.compareWith(doc2, nullptr, true));
@@ -3275,9 +3275,9 @@ TEST(DocumentComparison, DocumentCompareWithRespectsCollation) {
 }
 
 TEST(DocumentComparison, DocumentCompareWithBSONObjRespectsCollation) {
-    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
-    const mongo::BSONObj doc2 = mongo::fromjson("{a: 'bar'}");
+    merizo::CollatorInterfaceMock collator(merizo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(merizo::fromjson("{a: 'foo'}"));
+    const merizo::BSONObj doc2 = merizo::fromjson("{a: 'bar'}");
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
     ASSERT_NE(0, doc1.compareWithBSONObj(doc2, nullptr, true));
@@ -3285,9 +3285,9 @@ TEST(DocumentComparison, DocumentCompareWithBSONObjRespectsCollation) {
 }
 
 TEST(DocumentComparison, ElementCompareWithElementRespectsCollator) {
-    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
-    const mmb::Document doc2(mongo::fromjson("{a: 'bar'}"));
+    merizo::CollatorInterfaceMock collator(merizo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(merizo::fromjson("{a: 'foo'}"));
+    const mmb::Document doc2(merizo::fromjson("{a: 'bar'}"));
     const mmb::ConstElement element1 = doc1.root().leftChild();
     const mmb::ConstElement element2 = doc2.root().leftChild();
     // Pass true to indicate that we should compare field names. The two documents should be unequal
@@ -3297,11 +3297,11 @@ TEST(DocumentComparison, ElementCompareWithElementRespectsCollator) {
 }
 
 TEST(DocumentComparison, ElementCompareWithBSONElementRespectsCollator) {
-    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
-    const mongo::BSONObj doc2 = mongo::fromjson("{a: 'bar'}");
+    merizo::CollatorInterfaceMock collator(merizo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(merizo::fromjson("{a: 'foo'}"));
+    const merizo::BSONObj doc2 = merizo::fromjson("{a: 'bar'}");
     const mmb::ConstElement element1 = doc1.root().leftChild();
-    const mongo::BSONElement element2 = doc2["a"];
+    const merizo::BSONElement element2 = doc2["a"];
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
     ASSERT_NE(0, element1.compareWithBSONElement(element2, nullptr, true));
@@ -3309,9 +3309,9 @@ TEST(DocumentComparison, ElementCompareWithBSONElementRespectsCollator) {
 }
 
 TEST(DocumentComparison, ElementCompareWithBSONObjRespectsCollator) {
-    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const mmb::Document doc1(mongo::fromjson("{b: {c: 'foo'}}"));
-    const mongo::BSONObj doc2 = mongo::fromjson("{c: 'bar'}");
+    merizo::CollatorInterfaceMock collator(merizo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(merizo::fromjson("{b: {c: 'foo'}}"));
+    const merizo::BSONObj doc2 = merizo::fromjson("{c: 'bar'}");
     const mmb::ConstElement element1 = doc1.root().leftChild();
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
@@ -3320,9 +3320,9 @@ TEST(DocumentComparison, ElementCompareWithBSONObjRespectsCollator) {
 }
 
 TEST(DocumentComparison, DocumentCompareWithRespectsCollationRecursively) {
-    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const mmb::Document doc1(mongo::fromjson("{a: [{b: 'foo'}, {b: 'bar'}]}"));
-    const mmb::Document doc2(mongo::fromjson("{a: [{b: 'notFoo'}, {b: 'notBar'}]}"));
+    merizo::CollatorInterfaceMock collator(merizo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(merizo::fromjson("{a: [{b: 'foo'}, {b: 'bar'}]}"));
+    const mmb::Document doc2(merizo::fromjson("{a: [{b: 'notFoo'}, {b: 'notBar'}]}"));
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
     ASSERT_NE(0, doc1.compareWith(doc2, nullptr, true));
@@ -3330,9 +3330,9 @@ TEST(DocumentComparison, DocumentCompareWithRespectsCollationRecursively) {
 }
 
 TEST(DocumentComparison, DocumentCompareWithRespectsCollationWithDeserializedElement) {
-    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
-    mmb::Document doc1(mongo::fromjson("{a: ['foo', 'foo']}"));
-    mmb::Document doc2(mongo::fromjson("{a: ['bar', 'bar']}"));
+    merizo::CollatorInterfaceMock collator(merizo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    mmb::Document doc1(merizo::fromjson("{a: ['foo', 'foo']}"));
+    mmb::Document doc2(merizo::fromjson("{a: ['bar', 'bar']}"));
 
     // With the always equal collator, the documents should start out comparing equal.
     ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
@@ -3365,80 +3365,80 @@ TEST(DocumentComparison, DocumentCompareWithRespectsCollationWithDeserializedEle
 }
 
 TEST(UnorderedEqualityChecker, Identical) {
-    const mongo::BSONObj b1 =
-        mongo::fromjson("{ a : [1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b1 =
+        merizo::fromjson("{ a : [1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
 
-    const mongo::BSONObj b2 = b1.getOwned();
+    const merizo::BSONObj b2 = b1.getOwned();
 
     ASSERT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
 TEST(UnorderedEqualityChecker, DifferentValuesAreNotEqual) {
-    const mongo::BSONObj b1 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
-    const mongo::BSONObj b2 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 4 } }");
+    const merizo::BSONObj b1 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b2 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 4 } }");
 
     ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
 TEST(UnorderedEqualityChecker, DifferentTypesAreNotEqual) {
-    const mongo::BSONObj b1 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
-    const mongo::BSONObj b2 = mongo::fromjson(
+    const merizo::BSONObj b1 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b2 = merizo::fromjson(
         "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : '2', z : 3 } }");
 
     ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
 TEST(UnorderedEqualityChecker, DifferentFieldNamesAreNotEqual) {
-    const mongo::BSONObj b1 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
-    const mongo::BSONObj b2 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, Y : 2, z : 3 } }");
+    const merizo::BSONObj b1 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b2 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, Y : 2, z : 3 } }");
 
     ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
 TEST(UnorderedEqualityChecker, MissingFieldsInObjectAreNotEqual) {
-    const mongo::BSONObj b1 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
-    const mongo::BSONObj b2 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, z : 3 } }");
+    const merizo::BSONObj b1 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b2 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, z : 3 } }");
 
     ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
 TEST(UnorderedEqualityChecker, ObjectOrderingIsNotConsidered) {
-    const mongo::BSONObj b1 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
-    const mongo::BSONObj b2 = mongo::fromjson(
+    const merizo::BSONObj b1 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b2 = merizo::fromjson(
         "{ b : { y : 2, z : 3 , x : 1  }, a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ] }");
 
     ASSERT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
 TEST(UnorderedEqualityChecker, ArrayOrderingIsConsidered) {
-    const mongo::BSONObj b1 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b1 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
 
-    const mongo::BSONObj b2 =
-        mongo::fromjson("{ a : [ 1, { 'a' : 'b', 'x' : 'y' }, 2 ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b2 =
+        merizo::fromjson("{ a : [ 1, { 'a' : 'b', 'x' : 'y' }, 2 ], b : { x : 1, y : 2, z : 3 } }");
 
     ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
 TEST(UnorderedEqualityChecker, MissingItemsInArrayAreNotEqual) {
-    const mongo::BSONObj b1 =
-        mongo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
-    const mongo::BSONObj b2 =
-        mongo::fromjson("{ a : [ 1, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, z : 3 } }");
+    const merizo::BSONObj b1 =
+        merizo::fromjson("{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+    const merizo::BSONObj b2 =
+        merizo::fromjson("{ a : [ 1, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, z : 3 } }");
 
     ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
 TEST(SERVER_36024, RegressionCheck) {
-    mongo::BSONObj obj;
+    merizo::BSONObj obj;
     mmb::Document doc(obj, mmb::Document::kInPlaceDisabled);
 
     mmb::Element root = doc.root();

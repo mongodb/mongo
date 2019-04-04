@@ -125,7 +125,7 @@ var $config = extendWorkload($config, function($config, $super) {
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         if (isMongos(db)) {
-            return;  // convertToCapped can't be run against a mongos.
+            return;  // convertToCapped can't be run against a merizos.
         }
 
         assertWhenOwnDB.commandWorked(
@@ -133,7 +133,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     /**
-     * If being run against a mongos, shards '$config.data.outputCollName'. This is never undone,
+     * If being run against a merizos, shards '$config.data.outputCollName'. This is never undone,
      * and all subsequent $out's to this collection should fail.
      */
     $config.states.shardCollection = function shardCollection(db, unusedCollName) {

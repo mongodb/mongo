@@ -1,7 +1,7 @@
 /**
  * Test readCommitted lookup/graphLookup. 'db' must be the test database for either the replica set
- * primary or mongos instance. 'secondary' is the shard/replica set secondary. If 'db' is backed
- * by a mongos instance then the associated cluster should have only a single shard. 'rst' is the
+ * primary or merizos instance. 'secondary' is the shard/replica set secondary. If 'db' is backed
+ * by a merizos instance then the associated cluster should have only a single shard. 'rst' is the
  * ReplSetTest instance associated with the replica set/shard.
  */
 function testReadCommittedLookup(db, secondary, rst) {

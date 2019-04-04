@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/initialize_server_global_state.h"
+#include "merizo/db/initialize_server_global_state.h"
 
-#include "mongo/client/authenticate.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/auth/security_key.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/net/ssl_manager.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/config.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/db/auth/security_key.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/net/ssl_manager.h"
 
-namespace mongo {
+namespace merizo {
 
 bool initializeServerSecurityGlobalState(ServiceContext* service) {
 
@@ -74,4 +74,4 @@ bool initializeServerSecurityGlobalState(ServiceContext* service) {
 
     return true;
 }
-}  // namespace mongo
+}  // namespace merizo

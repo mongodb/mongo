@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,60 +27,60 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/commands/user_management_commands.h"
+#include "merizo/db/commands/user_management_commands.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/config.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/address_restriction.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/run_aggregate.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/service_context.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/icu.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/password_digest.h"
-#include "mongo/util/sequence_util.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/config.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/address_restriction.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/privilege_parser.h"
+#include "merizo/db/auth/resource_pattern.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/db/auth/user_document_parser.h"
+#include "merizo/db/auth/user_management_commands_parser.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/run_aggregate.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/service_context.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/util/icu.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/password_digest.h"
+#include "merizo/util/sequence_util.h"
+#include "merizo/util/time_support.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 using std::string;
@@ -174,7 +174,7 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
         const RoleName& roleToAdd = *it;
         if (roleToAdd == role) {
             return Status(ErrorCodes::InvalidRoleModification,
-                          mongoutils::str::stream() << "Cannot grant role " << role.getFullName()
+                          merizoutils::str::stream() << "Cannot grant role " << role.getFullName()
                                                     << " to itself.");
         }
 
@@ -204,7 +204,7 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
         if (sequenceContains(indirectRoles, role)) {
             return Status(
                 ErrorCodes::InvalidRoleModification,
-                mongoutils::str::stream() << "Granting " << roleToAdd.getFullName() << " to "
+                merizoutils::str::stream() << "Granting " << roleToAdd.getFullName() << " to "
                                           << role.getFullName()
                                           << " would introduce a cycle in the role graph.");
         }
@@ -592,7 +592,7 @@ private:
 
 /**
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
- * for the MongoDB 3.0 SCRAM auth mode.
+ * for the MerizoDB 3.0 SCRAM auth mode.
  * Returns an error otherwise.
  */
 StatusWith<AuthzLockGuard> requireWritableAuthSchema28SCRAM(OperationContext* opCtx,
@@ -626,7 +626,7 @@ StatusWith<AuthzLockGuard> requireWritableAuthSchema28SCRAM(OperationContext* op
 
 /**
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
- * for MongoDB 2.6 during the upgrade process.
+ * for MerizoDB 2.6 during the upgrade process.
  * Returns an error otherwise.
  *
  * This method should only be called by READ-ONLY commands (usersInfo & rolesInfo)
@@ -2344,10 +2344,10 @@ public:
 } CmdGetCacheGeneration;
 
 /**
- * This command is used only by mongorestore to handle restoring users/roles.  We do this so
- * that mongorestore doesn't do direct inserts into the admin.system.users and
+ * This command is used only by merizorestore to handle restoring users/roles.  We do this so
+ * that merizorestore doesn't do direct inserts into the admin.system.users and
  * admin.system.roles, which would bypass the authzUpdateLock and allow multiple concurrent
- * modifications to users/roles.  What mongorestore now does instead is it inserts all user/role
+ * modifications to users/roles.  What merizorestore now does instead is it inserts all user/role
  * definitions it wants to restore into temporary collections, then this command moves those
  * user/role definitions into their proper place in admin.system.users and admin.system.roles.
  * It either adds the users/roles to the existing ones or replaces the existing ones, depending
@@ -2370,7 +2370,7 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command used by mongorestore for updating user/role data";
+        return "Internal command used by merizorestore for updating user/role data";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -2492,7 +2492,7 @@ public:
             auditCreateOrUpdateUser(userObj, false);
             Status status = updatePrivilegeDocument(opCtx, userName, userObj);
             if (!status.isOK()) {
-                // Match the behavior of mongorestore to continue on failure
+                // Match the behavior of merizorestore to continue on failure
                 warning() << "Could not update user " << userName
                           << " in _mergeAuthzCollections command: " << redact(status);
             }
@@ -2500,7 +2500,7 @@ public:
             auditCreateOrUpdateUser(userObj, true);
             Status status = insertPrivilegeDocument(opCtx, userObj);
             if (!status.isOK()) {
-                // Match the behavior of mongorestore to continue on failure
+                // Match the behavior of merizorestore to continue on failure
                 warning() << "Could not insert user " << userName
                           << " in _mergeAuthzCollections command: " << redact(status);
             }
@@ -2530,7 +2530,7 @@ public:
             auditCreateOrUpdateRole(roleObj, false);
             Status status = updateRoleDocument(opCtx, roleName, roleObj);
             if (!status.isOK()) {
-                // Match the behavior of mongorestore to continue on failure
+                // Match the behavior of merizorestore to continue on failure
                 warning() << "Could not update role " << roleName
                           << " in _mergeAuthzCollections command: " << redact(status);
             }
@@ -2538,7 +2538,7 @@ public:
             auditCreateOrUpdateRole(roleObj, true);
             Status status = insertRoleDocument(opCtx, roleObj);
             if (!status.isOK()) {
-                // Match the behavior of mongorestore to continue on failure
+                // Match the behavior of merizorestore to continue on failure
                 warning() << "Could not insert role " << roleName
                           << " in _mergeAuthzCollections command: " << redact(status);
             }
@@ -2743,4 +2743,4 @@ public:
 
 } cmdMergeAuthzCollections;
 
-}  // namespace mongo
+}  // namespace merizo

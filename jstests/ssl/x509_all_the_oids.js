@@ -10,7 +10,7 @@
         const script =
             'assert(db.getSiblingDB(\'$external\').auth({mechanism: \'MONGODB-X509\'}));';
         clearRawMongoProgramOutput();
-        const exitCode = runMongoProgram('mongo',
+        const exitCode = runMongoProgram('merizo',
                                          '--ssl',
                                          '--sslAllowInvalidHostnames',
                                          '--sslPEMKeyFile',
@@ -35,13 +35,13 @@
     }
 
     // Standalone.
-    const mongod = MongoRunner.runMongod({
+    const merizod = MongoRunner.runMongod({
         auth: '',
         sslMode: 'requireSSL',
         sslPEMKeyFile: SERVER_CERT,
         sslCAFile: CA_CERT,
         sslAllowInvalidCertificates: '',
     });
-    runTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    runTest(merizod);
+    MongoRunner.stopMongod(merizod);
 })();

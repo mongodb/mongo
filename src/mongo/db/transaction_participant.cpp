@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,46 +27,46 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #define LOG_FOR_TRANSACTION(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kTransaction)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kTransaction)
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/transaction_participant.h"
+#include "merizo/db/transaction_participant.h"
 
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/retryable_writes_stats.h"
-#include "mongo/db/server_recovery.h"
-#include "mongo/db/server_transactions_metrics.h"
-#include "mongo/db/session.h"
-#include "mongo/db/session_catalog.h"
-#include "mongo/db/stats/fill_locker_info.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/db/transaction_participant_gen.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_utils.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/lock_state.h"
+#include "merizo/db/concurrency/locker.h"
+#include "merizo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/ops/update.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/retryable_writes_stats.h"
+#include "merizo/db/server_recovery.h"
+#include "merizo/db/server_transactions_metrics.h"
+#include "merizo/db/session.h"
+#include "merizo/db/session_catalog.h"
+#include "merizo/db/stats/fill_locker_info.h"
+#include "merizo/db/transaction_history_iterator.h"
+#include "merizo/db/transaction_participant_gen.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_utils.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 // Failpoint which will pause an operation just after allocating a point-in-time storage engine
@@ -2133,4 +2133,4 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

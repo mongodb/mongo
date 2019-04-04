@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/dbclient_rs.h"
+#include "merizo/client/dbclient_rs.h"
 
 #include <memory>
 #include <utility>
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/client/global_conn_pool.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/client/connpool.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/client/global_conn_pool.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/db/dbmessage.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::shared_ptr;
 using std::unique_ptr;
@@ -95,7 +95,7 @@ const size_t MAX_RETRY = 3;
  * Format A (official format):
  * { query: <actual query>, $readPreference: <read pref obj> }
  *
- * Format B (unofficial internal format from mongos):
+ * Format B (unofficial internal format from merizos):
  * { <actual query>, $queryOptions: { $readPreference: <read pref obj> }}
  *
  * @param query the raw query document
@@ -707,7 +707,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     _lastSlaveOkHost = selectedNode;
 
     // Primary connection is special because it is the only connection that is
-    // versioned in mongos. Therefore, we have to make sure that this object
+    // versioned in merizos. Therefore, we have to make sure that this object
     // maintains only one connection to the primary and use that connection
     // every time we need to talk to the primary.
     if (monitor->isPrimary(selectedNode)) {
@@ -1104,4 +1104,4 @@ void DBClientReplicaSet::resetSlaveOkConn() {
     _lastSlaveOkHost = HostAndPort();
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -31,25 +31,25 @@
     }
 
     var exitCode = MongoRunner.runMongoTool(
-        "mongodump",
+        "merizodump",
         Object.extend({
             host: slave.host,
             out: MongoRunner.dataDir + "/jstests_tool_dumpsecondary_external/",
         },
                       commonOptions));
-    assert.eq(0, exitCode, "mongodump failed to dump data from the secondary");
+    assert.eq(0, exitCode, "merizodump failed to dump data from the secondary");
 
     db.foo.drop();
     assert.eq(0, db.foo.count(), "after drop");
 
     exitCode = MongoRunner.runMongoTool(
-        "mongorestore",
+        "merizorestore",
         Object.extend({
             host: master.host,
             dir: MongoRunner.dataDir + "/jstests_tool_dumpsecondary_external/",
         },
                       commonOptions));
-    assert.eq(0, exitCode, "mongorestore failed to restore data to the primary");
+    assert.eq(0, exitCode, "merizorestore failed to restore data to the primary");
 
     assert.soon("db.foo.findOne()", "no data after sleep");
     assert.eq(1, db.foo.count(), "after restore");

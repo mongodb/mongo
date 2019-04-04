@@ -73,7 +73,7 @@ var FixtureHelpers = (function() {
      */
     function numberOfShardsForCollection(coll) {
         if (!isMongos(coll.getDB()) || !isSharded(coll)) {
-            // If we're not talking to a mongos, or the collection is not sharded, there is one
+            // If we're not talking to a merizos, or the collection is not sharded, there is one
             // shard.
             return 1;
         }

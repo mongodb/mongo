@@ -11,12 +11,12 @@ var testDbpath = MongoRunner.dataPath + testBaseName + "_dbpath_external/";
 var shardedDumpTests = {
     'serverSourceVersion': ["latest", "last-stable"],
     'serverDestVersion': ["latest", "last-stable"],
-    'mongoDumpVersion': ["latest", "last-stable"],
-    'mongoRestoreVersion': ["latest", "last-stable"],
+    'merizoDumpVersion': ["latest", "last-stable"],
+    'merizoRestoreVersion': ["latest", "last-stable"],
     'dumpDir': [dumpDir],
     'testDbpath': [testDbpath],
-    'dumpType': ["mongos"],
-    'restoreType': ["mongod"],
+    'dumpType': ["merizos"],
+    'restoreType': ["merizod"],
     'storageEngine': [jsTest.options().storageEngine || "wiredTiger"]
 };
 runAllDumpRestoreTests(shardedDumpTests);
@@ -25,12 +25,12 @@ runAllDumpRestoreTests(shardedDumpTests);
 var shardedRestoreTests = {
     'serverSourceVersion': ["latest", "last-stable"],
     'serverDestVersion': ["latest", "last-stable"],
-    'mongoDumpVersion': ["latest", "last-stable"],
-    'mongoRestoreVersion': ["latest", "last-stable"],
+    'merizoDumpVersion': ["latest", "last-stable"],
+    'merizoRestoreVersion': ["latest", "last-stable"],
     'dumpDir': [dumpDir],
     'testDbpath': [testDbpath],
-    'dumpType': ["mongod"],
-    'restoreType': ["mongos"],
+    'dumpType': ["merizod"],
+    'restoreType': ["merizos"],
     'storageEngine': [jsTest.options().storageEngine || "wiredTiger"]
 };
 runAllDumpRestoreTests(shardedRestoreTests);

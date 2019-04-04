@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,16 +26,16 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/util/bson_check.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/oplog_application_checks.h"
+#include "merizo/bson/util/bson_check.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/oplog_application_checks.h"
 
-namespace mongo {
+namespace merizo {
 UUID OplogApplicationChecks::getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
     BSONElement uiElem = oplogEntry["ui"];
     return uassertStatusOK(UUID::parse(uiElem));
@@ -164,7 +164,7 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "op does not contain required \"op\" field: " << e.fieldName()};
     }
-    if (opElement.type() != mongo::String) {
+    if (opElement.type() != merizo::String) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "\"op\" field is not a string: " << e.fieldName()};
     }
@@ -182,7 +182,7 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "op does not contain required \"ns\" field: " << e.fieldName()};
     }
-    if (nsElement.type() != mongo::String) {
+    if (nsElement.type() != merizo::String) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "\"ns\" field is not a string: " << e.fieldName()};
     }
@@ -263,4 +263,4 @@ Status OplogApplicationChecks::checkAuthForCommand(OperationContext* opCtx,
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -7,22 +7,22 @@
 package line
 
 import (
-	"github.com/mongodb/mongo-tools/mongostat/status"
+	"github.com/merizodb/merizo-tools/merizostat/status"
 )
 
 // Flags to determine cases when to activate/deactivate columns for output.
 const (
 	FlagAlways   = 1 << iota // always activate the column
 	FlagHosts                // only active if we may have multiple hosts
-	FlagDiscover             // only active when mongostat is in discover mode
+	FlagDiscover             // only active when merizostat is in discover mode
 	FlagRepl                 // only active if one of the nodes being monitored is in a replset
 	FlagLocks                // only active if node is capable of calculating lock info
-	FlagAll                  // only active if mongostat was run with --all option
+	FlagAll                  // only active if merizostat was run with --all option
 	FlagMMAP                 // only active if node has mmap-specific fields
 	FlagWT                   // only active if node has wiredtiger-specific fields
 )
 
-// StatHeader describes a single column for mongostat's terminal output,
+// StatHeader describes a single column for merizostat's terminal output,
 // its formatting, and in which modes it should be displayed.
 type StatHeader struct {
 	// ReadField produces a particular field according to the StatHeader instance.
@@ -30,7 +30,7 @@ type StatHeader struct {
 	ReadField func(c *status.ReaderConfig, newStat, oldStat *status.ServerStatus) string
 }
 
-// StatHeaders are the complete set of data metrics supported by mongostat.
+// StatHeaders are the complete set of data metrics supported by merizostat.
 var (
 	keyNames = map[string][]string{ // short, long, deprecated
 		"host":           {"host", "Host", "host"},

@@ -1,4 +1,4 @@
-# We compile MongoDB with UNICODE but Mozilla does not so we need to explicitly select the ANSI
+# We compile MerizoDB with UNICODE but Mozilla does not so we need to explicitly select the ANSI
 # version of GetModuleHandle
 diff --git b/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp a/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp
 index da690fe0b5..9762232f62 100644

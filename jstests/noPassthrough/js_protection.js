@@ -15,7 +15,7 @@
 
     var testServer = MongoRunner.runMongod({setParameter: "javascriptProtection=true"});
     assert.neq(
-        null, testServer, "failed to start mongod with --setParameter=javascriptProtection=true");
+        null, testServer, "failed to start merizod with --setParameter=javascriptProtection=true");
 
     var db = testServer.getDB("test");
     var t = db.js_protection;
@@ -36,7 +36,7 @@
             assert.eq(5, addOne(4));
         };
 
-        var exitCode = runMongoProgram("mongo",
+        var exitCode = runMongoProgram("merizo",
                                        "--port",
                                        testServer.port,
                                        "--enableJavaScriptProtection",

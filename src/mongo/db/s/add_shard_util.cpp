@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/add_shard_util.h"
+#include "merizo/db/s/add_shard_util.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/s/write_ops/batched_command_request.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/add_shard_cmd_gen.h"
+#include "merizo/s/catalog/sharding_catalog_client.h"
+#include "merizo/s/cluster_identity_loader.h"
+#include "merizo/s/shard_id.h"
+#include "merizo/s/write_ops/batched_command_request.h"
 
-namespace mongo {
+namespace merizo {
 namespace add_shard_util {
 
 AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
@@ -77,5 +77,5 @@ BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd) {
     return request.toBSON();
 }
 
-}  // namespace mongo
+}  // namespace merizo
 }  // namespace add_shard_util

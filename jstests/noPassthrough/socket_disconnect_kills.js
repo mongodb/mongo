@@ -33,7 +33,7 @@
         // Make a socket which will timeout
         id++;
         let conn = new Mongo(
-            `mongodb://${host}/?socketTimeoutMS=${socketTimeout}&appName=${testName}${id}`);
+            `merizodb://${host}/?socketTimeoutMS=${socketTimeout}&appName=${testName}${id}`);
 
         // Make sure it works at all
         assert.commandWorked(conn.adminCommand({ping: 1}));
@@ -220,7 +220,7 @@
     }
 
     {
-        let st = ShardingTest({mongo: 1, config: 1, shards: 1});
+        let st = ShardingTest({merizo: 1, config: 1, shards: 1});
         runTests(st.s0);
         st.stop();
     }

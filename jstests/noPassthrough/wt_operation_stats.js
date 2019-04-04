@@ -15,8 +15,8 @@
 
     let checkLogStats = function() {
         // Check if the log output contains the expected statistics.
-        let mongodLogs = rawMongoProgramOutput();
-        let lines = mongodLogs.split('\n');
+        let merizodLogs = rawMongoProgramOutput();
+        let lines = merizodLogs.split('\n');
         let match;
         let logLineCount = 0;
         for (let line of lines) {
@@ -41,9 +41,9 @@
     } else {
         let name = "wt_op_stat";
 
-        jsTestLog("run mongod");
+        jsTestLog("run merizod");
         let conn = MongoRunner.runMongod();
-        assert.neq(null, conn, "mongod was unable to start up");
+        assert.neq(null, conn, "merizod was unable to start up");
         let testDB = conn.getDB(name);
 
         // Insert 200 documents of size 1K each, spanning multiple pages in the btree.
@@ -80,7 +80,7 @@
         let profileObj = getLatestProfilerEntry(testDB, {op: "query", ns: "wt_op_stat.foo"});
         checkSystemProfileStats(profileObj, "bytesRead");
 
-        // Stopping the mongod waits until all of its logs have been read by the mongo shell.
+        // Stopping the merizod waits until all of its logs have been read by the merizo shell.
         MongoRunner.stopMongod(conn);
         checkLogStats();
 

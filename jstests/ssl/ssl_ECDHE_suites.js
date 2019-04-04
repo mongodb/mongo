@@ -32,18 +32,18 @@ load('jstests/ssl/libs/ssl_helpers.js');
         bind_ip_all: ""
     };
 
-    const mongod = MongoRunner.runMongod(x509_options);
+    const merizod = MongoRunner.runMongod(x509_options);
 
     // Use new toolchain python, if it exists
-    let python_binary = '/opt/mongodbtoolchain/v3/bin/python3';
+    let python_binary = '/opt/merizodbtoolchain/v3/bin/python3';
     if (runProgram('/bin/sh', '-c', 'ls ' + python_binary) !== 0) {
-        python_binary = '/opt/mongodbtoolchain/v3/bin/python3';
+        python_binary = '/opt/merizodbtoolchain/v3/bin/python3';
     }
 
     // Run the tls cipher suite enumerator
     const python = '/usr/bin/env ' + python_binary;
     const enumerator = " jstests/ssl/tls_enumerator.py ";
-    const python_command = python + enumerator + '--port=' + mongod.port + ' --cafile=' + CA_CERT +
+    const python_command = python + enumerator + '--port=' + merizod.port + ' --cafile=' + CA_CERT +
         ' --cert=' + CLIENT_CERT + ' --outfile=' + OUTFILE;
     assert.eq(runProgram('/bin/sh', '-c', python_command), 0);
 
@@ -97,5 +97,5 @@ load('jstests/ssl/libs/ssl_helpers.js');
         assert(hasDHE === hasECDHE, 'Supports both ECDHE and DHE or neither');
     }
 
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 }());

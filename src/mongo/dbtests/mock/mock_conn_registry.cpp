@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/dbtests/mock/mock_conn_registry.h"
+#include "merizo/dbtests/mock/mock_conn_registry.h"
 
-#include "mongo/base/init.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/base/init.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 
@@ -88,7 +88,7 @@ MockConnRegistry::MockConnHook::MockConnHook(MockConnRegistry* registry) : _regi
 
 MockConnRegistry::MockConnHook::~MockConnHook() {}
 
-std::unique_ptr<mongo::DBClientBase> MockConnRegistry::MockConnHook::connect(
+std::unique_ptr<merizo::DBClientBase> MockConnRegistry::MockConnHook::connect(
     const ConnectionString& connString, std::string& errmsg, double socketTimeout) {
     const string hostName(connString.toString());
     auto conn = _registry->connect(hostName);
@@ -101,4 +101,4 @@ std::unique_ptr<mongo::DBClientBase> MockConnRegistry::MockConnHook::connect(
 
     return std::move(conn);
 }
-}  // namespace mongo
+}  // namespace merizo

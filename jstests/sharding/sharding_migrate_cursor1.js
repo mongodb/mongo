@@ -10,7 +10,7 @@
     var chunkSize = 25;
 
     var s = new ShardingTest(
-        {name: "migrate_cursor1", shards: 2, mongos: 1, other: {chunkSize: chunkSize}});
+        {name: "migrate_cursor1", shards: 2, merizos: 1, other: {chunkSize: chunkSize}});
 
     s.adminCommand({enablesharding: "test"});
     db = s.getDB("test");

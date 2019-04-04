@@ -50,7 +50,7 @@
     // configuring a server parameter which could mess up other tests. This testing is
     // done elsewhere so that this test can stay in the core suite
     assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "MerizoDB Shell", tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.

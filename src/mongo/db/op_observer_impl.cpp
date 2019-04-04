@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,44 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/op_observer_impl.h"
+#include "merizo/db/op_observer_impl.h"
 
 #include <limits>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/namespace_uuid_cache.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer_util.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/transaction_participant_gen.h"
-#include "mongo/db/views/durable_view_catalog.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/namespace_uuid_cache.h"
+#include "merizo/db/commands/feature_compatibility_version.h"
+#include "merizo/db/commands/feature_compatibility_version_parser.h"
+#include "merizo/db/commands/txn_cmds_gen.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer_util.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_entry_gen.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/transaction_participant_gen.h"
+#include "merizo/db/views/durable_view_catalog.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/fail_point_service.h"
 
-namespace mongo {
+namespace merizo {
 using repl::OplogEntry;
 
 namespace {
@@ -1474,4 +1474,4 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

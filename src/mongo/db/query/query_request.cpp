@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/query_request.h"
+#include "merizo/db/query/query_request.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/command_generic_argument.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/dbmessage.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::unique_ptr;
@@ -685,7 +685,7 @@ StatusWith<int> QueryRequest::parseMaxTimeMS(BSONElement maxTimeMSElt) {
             (StringBuilder() << maxTimeMSElt.fieldNameStringData() << " is out of range").str());
     }
     double maxTimeMSDouble = maxTimeMSElt.numberDouble();
-    if (maxTimeMSElt.type() == mongo::NumberDouble && floor(maxTimeMSDouble) != maxTimeMSDouble) {
+    if (maxTimeMSElt.type() == merizo::NumberDouble && floor(maxTimeMSDouble) != maxTimeMSDouble) {
         return StatusWith<int>(
             ErrorCodes::BadValue,
             (StringBuilder() << maxTimeMSElt.fieldNameStringData() << " has non-integral value")
@@ -697,7 +697,7 @@ StatusWith<int> QueryRequest::parseMaxTimeMS(BSONElement maxTimeMSElt) {
 // static
 bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     // elt must be foo: {$meta: "textScore"}
-    if (mongo::Object != elt.type()) {
+    if (merizo::Object != elt.type()) {
         return false;
     }
     BSONObj metaObj = elt.Obj();
@@ -710,7 +710,7 @@ bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     if (!str::equals("$meta", metaElt.fieldName())) {
         return false;
     }
-    if (mongo::String != metaElt.type()) {
+    if (merizo::String != metaElt.type()) {
         return false;
     }
     if (QueryRequest::metaTextScore != metaElt.valuestr()) {
@@ -1118,4 +1118,4 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     }
     return StatusWith<BSONObj>(aggregationBuilder.obj());
 }
-}  // namespace mongo
+}  // namespace merizo

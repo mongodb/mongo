@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/global.h"
+#include "merizo/scripting/mozjs/global.h"
 
 #include <js/Conversions.h>
 
-#include "mongo/base/init.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/logstream_builder.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/jsstringwrapper.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/util/version.h"
+#include "merizo/base/init.h"
+#include "merizo/logger/logger.h"
+#include "merizo/logger/logstream_builder.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/scripting/mozjs/implscope.h"
+#include "merizo/scripting/mozjs/jsstringwrapper.h"
+#include "merizo/scripting/mozjs/objectwrapper.h"
+#include "merizo/scripting/mozjs/valuereader.h"
+#include "merizo/scripting/mozjs/valuewriter.h"
+#include "merizo/util/version.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec GlobalInfo::freeFunctions[7] = {
@@ -102,7 +102,7 @@ void GlobalInfo::Functions::buildInfo::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void GlobalInfo::Functions::getJSHeapLimitMB::call(JSContext* cx, JS::CallArgs args) {
-    ValueReader(cx, args.rval()).fromDouble(mongo::getGlobalScriptEngine()->getJSHeapLimitMB());
+    ValueReader(cx, args.rval()).fromDouble(merizo::getGlobalScriptEngine()->getJSHeapLimitMB());
 }
 
 void GlobalInfo::Functions::gc::call(JSContext* cx, JS::CallArgs args) {
@@ -131,4 +131,4 @@ MONGO_INITIALIZER(JavascriptPrintDomain)(InitializerContext*) {
 }
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

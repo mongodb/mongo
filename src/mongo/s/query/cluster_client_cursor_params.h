@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,20 +34,20 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/cursor_id.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/tailable_mode.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/query/async_results_merger_params_gen.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/cursor_id.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/pipeline.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/tailable_mode.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/query/async_results_merger_params_gen.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 namespace executor {
 class TaskExecutor;
 }
@@ -157,4 +157,4 @@ struct ClusterClientCursorParams {
     boost::optional<bool> isAutoCommit;
 };
 
-}  // mongo
+}  // merizo

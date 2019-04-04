@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authz_manager_external_state_local.h"
+#include "merizo/db/auth/authz_manager_external_state_local.h"
 
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/auth_options_gen.h"
-#include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/ssl_types.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/auth_options_gen.h"
+#include "merizo/db/auth/privilege_parser.h"
+#include "merizo/db/auth/user_document_parser.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/ssl_types.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -87,12 +87,12 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
             return Status::OK();
         } else if (versionElement.eoo()) {
             return Status(ErrorCodes::NoSuchKey,
-                          mongoutils::str::stream() << "No "
+                          merizoutils::str::stream() << "No "
                                                     << AuthorizationManager::schemaVersionFieldName
                                                     << " field in version document.");
         } else {
             return Status(ErrorCodes::TypeMismatch,
-                          mongoutils::str::stream()
+                          merizoutils::str::stream()
                               << "Could not determine schema version of authorization data.  "
                                  "Bad (non-numeric) type "
                               << typeName(versionElement.type())
@@ -136,7 +136,7 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
             fassert(17157,
                     warningsElement.appendString(
                         "",
-                        std::string(mongoutils::str::stream()
+                        std::string(merizoutils::str::stream()
                                     << "Skipped privileges on resource "
                                     << privileges[i].getResourcePattern().toString()
                                     << ". Reason: "
@@ -299,7 +299,7 @@ Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* opCtx,
 
     if (status == ErrorCodes::NoMatchingDocument) {
         status = Status(ErrorCodes::UserNotFound,
-                        mongoutils::str::stream() << "Could not find user \"" << userName.getUser()
+                        merizoutils::str::stream() << "Could not find user \"" << userName.getUser()
                                                   << "\" for db \""
                                                   << userName.getDB()
                                                   << "\"");
@@ -570,7 +570,7 @@ private:
         size_t splitPoint = idstr.find('.');
         if (splitPoint == std::string::npos) {
             return StatusWith<UserName>(ErrorCodes::FailedToParse,
-                                        mongoutils::str::stream()
+                                        merizoutils::str::stream()
                                             << "_id entries for user documents must be of "
                                                "the form <dbname>.<username>.  Found: "
                                             << idstr);
@@ -687,4 +687,4 @@ void AuthzManagerExternalStateLocal::setInUserManagementCommand(OperationContext
     inUserManagementCommandsFlag(opCtx) = val;
 }
 
-}  // namespace mongo
+}  // namespace merizo

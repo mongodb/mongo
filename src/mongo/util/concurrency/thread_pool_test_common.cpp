@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/concurrency/thread_pool_test_common.h"
+#include "merizo/util/concurrency/thread_pool_test_common.h"
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_pool_interface.h"
-#include "mongo/util/concurrency/thread_pool_test_fixture.h"
-#include "mongo/util/log.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/thread_pool_interface.h"
+#include "merizo/util/concurrency/thread_pool_test_fixture.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using ThreadPoolFactory = stdx::function<std::unique_ptr<ThreadPoolInterface>()>;
@@ -61,7 +61,7 @@ private:
 };
 
 using ThreadPoolTestCaseFactory =
-    stdx::function<std::unique_ptr<::mongo::unittest::Test>(ThreadPoolFactory)>;
+    stdx::function<std::unique_ptr<::merizo::unittest::Test>(ThreadPoolFactory)>;
 using ThreadPoolTestCaseMap = stdx::unordered_map<std::string, ThreadPoolTestCaseFactory>;
 
 static ThreadPoolTestCaseMap& threadPoolTestCaseRegistry() {
@@ -97,7 +97,7 @@ public:
             fassertFailed(34356);
         }
         entry = [makeTest](ThreadPoolFactory makeThreadPool) {
-            return stdx::make_unique<::mongo::unittest::DeathTest<T>>(std::move(makeThreadPool));
+            return stdx::make_unique<::merizo::unittest::DeathTest<T>>(std::move(makeThreadPool));
         };
     }
 };
@@ -227,4 +227,4 @@ void addTestsForThreadPool(const std::string& suiteName, ThreadPoolFactory makeT
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

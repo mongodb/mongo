@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Main package for the mongostat tool.
+// Main package for the merizostat tool.
 package main
 
 import (
@@ -13,15 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/password"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongostat"
-	"github.com/mongodb/mongo-tools/mongostat/stat_consumer"
-	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
-	"github.com/mongodb/mongo-tools/mongostat/status"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/password"
+	"github.com/merizodb/merizo-tools/common/signals"
+	"github.com/merizodb/merizo-tools/common/util"
+	"github.com/merizodb/merizo-tools/merizostat"
+	"github.com/merizodb/merizo-tools/merizostat/stat_consumer"
+	"github.com/merizodb/merizo-tools/merizostat/stat_consumer/line"
+	"github.com/merizodb/merizo-tools/merizostat/status"
 )
 
 // optionKeyNames interprets the CLI options Columns and AppendColumns into
@@ -54,13 +54,13 @@ func optionCustomHeaders(option string) (headers []string) {
 func main() {
 	// initialize command-line opts
 	opts := options.New(
-		"mongostat",
-		mongostat.Usage,
+		"merizostat",
+		merizostat.Usage,
 		options.EnabledOptions{Connection: true, Auth: true, Namespace: false, URI: true})
 	opts.UseReadOnlyHostDescription()
 
-	// add mongostat-specific options
-	statOpts := &mongostat.StatOptions{}
+	// add merizostat-specific options
+	statOpts := &merizostat.StatOptions{}
 	opts.AddOptions(statOpts)
 
 	interactiveOption := opts.FindOptionByLongName("interactive")
@@ -73,7 +73,7 @@ func main() {
 	args, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
-		log.Logvf(log.Always, "try 'mongostat --help' for more information")
+		log.Logvf(log.Always, "try 'merizostat --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -84,7 +84,7 @@ func main() {
 	if len(args) > 0 {
 		if len(args) != 1 {
 			log.Logvf(log.Always, "too many positional arguments: %v", args)
-			log.Logvf(log.Always, "try 'mongostat --help' for more information")
+			log.Logvf(log.Always, "try 'merizostat --help' for more information")
 			os.Exit(util.ExitBadOptions)
 		}
 		sleepInterval, err = strconv.Atoi(args[0])
@@ -205,16 +205,16 @@ func main() {
 	consumer := stat_consumer.NewStatConsumer(cliFlags, customHeaders,
 		keyNames, readerConfig, formatter, os.Stdout)
 	seedHosts := util.CreateConnectionAddrs(opts.Host, opts.Port)
-	var cluster mongostat.ClusterMonitor
+	var cluster merizostat.ClusterMonitor
 	if statOpts.Discover || len(seedHosts) > 1 {
-		cluster = &mongostat.AsyncClusterMonitor{
+		cluster = &merizostat.AsyncClusterMonitor{
 			ReportChan:    make(chan *status.ServerStatus),
 			ErrorChan:     make(chan *status.NodeError),
 			LastStatLines: map[string]*line.StatLine{},
 			Consumer:      consumer,
 		}
 	} else {
-		cluster = &mongostat.SyncClusterMonitor{
+		cluster = &merizostat.SyncClusterMonitor{
 			ReportChan: make(chan *status.ServerStatus),
 			ErrorChan:  make(chan *status.NodeError),
 			Consumer:   consumer,
@@ -227,10 +227,10 @@ func main() {
 	}
 
 	opts.Direct = true
-	stat := &mongostat.MongoStat{
+	stat := &merizostat.MongoStat{
 		Options:       opts,
 		StatOptions:   statOpts,
-		Nodes:         map[string]*mongostat.NodeMonitor{},
+		Nodes:         map[string]*merizostat.NodeMonitor{},
 		Discovered:    discoverChan,
 		SleepInterval: time.Duration(sleepInterval) * time.Second,
 		Cluster:       cluster,

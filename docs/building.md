@@ -1,7 +1,7 @@
-Building MongoDB
+Building MerizoDB
 ================
 
-To build MongoDB, you will need:
+To build MerizoDB, you will need:
 
 * A modern C++ compiler capable of compiling C++17. One of the following is required:
     * GCC 8.0 or newer
@@ -13,22 +13,22 @@ To build MongoDB, you will need:
 * Python 2.7.x and Pip modules:
   * See the section "Python Prerequisites" below.
 
-MongoDB supports the following architectures: arm64, ppc64le, s390x, and x86-64.
+MerizoDB supports the following architectures: arm64, ppc64le, s390x, and x86-64.
 More detailed platform instructions can be found below.
 
 
-MongoDB Tools
+MerizoDB Tools
 --------------
 
-The MongoDB command line tools (mongodump, mongorestore, mongoimport, mongoexport, etc)
+The MerizoDB command line tools (merizodump, merizorestore, merizoimport, merizoexport, etc)
 have been rewritten in [Go](http://golang.org/) and are no longer included in this repository.
 
-The source for the tools is now available at [mongodb/mongo-tools](https://github.com/mongodb/mongo-tools).
+The source for the tools is now available at [merizodb/merizo-tools](https://github.com/merizodb/merizo-tools).
 
 Python Prerequisites
 ---------------
 
-In order to build MongoDB, Python 2.7.x is required, and several Python modules. To install
+In order to build MerizoDB, Python 2.7.x is required, and several Python modules. To install
 the required Python modules, run:
 
     $ pip2 install -r etc/pip/compile-requirements.txt
@@ -39,47 +39,47 @@ associated with Python 2.7.x.
 SCons
 ---------------
 
-For detail information about building, please see [the build manual](https://github.com/mongodb/mongo/wiki/Build-Mongodb-From-Source)
+For detail information about building, please see [the build manual](https://github.com/merizodb/merizo/wiki/Build-Merizodb-From-Source)
 
-If you want to build everything (mongod, mongo, tests, etc):
+If you want to build everything (merizod, merizo, tests, etc):
 
     $ python2 buildscripts/scons.py all
 
 If you only want to build the database:
 
-    $ python2 buildscripts/scons.py mongod
+    $ python2 buildscripts/scons.py merizod
 
-***Note***: For C++ compilers that are newer than the supported version, the compiler may issue new warnings that cause MongoDB to fail to build since the build system treats compiler warnings as errors. To ignore the warnings, pass the switch `--disable-warnings-as-errors` to scons.
+***Note***: For C++ compilers that are newer than the supported version, the compiler may issue new warnings that cause MerizoDB to fail to build since the build system treats compiler warnings as errors. To ignore the warnings, pass the switch `--disable-warnings-as-errors` to scons.
 
-    $ python2 buildscripts/scons.py mongod --disable-warnings-as-errors
+    $ python2 buildscripts/scons.py merizod --disable-warnings-as-errors
 
 To install
 
-    $ python2 buildscripts/scons.py --prefix=/opt/mongo install
+    $ python2 buildscripts/scons.py --prefix=/opt/merizo install
 
-Please note that prebuilt binaries are available on [mongodb.org](http://www.mongodb.org/downloads) and may be the easiest way to get started.
+Please note that prebuilt binaries are available on [merizodb.org](http://www.merizodb.org/downloads) and may be the easiest way to get started.
 
 SCons Targets
 --------------
 
 The following targets can be named on the scons command line to build only certain components:
 
-* mongod
-* mongos
-* mongo
-* core (includes mongod, mongos, mongo)
+* merizod
+* merizos
+* merizo
+* core (includes merizod, merizos, merizo)
 * all
 
 Windows
 --------------
 
-See [the windows build manual](https://github.com/mongodb/mongo/wiki/Build-Mongodb-From-Source#windows-specific-instructions)
+See [the windows build manual](https://github.com/merizodb/merizo/wiki/Build-Merizodb-From-Source#windows-specific-instructions)
 
 Build requirements:
 * Visual Studio 2017 version 15.9 or newer
 * Python 2.7, ActiveState ActivePython 2.7.x Community Edition for Windows is recommended
 
-Or download a prebuilt binary for Windows at www.mongodb.org.
+Or download a prebuilt binary for Windows at www.merizodb.org.
 
 Debian/Ubuntu
 --------------
@@ -91,18 +91,18 @@ To install dependencies on Debian or Ubuntu systems:
 
 To run tests as well, you will need PyMongo:
 
-    # aptitude install python-pymongo
+    # aptitude install python-pymerizo
 
 OS X
 --------------
 
 Using [Homebrew](http://brew.sh):
 
-    $ brew install mongodb
+    $ brew install merizodb
 
 Using [MacPorts](http://www.macports.org):
 
-    $ sudo port install mongodb
+    $ sudo port install merizodb
 
 FreeBSD
 --------------
@@ -113,7 +113,7 @@ Install the following ports:
   * lang/llvm70
   * lang/python
 
-Optional Components if you want to use system libraries instead of the libraries included with MongoDB
+Optional Components if you want to use system libraries instead of the libraries included with MerizoDB
 
   * archivers/snappy
   * devel/boost

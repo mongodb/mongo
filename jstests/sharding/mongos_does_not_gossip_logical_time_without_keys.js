@@ -1,5 +1,5 @@
 /**
- * Tests that mongos does not gossip cluster time metadata until at least one key is created on the
+ * Tests that merizos does not gossip cluster time metadata until at least one key is created on the
  * config server, and that it does not block waiting for keys at startup.
  */
 
@@ -27,8 +27,8 @@
 
     let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
-    // Verify there are keys in the config server eventually, since mongos doesn't block for keys at
-    // startup, and that once there are, mongos sends $clusterTime with a signature in responses.
+    // Verify there are keys in the config server eventually, since merizos doesn't block for keys at
+    // startup, and that once there are, merizos sends $clusterTime with a signature in responses.
     assert.soonNoExcept(function() {
         assert(st.s.getDB("admin").system.keys.count() >= 2);
 
@@ -36,7 +36,7 @@
         assertContainsValidLogicalTime(res, false);
 
         return true;
-    }, "expected keys to be created and for mongos to send signed cluster times");
+    }, "expected keys to be created and for merizos to send signed cluster times");
 
     // Enable the failpoint, remove all keys, and restart the config servers with the failpoint
     // still enabled to guarantee there are no keys.
@@ -68,13 +68,13 @@
     // Mongos should restart with no problems.
     st.restartMongoses();
 
-    // Eventually mongos will discover the new keys, and start signing cluster times.
+    // Eventually merizos will discover the new keys, and start signing cluster times.
     assert.soonNoExcept(function() {
         assertContainsValidLogicalTime(st.s.getDB("test").runCommand({isMaster: 1}), false);
         return true;
-    }, "expected mongos to eventually start signing cluster times", 60 * 1000);  // 60 seconds.
+    }, "expected merizos to eventually start signing cluster times", 60 * 1000);  // 60 seconds.
 
-    // There may be a delay between the creation of the first and second keys, but mongos will start
+    // There may be a delay between the creation of the first and second keys, but merizos will start
     // signing after seeing the first key, so there is only guaranteed to be one at this point.
     assert(st.s.getDB("admin").system.keys.count() >= 1,
            "expected there to be at least one generation of keys on the config server");

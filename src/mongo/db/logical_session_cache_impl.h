@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,18 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/refresh_sessions_gen.h"
-#include "mongo/db/service_liaison.h"
-#include "mongo/db/sessions_collection.h"
-#include "mongo/db/time_proof_service.h"
-#include "mongo/db/transaction_reaper.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/util/lru_cache.h"
+#include "merizo/db/logical_session_cache.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/refresh_sessions_gen.h"
+#include "merizo/db/service_liaison.h"
+#include "merizo/db/sessions_collection.h"
+#include "merizo/db/time_proof_service.h"
+#include "merizo/db/transaction_reaper.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/util/lru_cache.h"
 
-namespace mongo {
+namespace merizo {
 
 class Client;
 class OperationContext;
@@ -171,4 +171,4 @@ private:
     Date_t lastRefreshTime;
 };
 
-}  // namespace mongo
+}  // namespace merizo

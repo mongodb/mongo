@@ -1,5 +1,5 @@
 // Validate a user deleting free monitoring in system.version does
-// not crash mongod
+// not crash merizod
 load("jstests/free_mon/libs/free_mon.js");
 
 (function() {

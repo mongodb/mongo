@@ -19,7 +19,7 @@ report_interval=1
 run_time=1200
 sample_interval=500ms
 sample_rate=1
-# MongoDB always has multiple tables, and checkpoints behave differently when
+# MerizoDB always has multiple tables, and checkpoints behave differently when
 # there is more than a single table.
 table_count=100
 # We are using a mix of 4:1 read vs write operations, and trying to reach

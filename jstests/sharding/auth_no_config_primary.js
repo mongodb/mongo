@@ -40,7 +40,7 @@ TestData.skipCheckDBHashes = true;
     assert.neq(null, res);
     assert.eq('world', res.hello);
 
-    // Test authenticate through new mongos.
+    // Test authenticate through new merizos.
     var otherMongos =
         MongoRunner.runMongos({keyFile: "jstests/libs/key1", configdb: st.s.savedOptions.configdb});
 

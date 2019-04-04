@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/stacktrace.h"
+#include "merizo/util/stacktrace.h"
 
 #pragma warning(push)
 // C4091: 'typedef ': ignored on left of '' when no variable is declared
@@ -48,14 +48,14 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/text.h"
+#include "merizo/base/init.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 const auto kPathBufferSize = 1024;
 
@@ -126,7 +126,7 @@ private:
     DWORD _origOptions;
 };
 
-MONGO_INITIALIZER(IntializeSymbolHandler)(::mongo::InitializerContext* ctx) {
+MONGO_INITIALIZER(IntializeSymbolHandler)(::merizo::InitializerContext* ctx) {
     // We call this to ensure that the symbol handler is initialized in a single-threaded
     // context. The constructor of SymbolHandler does all the error handling, so we don't need to
     // do anything with the return value. Just make sure it gets called.
@@ -183,7 +183,7 @@ static void getSourceFileAndLineNumber(HANDLE process,
     }
 
     std::string filename(line64.FileName);
-    std::string::size_type start = filename.find("\\src\\mongo\\");
+    std::string::size_type start = filename.find("\\src\\merizo\\");
     if (start == std::string::npos) {
         start = filename.find("\\src\\third_party\\");
     }

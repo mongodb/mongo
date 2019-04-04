@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/net/sock.h"
+#include "merizo/util/net/sock.h"
 
 #include <algorithm>
 
@@ -55,22 +55,22 @@
 #include <ws2tcpip.h>
 #endif
 
-#include "mongo/config.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/background.h"
-#include "mongo/util/concurrency/value.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/private/socket_poll.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/winutil.h"
+#include "merizo/config.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/background.h"
+#include "merizo/util/concurrency/value.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/private/socket_poll.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/winutil.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::pair;
 using std::string;
@@ -534,16 +534,16 @@ int Socket::_recv(char* buf, int max) {
 
 void Socket::handleSendError(int ret, const char* context) {
 #if defined(_WIN32)
-    const int mongo_errno = WSAGetLastError();
-    if (mongo_errno == WSAETIMEDOUT && _timeout != 0) {
+    const int merizo_errno = WSAGetLastError();
+    if (merizo_errno == WSAETIMEDOUT && _timeout != 0) {
 #else
-    const int mongo_errno = errno;
-    if ((mongo_errno == EAGAIN || mongo_errno == EWOULDBLOCK) && _timeout != 0) {
+    const int merizo_errno = errno;
+    if ((merizo_errno == EAGAIN || merizo_errno == EWOULDBLOCK) && _timeout != 0) {
 #endif
         LOG(_logLevel) << "Socket " << context << " send() timed out " << remoteString();
         throwSocketError(SocketErrorKind::SEND_TIMEOUT, remoteString());
-    } else if (mongo_errno != EINTR) {
-        LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription(mongo_errno)
+    } else if (merizo_errno != EINTR) {
+        LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription(merizo_errno)
                        << ' ' << remoteString();
         throwSocketError(SocketErrorKind::SEND_ERROR, remoteString());
     }
@@ -716,4 +716,4 @@ bool Socket::isStillConnected() {
     return false;
 }
 
-}  // namespace mongo
+}  // namespace merizo

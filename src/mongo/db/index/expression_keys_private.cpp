@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
-#include "mongo/db/index/expression_keys_private.h"
+#include "merizo/db/index/expression_keys_private.h"
 
 #include <utility>
 
-#include "mongo/bson/bsonelement_comparator_interface.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/fts/fts_index_format.h"
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/geo/geoparser.h"
-#include "mongo/db/geo/s2.h"
-#include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/s2_common.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/bsonelement_comparator_interface.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/fts/fts_index_format.h"
+#include "merizo/db/geo/geoconstants.h"
+#include "merizo/db/geo/geometry_container.h"
+#include "merizo/db/geo/geoparser.h"
+#include "merizo/db/geo/s2.h"
+#include "merizo/db/index/2d_common.h"
+#include "merizo/db/index/s2_common.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 //
 // Helper functions for getHaystackKeys
@@ -227,7 +227,7 @@ bool getS2LiteralKeys(const BSONElementSet& elements,
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 using std::pair;
 using std::string;
@@ -279,7 +279,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                 BSONElement locElement = oi.next();
 
                 uassert(16804,
-                        mongoutils::str::stream()
+                        merizoutils::str::stream()
                             << "location object expected, location array not in correct format",
                         locElement.isABSONObj());
 
@@ -437,7 +437,7 @@ int ExpressionKeysPrivate::hashHaystackElement(const BSONElement& e, double buck
 
 // static
 std::string ExpressionKeysPrivate::makeHaystackString(int hashedX, int hashedY) {
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     ss << hashedX << "_" << hashedY;
     return ss;
 }
@@ -563,4 +563,4 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
     *keys = std::move(keysToAdd);
 }
 
-}  // namespace mongo
+}  // namespace merizo

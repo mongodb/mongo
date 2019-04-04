@@ -25,13 +25,13 @@
 
     // Any positive number is valid.
     conn = MongoRunner.runMongod({setParameter: {maxAcceptableLogicalClockDriftSecs: 1}});
-    assert.neq(null, conn, "failed to start mongod with valid maxAcceptableLogicalClockDriftSecs");
+    assert.neq(null, conn, "failed to start merizod with valid maxAcceptableLogicalClockDriftSecs");
     MongoRunner.stopMongod(conn);
 
     conn = MongoRunner.runMongod({
         setParameter: {maxAcceptableLogicalClockDriftSecs: 60 * 60 * 24 * 365 * 10}
     });  // 10 years.
-    assert.neq(null, conn, "failed to start mongod with valid maxAcceptableLogicalClockDriftSecs");
+    assert.neq(null, conn, "failed to start merizod with valid maxAcceptableLogicalClockDriftSecs");
     MongoRunner.stopMongod(conn);
 
     // Verify maxAcceptableLogicalClockDriftSecs works as expected in a sharded cluster.
@@ -39,8 +39,8 @@
     const st = new ShardingTest({
         shards: 1,
         shardOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}},
-        mongosOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}},
-        mongosWaitsForKeys: true
+        merizosOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}},
+        merizosWaitsForKeys: true
     });
     let testDB = st.s.getDB("test");
 

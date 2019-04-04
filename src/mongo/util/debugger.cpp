@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/debugger.h"
+#include "merizo/util/debugger.h"
 
 #include <cstdlib>
 #include <mutex>
@@ -43,7 +43,7 @@
 #include <signal.h>
 #endif
 
-#include "mongo/util/debug_util.h"
+#include "merizo/util/debug_util.h"
 
 #ifndef _WIN32
 namespace {
@@ -51,7 +51,7 @@ std::once_flag breakpointOnceFlag;
 }  // namespace
 #endif
 
-namespace mongo {
+namespace merizo {
 void breakpoint() {
 #ifdef _WIN32
     if (IsDebuggerPresent()) {

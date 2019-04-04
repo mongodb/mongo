@@ -32,7 +32,7 @@
     var cluster = new ShardingTest({
         name: "authmr",
         shards: 1,
-        mongos: 1,
+        merizos: 1,
         other: {keyFile: "jstests/libs/key1", shardAsReplicaSet: false}
     });
 

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,16 +30,16 @@
 
 #pragma once
 
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/cursor_id.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/progress_meter.h"
-#include "mongo/util/time_support.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/cursor_id.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/server_options.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/util/progress_meter.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 class Client;
 class CurOp;
@@ -230,7 +230,7 @@ public:
     /**
      * Writes a report of the operation being executed by the given client to the supplied
      * BSONObjBuilder, in a format suitable for display in currentOp. Does not include a lockInfo
-     * report, since this may be called in either a mongoD or mongoS context and the latter does not
+     * report, since this may be called in either a merizoD or merizoS context and the latter does not
      * supply lock stats. The client must be locked before calling this method.
      */
     static void reportCurrentOpForClient(OperationContext* opCtx,
@@ -640,4 +640,4 @@ BSONObj upconvertQueryEntry(const BSONObj& query,
  */
 BSONObj upconvertGetMoreEntry(const NamespaceString& nss, CursorId cursorId, int ntoreturn);
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,23 +29,23 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_interface.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/fail_point_service.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/record_id.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/oplog_interface.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/fail_point_service.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
-// It is necessary to have this forward declare for the mongo fail point
+// It is necessary to have this forward declare for the merizo fail point
 // at this location because of the splitting of the rollback algorithms into
 // two separate files, rs_rollback and rs_rollback_no_uuid. However, after
-// MongoDB 3.8 is released, we no longer need to maintain rs_rollback_no_uuid
+// MerizoDB 3.8 is released, we no longer need to maintain rs_rollback_no_uuid
 // code and these forward declares can be removed. See SERVER-29766.
 MONGO_FAIL_POINT_DECLARE(rollbackHangBeforeFinish);
 MONGO_FAIL_POINT_DECLARE(rollbackHangThenFailAfterWritingMinValid);
@@ -126,4 +126,4 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperat
     const RollBackLocalOperations::RollbackOperationFn& rollbackOperation);
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

@@ -7,15 +7,15 @@
 
     const st = new ShardingTest({shards: 2, config: 1, verbose: ''});
 
-    const mongosDB = st.s.getDB("test");
-    st.shardColl(mongosDB.foo, {_id: 1}, {_id: 0}, {_id: -1});
+    const merizosDB = st.s.getDB("test");
+    st.shardColl(merizosDB.foo, {_id: 1}, {_id: 0}, {_id: -1});
 
-    assert.commandWorked(mongosDB.foo.insert([{_id: 1}, {_id: 2}]));
+    assert.commandWorked(merizosDB.foo.insert([{_id: 1}, {_id: 2}]));
 
-    assert.commandWorked(mongosDB.adminCommand(
-        {shardCollection: mongosDB.output.getFullName(), key: {_id: "hashed"}}));
+    assert.commandWorked(merizosDB.adminCommand(
+        {shardCollection: merizosDB.output.getFullName(), key: {_id: "hashed"}}));
 
-    assert.commandWorked(mongosDB.foo.mapReduce(
+    assert.commandWorked(merizosDB.foo.mapReduce(
         function() {
             emit(this._id, 1);
         },
@@ -26,7 +26,7 @@
 
     // Test that using just a collection name without specifying a merge mode or the 'sharded: true'
     // information will fail if the named collection is sharded.
-    const error = assert.throws(() => mongosDB.foo.mapReduce(
+    const error = assert.throws(() => merizosDB.foo.mapReduce(
                                     function() {
                                         emit(this._id, 1);
                                     },
@@ -36,7 +36,7 @@
                                     {out: "output"}));
     assert.eq(error.code, 15920);
 
-    for (let name of mongosDB.getCollectionNames()) {
+    for (let name of merizosDB.getCollectionNames()) {
         assert.eq(-1, name.indexOf("tmp.mrs"), name);
     }
 

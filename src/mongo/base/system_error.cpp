@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <string>
 
-#include "mongo/base/system_error.h"
+#include "merizo/base/system_error.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -45,7 +45,7 @@ public:
     MongoErrorCategoryImpl() = default;
 
     const char* name() const noexcept override {
-        return "mongo";
+        return "merizo";
     }
 
     std::string message(int ev) const override {
@@ -71,18 +71,18 @@ public:
 
 }  // namespace
 
-const std::error_category& mongoErrorCategory() {
+const std::error_category& merizoErrorCategory() {
     // TODO: Remove this static, and make a constexpr instance when we move to C++14.
     static const MongoErrorCategoryImpl instance{};
     return instance;
 }
 
 std::error_code make_error_code(ErrorCodes::Error code) {
-    return std::error_code(ErrorCodes::Error(code), mongoErrorCategory());
+    return std::error_code(ErrorCodes::Error(code), merizoErrorCategory());
 }
 
 std::error_condition make_error_condition(ErrorCodes::Error code) {
-    return std::error_condition(ErrorCodes::Error(code), mongoErrorCategory());
+    return std::error_condition(ErrorCodes::Error(code), merizoErrorCategory());
 }
 
-}  // namespace mongo
+}  // namespace merizo

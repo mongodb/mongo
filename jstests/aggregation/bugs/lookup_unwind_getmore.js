@@ -12,7 +12,7 @@
 
     const options = {setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'};
     const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+    assert.neq(null, conn, 'merizod was unable to start up with options: ' + tojson(options));
 
     const testDB = conn.getDB('test');
 
@@ -22,7 +22,7 @@
      */
     function runTest(options) {
         // The batchSize must be smaller than the number of documents returned by the $lookup. This
-        // ensures that the mongo shell will issue a getMore when unwinding the $lookup results for
+        // ensures that the merizo shell will issue a getMore when unwinding the $lookup results for
         // the same document in the 'source' collection, under a different OperationContext.
         const batchSize = 2;
 

@@ -53,10 +53,10 @@
  *      database as its single argument.
  *
  *  skipSharded
- *      If true, do not run this command on a mongos.
+ *      If true, do not run this command on a merizos.
  *
  *  skipStandalone
- *      If true, do not run this command on a standalone mongod.
+ *      If true, do not run this command on a standalone merizod.
  */
 
 (function() {
@@ -306,7 +306,7 @@
             command: {getShardVersion: "test.view"},
             isAdminCommand: true,
             expectFailure: true,
-            skipSharded: true,  // mongos is tested in views/views_sharded.js
+            skipSharded: true,  // merizos is tested in views/views_sharded.js
         },
         getnonce: {skip: isUnrelated},
         godinsert: {skip: isAnInternalCommand},
@@ -567,7 +567,7 @@
             assert.commandFailed(res, msg);
     };
 
-    // Are we on a mongos?
+    // Are we on a merizos?
     var isMaster = db.runCommand("ismaster");
     assert.commandWorked(isMaster);
     var isMongos = (isMaster.msg === "isdbgrid");
@@ -598,12 +598,12 @@
 
             // Skip tests depending on sharding configuration.
             if (subtest.skipSharded && isMongos) {
-                print("Skipping " + command + ": not applicable to mongoS");
+                print("Skipping " + command + ": not applicable to merizoS");
                 continue;
             }
 
             if (subtest.skipStandalone && !isMongos) {
-                print("Skipping " + command + ": not applicable to mongoD");
+                print("Skipping " + command + ": not applicable to merizoD");
                 continue;
             }
 

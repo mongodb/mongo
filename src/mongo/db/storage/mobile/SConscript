@@ -21,30 +21,30 @@ env.Library(
         env.Idlc('mobile_global_options.idl')[0],
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
-        '$BUILD_DIR/mongo/db/storage/journal_listener',
-        '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
-        '$BUILD_DIR/mongo/db/storage/oplog_hack',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/catalog/collection_options',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/merizo/db/index/index_descriptor',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/storage/index_entry_comparison',
+        '$BUILD_DIR/merizo/db/storage/journal_listener',
+        '$BUILD_DIR/merizo/db/storage/key_string',
+        '$BUILD_DIR/merizo/db/storage/kv/kv_prefix',
+        '$BUILD_DIR/merizo/db/storage/oplog_hack',
         '$BUILD_DIR/third_party/shim_sqlite',
         ],
     LIBDEPS_PRIVATE= [
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
         ],
     )
 
 serveronlyProgDepsDependents = []
 if mobile_se:
     serveronlyProgDepsDependents = [
-        '$BUILD_DIR/mongo/mongod',
-        '$BUILD_DIR/mongo/dbtests/dbtest',
+        '$BUILD_DIR/merizo/merizod',
+        '$BUILD_DIR/merizo/dbtests/dbtest',
         ]
 
 env.Library(
@@ -55,10 +55,10 @@ env.Library(
     PROGDEPS_DEPENDENTS=serveronlyProgDepsDependents,
     LIBDEPS=[
         'storage_mobile_core',
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
+        '$BUILD_DIR/merizo/db/storage/kv/kv_engine'
         ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
+        '$BUILD_DIR/merizo/db/storage/storage_engine_common',
     ],
 )
 '''
@@ -69,7 +69,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'storage_mobile_core',
-        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
+        '$BUILD_DIR/merizo/db/storage/sorted_data_interface_test_harness'
         ]
     )
 '''
@@ -81,8 +81,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'storage_mobile_core',
-        '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/merizo/db/storage/record_store_test_harness',
+        '$BUILD_DIR/merizo/db/concurrency/write_conflict_exception',
     ]
 )
 
@@ -92,11 +92,11 @@ env.CppUnitTest(
         'mobile_kv_engine_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/storage/kv/kv_engine_test_harness',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
         'storage_mobile_core',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
     ],
 )

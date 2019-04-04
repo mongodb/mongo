@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -35,19 +35,19 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
-#include "mongo/base/string_data_comparator_interface.h"
-#include "mongo/bson/bson_comparator_interface_base.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/config.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/platform/strnlen.h"
+#include "merizo/base/data_range.h"
+#include "merizo/base/data_type_endian.h"
+#include "merizo/base/data_view.h"
+#include "merizo/base/string_data_comparator_interface.h"
+#include "merizo/bson/bson_comparator_interface_base.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/bson/oid.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/config.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/platform/strnlen.h"
 
-namespace mongo {
+namespace merizo {
 class BSONObj;
 class BSONElement;
 class BSONObjBuilder;
@@ -106,13 +106,13 @@ public:
         std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
     */
     std::string String() const {
-        return chk(mongo::String).str();
+        return chk(merizo::String).str();
     }
     const StringData checkAndGetStringData() const {
-        return chk(mongo::String).valueStringData();
+        return chk(merizo::String).valueStringData();
     }
     Date_t Date() const {
-        return chk(mongo::Date).date();
+        return chk(merizo::Date).date();
     }
     double Number() const {
         uassert(13118,
@@ -135,10 +135,10 @@ public:
         return chk(NumberInt)._numberInt();
     }
     bool Bool() const {
-        return chk(mongo::Bool).boolean();
+        return chk(merizo::Bool).boolean();
     }
     std::vector<BSONElement> Array() const;  // see implementation for detailed comments
-    mongo::OID OID() const {
+    merizo::OID OID() const {
         return chk(jstOID).__oid();
     }
 
@@ -166,7 +166,7 @@ public:
         v = Bool();
     }
     void Val(BSONObj& v) const;
-    void Val(mongo::OID& v) const {
+    void Val(merizo::OID& v) const {
         v = OID();
     }
     void Val(int& v) const {
@@ -288,7 +288,7 @@ public:
     }
 
     bool isBoolean() const {
-        return type() == mongo::Bool;
+        return type() == merizo::Bool;
     }
 
     /** @return value of a boolean element.
@@ -375,7 +375,7 @@ public:
 
     /** Retrieve the object ID stored in the object.
         You must ensure the element is of type jstOID first. */
-    mongo::OID __oid() const {
+    merizo::OID __oid() const {
         return OID::from(value());
     }
 
@@ -406,11 +406,11 @@ public:
 
     /** Get the std::string value of the element.  If not a std::string returns "". */
     const char* valuestrsafe() const {
-        return type() == mongo::String ? valuestr() : "";
+        return type() == merizo::String ? valuestr() : "";
     }
     /** Get the std::string value of the element.  If not a std::string returns "". */
     std::string str() const {
-        return type() == mongo::String ? std::string(valuestr(), valuestrsize() - 1)
+        return type() == merizo::String ? std::string(valuestr(), valuestrsize() - 1)
                                        : std::string();
     }
 
@@ -588,7 +588,7 @@ public:
     bool mayEncapsulate() const {
         switch (type()) {
             case Object:
-            case mongo::Array:
+            case merizo::Array:
             case CodeWScope:
                 return true;
             default:
@@ -600,7 +600,7 @@ public:
     bool isABSONObj() const {
         switch (type()) {
             case Object:
-            case mongo::Array:
+            case merizo::Array:
                 return true;
             default:
                 return false;
@@ -608,7 +608,7 @@ public:
     }
 
     Timestamp timestamp() const {
-        if (type() == mongo::Date || type() == bsonTimestamp) {
+        if (type() == merizo::Date || type() == bsonTimestamp) {
             return Timestamp(ConstDataView(value()).read<LittleEndian<unsigned long long>>().value);
         }
         return Timestamp();
@@ -662,11 +662,11 @@ public:
         return value() + 4;
     }
 
-    const mongo::OID dbrefOID() const {
+    const merizo::OID dbrefOID() const {
         uassert(10064, "not a dbref", type() == DBRef);
         const char* start = value();
         start += 4 + ConstDataView(start).read<LittleEndian<int>>();
-        return mongo::OID::from(start);
+        return merizo::OID::from(start);
     }
 
     // @param maxLen don't scan more than maxLen bytes
@@ -760,7 +760,7 @@ inline bool BSONElement::trueValue() const {
             return _numberDecimal().isNotEqual(Decimal128(0));
         case NumberInt:
             return _numberInt() != 0;
-        case mongo::Bool:
+        case merizo::Bool:
             return boolean();
         case EOO:
         case jstNULL:

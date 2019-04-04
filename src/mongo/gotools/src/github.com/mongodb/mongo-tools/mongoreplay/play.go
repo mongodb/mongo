@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -12,20 +12,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/lldb"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/lldb"
+	"github.com/merizodb/merizo-tools/common/options"
 )
 
-// PlayCommand stores settings for the mongoreplay 'play' subcommand
+// PlayCommand stores settings for the merizoreplay 'play' subcommand
 type PlayCommand struct {
 	GlobalOpts *Options `no-flag:"true"`
 	StatOptions
 	PlaybackFile string       `description:"path to the playback file to play from" short:"p" long:"playback-file" required:"yes"`
 	Speed        float64      `description:"multiplier for playback speed (1.0 = real-time, .5 = half-speed, 3.0 = triple-speed, etc.)" long:"speed" default:"1.0"`
-	URL          string       `short:"h" long:"host" env:"MONGOREPLAY_HOST" description:"Location of the host to play back against" default:"mongodb://localhost:27017"`
+	URL          string       `short:"h" long:"host" env:"MONGOREPLAY_HOST" description:"Location of the host to play back against" default:"merizodb://localhost:27017"`
 	Repeat       int          `long:"repeat" description:"Number of times to play the playback file" default:"1"`
 	QueueTime    int          `long:"queueTime" description:"don't queue ops much further in the future than this number of seconds" default:"15"`
-	NoPreprocess bool         `long:"no-preprocess" description:"don't preprocess the input file to premap data such as mongo cursorIDs"`
+	NoPreprocess bool         `long:"no-preprocess" description:"don't preprocess the input file to premap data such as merizo cursorIDs"`
 	Gzip         bool         `long:"gzip" description:"decompress gzipped input"`
 	Collect      string       `long:"collect" description:"Stat collection format; 'format' option uses the --format string" choice:"json" choice:"format" choice:"none" default:"none"`
 	FullSpeed    bool         `long:"fullSpeed" description:"run the playback as fast as possible"`
@@ -77,8 +77,8 @@ func (play *PlayCommand) Execute(args []string) error {
 	// SSL options must be non-nil before parsing to enable parsing ssl;
 	// play.SSLopts will be nil if SSL is not enabled
 	toolOpts.SSL = play.SSLOpts
-	if !(strings.HasPrefix(play.URL, "mongodb://") || strings.HasPrefix(play.URL, "mongodb+srv://")) {
-		play.URL = fmt.Sprintf("mongodb://%s", play.URL)
+	if !(strings.HasPrefix(play.URL, "merizodb://") || strings.HasPrefix(play.URL, "merizodb+srv://")) {
+		play.URL = fmt.Sprintf("merizodb://%s", play.URL)
 	}
 	_, err = toolOpts.ParseArgs([]string{"--uri", play.URL})
 

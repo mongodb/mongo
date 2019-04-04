@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/util/file.h"
+#include "merizo/util/file.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <cstdint>
@@ -43,14 +43,14 @@
 #include <sys/types.h>
 #endif
 
-#include "mongo/platform/basic.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/text.h"
+#include "merizo/platform/basic.h"
+#include "merizo/util/allocator.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 
 #if defined(_WIN32)
 
@@ -138,7 +138,7 @@ void File::read(fileofs o, char* data, unsigned len) {
     } else if (bytesRead != len) {
         _bad = true;
         msgasserted(10438,
-                    mongoutils::str::stream() << "In File::read(), ReadFile for '" << _name
+                    merizoutils::str::stream() << "In File::read(), ReadFile for '" << _name
                                               << "' read "
                                               << bytesRead
                                               << " bytes while trying to read "
@@ -264,7 +264,7 @@ void File::read(fileofs o, char* data, unsigned len) {
     } else if (bytesRead != static_cast<ssize_t>(len)) {
         _bad = true;
         msgasserted(16569,
-                    mongoutils::str::stream() << "In File::read(), ::pread for '" << _name
+                    merizoutils::str::stream() << "In File::read(), ::pread for '" << _name
                                               << "' read "
                                               << bytesRead
                                               << " bytes while trying to read "

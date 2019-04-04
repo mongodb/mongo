@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,55 +33,55 @@
 #include <vm/PosixNSPR.h>
 
 
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/scripting/mozjs/bindata.h"
-#include "mongo/scripting/mozjs/bson.h"
-#include "mongo/scripting/mozjs/code.h"
-#include "mongo/scripting/mozjs/countdownlatch.h"
-#include "mongo/scripting/mozjs/cursor.h"
-#include "mongo/scripting/mozjs/cursor_handle.h"
-#include "mongo/scripting/mozjs/db.h"
-#include "mongo/scripting/mozjs/dbcollection.h"
-#include "mongo/scripting/mozjs/dbpointer.h"
-#include "mongo/scripting/mozjs/dbquery.h"
-#include "mongo/scripting/mozjs/dbref.h"
-#include "mongo/scripting/mozjs/engine.h"
-#include "mongo/scripting/mozjs/error.h"
-#include "mongo/scripting/mozjs/freeOpToJSContext.h"
-#include "mongo/scripting/mozjs/global.h"
-#include "mongo/scripting/mozjs/internedstring.h"
-#include "mongo/scripting/mozjs/jsthread.h"
-#include "mongo/scripting/mozjs/maxkey.h"
-#include "mongo/scripting/mozjs/minkey.h"
-#include "mongo/scripting/mozjs/mongo.h"
-#include "mongo/scripting/mozjs/mongohelpers.h"
-#include "mongo/scripting/mozjs/nativefunction.h"
-#include "mongo/scripting/mozjs/numberdecimal.h"
-#include "mongo/scripting/mozjs/numberint.h"
-#include "mongo/scripting/mozjs/numberlong.h"
-#include "mongo/scripting/mozjs/object.h"
-#include "mongo/scripting/mozjs/oid.h"
-#include "mongo/scripting/mozjs/regexp.h"
-#include "mongo/scripting/mozjs/session.h"
-#include "mongo/scripting/mozjs/status.h"
-#include "mongo/scripting/mozjs/timestamp.h"
-#include "mongo/scripting/mozjs/uri.h"
-#include "mongo/stdx/unordered_set.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/scripting/mozjs/bindata.h"
+#include "merizo/scripting/mozjs/bson.h"
+#include "merizo/scripting/mozjs/code.h"
+#include "merizo/scripting/mozjs/countdownlatch.h"
+#include "merizo/scripting/mozjs/cursor.h"
+#include "merizo/scripting/mozjs/cursor_handle.h"
+#include "merizo/scripting/mozjs/db.h"
+#include "merizo/scripting/mozjs/dbcollection.h"
+#include "merizo/scripting/mozjs/dbpointer.h"
+#include "merizo/scripting/mozjs/dbquery.h"
+#include "merizo/scripting/mozjs/dbref.h"
+#include "merizo/scripting/mozjs/engine.h"
+#include "merizo/scripting/mozjs/error.h"
+#include "merizo/scripting/mozjs/freeOpToJSContext.h"
+#include "merizo/scripting/mozjs/global.h"
+#include "merizo/scripting/mozjs/internedstring.h"
+#include "merizo/scripting/mozjs/jsthread.h"
+#include "merizo/scripting/mozjs/maxkey.h"
+#include "merizo/scripting/mozjs/minkey.h"
+#include "merizo/scripting/mozjs/merizo.h"
+#include "merizo/scripting/mozjs/merizohelpers.h"
+#include "merizo/scripting/mozjs/nativefunction.h"
+#include "merizo/scripting/mozjs/numberdecimal.h"
+#include "merizo/scripting/mozjs/numberint.h"
+#include "merizo/scripting/mozjs/numberlong.h"
+#include "merizo/scripting/mozjs/object.h"
+#include "merizo/scripting/mozjs/oid.h"
+#include "merizo/scripting/mozjs/regexp.h"
+#include "merizo/scripting/mozjs/session.h"
+#include "merizo/scripting/mozjs/status.h"
+#include "merizo/scripting/mozjs/timestamp.h"
+#include "merizo/scripting/mozjs/uri.h"
+#include "merizo/stdx/unordered_set.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 /**
  * Implementation Scope for MozJS
  *
  * The Implementation scope holds the actual mozjs runtime and context objects,
- * along with a number of global prototypes for mongoDB specific types. Each
+ * along with a number of global prototypes for merizoDB specific types. Each
  * ImplScope requires it's own thread and cannot be accessed from any thread
  * other than the one it was created on (this is a detail inherited from the
  * JSRuntime). If you need a scope that can be accessed by different threads
  * over the course of it's lifetime, see MozJSProxyScope
  *
- * For more information about overriden fields, see mongo::Scope
+ * For more information about overriden fields, see merizo::Scope
  */
 class MozJSImplScope final : public Scope {
     MozJSImplScope(const MozJSImplScope&) = delete;
@@ -237,13 +237,13 @@ public:
     template <typename T>
     typename std::enable_if<std::is_same<T, MongoExternalInfo>::value, WrapType<T>&>::type
     getProto() {
-        return _mongoExternalProto;
+        return _merizoExternalProto;
     }
 
     template <typename T>
     typename std::enable_if<std::is_same<T, MongoHelpersInfo>::value, WrapType<T>&>::type
     getProto() {
-        return _mongoHelpersProto;
+        return _merizoHelpersProto;
     }
 
     template <typename T>
@@ -445,8 +445,8 @@ private:
     WrapType<JSThreadInfo> _jsThreadProto;
     WrapType<MaxKeyInfo> _maxKeyProto;
     WrapType<MinKeyInfo> _minKeyProto;
-    WrapType<MongoExternalInfo> _mongoExternalProto;
-    WrapType<MongoHelpersInfo> _mongoHelpersProto;
+    WrapType<MongoExternalInfo> _merizoExternalProto;
+    WrapType<MongoHelpersInfo> _merizoHelpersProto;
     WrapType<NativeFunctionInfo> _nativeFunctionProto;
     WrapType<NumberDecimalInfo> _numberDecimalProto;
     WrapType<NumberIntInfo> _numberIntProto;
@@ -470,4 +470,4 @@ inline MozJSImplScope* getScope(js::FreeOp* fop) {
 
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

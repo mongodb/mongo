@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,14 +31,14 @@
 
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/reply_builder_interface.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/rpc/reply_builder_interface.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Builds the cursor field and the _latestOplogTimestamp field for a reply to a cursor-generating
@@ -273,4 +273,4 @@ private:
     boost::optional<BSONObj> _writeConcernError;
 };
 
-}  // namespace mongo
+}  // namespace merizo

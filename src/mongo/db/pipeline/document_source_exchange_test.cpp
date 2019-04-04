@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/hasher.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_exchange.h"
-#include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/platform/random.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/time_support.h"
+#include "merizo/db/hasher.h"
+#include "merizo/db/pipeline/aggregation_context_fixture.h"
+#include "merizo/db/pipeline/document_source_exchange.h"
+#include "merizo/db/pipeline/document_source_mock.h"
+#include "merizo/db/storage/key_string.h"
+#include "merizo/executor/network_interface_factory.h"
+#include "merizo/executor/thread_pool_task_executor.h"
+#include "merizo/platform/random.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/concurrency/thread_pool.h"
+#include "merizo/util/time_support.h"
 
 
-namespace mongo {
+namespace merizo {
 
 /**
  * An implementation of the MongoProcessInterface that is okay with changing the OperationContext,
@@ -60,7 +60,7 @@ class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:
     std::unique_ptr<executor::TaskExecutor> _executor;
     virtual void setUp() override {
-        getExpCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessOkWithOpCtxChanges>();
+        getExpCtx()->merizoProcessInterface = std::make_shared<StubMongoProcessOkWithOpCtxChanges>();
 
         auto net = executor::makeNetworkInterface("ExchangeTest");
 
@@ -830,4 +830,4 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidMissingKeys) {
         50967);
 }
 
-}  // namespace mongo
+}  // namespace merizo

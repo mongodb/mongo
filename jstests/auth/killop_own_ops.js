@@ -153,7 +153,7 @@
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     var st = new ShardingTest(
         {shards: 1, keyFile: 'jstests/libs/key1', other: {shardAsReplicaSet: false}});
-    // Use a different failpoint in the sharded version, since the mongos does not have a
+    // Use a different failpoint in the sharded version, since the merizos does not have a
     // setYieldAlllocksHang failpoint.
     runTest(st.s, "waitInFindBeforeMakingBatch");
     st.stop();

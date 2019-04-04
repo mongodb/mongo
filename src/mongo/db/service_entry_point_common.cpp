@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,75 +27,75 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/service_entry_point_common.h"
+#include "merizo/db/service_entry_point_common.h"
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/impersonation_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/command_can_run_here.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/curop_metrics.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/handle_request_response.h"
-#include "mongo/db/initialize_operation_session_info.h"
-#include "mongo/db/introspect.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/read_concern.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/run_op_kill_cursors.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharded_connection_info.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/transaction_coordinator_factory.h"
-#include "mongo/db/service_entry_point_common.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/snapshot_window_util.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/server_read_concern_metrics.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/transaction_validation.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/message.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
-#include "mongo/rpc/metadata/oplog_query_metadata.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/impersonation_session.h"
+#include "merizo/db/client.h"
+#include "merizo/db/command_can_run_here.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/commands/txn_cmds_gen.h"
+#include "merizo/db/concurrency/global_lock_acquisition_tracker.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/curop_metrics.h"
+#include "merizo/db/cursor_manager.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/handle_request_response.h"
+#include "merizo/db/initialize_operation_session_info.h"
+#include "merizo/db/introspect.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/logical_session_id_helpers.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/ops/write_ops_exec.h"
+#include "merizo/db/query/find.h"
+#include "merizo/db/read_concern.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/speculative_majority_read_info.h"
+#include "merizo/db/run_op_kill_cursors.h"
+#include "merizo/db/s/operation_sharding_state.h"
+#include "merizo/db/s/sharded_connection_info.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/s/transaction_coordinator_factory.h"
+#include "merizo/db/service_entry_point_common.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/snapshot_window_util.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/stats/server_read_concern_metrics.h"
+#include "merizo/db/stats/top.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/transaction_validation.h"
+#include "merizo/rpc/factory.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/message.h"
+#include "merizo/rpc/metadata.h"
+#include "merizo/rpc/metadata/logical_time_metadata.h"
+#include "merizo/rpc/metadata/oplog_query_metadata.h"
+#include "merizo/rpc/metadata/repl_set_metadata.h"
+#include "merizo/rpc/metadata/tracking_metadata.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/rpc/reply_builder_interface.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
@@ -601,7 +601,7 @@ void execCommandDatabase(OperationContext* opCtx,
             CurOp::get(opCtx)->setCommand_inlock(command);
         }
 
-        // TODO: move this back to runCommands when mongos supports OperationContext
+        // TODO: move this back to runCommands when merizos supports OperationContext
         // see SERVER-18515 for details.
         rpc::readRequestMetadata(opCtx, request.body, command->requiresAuth());
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
@@ -1340,4 +1340,4 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
 
 ServiceEntryPointCommon::Hooks::~Hooks() = default;
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,13 +32,13 @@
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonobj.h"
 
-namespace mongo {
+namespace merizo {
 /**
  * A JSONPointer (RFC 6901) is a string representation for referring to an element within a JSON
- * instance. In the MongoDB context, it specifically is used to point to a particular BSON element
+ * instance. In the MerizoDB context, it specifically is used to point to a particular BSON element
  * within a BSON object. This class implements JSON pointer parsing and resolution.
  *
  * It does not implement the behavior that the pointer "" returns the whole document.
@@ -83,4 +83,4 @@ private:
     std::string _original;
 };
 
-}  // namespace mongo
+}  // namespace merizo

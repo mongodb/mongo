@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,32 +28,32 @@
  */
 
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_manager.h"
 
 #include <boost/algorithm/string.hpp>
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/config.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/icu.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/net/ssl_parameters_gen.h"
-#include "mongo/util/synchronized_value.h"
-#include "mongo/util/text.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/config.h"
+#include "merizo/db/commands/server_status.h"
+#include "merizo/platform/overflow_arithmetic.h"
+#include "merizo/transport/session.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/icu.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/net/ssl_parameters_gen.h"
+#include "merizo/util/synchronized_value.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 
 SSLManagerInterface* theSSLManager = nullptr;
 
@@ -298,9 +298,9 @@ void canonicalizeClusterDN(std::vector<std::string>* dn) {
     for (size_t i = 0; i < dn->size(); i++) {
         std::string& comp = dn->at(i);
         boost::algorithm::trim(comp);
-        if (!mongoutils::str::startsWith(comp.c_str(), "DC=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "O=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "OU=")) {
+        if (!merizoutils::str::startsWith(comp.c_str(), "DC=") &&
+            !merizoutils::str::startsWith(comp.c_str(), "O=") &&
+            !merizoutils::str::startsWith(comp.c_str(), "OU=")) {
             dn->erase(dn->begin() + i);
             i--;
         }
@@ -943,7 +943,7 @@ StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
     const uint64_t tagAndLengthByteCount = kTagLength + encodedLengthBytesCount;
 
     // This may overflow since derLength is from user data so check our arithmetic carefully.
-    if (mongoUnsignedAddOverflow64(tagAndLengthByteCount, derLength, outLength) ||
+    if (merizoUnsignedAddOverflow64(tagAndLengthByteCount, derLength, outLength) ||
         *outLength > cdr.length()) {
         return Status(ErrorCodes::InvalidSSLConfiguration, "Invalid DER length");
     }
@@ -958,11 +958,11 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
     ConstDataRangeCursor cdcExtension(cdrExtension);
 
     /**
-     * MongoDBAuthorizationGrants ::= SET OF MongoDBAuthorizationGrant
+     * MerizoDBAuthorizationGrants ::= SET OF MerizoDBAuthorizationGrant
      *
-     * MongoDBAuthorizationGrant ::= CHOICE {
-     *  MongoDBRole,
-     *  ...!UTF8String:"Unrecognized entity in MongoDBAuthorizationGrant"
+     * MerizoDBAuthorizationGrant ::= CHOICE {
+     *  MerizoDBRole,
+     *  ...!UTF8String:"Unrecognized entity in MerizoDBAuthorizationGrant"
      * }
      */
     auto swSet = cdcExtension.readAndAdvance<DERToken>();
@@ -981,7 +981,7 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
 
     while (!cdcSet.empty()) {
         /**
-         * MongoDBRole ::= SEQUENCE {
+         * MerizoDBRole ::= SEQUENCE {
          *  role     UTF8String,
          *  database UTF8String
          * }
@@ -1075,7 +1075,7 @@ std::string escapeRfc2253(StringData str) {
 
 namespace {
 /**
- * Status section of which tls versions connected to MongoDB and completed an SSL handshake.
+ * Status section of which tls versions connected to MerizoDB and completed an SSL handshake.
  * Note: Clients are only not counted if they try to connect to the server with a unsupported TLS
  * version. They are still counted if the server rejects them for certificate issues in
  * parseAndValidatePeerCertificate.
@@ -1106,7 +1106,7 @@ public:
 
 void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
     StringData versionString;
-    auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
+    auto& counts = merizo::TLSVersionCounts::get(getGlobalServiceContext());
     switch (version) {
         case TLSVersion::kTLS10:
             counts.tls10.addAndFetch(1);
@@ -1158,10 +1158,10 @@ SSLManagerInterface* getSSLManager() {
     return theSSLManager;
 }
 
-}  // namespace mongo
+}  // namespace merizo
 
 // TODO SERVER-11601 Use NFC Unicode canonicalization
-bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
+bool merizo::hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
     nameToMatch = removeFQDNRoot(std::move(nameToMatch));
     certHostName = removeFQDNRoot(std::move(certHostName));
 

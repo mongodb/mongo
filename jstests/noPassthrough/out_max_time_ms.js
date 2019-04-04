@@ -37,7 +37,7 @@
     }
 
     /**
-     * Given a $out mode and a mongod connection, run a $out aggregation against 'conn' which hangs
+     * Given a $out mode and a merizod connection, run a $out aggregation against 'conn' which hangs
      * on the given failpoint and ensure that the $out maxTimeMS expires.
      */
     function forceAggregationToHangAndCheckMaxTimeMsExpires(mode, conn, failPointName) {
@@ -129,17 +129,17 @@
     // Run on a standalone.
     (function() {
         const conn = MongoRunner.runMongod({});
-        assert.neq(null, conn, 'mongod was unable to start up');
+        assert.neq(null, conn, 'merizod was unable to start up');
         insertDocs(conn.getDB(kDBName)[kSourceCollName]);
         withEachOutMode((mode) => runUnshardedTest(mode, conn));
         MongoRunner.stopMongod(conn);
     })();
 
-    // Runs a $out against 'mongosConn' and verifies that the maxTimeMS value is included in the
-    // command sent to mongod. Since the actual timeout can unreliably happen in mongos before even
+    // Runs a $out against 'merizosConn' and verifies that the maxTimeMS value is included in the
+    // command sent to merizod. Since the actual timeout can unreliably happen in merizos before even
     // reaching the shard, we instead set a very large timeout and verify that the command sent to
-    // mongod includes the maxTimeMS.
-    function runShardedTest(mode, mongosConn, mongodConn, comment) {
+    // merizod includes the maxTimeMS.
+    function runShardedTest(mode, merizosConn, merizodConn, comment) {
         jsTestLog("Running sharded test in mode " + mode);
         if (mode == "replaceCollection") {
             return;
@@ -148,23 +148,23 @@
         // Set a large timeout since we expect the command to finish.
         const maxTimeMS = 1000 * 20;
 
-        const sourceColl = mongosConn.getDB(kDBName)[kSourceCollName];
-        const destColl = mongosConn.getDB(kDBName)[kDestCollName];
+        const sourceColl = merizosConn.getDB(kDBName)[kSourceCollName];
+        const destColl = merizosConn.getDB(kDBName)[kDestCollName];
         assert.commandWorked(destColl.remove({}));
 
-        // Make sure we don't timeout in mongos before even reaching the shards.
-        assert.commandWorked(mongosConn.getDB("admin").runCommand(
+        // Make sure we don't timeout in merizos before even reaching the shards.
+        assert.commandWorked(merizosConn.getDB("admin").runCommand(
             {configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
 
         const cursor = sourceColl.aggregate([{$out: {to: destColl.getName(), mode: mode}}],
                                             {maxTimeMS: maxTimeMS, comment: comment});
         assert(!cursor.hasNext());
 
-        // Filter the profiler entries on the existence of $out, since aggregations through mongos
+        // Filter the profiler entries on the existence of $out, since aggregations through merizos
         // will include an extra aggregation with an empty pipeline to establish cursors on the
         // shards.
         assert.soon(function() {
-            return mongodConn.getDB(kDBName)
+            return merizodConn.getDB(kDBName)
                        .system.profile
                        .find({
                            "command.aggregate": kSourceCollName,
@@ -175,7 +175,7 @@
                        .itcount() == 1;
         });
 
-        assert.commandWorked(mongosConn.getDB("admin").runCommand(
+        assert.commandWorked(merizosConn.getDB("admin").runCommand(
             {configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}));
     }
 

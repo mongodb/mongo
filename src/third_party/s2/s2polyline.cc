@@ -18,8 +18,8 @@ using std::vector;
 #include "s2latlng.h"
 #include "s2edgeutil.h"
 
-#include "mongo/util/mongoutils/str.h"
-using mongoutils::str::stream;
+#include "merizo/util/merizoutils/str.h"
+using merizoutils::str::stream;
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 
@@ -54,7 +54,7 @@ void S2Polyline::Init(vector<S2Point> const& vertices) {
   vertices_ = new S2Point[num_vertices_];
   // Check (num_vertices_ > 0) to avoid invalid reference to vertices[0].
   if (num_vertices_ > 0) {
-    // mongodb: void* casts to silence a -Wclass-memaccess warning.
+    // merizodb: void* casts to silence a -Wclass-memaccess warning.
     memcpy(static_cast<void*>(vertices_), static_cast<const void*>(&vertices[0]),
            num_vertices_ * sizeof(vertices_[0]));
   }
@@ -105,7 +105,7 @@ bool S2Polyline::IsValid(vector<S2Point> const& v, string* err) {
 S2Polyline::S2Polyline(S2Polyline const* src)
   : num_vertices_(src->num_vertices_),
     vertices_(new S2Point[num_vertices_]) {
-  // mongodb: void* casts to silence a -Wclass-memaccess warning.
+  // merizodb: void* casts to silence a -Wclass-memaccess warning.
   memcpy(static_cast<void*>(vertices_), static_cast<const void*>(src->vertices_),
          num_vertices_ * sizeof(vertices_[0]));
 }

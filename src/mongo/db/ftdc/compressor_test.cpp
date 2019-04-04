@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <limits>
 #include <random>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/ftdc/compressor.h"
-#include "mongo/db/ftdc/config.h"
-#include "mongo/db/ftdc/decompressor.h"
-#include "mongo/db/ftdc/ftdc_test.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/ftdc/compressor.h"
+#include "merizo/db/ftdc/config.h"
+#include "merizo/db/ftdc/decompressor.h"
+#include "merizo/db/ftdc/ftdc_test.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 
 #define ASSERT_HAS_SPACE(st) \
     ASSERT_TRUE(st.isOK());  \
@@ -531,7 +531,7 @@ TEST_F(FTDCCompressorTest, Types) {
                                << "bool"
                                << true  // bool
                                << "regex"
-                               << BSONRegEx("mongodb")  // regex
+                               << BSONRegEx("merizodb")  // regex
                                << "ref"
                                << BSONDBRef("c", OID("010203040506070809101112"))  // ref
                                << "code"
@@ -650,4 +650,4 @@ TEST_F(FTDCCompressorTest, TestManyMetrics) {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

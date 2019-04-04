@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/user_management_commands_parser.h"
+#include "merizo/db/auth/user_management_commands_parser.h"
 
 #include <algorithm>
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/address_restriction.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/address_restriction.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/privilege_parser.h"
+#include "merizo/db/auth/user_document_parser.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/command_generic_argument.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 namespace auth {
 
 using std::vector;
@@ -65,7 +65,7 @@ Status _checkNoExtraFields(const BSONObj& cmdObj,
         StringData fieldName = (*iter).fieldNameStringData();
         if (!isGenericArgument(fieldName) && !validFieldNames.count(fieldName.toString())) {
             return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "\"" << fieldName << "\" is not "
+                          merizoutils::str::stream() << "\"" << fieldName << "\" is not "
                                                                             "a valid argument to "
                                                     << cmdName);
         }
@@ -176,7 +176,7 @@ Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
 
     if (!parsedRoleNames->size()) {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << cmdName << " command requires a non-empty "
+                      merizoutils::str::stream() << cmdName << " command requires a non-empty "
                                                               "\"roles\" array");
     }
     return Status::OK();
@@ -635,7 +635,7 @@ Status parseAndValidateRolePrivilegeManipulationCommands(const BSONObj& cmdObj,
     }
     if (!parsedPrivileges->size()) {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << cmdName << " command requires a non-empty "
+                      merizoutils::str::stream() << cmdName << " command requires a non-empty "
                                                               "\"privileges\" array");
     }
 
@@ -699,7 +699,7 @@ Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
             return Status(ErrorCodes::OutdatedClient,
                           "Missing \"db\" field for _mergeAuthzCollections command. This is "
                           "most likely due to running an outdated (pre-2.6.4) version of "
-                          "mongorestore.");
+                          "merizorestore.");
         }
         return status;
     }
@@ -713,4 +713,4 @@ Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
 }
 
 }  // namespace auth
-}  // namespace mongo
+}  // namespace merizo

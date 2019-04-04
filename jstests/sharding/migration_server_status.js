@@ -10,11 +10,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, merizos: 1});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var coll = mongos.getCollection("db.coll");
+    var merizos = st.s0;
+    var admin = merizos.getDB("admin");
+    var coll = merizos.getCollection("db.coll");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
@@ -61,8 +61,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert(!shard1ServerStatus.sharding.migrations);
 
     // Mongos should never return a migration status.
-    var mongosServerStatus = st.s0.getDB('admin').runCommand({serverStatus: 1});
-    assert(!mongosServerStatus.sharding.migrations);
+    var merizosServerStatus = st.s0.getDB('admin').runCommand({serverStatus: 1});
+    assert(!merizosServerStatus.sharding.migrations);
 
     unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.startedMoveChunk);
     joinMoveChunk();

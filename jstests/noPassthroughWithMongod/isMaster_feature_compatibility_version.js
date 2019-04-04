@@ -1,6 +1,6 @@
 // Tests that when the featureCompatibilityVersion is not equal to the downgrade version, running
 // isMaster with internalClient returns a response with minWireVersion == maxWireVersion. This
-// ensures that an older version mongod/mongos will fail to connect to the node when it is upgraded,
+// ensures that an older version merizod/merizos will fail to connect to the node when it is upgraded,
 // upgrading, or downgrading.
 //
 (function() {

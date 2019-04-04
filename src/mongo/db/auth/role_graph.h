@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,16 +33,16 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/restriction_set.h"
-#include "mongo/db/auth/role_name.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/restriction_set.h"
+#include "merizo/db/auth/role_name.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/stdx/unordered_set.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 
@@ -361,4 +361,4 @@ inline void swap(RoleGraph& lhs, RoleGraph& rhs) {
     lhs.swap(rhs);
 }
 
-}  // namespace mongo
+}  // namespace merizo

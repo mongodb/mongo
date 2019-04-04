@@ -1,21 +1,21 @@
-// Tests whether new sharding is detected on insert by mongos
+// Tests whether new sharding is detected on insert by merizos
 (function() {
 
-    var st = new ShardingTest({name: "mongos_no_detect_sharding", shards: 1, mongos: 2});
+    var st = new ShardingTest({name: "merizos_no_detect_sharding", shards: 1, merizos: 2});
 
-    var mongos = st.s;
-    var config = mongos.getDB("config");
+    var merizos = st.s;
+    var config = merizos.getDB("config");
 
     print("Creating unsharded connection...");
 
-    var mongos2 = st._mongos[1];
+    var merizos2 = st._merizos[1];
 
-    var coll = mongos2.getCollection("test.foo");
+    var coll = merizos2.getCollection("test.foo");
     assert.writeOK(coll.insert({i: 0}));
 
     print("Sharding collection...");
 
-    var admin = mongos.getDB("admin");
+    var admin = merizos.getDB("admin");
 
     assert.eq(coll.getShardVersion().ok, 0);
 

@@ -26,8 +26,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// MongoDB customization: includes basetsd.h under Windows where SSIZE_T is declared.
-#include "mongo/platform/basic.h"
+// MerizoDB customization: includes basetsd.h under Windows where SSIZE_T is declared.
+#include "merizo/platform/basic.h"
 
 #include "snappy.h"
 #include "snappy-internal.h"

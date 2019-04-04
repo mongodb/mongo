@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_facet.h"
+#include "merizo/db/pipeline/document_source_facet.h"
 
 #include <deque>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/bson/json.h"
+#include "merizo/db/pipeline/aggregation_context_fixture.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_source_limit.h"
+#include "merizo/db/pipeline/document_source_mock.h"
+#include "merizo/db/pipeline/document_source_skip.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 using std::deque;
 using std::vector;
 
@@ -181,7 +181,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithi
 
     auto spec = fromjson(
         "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
-        "{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+        "{$_internalSplitPipeline: {mergeType: 'merizos'}}]}}");
 
     ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                        AssertionException,
@@ -193,8 +193,8 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcros
     ctx->inMongos = true;
 
     auto spec = fromjson(
-        "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], mongosPipe: "
-        "[{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+        "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], merizosPipe: "
+        "[{$_internalSplitPipeline: {mergeType: 'merizos'}}]}}");
 
     ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                        AssertionException,
@@ -529,7 +529,7 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
     // We're going to be changing the OperationContext, so we need to use a MongoProcessInterface
     // that won't throw when we do so.
-    ctx->mongoProcessInterface = stdx::make_unique<StubMongoProcessOkWithOpCtxChanges>();
+    ctx->merizoProcessInterface = stdx::make_unique<StubMongoProcessOkWithOpCtxChanges>();
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto firstPipeline = unittest::assertGet(Pipeline::createFacetPipeline({firstDummy}, ctx));
@@ -822,4 +822,4 @@ TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstrai
            StageConstraints::TransactionRequirement::kNotAllowed);
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

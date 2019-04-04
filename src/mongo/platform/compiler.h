@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,7 +30,7 @@
 #pragma once
 
 /**
- * Include "mongo/platform/compiler.h" to get compiler-targeted macro definitions and utilities.
+ * Include "merizo/platform/compiler.h" to get compiler-targeted macro definitions and utilities.
  *
  * The following macros are provided in all compiler environments:
  *
@@ -109,7 +109,7 @@
  *   for the library, which is conditionally defined to either MONGO_COMIPLER_API_EXPORT or
  *   MONGO_COMPILER_API_IMPORT based on whether the compiler is currently building the library
  *   or building an object that depends on the library, respectively.  For example,
- *   MONGO_FOO_API might be defined to MONGO_COMPILER_API_EXPORT when building the MongoDB
+ *   MONGO_FOO_API might be defined to MONGO_COMPILER_API_EXPORT when building the MerizoDB
  *   libfoo shared library, and to MONGO_COMPILER_API_IMPORT when building an application that
  *   links against that shared library.
  *
@@ -162,9 +162,9 @@
 
 
 #if defined(_MSC_VER)
-#include "mongo/platform/compiler_msvc.h"
+#include "merizo/platform/compiler_msvc.h"
 #elif defined(__GNUC__)
-#include "mongo/platform/compiler_gcc.h"
+#include "merizo/platform/compiler_gcc.h"
 #else
 #error "Unsupported compiler family"
 #endif

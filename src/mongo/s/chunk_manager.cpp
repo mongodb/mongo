@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/chunk_manager.h"
+#include "merizo/s/chunk_manager.h"
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/s/chunk_writes_tracker.h"
-#include "mongo/util/log.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/db/query/index_bounds_builder.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/db/storage/key_string.h"
+#include "merizo/s/chunk_writes_tracker.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 // Used to generate sequence numbers to assign to each newly created RoutingTableHistory
@@ -250,8 +250,8 @@ RoutingTableHistory::overlappingRanges(const BSONObj& min,
 
 IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                                                  const CanonicalQuery& canonicalQuery) {
-    // $text is not allowed in planning since we don't have text index on mongos.
-    // TODO: Treat $text query as a no-op in planning on mongos. So with shard key {a: 1},
+    // $text is not allowed in planning since we don't have text index on merizos.
+    // TODO: Treat $text query as a no-op in planning on merizos. So with shard key {a: 1},
     //       the query { a: 2, $text: { ... } } will only target to {a: 2}.
     if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::TEXT)) {
         IndexBounds bounds;
@@ -259,7 +259,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
         return bounds;
     }
 
-    // Similarly, ignore GEO_NEAR queries in planning, since we do not have geo indexes on mongos.
+    // Similarly, ignore GEO_NEAR queries in planning, since we do not have geo indexes on merizos.
     if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::GEO_NEAR)) {
         IndexBounds bounds;
         IndexBoundsBuilder::allValuesBounds(key, &bounds);
@@ -590,4 +590,4 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
                                 collectionVersion));
 }
 
-}  // namespace mongo
+}  // namespace merizo

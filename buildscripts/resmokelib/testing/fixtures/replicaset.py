@@ -5,9 +5,9 @@ from __future__ import absolute_import
 import os.path
 import time
 
-import pymongo
-import pymongo.errors
-import pymongo.write_concern
+import pymerizo
+import pymerizo.errors
+import pymerizo.write_concern
 
 from . import interface
 from . import replicaset_utils
@@ -20,11 +20,11 @@ from ... import utils
 class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes
     """Fixture which provides JSTests with a replica set to run against."""
 
-    # Error response codes copied from mongo/base/error_codes.err.
+    # Error response codes copied from merizo/base/error_codes.err.
     _NODE_NOT_FOUND = 74
 
     def __init__(  # pylint: disable=too-many-arguments, too-many-locals
-            self, logger, job_num, mongod_executable=None, mongod_options=None, dbpath_prefix=None,
+            self, logger, job_num, merizod_executable=None, merizod_options=None, dbpath_prefix=None,
             preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
             write_concern_majority_journal_default=None, auth_options=None,
             replset_config_options=None, voting_secondaries=None, all_nodes_electable=False,
@@ -33,8 +33,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
-        self.mongod_executable = mongod_executable
-        self.mongod_options = utils.default_if_none(mongod_options, {})
+        self.merizod_executable = merizod_executable
+        self.merizod_options = utils.default_if_none(merizod_options, {})
         self.preserve_dbpath = preserve_dbpath
         self.num_nodes = num_nodes
         self.start_initial_sync_node = start_initial_sync_node
@@ -57,13 +57,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             self.use_replica_set_connection_string = self.all_nodes_electable
 
         # Set the default oplogSize to 511MB.
-        self.mongod_options.setdefault("oplogSize", 511)
+        self.merizod_options.setdefault("oplogSize", 511)
 
-        # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
+        # The dbpath in merizod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
         # create replica sets and assign their dbpath structure explicitly.
-        if "dbpath" in self.mongod_options:
-            self._dbpath_prefix = self.mongod_options.pop("dbpath")
+        if "dbpath" in self.merizod_options:
+            self._dbpath_prefix = self.merizod_options.pop("dbpath")
         else:
             self._dbpath_prefix = os.path.join(self._dbpath_prefix, config.FIXTURE_SUBDIR)
 
@@ -74,16 +74,16 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
     def setup(self):  # pylint: disable=too-many-branches,too-many-statements
         """Set up the replica set."""
-        self.replset_name = self.mongod_options.get("replSet", "rs")
+        self.replset_name = self.merizod_options.get("replSet", "rs")
 
         if not self.nodes:
             for i in xrange(self.num_nodes):
-                node = self._new_mongod(i, self.replset_name)
+                node = self._new_merizod(i, self.replset_name)
                 self.nodes.append(node)
 
         for i in xrange(self.num_nodes):
             if self.linear_chain and i > 0:
-                self.nodes[i].mongod_options["set_parameters"][
+                self.nodes[i].merizod_options["set_parameters"][
                     "failpoint.forceSyncSourceCandidate"] = {
                         "mode": "alwaysOn",
                         "data": {"hostAndPort": self.nodes[i - 1].get_internal_connection_string()}
@@ -93,7 +93,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         if self.start_initial_sync_node:
             if not self.initial_sync_node:
                 self.initial_sync_node_idx = len(self.nodes)
-                self.initial_sync_node = self._new_mongod(self.initial_sync_node_idx,
+                self.initial_sync_node = self._new_merizod(self.initial_sync_node_idx,
                                                           self.replset_name)
             self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
@@ -122,7 +122,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             })
 
         repl_config = {"_id": self.replset_name, "protocolVersion": 1}
-        client = self.nodes[0].mongo_client()
+        client = self.nodes[0].merizo_client()
 
         self.auth(client, self.auth_options)
 
@@ -180,7 +180,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             try:
                 client.admin.command(cmd_obj)
                 break
-            except pymongo.errors.OperationFailure as err:
+            except pymerizo.errors.OperationFailure as err:
                 # Retry on NodeNotFound errors from the "replSetInitiate" command.
                 if err.code != ReplicaSetFixture._NODE_NOT_FOUND:
                     msg = ("Operation failure while configuring the "
@@ -199,7 +199,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
     def await_last_op_committed(self):
         """Wait for the last majority committed op to be visible."""
-        primary_client = self.get_primary().mongo_client()
+        primary_client = self.get_primary().merizo_client()
         self.auth(primary_client, self.auth_options)
 
         primary_optime = replicaset_utils.get_last_optime(primary_client)
@@ -229,7 +229,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
         primary = self.nodes[0]
-        client = primary.mongo_client()
+        client = primary.merizo_client()
         while True:
             self.logger.info("Waiting for primary on port %d to be elected.", primary.port)
             is_master = client.admin.command("isMaster")["ismaster"]
@@ -247,7 +247,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             secondaries.append(self.initial_sync_node)
 
         for secondary in secondaries:
-            client = secondary.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
+            client = secondary.merizo_client(read_preference=pymerizo.ReadPreference.SECONDARY)
             while True:
                 self.logger.info("Waiting for secondary on port %d to become available.",
                                  secondary.port)
@@ -283,7 +283,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
-        primary_client = self.nodes[0].mongo_client()
+        primary_client = self.nodes[0].merizo_client()
         self.auth(primary_client, self.auth_options)
 
         # All nodes must be in primary/secondary state prior to this point. Perform a majority
@@ -291,13 +291,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         # propagate to all members and trigger a stable checkpoint on all persisted storage engines
         # nodes.
         admin = primary_client.get_database(
-            "admin", write_concern=pymongo.write_concern.WriteConcern(w="majority"))
+            "admin", write_concern=pymerizo.write_concern.WriteConcern(w="majority"))
         admin.command("appendOplogNote", data={"await_stable_recovery_timestamp": 1})
 
         for node in self.nodes:
             self.logger.info("Waiting for node on port %d to have a stable recovery timestamp.",
                              node.port)
-            client = node.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
+            client = node.merizo_client(read_preference=pymerizo.ReadPreference.SECONDARY)
             self.auth(client, self.auth_options)
 
             client_admin = client["admin"]
@@ -325,7 +325,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
     def _setup_sessions_collection(self):
         """Set up the sessions collection so that it will not attempt to set up during a test."""
         primary = self.nodes[0]
-        primary.mongo_client().admin.command({"refreshLogicalSessionCacheNow": 1})
+        primary.merizo_client().admin.command({"refreshLogicalSessionCacheNow": 1})
 
     def _do_teardown(self):
         self.logger.info("Stopping all members of the replica set...")
@@ -398,12 +398,12 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
                 try:
                     if node.port not in clients:
-                        clients[node.port] = self.auth(node.mongo_client(), self.auth_options)
+                        clients[node.port] = self.auth(node.merizo_client(), self.auth_options)
 
                     if fn(clients[node.port], node):
                         return node
 
-                except pymongo.errors.AutoReconnect:
+                except pymerizo.errors.AutoReconnect:
                     # AutoReconnect exceptions may occur if the primary stepped down since PyMongo
                     # last contacted it. We'll just try contacting the node again in the next round
                     # of isMaster requests.
@@ -418,20 +418,20 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         """Return initila sync node from the replica set."""
         return self.initial_sync_node
 
-    def _new_mongod(self, index, replset_name):
+    def _new_merizod(self, index, replset_name):
         """Return a standalone.MongoDFixture configured to be used as replica-set member."""
 
-        mongod_logger = self._get_logger_for_mongod(index)
-        mongod_options = self.mongod_options.copy()
-        mongod_options["replSet"] = replset_name
-        mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node{}".format(index))
-        mongod_options["set_parameters"] = mongod_options.get("set_parameters", {}).copy()
+        merizod_logger = self._get_logger_for_merizod(index)
+        merizod_options = self.merizod_options.copy()
+        merizod_options["replSet"] = replset_name
+        merizod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node{}".format(index))
+        merizod_options["set_parameters"] = merizod_options.get("set_parameters", {}).copy()
 
         return standalone.MongoDFixture(
-            mongod_logger, self.job_num, mongod_executable=self.mongod_executable,
-            mongod_options=mongod_options, preserve_dbpath=self.preserve_dbpath)
+            merizod_logger, self.job_num, merizod_executable=self.merizod_executable,
+            merizod_options=merizod_options, preserve_dbpath=self.preserve_dbpath)
 
-    def _get_logger_for_mongod(self, index):
+    def _get_logger_for_merizod(self, index):
         """Return a new logging.Logger instance.
 
         The instance is used as the primary, secondary, or initial sync member of a replica-set.
@@ -470,7 +470,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             conn_strs = [node.get_internal_connection_string() for node in self.nodes]
             if self.initial_sync_node:
                 conn_strs.append(self.initial_sync_node.get_internal_connection_string())
-            return "mongodb://" + ",".join(conn_strs) + "/?replicaSet=" + self.replset_name
+            return "merizodb://" + ",".join(conn_strs) + "/?replicaSet=" + self.replset_name
         else:
             # We return a direct connection to the expected pimary when only the first node is
             # electable because we want the client to error out if a stepdown occurs.

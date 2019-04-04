@@ -7,7 +7,7 @@
     load("jstests/noPassthrough/libs/index_build.js");
 
     const conn = MongoRunner.runMongod({nojournal: ""});
-    assert.neq(null, conn, "mongod failed to start.");
+    assert.neq(null, conn, "merizod failed to start.");
     var db = conn.getDB("test");
     var baseName = "jstests_indexbg1";
 
@@ -24,7 +24,7 @@
         resetParallel();
         print("doParallel: " + work);
         return startMongoProgramNoConnect(
-            "mongo",
+            "merizo",
             "--eval",
             work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
             db.getMongo().host);

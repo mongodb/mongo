@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,11 +32,11 @@
 #include <sstream>
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/auth/restriction_environment.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/auth/restriction_environment.h"
 
-namespace mongo {
+namespace merizo {
 
 // Represents a restriction which may be attached to a user or role.
 // A client authenticating as a user with a restriction, or as a user which possesses a role with a
@@ -97,4 +97,4 @@ struct UnnamedRestrictionImpl {
 using NamedRestriction = Restriction<restriction_detail::NamedRestrictionImpl>;
 using UnnamedRestriction = Restriction<restriction_detail::UnnamedRestrictionImpl>;
 
-}  // namespace mongo
+}  // namespace merizo

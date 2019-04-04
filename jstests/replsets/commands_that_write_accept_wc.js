@@ -1,6 +1,6 @@
 /**
  * This file tests that commands that do writes accept a write concern. This file does not test
- * mongos commands or user management commands, both of which are tested separately. This test
+ * merizos commands or user management commands, both of which are tested separately. This test
  * defines various database commands and what they expect to be true before and after the fact.
  * It then runs the commands with an invalid writeConcern and a valid writeConcern and
  * ensures that they succeed and fail appropriately.

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/mongo.h"
+#include "merizo/scripting/mozjs/merizo.h"
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/client/dbclient_base.h"
-#include "mongo/client/dbclient_rs.h"
-#include "mongo/client/global_conn_pool.h"
-#include "mongo/client/mongo_uri.h"
-#include "mongo/client/native_sasl_client_session.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/client/sasl_client_session.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/scripting/mozjs/cursor.h"
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/session.h"
-#include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/quick_exit.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/client/dbclient_base.h"
+#include "merizo/client/dbclient_rs.h"
+#include "merizo/client/global_conn_pool.h"
+#include "merizo/client/merizo_uri.h"
+#include "merizo/client/native_sasl_client_session.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/client/sasl_client_authenticate.h"
+#include "merizo/client/sasl_client_session.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/logical_session_id_helpers.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/scripting/dbdirectclient_factory.h"
+#include "merizo/scripting/mozjs/cursor.h"
+#include "merizo/scripting/mozjs/implscope.h"
+#include "merizo/scripting/mozjs/objectwrapper.h"
+#include "merizo/scripting/mozjs/session.h"
+#include "merizo/scripting/mozjs/valuereader.h"
+#include "merizo/scripting/mozjs/valuewriter.h"
+#include "merizo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/quick_exit.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec MongoBase::methods[] = {
@@ -153,8 +153,8 @@ void setCursorHandle(MozJSImplScope* scope,
 
 void setHiddenMongo(JSContext* cx, JS::HandleValue value, JS::CallArgs& args) {
     ObjectWrapper o(cx, args.rval());
-    if (!o.hasField(InternedString::_mongo)) {
-        o.defineProperty(InternedString::_mongo, value, JSPROP_READONLY | JSPROP_PERMANENT);
+    if (!o.hasField(InternedString::_merizo)) {
+        o.defineProperty(InternedString::_merizo, value, JSPROP_READONLY | JSPROP_PERMANENT);
     }
 }
 
@@ -167,7 +167,7 @@ void setHiddenMongo(JSContext* cx,
                     DBClientBase* origConn,
                     JS::CallArgs& args) {
     ObjectWrapper o(cx, args.rval());
-    // If the connection that ran the command is the same as conn, then we set a hidden "_mongo"
+    // If the connection that ran the command is the same as conn, then we set a hidden "_merizo"
     // property on the returned object that is just "this" Mongo object.
     if (resPtr.get() == origConn) {
         setHiddenMongo(cx, args.thisv(), args);
@@ -494,7 +494,7 @@ void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
 void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
     uassert(ErrorCodes::BadValue, "no connection", conn);
-    uassert(ErrorCodes::BadValue, "mongoAuth takes exactly 1 object argument", args.length() == 1);
+    uassert(ErrorCodes::BadValue, "merizoAuth takes exactly 1 object argument", args.length() == 1);
 
     conn->auth(ValueWriter(cx, args.get(0)).toBSON());
     args.rval().setBoolean(true);
@@ -760,7 +760,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
-    std::unique_ptr<DBClientBase> conn(cs.connect(appname.value_or("MongoDB Shell"), errmsg));
+    std::unique_ptr<DBClientBase> conn(cs.connect(appname.value_or("MerizoDB Shell"), errmsg));
 
     if (!conn.get()) {
         uasserted(ErrorCodes::InternalError, errmsg);
@@ -860,4 +860,4 @@ void MongoExternalInfo::Functions::_forgetReplSet::call(JSContext* cx, JS::CallA
 }
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,79 +27,79 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog.h"
 
 #include <deque>
 #include <set>
 #include <vector>
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/capped_utils.h"
-#include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/catalog/drop_database.h"
-#include "mongo/db/catalog/drop_indexes.h"
-#include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builder.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/dbcheck.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/timestamp_block.h"
-#include "mongo/db/repl/transaction_oplog_application.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/server_write_concern_metrics.h"
-#include "mongo/db/storage/flow_control.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/views/view_catalog.h"
-#include "mongo/platform/random.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/elapsed_tracker.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/file.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/startup_test.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/background.h"
+#include "merizo/db/catalog/capped_utils.h"
+#include "merizo/db/catalog/coll_mod.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/create_collection.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/drop_collection.h"
+#include "merizo/db/catalog/drop_database.h"
+#include "merizo/db/catalog/drop_indexes.h"
+#include "merizo/db/catalog/rename_collection.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/feature_compatibility_version_parser.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index_builder.h"
+#include "merizo/db/index_builds_coordinator.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_time.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/ops/delete.h"
+#include "merizo/db/ops/update.h"
+#include "merizo/db/repl/apply_ops.h"
+#include "merizo/db/repl/bgsync.h"
+#include "merizo/db/repl/dbcheck.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/timestamp_block.h"
+#include "merizo/db/repl/transaction_oplog_application.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/stats/server_write_concern_metrics.h"
+#include "merizo/db/storage/flow_control.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/views/view_catalog.h"
+#include "merizo/platform/random.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/elapsed_tracker.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/file.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/startup_test.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 using std::string;
@@ -799,7 +799,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
             if (n != o) {
                 stringstream ss;
                 ss << "cmdline oplogsize (" << n << ") different than existing (" << o
-                   << ") see: http://dochub.mongodb.org/core/increase-oplog";
+                   << ") see: http://dochub.merizodb.org/core/increase-oplog";
                 log() << ss.str() << endl;
                 uasserted(13257, ss.str());
             }
@@ -873,7 +873,7 @@ NamespaceString parseNs(const string& ns, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     uassert(40073,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
-            first.canonicalType() == canonicalizeBSONType(mongo::String));
+            first.canonicalType() == canonicalizeBSONType(merizo::String));
     std::string coll = first.valuestr();
     uassert(28635, "no collection name specified", !coll.empty());
     return NamespaceString(NamespaceString(ns).db().toString(), coll);
@@ -982,7 +982,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           invariant(first.fieldNameStringData() == "createIndexes");
           uassert(ErrorCodes::InvalidNamespace,
                   "createIndexes value must be a string",
-                  first.type() == mongo::String);
+                  first.type() == merizo::String);
           BSONObj indexSpec = cmd.removeField("createIndexes");
           // The UUID determines the collection to build the index on, so create new 'ns' field.
           BSONObj nsObj = BSON("ns" << nss.ns());
@@ -1090,7 +1090,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          invariant(first.fieldNameStringData() == "commitIndexBuild");
          uassert(ErrorCodes::InvalidNamespace,
                  "commitIndexBuild value must be a string",
-                 first.type() == mongo::String);
+                 first.type() == merizo::String);
 
          const NamespaceString nss(parseUUIDorNs(opCtx, ns, ui, cmd));
 
@@ -1151,7 +1151,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          invariant(first.fieldNameStringData() == "abortIndexBuild");
          uassert(ErrorCodes::InvalidNamespace,
                  "abortIndexBuild value must be a string specifying the collection name",
-                 first.type() == mongo::String);
+                 first.type() == merizo::String);
 
          auto buildUUIDElem = cmd.getField("indexBuildUUID");
          uassert(ErrorCodes::BadValue,
@@ -1997,7 +1997,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         auto op = kOpsMap.find(o.firstElementFieldName());
         if (op == kOpsMap.end()) {
             return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Invalid key '" << o.firstElementFieldName()
+                          merizoutils::str::stream() << "Invalid key '" << o.firstElementFieldName()
                                                     << "' found in field 'o'");
         }
 
@@ -2122,4 +2122,4 @@ void signalOplogWaiters() {
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

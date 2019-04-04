@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #include <limits>
 
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/snapshot_window_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/snapshot_window_options.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/processinfo.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 
@@ -649,7 +649,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
             BSONObjBuilder*& sub = subs[prefix.toString()];
             if (!sub)
                 sub = new BSONObjBuilder();
-            sub->appendNumber(mongoutils::str::ltrim(suffix.toString()), v);
+            sub->appendNumber(merizoutils::str::ltrim(suffix.toString()), v);
         }
     }
 
@@ -694,4 +694,4 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
                     oldestTimestamp.toStringPretty());
 }
 
-}  // namespace mongo
+}  // namespace merizo

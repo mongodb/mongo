@@ -9,9 +9,9 @@
 
 var crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
 var epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};
-var strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
+var strictCRS = {type: "name", properties: {name: "urn:x-merizodb:crs:strictwinding:EPSG:4326"}};
 // invalid CRS name
-var badCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:invalid:EPSG:4326"}};
+var badCRS = {type: "name", properties: {name: "urn:x-merizodb:crs:invalid:EPSG:4326"}};
 
 // helper to generate a line along a longitudinal
 function genLonLine(lon, startLat, endLat, latStep) {

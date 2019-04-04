@@ -8,7 +8,7 @@
     var str = new Array(len + 1).join('b');
 
     // We expect to successfully throw and catch this large exception message.
-    // We do not want the mongo shell to terminate.
+    // We do not want the merizo shell to terminate.
     assert.throws(function() {
         throw str;
     });

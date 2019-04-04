@@ -113,7 +113,7 @@
     assert.gte((new Date()) - now, 2000);
 
     // Repeat the test, this time tailing the oplog rather than a user-created capped collection.
-    // The oplog tailing in not possible on mongos.
+    // The oplog tailing in not possible on merizos.
     if (FixtureHelpers.isReplSet(db)) {
         var localDB = db.getSiblingDB("local");
         var oplogColl = localDB.oplog.rs;

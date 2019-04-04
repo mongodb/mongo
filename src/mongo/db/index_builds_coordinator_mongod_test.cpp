@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/index_builds_coordinator_mongod.h"
+#include "merizo/db/index_builds_coordinator_merizod.h"
 
-#include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/uuid.h"
+#include "merizo/db/catalog/catalog_test_fixture.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/commit_quorum_options.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 
 using unittest::assertGet;
 using unittest::log;
@@ -452,4 +452,4 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
 
 }  // namespace
 
-}  // namespace mongo
+}  // namespace merizo

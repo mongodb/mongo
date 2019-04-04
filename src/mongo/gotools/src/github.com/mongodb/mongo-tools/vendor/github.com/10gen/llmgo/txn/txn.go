@@ -2,7 +2,7 @@
 //
 // For details check the following blog post:
 //
-//     http://blog.labix.org/2012/08/22/multi-doc-transactions-for-mongodb
+//     http://blog.labix.org/2012/08/22/multi-doc-transactions-for-merizodb
 //
 package txn
 

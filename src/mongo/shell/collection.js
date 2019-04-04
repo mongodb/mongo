@@ -1,10 +1,10 @@
-// @file collection.js - DBCollection support in the mongo shell
+// @file collection.js - DBCollection support in the merizo shell
 // db.colName is a DBCollection object
 // or db["colName"]
 
 if ((typeof DBCollection) == "undefined") {
-    DBCollection = function(mongo, db, shortName, fullName) {
-        this._mongo = mongo;
+    DBCollection = function(merizo, db, shortName, fullName) {
+        this._merizo = merizo;
         this._db = db;
         this._shortName = shortName;
         this._fullName = fullName;
@@ -20,8 +20,8 @@ DBCollection.prototype.verify = function() {
 
     assert.eq(this._fullName, this._db._name + "." + this._shortName, "name mismatch");
 
-    assert(this._mongo, "no mongo in DBCollection");
-    assert(this.getMongo(), "no mongo from getMongo()");
+    assert(this._merizo, "no merizo in DBCollection");
+    assert(this.getMongo(), "no merizo from getMongo()");
 };
 
 DBCollection.prototype.getName = function() {
@@ -214,7 +214,7 @@ DBCollection.prototype._massageObject = function(q) {
 };
 
 DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, options) {
-    var cursor = new DBQuery(this._mongo,
+    var cursor = new DBQuery(this._merizo,
                              this._db,
                              this,
                              this._fullName,
@@ -1096,7 +1096,7 @@ DBCollection.autocomplete = function(obj) {
 /*
 Usage :
 
-mongo <mongos>
+merizo <merizos>
 > load('path-to-file/shardingAdditions.js')
 Loading custom sharding extensions...
 true

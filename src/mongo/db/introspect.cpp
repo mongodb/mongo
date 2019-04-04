@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/introspect.h"
+#include "merizo/db/introspect.h"
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/user_set.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/client.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/user_set.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/client.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/rpc/metadata/client_metadata.h"
+#include "merizo/rpc/metadata/client_metadata_ismaster.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::endl;
@@ -219,4 +219,4 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

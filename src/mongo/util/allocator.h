@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,18 +31,18 @@
 
 #include <cstddef>
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Wrapper around std::malloc().
  * If std::malloc() fails, reports error with stack trace and exit.
  */
-void* mongoMalloc(size_t size);
+void* merizoMalloc(size_t size);
 
 /**
  * Wrapper around std::realloc().
  * If std::realloc() fails, reports error with stack trace and exit.
  */
-void* mongoRealloc(void* ptr, size_t size);
+void* merizoRealloc(void* ptr, size_t size);
 
-}  // namespace mongo
+}  // namespace merizo

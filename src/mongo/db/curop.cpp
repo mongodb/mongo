@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,34 +29,34 @@
 
 // CHECK_LOG_REDACTION
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/curop.h"
+#include "merizo/db/curop.h"
 
 #include <iomanip>
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/json.h"
-#include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/global_lock_acquisition_tracker.h"
+#include "merizo/db/concurrency/locker.h"
+#include "merizo/db/json.h"
+#include "merizo/db/query/getmore_request.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/rpc/metadata/client_metadata.h"
+#include "merizo/rpc/metadata/client_metadata_ismaster.h"
+#include "merizo/rpc/metadata/impersonated_user_metadata.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 
@@ -327,7 +327,7 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
                                        const Command* command,
                                        BSONObj cmdObj,
                                        NetworkOp op) {
-    // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we resolve
+    // Set the _isCommand flags based on network op only. For legacy writes on merizoS, we resolve
     // them to OpMsgRequests and then pass them into the Commands path, so having a valid Command*
     // here does not guarantee that the op was issued from the client using a command protocol.
     const bool isCommand = (op == dbMsg || (op == dbQuery && nss.isCommand()));
@@ -904,4 +904,4 @@ string OpDebug::AdditiveMetrics::report() const {
     return s.str();
 }
 
-}  // namespace mongo
+}  // namespace merizo

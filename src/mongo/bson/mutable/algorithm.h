@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,12 +33,12 @@
 #include <cstddef>
 #include <vector>
 
-#include "mongo/base/string_data_comparator_interface.h"
-#include "mongo/bson/mutable/const_element.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/string_data_comparator_interface.h"
+#include "merizo/bson/mutable/const_element.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace mutablebson {
 
 /** For an overview of mutable BSON, please see the file document.h in this directory.
@@ -290,7 +290,7 @@ std::string getFullName(ElementType element, char delim = '.') {
         curr = curr.parent();
     }
 
-    mongoutils::str::stream name;
+    merizoutils::str::stream name;
     bool first = true;
     for (std::vector<StringData>::reverse_iterator it = names.rbegin(); it != names.rend(); ++it) {
         if (!first)
@@ -301,4 +301,4 @@ std::string getFullName(ElementType element, char delim = '.') {
     return name;
 }
 }  // namespace mutablebson
-}  // namespace mongo
+}  // namespace merizo

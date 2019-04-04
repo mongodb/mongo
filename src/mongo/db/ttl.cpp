@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,39 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/ttl.h"
+#include "merizo/db/ttl.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/ttl_collection_cache.h"
-#include "mongo/db/ttl_gen.h"
-#include "mongo/util/background.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
+#include "merizo/base/counter.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/fsync_locked.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/delete.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/ops/insert.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/ttl_collection_cache.h"
+#include "merizo/db/ttl_gen.h"
+#include "merizo/util/background.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 Counter64 ttlPasses;
 Counter64 ttlDeletedDocuments;
@@ -283,4 +283,4 @@ void startTTLBackgroundJob() {
 }
 
 std::string TTLMonitor::secondsExpireField = "expireAfterSeconds";
-}  // namespace mongo
+}  // namespace merizo

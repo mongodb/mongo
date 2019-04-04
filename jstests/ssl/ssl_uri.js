@@ -15,14 +15,14 @@
         }, [uri], "network error while attempting to run command");
     };
 
-    // Start up a mongod with ssl required.
+    // Start up a merizod with ssl required.
     var sslMongo = MongoRunner.runMongod({
         sslMode: "requireSSL",
         sslPEMKeyFile: "jstests/libs/server.pem",
         sslCAFile: "jstests/libs/ca.pem",
     });
 
-    var sslURI = "mongodb://localhost:" + sslMongo.port + "/admin";
+    var sslURI = "merizodb://localhost:" + sslMongo.port + "/admin";
 
     // When talking to a server with SSL, connecting with ssl=false fails.
     shouldSucceed(sslURI);
@@ -30,7 +30,7 @@
     shouldFail(sslURI + "?ssl=false");
 
     var connectWithURI = function(uri) {
-        return runMongoProgram('./mongo',
+        return runMongoProgram('./merizo',
                                '--ssl',
                                '--sslAllowInvalidCertificates',
                                '--sslCAFile',
@@ -57,7 +57,7 @@
 
     // Connecting with ssl=true without --ssl will not work
     var res =
-        runMongoProgram('./mongo', sslURI + "?ssl=true", '--eval', 'db.runCommand({ismaster: 1})');
+        runMongoProgram('./merizo', sslURI + "?ssl=true", '--eval', 'db.runCommand({ismaster: 1})');
     assert.eq(res, 1, "should not have been able to connect without --ssl");
 
     // Clean up

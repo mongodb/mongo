@@ -14,11 +14,11 @@
     const dbpath = MongoRunner.dataPath + baseName + "/";
 
     /**
-     * Run the test by supplying additional paramters to MongoRunner.runMongod with 'mongodOptions'.
+     * Run the test by supplying additional paramters to MongoRunner.runMongod with 'merizodOptions'.
      */
-    let runTest = function(mongodOptions) {
+    let runTest = function(merizodOptions) {
         resetDbpath(dbpath);
-        jsTestLog("Running test with args: " + tojson(mongodOptions));
+        jsTestLog("Running test with args: " + tojson(merizodOptions));
 
         /**
          * Test 1. Create a collection, corrupt its .wt file in an unrecoverable way, run repair.
@@ -26,8 +26,8 @@
          * normal startup.
          */
 
-        let mongod = startMongodOnExistingPath(dbpath, mongodOptions);
-        let testColl = mongod.getDB(baseName)[collName];
+        let merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        let testColl = merizod.getDB(baseName)[collName];
 
         const doc = {a: 1};
         assert.commandWorked(testColl.insert(doc));
@@ -35,15 +35,15 @@
         let testCollUri = getUriForColl(testColl);
         let testCollFile = dbpath + testCollUri + ".wt";
 
-        MongoRunner.stopMongod(mongod);
+        MongoRunner.stopMongod(merizod);
 
         jsTestLog("corrupting collection file: " + testCollFile);
         corruptFile(testCollFile);
 
-        assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
+        assertRepairSucceeds(dbpath, merizod.port, merizodOptions);
 
-        mongod = startMongodOnExistingPath(dbpath, mongodOptions);
-        testColl = mongod.getDB(baseName)[collName];
+        merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        testColl = merizod.getDB(baseName)[collName];
 
         assert.eq(testCollUri, getUriForColl(testColl));
         assert.eq(testColl.find({}).itcount(), 0);
@@ -51,7 +51,7 @@
 
         /**
          * Test 2. Corrupt an index file in an unrecoverable way. Verify that repair rebuilds and
-         * allows MongoDB to start up normally.
+         * allows MerizoDB to start up normally.
          */
 
         assert.commandWorked(testColl.insert(doc));
@@ -62,15 +62,15 @@
 
         let indexUri = getUriForIndex(testColl, indexName);
 
-        MongoRunner.stopMongod(mongod);
+        MongoRunner.stopMongod(merizod);
 
         let indexFile = dbpath + indexUri + ".wt";
         jsTestLog("corrupting index file: " + indexFile);
         corruptFile(indexFile);
 
-        assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
-        mongod = startMongodOnExistingPath(dbpath, mongodOptions);
-        testColl = mongod.getDB(baseName)[collName];
+        assertRepairSucceeds(dbpath, merizod.port, merizodOptions);
+        merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        testColl = merizod.getDB(baseName)[collName];
 
         // Repair creates new idents.
         assert.neq(indexUri, getUriForIndex(testColl, indexName));
@@ -79,7 +79,7 @@
         assert.eq(testColl.find(doc).itcount(), 1);
         assert.eq(testColl.count(), 1);
 
-        MongoRunner.stopMongod(mongod);
+        MongoRunner.stopMongod(merizod);
 
         /**
          * Test 3. Corrupt the _mdb_catalog in an unrecoverable way. Verify that repair suceeds
@@ -91,22 +91,22 @@
         jsTestLog("corrupting catalog file: " + mdbCatalogFile);
         corruptFile(mdbCatalogFile);
 
-        assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
+        assertRepairSucceeds(dbpath, merizod.port, merizodOptions);
 
-        mongod = startMongodOnExistingPath(dbpath, mongodOptions);
-        testColl = mongod.getDB(baseName)[collName];
+        merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        testColl = merizod.getDB(baseName)[collName];
         assert.isnull(testColl.exists());
         assert.eq(testColl.find(doc).itcount(), 0);
         assert.eq(testColl.count(), 0);
 
         // Ensure the collection orphan was created with the existing document.
         const orphanCollName = "orphan." + testCollUri.replace(/-/g, "_");
-        let orphanColl = mongod.getDB('local').getCollection(orphanCollName);
+        let orphanColl = merizod.getDB('local').getCollection(orphanCollName);
         assert(orphanColl.exists());
         assert.eq(orphanColl.find(doc).itcount(), 1);
         assert.eq(orphanColl.count(), 1);
 
-        MongoRunner.stopMongod(mongod);
+        MongoRunner.stopMongod(merizod);
     };
 
     runTest({});

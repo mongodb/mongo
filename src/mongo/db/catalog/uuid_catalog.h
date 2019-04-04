@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,13 +31,13 @@
 
 #include <unordered_map>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/uuid.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/service_context.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 /**
  * Class used for updating the UUID catalog on metadata operations.
  */
@@ -318,19 +318,19 @@ private:
     void _registerUUIDCatalogEntry_inlock(CollectionUUID uuid, std::unique_ptr<Collection> coll);
     std::unique_ptr<Collection> _removeUUIDCatalogEntry_inlock(CollectionUUID uuid);
 
-    mutable mongo::stdx::mutex _catalogLock;
+    mutable merizo::stdx::mutex _catalogLock;
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
      * to pre-close NSS. See also onCloseCatalog.
      */
     boost::optional<
-        mongo::stdx::unordered_map<CollectionUUID, NamespaceString, CollectionUUID::Hash>>
+        merizo::stdx::unordered_map<CollectionUUID, NamespaceString, CollectionUUID::Hash>>
         _shadowCatalog;
 
     /**
      * Unordered map from Collection UUID to the corresponding Collection object.
      */
-    mongo::stdx::unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>
+    merizo::stdx::unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>
         _catalog;
 
     /**
@@ -338,10 +338,10 @@ private:
      */
     std::map<std::pair<std::string, CollectionUUID>, Collection*> _orderedCollections;
 
-    mongo::stdx::unordered_map<NamespaceString, Collection*> _collections;
+    merizo::stdx::unordered_map<NamespaceString, Collection*> _collections;
     /**
      * Generation number to track changes to the catalog that could invalidate iterators.
      */
     uint64_t _generationNumber;
 };
-}  // namespace mongo
+}  // namespace merizo

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MerizoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -372,7 +372,7 @@ struct __wt_log_desc {
 	uint32_t	log_magic;	/* 00-03: Magic number */
 /*
  * NOTE: We bumped the log version from 2 to 3 to make it convenient for
- * MongoDB to detect users accidentally running old binaries on a newer
+ * MerizoDB to detect users accidentally running old binaries on a newer
  * release. There are no actual log file format changes with version 2 and 3.
  */
 #define	WT_LOG_VERSION	3

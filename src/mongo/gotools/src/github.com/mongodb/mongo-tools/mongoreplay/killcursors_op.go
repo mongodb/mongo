@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 
 // KillCursorsOp is used to close an active cursor in the database. This is necessary
 // to ensure that database resources are reclaimed at the end of the query.
-// http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-kill-cursors
+// http://docs.merizodb.org/meta-driver/latest/legacy/merizodb-wire-protocol/#op-kill-cursors
 type KillCursorsOp struct {
 	Header MsgHeader
 	mgo.KillCursorsOp

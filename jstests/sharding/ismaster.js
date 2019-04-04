@@ -1,4 +1,4 @@
-var st = new ShardingTest({shards: 1, mongos: 1});
+var st = new ShardingTest({shards: 1, merizos: 1});
 var res = st.s0.getDB("admin").runCommand("ismaster");
 // check that the fields that should be there are there and have proper values
 assert(res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,

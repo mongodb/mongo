@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,14 +29,14 @@
 
 #if defined(__sun)
 
-#include "mongo/platform/posix_fadvise.h"
+#include "merizo/platform/posix_fadvise.h"
 
 #include <dlfcn.h>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
 
-namespace mongo {
+namespace merizo {
 namespace pal {
 
 int posix_fadvise_emulation(int fd, off_t offset, off_t len, int advice) {
@@ -44,7 +44,7 @@ int posix_fadvise_emulation(int fd, off_t offset, off_t len, int advice) {
 }
 
 typedef int (*PosixFadviseFunc)(int fd, off_t offset, off_t len, int advice);
-static PosixFadviseFunc posix_fadvise_switcher = mongo::pal::posix_fadvise_emulation;
+static PosixFadviseFunc posix_fadvise_switcher = merizo::pal::posix_fadvise_emulation;
 
 int posix_fadvise(int fd, off_t offset, off_t len, int advice) {
     return posix_fadvise_switcher(fd, offset, len, advice);
@@ -58,12 +58,12 @@ MONGO_INITIALIZER_GENERAL(SolarisPosixFadvise, MONGO_NO_PREREQUISITES, ("default
 (InitializerContext* context) {
     void* functionAddress = dlsym(RTLD_DEFAULT, "posix_fadvise");
     if (functionAddress != NULL) {
-        mongo::pal::posix_fadvise_switcher =
-            reinterpret_cast<mongo::pal::PosixFadviseFunc>(functionAddress);
+        merizo::pal::posix_fadvise_switcher =
+            reinterpret_cast<merizo::pal::PosixFadviseFunc>(functionAddress);
     }
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo
 
 #endif  // #if defined(__sun)

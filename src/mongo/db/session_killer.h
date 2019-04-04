@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,16 +34,16 @@
 #include <random>
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/kill_sessions.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/base/status_with.h"
+#include "merizo/db/kill_sessions.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * The SessionKiller enforces a single thread for session killing for any given ServiceContext.
@@ -53,7 +53,7 @@ namespace mongo {
  * next round.
  *
  * The KillFunc's kill function is passed in to its constructor, and parameterizes its behavior
- * depending on context (mongod/mongos).
+ * depending on context (merizod/merizos).
  */
 class SessionKiller {
 public:
@@ -88,7 +88,7 @@ public:
     };
 
     /**
-     * A process specific kill function (we have a different impl in mongos versus mongod).
+     * A process specific kill function (we have a different impl in merizos versus merizod).
      */
     using KillFunc =
         stdx::function<Result(OperationContext*, const Matcher&, UniformRandomBitGenerator* urbg)>;
@@ -109,7 +109,7 @@ public:
 
     /**
      * This is the api for killSessions commands to invoke the killer.  It blocks until the kill is
-     * finished, or until it fails (times out on all nodes in mongos).
+     * finished, or until it fails (times out on all nodes in merizos).
      */
     std::shared_ptr<Result> kill(OperationContext* opCtx,
                                  const KillAllSessionsByPatternSet& toKill);
@@ -143,4 +143,4 @@ private:
     bool _inShutdown = false;
 };
 
-}  // namespace mongo
+}  // namespace merizo

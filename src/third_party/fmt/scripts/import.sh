@@ -12,7 +12,7 @@ if [[ "$#" -ne 0 ]]; then
 fi
 
 NAME=fmt
-REVISION=mongodb
+REVISION=merizodb
 
 # If WSL, get Windows temp directory
 if $(grep -q Microsoft /proc/version); then

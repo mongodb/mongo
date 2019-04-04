@@ -21,8 +21,8 @@ def get_all_source_files(arr=None, prefix="."):
     for fx in os.listdir(prefix):
         # pylint: disable=too-many-boolean-expressions
         if (fx.startswith(".") or fx.startswith("pcre-") or fx.startswith("32bit")
-                or fx.startswith("mongodb-") or fx.startswith("debian")
-                or fx.startswith("mongo-cxx-driver") or fx.startswith("sqlite") or "gotools" in fx
+                or fx.startswith("merizodb-") or fx.startswith("debian")
+                or fx.startswith("merizo-cxx-driver") or fx.startswith("sqlite") or "gotools" in fx
                 or fx.find("mozjs") != -1):
             continue
         # pylint: enable=too-many-boolean-expressions
@@ -65,7 +65,7 @@ def get_git_branch():
 def get_git_branch_string(prefix="", postfix=""):
     """Return the git branch name."""
     tt = re.compile(r"[/\\]").split(os.getcwd())
-    if len(tt) > 2 and tt[len(tt) - 1] == "mongo":
+    if len(tt) > 2 and tt[len(tt) - 1] == "merizo":
         par = tt[len(tt) - 2]
         mt = re.compile(r".*_([vV]\d+\.\d+)$").match(par)
         if mt is not None:

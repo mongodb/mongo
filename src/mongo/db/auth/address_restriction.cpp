@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/address_restriction.h"
-#include "mongo/db/auth/address_restriction_gen.h"
-#include "mongo/db/server_options.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/db/auth/address_restriction.h"
+#include "merizo/db/auth/address_restriction_gen.h"
+#include "merizo/db/server_options.h"
+#include "merizo/stdx/memory.h"
 
-constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::label;
-constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::field;
+constexpr merizo::StringData merizo::address_restriction_detail::ClientSource::label;
+constexpr merizo::StringData merizo::address_restriction_detail::ClientSource::field;
 
-constexpr mongo::StringData mongo::address_restriction_detail::ServerAddress::label;
-constexpr mongo::StringData mongo::address_restriction_detail::ServerAddress::field;
+constexpr merizo::StringData merizo::address_restriction_detail::ServerAddress::label;
+constexpr merizo::StringData merizo::address_restriction_detail::ServerAddress::field;
 
-mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
+merizo::StatusWith<merizo::RestrictionSet<>> merizo::parseAddressRestrictionSet(
     const BSONObj& obj) try {
     IDLParserErrorContext ctx("address restriction");
     const auto ar = Address_restriction::parse(ctx, obj);
@@ -65,7 +65,7 @@ mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
     return Status(ErrorCodes::BadValue, e.what());
 }
 
-mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRestriction(
+merizo::StatusWith<merizo::SharedRestrictionDocument> merizo::parseAuthenticationRestriction(
     const BSONArray& arr) {
     static_assert(
         std::is_same<std::shared_ptr<RestrictionDocument<>>, SharedRestrictionDocument>::value,
@@ -94,7 +94,7 @@ mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRe
     return std::make_shared<document_type>(std::move(doc));
 }
 
-mongo::StatusWith<mongo::BSONArray> mongo::getRawAuthenticationRestrictions(
+merizo::StatusWith<merizo::BSONArray> merizo::getRawAuthenticationRestrictions(
     const BSONArray& arr) noexcept try {
     BSONArrayBuilder builder;
 

@@ -2,16 +2,16 @@
 
 // tests write passthrough
 
-s = new ShardingTest({name: "shard5", shards: 2, mongos: 2});
+s = new ShardingTest({name: "shard5", shards: 2, merizos: 2});
 s.stopBalancer();
 
-s2 = s._mongos[1];
+s2 = s._merizos[1];
 
 s.adminCommand({enablesharding: "test"});
 s.ensurePrimaryShard('test', s.shard1.shardName);
 s.adminCommand({shardcollection: "test.foo", key: {num: 1}});
 if (s.configRS) {
-    // Ensure that the second mongos will see the movePrimary
+    // Ensure that the second merizos will see the movePrimary
     s.configRS.awaitLastOpCommitted();
 }
 

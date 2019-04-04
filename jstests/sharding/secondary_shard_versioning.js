@@ -8,7 +8,7 @@
 
     // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
     let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};
-    let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
+    let st = new ShardingTest({merizos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard0.shardName);
@@ -19,10 +19,10 @@
     let freshMongos = st.s0;
     let staleMongos = st.s1;
 
-    jsTest.log("do insert from stale mongos to make it load the routing table before the move");
+    jsTest.log("do insert from stale merizos to make it load the routing table before the move");
     assert.writeOK(staleMongos.getDB('test').foo.insert({x: 1}));
 
-    jsTest.log("do moveChunk from fresh mongos");
+    jsTest.log("do moveChunk from fresh merizos");
     assert.commandWorked(freshMongos.adminCommand({
         moveChunk: 'test.foo',
         find: {x: 0},
@@ -35,14 +35,14 @@
     assert.commandWorked(donorShardSecondary.getDB('test').setProfilingLevel(2));
     assert.commandWorked(recipientShardSecondary.getDB('test').setProfilingLevel(2));
 
-    // Use the mongos with the stale routing table to send read requests to the secondaries. 'local'
+    // Use the merizos with the stale routing table to send read requests to the secondaries. 'local'
     // read concern level must be specified in the request because secondaries default to
     // 'available', which doesn't participate in the version protocol. Check that the donor shard
-    // returns a stale shardVersion error, which provokes mongos to refresh its routing table and
+    // returns a stale shardVersion error, which provokes merizos to refresh its routing table and
     // re-target; that the recipient shard secondary refreshes its routing table on hearing the
-    // fresh version from mongos; and that the recipient shard secondary returns the results.
+    // fresh version from merizos; and that the recipient shard secondary returns the results.
 
-    jsTest.log("do secondary read from stale mongos");
+    jsTest.log("do secondary read from stale merizos");
     let res = staleMongos.getDB('test').runCommand({
         count: 'foo',
         query: {x: 1},
@@ -67,7 +67,7 @@
     });
 
     // The recipient shard secondary will also return stale shardVersion once, even though the
-    // mongos is fresh, because the recipient shard secondary was stale.
+    // merizos is fresh, because the recipient shard secondary was stale.
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: donorShardSecondary.getDB('test'),
         filter: {

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
 
-#include "mongo/base/init.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/storage/mobile/mobile_record_store.h"
-#include "mongo/db/storage/mobile/mobile_recovery_unit.h"
-#include "mongo/db/storage/mobile/mobile_session.h"
-#include "mongo/db/storage/mobile/mobile_session_pool.h"
-#include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
-#include "mongo/db/storage/mobile/mobile_util.h"
-#include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/init.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/storage/mobile/mobile_record_store.h"
+#include "merizo/db/storage/mobile/mobile_recovery_unit.h"
+#include "merizo/db/storage/mobile/mobile_session.h"
+#include "merizo/db/storage/mobile/mobile_session_pool.h"
+#include "merizo/db/storage/mobile/mobile_sqlite_statement.h"
+#include "merizo/db/storage/mobile/mobile_util.h"
+#include "merizo/db/storage/record_store_test_harness.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
 
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -137,8 +137,8 @@ std::unique_ptr<HarnessHelper> makeHarnessHelper() {
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+    merizo::registerHarnessHelperFactory(makeHarnessHelper);
     return Status::OK();
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

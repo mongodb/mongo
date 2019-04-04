@@ -1,56 +1,56 @@
 ############################################################
 # This section verifies start, stop, and restart.
-# - stop mongod so that we begin testing from a stopped state
+# - stop merizod so that we begin testing from a stopped state
 # - verify start, stop, and restart
 ############################################################
 
 # service is not in path for commands with sudo on suse
 service = os[:name] == 'suse' ? '/sbin/service' : 'service'
 
-describe command("#{service} mongod stop") do
+describe command("#{service} merizod stop") do
   its('exit_status') { should eq 0 }
 end
 
-describe command("#{service} mongod start") do
+describe command("#{service} merizod start") do
   its('exit_status') { should eq 0 }
 end
 
 # Inspec treats all amazon linux as upstart, we explicitly make it use
 # systemd_service https://github.com/chef/inspec/issues/2639
 if (os[:name] == 'amazon' and os[:release] == '2.0')
-  describe systemd_service('mongod') do
+  describe systemd_service('merizod') do
     it { should be_running }
   end
 else
-  describe service('mongod') do
+  describe service('merizod') do
     it { should be_running }
   end
 end
 
-describe command("#{service} mongod stop") do
+describe command("#{service} merizod stop") do
   its('exit_status') { should eq 0 }
 end
 
 if (os[:name] == 'amazon' and os[:release] == '2.0')
-  describe systemd_service('mongod') do
+  describe systemd_service('merizod') do
     it { should_not be_running }
   end
 else
-  describe service('mongod') do
+  describe service('merizod') do
     it { should_not be_running }
   end
 end
 
-describe command("#{service} mongod restart") do
+describe command("#{service} merizod restart") do
   its('exit_status') { should eq 0 }
 end
 
 if (os[:name] == 'amazon' and os[:release] == '2.0')
-  describe systemd_service('mongod') do
+  describe systemd_service('merizod') do
     it { should be_running }
   end
 else
-  describe service('mongod') do
+  describe service('merizod') do
     it { should be_running }
   end
 end
@@ -67,7 +67,7 @@ else
   end
 end
 
-# wait to make sure mongod is ready
+# wait to make sure merizod is ready
 describe command("/inspec_wait.sh") do
   its('exit_status') { should eq 0 }
 end
@@ -75,7 +75,7 @@ end
 ############################################################
 # This section verifies files, directories, and users
 # - files and directories exist and have correct attributes
-# - mongod user exists and has correct attributes
+# - merizod user exists and has correct attributes
 ############################################################
 
 # convenience variables for init system and package type
@@ -99,9 +99,9 @@ deb = !rpm
 
 # these files should exist on all systems
 %w(
-  /etc/mongod.conf
-  /usr/bin/mongod
-  /var/log/mongodb/mongod.log
+  /etc/merizod.conf
+  /usr/bin/merizod
+  /var/log/merizodb/merizod.log
 ).each do |filename|
   describe file(filename) do
     it { should be_file }
@@ -109,51 +109,51 @@ deb = !rpm
 end
 
 if sysvinit
-  describe file('/etc/init.d/mongod') do
+  describe file('/etc/init.d/merizod') do
     it { should be_file }
     it { should be_executable }
   end
 end
 
 if systemd
-  describe file('/lib/systemd/system/mongod.service') do
+  describe file('/lib/systemd/system/merizod.service') do
     it { should be_file }
   end
 end
 
 if rpm
   %w(
-    /var/lib/mongo
-    /var/run/mongodb
+    /var/lib/merizo
+    /var/run/merizodb
   ).each do |filename|
     describe file(filename) do
       it { should be_directory }
     end
   end
 
-  describe user('mongod') do
+  describe user('merizod') do
     it { should exist }
-    its('groups') { should include 'mongod' }
-    its('home') { should eq '/var/lib/mongo' }
+    its('groups') { should include 'merizod' }
+    its('home') { should eq '/var/lib/merizo' }
     its('shell') { should eq '/bin/false' }
   end
 end
 
 if deb
-  describe file('/var/lib/mongodb') do
+  describe file('/var/lib/merizodb') do
     it { should be_directory }
   end
 
   if os[:release] == '18.04'
-    describe user('mongodb') do
+    describe user('merizodb') do
       it { should exist }
-      its('groups') { should include 'mongodb' }
+      its('groups') { should include 'merizodb' }
       its('shell') { should eq '/usr/sbin/nologin' }
     end
   else
-    describe user('mongodb') do
+    describe user('merizodb') do
       it { should exist }
-      its('groups') { should include 'mongodb' }
+      its('groups') { should include 'merizodb' }
       its('shell') { should eq '/bin/false' }
     end
   end
@@ -171,7 +171,7 @@ ulimits = {
   'Max resident set'  => 'unlimited',
   'Max processes'     => '64000'
 }
-ulimits_cmd = 'cat /proc/$(pgrep mongod)/limits'
+ulimits_cmd = 'cat /proc/$(pgrep merizod)/limits'
 
 ulimits.each do |limit, value|
   describe command("#{ulimits_cmd} | grep \"#{limit}\"") do
@@ -185,13 +185,13 @@ end
 # - verify that findOne() returns a matching document
 ############################################################
 
-describe command('sh -c "ulimit -v unlimited && mongo --eval \"db.smoke.insert({answer: 42})\""') do
+describe command('sh -c "ulimit -v unlimited && merizo --eval \"db.smoke.insert({answer: 42})\""') do
   its('exit_status') { should eq 0 }
   its('stdout') { should match(/.+WriteResult\({ "nInserted" : 1 }\).+/m) }
 end
 
 # read a document from the db
-describe command('sh -c "ulimit -v unlimited && mongo --eval \"db.smoke.findOne()\""') do
+describe command('sh -c "ulimit -v unlimited && merizo --eval \"db.smoke.findOne()\""') do
   its('exit_status') { should eq 0 }
   its('stdout') { should match(/.+"answer" : 42.+/m) }
 end
@@ -201,19 +201,19 @@ end
 ############################################################
 
 if rpm
-  describe command('rpm -e $(rpm -qa | grep "mongodb.*server" | awk \'{print $1}\')') do
+  describe command('rpm -e $(rpm -qa | grep "merizodb.*server" | awk \'{print $1}\')') do
     its('exit_status') { should eq 0 }
   end
 elsif deb
-  describe command('dpkg -r $(dpkg -l | grep "mongodb.*server" | awk \'{print $2}\')') do
+  describe command('dpkg -r $(dpkg -l | grep "merizodb.*server" | awk \'{print $2}\')') do
     its('exit_status') { should eq 0 }
   end
 end
 
 # make sure we cleaned up
 %w(
-  /lib/systemd/system/mongod.service
-  /usr/bin/mongod
+  /lib/systemd/system/merizod.service
+  /usr/bin/merizod
 ).each do |filename|
   describe file(filename) do
     it { should_not exist }

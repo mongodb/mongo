@@ -1,5 +1,5 @@
-# wtperf options file: simulate MongoDB.
-# The configuration for the connection and table are from mongoDB.
+# wtperf options file: simulate MerizoDB.
+# The configuration for the connection and table are from merizoDB.
 # We use multiple tables to simulate collections and indexes.
 # This test assumes that its correlating populate already completed and exists.
 #

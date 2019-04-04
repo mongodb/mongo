@@ -8,7 +8,7 @@
 
     let s = new ShardingTest({
         shards: 2,
-        mongos: 1,
+        merizos: 1,
         other: {
             rs: true,
             numReplicas: 2,

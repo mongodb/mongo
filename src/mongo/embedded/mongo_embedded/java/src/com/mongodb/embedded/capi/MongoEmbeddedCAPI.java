@@ -1,10 +1,10 @@
 
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,25 +28,25 @@
  *    it in the license file.
  */
 
-package com.mongodb.embedded.capi;
+package com.merizodb.embedded.capi;
 
-import com.mongodb.embedded.capi.internal.CAPI;
+import com.merizodb.embedded.capi.internal.CAPI;
 import com.sun.jna.NativeLibrary;
 
 import static java.lang.String.format;
 
 /**
- * The embedded mongodb CAPI.
+ * The embedded merizodb CAPI.
  */
 public final class MongoEmbeddedCAPI {
-    private static final String NATIVE_LIBRARY_NAME = "mongo_embedded";
+    private static final String NATIVE_LIBRARY_NAME = "merizo_embedded";
 
     /**
-     * Initializes the embedded mongodb library, required before any other call.
+     * Initializes the embedded merizodb library, required before any other call.
      *
      * <p>Cannot be called multiple times without first calling {@link MongoEmbeddedLibrary#close()}.</p>
      *
-     * @param yamlConfig the yaml configuration for the embedded mongodb capi library
+     * @param yamlConfig the yaml configuration for the embedded merizodb capi library
      * @return the initialized MongoEmbedded.
      */
     public static MongoEmbeddedLibrary create(final String yamlConfig) {
@@ -54,11 +54,11 @@ public final class MongoEmbeddedCAPI {
     }
 
     /**
-     * Initializes the embedded mongodb library, required before any other call.
+     * Initializes the embedded merizodb library, required before any other call.
      *
      * <p>Cannot be called multiple times without first calling {@link MongoEmbeddedLibrary#close()}.</p>
      *
-     * @param yamlConfig the yaml configuration for the embedded mongodb capi library
+     * @param yamlConfig the yaml configuration for the embedded merizodb capi library
      * @param logLevel   the logging level
      * @return the initialized MongoEmbedded.
      */
@@ -67,12 +67,12 @@ public final class MongoEmbeddedCAPI {
     }
 
     /**
-     * Initializes the embedded mongodb library, required before any other call.
+     * Initializes the embedded merizodb library, required before any other call.
      *
      * <p>Cannot be called multiple times without first calling {@link MongoEmbeddedLibrary#close()}.</p>
      *
-     * @param yamlConfig the yaml configuration for the embedded mongodb capi library
-     * @param libraryPath the path to the embedded mongodb capi library.
+     * @param yamlConfig the yaml configuration for the embedded merizodb capi library
+     * @param libraryPath the path to the embedded merizodb capi library.
      * @param logLevel   the logging level
      * @return the initialized MongoEmbedded.
      */

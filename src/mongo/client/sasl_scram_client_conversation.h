@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,15 +32,15 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/client/sasl_client_conversation.h"
-#include "mongo/client/sasl_client_session.h"
-#include "mongo/client/scram_client_cache.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/util/icu.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/client/sasl_client_conversation.h"
+#include "merizo/client/sasl_client_session.h"
+#include "merizo/client/scram_client_cache.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/util/icu.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  *  Client side authentication session for SASL PLAIN.
@@ -151,4 +151,4 @@ private:
 
 using SaslSCRAMSHA1ClientConversation = SaslSCRAMClientConversationImpl<SHA1Block>;
 
-}  // namespace mongo
+}  // namespace merizo

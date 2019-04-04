@@ -3,7 +3,7 @@
 PORT=27017
 STARTMONGO=false
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PCAPFILE="$SCRIPT_DIR/mongoreplay_test.out"
+PCAPFILE="$SCRIPT_DIR/merizoreplay_test.out"
 
 while test $# -gt 0; do
 	case "$1" in
@@ -17,7 +17,7 @@ while test $# -gt 0; do
 			PORT="$1"
 			shift
 			;;
-		-m|--start-mongo)
+		-m|--start-merizo)
 			shift
 			STARTMONGO=true
 			;;
@@ -27,9 +27,9 @@ while test $# -gt 0; do
 	esac
 done
 
-command -v mongoreplay >/dev/null
+command -v merizoreplay >/dev/null
 if [ $? != 0 ]; then
-  echo "mongoreplay must be in PATH"
+  echo "merizoreplay must be in PATH"
   exit 1
 fi
 
@@ -37,29 +37,29 @@ set -e
 set -o verbose
 
 OUTFILE="$(echo $PCAPFILE | cut -f 1 -d '.').playback"
-mongoreplay record -f $PCAPFILE -p $OUTFILE
+merizoreplay record -f $PCAPFILE -p $OUTFILE
 
 if [ "$STARTMONGO" = true ]; then
-	rm -rf /data/mongoreplay/
-	mkdir /data/mongoreplay/
+	rm -rf /data/merizoreplay/
+	mkdir /data/merizoreplay/
 	echo "starting MONGOD"
-	mongod --port=$PORT --dbpath=/data/mongoreplay &
+	merizod --port=$PORT --dbpath=/data/merizoreplay &
 	MONGOPID=$!
 fi
 
-mongo --port=$PORT mongoplay_test --eval "db.setProfilingLevel(2);" 
-mongo --port=$PORT mongoplay_test --eval "db.createCollection('sanity_check', {});" 
+merizo --port=$PORT merizoplay_test --eval "db.setProfilingLevel(2);" 
+merizo --port=$PORT merizoplay_test --eval "db.createCollection('sanity_check', {});" 
 
-export MONGOREPLAY_HOST="mongodb://localhost:$PORT"
-mongoreplay play -p $OUTFILE
-mongo --port=$PORT mongoplay_test --eval "var profile_results = db.system.profile.find({'ns':'mongoplay_test.sanity_check'});
+export MONGOREPLAY_HOST="merizodb://localhost:$PORT"
+merizoreplay play -p $OUTFILE
+merizo --port=$PORT merizoplay_test --eval "var profile_results = db.system.profile.find({'ns':'merizoplay_test.sanity_check'});
 assert.gt(profile_results.size(), 0);" 
 
-mongo --port=$PORT mongoplay_test --eval "var query_results = db.sanity_check.find({'test_success':1});
+merizo --port=$PORT merizoplay_test --eval "var query_results = db.sanity_check.find({'test_success':1});
 assert.gt(query_results.size(), 0);" 
 
 # test that files are correctly gziped ( TOOLS-1503 )
-mongoreplay record -f $PCAPFILE -p ${OUTFILE} --gzip
+merizoreplay record -f $PCAPFILE -p ${OUTFILE} --gzip
 gunzip -t ${OUTFILE}
 
 echo "Success!"

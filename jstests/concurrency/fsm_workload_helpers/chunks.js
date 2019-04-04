@@ -82,14 +82,14 @@ var ChunkHelper = (function() {
         return runCommandWithRetries(db, cmd, acceptableErrorCodes);
     }
 
-    // Take a set of connections to a shard (replica set or standalone mongod),
+    // Take a set of connections to a shard (replica set or standalone merizod),
     // or a set of connections to the config servers, and return a connection
     // to any node in the set for which ismaster is true.
     function getPrimary(connArr) {
         assertAlways(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
 
         for (var conn of connArr) {
-            assert(isMongod(conn.getDB('admin')), tojson(conn) + ' is not to a mongod');
+            assert(isMongod(conn.getDB('admin')), tojson(conn) + ' is not to a merizod');
             var res = conn.adminCommand({isMaster: 1});
             assertAlways.commandWorked(res);
 
@@ -100,19 +100,19 @@ var ChunkHelper = (function() {
         assertAlways(false, 'No primary found for set: ' + tojson(connArr));
     }
 
-    // Take a set of mongos connections to a sharded cluster and return a
+    // Take a set of merizos connections to a sharded cluster and return a
     // random connection.
     function getRandomMongos(connArr) {
         assertAlways(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
         var conn = connArr[Random.randInt(connArr.length)];
-        assert(isMongos(conn.getDB('admin')), tojson(conn) + ' is not to a mongos');
+        assert(isMongos(conn.getDB('admin')), tojson(conn) + ' is not to a merizos');
         return conn;
     }
 
-    // Intended for use on mongos connections only.
+    // Intended for use on merizos connections only.
     // Return all shards containing documents in [lower, upper).
     function getShardsForRange(conn, collName, lower, upper) {
-        assert(isMongos(conn.getDB('admin')), tojson(conn) + ' is not to a mongos');
+        assert(isMongos(conn.getDB('admin')), tojson(conn) + ' is not to a merizos');
         var adminDB = conn.getDB('admin');
         var shardVersion = adminDB.runCommand({getShardVersion: collName, fullMetadata: true});
         assertAlways.commandWorked(shardVersion);
@@ -142,36 +142,36 @@ var ChunkHelper = (function() {
         return coll.find(query).itcount();
     }
 
-    // Intended for use on config or mongos connections only.
+    // Intended for use on config or merizos connections only.
     // Get number of chunks containing values in [lower, upper). The upper bound on a chunk is
     // exclusive, but to capture the chunk we must provide it with less than or equal to 'upper'.
     function getNumChunks(conn, ns, lower, upper) {
         assert(isMongos(conn.getDB('admin')) || isMongodConfigsvr(conn.getDB('admin')),
-               tojson(conn) + ' is not to a mongos or a mongod config server');
+               tojson(conn) + ' is not to a merizos or a merizod config server');
         assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
                ns + ' is not a valid namespace');
         var query = {'ns': ns, 'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
         return conn.getDB('config').chunks.find(query).itcount();
     }
 
-    // Intended for use on config or mongos connections only.
+    // Intended for use on config or merizos connections only.
     // For getting chunks containing values in [lower, upper). The upper bound on a chunk is
     // exclusive, but to capture the chunk we must provide it with less than or equal to 'upper'.
     function getChunks(conn, ns, lower, upper) {
         assert(isMongos(conn.getDB('admin')) || isMongodConfigsvr(conn.getDB('admin')),
-               tojson(conn) + ' is not to a mongos or a mongod config server');
+               tojson(conn) + ' is not to a merizos or a merizod config server');
         assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
                ns + ' is not a valid namespace');
         var query = {'ns': ns, 'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
         return conn.getDB('config').chunks.find(query).sort({'min._id': 1}).toArray();
     }
 
-    // Intended for use on config or mongos connections only.
+    // Intended for use on config or merizos connections only.
     // For debug printing chunks containing values in [lower, upper). The upper bound on a chunk is
     // exclusive, but to capture the chunk we must provide it with less than or equal to 'upper'.
     function stringifyChunks(conn, lower, upper) {
         assert(isMongos(conn.getDB('admin')) || isMongodConfigsvr(conn.getDB('admin')),
-               tojson(conn) + ' is not to a mongos or a mongod config server');
+               tojson(conn) + ' is not to a merizos or a merizod config server');
         return getChunks(conn, lower, upper).map(chunk => tojson(chunk)).join('\n');
     }
 

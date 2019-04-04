@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "merizo/base/status.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/dbtests/mock/mock_remote_db_server.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/concurrency/mutex.h"
 
-namespace mongo {
+namespace merizo {
 /**
  * Registry for storing mock servers and can create mock connections to these
  * servers.
@@ -99,7 +99,7 @@ private:
         MockConnHook(MockConnRegistry* registry);
         ~MockConnHook();
 
-        std::unique_ptr<mongo::DBClientBase> connect(const mongo::ConnectionString& connString,
+        std::unique_ptr<merizo::DBClientBase> connect(const merizo::ConnectionString& connString,
                                                      std::string& errmsg,
                                                      double socketTimeout);
 
@@ -117,4 +117,4 @@ private:
     stdx::mutex _registryMutex;
     stdx::unordered_map<std::string, MockRemoteDBServer*> _registry;
 };
-}  // namespace mongo
+}  // namespace merizo

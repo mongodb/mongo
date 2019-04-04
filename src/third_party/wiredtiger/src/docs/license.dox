@@ -28,7 +28,7 @@ the public domain and may be freely used and redistributed.
 
 For a license to use the WiredTiger software under conditions other than
 those described above, or for technical support for this software, please
-contact MongoDB, Inc. at
+contact MerizoDB, Inc. at
 <a mailto="info@wiredtiger.com">info@wiredtiger.com</a>.
 
 @section license_library 3rd party software always included in the WiredTiger library

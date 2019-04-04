@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include <boost/filesystem.hpp>
 #include <boost/none.hpp>
@@ -45,14 +45,14 @@
 #include <unistd.h>
 #include <vector>
 
-#include "mongo/util/file.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/util/file.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/processinfo.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Read the first line from a file; return empty string on failure
@@ -70,14 +70,14 @@ struct ProcPsinfo {
     ProcPsinfo() {
         FILE* f = fopen("/proc/self/psinfo", "r");
         massert(16846,
-                mongoutils::str::stream() << "couldn't open \"/proc/self/psinfo\": "
+                merizoutils::str::stream() << "couldn't open \"/proc/self/psinfo\": "
                                           << errnoWithDescription(),
                 f);
         size_t num = fread(&psinfo, sizeof(psinfo), 1, f);
         int err = errno;
         fclose(f);
         massert(16847,
-                mongoutils::str::stream() << "couldn't read from \"/proc/self/psinfo\": "
+                merizoutils::str::stream() << "couldn't read from \"/proc/self/psinfo\": "
                                           << errnoWithDescription(err),
                 num == 1);
     }
@@ -88,14 +88,14 @@ struct ProcUsage {
     ProcUsage() {
         FILE* f = fopen("/proc/self/usage", "r");
         massert(16848,
-                mongoutils::str::stream() << "couldn't open \"/proc/self/usage\": "
+                merizoutils::str::stream() << "couldn't open \"/proc/self/usage\": "
                                           << errnoWithDescription(),
                 f);
         size_t num = fread(&prusage, sizeof(prusage), 1, f);
         int err = errno;
         fclose(f);
         massert(16849,
-                mongoutils::str::stream() << "couldn't read from \"/proc/self/usage\": "
+                merizoutils::str::stream() << "couldn't read from \"/proc/self/usage\": "
                                           << errnoWithDescription(err),
                 num == 1);
     }
@@ -149,13 +149,13 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     char buf_native[32];
     if (sysinfo(SI_ARCHITECTURE_64, buf_64, sizeof(buf_64)) != -1 &&
         sysinfo(SI_ARCHITECTURE_NATIVE, buf_native, sizeof(buf_native)) != -1) {
-        addrSize = mongoutils::str::equals(buf_64, buf_native) ? 64 : 32;
+        addrSize = merizoutils::str::equals(buf_64, buf_native) ? 64 : 32;
     } else {
         log() << "Unable to determine system architecture: " << strerror(errno);
     }
 
     osType = unameData.sysname;
-    osName = mongoutils::str::ltrim(readLineFromFile("/etc/release"));
+    osName = merizoutils::str::ltrim(readLineFromFile("/etc/release"));
     osVersion = unameData.version;
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
     memSize = pageSize * static_cast<unsigned long long>(sysconf(_SC_PHYS_PAGES));
@@ -169,7 +169,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     // 2. Illumos kernel releases (which is all non Oracle Solaris releases)
     preferMsyncOverFSync = false;
 
-    if (mongoutils::str::startsWith(osName, "Oracle Solaris")) {
+    if (merizoutils::str::startsWith(osName, "Oracle Solaris")) {
         std::vector<std::string> versionComponents;
         splitStringDelim(osVersion, &versionComponents, '.');
 

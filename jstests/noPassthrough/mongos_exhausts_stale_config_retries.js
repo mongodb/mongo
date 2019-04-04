@@ -1,4 +1,4 @@
-// Verifies mongos returns StaleConfig if it exhausts its allowed stale version retry attempts,
+// Verifies merizos returns StaleConfig if it exhausts its allowed stale version retry attempts,
 // using the command read and write modes.
 //
 // @tags: [requires_sharding]
@@ -47,7 +47,7 @@
     ];
 
     kCommands.forEach((cmd) => {
-        // The recipient shard should return StaleConfig until mongos exhausts its retries and
+        // The recipient shard should return StaleConfig until merizos exhausts its retries and
         // returns the final StaleConfig to the client.
         assert.commandFailedWithCode(testDB.runCommand(cmd),
                                      ErrorCodes.StaleConfig,

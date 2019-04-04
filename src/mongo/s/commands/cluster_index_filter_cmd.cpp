@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/s/commands/strategy.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/query/collation/collation_spec.h"
+#include "merizo/s/commands/strategy.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 /**
- * Base class for mongos index filter commands. Cluster index filter commands don't do much more
+ * Base class for merizos index filter commands. Cluster index filter commands don't do much more
  * than forwarding the commands to all shards and combining the results.
  */
 class ClusterIndexFilterCmd : public BasicCommand {
@@ -139,4 +139,4 @@ ClusterIndexFilterCmd clusterPlanCacheSetFilterCmd(
     "planCacheSetFilter", "Sets index filter for a query shape. Overrides existing index filter.");
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MerizoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -16,7 +16,7 @@
 
 /*
  * __wt_timestamp_to_string --
- *	Convert a timestamp to the MongoDB string representation.
+ *	Convert a timestamp to the MerizoDB string representation.
  */
 void
 __wt_timestamp_to_string(wt_timestamp_t ts, char *ts_string)

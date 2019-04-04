@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,58 +27,58 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/storage_interface_impl.h"
+#include "merizo/db/repl/storage_interface_impl.h"
 
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <utility>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update_stage.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/delete_request.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/collection_bulk_loader_impl.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/rollback_gen.h"
-#include "mongo/db/service_context.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/catalog/coll_mod.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/exec/delete.h"
+#include "merizo/db/exec/update_stage.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/ops/delete_request.h"
+#include "merizo/db/ops/parsed_update.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/collection_bulk_loader_impl.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/rollback_gen.h"
+#include "merizo/db/service_context.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 const char StorageInterfaceImpl::kDefaultRollbackIdNamespace[] = "local.system.rollback.id";
@@ -411,7 +411,7 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
 }
 
 Status StorageInterfaceImpl::createOplog(OperationContext* opCtx, const NamespaceString& nss) {
-    mongo::repl::createOplog(opCtx, nss.ns(), true);
+    merizo::repl::createOplog(opCtx, nss.ns(), true);
     return Status::OK();
 }
 
@@ -869,7 +869,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         }
 
         auto planExecutorResult =
-            mongo::getExecutorUpdate(opCtx, nullptr, collection, &parsedUpdate);
+            merizo::getExecutorUpdate(opCtx, nullptr, collection, &parsedUpdate);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -997,7 +997,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
         auto collection = collectionResult.getValue();
 
         auto planExecutorResult =
-            mongo::getExecutorDelete(opCtx, nullptr, collection, &parsedDelete);
+            merizo::getExecutorDelete(opCtx, nullptr, collection, &parsedDelete);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -1129,7 +1129,7 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
             << "This indicates that the primary of this replica set was not successfully "
                "upgraded to schema version "
             << AuthorizationManager::schemaVersion26Final
-            << ", which is the minimum supported schema version in this version of MongoDB";
+            << ", which is the minimum supported schema version in this version of MerizoDB";
         return {ErrorCodes::AuthSchemaIncompatible, msg};
     }
     long long foundSchemaVersion;
@@ -1146,7 +1146,7 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
         (foundSchemaVersion != AuthorizationManager::schemaVersion28SCRAM)) {
         std::string msg = str::stream()
             << "During initial sync, found auth schema version " << foundSchemaVersion
-            << ", but this version of MongoDB only supports schema versions "
+            << ", but this version of MerizoDB only supports schema versions "
             << AuthorizationManager::schemaVersion26Final << " and "
             << AuthorizationManager::schemaVersion28SCRAM;
         return {ErrorCodes::AuthSchemaIncompatible, msg};
@@ -1229,4 +1229,4 @@ Timestamp StorageInterfaceImpl::getPointInTimeReadTimestamp(OperationContext* op
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

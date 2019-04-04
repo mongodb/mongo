@@ -21,14 +21,14 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
-    var st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 1}});
+    var st = new ShardingTest({shards: 2, merizos: 1, rs: {nodes: 1}});
 
     const dbName = "testDB";
     const ns = dbName + ".foo";
 
-    let mongos = st.s0;
-    let admin = mongos.getDB('admin');
-    let coll = mongos.getCollection(ns);
+    let merizos = st.s0;
+    let admin = merizos.getDB('admin');
+    let coll = merizos.getCollection(ns);
 
     let donor = st.shard0;
     let recipient = st.shard1;

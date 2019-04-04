@@ -12,8 +12,8 @@ env.Library(
         'transport_layer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -26,7 +26,7 @@ env.Library(
         'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/util/net/network',
     ],
 )
 
@@ -54,19 +54,19 @@ tlEnv.Library(
     ],
     LIBDEPS=[
         'transport_layer_common',
-        '$BUILD_DIR/mongo/base/system_error',
-        '$BUILD_DIR/mongo/db/auth/authentication_restriction',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/merizo/base/system_error',
+        '$BUILD_DIR/merizo/db/auth/authentication_restriction',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/stats/counters',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/merizo/util/net/ssl_manager',
         '$BUILD_DIR/third_party/shim_asio',
     ],
 )
 
-# This library will initialize an egress transport layer in a mongo initializer
+# This library will initialize an egress transport layer in a merizo initializer
 # for C++ tests that require networking.
 env.Library(
     target='transport_layer_egress_init',
@@ -85,9 +85,9 @@ tlEnv.CppUnitTest(
     ],
     LIBDEPS=[
         'transport_layer',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/rpc/protocol',
-        '$BUILD_DIR/mongo/util/net/socket',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/rpc/protocol',
+        '$BUILD_DIR/merizo/util/net/socket',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_asio',
@@ -101,11 +101,11 @@ tlEnv.CppIntegrationTest(
     ],
     LIBDEPS=[
         'transport_layer_egress_init',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/async_client',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/client/async_client',
+        '$BUILD_DIR/merizo/executor/task_executor_interface',
+        '$BUILD_DIR/merizo/util/net/network',
+        '$BUILD_DIR/merizo/util/version_impl',
         '$BUILD_DIR/third_party/shim_asio',
     ],
 )
@@ -119,11 +119,11 @@ tlEnv.Library(
         env.Idlc('service_executor.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/server_parameter",
-        "$BUILD_DIR/mongo/util/processinfo",
+        "$BUILD_DIR/merizo/idl/server_parameter",
+        "$BUILD_DIR/merizo/util/processinfo",
         '$BUILD_DIR/third_party/shim_asio',
         'transport_layer_common',
     ],
@@ -136,8 +136,8 @@ tlEnv.CppUnitTest(
     ],
     LIBDEPS=[
         'service_executor',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/unittest/unittest',
         '$BUILD_DIR/third_party/shim_asio',
     ],
 )
@@ -152,9 +152,9 @@ tlEnv.CppUnitTest(
 #     ],
 #     LIBDEPS=[
 #         'service_executor',
-#         '$BUILD_DIR/mongo/db/service_context',
-#         '$BUILD_DIR/mongo/unittest/unittest',
-#         '$BUILD_DIR/mongo/util/clock_source_mock',
+#         '$BUILD_DIR/merizo/db/service_context',
+#         '$BUILD_DIR/merizo/unittest/unittest',
+#         '$BUILD_DIR/merizo/util/clock_source_mock',
 #         '$BUILD_DIR/third_party/shim_asio',
 #     ],
 # )
@@ -166,18 +166,18 @@ env.Library(
         'service_state_machine.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authentication_restriction',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/rpc/protocol',
-        '$BUILD_DIR/mongo/util/processinfo',
+        '$BUILD_DIR/merizo/db/auth/authentication_restriction',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/stats/counters',
+        '$BUILD_DIR/merizo/rpc/protocol',
+        '$BUILD_DIR/merizo/util/processinfo',
         'service_executor',
         'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/traffic_recorder',
-        '$BUILD_DIR/mongo/transport/message_compressor',
+        '$BUILD_DIR/merizo/db/traffic_recorder',
+        '$BUILD_DIR/merizo/transport/message_compressor',
     ],
 )
 
@@ -189,7 +189,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'service_entry_point',
         'transport_layer_mock',
-        '$BUILD_DIR/mongo/unittest/unittest'
+        '$BUILD_DIR/merizo/unittest/unittest'
     ],
 )
 
@@ -202,11 +202,11 @@ env.CppUnitTest(
         'service_entry_point',
         'transport_layer_common',
         'transport_layer_mock',
-        '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/merizo/db/dbmessage',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/rpc/rpc',
+        '$BUILD_DIR/merizo/unittest/unittest',
+        '$BUILD_DIR/merizo/util/clock_source_mock',
     ],
 )
 
@@ -223,8 +223,8 @@ zlibEnv.Library(
         'message_compressor_zstd.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_snappy',
         '$BUILD_DIR/third_party/shim_zlib',
         '$BUILD_DIR/third_party/shim_zstd',
@@ -237,7 +237,7 @@ env.Library(
         env.Idlc('message_compressor_options_client.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'message_compressor',
     ],
 )
@@ -248,7 +248,7 @@ env.Library(
         env.Idlc('message_compressor_options_server.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'message_compressor',
     ],
 )

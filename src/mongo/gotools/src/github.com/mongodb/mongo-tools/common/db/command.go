@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -24,7 +24,7 @@ const (
 type NodeType string
 
 const (
-	Mongos     NodeType = "mongos"
+	Mongos     NodeType = "merizos"
 	Standalone          = "standalone"
 	ReplSet             = "replset"
 	Unknown             = "unknown"
@@ -84,7 +84,7 @@ func (sp *SessionProvider) CollectionNames(dbName string) ([]string, error) {
 	return session.DB(dbName).CollectionNames()
 }
 
-// GetNodeType checks if the connected SessionProvider is a mongos, standalone, or replset,
+// GetNodeType checks if the connected SessionProvider is a merizos, standalone, or replset,
 // by looking at the result of calling isMaster.
 func (sp *SessionProvider) GetNodeType() (NodeType, error) {
 	session, err := sp.GetSession()
@@ -106,8 +106,8 @@ func (sp *SessionProvider) GetNodeType() (NodeType, error) {
 	if masterDoc.SetName != nil || masterDoc.Hosts != nil {
 		return ReplSet, nil
 	} else if masterDoc.Msg == "isdbgrid" {
-		// isdbgrid is always the msg value when calling isMaster on a mongos
-		// see http://docs.mongodb.org/manual/core/sharded-cluster-query-router/
+		// isdbgrid is always the msg value when calling isMaster on a merizos
+		// see http://docs.merizodb.org/manual/core/sharded-cluster-query-router/
 		return Mongos, nil
 	}
 	return Standalone, nil
@@ -123,7 +123,7 @@ func (sp *SessionProvider) IsReplicaSet() (bool, error) {
 	return nodeType == ReplSet, nil
 }
 
-// IsMongos returns true if the connected server is a mongos.
+// IsMongos returns true if the connected server is a merizos.
 func (sp *SessionProvider) IsMongos() (bool, error) {
 	nodeType, err := sp.GetNodeType()
 	if err != nil {
@@ -178,7 +178,7 @@ func (sp *SessionProvider) SupportsRepairCursor(db, collection string) (bool, er
 	}
 	if strings.Index(err.Error(), "no such cmd: repairCursor") > -1 {
 		// return a helpful error message for early server versions
-		return false, fmt.Errorf("--repair flag cannot be used on mongodb versions before 2.7.8")
+		return false, fmt.Errorf("--repair flag cannot be used on merizodb versions before 2.7.8")
 	}
 	if strings.Index(err.Error(), "repair iterator not supported") > -1 {
 		// helpful error message if the storage engine does not support repair (WiredTiger)

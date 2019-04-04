@@ -29,8 +29,8 @@ using std::make_pair;
 #include "s2cell.h"
 #include "s2edgeindex.h"
 
-#include "mongo/util/mongoutils/str.h"
-using mongoutils::str::stream;
+#include "merizo/util/merizoutils/str.h"
+using merizoutils::str::stream;
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 
@@ -94,7 +94,7 @@ void S2Loop::Init(vector<S2Point> const& vertices) {
     vertices_ = NULL;
   } else {
     vertices_ = new S2Point[num_vertices_];
-    // mongodb: void* casts to silence a -Wclass-memaccess warning.
+    // merizodb: void* casts to silence a -Wclass-memaccess warning.
     memcpy(static_cast<void*>(vertices_), static_cast<const void*>(&vertices[0]),
            num_vertices_ * sizeof(vertices_[0]));
   }
@@ -267,7 +267,7 @@ S2Loop::S2Loop(S2Loop const* src)
     depth_(src->depth_),
     index_(this),
     num_find_vertex_calls_(0) {
-  // mongodb: void* casts to silence a -Wclass-memaccess warning.
+  // merizodb: void* casts to silence a -Wclass-memaccess warning.
   memcpy(static_cast<void*>(vertices_), static_cast<const void*>(src->vertices_),
          num_vertices_ * sizeof(vertices_[0]));
 }

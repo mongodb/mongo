@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
+    var st = new ShardingTest({name: "write_commands", merizos: 2, shards: 2});
 
     var dbTestName = 'WriteCommandsTestDB';
     var collName = dbTestName + '.TestColl';
@@ -54,11 +54,11 @@
     printjson(st.shard0.getDB(dbTestName).TestColl.find({}).toArray());
     printjson(st.shard1.getDB(dbTestName).TestColl.find({}).toArray());
 
-    // Now restart all mongod instances, so they don't know yet that they are sharded
+    // Now restart all merizod instances, so they don't know yet that they are sharded
     st.restartShardRS(0);
     st.restartShardRS(1);
 
-    // Now that both mongod shards are restarted, they don't know yet that they are part of a
+    // Now that both merizod shards are restarted, they don't know yet that they are part of a
     // sharded
     // cluster until they get a setShardVerion command. Mongos instance s1 has stale metadata and
     // doesn't know that chunk with key 19 has moved to st.shard0.shardName so it will send it to

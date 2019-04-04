@@ -55,7 +55,7 @@
     assert(profileObj.locks.hasOwnProperty("Collection"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(!profileObj.hasOwnProperty("cursorExhausted"), tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "MerizoDB Shell", tojson(profileObj));
 
     //
     // Confirm hasSortStage on getMore with a not-exhausted cursor and in-memory sort.
@@ -92,7 +92,7 @@
            tojson(profileObj));  // cursorid should always be present on getMore.
     assert.neq(0, profileObj.cursorid, tojson(profileObj));
     assert.eq(profileObj.cursorExhausted, true, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "MerizoDB Shell", tojson(profileObj));
 
     //
     // Confirm getMore on aggregation.
@@ -123,7 +123,7 @@
     assert.eq(profileObj.cursorExhausted, true, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 20, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 20, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "MerizoDB Shell", tojson(profileObj));
     assert.eq(profileObj.originatingCommand.hint, {a: 1}, tojson(profileObj));
 
     //

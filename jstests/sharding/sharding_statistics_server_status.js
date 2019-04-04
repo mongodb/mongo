@@ -40,10 +40,10 @@
                       statsFromServerStatus[i].countRecipientMoveChunkStarted);
         }
     }
-    const st = new ShardingTest({shards: 2, mongos: 1});
-    const mongos = st.s0;
-    const admin = mongos.getDB("admin");
-    const coll = mongos.getCollection("db.coll");
+    const st = new ShardingTest({shards: 2, merizos: 1});
+    const merizos = st.s0;
+    const admin = merizos.getDB("admin");
+    const coll = merizos.getCollection("db.coll");
     const numDocsToInsert = 3;
     const shardArr = [st.shard0, st.shard1];
     const stats = [new ShardStat(), new ShardStat()];
@@ -56,7 +56,7 @@
 
     // Move chunk from shard0 to shard1 without docs.
     assert.commandWorked(
-        mongos.adminCommand({moveChunk: coll + '', find: {_id: 1}, to: st.shard1.shardName}));
+        merizos.adminCommand({moveChunk: coll + '', find: {_id: 1}, to: st.shard1.shardName}));
     incrementStatsAndCheckServerShardStats(stats[0], stats[1], numDocsInserted);
 
     // Insert docs and then move chunk again from shard1 to shard0.
@@ -64,17 +64,17 @@
         assert.writeOK(coll.insert({_id: i}));
         ++numDocsInserted;
     }
-    assert.commandWorked(mongos.adminCommand(
+    assert.commandWorked(merizos.adminCommand(
         {moveChunk: coll + '', find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}));
     incrementStatsAndCheckServerShardStats(stats[1], stats[0], numDocsInserted);
 
     // Check that numbers are indeed cumulative. Move chunk from shard0 to shard1.
-    assert.commandWorked(mongos.adminCommand(
+    assert.commandWorked(merizos.adminCommand(
         {moveChunk: coll + '', find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true}));
     incrementStatsAndCheckServerShardStats(stats[0], stats[1], numDocsInserted);
 
     // Move chunk from shard1 to shard0.
-    assert.commandWorked(mongos.adminCommand(
+    assert.commandWorked(merizos.adminCommand(
         {moveChunk: coll + '', find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}));
     incrementStatsAndCheckServerShardStats(stats[1], stats[0], numDocsInserted);
 

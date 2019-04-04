@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/modifier_table.h"
+#include "merizo/db/update/modifier_table.h"
 
 #include <string>
 #include <utility>
 
-#include "mongo/base/init.h"
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/base/status.h"
-#include "mongo/db/update/addtoset_node.h"
-#include "mongo/db/update/arithmetic_node.h"
-#include "mongo/db/update/bit_node.h"
-#include "mongo/db/update/compare_node.h"
-#include "mongo/db/update/conflict_placeholder_node.h"
-#include "mongo/db/update/current_date_node.h"
-#include "mongo/db/update/pop_node.h"
-#include "mongo/db/update/pull_node.h"
-#include "mongo/db/update/pullall_node.h"
-#include "mongo/db/update/push_node.h"
-#include "mongo/db/update/rename_node.h"
-#include "mongo/db/update/set_node.h"
-#include "mongo/db/update/unset_node.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/base/init.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/base/status.h"
+#include "merizo/db/update/addtoset_node.h"
+#include "merizo/db/update/arithmetic_node.h"
+#include "merizo/db/update/bit_node.h"
+#include "merizo/db/update/compare_node.h"
+#include "merizo/db/update/conflict_placeholder_node.h"
+#include "merizo/db/update/current_date_node.h"
+#include "merizo/db/update/pop_node.h"
+#include "merizo/db/update/pull_node.h"
+#include "merizo/db/update/pullall_node.h"
+#include "merizo/db/update/push_node.h"
+#include "merizo/db/update/rename_node.h"
+#include "merizo/db/update/set_node.h"
+#include "merizo/db/update/unset_node.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::make_pair;
 using std::string;
@@ -175,4 +175,4 @@ std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
 }
 
 }  // namespace modifiertable
-}  // namespace mongo
+}  // namespace merizo

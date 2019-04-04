@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,8 +28,8 @@
  */
 
 
-#include "mongo/platform/decimal128.h"
-#include "mongo/platform/basic.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/platform/basic.h"
 
 #include <algorithm>
 #include <cctype>
@@ -46,13 +46,13 @@
 #include <third_party/IntelRDFPMathLib20U1/LIBRARY/src/bid_functions.h>
 #undef _WCHAR_T
 
-#include "mongo/base/static_assert.h"
-#include "mongo/config.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/config.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/stringutils.h"
 
 namespace {
-void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags) {
+void validateInputString(merizo::StringData input, std::uint32_t* signalingFlags) {
     // Input must be of these forms:
     // * Valid decimal (standard or scientific notation):
     //      /[-+]?\d*(.\d+)?([e][+\-]?\d+)?/
@@ -63,7 +63,7 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
 
     // Check for NaN and Infinity
     size_t start = (isSigned) ? 1 : 0;
-    mongo::StringData noSign = input.substr(start);
+    merizo::StringData noSign = input.substr(start);
     bool isNanOrInf = noSign == "nan" || noSign == "inf" || noSign == "infinity";
     if (isNanOrInf)
         return;
@@ -71,10 +71,10 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
     // Input starting with non digit
     if (!std::isdigit(noSign[0])) {
         if (noSign[0] != '.') {
-            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            *signalingFlags = merizo::Decimal128::SignalingFlag::kInvalid;
             return;
         } else if (noSign.size() == 1) {
-            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            *signalingFlags = merizo::Decimal128::SignalingFlag::kInvalid;
             return;
         }
     }
@@ -89,7 +89,7 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
         if (c == '.') {
             dotCount++;
             if (dotCount > 1) {
-                *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+                *signalingFlags = merizo::Decimal128::SignalingFlag::kInvalid;
                 return;
             }
         } else if (!std::isdigit(c)) {
@@ -104,7 +104,7 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
 
     if (isZero) {
         // Override inexact/overflow flag set by the intel library
-        *signalingFlags = mongo::Decimal128::SignalingFlag::kNoFlag;
+        *signalingFlags = merizo::Decimal128::SignalingFlag::kNoFlag;
     }
 
     // Input is valid if we've parsed the entire string
@@ -114,21 +114,21 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
 
     // String with empty coefficient and non-empty exponent
     if (!hasCoefficient) {
-        *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+        *signalingFlags = merizo::Decimal128::SignalingFlag::kInvalid;
         return;
     }
 
     // Check exponent
-    mongo::StringData exponent = noSign.substr(i);
+    merizo::StringData exponent = noSign.substr(i);
 
     if (exponent[0] != 'e' || exponent.size() < 2) {
-        *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+        *signalingFlags = merizo::Decimal128::SignalingFlag::kInvalid;
         return;
     }
     if (exponent[1] == '-' || exponent[1] == '+') {
         exponent = exponent.substr(2);
         if (exponent.size() == 0) {
-            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            *signalingFlags = merizo::Decimal128::SignalingFlag::kInvalid;
             return;
         }
     } else {
@@ -138,14 +138,14 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
     for (size_t j = 0; j < exponent.size(); j++) {
         char c = exponent[j];
         if (!std::isdigit(c)) {
-            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            *signalingFlags = merizo::Decimal128::SignalingFlag::kInvalid;
             return;
         }
     }
 }
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 // Determine system's endian ordering in order to construct decimal 128 values directly
@@ -999,4 +999,4 @@ std::ostream& operator<<(std::ostream& stream, const Decimal128& value) {
     return stream << value.toString();
 }
 
-}  // namespace mongo
+}  // namespace merizo

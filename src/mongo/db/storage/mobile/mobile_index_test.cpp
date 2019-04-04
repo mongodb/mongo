@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,18 +30,18 @@
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
 
-#include "mongo/base/init.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/mobile/mobile_index.h"
-#include "mongo/db/storage/mobile/mobile_recovery_unit.h"
-#include "mongo/db/storage/mobile/mobile_session_pool.h"
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/platform/basic.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/init.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/storage/mobile/mobile_index.h"
+#include "merizo/db/storage/mobile/mobile_recovery_unit.h"
+#include "merizo/db/storage/mobile/mobile_session_pool.h"
+#include "merizo/db/storage/sorted_data_interface_test_harness.h"
+#include "merizo/platform/basic.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 int inc = 0;
 
 class MobileIndexTestHarnessHelper final : public virtual SortedDataInterfaceHarnessHelper {
@@ -83,7 +83,7 @@ std::unique_ptr<HarnessHelper> makeHarnessHelper() {
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+    merizo::registerHarnessHelperFactory(makeHarnessHelper);
     return Status::OK();
 }
-}  // namespace mongo
+}  // namespace merizo

@@ -3,7 +3,7 @@
 set_goenv() {
     # Error out if not in the same directory as this script
     if [ ! -f ./set_goenv.sh ]; then
-        echo "Must be run from mongo-tools top-level directory. Aborting."
+        echo "Must be run from merizo-tools top-level directory. Aborting."
         return 1
     fi
 
@@ -16,8 +16,8 @@ set_goenv() {
         ;;
         *)
             PREF_GOROOT="/opt/golang/go1.11"
-            # XXX might not need mongodbtoolchain anymore
-            PREF_PATH="$PREF_GOROOT/bin:/opt/mongodbtoolchain/v2/bin/:$PATH"
+            # XXX might not need merizodbtoolchain anymore
+            PREF_PATH="$PREF_GOROOT/bin:/opt/merizodbtoolchain/v2/bin/:$PATH"
         ;;
     esac
 
@@ -33,20 +33,20 @@ set_goenv() {
     esac
 
     # XXX Setting the compiler might not be necessary anymore now that we're
-    # using standard Go toolchain and if we don't put mongodbtoolchain into the
-    # path.  But if we need to keep mongodbtoolchain for other tools (eg. python),
+    # using standard Go toolchain and if we don't put merizodbtoolchain into the
+    # path.  But if we need to keep merizodbtoolchain for other tools (eg. python),
     # then this is probably still necessary to find the right gcc.
     if [ -z "$CC" ]; then
         UNAME_M=$(PATH="/usr/bin:/bin" uname -m)
         case $UNAME_M in
             aarch64)
-                export CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc
+                export CC=/opt/merizodbtoolchain/v2/bin/aarch64-merizodb-linux-gcc
             ;;
             ppc64le)
-                export CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc
+                export CC=/opt/merizodbtoolchain/v2/bin/ppc64le-merizodb-linux-gcc
             ;;
             s390x)
-                export CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc
+                export CC=/opt/merizodbtoolchain/v2/bin/s390x-merizodb-linux-gcc
             ;;
             *)
                 # Not needed for other architectures
@@ -68,8 +68,8 @@ set_goenv() {
 
     # Derive GOPATH from current directory, but error if the current diretory
     # doesn't look like a GOPATH structure.
-    if expr "$(pwd)" : '.*src/github.com/mongodb/mongo-tools$' > /dev/null; then
-        export GOPATH=$(echo $(pwd) | perl -pe 's{src/github.com/mongodb/mongo-tools}{}')
+    if expr "$(pwd)" : '.*src/github.com/merizodb/merizo-tools$' > /dev/null; then
+        export GOPATH=$(echo $(pwd) | perl -pe 's{src/github.com/merizodb/merizo-tools}{}')
         if expr "$UNAME_S" : 'CYGWIN' > /dev/null; then
             export GOPATH=$(cygpath -w "$GOPATH")
         fi
@@ -84,7 +84,7 @@ set_goenv() {
 print_ldflags() {
     VersionStr="$(git describe)"
     Gitspec="$(git rev-parse HEAD)"
-    importpath="github.com/mongodb/mongo-tools/common/options"
+    importpath="github.com/merizodb/merizo-tools/common/options"
     echo "-X ${importpath}.VersionStr=${VersionStr} -X ${importpath}.Gitspec=${Gitspec}"
 }
 

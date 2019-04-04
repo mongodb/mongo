@@ -1,4 +1,4 @@
-// Tests mongos behavior on snapshot errors encountered during subsequent statements in a
+// Tests merizos behavior on snapshot errors encountered during subsequent statements in a
 // multi-statement transaction. In particular, verifies that snapshot errors beyond the first
 // command in a transaction are fatal to the entire transaction.
 //
@@ -37,7 +37,7 @@
           command:
               {delete: collName, deletes: [{q: {_id: 2}, limit: 1}, {q: {_id: 12}, limit: 1}]}
         },
-        // We cannot test killCursors because mongos discards the response from any killCursors
+        // We cannot test killCursors because merizos discards the response from any killCursors
         // requests that may be sent to shards.
     ];
 
@@ -65,7 +65,7 @@
         }
     }
 
-    const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+    const st = new ShardingTest({shards: 2, merizos: 1, config: 1});
 
     enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 

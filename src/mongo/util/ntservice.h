@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,7 +28,7 @@
  */
 
 /**
- * The ntservice namespace provides minimal support for running mongo servers as NT services.
+ * The ntservice namespace provides minimal support for running merizo servers as NT services.
  *
  * TODO: ntservice should only provide implementation for a more general server process
  * startup/shutdown/management interface.
@@ -41,17 +41,17 @@
 #include <string>
 #include <vector>
 
-#include "mongo/platform/compiler.h"
-#include "mongo/util/exit_code.h"
+#include "merizo/platform/compiler.h"
+#include "merizo/util/exit_code.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace optionenvironment {
 class OptionSection;
 class Environment;
 }  // namespace optionenvironment
 
-namespace moe = mongo::optionenvironment;
+namespace moe = merizo::optionenvironment;
 
 namespace ntservice {
 struct NtServiceDefaultStrings {
@@ -83,11 +83,11 @@ void configureService(ServiceCallback serviceCallback,
 bool shouldStartService();
 
 /**
- * Construct an argv array that Windows should use to start mongod/mongos as a service
- * if mongo was started with "inputArgv", which is assumed to be an argument vector that
- * dictates that Windows should install mongo as a service.
+ * Construct an argv array that Windows should use to start merizod/merizos as a service
+ * if merizo was started with "inputArgv", which is assumed to be an argument vector that
+ * dictates that Windows should install merizo as a service.
  *
- * The result is suitable for passing to mongo::constructUtf8WindowsCommandLine() to construct
+ * The result is suitable for passing to merizo::constructUtf8WindowsCommandLine() to construct
  * a properly quoted command line string.
  */
 std::vector<std::string> constructServiceArgv(const std::vector<std::string>& inputArgv);
@@ -100,6 +100,6 @@ MONGO_COMPILER_NORETURN void startService();
 bool reportStatus(DWORD reportState, DWORD waitHint = 0, DWORD exitCode = 0);
 
 }  // namespace ntservice
-}  // namespace mongo
+}  // namespace merizo
 
 #endif  // defined(_WIN32)

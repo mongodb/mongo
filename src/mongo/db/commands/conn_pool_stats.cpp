@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/client/global_conn_pool.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/client/shard_connection.h"
-#include "mongo/s/grid.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/client/connpool.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/client/global_conn_pool.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/executor/connection_pool_stats.h"
+#include "merizo/executor/network_interface_factory.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/s/client/shard_connection.h"
+#include "merizo/s/grid.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class PoolStats final : public BasicCommand {
@@ -73,8 +73,8 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& db,
-             const mongo::BSONObj& cmdObj,
-             mongo::BSONObjBuilder& result) override {
+             const merizo::BSONObj& cmdObj,
+             merizo::BSONObjBuilder& result) override {
         executor::ConnectionPoolStats stats{};
 
         // Global connection pool connections.
@@ -145,8 +145,8 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,
-             const mongo::BSONObj& cmdObj,
-             mongo::BSONObjBuilder& result) override {
+             const merizo::BSONObj& cmdObj,
+             merizo::BSONObjBuilder& result) override {
         // Connection information
         executor::ConnectionPoolStats stats{};
         shardConnectionPool.appendConnectionStats(&stats);
@@ -160,4 +160,4 @@ public:
 } shardedPoolStatsCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

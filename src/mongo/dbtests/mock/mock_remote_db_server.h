@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,14 +32,14 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/connection_string.h"
-#include "mongo/client/query.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/unique_message.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/spin_lock.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/query.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/rpc/unique_message.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/concurrency/spin_lock.h"
 
-namespace mongo {
+namespace merizo {
 
 const std::string IdentityNS("local.me");
 const BSONField<std::string> HostField("host");
@@ -58,7 +58,7 @@ public:
 
     /**
      * Creates a new mock server. This can also be setup to work with the
-     * ConnectionString class by using mongo::MockConnRegistry as follows:
+     * ConnectionString class by using merizo::MockConnRegistry as follows:
      *
      * ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
      * MockRemoteDBServer server("$a:27017");
@@ -91,7 +91,7 @@ public:
 
     /**
      * Shuts down this server. Any operations on this server with an InstanceID
-     * less than or equal to the current one will throw a mongo::SocketException.
+     * less than or equal to the current one will throw a merizo::SocketException.
      * To bring the server up again, use the reboot method.
      */
     void shutdown();
@@ -116,7 +116,7 @@ public:
      * @param cmdName the name of the command
      * @param replyObj the exact reply for the command
      */
-    void setCommandReply(const std::string& cmdName, const mongo::BSONObj& replyObj);
+    void setCommandReply(const std::string& cmdName, const merizo::BSONObj& replyObj);
 
     /**
      * Sets the reply for a command.
@@ -128,7 +128,7 @@ public:
      *     that requires different results when calling a method.
      */
     void setCommandReply(const std::string& cmdName,
-                         const std::vector<mongo::BSONObj>& replySequence);
+                         const std::vector<merizo::BSONObj>& replySequence);
 
     /**
      * Inserts a single document to this server.
@@ -154,19 +154,19 @@ public:
      * @param ns the namespace to be associated with the uuid.
      * @param uuid the uuid to associate with the namespace.
      */
-    void assignCollectionUuid(const std::string& ns, const mongo::UUID& uuid);
+    void assignCollectionUuid(const std::string& ns, const merizo::UUID& uuid);
 
     //
     // DBClientBase methods
     //
     rpc::UniqueReply runCommand(InstanceID id, const OpMsgRequest& request);
 
-    mongo::BSONArray query(InstanceID id,
+    merizo::BSONArray query(InstanceID id,
                            const NamespaceStringOrUUID& nsOrUuid,
-                           mongo::Query query = mongo::Query(),
+                           merizo::Query query = merizo::Query(),
                            int nToReturn = 0,
                            int nToSkip = 0,
-                           const mongo::BSONObj* fieldsToReturn = 0,
+                           const merizo::BSONObj* fieldsToReturn = 0,
                            int queryOptions = 0,
                            int batchSize = 0);
 
@@ -175,7 +175,7 @@ public:
     //
 
     InstanceID getInstanceID() const;
-    mongo::ConnectionString::ConnectionType type() const;
+    merizo::ConnectionString::ConnectionType type() const;
     double getSoTimeout() const;
 
     /**
@@ -203,24 +203,24 @@ private:
         /**
          * Creates a new iterator with a deep copy of the vector.
          */
-        CircularBSONIterator(const std::vector<mongo::BSONObj>& replyVector);
-        mongo::BSONObj next();
+        CircularBSONIterator(const std::vector<merizo::BSONObj>& replyVector);
+        merizo::BSONObj next();
 
     private:
-        std::vector<mongo::BSONObj>::iterator _iter;
-        std::vector<mongo::BSONObj> _replyObjs;
+        std::vector<merizo::BSONObj>::iterator _iter;
+        std::vector<merizo::BSONObj> _replyObjs;
     };
 
     /**
      * Checks whether the instance of the server is still up.
      *
-     * @throws mongo::SocketException if this server is down
+     * @throws merizo::SocketException if this server is down
      */
     void checkIfUp(InstanceID id) const;
 
     typedef stdx::unordered_map<std::string, std::shared_ptr<CircularBSONIterator>> CmdToReplyObj;
     typedef stdx::unordered_map<std::string, std::vector<BSONObj>> MockDataMgr;
-    typedef stdx::unordered_map<mongo::UUID, std::string, UUID::Hash> UUIDMap;
+    typedef stdx::unordered_map<merizo::UUID, std::string, UUID::Hash> UUIDMap;
 
     bool _isRunning;
 
@@ -245,6 +245,6 @@ private:
     InstanceID _instanceID;
 
     // protects this entire instance
-    mutable mongo::SpinLock _lock;
+    mutable merizo::SpinLock _lock;
 };
-}  // namespace mongo
+}  // namespace merizo

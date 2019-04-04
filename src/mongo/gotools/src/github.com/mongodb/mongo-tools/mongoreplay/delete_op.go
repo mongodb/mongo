@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ import (
 )
 
 // DeleteOp is used to remove one or more documents from a collection.
-// http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-delete
+// http://docs.merizodb.org/meta-driver/latest/legacy/merizodb-wire-protocol/#op-delete
 type DeleteOp struct {
 	Header MsgHeader
 	mgo.DeleteOp

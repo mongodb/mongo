@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/s/query/blocking_results_merger.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/s/query/blocking_results_merger.h"
 
-namespace mongo {
+namespace merizo {
 
 BlockingResultsMerger::BlockingResultsMerger(OperationContext* opCtx,
                                              AsyncResultsMergerParams&& armParams,
@@ -143,12 +143,12 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::next(OperationContext* opC
 }
 
 StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEvent() {
-    // If we abandoned a previous event due to a mongoS-side timeout, wait for it first.
+    // If we abandoned a previous event due to a merizoS-side timeout, wait for it first.
     if (_leftoverEventFromLastTimeout) {
         invariant(_tailableMode == TailableModeEnum::kTailableAndAwaitData);
         // If we have an outstanding event from last time, then we might have to manually schedule
         // some getMores for the cursors. If a remote response came back while we were between
-        // getMores (from the user to mongos), the response may have been an empty batch, and the
+        // getMores (from the user to merizos), the response may have been an empty batch, and the
         // ARM would not be able to ask for the next batch immediately since it is not attached to
         // an OperationContext. Now that we have a valid OperationContext, we schedule the getMores
         // ourselves.
@@ -175,4 +175,4 @@ void BlockingResultsMerger::kill(OperationContext* opCtx) {
     _executor->waitForEvent(killEvent);
 }
 
-}  // namespace mongo
+}  // namespace merizo

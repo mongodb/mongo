@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -9,8 +9,8 @@ package bsonutil
 import (
 	"bytes"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 )
 

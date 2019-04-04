@@ -5,15 +5,15 @@ var DB;
 (function() {
 
     if (DB === undefined) {
-        DB = function(mongo, name) {
-            this._mongo = mongo;
+        DB = function(merizo, name) {
+            this._merizo = merizo;
             this._name = name;
         };
     }
 
     DB.prototype.getMongo = function() {
-        assert(this._mongo, "why no mongo!");
-        return this._mongo;
+        assert(this._merizo, "why no merizo!");
+        return this._merizo;
     };
 
     DB.prototype.getSiblingDB = function(name) {
@@ -31,7 +31,7 @@ var DB;
     };
 
     DB.prototype.getCollection = function(name) {
-        return new DBCollection(this._mongo, this, name, this._name + "." + name);
+        return new DBCollection(this._merizo, this, name, this._name + "." + name);
     };
 
     DB.prototype.commandHelp = function(name) {
@@ -465,8 +465,8 @@ var DB;
     };
 
     /**
-      Clone database on another server to here. This functionality was removed as of MongoDB 4.2.
-      The shell helper is kept to maintain compatibility with previous versions of MongoDB.
+      Clone database on another server to here. This functionality was removed as of MerizoDB 4.2.
+      The shell helper is kept to maintain compatibility with previous versions of MerizoDB.
       <p>
       Generally, you should dropDatabase() first as otherwise the cloned information will MERGE
       into whatever data is already present in this database.  (That is however a valid way to use
@@ -482,7 +482,7 @@ var DB;
      */
     DB.prototype.cloneDatabase = function(from) {
         print(
-            "WARNING: db.cloneDatabase will only function with MongoDB 4.0 and below. See http://dochub.mongodb.org/core/4.2-copydb-clone");
+            "WARNING: db.cloneDatabase will only function with MerizoDB 4.0 and below. See http://dochub.merizodb.org/core/4.2-copydb-clone");
         assert(isString(from) && from.length);
         return this._dbCommand({clone: from});
     };
@@ -497,8 +497,8 @@ var DB;
      <p>
      This is a low level administrative function is not typically used.
 
-     * @param {String} from mongod instance from which to clnoe (dbhostname:port).  May
-     not be this mongod instance, as clone from self is not allowed.
+     * @param {String} from merizod instance from which to clnoe (dbhostname:port).  May
+     not be this merizod instance, as clone from self is not allowed.
      * @param {String} collection name of collection to clone.
      * @param {Object} query query specifying which elements of collection are to be cloned.
      * @return Object returned has member ok set to true if operation succeeds, false otherwise.
@@ -506,7 +506,7 @@ var DB;
      */
     DB.prototype.cloneCollection = function(from, collection, query) {
         print(
-            "WARNING: db.cloneCollection is deprecated. See http://dochub.mongodb.org/core/clonecollection-deprecation");
+            "WARNING: db.cloneCollection is deprecated. See http://dochub.merizodb.org/core/clonecollection-deprecation");
         assert(isString(from) && from.length);
         assert(isString(collection) && collection.length);
         collection = this._name + "." + collection;
@@ -516,8 +516,8 @@ var DB;
 
     /**
       Copy database from one server or name to another server or name. This functionality was
-      removed as of MongoDB 4.2. The shell helper is kept to maintain compatibility with previous
-      versions of MongoDB.
+      removed as of MerizoDB 4.2. The shell helper is kept to maintain compatibility with previous
+      versions of MerizoDB.
 
       Generally, you should dropDatabase() first as otherwise the copied information will MERGE
       into whatever data is already present in this database (and you will get duplicate objects
@@ -539,7 +539,7 @@ var DB;
     DB.prototype.copyDatabase = function(
         fromdb, todb, fromhost, username, password, mechanism, slaveOk) {
         print(
-            "WARNING: db.copyDatabase will only function with MongoDB 4.0 and below. See http://dochub.mongodb.org/core/4.2-copydb-clone");
+            "WARNING: db.copyDatabase will only function with MerizoDB 4.0 and below. See http://dochub.merizodb.org/core/4.2-copydb-clone");
         assert(isString(fromdb) && fromdb.length);
         assert(isString(todb) && todb.length);
         fromhost = fromhost || "";
@@ -592,10 +592,10 @@ var DB;
         print(
             "\tdb.aggregate([pipeline], {options}) - performs a collectionless aggregation on this database; returns a cursor");
         print("\tdb.auth(username, password)");
-        print("\tdb.cloneDatabase(fromhost) - will only function with MongoDB 4.0 and below");
+        print("\tdb.cloneDatabase(fromhost) - will only function with MerizoDB 4.0 and below");
         print("\tdb.commandHelp(name) returns the help for the command");
         print(
-            "\tdb.copyDatabase(fromdb, todb, fromhost) - will only function with MongoDB 4.0 and below");
+            "\tdb.copyDatabase(fromdb, todb, fromhost) - will only function with MerizoDB 4.0 and below");
         print("\tdb.createCollection(name, {size: ..., capped: ..., max: ...})");
         print("\tdb.createUser(userDocument)");
         print("\tdb.createView(name, viewOn, [{$operator: {...}}, ...], {viewOptions})");
@@ -1299,7 +1299,7 @@ var DB;
     DB.prototype.getSlaveOk = function() {
         if (this._slaveOk != undefined)
             return this._slaveOk;
-        return this._mongo.getSlaveOk();
+        return this._merizo.getSlaveOk();
     };
 
     DB.prototype.getQueryOptions = function() {
@@ -1386,7 +1386,7 @@ var DB;
 
         if (res.errmsg == "no such cmd: createUser") {
             throw Error("'createUser' command not found.  This is most likely because you are " +
-                        "talking to an old (pre v2.6) MongoDB server");
+                        "talking to an old (pre v2.6) MerizoDB server");
         }
 
         if (res.errmsg == "timeout") {
@@ -1402,12 +1402,12 @@ var DB;
             throw Error("User passwords must be of type string. Was given password with type: " +
                         typeof(password));
         }
-        return hex_md5(username + ":mongo:" + password);
+        return hex_md5(username + ":merizo:" + password);
     }
 
     /**
      * Used for updating users in systems with V1 style user information
-     * (ie MongoDB v2.4 and prior)
+     * (ie MerizoDB v2.4 and prior)
      */
     DB.prototype._updateUserV1 = function(name, updateObject, writeConcern) {
         var setObj = {};
@@ -1486,7 +1486,7 @@ var DB;
 
     /**
      * Used for removing users in systems with V1 style user information
-     * (ie MongoDB v2.4 and prior)
+     * (ie MerizoDB v2.4 and prior)
      */
     DB.prototype._removeUserV1 = function(username, writeConcern) {
         this.getCollection("system.users").remove({user: username});
@@ -1875,7 +1875,7 @@ var DB;
 
             print("Unable to get immediate response from the Cloud Monitoring service. We will" +
                   "continue to retry in the background. Please check your firewall " +
-                  "settings to ensure that mongod can communicate with \"" + url + "\"");
+                  "settings to ensure that merizod can communicate with \"" + url + "\"");
             return;
         }
 

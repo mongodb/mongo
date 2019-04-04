@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,73 +27,73 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <time.h>
 
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/catalog/drop_database.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/profile_common.h"
-#include "mongo/db/commands/profile_gen.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/introspect.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/read_concern.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/stats/storage_stats.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/md5.hpp"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/user_management_commands_parser.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/background.h"
+#include "merizo/db/catalog/coll_mod.h"
+#include "merizo/db/catalog/create_collection.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/drop_collection.h"
+#include "merizo/db/catalog/drop_database.h"
+#include "merizo/db/catalog/index_key_validate.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/profile_common.h"
+#include "merizo/db/commands/profile_gen.h"
+#include "merizo/db/commands/server_status.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/introspect.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/ops/insert.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/read_concern.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/stats/storage_stats.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/md5.hpp"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::ostringstream;
 using std::string;
@@ -193,8 +193,8 @@ public:
         if (partialOk) {
             // WARNING: This code depends on the binary layout of md5_state. It will not be
             // compatible with different md5 libraries or work correctly in an environment with
-            // mongod's of different endians. It is ok for mongos to be a different endian since
-            // it just passes the buffer through to another mongod.
+            // merizod's of different endians. It is ok for merizos to be a different endian since
+            // it just passes the buffer through to another merizod.
             BSONElement stateElem = jsobj["md5state"];
             if (!stateElem.eoo()) {
                 uassert(50847,
@@ -376,4 +376,4 @@ public:
 } availableQueryOptionsCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

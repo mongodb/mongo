@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 /**
  * Unit tests of the AuthorizationSession type.
  */
-#include "mongo/base/status.h"
-#include "mongo/bson/bson_depth.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authorization_session_for_test.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/restriction_environment.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/map_util.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/bson_depth.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/crypto/sha256_block.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_manager_impl.h"
+#include "merizo/db/auth/authorization_session_for_test.h"
+#include "merizo/db/auth/authz_manager_external_state_mock.h"
+#include "merizo/db/auth/authz_session_external_state_mock.h"
+#include "merizo/db/auth/restriction_environment.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/transport/session.h"
+#include "merizo/transport/transport_layer_mock.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/map_util.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class FailureCapableAuthzManagerExternalStateMock : public AuthzManagerExternalStateMock {
@@ -85,7 +85,7 @@ private:
     bool _findsShouldFail;
 };
 
-class AuthorizationSessionTest : public ::mongo::unittest::Test {
+class AuthorizationSessionTest : public ::merizo::unittest::Test {
 public:
     FailureCapableAuthzManagerExternalStateMock* managerState;
     transport::TransportLayerMock transportLayer;
@@ -1367,4 +1367,4 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
 
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

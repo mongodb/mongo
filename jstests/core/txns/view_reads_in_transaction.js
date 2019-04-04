@@ -23,7 +23,7 @@
     if (isMongos) {
         // Refresh the router's and shard's database versions so the distinct run below can succeed.
         // This is necessary because shards always abort their local transaction on stale version
-        // errors and mongos is not allowed to retry on these errors in a transaction if the stale
+        // errors and merizos is not allowed to retry on these errors in a transaction if the stale
         // shard has completed at least one earlier statement.
         assert.eq(view.distinct("_id"), ["kyle"]);
     }

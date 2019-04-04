@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,33 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 
-#include "mongo/client/fetcher.h"
-#include "mongo/db/client.h"
-#include "mongo/db/json.h"
-#include "mongo/db/repl/base_cloner_test_fixture.h"
-#include "mongo/db/repl/databases_cloner.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/unittest/task_executor_proxy.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/client/fetcher.h"
+#include "merizo/db/client.h"
+#include "merizo/db/json.h"
+#include "merizo/db/repl/base_cloner_test_fixture.h"
+#include "merizo/db/repl/databases_cloner.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/repl/storage_interface_mock.h"
+#include "merizo/db/service_context_test_fixture.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/executor/network_interface_mock.h"
+#include "merizo/executor/thread_pool_task_executor_test_fixture.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/unittest/task_executor_proxy.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/concurrency/thread_name.h"
+#include "merizo/util/concurrency/thread_pool.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
 namespace {
-using namespace mongo;
-using namespace mongo::repl;
+using namespace merizo;
+using namespace merizo::repl;
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;

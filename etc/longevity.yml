@@ -33,7 +33,7 @@ post:
           # these default values in the distro config in evergreen.
 
           if [ -d "${scons_cache_path}" ]; then
-              ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+              ${python|/opt/merizodbtoolchain/v3/bin/python2} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
 
 functions:
@@ -57,7 +57,7 @@ functions:
           cat > bootstrap.yml <<EOF
           infrastructure_provisioning: ${cluster}
           platform: ${platform}
-          mongodb_setup: ${setup}
+          merizodb_setup: ${setup}
           storageEngine: ${storageEngine}
           test_control: ${test}.longevity
           production: true
@@ -65,7 +65,7 @@ functions:
           ycsb_dir: ../src/YCSB/YCSB
 
           # compositions of expansions
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          merizodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/merizod-${version_id}.tar.gz"
           EOF
 
           cat > runtime.yml <<EOF
@@ -135,7 +135,7 @@ functions:
           source ./venv/bin/activate
           infrastructure_provisioning.py
           workload_setup.py
-          mongodb_setup.py
+          merizodb_setup.py
 
   "run test":
     - command: shell.exec
@@ -182,7 +182,7 @@ functions:
           set -o errexit
           set -o verbose
           TAG="3.2.1-Baseline"
-          PROJECT="mongo-longevity"
+          PROJECT="merizo-longevity"
           OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/longevity_override.json"
           python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file perf.json --rev ${revision} --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
 
@@ -210,7 +210,7 @@ tasks:
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/merizodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -221,23 +221,23 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          ${python|/opt/mongodbtoolchain/v3/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
-          mkdir -p mongodb/bin
-          mv mongo${extension|} mongodb/bin
-          mv mongod${extension|} mongodb/bin
-          mv mongos${extension|} mongodb/bin
-          tar cvf mongodb.tar mongodb
-          gzip mongodb.tar
+          ${python|/opt/merizodbtoolchain/v3/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} merizo${extension} merizod${extension} merizos${extension} MONGO_VERSION=${version}
+          mkdir -p merizodb/bin
+          mv merizo${extension|} merizodb/bin
+          mv merizod${extension|} merizodb/bin
+          mv merizos${extension|} merizodb/bin
+          tar cvf merizodb.tar merizodb
+          gzip merizodb.tar
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb.tar.gz
-        remote_file: ${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
+        local_file: src/merizodb.tar.gz
+        remote_file: ${project}/${version_id}/${revision}/${platform}/merizod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb.tar.gz
+        display_name: merizodb.tar.gz
 
 - name: shard_cluster_test
   depends_on:
@@ -280,7 +280,7 @@ buildvariants:
   modules: &modules
     - dsi
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v3/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/merizodbtoolchain/v3/bin/gcc CXX=/opt/merizodbtoolchain/v3/bin/g++ OBJCOPY=/opt/merizodbtoolchain/v3/bin/objcopy
     setup: shard-longevity
     cluster: longevity
     numShard: 3

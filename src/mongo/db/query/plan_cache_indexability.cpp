@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/plan_cache_indexability.h"
+#include "merizo/db/query/plan_cache_indexability.h"
 
-#include "mongo/base/init.h"
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/index/wildcard_key_generator.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_internal_expr_eq.h"
-#include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/planner_ixselect.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/base/init.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/db/index/wildcard_key_generator.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/matcher/expression_algo.h"
+#include "merizo/db/matcher/expression_internal_expr_eq.h"
+#include "merizo/db/matcher/expression_leaf.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/db/query/index_entry.h"
+#include "merizo/db/query/planner_ixselect.h"
+#include "merizo/stdx/memory.h"
 #include <memory>
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -187,4 +187,4 @@ void PlanCacheIndexabilityState::updateDiscriminators(
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

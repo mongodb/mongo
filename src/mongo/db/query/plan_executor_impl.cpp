@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,40 +27,40 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/plan_executor_impl.h"
+#include "merizo/db/query/plan_executor_impl.h"
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/exec/cached_plan.h"
-#include "mongo/db/exec/change_stream_proxy.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/subplan.h"
-#include "mongo/db/exec/trial_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/mock_yield_policies.h"
-#include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/exec/cached_plan.h"
+#include "merizo/db/exec/change_stream_proxy.h"
+#include "merizo/db/exec/collection_scan.h"
+#include "merizo/db/exec/multi_plan.h"
+#include "merizo/db/exec/plan_stage.h"
+#include "merizo/db/exec/plan_stats.h"
+#include "merizo/db/exec/subplan.h"
+#include "merizo/db/exec/trial_stage.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/query/mock_yield_policies.h"
+#include "merizo/db/query/plan_yield_policy.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/service_context.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/stacktrace.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::shared_ptr;
 using std::string;
@@ -699,4 +699,4 @@ Status PlanExecutorImpl::getMemberObjectStatus(const BSONObj& memberObj) const {
     return WorkingSetCommon::getMemberObjectStatus(memberObj);
 }
 
-}  // namespace mongo
+}  // namespace merizo

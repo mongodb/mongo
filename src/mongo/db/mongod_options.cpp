@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/db/mongod_options.h"
+#include "merizo/db/merizod_options.h"
 
 #include <boost/filesystem.hpp>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/json.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/config.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/mongod_options_general_gen.h"
-#include "mongo/db/mongod_options_legacy_gen.h"
-#include "mongo/db/mongod_options_replication_gen.h"
-#include "mongo/db/mongod_options_sharding_gen.h"
-#include "mongo/db/mongod_options_storage_gen.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_options_base.h"
-#include "mongo/db/server_options_nongeneral_gen.h"
-#include "mongo/db/server_options_server_helpers.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/stringutils.h"
-#include "mongo/util/version.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/json.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/config.h"
+#include "merizo/db/global_settings.h"
+#include "merizo/db/merizod_options_general_gen.h"
+#include "merizo/db/merizod_options_legacy_gen.h"
+#include "merizo/db/merizod_options_replication_gen.h"
+#include "merizo/db/merizod_options_sharding_gen.h"
+#include "merizo/db/merizod_options_storage_gen.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/server_options_base.h"
+#include "merizo/db/server_options_nongeneral_gen.h"
+#include "merizo/db/server_options_server_helpers.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/options_parser/startup_options.h"
+#include "merizo/util/stringutils.h"
+#include "merizo/util/version.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 
@@ -118,7 +118,7 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
     if (params.count("version") && params["version"].as<bool>() == true) {
         setPlainConsoleLogger();
         auto&& vii = VersionInfoInterface::instance();
-        log() << mongodVersion(vii);
+        log() << merizodVersion(vii);
         vii.logBuildInfo();
         return false;
     }
@@ -443,18 +443,18 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     if (params.count("security.javascriptEnabled")) {
-        mongodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
+        merizodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
     }
 
     if (params.count("security.clusterIpSourceWhitelist")) {
-        mongodGlobalParams.whitelistedClusterNetwork = std::vector<std::string>();
+        merizodGlobalParams.whitelistedClusterNetwork = std::vector<std::string>();
         for (const std::string& whitelistEntry :
              params["security.clusterIpSourceWhitelist"].as<std::vector<std::string>>()) {
             std::vector<std::string> intermediates;
             splitStringDelim(whitelistEntry, &intermediates, ',');
             std::copy(intermediates.begin(),
                       intermediates.end(),
-                      std::back_inserter(*mongodGlobalParams.whitelistedClusterNetwork));
+                      std::back_inserter(*merizodGlobalParams.whitelistedClusterNetwork));
         }
     }
 
@@ -593,7 +593,7 @@ Status storeMongodOptions(const moe::Environment& params) {
                       "****\n"
                       "Replica Pairs have been deprecated. Invalid options: "
                       "--pairwith, --arbiter, and/or --opIdMem\n"
-                      "<http://dochub.mongodb.org/core/replicapairs>\n"
+                      "<http://dochub.merizodb.org/core/replicapairs>\n"
                       "****");
     }
 
@@ -635,4 +635,4 @@ Status storeMongodOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

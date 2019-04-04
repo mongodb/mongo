@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,50 +29,50 @@
 
 #include <limits>
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 #undef MONGO_PCH_WHITELISTED  // for malloc/realloc pulled from bson
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/safe_num.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/safe_num.h"
 
 namespace {
 
-using mongo::SafeNum;
-using mongo::Decimal128;
+using merizo::SafeNum;
+using merizo::Decimal128;
 
 TEST(Basics, Initialization) {
     const SafeNum numInt(0);
-    ASSERT_EQUALS(numInt.type(), mongo::NumberInt);
+    ASSERT_EQUALS(numInt.type(), merizo::NumberInt);
 
     const SafeNum numLong(static_cast<int64_t>(0));
-    ASSERT_EQUALS(numLong.type(), mongo::NumberLong);
+    ASSERT_EQUALS(numLong.type(), merizo::NumberLong);
 
     const SafeNum numDouble(0.0);
-    ASSERT_EQUALS(numDouble.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(numDouble.type(), merizo::NumberDouble);
 
     const SafeNum numDecimal(Decimal128("1.0"));
-    ASSERT_EQUALS(numDecimal.type(), mongo::NumberDecimal);
+    ASSERT_EQUALS(numDecimal.type(), merizo::NumberDecimal);
 }
 
 TEST(Basics, BSONElementInitialization) {
-    mongo::BSONObj o;
+    merizo::BSONObj o;
     o = BSON("numberInt" << 1 << "numberLong" << 1LL << "numberDouble" << 0.1 << "NumberDecimal"
                          << Decimal128("1"));
 
     const SafeNum numInt(o.getField("numberInt"));
-    ASSERT_EQUALS(numInt.type(), mongo::NumberInt);
+    ASSERT_EQUALS(numInt.type(), merizo::NumberInt);
 
     const SafeNum numLong(o.getField("numberLong"));
-    ASSERT_EQUALS(numLong.type(), mongo::NumberLong);
+    ASSERT_EQUALS(numLong.type(), merizo::NumberLong);
 
     const SafeNum numDouble(o.getField("numberDouble"));
-    ASSERT_EQUALS(numDouble.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(numDouble.type(), merizo::NumberDouble);
 
     const SafeNum numDecimal(o.getField("NumberDecimal"));
-    ASSERT_EQUALS(numDecimal.type(), mongo::NumberDecimal);
+    ASSERT_EQUALS(numDecimal.type(), merizo::NumberDecimal);
 }
 
 TEST(Comparison, EOO) {
@@ -80,8 +80,8 @@ TEST(Comparison, EOO) {
     const SafeNum safeNumB;
     ASSERT_FALSE(safeNumA.isValid());
     ASSERT_FALSE(safeNumB.isValid());
-    ASSERT_EQUALS(safeNumA.type(), mongo::EOO);
-    ASSERT_EQUALS(safeNumB.type(), mongo::EOO);
+    ASSERT_EQUALS(safeNumA.type(), merizo::EOO);
+    ASSERT_EQUALS(safeNumB.type(), merizo::EOO);
     ASSERT_TRUE(safeNumA.isEquivalent(safeNumB));
     ASSERT_FALSE(safeNumA.isIdentical(safeNumB));
 
@@ -140,40 +140,40 @@ TEST(Addition, UpConvertion) {
     const SafeNum zeroInt32(0);
     const SafeNum zeroInt64(static_cast<int64_t>(0));
     const SafeNum zeroDouble(0.0);
-    ASSERT_EQUALS((zeroInt32 + zeroInt64).type(), mongo::NumberLong);
-    ASSERT_EQUALS((zeroInt64 + zeroInt32).type(), mongo::NumberLong);
-    ASSERT_EQUALS((zeroInt32 + zeroDouble).type(), mongo::NumberDouble);
-    ASSERT_EQUALS((zeroInt64 + zeroDouble).type(), mongo::NumberDouble);
+    ASSERT_EQUALS((zeroInt32 + zeroInt64).type(), merizo::NumberLong);
+    ASSERT_EQUALS((zeroInt64 + zeroInt32).type(), merizo::NumberLong);
+    ASSERT_EQUALS((zeroInt32 + zeroDouble).type(), merizo::NumberDouble);
+    ASSERT_EQUALS((zeroInt64 + zeroDouble).type(), merizo::NumberDouble);
 
 
     const SafeNum stillInt32(zeroInt32 + zeroInt32);
     const SafeNum stillInt64(zeroInt64 + zeroInt64);
     const SafeNum stillDouble(zeroDouble + zeroDouble);
-    ASSERT_EQUALS(stillInt32.type(), mongo::NumberInt);
-    ASSERT_EQUALS(stillInt64.type(), mongo::NumberLong);
-    ASSERT_EQUALS(stillDouble.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(stillInt32.type(), merizo::NumberInt);
+    ASSERT_EQUALS(stillInt64.type(), merizo::NumberLong);
+    ASSERT_EQUALS(stillDouble.type(), merizo::NumberDouble);
 
     const SafeNum zeroDecimal(Decimal128(0));
-    ASSERT_EQUALS((zeroInt64 + zeroDecimal).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroInt32 + zeroDecimal).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroDouble + zeroDecimal).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroDecimal + zeroInt32).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroDecimal + zeroInt64).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroDecimal + zeroDouble).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroInt64 + zeroDecimal).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroInt32 + zeroDecimal).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroDouble + zeroDecimal).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal + zeroInt32).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal + zeroInt64).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal + zeroDouble).type(), merizo::NumberDecimal);
 
     const SafeNum stillDecimal(zeroDecimal + zeroDecimal);
-    ASSERT_EQUALS(stillDecimal.type(), mongo::NumberDecimal);
+    ASSERT_EQUALS(stillDecimal.type(), merizo::NumberDecimal);
 }
 
 TEST(Addition, Overflow32to64) {
     const SafeNum maxInt32(std::numeric_limits<int32_t>::max());
-    ASSERT_EQUALS(maxInt32.type(), mongo::NumberInt);
+    ASSERT_EQUALS(maxInt32.type(), merizo::NumberInt);
 
     const SafeNum int32PlusOne(maxInt32 + 1);
-    ASSERT_EQUALS(int32PlusOne.type(), mongo::NumberLong);
+    ASSERT_EQUALS(int32PlusOne.type(), merizo::NumberLong);
 
     const SafeNum int32MinusOne(maxInt32 + -1);
-    ASSERT_EQUALS(int32MinusOne.type(), mongo::NumberInt);
+    ASSERT_EQUALS(int32MinusOne.type(), merizo::NumberInt);
 
     const SafeNum longResult(std::numeric_limits<int32_t>::max() + static_cast<int64_t>(1));
     ASSERT_EQUALS(int32PlusOne, longResult);
@@ -181,27 +181,27 @@ TEST(Addition, Overflow32to64) {
 
 TEST(Addition, Overflow64toDouble) {
     const SafeNum maxInt64(std::numeric_limits<int64_t>::max());
-    ASSERT_EQUALS(maxInt64.type(), mongo::NumberLong);
+    ASSERT_EQUALS(maxInt64.type(), merizo::NumberLong);
 
     // We don't overflow int64 to double.
     const SafeNum int64PlusOne(maxInt64 + 1);
-    ASSERT_EQUALS(int64PlusOne.type(), mongo::EOO);
+    ASSERT_EQUALS(int64PlusOne.type(), merizo::EOO);
 
     const SafeNum int64MinusOne(maxInt64 + -1);
-    ASSERT_EQUALS(int64MinusOne.type(), mongo::NumberLong);
+    ASSERT_EQUALS(int64MinusOne.type(), merizo::NumberLong);
 
     const SafeNum doubleResult(std::numeric_limits<int64_t>::max() + static_cast<double>(1));
-    ASSERT_EQUALS(doubleResult.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(doubleResult.type(), merizo::NumberDouble);
     ASSERT_NOT_EQUALS(int64PlusOne, doubleResult);
 }
 
 TEST(Addition, OverflowDouble) {
     const SafeNum maxDouble(std::numeric_limits<double>::max());
-    ASSERT_EQUALS(maxDouble.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(maxDouble.type(), merizo::NumberDouble);
 
     // can't just add one here, as max double is so sparse max == max+1
     const SafeNum doublePlusMax(maxDouble + maxDouble);
-    ASSERT_EQUALS(doublePlusMax.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(doublePlusMax.type(), merizo::NumberDouble);
 
     const SafeNum infinity(std::numeric_limits<double>::infinity());
     ASSERT_EQUALS(doublePlusMax, infinity);
@@ -209,13 +209,13 @@ TEST(Addition, OverflowDouble) {
 
 TEST(Addition, Negative32to64) {
     const SafeNum minInt32(std::numeric_limits<int32_t>::min());
-    ASSERT_EQUALS(minInt32.type(), mongo::NumberInt);
+    ASSERT_EQUALS(minInt32.type(), merizo::NumberInt);
 
     const SafeNum int32MinusOne(minInt32 + -1);
-    ASSERT_EQUALS(int32MinusOne.type(), mongo::NumberLong);
+    ASSERT_EQUALS(int32MinusOne.type(), merizo::NumberLong);
 
     const SafeNum int32PlusOne(minInt32 + 1);
-    ASSERT_EQUALS(int32PlusOne.type(), mongo::NumberInt);
+    ASSERT_EQUALS(int32PlusOne.type(), merizo::NumberInt);
 
     const SafeNum longResult(std::numeric_limits<int32_t>::min() - static_cast<int64_t>(1));
     ASSERT_EQUALS(int32MinusOne, longResult);
@@ -223,17 +223,17 @@ TEST(Addition, Negative32to64) {
 
 TEST(Addition, Negative64toDouble) {
     const SafeNum minInt64(std::numeric_limits<int64_t>::min());
-    ASSERT_EQUALS(minInt64.type(), mongo::NumberLong);
+    ASSERT_EQUALS(minInt64.type(), merizo::NumberLong);
 
     // We don't overflow int64 to double.
     const SafeNum int64MinusOne(minInt64 + -1);
-    ASSERT_EQUALS(int64MinusOne.type(), mongo::EOO);
+    ASSERT_EQUALS(int64MinusOne.type(), merizo::EOO);
 
     const SafeNum int64PlusOne(minInt64 + 1);
-    ASSERT_EQUALS(int64PlusOne.type(), mongo::NumberLong);
+    ASSERT_EQUALS(int64PlusOne.type(), merizo::NumberLong);
 
     const SafeNum doubleResult(std::numeric_limits<int64_t>::min() - static_cast<double>(1));
-    ASSERT_EQUALS(doubleResult.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(doubleResult.type(), merizo::NumberDouble);
     ASSERT_NOT_EQUALS(int64MinusOne, doubleResult);
 }
 
@@ -261,7 +261,7 @@ TEST(BitAnd, 32and32) {
     const SafeNum val2(static_cast<int32_t>(0xDF01));
     const SafeNum expected(static_cast<int32_t>(0xC001));
     const SafeNum result = val1 & val2;
-    ASSERT_EQUALS(mongo::NumberInt, result.type());
+    ASSERT_EQUALS(merizo::NumberInt, result.type());
 
     ASSERT_TRUE(expected.isIdentical(result));
 }
@@ -271,7 +271,7 @@ TEST(BitAnd, 64and64) {
     const SafeNum val2(static_cast<int64_t>(0xDF01DF01DF01));
     const SafeNum expected(static_cast<int64_t>(0xC001C001C001));
     const SafeNum result = val1 & val2;
-    ASSERT_EQUALS(mongo::NumberLong, result.type());
+    ASSERT_EQUALS(merizo::NumberLong, result.type());
     ASSERT_TRUE(expected.isIdentical(result));
 }
 
@@ -282,10 +282,10 @@ TEST(BitAnd, MixedSize) {
     const SafeNum result_s_b = val_small & val_big;
     const SafeNum result_b_s = val_big & val_small;
 
-    ASSERT_EQUALS(mongo::NumberLong, result_s_b.type());
+    ASSERT_EQUALS(merizo::NumberLong, result_s_b.type());
     ASSERT_TRUE(expected.isIdentical(result_s_b));
 
-    ASSERT_EQUALS(mongo::NumberLong, result_b_s.type());
+    ASSERT_EQUALS(merizo::NumberLong, result_b_s.type());
     ASSERT_TRUE(expected.isIdentical(result_b_s));
 }
 
@@ -313,7 +313,7 @@ TEST(BitOr, 32and32) {
     const SafeNum val2(static_cast<int32_t>(0xDF01));
     const SafeNum result = val1 | val2;
     const SafeNum expected(static_cast<int32_t>(0xFFF1));
-    ASSERT_EQUALS(mongo::NumberInt, result.type());
+    ASSERT_EQUALS(merizo::NumberInt, result.type());
     ASSERT_TRUE(expected.isIdentical(result));
 }
 
@@ -322,7 +322,7 @@ TEST(BitOr, 64and64) {
     const SafeNum val2(static_cast<int64_t>(0xDF01DF01DF01));
     const SafeNum result = val1 | val2;
     const SafeNum expected(static_cast<int64_t>(0xFFF1FFF1FFF1));
-    ASSERT_EQUALS(mongo::NumberLong, result.type());
+    ASSERT_EQUALS(merizo::NumberLong, result.type());
     ASSERT_TRUE(expected.isIdentical(result));
 }
 
@@ -333,10 +333,10 @@ TEST(BitOr, MixedSize) {
     const SafeNum result_s_b = val_small | val_big;
     const SafeNum result_b_s = val_big | val_small;
 
-    ASSERT_EQUALS(mongo::NumberLong, result_s_b.type());
+    ASSERT_EQUALS(merizo::NumberLong, result_s_b.type());
     ASSERT_TRUE(expected.isIdentical(result_s_b));
 
-    ASSERT_EQUALS(mongo::NumberLong, result_b_s.type());
+    ASSERT_EQUALS(merizo::NumberLong, result_b_s.type());
     ASSERT_TRUE(expected.isIdentical(result_b_s));
 }
 
@@ -364,7 +364,7 @@ TEST(BitXor, 32and32) {
     const SafeNum val2(static_cast<int32_t>(0xDF01));
     const SafeNum result = val1 ^ val2;
     const SafeNum expected(static_cast<int32_t>(0x3FF0));
-    ASSERT_EQUALS(mongo::NumberInt, result.type());
+    ASSERT_EQUALS(merizo::NumberInt, result.type());
     ASSERT_TRUE(expected.isIdentical(result));
 }
 
@@ -373,7 +373,7 @@ TEST(BitXor, 64and64) {
     const SafeNum val2(static_cast<int64_t>(0xDF01DF01DF01));
     const SafeNum result = val1 ^ val2;
     const SafeNum expected(static_cast<int64_t>(0x3FF03FF03FF0));
-    ASSERT_EQUALS(mongo::NumberLong, result.type());
+    ASSERT_EQUALS(merizo::NumberLong, result.type());
     ASSERT_TRUE(expected.isIdentical(result));
 }
 
@@ -384,10 +384,10 @@ TEST(BitXor, MixedSize) {
     const SafeNum result_s_b = val_small ^ val_big;
     const SafeNum result_b_s = val_big ^ val_small;
 
-    ASSERT_EQUALS(mongo::NumberLong, result_s_b.type());
+    ASSERT_EQUALS(merizo::NumberLong, result_s_b.type());
     ASSERT_TRUE(expected.isIdentical(result_s_b));
 
-    ASSERT_EQUALS(mongo::NumberLong, result_b_s.type());
+    ASSERT_EQUALS(merizo::NumberLong, result_b_s.type());
     ASSERT_TRUE(expected.isIdentical(result_b_s));
 }
 
@@ -431,61 +431,61 @@ TEST(Multiplication, UpConvertion) {
     const SafeNum zeroInt32(0);
     const SafeNum zeroInt64(static_cast<int64_t>(0));
     const SafeNum zeroDouble(0.0);
-    ASSERT_EQUALS((zeroInt32 * zeroInt64).type(), mongo::NumberLong);
-    ASSERT_EQUALS((zeroInt64 * zeroInt32).type(), mongo::NumberLong);
-    ASSERT_EQUALS((zeroInt32 * zeroDouble).type(), mongo::NumberDouble);
-    ASSERT_EQUALS((zeroInt64 * zeroDouble).type(), mongo::NumberDouble);
-    ASSERT_EQUALS((zeroDouble * zeroInt32).type(), mongo::NumberDouble);
-    ASSERT_EQUALS((zeroDouble * zeroInt64).type(), mongo::NumberDouble);
+    ASSERT_EQUALS((zeroInt32 * zeroInt64).type(), merizo::NumberLong);
+    ASSERT_EQUALS((zeroInt64 * zeroInt32).type(), merizo::NumberLong);
+    ASSERT_EQUALS((zeroInt32 * zeroDouble).type(), merizo::NumberDouble);
+    ASSERT_EQUALS((zeroInt64 * zeroDouble).type(), merizo::NumberDouble);
+    ASSERT_EQUALS((zeroDouble * zeroInt32).type(), merizo::NumberDouble);
+    ASSERT_EQUALS((zeroDouble * zeroInt64).type(), merizo::NumberDouble);
 
     const SafeNum stillInt32(zeroInt32 * zeroInt32);
     const SafeNum stillInt64(zeroInt64 * zeroInt64);
     const SafeNum stillDouble(zeroDouble * zeroDouble);
-    ASSERT_EQUALS(stillInt32.type(), mongo::NumberInt);
-    ASSERT_EQUALS(stillInt64.type(), mongo::NumberLong);
-    ASSERT_EQUALS(stillDouble.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(stillInt32.type(), merizo::NumberInt);
+    ASSERT_EQUALS(stillInt64.type(), merizo::NumberLong);
+    ASSERT_EQUALS(stillDouble.type(), merizo::NumberDouble);
 
     const SafeNum zeroDecimal(Decimal128(0));
-    ASSERT_EQUALS((zeroDecimal * zeroInt32).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroInt32 * zeroDecimal).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroDecimal * zeroInt64).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroInt64 * zeroDecimal).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroDecimal * zeroDouble).type(), mongo::NumberDecimal);
-    ASSERT_EQUALS((zeroDouble * zeroDecimal).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal * zeroInt32).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroInt32 * zeroDecimal).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal * zeroInt64).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroInt64 * zeroDecimal).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal * zeroDouble).type(), merizo::NumberDecimal);
+    ASSERT_EQUALS((zeroDouble * zeroDecimal).type(), merizo::NumberDecimal);
     const SafeNum stillDecimal(zeroDecimal * zeroDecimal);
-    ASSERT_EQUALS(stillDecimal.type(), mongo::NumberDecimal);
+    ASSERT_EQUALS(stillDecimal.type(), merizo::NumberDecimal);
 }
 
 TEST(Multiplication, Overflow32to64) {
     const SafeNum maxInt32(std::numeric_limits<int32_t>::max());
-    ASSERT_EQUALS(maxInt32.type(), mongo::NumberInt);
+    ASSERT_EQUALS(maxInt32.type(), merizo::NumberInt);
 
     const SafeNum int32TimesOne(maxInt32 * 1);
-    ASSERT_EQUALS(int32TimesOne.type(), mongo::NumberInt);
+    ASSERT_EQUALS(int32TimesOne.type(), merizo::NumberInt);
 
     const SafeNum int32TimesTwo(maxInt32 * 2);
-    ASSERT_EQUALS(int32TimesTwo.type(), mongo::NumberLong);
+    ASSERT_EQUALS(int32TimesTwo.type(), merizo::NumberLong);
 }
 
 TEST(Multiplication, Overflow64toDouble) {
     const SafeNum maxInt64(std::numeric_limits<int64_t>::max());
-    ASSERT_EQUALS(maxInt64.type(), mongo::NumberLong);
+    ASSERT_EQUALS(maxInt64.type(), merizo::NumberLong);
 
     // We don't overflow int64 to double.
     const SafeNum int64TimesTwo(maxInt64 * 2);
-    ASSERT_EQUALS(int64TimesTwo.type(), mongo::EOO);
+    ASSERT_EQUALS(int64TimesTwo.type(), merizo::EOO);
 
     const SafeNum doubleResult(std::numeric_limits<int64_t>::max() * static_cast<double>(2));
-    ASSERT_EQUALS(doubleResult.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(doubleResult.type(), merizo::NumberDouble);
     ASSERT_NOT_EQUALS(int64TimesTwo, doubleResult);
 }
 
 TEST(Multiplication, OverflowDouble) {
     const SafeNum maxDouble(std::numeric_limits<double>::max());
-    ASSERT_EQUALS(maxDouble.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(maxDouble.type(), merizo::NumberDouble);
 
     const SafeNum doublePlusMax(maxDouble * maxDouble);
-    ASSERT_EQUALS(doublePlusMax.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(doublePlusMax.type(), merizo::NumberDouble);
 
     const SafeNum infinity(std::numeric_limits<double>::infinity());
     ASSERT_EQUALS(doublePlusMax, infinity);
@@ -493,48 +493,48 @@ TEST(Multiplication, OverflowDouble) {
 
 TEST(Multiplication, Negative32to64) {
     const SafeNum minInt32(std::numeric_limits<int32_t>::min());
-    ASSERT_EQUALS(minInt32.type(), mongo::NumberInt);
+    ASSERT_EQUALS(minInt32.type(), merizo::NumberInt);
 
     const SafeNum int32TimesOne(minInt32 * 1);
-    ASSERT_EQUALS(int32TimesOne.type(), mongo::NumberInt);
+    ASSERT_EQUALS(int32TimesOne.type(), merizo::NumberInt);
 
     const SafeNum int32TimesTwo(minInt32 * 2);
-    ASSERT_EQUALS(int32TimesTwo.type(), mongo::NumberLong);
+    ASSERT_EQUALS(int32TimesTwo.type(), merizo::NumberLong);
 }
 
 TEST(Multiplication, Negative64toDouble) {
     const SafeNum minInt64(std::numeric_limits<int64_t>::min());
-    ASSERT_EQUALS(minInt64.type(), mongo::NumberLong);
+    ASSERT_EQUALS(minInt64.type(), merizo::NumberLong);
 
     // We don't overflow int64 to double.
     const SafeNum int64TimesTwo(minInt64 * 2);
-    ASSERT_EQUALS(int64TimesTwo.type(), mongo::EOO);
+    ASSERT_EQUALS(int64TimesTwo.type(), merizo::EOO);
 
     const SafeNum int64TimesOne(minInt64 * 1);
-    ASSERT_EQUALS(int64TimesOne.type(), mongo::NumberLong);
+    ASSERT_EQUALS(int64TimesOne.type(), merizo::NumberLong);
 
     const SafeNum doubleResult(std::numeric_limits<int64_t>::min() * static_cast<double>(2));
-    ASSERT_EQUALS(doubleResult.type(), mongo::NumberDouble);
+    ASSERT_EQUALS(doubleResult.type(), merizo::NumberDouble);
     ASSERT_NOT_EQUALS(int64TimesTwo, doubleResult);
 }
 
 TEST(Multiplication, 64OverflowsFourWays) {
     const SafeNum maxInt64(std::numeric_limits<int64_t>::max());
     const SafeNum minInt64(std::numeric_limits<int64_t>::min());
-    ASSERT_EQUALS(mongo::EOO, (maxInt64 * maxInt64).type());
-    ASSERT_EQUALS(mongo::EOO, (maxInt64 * minInt64).type());
-    ASSERT_EQUALS(mongo::EOO, (minInt64 * maxInt64).type());
-    ASSERT_EQUALS(mongo::EOO, (minInt64 * minInt64).type());
+    ASSERT_EQUALS(merizo::EOO, (maxInt64 * maxInt64).type());
+    ASSERT_EQUALS(merizo::EOO, (maxInt64 * minInt64).type());
+    ASSERT_EQUALS(merizo::EOO, (minInt64 * maxInt64).type());
+    ASSERT_EQUALS(merizo::EOO, (minInt64 * minInt64).type());
 }
 
 TEST(Multiplication, BoundsWithNegativeOne) {
     const SafeNum maxInt64(std::numeric_limits<int64_t>::max());
     const SafeNum minInt64(std::numeric_limits<int64_t>::min());
     const SafeNum minusOneInt64(static_cast<int64_t>(-1));
-    ASSERT_NOT_EQUALS(mongo::EOO, (maxInt64 * minusOneInt64).type());
-    ASSERT_NOT_EQUALS(mongo::EOO, (minusOneInt64 * maxInt64).type());
-    ASSERT_EQUALS(mongo::EOO, (minInt64 * minusOneInt64).type());
-    ASSERT_EQUALS(mongo::EOO, (minusOneInt64 * minInt64).type());
+    ASSERT_NOT_EQUALS(merizo::EOO, (maxInt64 * minusOneInt64).type());
+    ASSERT_NOT_EQUALS(merizo::EOO, (minusOneInt64 * maxInt64).type());
+    ASSERT_EQUALS(merizo::EOO, (minInt64 * minusOneInt64).type());
+    ASSERT_EQUALS(merizo::EOO, (minusOneInt64 * minInt64).type());
 }
 
 }  // unnamed namespace

@@ -209,7 +209,7 @@ var testOps = function(db, allowedActions) {
     })();
 
     var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
-    // Note: fsyncUnlock is not supported in mongos.
+    // Note: fsyncUnlock is not supported in merizos.
     if (!isMongos) {
         checkErr(allowedActions.hasOwnProperty('fsync_unlock'), function() {
             var res = db.fsyncUnlock();
@@ -447,7 +447,7 @@ var TESTS = [
  * Driver method for setting up the test environment, running them, cleanup
  * after every test and keeping track of test failures.
  *
- * @param conn {Mongo} a connection to a mongod or mongos to test.
+ * @param conn {Mongo} a connection to a merizod or merizos to test.
  */
 var runTests = function(conn) {
     var setup = function() {

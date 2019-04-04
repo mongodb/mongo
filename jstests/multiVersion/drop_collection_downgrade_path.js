@@ -1,7 +1,7 @@
 /**
  * Test unfinished 4.2-style two phase drop can be handled in a restart with 4.0 binary.
  *
- * TODO: Remove this test in MongoDB 4.4 once upgrade & downgrade binaries both use the 4.2-style
+ * TODO: Remove this test in MerizoDB 4.4 once upgrade & downgrade binaries both use the 4.2-style
  * two phase drop.
  */
 (function() {

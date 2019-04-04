@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_check_invalidate.h"
-#include "mongo/util/log.h"
+#include "merizo/db/pipeline/document_source_change_stream.h"
+#include "merizo/db/pipeline/document_source_check_invalidate.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using DSCS = DocumentSourceChangeStream;
 
@@ -99,7 +99,7 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
         // cases, since we will later rely upon it to generate a correct postBatchResumeToken. We
         // must therefore update the sort key to match the new resume token that we generated above.
         // TODO SERVER-38539: when returning results for merging, we check whether 'mergeByPBRT' has
-        // been set. If not, then the request was sent from an older mongoS which cannot merge by
+        // been set. If not, then the request was sent from an older merizoS which cannot merge by
         // raw resume tokens, and the sort key should therefore be left alone. The 'mergeByPBRT'
         // flag is no longer necessary in 4.4; all change streams will be merged by resume token.
         result.copyMetaDataFrom(doc);
@@ -118,4 +118,4 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
     return nextInput;
 }
 
-}  // namespace mongo
+}  // namespace merizo

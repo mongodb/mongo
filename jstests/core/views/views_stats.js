@@ -40,7 +40,7 @@
     let isMasterResponse = assert.commandWorked(viewsDB.runCommand("isMaster"));
     const isMongos = (isMasterResponse.msg === "isdbgrid");
     if (isMongos) {
-        jsTest.log("Tests are being run on a mongos; skipping top tests.");
+        jsTest.log("Tests are being run on a merizos; skipping top tests.");
         return;
     }
 

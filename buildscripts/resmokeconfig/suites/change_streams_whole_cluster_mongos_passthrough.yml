@@ -4,8 +4,8 @@ selector:
   roots:
   - jstests/change_streams/**/*.js
   exclude_files:
-  # This test exercises an internal detail of mongos<->mongod communication and is not expected
-  # to work against a mongos.
+  # This test exercises an internal detail of merizos<->merizod communication and is not expected
+  # to work against a merizos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
   exclude_with_any_tags:
   ##
@@ -50,11 +50,11 @@ executor:
     # Use two shards to make sure we will only talk to the primary shard for the database and will
     # not delay changes to wait for notifications or a clock advancement from other shards.
     num_shards: 2
-    mongos_options:
+    merizos_options:
       bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1
-    mongod_options:
+    merizod_options:
       bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1

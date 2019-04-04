@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/rpc/legacy_request_builder.h"
+#include "merizo/rpc/legacy_request_builder.h"
 
 #include <tuple>
 #include <utility>
 
-#include "mongo/client/read_preference.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/rpc/message.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/dbmessage.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/rpc/message.h"
+#include "merizo/rpc/metadata.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 namespace rpc {
 
 namespace {
@@ -92,7 +92,7 @@ BSONObj downconvertRequestBody(const OpMsgRequest& request, int* queryOptions) {
 
 Message legacyRequestFromOpMsgRequest(const OpMsgRequest& request) {
     BufBuilder builder;
-    builder.skip(mongo::MsgData::MsgDataHeaderSize);
+    builder.skip(merizo::MsgData::MsgDataHeaderSize);
 
     const auto cmdNS = NamespaceString(request.getDatabase(), "").getCommandNS().toString();
 
@@ -113,4 +113,4 @@ Message legacyRequestFromOpMsgRequest(const OpMsgRequest& request) {
 }
 
 }  // namespace rpc
-}  // namespace mongo
+}  // namespace merizo

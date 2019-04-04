@@ -1,5 +1,5 @@
 DBCollection.prototype._createWriteConcern = function(options) {
-    // If writeConcern set, use it, else get from collection (which will inherit from db/mongo)
+    // If writeConcern set, use it, else get from collection (which will inherit from db/merizo)
     var writeConcern = options.writeConcern || this.getWriteConcern();
     var writeConcernOptions = ['w', 'wtimeout', 'j', 'fsync'];
 
@@ -221,7 +221,7 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
 };
 
 /**
-* Inserts a single document into MongoDB.
+* Inserts a single document into MerizoDB.
 *
 * @method
 * @param {object} doc Document to insert.
@@ -276,7 +276,7 @@ DBCollection.prototype.insertOne = function(document, options) {
 };
 
 /**
-* Inserts an array of documents into MongoDB.
+* Inserts an array of documents into MerizoDB.
 *
 * @method
 * @param {object[]} docs Documents to insert.
@@ -327,7 +327,7 @@ DBCollection.prototype.insertMany = function(documents, options) {
 };
 
 /**
-* Delete a document on MongoDB
+* Delete a document on MerizoDB
 *
 * @method
 * @param {object} filter The filter used to select the document to remove
@@ -384,7 +384,7 @@ DBCollection.prototype.deleteOne = function(filter, options) {
 };
 
 /**
-* Delete multiple documents on MongoDB
+* Delete multiple documents on MerizoDB
 *
 * @method
 * @param {object} filter The Filter used to select the documents to remove
@@ -441,7 +441,7 @@ DBCollection.prototype.deleteMany = function(filter, options) {
 };
 
 /**
-* Replace a document on MongoDB
+* Replace a document on MerizoDB
 *
 * @method
 * @param {object} filter The Filter used to select the document to update
@@ -516,7 +516,7 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
 };
 
 /**
-* Update a single document on MongoDB
+* Update a single document on MerizoDB
 *
 * @method
 * @param {object} filter The Filter used to select the document to update
@@ -599,7 +599,7 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
 };
 
 /**
-* Update multiple documents on MongoDB
+* Update multiple documents on MerizoDB
 *
 * @method
 * @param {object} filter The Filter used to select the document to update

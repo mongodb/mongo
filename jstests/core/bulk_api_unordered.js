@@ -180,7 +180,7 @@ var _useWriteCommands = coll.getMongo().useWriteCommands;
 // execute the down converted version
 if (buildVersion >= 255) {
     // Force the use of useWriteCommands
-    coll._mongo.useWriteCommands = function() {
+    coll._merizo.useWriteCommands = function() {
         return true;
     };
 
@@ -189,7 +189,7 @@ if (buildVersion >= 255) {
 }
 
 // Force the use of legacy commands
-coll._mongo.useWriteCommands = function() {
+coll._merizo.useWriteCommands = function() {
     return false;
 };
 

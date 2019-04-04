@@ -1,6 +1,6 @@
 """API to parse and access the configuration present in a evergreen.yml file.
 
-The API also provides methods to access specific fields present in the mongodb/mongo
+The API also provides methods to access specific fields present in the merizodb/merizo
 configuration file.
 """
 

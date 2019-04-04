@@ -1,7 +1,7 @@
 
 
 Don't make manual changes to files in the dist/ or platform/ directories.
-Source code changes should be made in the mongodb-labs/gperftools repo.
+Source code changes should be made in the merizodb-labs/gperftools repo.
 Tweaks or reconfigurations of our third-party installation have to be
 made in scripts/ or SConscript files, etc.
 
@@ -10,7 +10,7 @@ made in scripts/ or SConscript files, etc.
 ```
     src/third_party/
         gperftool-2.7/
-            dist/                # 'make distdir' snapshot of mongodb-labs/gperftools
+            dist/                # 'make distdir' snapshot of merizodb-labs/gperftools
             platform/
                 linux_x86_64/    # per platform directories
                     include/     # headers used by consumers of gperftools

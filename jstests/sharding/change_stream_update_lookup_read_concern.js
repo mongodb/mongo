@@ -48,40 +48,40 @@
     const st = new ShardingTest({manualAddShard: true});
     assert.commandWorked(st.s.adminCommand({addShard: replSetName + "/" + rst.getPrimary().host}));
 
-    const mongosDB = st.s0.getDB(jsTestName());
-    const mongosColl = mongosDB[jsTestName()];
+    const merizosDB = st.s0.getDB(jsTestName());
+    const merizosColl = merizosDB[jsTestName()];
 
-    // Shard the collection to ensure the change stream will perform update lookup from mongos.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
+    // Shard the collection to ensure the change stream will perform update lookup from merizos.
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {_id: 1}}));
 
-    assert.writeOK(mongosColl.insert({_id: 1}));
+    assert.writeOK(merizosColl.insert({_id: 1}));
     rst.awaitReplication();
 
     // Make sure reads with read preference tag 'closestSecondary' go to the tagged secondary.
     const closestSecondary = rst.nodes[1];
-    const closestSecondaryDB = closestSecondary.getDB(mongosDB.getName());
+    const closestSecondaryDB = closestSecondary.getDB(merizosDB.getName());
     assert.commandWorked(closestSecondaryDB.setProfilingLevel(2));
 
     // We expect the tag to ensure there is only one node to choose from, so the actual read
     // preference doesn't really matter - we use 'nearest' throughout.
-    assert.eq(mongosColl.find()
+    assert.eq(merizosColl.find()
                   .readPref("nearest", [{tag: "closestSecondary"}])
                   .comment("testing targeting")
                   .itcount(),
               1);
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: closestSecondaryDB,
-        filter: {ns: mongosColl.getFullName(), "command.comment": "testing targeting"}
+        filter: {ns: merizosColl.getFullName(), "command.comment": "testing targeting"}
     });
 
     const changeStreamComment = "change stream against closestSecondary";
-    const changeStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}], {
+    const changeStream = merizosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}], {
         comment: changeStreamComment,
         $readPreference: {mode: "nearest", tags: [{tag: "closestSecondary"}]}
     });
-    assert.writeOK(mongosColl.update({_id: 1}, {$set: {updatedCount: 1}}));
+    assert.writeOK(merizosColl.update({_id: 1}, {$set: {updatedCount: 1}}));
     assert.soon(() => changeStream.hasNext());
     let latestChange = changeStream.next();
     assert.eq(latestChange.operationType, "update");
@@ -101,7 +101,7 @@
         profileDB: closestSecondaryDB,
         filter: {
             op: "query",
-            ns: mongosColl.getFullName(),
+            ns: merizosColl.getFullName(),
             "command.filter._id": 1,
             "command.comment": changeStreamComment,
             // We need to filter out any profiler entries with a stale config - this is the first
@@ -109,7 +109,7 @@
             // secondary that will enforce shard version.
             errCode: {$ne: ErrorCodes.StaleConfig}
         },
-        errorMsgFilter: {ns: mongosColl.getFullName()},
+        errorMsgFilter: {ns: merizosColl.getFullName()},
         errorMsgProj: {ns: 1, op: 1, command: 1},
     });
 
@@ -123,10 +123,10 @@
     reconfig(rst, rsConfig);
     rst.awaitSecondaryNodes();
     const newClosestSecondary = rst.nodes[2];
-    const newClosestSecondaryDB = newClosestSecondary.getDB(mongosDB.getName());
+    const newClosestSecondaryDB = newClosestSecondary.getDB(merizosDB.getName());
     const originalClosestSecondaryDB = closestSecondaryDB;
 
-    // Wait for the mongos to acknowledge the new tags from our reconfig.
+    // Wait for the merizos to acknowledge the new tags from our reconfig.
     awaitRSClientHosts(st.s,
                        newClosestSecondary,
                        {ok: true, secondary: true, tags: {tag: "closestSecondary"}},
@@ -139,21 +139,21 @@
 
     // Make sure new queries with read preference tag "closestSecondary" go to the new secondary.
     profilerHasZeroMatchingEntriesOrThrow({profileDB: newClosestSecondaryDB, filter: {}});
-    assert.eq(mongosColl.find()
+    assert.eq(merizosColl.find()
                   .readPref("nearest", [{tag: "closestSecondary"}])
                   .comment("testing targeting")
                   .itcount(),
               1);
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: newClosestSecondaryDB,
-        filter: {ns: mongosColl.getFullName(), "command.comment": "testing targeting"}
+        filter: {ns: merizosColl.getFullName(), "command.comment": "testing targeting"}
     });
 
     // Test that the change stream continues on the original host, but the update lookup now targets
     // the new, lagged secondary. Even though it's lagged, the lookup should use 'afterClusterTime'
     // to ensure it does not return until the node can see the change it's looking up.
     stopServerReplication(newClosestSecondary);
-    assert.writeOK(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
+    assert.writeOK(merizosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
 
     // Since we stopped replication, we expect the update lookup to block indefinitely until we
     // resume replication, so we resume replication in a parallel shell while this thread is blocked
@@ -165,7 +165,7 @@
             const pausedSecondary = new Mongo("${newClosestSecondary.host}");
 
             // Wait for the update lookup to appear in currentOp.
-            const changeStreamDB = pausedSecondary.getDB("${mongosDB.getName()}");
+            const changeStreamDB = pausedSecondary.getDB("${merizosDB.getName()}");
             assert.soon(
                 function() {
                     return changeStreamDB
@@ -175,7 +175,7 @@
                                    // because we're blocked waiting for the read concern, which
                                    // happens before we get to the command processing level and
                                    // adjust the currentOp namespace to include the collection name.
-                                   ns: "${mongosDB.getName()}.$cmd",
+                                   ns: "${merizosDB.getName()}.$cmd",
                                    "command.comment": "${changeStreamComment}",
                                })
                                .inprog.length === 1;
@@ -198,7 +198,7 @@
         profileDB: newClosestSecondaryDB,
         filter: {
             op: "query",
-            ns: mongosColl.getFullName(), "command.comment": changeStreamComment,
+            ns: merizosColl.getFullName(), "command.comment": changeStreamComment,
             // We need to filter out any profiler entries with a stale config - this is the first
             // read on this secondary with a readConcern specified, so it is the first read on this
             // secondary that will enforce shard version.

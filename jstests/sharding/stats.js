@@ -1,6 +1,6 @@
 (function() {
 
-    var s = new ShardingTest({name: "stats", shards: 2, mongos: 1});
+    var s = new ShardingTest({name: "stats", shards: 2, merizos: 1});
 
     s.adminCommand({enablesharding: "test"});
 
@@ -16,7 +16,7 @@
 
     db.foo.drop();
     //	SERVER-29678 changed collStats so versions > 4.0 now return 0s on NS not found
-    if (MongoRunner.getBinVersionFor(jsTest.options().mongosBinVersion) === '4.0') {
+    if (MongoRunner.getBinVersionFor(jsTest.options().merizosBinVersion) === '4.0') {
         // TODO: This should be fixed in 4.4
         let res = db.foo.stats();
         if (res.ok === 1) {
@@ -126,13 +126,13 @@
         statComp(stat_obj.avgObjSize, stat_obj_scaled.avgObjSize, 1);
     }
 
-    function collStatComp(stat_obj, stat_obj_scaled, scale, mongos) {
+    function collStatComp(stat_obj, stat_obj_scaled, scale, merizos) {
         statComp(stat_obj.size, stat_obj_scaled.size, scale);
         statComp(stat_obj.storageSize, stat_obj_scaled.storageSize, scale);
         statComp(stat_obj.totalIndexSize, stat_obj_scaled.totalIndexSize, scale);
         statComp(stat_obj.avgObjSize, stat_obj_scaled.avgObjSize, 1);
-        /* lastExtentSize doesn't exist in mongos level collection stats */
-        if (!mongos) {
+        /* lastExtentSize doesn't exist in merizos level collection stats */
+        if (!merizos) {
             statComp(stat_obj.lastExtentSize, stat_obj_scaled.lastExtentSize, scale);
         }
     }

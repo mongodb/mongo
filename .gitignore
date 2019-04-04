@@ -1,5 +1,5 @@
 /build
-/src/mongo/db/modules
+/src/merizo/db/modules
 /.jsdbshell
 /.dbshell
 /*.ninja
@@ -42,16 +42,16 @@
 *#
 .#*
 
-/src/mongo/*/*Debug*/
-/src/mongo/*/*/*Debug*/
-/src/mongo/*/*Release*/
-/src/mongo/*/*/*Release*/
+/src/merizo/*/*Debug*/
+/src/merizo/*/*/*Debug*/
+/src/merizo/*/*Release*/
+/src/merizo/*/*/*Release*/
 /src/ipch
-/src/mongo/*/ipch
-/src/mongo/*/*/ipch
-/src/mongo/db/.gdb*
-/src/mongo/db/makefile.local
-/src/mongo/db/_ReSharper.db
+/src/merizo/*/ipch
+/src/merizo/*/*/ipch
+/src/merizo/db/.gdb*
+/src/merizo/db/makefile.local
+/src/merizo/db/_ReSharper.db
 /src/third_party/*/*.cache
 /src/third_party/*/*.tlog
 /src/third_party/*/*.lastbuildstate
@@ -74,16 +74,16 @@ scratch
 # binaries
 /docgen
 /loadgen
-/mongo
-/mongobridge
-/mongod
-/mongoed
-/mongogrid
-/mongoperf
-/mongos
-/mongoshim
-/mongosniff
-/mongotrafficreader
+/merizo
+/merizobridge
+/merizod
+/merizoed
+/merizogrid
+/merizoperf
+/merizos
+/merizoshim
+/merizosniff
+/merizotrafficreader
 /wt
 
 *.tgz
@@ -91,9 +91,9 @@ scratch
 *.tar.gz
 
 #libs
-/libmongoclient.*
-/libmongotestfiles.*
-/libmongoshellfiles.*
+/libmerizoclient.*
+/libmerizotestfiles.*
+/libmerizoshellfiles.*
 /sharedclient
 /genny
 
@@ -125,7 +125,7 @@ scratch
 #debian
 build-stamp
 configure-stamp
-debian/mongodb
+debian/merizodb
 
 # OSX files
 .DS_Store
@@ -167,9 +167,9 @@ DriverInclude.wxs
 
 # Gradle
 .gradle
-src/mongo/embedded/java/build/
-src/mongo/embedded/java/aar/build/
-src/mongo/embedded/java/jar/build/
+src/merizo/embedded/java/build/
+src/merizo/embedded/java/aar/build/
+src/merizo/embedded/java/jar/build/
 local.properties
 
 compile_commands.json

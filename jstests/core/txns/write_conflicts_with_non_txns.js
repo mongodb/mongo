@@ -2,7 +2,7 @@
  * Test the write conflict behavior between transactional and non-transactional (single document)
  * writes.
  *
- * All writes in MongoDB execute inside transactions. Single document writes (which, until 4.0,
+ * All writes in MerizoDB execute inside transactions. Single document writes (which, until 4.0,
  * categorized all writes), will indefinitely retry, if their associated transaction encounters a
  * WriteConflict error. This differs from the behavior of multi-document transactions, where
  * WriteConflict exceptions that occur inside a transaction are not automatically retried, and are

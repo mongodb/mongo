@@ -10,7 +10,7 @@ env.Library(
         'thread_pool.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -21,7 +21,7 @@ env.Library(
         'thread_pool_test_fixture.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/unittest/unittest',
     ]
 )
 
@@ -36,8 +36,8 @@ env.CppUnitTest(
 env.Library('ticketholder',
             ['ticketholder.cpp'],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/db/service_context',
+                '$BUILD_DIR/merizo/base',
+                '$BUILD_DIR/merizo/db/service_context',
                 '$BUILD_DIR/third_party/shim_boost',
             ])
 
@@ -47,7 +47,7 @@ env.CppUnitTest(
     source=['ticketholder_test.cpp'],
     LIBDEPS=[
         'ticketholder',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/unittest/unittest',
     ])
 
 env.Library(

@@ -10,7 +10,7 @@ import (
 // Bulk represents an operation that can be prepared with several
 // orthogonal changes before being delivered to the server.
 //
-// MongoDB servers older than version 2.6 do not have proper support for bulk
+// MerizoDB servers older than version 2.6 do not have proper support for bulk
 // operations, so the driver attempts to map its API as much as possible into
 // the functionality that works. In particular, in those releases updates and
 // removals are sent individually, and inserts are sent in bulk but have
@@ -19,7 +19,7 @@ import (
 //
 // Relevant documentation:
 //
-//   http://blog.mongodb.org/post/84922794768/mongodbs-new-bulk-api
+//   http://blog.merizodb.org/post/84922794768/merizodbs-new-bulk-api
 //
 type Bulk struct {
 	c       *Collection
@@ -49,7 +49,7 @@ type bulkDeleteOp []interface{}
 // BulkResult holds the results for a bulk operation.
 type BulkResult struct {
 	Matched  int
-	Modified int // Available only for MongoDB 2.6+
+	Modified int // Available only for MerizoDB 2.6+
 
 	// Be conservative while we understand exactly how to report these
 	// results in a useful and convenient way, and also how to emulate
@@ -101,7 +101,7 @@ func (slice bulkErrorCases) Swap(i, j int)      { slice[i], slice[j] = slice[j],
 // BulkErrorCase holds an individual error found while attempting a single change
 // within a bulk operation, and the position in which it was enqueued.
 //
-// MongoDB servers older than version 2.6 do not have proper support for bulk
+// MerizoDB servers older than version 2.6 do not have proper support for bulk
 // operations, so the driver attempts to map its API as much as possible into
 // the functionality that works. In particular, only the last error is reported
 // for bulk inserts and without any positional information, so the Index
@@ -113,7 +113,7 @@ type BulkErrorCase struct {
 
 // Cases returns all individual errors found while attempting the requested changes.
 //
-// See the documentation of BulkErrorCase for limitations in older MongoDB releases.
+// See the documentation of BulkErrorCase for limitations in older MerizoDB releases.
 func (e *BulkError) Cases() []BulkErrorCase {
 	return e.ecases
 }
@@ -269,7 +269,7 @@ func (b *Bulk) Upsert(pairs ...interface{}) {
 //
 // If an error is reported on an unordered bulk operation, the error value may
 // be an aggregation of all issues observed. As an exception to that, Insert
-// operations running on MongoDB versions prior to 2.6 will report the last
+// operations running on MerizoDB versions prior to 2.6 will report the last
 // error only due to a limitation in the wire protocol.
 func (b *Bulk) Run() (*BulkResult, error) {
 	var result BulkResult

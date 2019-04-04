@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -40,7 +40,7 @@ func GetBareSessionProvider() (*db.SessionProvider, *options.ToolOptions, error)
 	// get ToolOptions from URI or defaults
 	if uri := os.Getenv("TOOLS_TESTING_MONGOD"); uri != "" {
 		fakeArgs := []string{"--uri=" + uri}
-		toolOptions = options.New("mongodump", "", options.EnabledOptions{URI: true})
+		toolOptions = options.New("merizodump", "", options.EnabledOptions{URI: true})
 		toolOptions.URI.AddKnownURIParameters(options.KnownURIOptionsReadPreference)
 		_, err := toolOptions.ParseArgs(fakeArgs)
 		if err != nil {

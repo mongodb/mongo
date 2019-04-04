@@ -1,11 +1,11 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package mongofiles provides an interface to GridFS collections in a MongoDB instance.
-package mongofiles
+// Package merizofiles provides an interface to GridFS collections in a MerizoDB instance.
+package merizofiles
 
 import (
 	"fmt"
@@ -14,17 +14,17 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/bsonutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
-// List of possible commands for mongofiles.
+// List of possible commands for merizofiles.
 const (
 	List     = "list"
 	Search   = "search"
@@ -37,15 +37,15 @@ const (
 )
 
 // MongoFiles is a container for the user-specified options and
-// internal state used for running mongofiles.
+// internal state used for running merizofiles.
 type MongoFiles struct {
-	// generic mongo tool options
+	// generic merizo tool options
 	ToolOptions *options.ToolOptions
 
-	// mongofiles-specific storage options
+	// merizofiles-specific storage options
 	StorageOptions *StorageOptions
 
-	// mongofiles-specific input options
+	// merizofiles-specific input options
 	InputOptions *InputOptions
 
 	// for connecting to the db
@@ -95,7 +95,7 @@ func (mf *MongoFiles) ValidateCommand(args []string) error {
 			return fmt.Errorf("too many positional arguments")
 		}
 		// also make sure the supporting argument isn't literally an
-		// empty string for example, mongofiles get ""
+		// empty string for example, merizofiles get ""
 		if len(args) == 1 || args[1] == "" {
 			return fmt.Errorf("'%v' argument missing", args[0])
 		}
@@ -317,7 +317,7 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (err error) {
 	return nil
 }
 
-// Run the mongofiles utility. If displayHost is true, the connected host/port is
+// Run the merizofiles utility. If displayHost is true, the connected host/port is
 // displayed.
 func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 	connUrl := mf.ToolOptions.Host
@@ -389,7 +389,7 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 
 	var output string
 
-	log.Logvf(log.Info, "handling mongofiles '%v' command...", mf.Command)
+	log.Logvf(log.Info, "handling merizofiles '%v' command...", mf.Command)
 
 	switch mf.Command {
 

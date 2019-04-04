@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,9 +33,9 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/jsobj.h"
+#include "merizo/db/jsobj.h"
 
-namespace mongo {
+namespace merizo {
 
 class StringData;
 
@@ -127,7 +127,7 @@ public:
      */
     IndexSpec& expireAfterSeconds(int value);
 
-    /** Explicitly request an index of the given version. As of MongoDB 2.6, the only accepted
+    /** Explicitly request an index of the given version. As of MerizoDB 2.6, the only accepted
      *  values are 0 or 1. Versions 2.0 and later default to '1'. Do not set this option except
      *  in unusual circumstances.
      */
@@ -147,8 +147,8 @@ public:
     /** Sets the name of the field containing the language override in a text index. */
     IndexSpec& textLanguageOverride(const StringData& value);
 
-    /** Sets the version of the text index to use. MongoDB 2.4 only supports version
-     *  '1'. If not otherwise specified, MongoDB 2.6 defaults to version 2.
+    /** Sets the version of the text index to use. MerizoDB 2.4 only supports version
+     *  '1'. If not otherwise specified, MerizoDB 2.6 defaults to version 2.
      */
     IndexSpec& textIndexVersion(int value);
 
@@ -157,8 +157,8 @@ public:
     // 2D Sphere Options
     //
 
-    /** Sets the version of the 2D sphere index to use. MongoDB 2.4 only supports version
-     *  '1'. If not otherwise specified, MongoDB 2.6 defaults to version 2.
+    /** Sets the version of the 2D sphere index to use. MerizoDB 2.4 only supports version
+     *  '1'. If not otherwise specified, MerizoDB 2.6 defaults to version 2.
      */
     IndexSpec& geo2DSphereIndexVersion(int value);
 
@@ -218,4 +218,4 @@ private:
     mutable BSONObjBuilder _options;
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -28,7 +28,7 @@ class CheckForConfigH(object):
             return
 
         cur_line = clean_lines.elided[line_num]
-        self.found_configh = cur_line.startswith('#include "mongo/config.h"')
+        self.found_configh = cur_line.startswith('#include "merizo/config.h"')
 
         if not self.found_configh and "MONGO_CONFIG_" in cur_line:
             error(filename, line_num, 'build/config_h_include', 5,
@@ -139,7 +139,7 @@ def main():
         paths.append(arg)
 
     if not paths:
-        paths.append("src/mongo/")
+        paths.append("src/merizo/")
 
     if not run_lint(paths, nudge):
         sys.exit(-1)

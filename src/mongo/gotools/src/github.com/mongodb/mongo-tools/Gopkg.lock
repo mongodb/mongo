@@ -32,7 +32,7 @@
 
 [[projects]]
   digest = "1:d9d83b3d983f3e6f78baf83e19666facd3377e81acde31f7db8a6fcd31eae009"
-  name = "github.com/3rf/mongo-lint"
+  name = "github.com/3rf/merizo-lint"
   packages = ["."]
   pruneopts = "T"
   revision = "3550fdcf1f43b89aaeabaa4559eaae6dc4407e42"
@@ -194,7 +194,7 @@
     "github.com/10gen/llmgo",
     "github.com/10gen/llmgo/bson",
     "github.com/10gen/openssl",
-    "github.com/3rf/mongo-lint",
+    "github.com/3rf/merizo-lint",
     "github.com/google/gopacket",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcap",

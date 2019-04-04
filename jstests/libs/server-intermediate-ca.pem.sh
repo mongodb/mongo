@@ -3,8 +3,8 @@
 # Run this from the base directory of the server source.
 set -ev
 
-PREFIX="/C=US/ST=New York/L=New York City/O=MongoDB/OU=Kernel"
-OPENSSL="/opt/mongodbtoolchain/v3/bin/openssl"
+PREFIX="/C=US/ST=New York/L=New York City/O=MerizoDB/OU=Kernel"
+OPENSSL="/opt/merizodbtoolchain/v3/bin/openssl"
 
 cd jstests/libs
 

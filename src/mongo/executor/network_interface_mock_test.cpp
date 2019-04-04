@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <iostream>
 #include <memory>
 #include <utility>
 
-#include "mongo/base/status.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/test_network_connection_hook.h"
-#include "mongo/executor/thread_pool_mock.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/status.h"
+#include "merizo/executor/network_connection_hook.h"
+#include "merizo/executor/network_interface.h"
+#include "merizo/executor/network_interface_mock.h"
+#include "merizo/executor/test_network_connection_hook.h"
+#include "merizo/executor/thread_pool_mock.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace executor {
 namespace {
 
-class NetworkInterfaceMockTest : public mongo::unittest::Test {
+class NetworkInterfaceMockTest : public merizo::unittest::Test {
 public:
     NetworkInterfaceMockTest()
         : _net{}, _executor(&_net, 1, ThreadPoolMock::Options()), _tearDownCalled(false) {}
@@ -484,4 +484,4 @@ TEST_F(NetworkInterfaceMockTest, CommandTimeout) {
 
 }  // namespace
 }  // namespace executor
-}  // namespace mongo
+}  // namespace merizo

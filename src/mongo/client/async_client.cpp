@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/async_client.h"
+#include "merizo/client/async_client.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/authenticate.h"
-#include "mongo/config.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/executor/egress_tag_closer_manager.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/legacy_request_builder.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/reply_interface.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/version.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/config.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/executor/egress_tag_closer_manager.h"
+#include "merizo/rpc/factory.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/legacy_request_builder.h"
+#include "merizo/rpc/metadata/client_metadata.h"
+#include "merizo/rpc/reply_interface.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/version.h"
 
-namespace mongo {
+namespace merizo {
 
 Future<AsyncDBClient::Handle> AsyncDBClient::connect(const HostAndPort& peer,
                                                      transport::ConnectSSLMode sslMode,
@@ -76,7 +76,7 @@ BSONObj AsyncDBClient::_buildIsMasterRequest(const std::string& appName,
 
     if (getTestCommandsEnabled()) {
         // Only include the host:port of this process in the isMaster command request if test
-        // commands are enabled. mongobridge uses this field to identify the process opening a
+        // commands are enabled. merizobridge uses this field to identify the process opening a
         // connection to it.
         StringBuilder sb;
         sb << getHostNameCached() << ':' << serverGlobalParams.port;
@@ -264,4 +264,4 @@ const HostAndPort& AsyncDBClient::local() const {
     return _session->local();
 }
 
-}  // namespace mongo
+}  // namespace merizo

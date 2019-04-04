@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,16 +31,16 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/client/read_preference.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/s/query/cluster_client_cursor_params.h"
-#include "mongo/s/query/cluster_query_result.h"
-#include "mongo/s/query/router_exec_stage.h"
-#include "mongo/util/time_support.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/s/query/cluster_client_cursor_params.h"
+#include "merizo/s/query/cluster_query_result.h"
+#include "merizo/s/query/router_exec_stage.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 template <typename T>
@@ -53,7 +53,7 @@ class StatusWith;
  * all command results, getMores must be issued against each of the remote cursors until they
  * are exhausted.
  *
- * Results are generated using a pipeline of mongoS query execution stages called RouterExecStage.
+ * Results are generated using a pipeline of merizoS query execution stages called RouterExecStage.
  *
  * Does not throw exceptions.
  */
@@ -139,7 +139,7 @@ public:
      * next().
      *
      * Queued documents are returned in FIFO order. The queued results are exhausted before
-     * generating further results from the underlying mongos query stages.
+     * generating further results from the underlying merizos query stages.
      *
      * 'obj' must be owned BSON.
      */
@@ -228,4 +228,4 @@ private:
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();
 };
 
-}  // namespace mongo
+}  // namespace merizo

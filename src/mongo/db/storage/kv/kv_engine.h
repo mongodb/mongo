@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,15 +33,15 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/storage_engine.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/storage/kv/kv_prefix.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/db/storage/storage_engine.h"
 
-namespace mongo {
+namespace merizo {
 
 class IndexDescriptor;
 class JournalListener;
@@ -124,7 +124,7 @@ public:
                                                                   StringData ident) = 0;
 
     /**
-     * Create a RecordStore that MongoDB considers eligible to share space in an underlying table
+     * Create a RecordStore that MerizoDB considers eligible to share space in an underlying table
      * with other RecordStores. 'prefix' is guaranteed to be 'KVPrefix::kNotPrefixed' when
      * 'groupCollections' is not enabled.
      *
@@ -148,7 +148,7 @@ public:
                                              const IndexDescriptor* desc) = 0;
 
     /**
-     * Create a SortedDataInterface that MongoDB considers eligible to share space in an
+     * Create a SortedDataInterface that MerizoDB considers eligible to share space in an
      * underlying table with other SortedDataInterfaces. 'prefix' is guaranteed to be
      * 'KVPrefix::kNotPrefixed' when 'groupCollections' is not enabled.
      *
@@ -265,7 +265,7 @@ public:
     /**
      * Returns true if storage engine supports --directoryperdb.
      * See:
-     *     http://docs.mongodb.org/manual/reference/program/mongod/#cmdoption--directoryperdb
+     *     http://docs.merizodb.org/manual/reference/program/merizod/#cmdoption--directoryperdb
      */
     virtual bool supportsDirectoryPerDB() const = 0;
 
@@ -284,7 +284,7 @@ public:
     /**
      * This method will be called before there is a clean shutdown.  Storage engines should
      * override this method if they have clean-up to do that is different from unclean shutdown.
-     * MongoDB will not call into the storage subsystem after calling this function.
+     * MerizoDB will not call into the storage subsystem after calling this function.
      *
      * There is intentionally no uncleanShutdown().
      */
@@ -420,7 +420,7 @@ public:
     }
 
     /**
-     * The destructor will never be called from mongod, but may be called from tests.
+     * The destructor will never be called from merizod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if
      * cleanShutdown() hasn't been called.
      */

@@ -28,7 +28,7 @@
             {sslMode: 'allowSSL', sslPEMKeyFile: 'jstests/libs/' + prefix + 'server.pem'});
 
         let argv = [
-            './mongo',
+            './merizo',
             '--ssl',
             '--port',
             conn.port,

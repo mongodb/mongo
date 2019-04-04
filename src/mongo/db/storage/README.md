@@ -1,16 +1,16 @@
 Storage Engine API
 ==================
 
-The purpose of the Storage Engine API is to allow for pluggable storage engines in MongoDB (refer
+The purpose of the Storage Engine API is to allow for pluggable storage engines in MerizoDB (refer
 to the [Storage FAQ][]). This document gives a brief overview of the API, and provides pointers
 to places with more detailed documentation. Where referencing code, links are to the version that
 was current at the time when the reference was made. Always compare with the latest version for
 changes not yet reflected here.  For questions on the API that are not addressed by this material,
-use the [mongodb-dev][] Google group. Everybody involved in the Storage Engine API will read your
+use the [merizodb-dev][] Google group. Everybody involved in the Storage Engine API will read your
 post.
 
 Third-party storage engines are integrated through self-contained modules that can be dropped into
-an existing MongoDB source tree, and will be automatically configured and included. A typical
+an existing MerizoDB source tree, and will be automatically configured and included. A typical
 module would at least have the following files:
 
     src/             Directory with the actual source files
@@ -18,7 +18,7 @@ module would at least have the following files:
     SConscript       Scons build rules
     build.py         Module configuration script
 
-See <https://github.com/mongodb-partners/mongo-rocks> for a good example of the structure.
+See <https://github.com/merizodb-partners/merizo-rocks> for a good example of the structure.
 
 
 Concepts
@@ -26,7 +26,7 @@ Concepts
 
 ### Record Stores
 A database contains one or more collections, each with a number of indexes, and a catalog listing
-them. All MongoDB collections are implemented with record stores: one for the documents themselves,
+them. All MerizoDB collections are implemented with record stores: one for the documents themselves,
 and one for each index. By using the KVEngine class, you only have to deal with the abstraction, as
 the KVStorageEngine implements the StorageEngine interface, using record stores for catalogs and
 indexes.
@@ -43,15 +43,15 @@ Currently all cloning, [initial sync][] and other operations are done in terms o
 individual documents, though there is a BulkBuilder class for more efficiently building indexes.
 
 ### Locking and Concurrency
-MongoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all cases, this will
+MerizoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all cases, this will
 ensure that operations to meta-data, such as creation and deletion of record stores, are serialized
 with respect to other accesses. Storage engines can choose to support document-level concurrency,
 in which case the storage engine is responsible for any additional synchronization necessary. For
-storage engines not supporting document-level concurrency, MongoDB will use shared/exclusive locks
+storage engines not supporting document-level concurrency, MerizoDB will use shared/exclusive locks
 at the collection level, so all record store accesses will be serialized.
 
-MongoDB uses [two-phase locking][] (2PL) to guarantee serializability of accesses to resources it
-manages. For storage engines that support document level concurrency, MongoDB will only use intent
+MerizoDB uses [two-phase locking][] (2PL) to guarantee serializability of accesses to resources it
+manages. For storage engines that support document level concurrency, MerizoDB will only use intent
 locks for the most common operations, leaving synchronization at the record store layer up to the
 storage engine.
 
@@ -95,7 +95,7 @@ storage engine may wait for durability at commit time.
 Systems with optimistic concurrency control (OCC) or multi-version concurrency control (MVCC) may
 find that a transaction conflicts with other transactions, that executing an operation would result
 in deadlock or violate other resource constraints. In such cases the storage engine may throw a
-WriteConflictException to signal the transient failure. MongoDB will handle the exception, abort
+WriteConflictException to signal the transient failure. MerizoDB will handle the exception, abort
 and restart the transaction.
 
 ### Point-in-time snapshot reads
@@ -123,9 +123,9 @@ details.
 * [ServerParameter](../server_parameters.h)
 
 
-[Concurrency FAQ]: http://docs.mongodb.org/manual/faq/concurrency/
-[initial sync]: http://docs.mongodb.org/manual/core/replica-set-sync/#replica-set-initial-sync
-[mongodb-dev]: https://groups.google.com/forum/#!forum/mongodb-dev
-[replica set]: http://docs.mongodb.org/manual/replication/
-[Storage FAQ]: http://docs.mongodb.org/manual/faq/storage
+[Concurrency FAQ]: http://docs.merizodb.org/manual/faq/concurrency/
+[initial sync]: http://docs.merizodb.org/manual/core/replica-set-sync/#replica-set-initial-sync
+[merizodb-dev]: https://groups.google.com/forum/#!forum/merizodb-dev
+[replica set]: http://docs.merizodb.org/manual/replication/
+[Storage FAQ]: http://docs.merizodb.org/manual/faq/storage
 [two-phase locking]: http://en.wikipedia.org/wiki/Two-phase_locking

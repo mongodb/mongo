@@ -48,11 +48,11 @@ for (i = 0; i < 100; i++) {
 
 (function() {
     var validateResult = assert.commandWorked(db.getCollection("test_db").validate());
-    // Extract validation results from mongos output if running in a sharded context.
+    // Extract validation results from merizos output if running in a sharded context.
     var isShardedNS = validateResult.hasOwnProperty('raw');
 
     if (isShardedNS) {
-        // Sample mongos format:
+        // Sample merizos format:
         // {
         //   raw: {
         //     "localhost:30000": {

@@ -10,7 +10,7 @@ import time
 def main():
     """Main Method."""
 
-    parser = argparse.ArgumentParser(description='MongoDB Mock Config Expandsion EXEC Endpoint.')
+    parser = argparse.ArgumentParser(description='MerizoDB Mock Config Expandsion EXEC Endpoint.')
     parser.add_argument('-s', '--sleep', type=int, default=0, help="Add artificial delay for timeout testing")
     parser.add_argument('value', type=str, help="Content to reflect to stdout")
 

@@ -2,7 +2,7 @@
 (function() {
     'use strict';
 
-    const st = new ShardingTest({shards: 2, mongos: 1});
+    const st = new ShardingTest({shards: 2, merizos: 1});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard1.shardName);

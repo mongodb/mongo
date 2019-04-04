@@ -4,7 +4,7 @@
 # Copyright (C) 2004 by the Icecream Authors
 # GPL
 #
-# NOTE: This file includes modifications made by MongoDB
+# NOTE: This file includes modifications made by MerizoDB
 
 target_files=
 
@@ -340,9 +340,9 @@ if test -f /etc/ld.so.conf; then
     echo "$directive $path"
   done </etc/ld.so.conf >$tmp_ld_so_conf
 
-  # Hack to make mongodbtoolchain clang work.
-  echo '/opt/mongodbtoolchain/v3/lib' >> $tmp_ld_so_conf
-  echo '/opt/mongodbtoolchain/v3/lib64' >> $tmp_ld_so_conf
+  # Hack to make merizodbtoolchain clang work.
+  echo '/opt/merizodbtoolchain/v3/lib' >> $tmp_ld_so_conf
+  echo '/opt/merizodbtoolchain/v3/lib64' >> $tmp_ld_so_conf
 
   # Work around new directory layout for clang in ubuntu >= 16.10
   if [ -n "$clangprefix" ]; then

@@ -1,10 +1,10 @@
 
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,7 +30,7 @@
 
 #include <initializer_list>
 
-#include "mongo/base/string_data.h"
+#include "merizo/base/string_data.h"
 
 // NOTE: You almost certainly don't want to include this file directly. Instead, access this
 // information via the VersionInfoInterface singleton. To enforce this restriction we only allow
@@ -38,20 +38,20 @@
 // file is only ever included in .cpp files, it makes some sense to use an unnamed namespace here.
 
 #ifndef MONGO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
-#error "Cannot include mongo/util/version_constants.h"
+#error "Cannot include merizo/util/version_constants.h"
 #endif
 
-namespace mongo {
+namespace merizo {
 namespace version {
 namespace {
 
-constexpr auto kVersion = "@mongo_version@"_sd;
-constexpr int kMajorVersion = @mongo_version_major@;
-constexpr int kMinorVersion = @mongo_version_minor@;
-constexpr int kPatchVersion = @mongo_version_patch@;
-constexpr int kExtraVersion = @mongo_version_extra@;
-constexpr auto kVersionExtraStr = "@mongo_version_extra_str@"_sd;
-constexpr auto kGitVersion = "@mongo_git_hash@"_sd;
+constexpr auto kVersion = "@merizo_version@"_sd;
+constexpr int kMajorVersion = @merizo_version_major@;
+constexpr int kMinorVersion = @merizo_version_minor@;
+constexpr int kPatchVersion = @merizo_version_patch@;
+constexpr int kExtraVersion = @merizo_version_extra@;
+constexpr auto kVersionExtraStr = "@merizo_version_extra_str@"_sd;
+constexpr auto kGitVersion = "@merizo_git_hash@"_sd;
 constexpr auto kAllocator = "@buildinfo_allocator@"_sd;
 constexpr auto kJsEngine = "@buildinfo_js_engine@"_sd;
 
@@ -62,4 +62,4 @@ const std::initializer_list<VersionInfoInterface::BuildInfoTuple> kBuildEnvironm
 
 }  // namespace
 }  // namespace version
-}  // namespace mongo
+}  // namespace merizo

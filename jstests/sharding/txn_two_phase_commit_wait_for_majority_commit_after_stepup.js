@@ -21,7 +21,7 @@
         config: numCoordinatorNodes,  // number of replica set *nodes* in *config shard*
         causallyConsistent: true,
         other: {
-            mongosOptions: {
+            merizosOptions: {
                 // This failpoint is needed because it is not yet possible to step down a node
                 // with a prepared transaction.
                 setParameter:

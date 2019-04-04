@@ -11,8 +11,8 @@ if (db1.getDB("admin").serverBuildInfo().OpenSSLVersion) {
 for (var i in ports) {
     var port = ports[i]
     var server = "localhost:" + port
-    var mongo = new Mongo("localhost:" + port)
-    var admin = mongo.getDB("admin")
+    var merizo = new Mongo("localhost:" + port)
+    var admin = merizo.getDB("admin")
 
     for (var j in auth) {
         if (auth[j] == port) {
@@ -22,7 +22,7 @@ for (var i in ports) {
                         return;
                 }
                 if (typeof admin.dropUser == "function") {
-                    mongo.getDB(u.db).dropUser(u.user);
+                    merizo.getDB(u.db).dropUser(u.user);
                 } else {
                     admin.removeUser(u.user);
                 }
@@ -54,7 +54,7 @@ for (var i in ports) {
         case "config":
             break
         default:
-            mongo.getDB(db.name).dropDatabase()
+            merizo.getDB(db.name).dropDatabase()
         }
     }
 }

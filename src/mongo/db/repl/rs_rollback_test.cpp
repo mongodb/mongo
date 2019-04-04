@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,45 +27,45 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <initializer_list>
 #include <utility>
 
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/drop_indexes.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer_noop.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_interface.h"
-#include "mongo/db/repl/oplog_interface_mock.h"
-#include "mongo/db/repl/rollback_source.h"
-#include "mongo/db/repl/rollback_test_fixture.h"
-#include "mongo/db/repl/rs_rollback.h"
-#include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/drop_indexes.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer_noop.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_interface.h"
+#include "merizo/db/repl/oplog_interface_mock.h"
+#include "merizo/db/repl/rollback_source.h"
+#include "merizo/db/repl/rollback_test_fixture.h"
+#include "merizo/db/repl/rs_rollback.h"
+#include "merizo/db/s/shard_identity_rollback_notifier.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/net/hostandport.h"
 
 namespace {
 
-using namespace mongo;
-using namespace mongo::repl;
-using namespace mongo::repl::rollback_internal;
+using namespace merizo;
+using namespace merizo::repl;
+using namespace merizo::repl::rollback_internal;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -1569,7 +1569,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     options.uuid = UUID::gen();
     {
         AutoGetOrCreateDb autoDb(_opCtx.get(), "test", MODE_X);
-        mongo::WriteUnitOfWork wuow(_opCtx.get());
+        merizo::WriteUnitOfWork wuow(_opCtx.get());
         coll = autoDb.getDb()->getCollection(_opCtx.get(), "test.t");
         if (!coll) {
             coll = autoDb.getDb()->createCollection(_opCtx.get(), "test.t", options);

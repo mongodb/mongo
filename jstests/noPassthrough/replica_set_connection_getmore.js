@@ -1,5 +1,5 @@
 /**
- * Tests the behavior of how getMore operations are routed by the mongo shell when using a replica
+ * Tests the behavior of how getMore operations are routed by the merizo shell when using a replica
  * set connection and cursors are established on a secondary.
  * @tags: [requires_replication]
  */
@@ -17,12 +17,12 @@
     var conn = new Mongo(rst.getURL());
 
     // We force a read mode of "compatibility" so that we can test Mongo.prototype.readMode()
-    // resolves to "commands" independently of the --readMode passed to the mongo shell running this
+    // resolves to "commands" independently of the --readMode passed to the merizo shell running this
     // test.
     conn.forceReadMode("compatibility");
     assert.eq("commands",
               conn.readMode(),
-              "replica set connections created by the mongo shell should use 'commands' read mode");
+              "replica set connections created by the merizo shell should use 'commands' read mode");
     var coll = conn.getDB(dbName)[collName];
     coll.drop();
 

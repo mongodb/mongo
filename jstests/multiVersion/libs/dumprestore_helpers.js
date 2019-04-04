@@ -9,12 +9,12 @@ load('./jstests/multiVersion/libs/verify_collection_data.js');
 // {
 //     'serverSourceVersion' : "latest",
 //     'serverDestVersion' : "2.4",
-//     'mongoDumpVersion' : "2.2",
-//     'mongoRestoreVersion' : "latest",
+//     'merizoDumpVersion' : "2.2",
+//     'merizoRestoreVersion' : "latest",
 //     'dumpDir' : dumpDir,
 //     'testDbpath' : testDbpath,
-//     'dumpType' : "mongos",
-//     'restoreType' : "mongod", // "mongos" also supported
+//     'dumpType' : "merizos",
+//     'restoreType' : "merizod", // "merizos" also supported
 //     'storageEngine': [ "mmapv1" ]
 // }
 //
@@ -25,16 +25,16 @@ load('./jstests/multiVersion/libs/verify_collection_data.js');
 // The "testDbpath" is the external directory to use as the server dbpath directory.
 //
 // For the "dumpType" and "restoreType" fields, the following values are supported:
-//     - "mongod" - Do the dump or restore by connecting to a single mongod node
-//     - "mongos" - Do the dump or restore by connecting to a sharded cluster
+//     - "merizod" - Do the dump or restore by connecting to a single merizod node
+//     - "merizos" - Do the dump or restore by connecting to a sharded cluster
 //
 function multiVersionDumpRestoreTest(configObj) {
     // First sanity check the arguments in our configObj
     var requiredKeys = [
         'serverSourceVersion',
         'serverDestVersion',
-        'mongoDumpVersion',
-        'mongoRestoreVersion',
+        'merizoDumpVersion',
+        'merizoRestoreVersion',
         'dumpDir',
         'testDbpath',
         'dumpType',
@@ -51,10 +51,10 @@ function multiVersionDumpRestoreTest(configObj) {
 
     resetDbpath(configObj.dumpDir);
     resetDbpath(configObj.testDbpath);
-    if (configObj.dumpType === "mongos") {
+    if (configObj.dumpType === "merizos") {
         var shardingTestConfig = {
             name: testBaseName + "_sharded_source",
-            mongos: [{binVersion: configObj.serverSourceVersion}],
+            merizos: [{binVersion: configObj.serverSourceVersion}],
             shards: [{
                 binVersion: configObj.serverSourceVersion,
                 storageEngine: configObj.storageEngine
@@ -87,49 +87,49 @@ function multiVersionDumpRestoreTest(configObj) {
     var collValid = new CollectionDataValidator();
     collValid.recordCollectionData(sourceColl);
 
-    // Dump using the specified version of mongodump from the running mongod or mongos instance.
-    if (configObj.dumpType === "mongod") {
-        MongoRunner.runMongoTool("mongodump", {
+    // Dump using the specified version of merizodump from the running merizod or merizos instance.
+    if (configObj.dumpType === "merizod") {
+        MongoRunner.runMongoTool("merizodump", {
             out: configObj.dumpDir,
-            binVersion: configObj.mongoDumpVersion,
+            binVersion: configObj.merizoDumpVersion,
             host: serverSource.host,
             db: testBaseName
         });
         MongoRunner.stopMongod(serverSource);
-    } else { /* "mongos" */
-        MongoRunner.runMongoTool("mongodump", {
+    } else { /* "merizos" */
+        MongoRunner.runMongoTool("merizodump", {
             out: configObj.dumpDir,
-            binVersion: configObj.mongoDumpVersion,
+            binVersion: configObj.merizoDumpVersion,
             host: serverSource.host,
             db: testBaseName
         });
         shardingTest.stop();
     }
 
-    // Restore using the specified version of mongorestore
-    if (configObj.restoreType === "mongod") {
+    // Restore using the specified version of merizorestore
+    if (configObj.restoreType === "merizod") {
         var serverDest = MongoRunner.runMongod(
             {binVersion: configObj.serverDestVersion, storageEngine: configObj.storageEngine});
 
-        MongoRunner.runMongoTool("mongorestore", {
+        MongoRunner.runMongoTool("merizorestore", {
             dir: configObj.dumpDir + "/" + testBaseName,
-            binVersion: configObj.mongoRestoreVersion,
+            binVersion: configObj.merizoRestoreVersion,
             host: serverDest.host,
             db: testBaseName
         });
-    } else { /* "mongos" */
+    } else { /* "merizos" */
         var shardingTestConfig = {
             name: testBaseName + "_sharded_dest",
-            mongos: [{binVersion: configObj.serverDestVersion}],
+            merizos: [{binVersion: configObj.serverDestVersion}],
             shards:
                 [{binVersion: configObj.serverDestVersion, storageEngine: configObj.storageEngine}],
             config: [{binVersion: configObj.serverDestVersion}]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         serverDest = shardingTest.s;
-        MongoRunner.runMongoTool("mongorestore", {
+        MongoRunner.runMongoTool("merizorestore", {
             dir: configObj.dumpDir + "/" + testBaseName,
-            binVersion: configObj.mongoRestoreVersion,
+            binVersion: configObj.merizoRestoreVersion,
             host: serverDest.host,
             db: testBaseName
         });
@@ -149,7 +149,7 @@ function multiVersionDumpRestoreTest(configObj) {
 
     let destDbVersion = destDB.version();
 
-    // The mongorestore tool removes the "v" field when creating indexes from a dump. This allows
+    // The merizorestore tool removes the "v" field when creating indexes from a dump. This allows
     // indexes to be built with the latest supported index version. We therefore remove the "v"
     // field when comparing whether the indexes we built are equivalent.
     const options = {indexSpecFieldsToSkip: ["v"]};
@@ -158,7 +158,7 @@ function multiVersionDumpRestoreTest(configObj) {
     assert(collValid.validateCollectionData(destColl, destDbVersion, options));
     assert(cappedCollValid.validateCollectionData(destCollCapped, destDbVersion, options));
 
-    if (configObj.restoreType === "mongos") {
+    if (configObj.restoreType === "merizos") {
         shardingTest.stop();
     } else {
         MongoRunner.stopMongod(serverDest);
@@ -240,12 +240,12 @@ function getPermutationIterator(permsObj) {
 // {
 //     'serverSourceVersion' : [ "latest", "2.4" ],
 //     'serverDestVersion' :[ "latest", "2.4" ],
-//     'mongoDumpVersion' :[ "latest", "2.4" ],
-//     'mongoRestoreVersion' :[ "latest", "2.4" ],
+//     'merizoDumpVersion' :[ "latest", "2.4" ],
+//     'merizoRestoreVersion' :[ "latest", "2.4" ],
 //     'dumpDir' : [ dumpDir ],
 //     'testDbpath' : [ testDbpath ],
-//     'dumpType' : [ "mongod", "mongos" ],
-//     'restoreType' : [ "mongod", "mongos" ],
+//     'dumpType' : [ "merizod", "merizos" ],
+//     'restoreType' : [ "merizod", "merizos" ],
 //     'storageEngine': [ "mmapv1" ]
 // }
 //
@@ -255,7 +255,7 @@ function runAllDumpRestoreTests(testCasePermutations) {
     var testCaseCursor = getPermutationIterator(testCasePermutations);
     while (testCaseCursor.hasNext()) {
         var testCase = testCaseCursor.next();
-        print("Running multiversion mongodump mongorestore test:");
+        print("Running multiversion merizodump merizorestore test:");
         printjson(testCase);
         multiVersionDumpRestoreTest(testCase);
     }

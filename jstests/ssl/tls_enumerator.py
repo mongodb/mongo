@@ -32,7 +32,7 @@ def enumerate_tls_ciphers(protocol_options, host, port, cert, cafile):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='MongoDB TLS Cipher Suite Enumerator')
+    parser = argparse.ArgumentParser(description='MerizoDB TLS Cipher Suite Enumerator')
     parser.add_argument('--port', type=int, default=27017, help='Port to connect to')
     parser.add_argument('-o', '--outfile', type=str, default='ciphers.json', help='file to write the output to')
     parser.add_argument('--host', type=str, default='localhost', help='host to connect to')

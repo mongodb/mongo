@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/db/query/planner_analysis.h"
+#include "merizo/db/query/planner_analysis.h"
 
 #include <set>
 #include <vector>
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/s2_common.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/index/expression_params.h"
+#include "merizo/db/index/s2_common.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/expression_geo.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::endl;
 using std::string;
 using std::vector;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 //
 // Helpers for bounds explosion AKA quick-and-dirty SERVER-1205.
@@ -432,7 +432,7 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
     BSONObjIterator kpIt(indexKeyPattern);
     while (kpIt.more()) {
         BSONElement elt = kpIt.next();
-        if (elt.type() == mongo::String) {
+        if (elt.type() == merizo::String) {
             break;
         }
         // The canonical check as to whether a key pattern element is "ascending" or "descending" is
@@ -837,4 +837,4 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     return soln;
 }
 
-}  // namespace mongo
+}  // namespace merizo

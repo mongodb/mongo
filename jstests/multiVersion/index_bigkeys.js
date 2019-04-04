@@ -1,12 +1,12 @@
 /**
  * Test interactions with big keys in different versions:
- * 1. MongoDB 4.2 (FCV 4.0) and MongoDB 4.0 allow reading and deleting long (unique) index keys but
+ * 1. MerizoDB 4.2 (FCV 4.0) and MerizoDB 4.0 allow reading and deleting long (unique) index keys but
  * does not allow inserting or updating long (unique) index keys.
- * 2. MongoDB 4.2 (FCV 4.2) allows inserting, reading, deleting and updating long (unique) index
+ * 2. MerizoDB 4.2 (FCV 4.2) allows inserting, reading, deleting and updating long (unique) index
  * keys.
- * 3. MongoDB 4.2 could successfully validate index consistency after reindex() if 4.0 intentionally
+ * 3. MerizoDB 4.2 could successfully validate index consistency after reindex() if 4.0 intentionally
  * missed out long index keys by setting 'failIndexKeyTooLong' to false.
- * 4. MongoDB 4.0 could successfully validate index consistency after drop() if 4.2 inserted long
+ * 4. MerizoDB 4.0 could successfully validate index consistency after drop() if 4.2 inserted long
  * index keys (with < 127 bytes typebits).
  *
  * TODO SERVER-36385: Remove this test in 4.4

@@ -1,4 +1,4 @@
-The MongoDB driver for Go
+The MerizoDB driver for Go
 -------------------------
 
 Please go to [http://labix.org/mgo](http://labix.org/mgo) for all project details.
@@ -7,9 +7,9 @@ Please go to [http://labix.org/mgo](http://labix.org/mgo) for all project detail
 
 Tests require custom orchestration.  Install
 [daemontools](https://cr.yp.to/daemontools.html) as a prerequisite and make
-sure mongod and mongos are in your path.  To start the orchestration:
+sure merizod and merizos are in your path.  To start the orchestration:
 
-    $ export PATH=/path/to/mongodb/bin:$PATH
+    $ export PATH=/path/to/merizodb/bin:$PATH
     $ make startdb
 
 To stop the orchestration:

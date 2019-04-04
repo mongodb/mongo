@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/logical_session_cache_impl.h"
+#include "merizo/db/logical_session_cache_impl.h"
 
-#include "mongo/db/logical_session_cache_impl_gen.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/log.h"
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/logical_session_cache_impl_gen.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/logical_session_id_helpers.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/s/operation_sharding_state.h"
+#include "merizo/db/service_context.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/util/duration.h"
+#include "merizo/util/log.h"
+#include "merizo/util/periodic_runner.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -466,4 +466,4 @@ boost::optional<LogicalSessionRecord> LogicalSessionCacheImpl::peekCached(
     }
     return it->second;
 }
-}  // namespace mongo
+}  // namespace merizo

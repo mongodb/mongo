@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2019 MongoDB, Inc.
+# Public Domain 2014-2019 MerizoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_backup05.py
-#   Test that backups can be performed similar to MongoDB's fsyncLock.
+#   Test that backups can be performed similar to MerizoDB's fsyncLock.
 #   We assume writes are not being performed, a checkpoint is done and
 #   then we open a backup cursor to prevent log archiving and other file
 #   manipulations.  Manually copy the directory and verify it.

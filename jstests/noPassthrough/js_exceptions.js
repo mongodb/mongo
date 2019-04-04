@@ -88,7 +88,7 @@
                 code + ";\nrecurser(0," + depth + "," + tojson(t.callback) + ");", false, true));
             let output = rawMongoProgramOutput();
             let lines = output.split(/\s*\n/);
-            assertMatch(/MongoDB shell version/, lines.shift());
+            assertMatch(/MerizoDB shell version/, lines.shift());
             assertMatch(/^\s*$/, lines.pop());
             assertMatch(/exiting with code/, lines.pop());
             assertMatch(new RegExp("\\\[js\\\] " + t.match + "$"), lines.shift());

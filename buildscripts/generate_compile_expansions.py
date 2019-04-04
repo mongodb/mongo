@@ -78,10 +78,10 @@ def generate_scons_cache_expansions():
     """Generate scons cache expansions from some files and environment variables."""
     expansions = {}
     if sys.platform.startswith("win"):
-        system_id_path = r"c:\mongodb-build-system-id"
+        system_id_path = r"c:\merizodb-build-system-id"
         default_cache_path_base = r"z:\data\scons-cache"
     else:
-        system_id_path = "/etc/mongodb-build-system-id"
+        system_id_path = "/etc/merizodb-build-system-id"
         default_cache_path_base = "/data/scons-cache"
 
     if os.path.isfile(system_id_path):

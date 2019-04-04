@@ -33,7 +33,7 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.commandWorked(res);
             var stage = res.executionStats.executionStages;
 
-            // if explaining a write command through mongos
+            // if explaining a write command through merizos
             if (isMongos(db)) {
                 stage = stage.shards[0].executionStages;
             }
@@ -53,7 +53,7 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.commandWorked(res);
             var stage = res.executionStats.executionStages;
 
-            // if explaining a write command through mongos
+            // if explaining a write command through merizos
             if (isMongos(db)) {
                 stage = stage.shards[0].executionStages;
             }

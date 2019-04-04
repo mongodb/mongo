@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,14 +28,14 @@
  */
 #pragma once
 
-#include "mongo/db/storage/biggie/store.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/sorted_data_interface.h"
+#include "merizo/db/storage/biggie/store.h"
+#include "merizo/db/storage/key_string.h"
+#include "merizo/db/storage/sorted_data_interface.h"
 
-namespace mongo {
+namespace merizo {
 namespace biggie {
 
-class SortedDataBuilderInterface : public ::mongo::SortedDataBuilderInterface {
+class SortedDataBuilderInterface : public ::merizo::SortedDataBuilderInterface {
 public:
     SortedDataBuilderInterface(OperationContext* opCtx,
                                bool unique,
@@ -70,7 +70,7 @@ private:
     int64_t _lastRID;
 };
 
-class SortedDataInterface : public ::mongo::SortedDataInterface {
+class SortedDataInterface : public ::merizo::SortedDataInterface {
 public:
     // Truncate is not required at the time of writing but will be when the truncate command is
     // created
@@ -96,14 +96,14 @@ public:
                                    double scale) const override;
     virtual long long getSpaceUsedBytes(OperationContext* opCtx) const override;
     virtual bool isEmpty(OperationContext* opCtx) override;
-    virtual std::unique_ptr<mongo::SortedDataInterface::Cursor> newCursor(
+    virtual std::unique_ptr<merizo::SortedDataInterface::Cursor> newCursor(
         OperationContext* opCtx, bool isForward = true) const override;
     virtual Status initAsEmpty(OperationContext* opCtx) override;
 
     /*
      * This is the cursor class required by the sorted data interface.
      */
-    class Cursor final : public ::mongo::SortedDataInterface::Cursor {
+    class Cursor final : public ::merizo::SortedDataInterface::Cursor {
     public:
         // All the following public functions just implement the interface.
         Cursor(OperationContext* opCtx,
@@ -200,4 +200,4 @@ private:
     bool _isPartial;
 };
 }  // namespace biggie
-}  // namespace mongo
+}  // namespace merizo

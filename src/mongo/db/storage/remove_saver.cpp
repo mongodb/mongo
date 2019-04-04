@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/remove_saver.h"
+#include "merizo/db/storage/remove_saver.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/encryption_hooks.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/util/errno_util.h"
-#include "mongo/util/log.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/encryption_hooks.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/util/errno_util.h"
+#include "merizo/util/log.h"
 
 
 using std::ios_base;
@@ -48,7 +48,7 @@ using std::ofstream;
 using std::stringstream;
 using std::string;
 
-namespace mongo {
+namespace merizo {
 
 RemoveSaver::RemoveSaver(const string& a, const string& b, const string& why) {
     static int NUM = 0;
@@ -175,4 +175,4 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,5 +1,5 @@
 /**
- * Tests for the write assertion functions in mongo/shell/assert.js.
+ * Tests for the write assertion functions in merizo/shell/assert.js.
  *
  * @tags: [requires_replication]
  */
@@ -17,7 +17,7 @@ load("jstests/libs/write_concern_util.js");
 
     const conn = replTest.getPrimary();
     const db = conn.getDB("writeAssertions");
-    assert.neq(null, conn, "mongodb was unable to start up");
+    assert.neq(null, conn, "merizodb was unable to start up");
     const tests = [];
 
     function setup() {

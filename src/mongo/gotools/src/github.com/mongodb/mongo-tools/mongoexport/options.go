@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoexport
+package merizoexport
 
 import (
 	"fmt"
@@ -13,9 +13,9 @@ import (
 
 var Usage = `<options>
 
-Export data from MongoDB in CSV or JSON format.
+Export data from MerizoDB in CSV or JSON format.
 
-See http://docs.mongodb.org/manual/reference/program/mongoexport/ for more information.`
+See http://docs.merizodb.org/manual/reference/program/merizoexport/ for more information.`
 
 // OutputFormatOptions defines the set of options to use in formatting exported data.
 type OutputFormatOptions struct {

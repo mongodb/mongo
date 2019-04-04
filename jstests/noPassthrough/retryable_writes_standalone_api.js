@@ -1,5 +1,5 @@
 /*
- * Verify behavior of retryable write commands on a standalone mongod.
+ * Verify behavior of retryable write commands on a standalone merizod.
  */
 (function() {
     "use strict";
@@ -19,7 +19,7 @@
         testDB.runCommand(
             {insert: "foo", documents: [{x: 1}], txnNumber: NumberLong(1), lsid: {id: UUID()}}),
         ErrorCodes.IllegalOperation,
-        "expected command with transaction number to fail on standalone mongod");
+        "expected command with transaction number to fail on standalone merizod");
 
     MongoRunner.stopMongod(standalone);
 }());

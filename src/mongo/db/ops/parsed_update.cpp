@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/ops/parsed_update.h"
+#include "merizo/db/ops/parsed_update.h"
 
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/server_options.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/db/server_options.h"
 
-namespace mongo {
+namespace merizo {
 
 ParsedUpdate::ParsedUpdate(OperationContext* opCtx, const UpdateRequest* request)
     : _opCtx(opCtx),
@@ -221,4 +221,4 @@ void ParsedUpdate::setCollator(std::unique_ptr<CollatorInterface> collator) {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

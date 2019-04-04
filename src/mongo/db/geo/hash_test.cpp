@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,7 +28,7 @@
  */
 
 /**
- * This file contains tests for mongo/db/geo/hash.cpp.
+ * This file contains tests for merizo/db/geo/hash.cpp.
  */
 
 #include <algorithm>  // For max()
@@ -38,16 +38,16 @@
 #include <sstream>
 #include <string>
 
-#include "mongo/db/geo/hash.h"
-#include "mongo/db/geo/shapes.h"
-#include "mongo/platform/random.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/geo/hash.h"
+#include "merizo/db/geo/shapes.h"
+#include "merizo/platform/random.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 
 using std::cout;
 using std::endl;
@@ -61,7 +61,7 @@ TEST(GeoHash, MakeZeroHash) {
 
 static string makeRandomBitString(int length) {
     stringstream ss;
-    mongo::PseudoRandom random(31337);
+    merizo::PseudoRandom random(31337);
     for (int i = 0; i < length; ++i) {
         if (random.nextInt32() & 1) {
             ss << "1";
@@ -122,12 +122,12 @@ static GeoHash makeHash(const string& a) {
 
 TEST(GeoHash, MakeTooLongHash) {
     string a = makeRandomBitString(100);
-    ASSERT_THROWS(makeHash(a), mongo::AssertionException);
+    ASSERT_THROWS(makeHash(a), merizo::AssertionException);
 }
 
 TEST(GeoHash, MakeOddHash) {
     string a = makeRandomBitString(13);
-    ASSERT_THROWS(makeHash(a), mongo::AssertionException);
+    ASSERT_THROWS(makeHash(a), merizo::AssertionException);
 }
 
 TEST(GeoHash, UnhashFastMatchesUnhashSlow) {
@@ -430,9 +430,9 @@ TEST(GeoHashConverter, GeoHashBox) {
     GeoHashConverter converter(params);
 
     // Without expanding the box, the following point is not contained by its GeoHash box.
-    mongo::Point p(-7201198.6497758823, -0.1);
-    mongo::GeoHash hash = converter.hash(p);
-    mongo::Box box = converter.unhashToBoxCovering(hash);
+    merizo::Point p(-7201198.6497758823, -0.1);
+    merizo::GeoHash hash = converter.hash(p);
+    merizo::Box box = converter.unhashToBoxCovering(hash);
     ASSERT(box.inside(p));
 }
 

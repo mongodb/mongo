@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,13 +31,13 @@
 #include <stack>
 #include <string>
 
-#include "mongo/idl/idl_parser.h"
+#include "merizo/idl/idl_parser.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/command_generic_argument.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 /**
@@ -226,7 +226,7 @@ void IDLParserErrorContext::throwBadEnumValue(StringData enumValue) const {
 
 NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbName,
                                                                  const BSONElement& element) {
-    const bool isUUID = (element.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
+    const bool isUUID = (element.canonicalType() == canonicalizeBSONType(merizo::BinData) &&
                          element.binDataType() == BinDataType::newUUID);
     uassert(ErrorCodes::BadValue,
             str::stream() << "Collection name must be provided. UUID is not valid in this "
@@ -234,7 +234,7 @@ NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbNa
             !isUUID);
     uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(element.type()),
-            element.canonicalType() == canonicalizeBSONType(mongo::String));
+            element.canonicalType() == canonicalizeBSONType(merizo::String));
 
     const NamespaceString nss(dbName, element.valueStringData());
 
@@ -268,7 +268,7 @@ void IDLParserErrorContext::appendGenericCommandArguments(
 
         StringData name = element.fieldNameStringData();
         // Include a passthrough field as long the IDL class has not defined it.
-        if (mongo::isGenericArgument(name) &&
+        if (merizo::isGenericArgument(name) &&
             std::find(knownFields.begin(), knownFields.end(), name) == knownFields.end()) {
             builder->append(element);
         }
@@ -316,4 +316,4 @@ std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDa
 
     return output;
 }
-}  // namespace mongo
+}  // namespace merizo

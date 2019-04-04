@@ -1,6 +1,6 @@
 /**
  * Verifies that the $collStats aggregation stage includes the shard and hostname for each output
- * document when run via mongoS, and that the former is absent when run on a non-shard mongoD.
+ * document when run via merizoS, and that the former is absent when run on a non-shard merizoD.
  * @tags: [
  *   requires_sharding,
  *   requires_spawning_own_processes,
@@ -9,14 +9,14 @@
 (function() {
     "use strict";
 
-    // Test mongoD behaviour using the standalone started by resmoke.py.
+    // Test merizoD behaviour using the standalone started by resmoke.py.
     let testDB = db.getSiblingDB(jsTestName());
     let testColl = testDB.test;
 
     // getHostName() doesn't include port, db.getMongo().host is 127.0.0.1:<port>
     const hostName = (getHostName() + ":" + db.getMongo().host.split(":")[1]);
 
-    // Test that the shard field is absent and the host field is present when run on mongoD.
+    // Test that the shard field is absent and the host field is present when run on merizoD.
     assert.eq(testColl
                   .aggregate([
                       {$collStats: {latencyStats: {histograms: true}}},

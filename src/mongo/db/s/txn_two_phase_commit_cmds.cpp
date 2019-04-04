@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/transaction_coordinator_service.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/log.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/s/transaction_coordinator_service.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic);
@@ -172,7 +172,7 @@ public:
 } prepareTransactionCmd;
 
 std::set<ShardId> validateParticipants(OperationContext* opCtx,
-                                       const std::vector<mongo::CommitParticipant>& participants) {
+                                       const std::vector<merizo::CommitParticipant>& participants) {
     StringBuilder ss;
     std::set<ShardId> participantsSet;
 
@@ -335,7 +335,7 @@ public:
     }
 
     std::string help() const override {
-        return "Coordinates the commit for a transaction. Only called by mongos.";
+        return "Coordinates the commit for a transaction. Only called by merizos.";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -345,4 +345,4 @@ public:
 } coordinateCommitTransactionCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

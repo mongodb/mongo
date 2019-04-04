@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/change_stream_constants.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/change_stream_constants.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_change_stream.h"
+#include "merizo/db/pipeline/document_source_sort.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * This stage is used internally for change notifications to close cursor after returning
@@ -55,8 +55,8 @@ public:
         invariant(pipeState != Pipeline::SplitState::kSplitForShards);
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                // If this is parsed on mongos it should stay on mongos. If we're not in a sharded
-                // cluster then it's okay to run on mongod.
+                // If this is parsed on merizos it should stay on merizos. If we're not in a sharded
+                // cluster then it's okay to run on merizod.
                 HostTypeRequirement::kLocalOnly,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
@@ -76,7 +76,7 @@ public:
     }
 
     boost::optional<MergingLogic> mergingLogic() final {
-        // This stage must run on mongos to ensure it sees any invalidation in the correct order,
+        // This stage must run on merizos to ensure it sees any invalidation in the correct order,
         // and to ensure that all remote cursors are cleaned up properly.
         // {shardsStage, mergingStage, sortPattern}
         return MergingLogic{nullptr, this, change_stream_constants::kSortSpec};
@@ -92,4 +92,4 @@ private:
     bool _shouldCloseCursor = false;
 };
 
-}  // namespace mongo
+}  // namespace merizo

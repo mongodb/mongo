@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/client/shard_connection.h"
+#include "merizo/s/client/shard_connection.h"
 
 #include <set>
 
-#include "mongo/base/init.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_connection_gen.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/client/version_manager.h"
-#include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/s/transaction_router.h"
-#include "mongo/util/concurrency/spin_lock.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/stacktrace.h"
+#include "merizo/base/init.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/s/chunk_manager.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/client/shard_connection_gen.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/client/version_manager.h"
+#include "merizo/s/cluster_last_error_info.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/is_merizos.h"
+#include "merizo/s/transaction_router.h"
+#include "merizo/util/concurrency/spin_lock.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/stacktrace.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class ClientConnections;
@@ -379,7 +379,7 @@ ShardConnection::ShardConnection(OperationContext* opCtx,
 
     _conn = ClientConnections::threadInstance()->get(csString, _ns);
     if (isMongos()) {
-        // In mongos, we record this connection as having been used for useful work to provide
+        // In merizos, we record this connection as having been used for useful work to provide
         // useful information in getLastError.
         ClusterLastErrorInfo::get(opCtx->getClient())->addShardHost(csString);
     }
@@ -469,4 +469,4 @@ void ShardConnection::forgetNS(const std::string& ns) {
     ClientConnections::threadInstance()->forgetNS(ns);
 }
 
-}  // namespace mongo
+}  // namespace merizo

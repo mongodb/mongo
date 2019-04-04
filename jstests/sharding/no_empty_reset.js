@@ -1,6 +1,6 @@
 // Tests that an empty shard can't be the cause of a chunk reset
 
-var st = new ShardingTest({shards: 2, mongos: 2});
+var st = new ShardingTest({shards: 2, merizos: 2});
 
 var coll = st.s.getCollection(jsTestName() + ".coll");
 
@@ -13,14 +13,14 @@ jsTestLog("Sharded setup complete");
 
 st.printShardingStatus();
 
-jsTestLog("Setting initial versions for each mongos...");
+jsTestLog("Setting initial versions for each merizos...");
 
 coll.find().itcount();
 
 var collB = st.s1.getCollection("" + coll);
 collB.find().itcount();
 
-jsTestLog("Migrating via first mongos...");
+jsTestLog("Migrating via first merizos...");
 
 var fullShard = st.getShard(coll, {_id: 1});
 var emptyShard = st.getShard(coll, {_id: -1});
@@ -29,7 +29,7 @@ var admin = st.s.getDB("admin");
 assert.commandWorked(st.s0.adminCommand(
     {moveChunk: "" + coll, find: {_id: -1}, to: fullShard.shardName, _waitForDelete: true}));
 
-jsTestLog("Resetting shard version via first mongos...");
+jsTestLog("Resetting shard version via first merizos...");
 
 coll.find().itcount();
 

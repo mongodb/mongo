@@ -1,4 +1,4 @@
-"""Class used to allocate ports for mongod and mongos processes involved in running the tests."""
+"""Class used to allocate ports for merizod and merizos processes involved in running the tests."""
 
 from __future__ import absolute_import
 
@@ -38,7 +38,7 @@ class PortAllocator(object):
 
     It reserves a range of ports for each job with the first part of
     that range used for the fixture started by that job, and the second
-    part of the range used for mongod and mongos processes started by
+    part of the range used for merizod and merizos processes started by
     tests run by that job.
     """
 

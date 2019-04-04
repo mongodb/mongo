@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/client/version_manager.h"
+#include "merizo/s/client/version_manager.h"
 
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/client/dbclient_rs.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/s/request_types/set_shard_version_request.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/s/transaction_router.h"
-#include "mongo/util/log.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/client/dbclient_rs.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/shard_connection.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/is_merizos.h"
+#include "merizo/s/request_types/set_shard_version_request.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/s/transaction_router.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::shared_ptr;
 using std::map;
@@ -175,7 +175,7 @@ DBClientBase* getVersionable(DBClientBase* conn) {
  * shards.
  *
  * Eventually this should go completely away, but for now many commands rely on unversioned but
- * mongos-specific behavior on mongod (auditing and replication information in commands)
+ * merizos-specific behavior on merizod (auditing and replication information in commands)
  */
 bool initShardVersionEmptyNS(OperationContext* opCtx, DBClientBase* conn_in) {
     try {
@@ -235,7 +235,7 @@ bool initShardVersionEmptyNS(OperationContext* opCtx, DBClientBase* conn_in) {
  * If no remote cached version has ever been set, an initial shard version is sent.
  *
  * If the namespace is empty and no version has ever been sent, the config server + shard name
- * is sent to the remote shard host to initialize the connection as coming from mongos.
+ * is sent to the remote shard host to initialize the connection as coming from merizos.
  * NOTE: This initialization is *best-effort only*.  Operations which wish to correctly version
  * must send the namespace.
  *
@@ -415,7 +415,7 @@ void VersionManager::resetShardVersionCB(DBClientBase* conn) {
 }
 
 bool VersionManager::isVersionableCB(DBClientBase* conn) {
-    // We do not version shard connections when issued from mongod
+    // We do not version shard connections when issued from merizod
     if (!isMongos()) {
         return false;
     }
@@ -439,4 +439,4 @@ bool VersionManager::checkShardVersionCB(OperationContext* opCtx,
         opCtx, conn_in->get(), conn_in->getNS(), conn_in->getManager(), authoritative, tryNumber);
 }
 
-}  // namespace mongo
+}  // namespace merizo

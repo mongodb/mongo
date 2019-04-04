@@ -6,7 +6,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     load("jstests/replsets/rslib.js");
 
-    var s = new ShardingTest({shards: 2, mongos: 1, rs: {oplogSize: 10}});
+    var s = new ShardingTest({shards: 2, merizos: 1, rs: {oplogSize: 10}});
 
     var db = s.getDB("test");
     var replTest = s.rs0;

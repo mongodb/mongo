@@ -45,7 +45,7 @@ The WiredTiger source code can be found at:
 
 WiredTiger uses JIRA for issue management:
 
-	http://jira.mongodb.org/browse/WT
+	http://jira.merizodb.org/browse/WT
 
 Please do not report issues through GitHub.
 

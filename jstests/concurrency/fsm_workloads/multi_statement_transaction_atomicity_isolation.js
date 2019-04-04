@@ -87,7 +87,7 @@ var $config = (function() {
 
         for (let doc of documents) {
             for (let op of doc.order) {
-                // We store 'op' both as the key and as part of the value because the mongo shell's
+                // We store 'op' both as the key and as part of the value because the merizo shell's
                 // Map type mangles the key and doesn't provide an API to retrieve the original
                 // key-value pairs.
                 const value = updateCounts.get(op) || {op, actual: 0};

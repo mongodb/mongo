@@ -10,15 +10,15 @@ var password = "bar";
 
 load("jstests/libs/host_ipaddr.js");
 
-var createUser = function(mongo) {
+var createUser = function(merizo) {
     print("============ adding a user.");
-    mongo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
+    merizo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
 };
 
-var assertCannotRunCommands = function(mongo, isPrimary) {
+var assertCannotRunCommands = function(merizo, isPrimary) {
     print("============ ensuring that commands cannot be run.");
 
-    var test = mongo.getDB("test");
+    var test = merizo.getDB("test");
     assert.throws(function() {
         test.system.users.findOne();
     });
@@ -46,7 +46,7 @@ var assertCannotRunCommands = function(mongo, isPrimary) {
     // Create collection
     var authorizeErrorCode = 13;
     assert.commandFailedWithCode(
-        mongo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),
+        merizo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),
         authorizeErrorCode,
         "createCollection");
     // Set/Get system parameters
@@ -68,20 +68,20 @@ var assertCannotRunCommands = function(mongo, isPrimary) {
         var cmd = {setParameter: 1};
         cmd[p.param] = p.val;
         assert.commandFailedWithCode(
-            mongo.getDB("admin").runCommand(cmd), authorizeErrorCode, "setParameter: " + p.param);
+            merizo.getDB("admin").runCommand(cmd), authorizeErrorCode, "setParameter: " + p.param);
     });
     params.forEach(function(p) {
         var cmd = {getParameter: 1};
         cmd[p.param] = 1;
         assert.commandFailedWithCode(
-            mongo.getDB("admin").runCommand(cmd), authorizeErrorCode, "getParameter: " + p.param);
+            merizo.getDB("admin").runCommand(cmd), authorizeErrorCode, "getParameter: " + p.param);
     });
 };
 
-var assertCanRunCommands = function(mongo) {
+var assertCanRunCommands = function(merizo) {
     print("============ ensuring that commands can be run.");
 
-    var test = mongo.getDB("test");
+    var test = merizo.getDB("test");
     // will throw on failure
     test.system.users.findOne();
 
@@ -98,12 +98,12 @@ var assertCanRunCommands = function(mongo) {
         },
         {out: "other"});
 
-    assert.commandWorked(mongo.getDB("admin").runCommand({replSetGetStatus: 1}));
+    assert.commandWorked(merizo.getDB("admin").runCommand({replSetGetStatus: 1}));
 };
 
-var authenticate = function(mongo) {
+var authenticate = function(merizo) {
     print("============ authenticating user.");
-    mongo.getDB("admin").auth(username, password);
+    merizo.getDB("admin").auth(username, password);
 };
 
 var start = function(useHostName) {
@@ -135,30 +135,30 @@ var runTest = function(useHostName) {
         secHosts.push("localhost:" + rs.getPort(sec));
     });
 
-    var mongo = new Mongo(host);
+    var merizo = new Mongo(host);
 
-    assertCannotRunCommands(mongo, true);
+    assertCannotRunCommands(merizo, true);
 
     // Test localhost access on secondaries
-    var mongoSecs = [];
+    var merizoSecs = [];
     secHosts.forEach(function(h) {
-        mongoSecs.push(new Mongo(h));
+        merizoSecs.push(new Mongo(h));
     });
 
-    mongoSecs.forEach(function(m) {
+    merizoSecs.forEach(function(m) {
         assertCannotRunCommands(m, false);
     });
 
-    createUser(mongo);
+    createUser(merizo);
 
-    assertCannotRunCommands(mongo, true);
+    assertCannotRunCommands(merizo, true);
 
-    authenticate(mongo);
+    authenticate(merizo);
 
-    assertCanRunCommands(mongo, true);
+    assertCanRunCommands(merizo, true);
 
     // Test localhost access on secondaries on exsiting connection
-    mongoSecs.forEach(function(m) {
+    merizoSecs.forEach(function(m) {
         assertCannotRunCommands(m, false);
         authenticate(m);
     });
@@ -167,13 +167,13 @@ var runTest = function(useHostName) {
     print("reconnecting with a new client.");
     print("===============================");
 
-    mongo = new Mongo(host);
+    merizo = new Mongo(host);
 
-    assertCannotRunCommands(mongo, true);
+    assertCannotRunCommands(merizo, true);
 
-    authenticate(mongo);
+    authenticate(merizo);
 
-    assertCanRunCommands(mongo, true);
+    assertCanRunCommands(merizo, true);
 
     // Test localhost access on secondaries on new connection
     secHosts.forEach(function(h) {
@@ -187,7 +187,7 @@ var runTest = function(useHostName) {
 
 var runNonlocalTest = function(ipAddr) {
     print("==========================");
-    print("starting mongod: non-local host access " + ipAddr);
+    print("starting merizod: non-local host access " + ipAddr);
     print("==========================");
 
     var rs = start(false);
@@ -199,22 +199,22 @@ var runNonlocalTest = function(ipAddr) {
         secHosts.push(ipAddr + ":" + rs.getPort(sec));
     });
 
-    var mongo = new Mongo(host);
+    var merizo = new Mongo(host);
 
-    assertCannotRunCommands(mongo, true);
+    assertCannotRunCommands(merizo, true);
 
     // Test localhost access on secondaries
-    var mongoSecs = [];
+    var merizoSecs = [];
     secHosts.forEach(function(h) {
-        mongoSecs.push(new Mongo(h));
+        merizoSecs.push(new Mongo(h));
     });
 
-    mongoSecs.forEach(function(m) {
+    merizoSecs.forEach(function(m) {
         assertCannotRunCommands(m, false);
     });
 
     assert.throws(function() {
-        mongo.getDB("admin").createUser(
+        merizo.getDB("admin").createUser(
             {user: username, pwd: password, roles: jsTest.adminUserRoles});
     });
 

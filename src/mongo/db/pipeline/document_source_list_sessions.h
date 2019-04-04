@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/pipeline/document_source_list_local_sessions.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/db/pipeline/document_source_list_local_sessions.h"
+#include "merizo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/lite_parsed_document_source.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * $listSessions: { allUsers: true/false, users: [ {user:"jsmith", db:"test"}, ... ] }
@@ -100,11 +100,11 @@ private:
     DocumentSourceListSessions(const BSONObj& query,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                const bool allUsers,
-                               const boost::optional<std::vector<mongo::ListSessionsUser>>& users)
+                               const boost::optional<std::vector<merizo::ListSessionsUser>>& users)
         : DocumentSourceMatch(query, pExpCtx), _allUsers(allUsers), _users(users) {}
 
     bool _allUsers;
-    boost::optional<std::vector<mongo::ListSessionsUser>> _users;
+    boost::optional<std::vector<merizo::ListSessionsUser>> _users;
 };
 
-}  // namespace mongo
+}  // namespace merizo

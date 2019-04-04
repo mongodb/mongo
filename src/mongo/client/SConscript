@@ -10,13 +10,13 @@ env.Library(
     target='connection_string',
     source=[
         'connection_string.cpp',
-        'mongo_uri.cpp',
+        'merizo_uri.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/util/net/network',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/dns_query',
+        '$BUILD_DIR/merizo/util/dns_query',
     ],
 )
 
@@ -31,13 +31,13 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='mongo_uri_test',
+    target='merizo_uri_test',
     source=[
-        'mongo_uri_test.cpp',
+        'merizo_uri_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
         'clientdriver_network',
     ],
 )
@@ -50,8 +50,8 @@ env.Library(
         'read_preference.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/service_context'
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/db/service_context'
     ],
 )
 
@@ -98,15 +98,15 @@ saslClientEnv.Library(
     target='sasl_client',
     source=saslClientSource,
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base/secure_allocator',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/executor/remote_command',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/icu',
-        '$BUILD_DIR/mongo/util/md5',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/base/secure_allocator',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/executor/remote_command',
+        '$BUILD_DIR/merizo/rpc/command_status',
+        '$BUILD_DIR/merizo/rpc/metadata',
+        '$BUILD_DIR/merizo/util/icu',
+        '$BUILD_DIR/merizo/util/md5',
+        '$BUILD_DIR/merizo/util/net/network',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ],
     SYSLIBDEPS=saslLibs,
 )
@@ -117,8 +117,8 @@ env.Library(
         'authenticate.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/executor/remote_command',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/executor/remote_command',
         'sasl_client'
     ],
 )
@@ -131,9 +131,9 @@ env.CppUnitTest(
         'authenticate_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/md5',
+        '$BUILD_DIR/merizo/rpc/command_status',
+        '$BUILD_DIR/merizo/util/net/network',
+        '$BUILD_DIR/merizo/util/md5',
         'authentication',
     ],
 )
@@ -144,7 +144,7 @@ env.Library(
         'query.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'read_preference',
     ],
 )
@@ -160,19 +160,19 @@ clientDriverEnv.Library(
         'index_spec.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/db/wire_version',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/merizo/db/dbmessage',
+        '$BUILD_DIR/merizo/db/query/command_request_response',
+        '$BUILD_DIR/merizo/db/query/query_request',
+        '$BUILD_DIR/merizo/db/wire_version',
+        '$BUILD_DIR/merizo/rpc/command_status',
+        '$BUILD_DIR/merizo/rpc/rpc',
+        '$BUILD_DIR/merizo/s/common_s',
         'authentication',
         'client_query',
         'connection_string',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/merizo/util/net/ssl_manager',
     ],
 )
 
@@ -180,7 +180,7 @@ clientDriverEnv.Library(
     target='clientdriver_network',
     source=[
         'connection_string_connect.cpp',
-        'mongo_uri_connect.cpp',
+        'merizo_uri_connect.cpp',
         'connpool.cpp',
         'dbclient_connection.cpp',
         'dbclient_rs.cpp',
@@ -190,20 +190,20 @@ clientDriverEnv.Library(
         'replica_set_monitor_manager.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/executor/connection_pool_stats',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/util/md5',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/db/write_concern_options',
+        '$BUILD_DIR/merizo/executor/connection_pool_stats',
+        '$BUILD_DIR/merizo/executor/network_interface_factory',
+        '$BUILD_DIR/merizo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/merizo/util/background_job',
+        '$BUILD_DIR/merizo/util/md5',
+        '$BUILD_DIR/merizo/util/net/network',
         'clientdriver_minimal',
         'read_preference',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/transport/message_compressor',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/transport/message_compressor',
     ]
 )
 
@@ -214,8 +214,8 @@ env.CppIntegrationTest(
     ],
     LIBDEPS=[
         'clientdriver_network',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/merizo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/merizo/util/version_impl',
     ],
 )
 
@@ -226,8 +226,8 @@ env.CppIntegrationTest(
     ],
     LIBDEPS=[
         'clientdriver_network',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/merizo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/merizo/util/version_impl',
     ],
 )
 
@@ -237,18 +237,18 @@ env.Library(
         'async_client.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/wire_version',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/merizo/db/wire_version',
+        '$BUILD_DIR/merizo/rpc/command_status',
+        '$BUILD_DIR/merizo/rpc/rpc',
+        '$BUILD_DIR/merizo/transport/transport_layer_common',
+        '$BUILD_DIR/merizo/util/net/ssl_manager',
         'authentication',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
-        '$BUILD_DIR/mongo/transport/message_compressor',
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/executor/egress_tag_closer_manager',
+        '$BUILD_DIR/merizo/transport/message_compressor',
+        '$BUILD_DIR/merizo/util/net/ssl_manager',
     ],
 )
 
@@ -271,7 +271,7 @@ env.Library(
     ],
     LIBDEPS=[
         'clientdriver_network',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -282,8 +282,8 @@ env.Library(
         'remote_command_targeter_factory_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/merizo/util/net/network',
+        '$BUILD_DIR/merizo/s/coreshard',
     ],
 )
 
@@ -295,7 +295,7 @@ env.CppUnitTest(
         'replica_set_monitor_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/merizo/db/write_concern_options',
         'clientdriver_network',
     ],
 )
@@ -304,7 +304,7 @@ env.CppUnitTest('dbclient_rs_test',
                 ['dbclient_rs_test.cpp'],
                 LIBDEPS=[
                     'clientdriver_network',
-                    '$BUILD_DIR/mongo/dbtests/mocklib',
+                    '$BUILD_DIR/merizo/dbtests/mocklib',
                 ],
 )
 
@@ -325,10 +325,10 @@ env.Library(
     ],
     LIBDEPS=[
         'remote_command_retry_scheduler',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/merizo/executor/task_executor_interface',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/rpc/command_status',
     ],
 )
 
@@ -337,8 +337,8 @@ env.CppUnitTest(
     source='fetcher_test.cpp',
     LIBDEPS=[
         'fetcher',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
 
@@ -348,8 +348,8 @@ env.Library(
         'remote_command_retry_scheduler.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/executor/task_executor_interface',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -358,8 +358,8 @@ env.CppUnitTest(
     source='remote_command_retry_scheduler_test.cpp',
     LIBDEPS=[
         'remote_command_retry_scheduler',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/merizo/unittest/task_executor_proxy',
     ],
 )
 
@@ -369,6 +369,6 @@ env.CppUnitTest(
         'dbclient_cursor_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/merizo/client/clientdriver_network',
     ],
 )

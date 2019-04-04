@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/commands/feature_compatibility_version.h"
+#include "merizo/db/commands/feature_compatibility_version.h"
 
-#include "mongo/base/status.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
-#include "mongo/db/commands/feature_compatibility_version_gen.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/executor/egress_tag_closer_manager.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/util/log.h"
+#include "merizo/base/status.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/commands/feature_compatibility_version_documentation.h"
+#include "merizo/db/commands/feature_compatibility_version_gen.h"
+#include "merizo/db/commands/feature_compatibility_version_parser.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/kill_sessions_local.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/executor/egress_tag_closer_manager.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/grid.h"
+#include "merizo/transport/service_entry_point.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using repl::UnreplicatedWritesBlock;
 
@@ -309,4 +309,4 @@ Status FeatureCompatibilityVersionParameter::setFromString(const std::string&) {
                           << "."};
 }
 
-}  // namespace mongo
+}  // namespace merizo

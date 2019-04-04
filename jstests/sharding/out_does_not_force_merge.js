@@ -5,19 +5,19 @@
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
-    const mongosDB = st.s.getDB("test_db");
+    const merizosDB = st.s.getDB("test_db");
 
-    const inColl = mongosDB["inColl"];
+    const inColl = merizosDB["inColl"];
     // Two different output collections will be sharded by different keys.
-    const outCollById = mongosDB["outCollById"];
-    const outCollBySK = mongosDB["outCollBySK"];
-    st.shardColl(outCollById, {_id: 1}, {_id: 500}, {_id: 500}, mongosDB.getName());
-    st.shardColl(outCollBySK, {sk: 1}, {sk: 500}, {sk: 500}, mongosDB.getName());
+    const outCollById = merizosDB["outCollById"];
+    const outCollBySK = merizosDB["outCollBySK"];
+    st.shardColl(outCollById, {_id: 1}, {_id: 500}, {_id: 500}, merizosDB.getName());
+    st.shardColl(outCollBySK, {sk: 1}, {sk: 500}, {sk: 500}, merizosDB.getName());
 
     const numDocs = 1000;
 
     // Shard the input collection.
-    st.shardColl(inColl, {_id: 1}, {_id: 500}, {_id: 500}, mongosDB.getName());
+    st.shardColl(inColl, {_id: 1}, {_id: 500}, {_id: 500}, merizosDB.getName());
 
     // Insert some data to the input collection.
     const bulk = inColl.initializeUnorderedBulkOp();

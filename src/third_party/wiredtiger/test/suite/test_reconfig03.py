@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2019 MongoDB, Inc.
+# Public Domain 2014-2019 MerizoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -31,13 +31,13 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
 # test_reconfig03.py
-#    Test the connection reconfiguration operations used in the MongoDB
+#    Test the connection reconfiguration operations used in the MerizoDB
 #    test reconfigwt.js.
 class test_reconfig03(wttest.WiredTigerTestCase):
     conn_config = 'log=(archive=false,enabled,file_max=100K,prealloc=false,zero_fill=false),checkpoint=(wait=1),cache_size=1G'
     uri = "table:reconfig03"
 
-    # Reconfigure similar to MongoDB tests.  Sleep so that checkpoint
+    # Reconfigure similar to MerizoDB tests.  Sleep so that checkpoint
     # can run after we've made modifications.
     def test_reconfig03_mdb(self):
         entries = 10000

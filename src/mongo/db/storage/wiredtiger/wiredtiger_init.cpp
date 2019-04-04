@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,34 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #if defined(__linux__)
 #include <sys/vfs.h>
 #endif
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/storage/storage_engine_lock_file.h"
-#include "mongo/db/storage/storage_engine_metadata.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/processinfo.h"
+#include "merizo/base/init.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/kv/kv_storage_engine.h"
+#include "merizo/db/storage/storage_engine_init.h"
+#include "merizo/db/storage/storage_engine_lock_file.h"
+#include "merizo/db/storage/storage_engine_metadata.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_server_status.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/processinfo.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 class WiredTigerFactory : public StorageEngine::Factory {
@@ -80,7 +80,7 @@ public:
                          "WiredTiger storage engine"
                       << startupWarningsLog;
                 log() << "**          See "
-                         "http://dochub.mongodb.org/core/prodnotes-filesystem"
+                         "http://dochub.merizodb.org/core/prodnotes-filesystem"
                       << startupWarningsLog;
             }
         }
@@ -96,7 +96,7 @@ public:
                       << memoryThresholdPercentage * 100 << "% of available RAM."
                       << startupWarningsLog;
                 log() << "**          See "
-                         "http://dochub.mongodb.org/core/faq-memory-diagnostics-wt"
+                         "http://dochub.merizodb.org/core/faq-memory-diagnostics-wt"
                       << startupWarningsLog;
             }
         }
@@ -155,7 +155,7 @@ public:
         // If the 'groupCollections' field does not exist in the 'storage.bson' file, the
         // data-format of existing tables is as if 'groupCollections' is false. Passing this in
         // prevents validation from accepting 'params.groupCollections' being true when a "group
-        // collections" aware mongod is launched on an 3.4- dbpath.
+        // collections" aware merizod is launched on an 3.4- dbpath.
         const bool kDefaultGroupCollections = false;
         status =
             metadata.validateStorageEngineOption("groupCollections",
@@ -186,4 +186,4 @@ ServiceContext::ConstructorActionRegisterer registerWiredTiger(
         registerStorageEngine(service, std::make_unique<WiredTigerFactory>());
     });
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

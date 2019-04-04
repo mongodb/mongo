@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -49,7 +49,7 @@ func TestVanillaDBConnector(t *testing.T) {
 
 		})
 
-		Convey("calling GetNewSession with a running mongod should connect"+
+		Convey("calling GetNewSession with a running merizod should connect"+
 			" successfully", func() {
 
 			connector = &db.VanillaDBConnector{}
@@ -81,7 +81,7 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 		t.SkipNow()
 	}
 
-	Convey("With a vanilla db connector and a mongod running with"+
+	Convey("With a vanilla db connector and a merizod running with"+
 		" auth", t, func() {
 
 		auth := testutil.GetAuthOptions()

@@ -12,7 +12,7 @@ connect_count = 0
 
 class ConfigExpandRestHandler(http.server.BaseHTTPRequestHandler):
     """
-    Handle requests from mongod during config expansion.
+    Handle requests from merizod during config expansion.
     """
 
     protocol_version = 'HTTP/1.1'
@@ -86,7 +86,7 @@ def run(port):
 def main():
     """Main Method."""
 
-    parser = argparse.ArgumentParser(description='MongoDB Mock Config Expandsion REST Endpoint.')
+    parser = argparse.ArgumentParser(description='MerizoDB Mock Config Expandsion REST Endpoint.')
 
     parser.add_argument('-p', '--port', type=int, default=8000, help="Port to listen on")
 

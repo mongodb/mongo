@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <algorithm>
 #include <exception>
 
-#include "mongo/base/status_with.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface_integration_fixture.h"
-#include "mongo/executor/test_network_connection_hook.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/message.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/status_with.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/executor/network_connection_hook.h"
+#include "merizo/executor/network_interface_integration_fixture.h"
+#include "merizo/executor/test_network_connection_hook.h"
+#include "merizo/rpc/factory.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/message.h"
+#include "merizo/stdx/future.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/integration_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace executor {
 namespace {
 
 bool pingCommandMissing(const RemoteCommandResponse& result) {
     if (result.isOK()) {
-        // On mongos, there is no sleep command, so just check that the command failed with
+        // On merizos, there is no sleep command, so just check that the command failed with
         // a "Command not found" error code
         ASSERT_EQ(result.data["ok"].Double(), 0.0);
         ASSERT_EQ(result.data["code"].Int(), 59);
@@ -109,7 +109,7 @@ TEST_F(NetworkInterfaceIntegrationFixture, HookHangs) {
     startNet(stdx::make_unique<HangingHook>());
 
     /**
-     *  Since mongos's have no ping command, we effectively skip this test by returning
+     *  Since merizos's have no ping command, we effectively skip this test by returning
      *  ExceededTimeLimit above. (That ErrorCode is used heavily in repl and sharding code.)
      *  If we return NetworkInterfaceExceededTimeLimit, it will make the ConnectionPool
      *  attempt to reform the connection, which can lead to an accepted but unfortunate
@@ -282,7 +282,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
 
     auto result = deferred.get();
 
-    // mongos doesn't implement the ping command, so ignore the response there, otherwise
+    // merizos doesn't implement the ping command, so ignore the response there, otherwise
     // check that we've timed out.
     if (!pingCommandMissing(result)) {
         ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
@@ -386,4 +386,4 @@ TEST_F(NetworkInterfaceTest, IsMasterRequestMissingInternalClientInfoWhenNotInte
 
 }  // namespace
 }  // namespace executor
-}  // namespace mongo
+}  // namespace merizo

@@ -5,7 +5,7 @@ selector:
   - jstests/ssl/*.js
   exclude_files:
 
-# ssl tests start their own mongod's.
+# ssl tests start their own merizod's.
 executor:
   config:
     shell_options:

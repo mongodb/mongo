@@ -1,6 +1,6 @@
 /**
  * Checks that:
- * 1) Issuing a metadata command through a mongos with any write concern succeeds (because we
+ * 1) Issuing a metadata command through a merizos with any write concern succeeds (because we
  * convert it up to majority WC),
  * 2) Issuing a metadata command directly to a config server with non-majority write concern fails.
  */
@@ -27,7 +27,7 @@
         {writeConcern: {w: "majority", wtimeout: 15000}},
     ];
 
-    // Any write concern can be sent to a mongos, because mongos will upconvert it to majority.
+    // Any write concern can be sent to a merizos, because merizos will upconvert it to majority.
     const unacceptableWCsForMongos = [];
     const acceptableWCsForMongos = [
         {},
@@ -153,8 +153,8 @@
                           cleanupFuncs.dropDatabase);
 
     // createDatabase
-    // Don't check createDatabase against mongos: there is no createDatabase command exposed on
-    // mongos; a database is created implicitly when a collection in it is created.
+    // Don't check createDatabase against merizos: there is no createDatabase command exposed on
+    // merizos; a database is created implicitly when a collection in it is created.
     checkCommandConfigSvr({_configsvrCreateDatabase: dbName, to: st.shard0.name},
                           setupFuncs.noop,
                           cleanupFuncs.dropDatabase);

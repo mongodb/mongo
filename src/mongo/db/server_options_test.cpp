@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/config.h"
+#include "merizo/config.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -47,28 +47,28 @@
 
 #include <boost/filesystem.hpp>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_options_base.h"
-#include "mongo/db/server_options_nongeneral_gen.h"
-#include "mongo/db/server_options_server_helpers.h"
-#include "mongo/logger/logger.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/server_options_base.h"
+#include "merizo/db/server_options_nongeneral_gen.h"
+#include "merizo/db/server_options_server_helpers.h"
+#include "merizo/logger/logger.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/log.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_section.h"
+#include "merizo/util/options_parser/options_parser.h"
+#include "merizo/util/scopeguard.h"
 
 
 namespace {
 
-using mongo::ErrorCodes;
-using mongo::Status;
-namespace moe = mongo::optionenvironment;
+using merizo::ErrorCodes;
+using merizo::Status;
+namespace moe = merizo::optionenvironment;
 
-MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
+MONGO_INITIALIZER(ServerLogRedirection)(merizo::InitializerContext*) {
     // ssl_options_server.cpp has an initializer which depends on logging.
     // We can stub that dependency out for unit testing purposes.
     return Status::OK();
@@ -78,7 +78,7 @@ class OptionsParserTester : public moe::OptionsParser {
 public:
     Status readConfigFile(const std::string& filename, std::string* config) {
         if (filename != _filename) {
-            ::mongo::StringBuilder sb;
+            ::merizo::StringBuilder sb;
             sb << "Parser using filename: " << filename
                << " which does not match expected filename: " << _filename;
             return Status(ErrorCodes::InternalError, sb.str());
@@ -102,10 +102,10 @@ TEST(Verbosity, Default) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -113,14 +113,14 @@ TEST(Verbosity, Default) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     // Make sure the log level didn't change since we didn't specify any verbose options
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Info());
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Info());
 }
 
 TEST(Verbosity, CommandLineImplicit) {
@@ -129,10 +129,10 @@ TEST(Verbosity, CommandLineImplicit) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -141,14 +141,14 @@ TEST(Verbosity, CommandLineImplicit) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     int verbosity = 1;
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 }
 
 TEST(Verbosity, CommandLineString) {
@@ -157,10 +157,10 @@ TEST(Verbosity, CommandLineString) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -170,14 +170,14 @@ TEST(Verbosity, CommandLineString) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     int verbosity = 4;
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 }
 
 TEST(Verbosity, CommandLineStringDisguisedLongForm) {
@@ -186,10 +186,10 @@ TEST(Verbosity, CommandLineStringDisguisedLongForm) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -199,14 +199,14 @@ TEST(Verbosity, CommandLineStringDisguisedLongForm) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     int verbosity = 4;
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 }
 
 TEST(Verbosity, CommandLineEmptyString) {
@@ -215,10 +215,10 @@ TEST(Verbosity, CommandLineEmptyString) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -235,10 +235,10 @@ TEST(Verbosity, CommandLineBadString) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -248,7 +248,7 @@ TEST(Verbosity, CommandLineBadString) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
+    ASSERT_NOT_OK(::merizo::validateServerOptions(environment));
 }
 
 TEST(Verbosity, CommandLineBadStringOnlyDash) {
@@ -257,10 +257,10 @@ TEST(Verbosity, CommandLineBadStringOnlyDash) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -276,10 +276,10 @@ TEST(Verbosity, CommandLineBadStringOnlyTwoDashes) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -295,10 +295,10 @@ TEST(Verbosity, INIConfigString) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -310,14 +310,14 @@ TEST(Verbosity, INIConfigString) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     int verbosity = 4;
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 }
 
 TEST(Verbosity, INIConfigBadString) {
@@ -326,10 +326,10 @@ TEST(Verbosity, INIConfigBadString) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -341,7 +341,7 @@ TEST(Verbosity, INIConfigBadString) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
+    ASSERT_NOT_OK(::merizo::validateServerOptions(environment));
 }
 
 TEST(Verbosity, INIConfigEmptyString) {
@@ -350,10 +350,10 @@ TEST(Verbosity, INIConfigEmptyString) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -365,14 +365,14 @@ TEST(Verbosity, INIConfigEmptyString) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     int verbosity = 0;
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 }
 
 TEST(Verbosity, JSONConfigString) {
@@ -381,10 +381,10 @@ TEST(Verbosity, JSONConfigString) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -396,14 +396,14 @@ TEST(Verbosity, JSONConfigString) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     int verbosity = 4;
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 }
 
 TEST(Verbosity, MultipleSourcesMultipleOptions) {
@@ -412,10 +412,10 @@ TEST(Verbosity, MultipleSourcesMultipleOptions) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -429,14 +429,14 @@ TEST(Verbosity, MultipleSourcesMultipleOptions) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     int verbosity = 3;
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 }
 
 TEST(Verbosity, YAMLConfigStringLogComponent) {
@@ -445,13 +445,13 @@ TEST(Verbosity, YAMLConfigStringLogComponent) {
     moe::OptionSection options;
 
     // Reset the log level before we test
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Info());
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Info());
     // Log level for Storage will be cleared by config file value.
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogComponent::kStorage, ::mongo::logger::LogSeverity::Debug(1));
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogComponent::kStorage, ::merizo::logger::LogSeverity::Debug(1));
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -472,98 +472,98 @@ TEST(Verbosity, YAMLConfigStringLogComponent) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
     // Verify component log levels using global log domain.
     int verbosity = 4;
 
     // Default
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
-                      ::mongo::logger::LogComponent::kDefault),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(
+                      ::merizo::logger::LogComponent::kDefault),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 
     // AccessControl
-    ASSERT_TRUE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
-        ::mongo::logger::LogComponent::kAccessControl));
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
-                      ::mongo::logger::LogComponent::kAccessControl),
-                  ::mongo::logger::LogSeverity::Log());
+    ASSERT_TRUE(::merizo::logger::globalLogDomain()->hasMinimumLogSeverity(
+        ::merizo::logger::LogComponent::kAccessControl));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(
+                      ::merizo::logger::LogComponent::kAccessControl),
+                  ::merizo::logger::LogSeverity::Log());
 
     // Query - not mentioned in configuration. should match default.
-    ASSERT_FALSE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
-        ::mongo::logger::LogComponent::kStorage));
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
-                      ::mongo::logger::LogComponent::kStorage),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_FALSE(::merizo::logger::globalLogDomain()->hasMinimumLogSeverity(
+        ::merizo::logger::LogComponent::kStorage));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(
+                      ::merizo::logger::LogComponent::kStorage),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 
     // Storage - cleared by -1 value in configuration. should match default.
-    ASSERT_FALSE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
-        ::mongo::logger::LogComponent::kStorage));
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
-                      ::mongo::logger::LogComponent::kStorage),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_FALSE(::merizo::logger::globalLogDomain()->hasMinimumLogSeverity(
+        ::merizo::logger::LogComponent::kStorage));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(
+                      ::merizo::logger::LogComponent::kStorage),
+                  ::merizo::logger::LogSeverity::Debug(verbosity));
 
     // Journaling - explicitly set to 2 in configuration.
-    ASSERT_TRUE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
-        ::mongo::logger::LogComponent::kJournal));
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
-                      ::mongo::logger::LogComponent::kJournal),
-                  ::mongo::logger::LogSeverity::Debug(2));
+    ASSERT_TRUE(::merizo::logger::globalLogDomain()->hasMinimumLogSeverity(
+        ::merizo::logger::LogComponent::kJournal));
+    ASSERT_EQUALS(::merizo::logger::globalLogDomain()->getMinimumLogSeverity(
+                      ::merizo::logger::LogComponent::kJournal),
+                  ::merizo::logger::LogSeverity::Debug(2));
 }
 
 TEST(SetupOptions, Default) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
 
-    ASSERT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
 
-    ASSERT_EQUALS(::mongo::serverGlobalParams.binaryName, "binaryname");
-    ASSERT_FALSE(::mongo::serverGlobalParams.cwd.empty());
-    ASSERT_EQUALS(::mongo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
+    ASSERT_EQUALS(::merizo::serverGlobalParams.binaryName, "binaryname");
+    ASSERT_FALSE(::merizo::serverGlobalParams.cwd.empty());
+    ASSERT_EQUALS(::merizo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
 }
 
 TEST(SetupOptions, RelativeBinaryPath) {
     std::vector<std::string> argv;
     argv.push_back("foo/bar/baz/binaryname");
 
-    ASSERT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
 
-    ASSERT_EQUALS(::mongo::serverGlobalParams.binaryName, "binaryname");
-    ASSERT_FALSE(::mongo::serverGlobalParams.cwd.empty());
-    ASSERT_EQUALS(::mongo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
+    ASSERT_EQUALS(::merizo::serverGlobalParams.binaryName, "binaryname");
+    ASSERT_FALSE(::merizo::serverGlobalParams.cwd.empty());
+    ASSERT_EQUALS(::merizo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
 }
 
 TEST(SetupOptions, AbsoluteBinaryPath) {
     std::vector<std::string> argv;
     argv.push_back("/foo/bar/baz/binaryname");
 
-    ASSERT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
 
-    ASSERT_EQUALS(::mongo::serverGlobalParams.binaryName, "binaryname");
-    ASSERT_FALSE(::mongo::serverGlobalParams.cwd.empty());
-    ASSERT_EQUALS(::mongo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
+    ASSERT_EQUALS(::merizo::serverGlobalParams.binaryName, "binaryname");
+    ASSERT_FALSE(::merizo::serverGlobalParams.cwd.empty());
+    ASSERT_EQUALS(::merizo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
 }
 
 TEST(SetupOptions, EmptyBinaryName) {
     std::vector<std::string> argv;
     argv.push_back("");
 
-    ASSERT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
 
-    ASSERT_EQUALS(::mongo::serverGlobalParams.binaryName, "");
-    ASSERT_FALSE(::mongo::serverGlobalParams.cwd.empty());
-    ASSERT_EQUALS(::mongo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
+    ASSERT_EQUALS(::merizo::serverGlobalParams.binaryName, "");
+    ASSERT_FALSE(::merizo::serverGlobalParams.cwd.empty());
+    ASSERT_EQUALS(::merizo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
 }
 
 TEST(SetupOptions, MissingBinaryName) {
     std::vector<std::string> argv;
 
-    ASSERT_NOT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_NOT_OK(::merizo::setupServerOptions(argv));
 }
 
 TEST(SetupOptions, SlowMsCommandLineParamParsesSuccessfully) {
@@ -571,7 +571,7 @@ TEST(SetupOptions, SlowMsCommandLineParamParsesSuccessfully) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -581,12 +581,12 @@ TEST(SetupOptions, SlowMsCommandLineParamParsesSuccessfully) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::merizo::serverGlobalParams.slowMS, 300);
 }
 
 TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
@@ -594,8 +594,8 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -607,12 +607,12 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::merizo::serverGlobalParams.slowMS, 300);
 }
 
 TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
@@ -620,8 +620,8 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -635,12 +635,12 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::merizo::serverGlobalParams.slowMS, 300);
 }
 
 TEST(SetupOptions, NonNumericSlowMsCommandLineOptionFailsToParse) {
@@ -648,7 +648,7 @@ TEST(SetupOptions, NonNumericSlowMsCommandLineOptionFailsToParse) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -664,7 +664,7 @@ TEST(SetupOptions, NonNumericSlowMsYAMLConfigOptionFailsToParse) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -684,7 +684,7 @@ TEST(SetupOptions, SampleRateCommandLineParamParsesSuccessfully) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -694,12 +694,12 @@ TEST(SetupOptions, SampleRateCommandLineParamParsesSuccessfully) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::merizo::serverGlobalParams.sampleRate, 0.5);
 }
 
 TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
@@ -707,8 +707,8 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -720,12 +720,12 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::merizo::serverGlobalParams.sampleRate, 0.5);
 }
 
 TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
@@ -733,8 +733,8 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -748,12 +748,12 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::setupServerOptions(argv));
-    ASSERT_OK(::mongo::storeServerOptions(environment));
+    ASSERT_OK(::merizo::validateServerOptions(environment));
+    ASSERT_OK(::merizo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::merizo::setupServerOptions(argv));
+    ASSERT_OK(::merizo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::merizo::serverGlobalParams.sampleRate, 0.5);
 }
 
 TEST(SetupOptions, NonNumericSampleRateCommandLineOptionFailsToParse) {
@@ -761,7 +761,7 @@ TEST(SetupOptions, NonNumericSampleRateCommandLineOptionFailsToParse) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -778,7 +778,7 @@ TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
     moe::OptionSection options;
 
 
-    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+    ASSERT_OK(::merizo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -807,11 +807,11 @@ TEST(SetupOptions, DeepCwd) {
     ASSERT_BOOST_SUCCESS(ec);
 
     // All work is done under a temporary base directory.
-    ::mongo::StringBuilder sb;
+    ::merizo::StringBuilder sb;
     sb << "/tmp/deepcwd-" << getpid();
     boost::filesystem::path deepBaseDir = sb.str();
 
-    auto cleanup = ::mongo::makeGuard([&] {
+    auto cleanup = ::merizo::makeGuard([&] {
         boost::filesystem::current_path(cwd, ec);
         boost::filesystem::remove_all(deepBaseDir, ec);
     });
@@ -847,14 +847,14 @@ TEST(SetupOptions, DeepCwd) {
     }
 
     // Run the actual test.
-    Status res = ::mongo::setupServerOptions(argv);
+    Status res = ::merizo::setupServerOptions(argv);
 
     ASSERT_OK(res);
-    ASSERT_FALSE(::mongo::serverGlobalParams.cwd.empty());
-    ASSERT_EQUALS(::mongo::serverGlobalParams.cwd, deepCwd.native())
-        << "serverGlobalParams.cwd is " << ::mongo::serverGlobalParams.cwd.size()
+    ASSERT_FALSE(::merizo::serverGlobalParams.cwd.empty());
+    ASSERT_EQUALS(::merizo::serverGlobalParams.cwd, deepCwd.native())
+        << "serverGlobalParams.cwd is " << ::merizo::serverGlobalParams.cwd.size()
         << " bytes long and deepCwd is " << deepCwd.size() << " bytes long.";
-    ASSERT_EQUALS(::mongo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
+    ASSERT_EQUALS(::merizo::serverGlobalParams.argvArray.nFields(), static_cast<int>(argv.size()));
 }
 
 TEST(SetupOptions, UnlinkedCwd) {
@@ -868,7 +868,7 @@ TEST(SetupOptions, UnlinkedCwd) {
 
     std::string unlinkDir;
 
-    auto cleanup = ::mongo::makeGuard([&] {
+    auto cleanup = ::merizo::makeGuard([&] {
         boost::filesystem::current_path(cwd, ec);
         if (!unlinkDir.empty()) {
             boost::filesystem::remove(cwd / unlinkDir, ec);
@@ -878,7 +878,7 @@ TEST(SetupOptions, UnlinkedCwd) {
     // mkdir our own unlink dir
     unsigned int i = 0;
     while (1) {
-        ::mongo::StringBuilder sb;
+        ::merizo::StringBuilder sb;
         sb << "unlink" << i;
         unlinkDir = sb.str();
         if (boost::filesystem::create_directory(unlinkDir, ec)) {
@@ -899,7 +899,7 @@ TEST(SetupOptions, UnlinkedCwd) {
     // Naive rmdir of cwd doesn't work on Solaris doesn't work (no matter how it's specified).
     // So we use a subprocess to unlink the dir.
     pid_t pid = fork();
-    ASSERT_NOT_EQUALS(pid, -1) << "unable to fork: " << ::mongo::errnoWithDescription();
+    ASSERT_NOT_EQUALS(pid, -1) << "unable to fork: " << ::merizo::errnoWithDescription();
     if (pid == 0) {
         // Subprocess
         // No exceptions, ASSERT(), FAIL() or logging.
@@ -936,7 +936,7 @@ TEST(SetupOptions, UnlinkedCwd) {
     }
 
     // Run the actual test.
-    Status res = ::mongo::setupServerOptions(argv);
+    Status res = ::merizo::setupServerOptions(argv);
 
     ASSERT_NOT_OK(res);
     ASSERT_STRING_CONTAINS(res.toString(), "Cannot get current working directory");

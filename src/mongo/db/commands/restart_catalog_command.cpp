@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/db/catalog/catalog_control.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/util/log.h"
+#include "merizo/db/catalog/catalog_control.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 /**
  * This testing-only command causes the server to close and reopen the catalog, rebuilding all
  * in-memory data structures.
@@ -117,4 +117,4 @@ public:
 
 MONGO_REGISTER_TEST_COMMAND(RestartCatalogCmd);
 
-}  // namespace mongo
+}  // namespace merizo

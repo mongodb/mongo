@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/s/balancer/migration_manager.h"
-#include "mongo/db/s/balancer/type_migration.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_locks.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/config_server_test_fixture.h"
-#include "mongo/s/database_version_helpers.h"
-#include "mongo/s/request_types/move_chunk_request.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/s/balancer/migration_manager.h"
+#include "merizo/db/s/balancer/type_migration.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/s/catalog/dist_lock_manager_mock.h"
+#include "merizo/s/catalog/type_collection.h"
+#include "merizo/s/catalog/type_database.h"
+#include "merizo/s/catalog/type_locks.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/config_server_test_fixture.h"
+#include "merizo/s/database_version_helpers.h"
+#include "merizo/s/request_types/move_chunk_request.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using executor::RemoteCommandRequest;
@@ -728,7 +728,7 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
 }
 
 // Check that retriable / replset monitor altering errors returned from remote moveChunk commands
-// sent to source shards are not returned to the caller (mongos), but instead converted into
+// sent to source shards are not returned to the caller (merizos), but instead converted into
 // OperationFailed errors.
 TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
     // Set up two shards in the metadata.
@@ -791,4 +791,4 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -13,7 +13,7 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-// DBServer controls a MongoDB server process to be used within test suites.
+// DBServer controls a MerizoDB server process to be used within test suites.
 //
 // The test server is started when Session is called the first time and should
 // remain running for the duration of all tests, with the Wipe method being
@@ -64,7 +64,7 @@ func (dbs *DBServer) start() {
 		"--nojournal",
 	}
 	dbs.tomb = tomb.Tomb{}
-	dbs.server = exec.Command("mongod", args...)
+	dbs.server = exec.Command("merizod", args...)
 	dbs.server.Stdout = &dbs.output
 	dbs.server.Stderr = &dbs.output
 	err = dbs.server.Start()
@@ -79,16 +79,16 @@ func (dbs *DBServer) monitor() error {
 	dbs.server.Process.Wait()
 	if dbs.tomb.Alive() {
 		// Present some debugging information.
-		fmt.Fprintf(os.Stderr, "---- mongod process died unexpectedly:\n")
+		fmt.Fprintf(os.Stderr, "---- merizod process died unexpectedly:\n")
 		fmt.Fprintf(os.Stderr, "%s", dbs.output.Bytes())
-		fmt.Fprintf(os.Stderr, "---- mongod processes running right now:\n")
-		cmd := exec.Command("/bin/sh", "-c", "ps auxw | grep mongod")
+		fmt.Fprintf(os.Stderr, "---- merizod processes running right now:\n")
+		cmd := exec.Command("/bin/sh", "-c", "ps auxw | grep merizod")
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
 		cmd.Run()
 		fmt.Fprintf(os.Stderr, "----------------------------------------\n")
 
-		panic("mongod process died unexpectedly")
+		panic("merizod process died unexpectedly")
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (dbs *DBServer) Stop() {
 		select {
 		case <-dbs.tomb.Dead():
 		case <-time.After(5 * time.Second):
-			panic("timeout waiting for mongod process to die")
+			panic("timeout waiting for merizod process to die")
 		}
 		dbs.server = nil
 	}
@@ -161,7 +161,7 @@ func (dbs *DBServer) checkSessions() {
 
 // Wipe drops all created databases and their data.
 //
-// The MongoDB server remains running if it was prevoiusly running,
+// The MerizoDB server remains running if it was prevoiusly running,
 // or stopped if it was previously stopped.
 //
 // All database sessions must be closed before or while the Wipe method

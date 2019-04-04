@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,19 +32,19 @@
 #include <functional>
 #include <string>
 
-#include "mongo/base/status_with.h"
-#include "mongo/config.h"
-#include "mongo/db/server_options.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_mode.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/net/ssl_types.h"
+#include "merizo/base/status_with.h"
+#include "merizo/config.h"
+#include "merizo/db/server_options.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/transport/transport_layer.h"
+#include "merizo/transport/transport_mode.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/net/ssl_types.h"
 
 namespace asio {
 class io_context;
@@ -61,7 +61,7 @@ class context;
 }  // namespace ssl
 }  // namespace asio
 
-namespace mongo {
+namespace merizo {
 
 class ServiceContext;
 class ServiceEntryPoint;
@@ -206,4 +206,4 @@ private:
 };
 
 }  // namespace transport
-}  // namespace mongo
+}  // namespace merizo

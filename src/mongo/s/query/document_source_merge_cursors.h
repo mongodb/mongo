@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,22 +29,22 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/query/blocking_results_merger.h"
-#include "mongo/s/query/router_stage_merge.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/s/query/blocking_results_merger.h"
+#include "merizo/s/query/router_stage_merge.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * A stage used only internally to merge results that are being gathered from remote hosts, possibly
  * including this host.
  *
  * Does not assume ownership of cursors until the first call to getNext(). This is to allow this
- * stage to be used on mongos without actually iterating the cursors. For example, when this stage
- * is parsed on mongos it may later be decided that the merging should happen on one of the shards.
+ * stage to be used on merizos without actually iterating the cursors. For example, when this stage
+ * is parsed on merizos it may later be decided that the merging should happen on one of the shards.
  * Then this stage is forwarded to the merging shard, and it should not kill the cursors when it
- * goes out of scope on mongos.
+ * goes out of scope on merizos.
  */
 class DocumentSourceMergeCursors : public DocumentSource {
 public:
@@ -167,12 +167,12 @@ private:
 
     // '_blockingResultsMerger' is lazily populated. Until we need to use it, '_armParams' will be
     // populated with the parameters. Once we start using '_blockingResultsMerger', '_armParams'
-    // will become boost::none. We do this to prevent populating '_blockingResultsMerger' on mongos
+    // will become boost::none. We do this to prevent populating '_blockingResultsMerger' on merizos
     // before serializing this stage and sending it to a shard to perform the merge. If we always
     // populated '_blockingResultsMerger', then the destruction of this stage would cause the
     // cursors within '_blockingResultsMerger' to be killed prematurely. For example, if this stage
-    // is parsed on mongos then forwarded to the shards, it should not kill the cursors when it goes
-    // out of scope on mongos.
+    // is parsed on merizos then forwarded to the shards, it should not kill the cursors when it goes
+    // out of scope on merizos.
     boost::optional<AsyncResultsMergerParams> _armParams;
     boost::optional<BlockingResultsMerger> _blockingResultsMerger;
 
@@ -186,4 +186,4 @@ private:
     bool _ownCursors = true;
 };
 
-}  // namespace mongo
+}  // namespace merizo

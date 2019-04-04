@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/async_client.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_layer_asio.h"
-#include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
+#include "merizo/client/async_client.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/db/client.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/transport/session.h"
+#include "merizo/transport/transport_layer.h"
+#include "merizo/transport/transport_layer_asio.h"
+#include "merizo/unittest/integration_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
 
 #include "asio.hpp"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 TEST(TransportLayerASIO, HTTPRequestGetsHTTPError) {
@@ -66,7 +66,7 @@ TEST(TransportLayerASIO, HTTPRequestGetsHTTPError) {
     std::string httpReq = str::stream() << "GET /\r\n"
                                            "Host: "
                                         << server << "\r\n"
-                                                     "User-Agent: MongoDB Integration test\r\n"
+                                                     "User-Agent: MerizoDB Integration test\r\n"
                                                      "Accept: */*";
     asio::write(socket, asio::buffer(httpReq.data(), httpReq.size()));
 
@@ -151,4 +151,4 @@ TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

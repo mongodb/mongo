@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/parse_number.h"
+#include "merizo/base/parse_number.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -38,11 +38,11 @@
 #include <limits>
 #include <string>
 
-#include "mongo/base/status_with.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/platform/overflow_arithmetic.h"
+#include "merizo/base/status_with.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/platform/overflow_arithmetic.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 /**
@@ -140,9 +140,9 @@ inline StatusWith<uint64_t> parseMagnitudeFromStringWithBase(uint64_t base,
 
         // This block is (n = (n * base) + digitValue) with overflow checking at each step.
         uint64_t multiplied;
-        if (mongoUnsignedMultiplyOverflow64(n, base, &multiplied))
+        if (merizoUnsignedMultiplyOverflow64(n, base, &multiplied))
             return Status(ErrorCodes::FailedToParse, "Overflow");
-        if (mongoUnsignedAddOverflow64(multiplied, digitValue, &n))
+        if (merizoUnsignedAddOverflow64(multiplied, digitValue, &n))
             return Status(ErrorCodes::FailedToParse, "Overflow");
     }
     return n;
@@ -294,4 +294,4 @@ Status parseNumberFromStringWithBase<Decimal128>(StringData stringValue,
     *result = parsedDecimal;
     return Status::OK();
 }
-}  // namespace mongo
+}  // namespace merizo

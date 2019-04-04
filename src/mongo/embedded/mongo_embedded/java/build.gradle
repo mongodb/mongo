@@ -1,14 +1,14 @@
 ext.jnaVersion = '4.5.2'
 ext.libraryName = 'embedded-capi'
-ext.licenseShort = 'MongoDB Embedded License'
-ext.pomName = 'MongoDB Embedded for Java'
-ext.pomDescription = 'The MongoDB Embedded SDK for Java'
-ext.pomUrl = 'http://www.mongodb.org'
-ext.pomLicenseName = 'MongoDB Embedded License'
-ext.pomLicenseUrl = 'https://www.mongodb.com/licensing/embedded-license'
-ext.pomScmConnection = 'https://github.com/mongodb/mongo.git'
-ext.pomScmDevConnection = 'git@github.com:mongodb/mongo.git'
-ext.pomScmUrl = 'https://github.com/mongodb/mongo'
+ext.licenseShort = 'MerizoDB Embedded License'
+ext.pomName = 'MerizoDB Embedded for Java'
+ext.pomDescription = 'The MerizoDB Embedded SDK for Java'
+ext.pomUrl = 'http://www.merizodb.org'
+ext.pomLicenseName = 'MerizoDB Embedded License'
+ext.pomLicenseUrl = 'https://www.merizodb.com/licensing/embedded-license'
+ext.pomScmConnection = 'https://github.com/merizodb/merizo.git'
+ext.pomScmDevConnection = 'git@github.com:merizodb/merizo.git'
+ext.pomScmUrl = 'https://github.com/merizodb/merizo'
 
 buildscript {
     repositories {
@@ -59,7 +59,7 @@ if (localPropsFile.exists()) {
 }
 
 allprojects {
-    group = 'org.mongodb'
+    group = 'org.merizodb'
     version = getGitVersion()
 
     repositories {
@@ -75,7 +75,7 @@ task clean(type: Delete) {
 apply plugin: 'io.codearte.nexus-staging'
 
 nexusStaging {
-    packageGroup = "org.mongodb"
+    packageGroup = "org.merizodb"
     username = ossrhUsername
     password = ossrhPassword
 }

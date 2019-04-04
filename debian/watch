@@ -7,4 +7,4 @@
 version=3
 
 # examine a Webserver directory
-http://downloads.mongodb.org/linux/mongodb-linux-(.*)\.tar\.gz
+http://downloads.merizodb.org/linux/merizodb-linux-(.*)\.tar\.gz

@@ -14,7 +14,7 @@
         // Start with 4.0 because we can't skip more than one major version at a time.
         MongoRunner.stopMongod(conn);
         conn = MongoRunner.runMongod({binVersion: '4.0', dbpath: dbpath, noCleanData: true});
-        assert.neq(null, conn, 'mongod was unable to start with version 4.0');
+        assert.neq(null, conn, 'merizod was unable to start with version 4.0');
         let adminDb = conn.getDB('admin');
         assert.commandWorked(adminDb.runCommand({'setFeatureCompatibilityVersion': '4.0'}));
 
@@ -23,10 +23,10 @@
         conn = MongoRunner.runMongod({binVersion: 'latest', dbpath: dbpath, noCleanData: true});
 
         if (shouldPass) {
-            assert.neq(null, conn, 'mongod failed to start with latest version');
+            assert.neq(null, conn, 'merizod failed to start with latest version');
             MongoRunner.stopMongod(conn);
         } else {
-            assert.eq(null, conn, 'mongod started with latest version but should have failed');
+            assert.eq(null, conn, 'merizod started with latest version but should have failed');
         }
 
         resetDbpath(dbpath);
@@ -36,7 +36,7 @@
     // latest fails.
     function cannotUpgradeWithoutIndex() {
         let conn = MongoRunner.runMongod({binVersion: '3.6'});
-        assert.neq(null, conn, 'mongod was unable able to start with version 3.6');
+        assert.neq(null, conn, 'merizod was unable able to start with version 3.6');
 
         // Create a collection with autoIndexId: false.
         let testDb = conn.getDB('test');
@@ -50,7 +50,7 @@
     // _id field, and ensure that an upgrade to latest passes.
     function canUpgradeAfterCreatingIndex() {
         let conn = MongoRunner.runMongod({binVersion: '3.6'});
-        assert.neq(null, conn, 'mongod was unable able to start with version 3.6');
+        assert.neq(null, conn, 'merizod was unable able to start with version 3.6');
 
         // Create a collection with autoIndexId: false and then manually create the _id index.
         let testDb = conn.getDB('test');

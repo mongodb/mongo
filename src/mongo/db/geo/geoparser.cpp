@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kGeo
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kGeo
 
-#include "mongo/db/geo/geoparser.h"
+#include "merizo/db/geo/geoparser.h"
 
 #include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/geo/shapes.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/geo/shapes.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 #include "third_party/s2/s2polygonbuilder.h"
 
-#define BAD_VALUE(error) Status(ErrorCodes::BadValue, ::mongoutils::str::stream() << error)
+#define BAD_VALUE(error) Status(ErrorCodes::BadValue, ::merizoutils::str::stream() << error)
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::stringstream;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 // This field must be present, and...
 static const string GEOJSON_TYPE = "type";
@@ -74,7 +74,7 @@ static const string GEOJSON_GEOMETRIES = "geometries";
 // and http://www.geojson.org/geojson-spec.html#named-crs
 static const string CRS_CRS84 = "urn:ogc:def:crs:OGC:1.3:CRS84";
 static const string CRS_EPSG_4326 = "EPSG:4326";
-static const string CRS_STRICT_WINDING = "urn:x-mongodb:crs:strictwinding:EPSG:4326";
+static const string CRS_STRICT_WINDING = "urn:x-merizodb:crs:strictwinding:EPSG:4326";
 
 static Status parseFlatPoint(const BSONElement& elem, Point* out, bool allowAddlFields = false) {
     if (!elem.isABSONObj())
@@ -112,7 +112,7 @@ static Status coordToPoint(double lng, double lat, S2Point* out) {
     // spherical.
     if (!isValidLngLat(lng, lat))
         return BAD_VALUE("longitude/latitude is out of bounds, lng: " << lng << " lat: " << lat);
-    // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
+    // Note that it's (lat, lng) for S2 but (lng, lat) for MerizoDB.
     S2LatLng ll = S2LatLng::FromDegrees(lat, lng).Normalized();
     // This shouldn't happen since we should only have valid lng/lats.
     if (!ll.is_valid()) {
@@ -777,15 +777,15 @@ GeoParser::GeoSpecifier GeoParser::parseGeoSpecifier(const BSONElement& type) {
         return GeoParser::UNKNOWN;
     }
     const char* fieldName = type.fieldName();
-    if (mongoutils::str::equals(fieldName, "$box")) {
+    if (merizoutils::str::equals(fieldName, "$box")) {
         return GeoParser::BOX;
-    } else if (mongoutils::str::equals(fieldName, "$center")) {
+    } else if (merizoutils::str::equals(fieldName, "$center")) {
         return GeoParser::CENTER;
-    } else if (mongoutils::str::equals(fieldName, "$polygon")) {
+    } else if (merizoutils::str::equals(fieldName, "$polygon")) {
         return GeoParser::POLYGON;
-    } else if (mongoutils::str::equals(fieldName, "$centerSphere")) {
+    } else if (merizoutils::str::equals(fieldName, "$centerSphere")) {
         return GeoParser::CENTER_SPHERE;
-    } else if (mongoutils::str::equals(fieldName, "$geometry")) {
+    } else if (merizoutils::str::equals(fieldName, "$geometry")) {
         return GeoParser::GEOMETRY;
     }
     return GeoParser::UNKNOWN;
@@ -815,4 +815,4 @@ GeoParser::GeoJSONType GeoParser::parseGeoJSONType(const BSONObj& obj) {
     return GeoParser::GEOJSON_UNKNOWN;
 }
 
-}  // namespace mongo
+}  // namespace merizo

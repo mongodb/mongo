@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/snapshot_window_options.h"
-#include "mongo/db/storage/biggie/biggie_kv_engine.h"
-#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/snapshot_window_options.h"
+#include "merizo/db/storage/biggie/biggie_kv_engine.h"
+#include "merizo/db/storage/biggie/biggie_recovery_unit.h"
+#include "merizo/db/storage/key_string.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/db/storage/sorted_data_interface.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 namespace biggie {
 
-mongo::RecoveryUnit* KVEngine::newRecoveryUnit() {
+merizo::RecoveryUnit* KVEngine::newRecoveryUnit() {
     return new RecoveryUnit(this, nullptr);
 }
 
@@ -59,20 +59,20 @@ Status KVEngine::createRecordStore(OperationContext* opCtx,
     return Status::OK();
 }
 
-std::unique_ptr<mongo::RecordStore> KVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
+std::unique_ptr<merizo::RecordStore> KVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                        StringData ident) {
-    std::unique_ptr<mongo::RecordStore> recordStore =
+    std::unique_ptr<merizo::RecordStore> recordStore =
         std::make_unique<RecordStore>("", ident, false);
     _idents[ident.toString()] = true;
     return recordStore;
 };
 
 
-std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* opCtx,
+std::unique_ptr<merizo::RecordStore> KVEngine::getRecordStore(OperationContext* opCtx,
                                                              StringData ns,
                                                              StringData ident,
                                                              const CollectionOptions& options) {
-    std::unique_ptr<mongo::RecordStore> recordStore;
+    std::unique_ptr<merizo::RecordStore> recordStore;
     if (options.capped) {
         if (NamespaceString::oplog(ns))
             _visibilityManager = std::make_unique<VisibilityManager>();
@@ -109,7 +109,7 @@ Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
     return Status::OK();  // I don't think we actually need to do anything here
 }
 
-mongo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* opCtx,
+merizo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              StringData ident,
                                                              const IndexDescriptor* desc) {
     _idents[ident.toString()] = false;
@@ -153,4 +153,4 @@ public:
     void reattachToOperationContext(OperationContext* opCtx) final {}
 };
 }  // namespace biggie
-}  // namespace mongo
+}  // namespace merizo

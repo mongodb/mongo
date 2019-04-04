@@ -1,8 +1,8 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -35,29 +35,29 @@
 # 5. Optional fields
 # 6. Default values
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "merizo"
     cpp_includes:
-        - "mongo/db/namespace_string.h"
+        - "merizo/db/namespace_string.h"
 
 types:
     string:
         bson_serialization_type: string
         description: "A BSON UTF-8 string"
         cpp_type: "std::string"
-        deserializer: "mongo::BSONElement::str"
+        deserializer: "merizo::BSONElement::str"
 
     int:
         bson_serialization_type: int
         description: "A BSON 32-bit integer"
         cpp_type: "std::int32_t"
-        deserializer: "mongo::BSONElement::_numberInt"
+        deserializer: "merizo::BSONElement::_numberInt"
 
     namespacestring:
         bson_serialization_type: string
-        description: "A MongoDB NamespaceString"
-        cpp_type: "mongo::NamespaceString"
-        serializer: mongo::NamespaceString::toString
-        deserializer: mongo::NamespaceString
+        description: "A MerizoDB NamespaceString"
+        cpp_type: "merizo::NamespaceString"
+        serializer: merizo::NamespaceString::toString
+        deserializer: merizo::NamespaceString
 
     safeInt32:
         description: Accepts any numerical type within int32 range
@@ -67,21 +67,21 @@ types:
                                 - int
                                 - decimal
                                 - double
-        deserializer: "mongo::BSONElement::numberInt"
+        deserializer: "merizo::BSONElement::numberInt"
 
     bindata_generic:
         bson_serialization_type: bindata
         bindata_subtype: generic
         description: "A BSON bindata of "
         cpp_type: "std::vector<std::uint8_t>"
-        deserializer: "mongo::BSONElement::_binDataVector"
+        deserializer: "merizo::BSONElement::_binDataVector"
 
     bindata_uuid:
         bson_serialization_type: bindata
         bindata_subtype: uuid
         description: "A BSON bindata of uuid sub type"
         cpp_type: "std::array<std::uint8_t, 16>"
-        deserializer: "mongo::BSONElement::uuid"
+        deserializer: "merizo::BSONElement::uuid"
 
 
 structs:

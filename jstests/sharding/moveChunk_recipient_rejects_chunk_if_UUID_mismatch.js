@@ -19,7 +19,7 @@
     st.ensurePrimaryShard(dbName, donor.shardName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-    jsTest.log("Insert a document with {_id: 0} into " + ns + " through mongos");
+    jsTest.log("Insert a document with {_id: 0} into " + ns + " through merizos");
     assert.writeOK(st.s.getCollection(ns).insert({_id: 0}));
 
     jsTest.log("Insert a document with {_id: 1} into " + ns + " directly on the recipient");

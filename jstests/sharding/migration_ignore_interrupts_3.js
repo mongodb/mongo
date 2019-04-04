@@ -14,8 +14,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     var st = new ShardingTest({shards: 3});
 
-    var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
-        ns2 = dbName + ".bar", coll1 = mongos.getCollection(ns1), coll2 = mongos.getCollection(ns2),
+    var merizos = st.s0, admin = merizos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
+        ns2 = dbName + ".bar", coll1 = merizos.getCollection(ns1), coll2 = merizos.getCollection(ns2),
         shard0 = st.shard0, shard1 = st.shard1, shard2 = st.shard2,
         shard0Coll1 = shard0.getCollection(ns1), shard1Coll1 = shard1.getCollection(ns1),
         shard2Coll1 = shard2.getCollection(ns1), shard0Coll2 = shard0.getCollection(ns2),

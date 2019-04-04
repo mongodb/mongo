@@ -342,7 +342,7 @@
         assert(userColl.drop());
     };
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, merizos: 1});
     var testNamespaces = setupTestCollections(st);
     var configDB = st.s.getDB("config");
     var adminDB = st.s.getDB("admin");

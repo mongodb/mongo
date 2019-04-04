@@ -7,7 +7,7 @@
     load("jstests/libs/analyze_plan.js");
 
     const conn = MongoRunner.runMongod();
-    assert.neq(null, conn, "mongod failed to start up");
+    assert.neq(null, conn, "merizod failed to start up");
 
     const testDb = conn.getDB("test");
     const coll = testDb.plan_cache_stats_agg_source;

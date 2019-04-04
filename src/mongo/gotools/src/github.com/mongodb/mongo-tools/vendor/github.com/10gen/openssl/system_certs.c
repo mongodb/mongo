@@ -1,4 +1,4 @@
-// Copyright 2016 MongoDB, Inc.
+// Copyright 2016 MerizoDB, Inc.
 
 #include <openssl/err.h>
 #include <openssl/evp.h>

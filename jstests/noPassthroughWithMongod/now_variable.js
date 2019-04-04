@@ -84,7 +84,7 @@
     runTests(fromViewWithNow);
     runTests(withExprNow);
 
-    // $$CLUSTER_TIME is not available on a standalone mongod.
+    // $$CLUSTER_TIME is not available on a standalone merizod.
     runTestsExpectFailure(baseCollectionClusterTime);
     runTestsExpectFailure(fromViewWithClusterTime);
     runTestsExpectFailure(withExprClusterTime);

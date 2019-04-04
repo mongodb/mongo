@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,16 +32,16 @@
 #include <memory>
 #include <string>
 
-#include "mongo/db/service_context.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/time_support.h"
+#include "merizo/db/service_context.h"
+#include "merizo/util/string_map.h"
+#include "merizo/util/time_support.h"
 
 struct _timelib_error_container;
 struct _timelib_time;
 struct _timelib_tzdb;
 struct _timelib_tzinfo;
 
-namespace mongo {
+namespace merizo {
 
 /**
  * A TimeZone object represents one way of formatting/reading dates to compute things like the day
@@ -431,4 +431,4 @@ private:
     std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> _timeZoneDatabase;
 };
 
-}  // namespace mongo
+}  // namespace merizo

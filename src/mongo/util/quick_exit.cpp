@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-// NOTE: This file *must not* depend on any mongo symbols.
+// NOTE: This file *must not* depend on any merizo symbols.
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/config.h"
+#include "merizo/config.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -41,7 +41,7 @@
 #include <cstdlib>
 
 // NOTE: Header only dependencies are OK in this library.
-#include "mongo/stdx/mutex.h"
+#include "merizo/stdx/mutex.h"
 
 #if !defined(__has_feature)
 #define __has_feature(x) 0
@@ -71,7 +71,7 @@
 extern "C" void __gcov_flush();
 #endif
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 stdx::mutex* const quickExitMutex = new stdx::mutex;
@@ -110,4 +110,4 @@ void quickExit(int code) {
 #endif
 }
 
-}  // namespace mongo
+}  // namespace merizo

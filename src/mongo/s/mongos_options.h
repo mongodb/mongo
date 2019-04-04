@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,28 +29,28 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/db/server_options.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
+#include "merizo/base/status.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/db/server_options.h"
+#include "merizo/s/is_merizos.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_section.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace optionenvironment {
 class OptionSection;
 class Environment;
 }  // namespace optionenvironment
 
-namespace moe = mongo::optionenvironment;
+namespace moe = merizo::optionenvironment;
 
 struct MongosGlobalParams {
     // The config server connection string
     ConnectionString configdbs;
 };
 
-extern MongosGlobalParams mongosGlobalParams;
+extern MongosGlobalParams merizosGlobalParams;
 
 void printMongosHelp(const moe::OptionSection& options);
 
@@ -63,14 +63,14 @@ bool handlePreValidationMongosOptions(const moe::Environment& params,
                                       const std::vector<std::string>& args);
 
 /**
- * Handle custom validation of mongos options that can not currently be done by using
+ * Handle custom validation of merizos options that can not currently be done by using
  * Constraints in the Environment.  See the "validate" function in the Environment class for
  * more details.
  */
 Status validateMongosOptions(const moe::Environment& params);
 
 /**
- * Canonicalize mongos options for the given environment.
+ * Canonicalize merizos options for the given environment.
  *
  * For example, the options "dur", "nodur", "journal", "nojournal", and
  * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".

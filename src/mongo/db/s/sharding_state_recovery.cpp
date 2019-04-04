@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,34 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/sharding_state_recovery.h"
+#include "merizo/db/s/sharding_state_recovery.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/sharding_logging.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/ops/update.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/repl/bson_extract_optime.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/s/sharding_logging.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const char kRecoveryDocumentId[] = "minOpTimeRecovery";
@@ -273,4 +273,4 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
 }
 
 
-}  // namespace mongo
+}  // namespace merizo

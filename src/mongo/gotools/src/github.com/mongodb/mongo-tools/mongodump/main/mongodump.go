@@ -1,22 +1,22 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Main package for the mongodump tool.
+// Main package for the merizodump tool.
 package main
 
 import (
 	"os"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongodump"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/signals"
+	"github.com/merizodb/merizo-tools/common/util"
+	"github.com/merizodb/merizo-tools/merizodump"
 )
 
 const (
@@ -26,24 +26,24 @@ const (
 
 func main() {
 	// initialize command-line opts
-	opts := options.New("mongodump", mongodump.Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
+	opts := options.New("merizodump", merizodump.Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
 
-	inputOpts := &mongodump.InputOptions{}
+	inputOpts := &merizodump.InputOptions{}
 	opts.AddOptions(inputOpts)
-	outputOpts := &mongodump.OutputOptions{}
+	outputOpts := &merizodump.OutputOptions{}
 	opts.AddOptions(outputOpts)
 	opts.URI.AddKnownURIParameters(options.KnownURIOptionsReadPreference)
 
 	args, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
-		log.Logvf(log.Always, "try 'mongodump --help' for more information")
+		log.Logvf(log.Always, "try 'merizodump --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
 	if len(args) > 0 {
 		log.Logvf(log.Always, "positional arguments not allowed: %v", args)
-		log.Logvf(log.Always, "try 'mongodump --help' for more information")
+		log.Logvf(log.Always, "try 'merizodump --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -68,7 +68,7 @@ func main() {
 	progressManager.Start()
 	defer progressManager.Stop()
 
-	dump := mongodump.MongoDump{
+	dump := merizodump.MongoDump{
 		ToolOptions:     opts,
 		OutputOptions:   outputOpts,
 		InputOptions:    inputOpts,

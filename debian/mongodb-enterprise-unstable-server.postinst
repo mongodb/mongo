@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for mongodb
+# postinst script for merizodb
 #
 # see: dh_installdeb(1)
 
@@ -20,23 +20,23 @@ set -e
 
 case "$1" in
     configure)
-        # create a mongodb group and user
-        if ! getent passwd mongodb >/dev/null 2>&1; then
-            adduser --system --no-create-home mongodb
-            addgroup --system mongodb
-            adduser mongodb mongodb
+        # create a merizodb group and user
+        if ! getent passwd merizodb >/dev/null 2>&1; then
+            adduser --system --no-create-home merizodb
+            addgroup --system merizodb
+            adduser merizodb merizodb
         fi
 
-        # create db -- note: this should agree with dbpath in mongod.conf
-        if [ ! -d /var/lib/mongodb ]; then
-            mkdir -p /var/lib/mongodb
-            chown mongodb:mongodb /var/lib/mongodb
+        # create db -- note: this should agree with dbpath in merizod.conf
+        if [ ! -d /var/lib/merizodb ]; then
+            mkdir -p /var/lib/merizodb
+            chown merizodb:merizodb /var/lib/merizodb
         fi
 
-        # create logdir -- note: this should agree with logpath in mongod.conf
-        if [ ! -d /var/log/mongodb ]; then
-            mkdir -p /var/log/mongodb
-            chown mongodb:mongodb /var/log/mongodb
+        # create logdir -- note: this should agree with logpath in merizod.conf
+        if [ ! -d /var/log/merizodb ]; then
+            mkdir -p /var/log/merizodb
+            chown merizodb:merizodb /var/log/merizodb
         fi
     ;;
 

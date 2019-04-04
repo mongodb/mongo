@@ -1,8 +1,8 @@
-#    Copyright (C) 2018-present MongoDB, Inc.
+#    Copyright (C) 2018-present MerizoDB, Inc.
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the Server Side Public License, version 1,
-#    as published by MongoDB, Inc.
+#    as published by MerizoDB, Inc.
 #
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 #    You should have received a copy of the Server Side Public License
 #    along with this program. If not, see 
-#    <http://www.mongodb.com/licensing/server-side-public-license>.
+#    <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 #    As a special exception, the copyright holders give permission to link the 
 #    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+  cpp_namespace: "merizo"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "merizo/idl/basic_types.idl"
 
 server_parameters:
   connPoolMaxConnsPerHost:
     description: >
       New in version 2.6.
 
-      Available for both mongod and mongos.
+      Available for both merizod and merizos.
 
       Sets the maximum size of the legacy connection pools for
-      outgoing connections to other mongod instances in the global
+      outgoing connections to other merizod instances in the global
       connection pool. The size of a pool does not prevent the
       creation of additional connections, but does prevent a
       connection pool from retaining connections in excess of the
@@ -61,10 +61,10 @@ server_parameters:
     description: >
       New in version 3.6.3.
 
-      Available for both mongod and mongos.
+      Available for both merizod and merizos.
 
       Sets the maximum number of in-use connections at any given time
-      for for outgoing connections to other mongod instances in the
+      for for outgoing connections to other merizod instances in the
       legacy global connection pool.
 
       By default, the parameter is unset.
@@ -81,7 +81,7 @@ server_parameters:
     description: >
       New in version 3.6.3.
 
-      Available for both mongod and mongos.
+      Available for both merizod and merizos.
 
       Sets the time limit that connection in the legacy global
       connection pool can remain idle before being closed.

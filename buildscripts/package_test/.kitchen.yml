@@ -97,6 +97,6 @@ transport:
 suites:
   - name: service
     run_list:
-      - recipe[package_test::install_mongodb]
+      - recipe[package_test::install_merizodb]
     attributes:
       artifacts_url: <%= ENV['KITCHEN_ARTIFACTS_URL'] %>

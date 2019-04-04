@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/ops/update.h"
+#include "merizo/db/ops/update.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/exec/update_stage.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/update/update_driver.h"
-#include "mongo/db/update_index_data.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/client.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/exec/update_stage.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/update/update_driver.h"
+#include "merizo/db/update_index_data.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& request) {
     invariant(db);
@@ -126,4 +126,4 @@ BSONObj applyUpdateOperators(OperationContext* opCtx,
     return doc.getObject();
 }
 
-}  // namespace mongo
+}  // namespace merizo

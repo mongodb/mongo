@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/sorter/sorter.h"
+#include "merizo/db/sorter/sorter.h"
 
 #include <boost/filesystem.hpp>
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/init.h"
-#include "mongo/base/static_assert.h"
-#include "mongo/config.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/data_type_endian.h"
+#include "merizo/base/init.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/config.h"
+#include "merizo/db/service_context_test_fixture.h"
+#include "merizo/platform/random.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/merizoutils/str.h"
 
 #include <memory>
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Generates a new file name on each call using a static, atomic and monotonically increasing
@@ -62,14 +62,14 @@ std::string nextFileName() {
     return "extsort-sorter-test." + std::to_string(sorterTestFileCounter.fetchAndAdd(1));
 }
 
-}  // namespace mongo
+}  // namespace merizo
 
 // Need access to internal classes
-#include "mongo/db/sorter/sorter.cpp"
+#include "merizo/db/sorter/sorter.cpp"
 
-namespace mongo {
+namespace merizo {
 
-using namespace mongo::sorter;
+using namespace merizo::sorter;
 using std::make_shared;
 using std::pair;
 
@@ -204,7 +204,7 @@ void _assertIteratorsEquivalent(It1 it1, It2 it2, int line) {
         it1->closeSource();
         it2->closeSource();
     } catch (...) {
-        mongo::unittest::log() << "Failure from line " << line << " on iteration " << iteration
+        merizo::unittest::log() << "Failure from line " << line << " on iteration " << iteration
                                << std::endl;
         it1->closeSource();
         it2->closeSource();
@@ -578,7 +578,7 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
 };
 }  // namespace SorterTests
 
-class SorterSuite : public mongo::unittest::Suite {
+class SorterSuite : public merizo::unittest::Suite {
 public:
     SorterSuite() : Suite("sorter") {}
 
@@ -619,5 +619,5 @@ public:
     }
 };
 
-mongo::unittest::SuiteInstance<SorterSuite> extSortTests;
-}  // namespace mongo
+merizo::unittest::SuiteInstance<SorterSuite> extSortTests;
+}  // namespace merizo

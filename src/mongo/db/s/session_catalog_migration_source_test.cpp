@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/s/session_catalog_migration_source.h"
-#include "mongo/db/session.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/repl/mock_repl_coord_server_fixture.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/s/session_catalog_migration_source.h"
+#include "merizo/db/session.h"
+#include "merizo/db/session_txn_record_gen.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/executor/remote_command_request.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using executor::RemoteCommandRequest;
@@ -693,4 +693,4 @@ TEST_F(SessionCatalogMigrationSourceTest, TransactionEntriesShouldBeIgnored) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

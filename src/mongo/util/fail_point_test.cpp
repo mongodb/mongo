@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/time_support.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/time_support.h"
 
-using mongo::getGlobalFailPointRegistry;
-using mongo::BSONObj;
-using mongo::FailPoint;
-using mongo::FailPointEnableBlock;
-namespace stdx = mongo::stdx;
+using merizo::getGlobalFailPointRegistry;
+using merizo::BSONObj;
+using merizo::FailPoint;
+using merizo::FailPointEnableBlock;
+namespace stdx = merizo::stdx;
 
-namespace mongo_test {
+namespace merizo_test {
 TEST(FailPoint, InitialState) {
     FailPoint failPoint;
     ASSERT_FALSE(failPoint.shouldFail());
@@ -147,7 +147,7 @@ TEST(FailPoint, SetGetParam) {
     }
 }
 
-class FailPointStress : public mongo::unittest::Test {
+class FailPointStress : public merizo::unittest::Test {
 public:
     void setUp() {
         _fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
@@ -182,12 +182,12 @@ private:
     void blockTask() {
         while (true) {
             MONGO_FAIL_POINT_BLOCK(_fp, scopedFp) {
-                const mongo::BSONObj& data = scopedFp.getData();
+                const merizo::BSONObj& data = scopedFp.getData();
 
                 // Expanded ASSERT_EQUALS since the error is not being
                 // printed out properly
                 if (data["a"].numberInt() != 44) {
-                    mongo::error() << "blockTask thread detected anomaly"
+                    merizo::error() << "blockTask thread detected anomaly"
                                    << " - data: " << data << std::endl;
                     ASSERT(false);
                 }
@@ -203,10 +203,10 @@ private:
         while (true) {
             try {
                 MONGO_FAIL_POINT_BLOCK(_fp, scopedFp) {
-                    const mongo::BSONObj& data = scopedFp.getData();
+                    const merizo::BSONObj& data = scopedFp.getData();
 
                     if (data["a"].numberInt() != 44) {
-                        mongo::error() << "blockWithExceptionTask thread detected anomaly"
+                        merizo::error() << "blockWithExceptionTask thread detected anomaly"
                                        << " - data: " << data << std::endl;
                         ASSERT(false);
                     }
@@ -253,7 +253,7 @@ private:
 
 TEST_F(FailPointStress, Basic) {
     startTest();
-    mongo::sleepsecs(30);
+    merizo::sleepsecs(30);
     stopTest();
 }
 

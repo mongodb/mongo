@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/shard_server_op_observer.h"
+#include "merizo/db/s/shard_server_op_observer.h"
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/op_observer_impl.h"
-#include "mongo/db/s/chunk_split_state_driver.h"
-#include "mongo/db/s/chunk_splitter.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/migration_source_manager.h"
-#include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/type_shard_identity.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/type_shard_collection.h"
-#include "mongo/s/catalog/type_shard_database.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/op_observer_impl.h"
+#include "merizo/db/s/chunk_split_state_driver.h"
+#include "merizo/db/s/chunk_splitter.h"
+#include "merizo/db/s/database_sharding_state.h"
+#include "merizo/db/s/migration_source_manager.h"
+#include "merizo/db/s/shard_identity_rollback_notifier.h"
+#include "merizo/db/s/sharding_initialization_merizod.h"
+#include "merizo/db/s/type_shard_identity.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/catalog/type_shard_collection.h"
+#include "merizo/s/catalog/type_shard_database.h"
+#include "merizo/s/catalog_cache_loader.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const auto getDocumentKey = OperationContext::declareDecoration<BSONObj>();
@@ -156,8 +156,8 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
     const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
 
     // Each inserted/updated document should contain the shard key. The only instance in which a
-    // document could not contain a shard key is if the insert/update is performed through mongod
-    // explicitly, as opposed to first routed through mongos.
+    // document could not contain a shard key is if the insert/update is performed through merizod
+    // explicitly, as opposed to first routed through merizos.
     BSONObj shardKey = shardKeyPattern.extractShardKeyFromDoc(document);
     if (shardKey.woCompare(BSONObj()) == 0) {
         warning() << "inserting document " << document.toString() << " without shard key pattern "
@@ -413,4 +413,4 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-}  // namespace mongo
+}  // namespace merizo

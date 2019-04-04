@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/config.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/transport/message_compressor_registry.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/util/net/hostname_canonicalization.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_manager.h"
+#include "merizo/config.h"
+#include "merizo/db/commands/server_status.h"
+#include "merizo/transport/message_compressor_registry.h"
+#include "merizo/transport/service_entry_point.h"
+#include "merizo/util/net/hostname_canonicalization.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/net/ssl_manager.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 using std::map;
@@ -134,4 +134,4 @@ public:
 } advisoryHostFQDNs;
 }  // namespace
 
-}  // namespace mongo
+}  // namespace merizo

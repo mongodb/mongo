@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/service_context.h"
+#include "merizo/db/service_context.h"
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop.h"
-#include "mongo/db/default_baton.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/list.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/system_clock_source.h"
-#include "mongo/util/system_tick_source.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/locker_noop.h"
+#include "merizo/db/default_baton.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/storage/recovery_unit_noop.h"
+#include "merizo/stdx/list.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/transport/service_entry_point.h"
+#include "merizo/transport/session.h"
+#include "merizo/transport/transport_layer.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/system_clock_source.h"
+#include "merizo/util/system_tick_source.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using ConstructorActionList = stdx::list<ServiceContext::ConstructorDestructorActions>;
@@ -411,4 +411,4 @@ BatonHandle ServiceContext::makeBaton(OperationContext* opCtx) const {
     return baton;
 }
 
-}  // namespace mongo
+}  // namespace merizo

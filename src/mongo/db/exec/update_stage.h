@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,16 +30,16 @@
 #pragma once
 
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/requires_collection_stage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/update_result.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/update/update_driver.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/exec/requires_collection_stage.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/ops/parsed_update.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/ops/update_result.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/update/update_driver.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 class OpDebug;
@@ -246,4 +246,4 @@ private:
     mutablebson::DamageVector _damages;
 };
 
-}  // namespace mongo
+}  // namespace merizo

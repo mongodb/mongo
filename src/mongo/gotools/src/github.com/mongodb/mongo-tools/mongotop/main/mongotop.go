@@ -1,19 +1,19 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Main package for the mongotop tool.
+// Main package for the merizotop tool.
 package main
 
 import (
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongotop"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/signals"
+	"github.com/merizodb/merizo-tools/common/util"
+	"github.com/merizodb/merizo-tools/merizotop"
 	"gopkg.in/mgo.v2"
 	"os"
 	"strconv"
@@ -22,18 +22,18 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := options.New("mongotop", mongotop.Usage,
+	opts := options.New("merizotop", merizotop.Usage,
 		options.EnabledOptions{Auth: true, Connection: true, Namespace: false, URI: true})
 	opts.UseReadOnlyHostDescription()
 
-	// add mongotop-specific options
-	outputOpts := &mongotop.Output{}
+	// add merizotop-specific options
+	outputOpts := &merizotop.Output{}
 	opts.AddOptions(outputOpts)
 
 	args, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
-		log.Logvf(log.Always, "try 'mongotop --help' for more information")
+		log.Logvf(log.Always, "try 'merizotop --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -55,7 +55,7 @@ func main() {
 
 	if len(args) > 1 {
 		log.Logvf(log.Always, "too many positional arguments")
-		log.Logvf(log.Always, "try 'mongotop --help' for more information")
+		log.Logvf(log.Always, "try 'merizotop --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -92,19 +92,19 @@ func main() {
 		sessionProvider.SetReadPreference(mgo.PrimaryPreferred)
 	}
 
-	// fail fast if connecting to a mongos
+	// fail fast if connecting to a merizos
 	isMongos, err := sessionProvider.IsMongos()
 	if err != nil {
 		log.Logvf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 	if isMongos {
-		log.Logvf(log.Always, "cannot run mongotop against a mongos")
+		log.Logvf(log.Always, "cannot run merizotop against a merizos")
 		os.Exit(util.ExitError)
 	}
 
-	// instantiate a mongotop instance
-	top := &mongotop.MongoTop{
+	// instantiate a merizotop instance
+	top := &merizotop.MongoTop{
 		Options:         opts,
 		OutputOptions:   outputOpts,
 		SessionProvider: sessionProvider,

@@ -4,10 +4,10 @@
  *   - config servers (primary + secondary)
  *
  * And is not returned by:
- *   - mongos
+ *   - merizos
  *   - non-sharding aware shard servers (primary + secondary)
- *   - mongod from a standalone replica set (primary + secondary)
- *   - standalone mongod
+ *   - merizod from a standalone replica set (primary + secondary)
+ *   - standalone merizod
  */
 (function() {
     "use strict";
@@ -91,18 +91,18 @@
 
     // Sharded collection.
     assertDoesNotReturnLastCommittedOpTime(
-        st.s.getDB("test"), "foo", "mongos talking to a sharded collection");
+        st.s.getDB("test"), "foo", "merizos talking to a sharded collection");
 
     // Unsharded collection.
     assertDoesNotReturnLastCommittedOpTime(
-        st.s.getDB("test"), "unsharded", "mongos talking to a non-sharded collection");
+        st.s.getDB("test"), "unsharded", "merizos talking to a non-sharded collection");
 
     // Collection stored on the config server.
     assertDoesNotReturnLastCommittedOpTime(
-        st.s.getDB("config"), "foo", "mongos talking to a config server collection");
+        st.s.getDB("config"), "foo", "merizos talking to a config server collection");
 
     //
-    // A mongod in a sharded replica set returns lastCommittedOpTime.
+    // A merizod in a sharded replica set returns lastCommittedOpTime.
     //
 
     // To verify the lastCommittedOpTime is being returned, pause replication on the secondary to
@@ -148,7 +148,7 @@
     st.stop();
 
     //
-    // A mongod started with --shardsvr that is not sharding aware does not return
+    // A merizod started with --shardsvr that is not sharding aware does not return
     // lastCommittedOpTime.
     //
 
@@ -164,7 +164,7 @@
     replTestShardSvr.stopSet();
 
     //
-    // A mongod from a standalone replica set does not return lastCommittedOpTime.
+    // A merizod from a standalone replica set does not return lastCommittedOpTime.
     //
 
     const replTest = new ReplSetTest({nodes: 2});
@@ -179,12 +179,12 @@
     replTest.stopSet();
 
     //
-    // A standalone mongod does not return lastCommittedOpTime.
+    // A standalone merizod does not return lastCommittedOpTime.
     //
 
     const standalone = MongoRunner.runMongod();
 
-    assertDoesNotReturnLastCommittedOpTime(standalone.getDB("test"), "foo", "standalone mongod");
+    assertDoesNotReturnLastCommittedOpTime(standalone.getDB("test"), "foo", "standalone merizod");
 
     MongoRunner.stopMongod(standalone);
 })();

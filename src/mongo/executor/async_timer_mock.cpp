@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/async_timer_mock.h"
+#include "merizo/executor/async_timer_mock.h"
 
-#include "mongo/base/system_error.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/base/system_error.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 namespace executor {
 
 namespace {
@@ -42,7 +42,7 @@ const Milliseconds kZeroMilliseconds = Milliseconds(0);
 AsyncTimerMockImpl::AsyncTimerMockImpl(Milliseconds expiration) : _timeLeft(expiration) {}
 
 void AsyncTimerMockImpl::cancel() {
-    _callAllHandlers(std::error_code(ErrorCodes::CallbackCanceled, mongoErrorCategory()));
+    _callAllHandlers(std::error_code(ErrorCodes::CallbackCanceled, merizoErrorCategory()));
 }
 
 void AsyncTimerMockImpl::asyncWait(AsyncTimerInterface::Handler handler) {
@@ -97,7 +97,7 @@ void AsyncTimerMockImpl::expireAfter(Milliseconds expiration) {
 
     // Call handlers with a "canceled" error code
     for (const auto& handler : tmp) {
-        handler(std::error_code(ErrorCodes::CallbackCanceled, mongoErrorCategory()));
+        handler(std::error_code(ErrorCodes::CallbackCanceled, merizoErrorCategory()));
     }
 }
 
@@ -167,4 +167,4 @@ int AsyncTimerFactoryMock::jobs() {
 }
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace merizo

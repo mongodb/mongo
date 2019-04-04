@@ -18,8 +18,8 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
         // 1)  The checks are performed against shard and config primaries, and the connections
         //     cached on ShardingTest are used. So, tests that end with a different (or no) shard or
         //     config primary should skip the checks.
-        // 2) The sharding catalog is read from the config server via mongos, so tests that cause
-        //    the config primary to be unreachable from mongos should skip the checks.
+        // 2) The sharding catalog is read from the config server via merizos, so tests that cause
+        //    the config primary to be unreachable from merizos should skip the checks.
         print(
             "Skipping checking consistency of the sharding catalog with shards' storage catalogs and catalog caches");
         return;

@@ -10,7 +10,7 @@ env.Library(
         'bson_extract.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -20,7 +20,7 @@ env.CppUnitTest(
         'bson_extract_test.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'bson_extract',
     ],
 )
@@ -31,7 +31,7 @@ env.CppUnitTest(
         'builder_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -41,6 +41,6 @@ env.CppUnitTest(
         'bson_check_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )

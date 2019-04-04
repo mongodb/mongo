@@ -14,8 +14,8 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
     var st = new ShardingTest({shards: 2, other: {separateConfig: true}});
 
-    var mongos = st.s0, admin = mongos.getDB('admin'), dbName = 'foo', ns = dbName + '.bar',
-        coll = mongos.getCollection(ns);
+    var merizos = st.s0, admin = merizos.getDB('admin'), dbName = 'foo', ns = dbName + '.bar',
+        coll = merizos.getCollection(ns);
 
     assert.commandWorked(admin.runCommand({enableSharding: dbName}));
     printjson(admin.runCommand({movePrimary: dbName, to: st.shard0.shardName}));
@@ -30,11 +30,11 @@ load('./jstests/libs/cleanup_orphaned_util.js');
 
     var found = false;
     for (var i = 0; i < 10000; i++) {
-        var doc = {key: ObjectId()}, hash = mongos.adminCommand({_hashBSONElement: doc.key}).out;
+        var doc = {key: ObjectId()}, hash = merizos.adminCommand({_hashBSONElement: doc.key}).out;
 
         print('doc.key ' + doc.key + ' hashes to ' + hash);
 
-        if (mongos.getCollection('config.chunks')
+        if (merizos.getCollection('config.chunks')
                 .findOne(
                     {_id: chunkWithDoc._id, 'min.key': {$lte: hash}, 'max.key': {$gt: hash}})) {
             found = true;

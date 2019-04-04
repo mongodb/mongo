@@ -1,16 +1,16 @@
-// Test mongo shell connect strings.
+// Test merizo shell connect strings.
 // @tags: [
 //   uses_multiple_connections,
 // ]
 (function() {
     'use strict';
 
-    const mongod = new MongoURI(db.getMongo().host).servers[0];
-    const host = mongod.host;
-    const port = mongod.port;
+    const merizod = new MongoURI(db.getMongo().host).servers[0];
+    const host = merizod.host;
+    const port = merizod.port;
 
     function testConnect(ok, ...args) {
-        const exitCode = runMongoProgram('mongo', '--eval', ';', ...args);
+        const exitCode = runMongoProgram('merizo', '--eval', ';', ...args);
         if (ok) {
             assert.eq(exitCode, 0, "failed to connect with `" + args.join(' ') + "`");
         } else {
@@ -25,12 +25,12 @@
     testConnect(true, host, '--port', port);
     testConnect(true, '--host', host, '--port', port, 'test');
     testConnect(true, '--host', host, '--port', port, 'admin');
-    testConnect(true, `mongodb://${host}:${port}/test`);
-    testConnect(true, `mongodb://${host}:${port}/test?connectTimeoutMS=10000`);
+    testConnect(true, `merizodb://${host}:${port}/test`);
+    testConnect(true, `merizodb://${host}:${port}/test?connectTimeoutMS=10000`);
 
     // if a full URI is provided, you cannot also specify host or port
     testConnect(false, `${host}/test`, '--port', port);
-    testConnect(false, `mongodb://${host}:${port}/test`, '--port', port);
-    testConnect(false, `mongodb://${host}:${port}/test`, '--host', host);
-    testConnect(false, `mongodb://${host}:${port}/test`, '--host', host, '--port', port);
+    testConnect(false, `merizodb://${host}:${port}/test`, '--port', port);
+    testConnect(false, `merizodb://${host}:${port}/test`, '--host', host);
+    testConnect(false, `merizodb://${host}:${port}/test`, '--host', host, '--port', port);
 })();

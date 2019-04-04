@@ -6,9 +6,9 @@ sorterEnv = env.Clone()
 sorterEnv.InjectThirdParty(libraries=['snappy'])
 sorterEnv.CppUnitTest('sorter_test',
                       'sorter_test.cpp',
-                       LIBDEPS=['$BUILD_DIR/mongo/db/service_context',
-                                '$BUILD_DIR/mongo/db/service_context_test_fixture',
-                                '$BUILD_DIR/mongo/db/storage/encryption_hooks',
-                                '$BUILD_DIR/mongo/db/storage/storage_options',
-                                '$BUILD_DIR/mongo/s/is_mongos',
+                       LIBDEPS=['$BUILD_DIR/merizo/db/service_context',
+                                '$BUILD_DIR/merizo/db/service_context_test_fixture',
+                                '$BUILD_DIR/merizo/db/storage/encryption_hooks',
+                                '$BUILD_DIR/merizo/db/storage/storage_options',
+                                '$BUILD_DIR/merizo/s/is_merizos',
                                 '$BUILD_DIR/third_party/shim_snappy'])

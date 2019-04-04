@@ -1,5 +1,5 @@
 /**
- * Verify that a current mongos, when connected to an old mongod (one that
+ * Verify that a current merizos, when connected to an old merizod (one that
  * implements a different wire-protocol version) reports the resulting failures
  * properly.
  *
@@ -17,14 +17,14 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     'use strict';
 
-    /*  Start a ShardingTest with a 'last-stable' mongos so that a 'last-stable'
+    /*  Start a ShardingTest with a 'last-stable' merizos so that a 'last-stable'
      *  shard can be added.  (A 'last-stable' shard cannot be added from a
-     *  current mongos because the wire protocol must be presumed different.)
+     *  current merizos because the wire protocol must be presumed different.)
      */
     var st = new ShardingTest({
         shards: 1,
         other: {
-            mongosOptions: {binVersion: 'last-stable'},
+            merizosOptions: {binVersion: 'last-stable'},
             shardOptions: {binVersion: 'last-stable'},
             shardAsReplicaSet: false
         }
@@ -33,7 +33,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
     assert.commandWorked(st.s.adminCommand({shardCollection: 'test.foo', key: {x: 1}}));
 
-    // Start a current-version mongos.
+    // Start a current-version merizos.
     var newMongos = MongoRunner.runMongos({configdb: st._configDB});
 
     // Write commands report failure by returning writeError:

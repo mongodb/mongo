@@ -1,14 +1,14 @@
 [Unit]
-Description=MongoDB Database Server
+Description=MerizoDB Database Server
 After=multi-user.target
-Documentation=https://docs.mongodb.org/manual
+Documentation=https://docs.merizodb.org/manual
 
 [Service]
-User=mongodb
-Group=mongodb
-EnvironmentFile=-/etc/default/mongod
-ExecStart=/usr/bin/mongod --config /etc/mongod.conf
-PIDFile=/var/run/mongodb/mongod.pid
+User=merizodb
+Group=merizodb
+EnvironmentFile=-/etc/default/merizod
+ExecStart=/usr/bin/merizod --config /etc/merizod.conf
+PIDFile=/var/run/merizodb/merizod.pid
 # file size
 LimitFSIZE=infinity
 # cpu time
@@ -25,8 +25,8 @@ LimitMEMLOCK=infinity
 TasksMax=infinity
 TasksAccounting=false
 
-# Recommended limits for for mongod as specified in
-# http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
+# Recommended limits for for merizod as specified in
+# http://docs.merizodb.org/manual/reference/ulimit/#recommended-settings
 
 [Install]
 WantedBy=multi-user.target

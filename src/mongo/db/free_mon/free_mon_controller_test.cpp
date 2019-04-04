@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,51 +27,51 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/filesystem.hpp>
 #include <future>
 #include <iostream>
 #include <snappy.h>
 
-#include "mongo/db/free_mon/free_mon_controller.h"
-#include "mongo/db/free_mon/free_mon_storage.h"
+#include "merizo/db/free_mon/free_mon_controller.h"
+#include "merizo/db/free_mon/free_mon_storage.h"
 
-#include "mongo/base/data_type_validated.h"
-#include "mongo/base/deinitializer_context.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/free_mon/free_mon_op_observer.h"
-#include "mongo/db/ftdc/collector.h"
-#include "mongo/db/ftdc/config.h"
-#include "mongo/db/ftdc/constants.h"
-#include "mongo/db/ftdc/controller.h"
-#include "mongo/db/ftdc/ftdc_test.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/op_observer_noop.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/barrier.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/log.h"
+#include "merizo/base/data_type_validated.h"
+#include "merizo/base/deinitializer_context.h"
+#include "merizo/bson/bson_validate.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/client.h"
+#include "merizo/db/free_mon/free_mon_op_observer.h"
+#include "merizo/db/ftdc/collector.h"
+#include "merizo/db/ftdc/config.h"
+#include "merizo/db/ftdc/constants.h"
+#include "merizo/db/ftdc/controller.h"
+#include "merizo/db/ftdc/ftdc_test.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/op_observer_noop.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/repl/storage_interface_impl.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/executor/network_interface_mock.h"
+#include "merizo/executor/thread_pool_task_executor_test_fixture.h"
+#include "merizo/rpc/object_check.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/barrier.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/clock_source.h"
+#include "merizo/util/log.h"
 
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 
@@ -1614,4 +1614,4 @@ TEST_F(FreeMonControllerRSTest, SecondaryRollbackStopMetrics) {
 // TODO: Positive: ensure optional fields are rotated
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "merizo/db/s/config/sharding_catalog_manager.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/log.h"
+#include "merizo/base/status_with.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/s/balancer/balancer_policy.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/s/catalog/sharding_catalog_client.h"
+#include "merizo/s/catalog/type_collection.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/catalog/type_tags.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const ReadPreferenceSetting kConfigPrimarySelector(ReadPreference::PrimaryOnly);
@@ -418,4 +418,4 @@ Status ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
         opCtx, TagsType::ConfigNS, removeBuilder.obj(), kNoWaitWriteConcern);
 }
 
-}  // namespace mongo
+}  // namespace merizo

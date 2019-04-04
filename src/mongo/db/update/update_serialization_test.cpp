@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <iostream>
@@ -35,13 +35,13 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/json.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/update/update_driver.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/json.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/update/update_driver.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 // Unit tests for UpdateNode serialization. Note that these tests are, for simplicity, sensitive to
@@ -50,13 +50,13 @@ namespace {
 
 auto updateRoundTrip(const char* json, const std::vector<std::string> filterNames = {}) {
     UpdateDriver driver(new ExpressionContextForTest);
-    auto bson = mongo::fromjson(json);
+    auto bson = merizo::fromjson(json);
     // Include some trivial array filters to allow parsing '$[<identifier>]'.
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> filters;
     for (const auto& name : filterNames)
         filters[name] = nullptr;
     driver.parse(bson, filters);
-    return mongo::tojson(driver.serialize());
+    return merizo::tojson(driver.serialize());
 }
 
 TEST(UpdateSerialization, DocumentReplacementSerializesExactly) {
@@ -248,4 +248,4 @@ TEST(UpdateSerialization, CompoundStatementsSerialize) {
 }
 
 }  // namespace
-}  // mongo
+}  // merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,33 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/devnull/devnull_kv_engine.h"
-#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
-#include "mongo/db/storage/kv/kv_database_catalog_entry.h"
-#include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/unclean_shutdown.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/barrier.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/periodic_runner_factory.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/db/storage/devnull/devnull_kv_engine.h"
+#include "merizo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
+#include "merizo/db/storage/kv/kv_database_catalog_entry.h"
+#include "merizo/db/storage/kv/kv_database_catalog_entry_mock.h"
+#include "merizo/db/storage/kv/kv_engine.h"
+#include "merizo/db/storage/kv/kv_storage_engine.h"
+#include "merizo/db/storage/storage_repair_observer.h"
+#include "merizo/db/unclean_shutdown.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/barrier.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/periodic_runner_factory.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class KVStorageEngineTest : public ServiceContextMongoDTest {
@@ -653,4 +653,4 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

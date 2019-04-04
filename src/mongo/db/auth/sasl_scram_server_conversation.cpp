@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/sasl_scram_server_conversation.h"
+#include "merizo/db/auth/sasl_scram_server_conversation.h"
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/db/auth/sasl_mechanism_policies.h"
-#include "mongo/db/auth/sasl_mechanism_registry.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/platform/random.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/sequence_util.h"
-#include "mongo/util/text.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/db/auth/sasl_mechanism_policies.h"
+#include "merizo/db/auth/sasl_mechanism_registry.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/platform/random.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/sequence_util.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 
 
 template <typename Policy>
@@ -366,4 +366,4 @@ namespace {
 GlobalSASLMechanismRegisterer<SCRAMSHA1ServerFactory> scramsha1Registerer;
 GlobalSASLMechanismRegisterer<SCRAMSHA256ServerFactory> scramsha256Registerer;
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

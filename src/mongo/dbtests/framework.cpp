@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,39 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/dbtests/framework.h"
+#include "merizo/dbtests/framework.h"
 
 #include <string>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/status.h"
-#include "mongo/db/catalog/database_holder_impl.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/dbtests/framework_options.h"
-#include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/periodic_runner_factory.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/version.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/status.h"
+#include "merizo/db/catalog/database_holder_impl.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/lock_state.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/index_builds_coordinator_merizod.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/storage_engine_init.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/dbtests/framework_options.h"
+#include "merizo/scripting/dbdirectclient_factory.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/periodic_runner_factory.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/version.h"
 
-namespace mongo {
+namespace merizo {
 namespace dbtests {
 
 int runDbTests(int argc, char** argv) {
@@ -123,4 +123,4 @@ int runDbTests(int argc, char** argv) {
 
 }  // namespace dbtests
 
-}  // namespace mongo
+}  // namespace merizo

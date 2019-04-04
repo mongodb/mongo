@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,26 +33,26 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/counter.h"
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/string_map.h"
+#include "merizo/base/counter.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/resource_pattern.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/rpc/reply_builder_interface.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/string_map.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DECLARE(failCommand);
 MONGO_FAIL_POINT_DECLARE(waitInCommandMarkKillOnClientDisconnect);
@@ -69,11 +69,11 @@ class Document;
 // Would be a namespace, but want to keep it closed rather than open.
 // Some of these may move to the BasicCommand shim if they are only for legacy implementations.
 struct CommandHelpers {
-    // The type of the first field in 'cmdObj' must be mongo::String. The first field is
+    // The type of the first field in 'cmdObj' must be merizo::String. The first field is
     // interpreted as a collection name.
     static std::string parseNsFullyQualified(const BSONObj& cmdObj);
 
-    // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
+    // The type of the first field in 'cmdObj' must be merizo::String or Symbol.
     // The first field is interpreted as a collection name.
     static NamespaceString parseNsCollectionRequired(StringData dbname, const BSONObj& cmdObj);
 
@@ -81,9 +81,9 @@ struct CommandHelpers {
 
     /**
      * Return the namespace for the command. If the first field in 'cmdObj' is of type
-     * mongo::String, then that field is interpreted as the collection name, and is
+     * merizo::String, then that field is interpreted as the collection name, and is
      * appended to 'dbname' after a '.' character. If the first field is not of type
-     * mongo::String, then 'dbname' is returned unmodified.
+     * merizo::String, then 'dbname' is returned unmodified.
      */
     static std::string parseNsFromCommand(StringData dbname, const BSONObj& cmdObj);
 
@@ -153,15 +153,15 @@ struct CommandHelpers {
      *
      * This performs 2 transformations:
      * 1) $readPreference fields are moved into a subobject called $queryOptions. This matches the
-     *    "wrapped" format historically used internally by mongos. Moving off of that format will be
+     *    "wrapped" format historically used internally by merizos. Moving off of that format will be
      *    done as SERVER-29091.
      *
      * 2) Filter out generic arguments that shouldn't be blindly passed to the shards.  This is
-     *    necessary because many mongos implementations of Command::run() just pass cmdObj through
+     *    necessary because many merizos implementations of Command::run() just pass cmdObj through
      *    directly to the shards. However, some of the generic arguments fields are automatically
      *    appended in the egress layer. Removing them here ensures that they don't get duplicated.
      *
-     * Ideally this function can be deleted once mongos run() implementations are more careful about
+     * Ideally this function can be deleted once merizos run() implementations are more careful about
      * what they send to the shards.
      */
     static BSONObj filterCommandRequestForPassthrough(const BSONObj& cmdObj);
@@ -171,7 +171,7 @@ struct CommandHelpers {
     /**
      * Rewrites reply into a format safe to blindly forward from shards to clients.
      *
-     * Ideally this function can be deleted once mongos run() implementations are more careful about
+     * Ideally this function can be deleted once merizos run() implementations are more careful about
      * what they return from the shards.
      */
     static BSONObj filterCommandReplyForPassthrough(const BSONObj& reply);
@@ -406,7 +406,7 @@ public:
     /**
      * If true, the logical sessions attached to the command request will be attached to the
      * request's operation context. Note that returning false can potentially strip the logical
-     * session from the request in multi-staged invocations, like for example, mongos -> mongod.
+     * session from the request in multi-staged invocations, like for example, merizos -> merizod.
      * This can have security implications so think carefully before returning false.
      */
     virtual bool attachLogicalSessionsToOpCtx() const {
@@ -473,7 +473,7 @@ public:
      * If a readConcern level argument is sent to a command that returns false the command processor
      * will reject the command, returning an appropriate error message.
      *
-     * Note that this is never called on mongos. Sharded commands are responsible for forwarding
+     * Note that this is never called on merizos. Sharded commands are responsible for forwarding
      * the option to the shards as needed. We rely on the shards to fail the commands in the
      * cases where it isn't supported.
      */
@@ -618,7 +618,7 @@ public:
      * If a readConcern level argument is sent to a command that returns false the command processor
      * will reject the command, returning an appropriate error message.
      *
-     * Note that this is never called on mongos. Sharded commands are responsible for forwarding
+     * Note that this is never called on merizos. Sharded commands are responsible for forwarding
      * the option to the shards as needed. We rely on the shards to fail the commands in the
      * cases where it isn't supported.
      */
@@ -875,4 +875,4 @@ CommandRegistry* globalCommandRegistry();
         return Status::OK();                                                \
     }
 
-}  // namespace mongo
+}  // namespace merizo

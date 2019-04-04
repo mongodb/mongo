@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <set>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_rs.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_internal.h"
-#include "mongo/dbtests/mock/mock_conn_registry.h"
-#include "mongo/dbtests/mock/mock_replica_set.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/init.h"
+#include "merizo/client/connpool.h"
+#include "merizo/client/dbclient_rs.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/client/replica_set_monitor_internal.h"
+#include "merizo/dbtests/mock/mock_conn_registry.h"
+#include "merizo/dbtests/mock/mock_replica_set.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::map;
@@ -62,19 +62,19 @@ MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
  * Warning: Tests running this fixture cannot be run in parallel with other tests
  * that uses ConnectionString::setConnectionHook
  */
-class ReplicaSetMonitorTest : public mongo::unittest::Test {
+class ReplicaSetMonitorTest : public merizo::unittest::Test {
 protected:
     void setUp() {
         _replSet.reset(new MockReplicaSet("test", 3));
         _originalConnectionHook = ConnectionString::getConnectionHook();
-        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+        ConnectionString::setConnectionHook(merizo::MockConnRegistry::get()->getConnStrHook());
     }
 
     void tearDown() {
         ConnectionString::setConnectionHook(_originalConnectionHook);
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
-        mongo::ScopedDbConnection::clearPool();
+        merizo::ScopedDbConnection::clearPool();
     }
 
     MockReplicaSet* getReplSet() {
@@ -148,7 +148,7 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
     const size_t NODE_COUNT = 5;
     MockReplicaSet replSet("test", NODE_COUNT);
     ConnectionString::ConnectionHook* originalConnHook = ConnectionString::getConnectionHook();
-    ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+    ConnectionString::setConnectionHook(merizo::MockConnRegistry::get()->getConnStrHook());
 
     const string replSetName(replSet.getSetName());
     set<HostAndPort> seedList;
@@ -169,7 +169,7 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
             BSONObj monitorState = monitorStateBuilder.done();
 
             BSONElement hostsElem = monitorState["hosts"];
-            BSONElement addrElem = hostsElem[mongo::str::stream() << idxToRemove]["addr"];
+            BSONElement addrElem = hostsElem[merizo::str::stream() << idxToRemove]["addr"];
             hostToRemove = addrElem.String();
         }
 
@@ -188,32 +188,32 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
     replMonitor.reset();
     ReplicaSetMonitor::cleanup();
     ConnectionString::setConnectionHook(originalConnHook);
-    mongo::ScopedDbConnection::clearPool();
+    merizo::ScopedDbConnection::clearPool();
 }
 
 /**
  * Warning: Tests running this fixture cannot be run in parallel with other tests
  * that use ConnectionString::setConnectionHook.
  */
-class TwoNodeWithTags : public mongo::unittest::Test {
+class TwoNodeWithTags : public merizo::unittest::Test {
 protected:
     void setUp() {
         _replSet.reset(new MockReplicaSet("test", 2));
         _originalConnectionHook = ConnectionString::getConnectionHook();
-        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+        ConnectionString::setConnectionHook(merizo::MockConnRegistry::get()->getConnStrHook());
 
         repl::ReplSetConfig oldConfig = _replSet->getReplConfig();
 
-        mongo::BSONObjBuilder newConfigBuilder;
+        merizo::BSONObjBuilder newConfigBuilder;
         newConfigBuilder.append("_id", oldConfig.getReplSetName());
         newConfigBuilder.append("version", oldConfig.getConfigVersion());
         newConfigBuilder.append("protocolVersion", oldConfig.getProtocolVersion());
 
-        mongo::BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
+        merizo::BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
 
         {
             const string host(_replSet->getPrimary());
-            const mongo::repl::MemberConfig* member =
+            const merizo::repl::MemberConfig* member =
                 oldConfig.findMemberByHostAndPort(HostAndPort(host));
             membersBuilder.append(
                 BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
@@ -224,7 +224,7 @@ protected:
 
         {
             const string host(_replSet->getSecondaries().front());
-            const mongo::repl::MemberConfig* member =
+            const merizo::repl::MemberConfig* member =
                 oldConfig.findMemberByHostAndPort(HostAndPort(host));
             membersBuilder.append(
                 BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
@@ -276,7 +276,7 @@ TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
 
     HostAndPort node = monitor
                            ->getHostOrRefresh(ReadPreferenceSetting(
-                                                  mongo::ReadPreference::SecondaryOnly, TagSet()),
+                                                  merizo::ReadPreference::SecondaryOnly, TagSet()),
                                               Milliseconds(1))
                            .get();
 
@@ -307,7 +307,7 @@ TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
                                 << "ny")));
     HostAndPort node =
         monitor
-            ->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, tags),
+            ->getHostOrRefresh(ReadPreferenceSetting(merizo::ReadPreference::SecondaryOnly, tags),
                                Milliseconds(1))
             .get();
 
@@ -335,26 +335,26 @@ TEST_F(TwoNodeWithTags, SecDownRetryExpiredTimeout) {
 
     // This will fail, immediately without doing any refreshing.
     auto errorFut = monitor->getHostOrRefresh(
-        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, TagSet()), Milliseconds(0));
+        ReadPreferenceSetting(merizo::ReadPreference::SecondaryOnly, TagSet()), Milliseconds(0));
     ASSERT(errorFut.isReady());
     ASSERT_EQ(errorFut.getNoThrow().getStatus(), ErrorCodes::FailedToSatisfyReadPreference);
 
     // Because it did not schedule an expedited scan, it will continue failing until someone waits.
     errorFut = monitor->getHostOrRefresh(
-        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, TagSet()), Milliseconds(0));
+        ReadPreferenceSetting(merizo::ReadPreference::SecondaryOnly, TagSet()), Milliseconds(0));
     ASSERT(errorFut.isReady());
     ASSERT_EQ(errorFut.getNoThrow().getStatus(), ErrorCodes::FailedToSatisfyReadPreference);
 
     // Negative timeouts are handled the same way
     errorFut = monitor->getHostOrRefresh(
-        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, TagSet()), Milliseconds(-1234));
+        ReadPreferenceSetting(merizo::ReadPreference::SecondaryOnly, TagSet()), Milliseconds(-1234));
     ASSERT(errorFut.isReady());
     ASSERT_EQ(errorFut.getNoThrow().getStatus(), ErrorCodes::FailedToSatisfyReadPreference);
 
     // This will trigger a rescan. It is the only call in this test with a non-zero timeout.
     HostAndPort node = monitor
                            ->getHostOrRefresh(ReadPreferenceSetting(
-                                                  mongo::ReadPreference::SecondaryOnly, TagSet()),
+                                                  merizo::ReadPreference::SecondaryOnly, TagSet()),
                                               Milliseconds(1))
                            .get();
 
@@ -364,7 +364,7 @@ TEST_F(TwoNodeWithTags, SecDownRetryExpiredTimeout) {
     // And this will now succeed.
     node = monitor
                ->getHostOrRefresh(
-                   ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, TagSet()),
+                   ReadPreferenceSetting(merizo::ReadPreference::SecondaryOnly, TagSet()),
                    Milliseconds(0))
                .get();
     ASSERT_FALSE(monitor->isPrimary(node));
@@ -374,4 +374,4 @@ TEST_F(TwoNodeWithTags, SecDownRetryExpiredTimeout) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

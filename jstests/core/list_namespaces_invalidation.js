@@ -42,7 +42,7 @@
                 validator: {
                     $or: [
                         {phone: {$type: "string"}},
-                        {email: {$regex: /@mongodb\.com$/}},
+                        {email: {$regex: /@merizodb\.com$/}},
                         {status: {$in: ["Unknown", "Incomplete"]}},
                         {address: {$type: "string"}},
                         {ssn: {$type: "string"}},

@@ -1,8 +1,8 @@
-# Copyright (C) 2019-present MongoDB, Inc.
+# Copyright (C) 2019-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
 #
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "merizo"
     cpp_includes:
-        - "mongo/bson/bson_depth.h"
+        - "merizo/bson/bson_depth.h"
 
 server_parameters:
     notablescan:
         # NOT recommended for production use.
         description: >-
             Whether all queries must use indexes.
-            If true, MongoDB will not execute queries that require a table scan and will return an error.
+            If true, MerizoDB will not execute queries that require a table scan and will return an error.
         set_at: [ startup, runtime ]
         cpp_varname: 'storageGlobalParams.noTableScan'
     syncdelay:
         # In almost every situation you should not set this value and use the default setting.
         description: >-
-            Interval in seconds between fsync operations where mongod flushes its
-            working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
+            Interval in seconds between fsync operations where merizod flushes its
+            working memory to disk. By default, merizod flushes memory to disk every 60 seconds.
         set_at: [ startup, runtime ]
         cpp_varname: 'storageGlobalParams.syncdelay'
         validator:

@@ -1,5 +1,5 @@
 /**
- * Tests that query options are not dropped by mongos when a query against a view is rewritten as an
+ * Tests that query options are not dropped by merizos when a query against a view is rewritten as an
  * aggregation against the underlying collection.
  */
 (function() {
@@ -27,39 +27,39 @@
         }
     });
 
-    const mongos = st.s0;
-    const config = mongos.getDB("config");
-    const mongosDB = mongos.getDB("view_rewrite");
-    const coll = mongosDB.getCollection("coll");
+    const merizos = st.s0;
+    const config = merizos.getDB("config");
+    const merizosDB = merizos.getDB("view_rewrite");
+    const coll = merizosDB.getCollection("coll");
 
-    assert.commandWorked(config.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), "view_rewrite-rs0");
+    assert.commandWorked(config.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), "view_rewrite-rs0");
 
     const rs0Secondary = st.rs0.getSecondary();
     const rs1Primary = st.rs1.getPrimary();
     const rs1Secondary = st.rs1.getSecondary();
 
     assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
-    assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 5}}));
-    assert.commandWorked(mongosDB.adminCommand(
+    assert.commandWorked(merizos.adminCommand({split: coll.getFullName(), middle: {a: 5}}));
+    assert.commandWorked(merizosDB.adminCommand(
         {moveChunk: coll.getFullName(), find: {a: 5}, to: "view_rewrite-rs1"}));
 
     for (let i = 0; i < 10; ++i) {
         assert.writeOK(coll.insert({a: i}));
     }
 
-    assert.commandWorked(mongosDB.createView("view", coll.getName(), []));
-    const view = mongosDB.getCollection("view");
+    assert.commandWorked(merizosDB.createView("view", coll.getName(), []));
+    const view = merizosDB.getCollection("view");
 
     //
-    // Confirms that queries run against views on mongos result in execution of a rewritten
+    // Confirms that queries run against views on merizos result in execution of a rewritten
     // aggregation that contains all expected query options.
     //
     function confirmOptionsInProfiler(shardPrimary) {
         assert.commandWorked(shardPrimary.setProfilingLevel(2));
 
         // Aggregation
-        assert.commandWorked(mongosDB.runCommand({
+        assert.commandWorked(merizosDB.runCommand({
             aggregate: "view",
             pipeline: [],
             comment: "agg_rewrite",
@@ -82,7 +82,7 @@
         });
 
         // Find
-        assert.commandWorked(mongosDB.runCommand({
+        assert.commandWorked(merizosDB.runCommand({
             find: "view",
             comment: "find_rewrite",
             maxTimeMS: 5 * 60 * 1000,
@@ -103,7 +103,7 @@
         });
 
         // Count
-        assert.commandWorked(mongosDB.runCommand({
+        assert.commandWorked(merizosDB.runCommand({
             count: "view",
             comment: "count_rewrite",
             maxTimeMS: 5 * 60 * 1000,
@@ -124,7 +124,7 @@
         });
 
         // Distinct
-        assert.commandWorked(mongosDB.runCommand({
+        assert.commandWorked(merizosDB.runCommand({
             distinct: "view",
             key: "a",
             comment: "distinct_rewrite",
@@ -150,14 +150,14 @@
     }
 
     //
-    // Confirms that queries run against views on mongos are executed against a tagged secondary, as
+    // Confirms that queries run against views on merizos are executed against a tagged secondary, as
     // per readPreference setting.
     //
     function confirmReadPreference(shardSecondary) {
         assert.commandWorked(shardSecondary.setProfilingLevel(2));
 
         // Aggregation
-        assert.commandWorked(mongosDB.runCommand({
+        assert.commandWorked(merizosDB.runCommand({
             query: {aggregate: "view", pipeline: [], comment: "agg_readPref", cursor: {}},
             $readPreference: {mode: "nearest", tags: [{tag: "secondary"}]},
             readConcern: {level: "local"}
@@ -175,7 +175,7 @@
         });
 
         // Find
-        assert.commandWorked(mongosDB.runCommand({
+        assert.commandWorked(merizosDB.runCommand({
             query: {find: "view", comment: "find_readPref", maxTimeMS: 5 * 60 * 1000},
             $readPreference: {mode: "nearest", tags: [{tag: "secondary"}]},
             readConcern: {level: "local"}
@@ -193,7 +193,7 @@
         });
 
         // Count
-        assert.commandWorked(mongosDB.runCommand({
+        assert.commandWorked(merizosDB.runCommand({
             query: {count: "view", comment: "count_readPref"},
             $readPreference: {mode: "nearest", tags: [{tag: "secondary"}]},
             readConcern: {level: "local"}
@@ -211,7 +211,7 @@
         });
 
         // Distinct
-        assert.commandWorked(mongosDB.runCommand({
+        assert.commandWorked(merizosDB.runCommand({
             query: {distinct: "view", key: "a", comment: "distinct_readPref"},
             $readPreference: {mode: "nearest", tags: [{tag: "secondary"}]},
             readConcern: {level: "local"}
@@ -231,10 +231,10 @@
         assert.commandWorked(shardSecondary.setProfilingLevel(0));
     }
 
-    confirmOptionsInProfiler(st.rs1.getPrimary().getDB(mongosDB.getName()));
+    confirmOptionsInProfiler(st.rs1.getPrimary().getDB(merizosDB.getName()));
 
-    confirmReadPreference(st.rs0.getSecondary().getDB(mongosDB.getName()));
-    confirmReadPreference(st.rs1.getSecondary().getDB(mongosDB.getName()));
+    confirmReadPreference(st.rs0.getSecondary().getDB(merizosDB.getName()));
+    confirmReadPreference(st.rs1.getSecondary().getDB(merizosDB.getName()));
 
     st.stop();
 })();

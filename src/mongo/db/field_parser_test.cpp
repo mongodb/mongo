@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,25 +31,25 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/field_parser.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/time_support.h"
+#include "merizo/db/field_parser.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/time_support.h"
 
 namespace {
 
-using mongo::BSONArray;
-using mongo::BSONField;
-using mongo::BSONObj;
-using mongo::BSONObjBuilder;
-using mongo::Date_t;
-using mongo::FieldParser;
-using mongo::OID;
+using merizo::BSONArray;
+using merizo::BSONField;
+using merizo::BSONObj;
+using merizo::BSONObjBuilder;
+using merizo::Date_t;
+using merizo::FieldParser;
+using merizo::OID;
 using std::map;
 using std::string;
 using std::vector;
 
-class ExtractionFixture : public mongo::unittest::Test {
+class ExtractionFixture : public merizo::unittest::Test {
 protected:
     BSONObj doc;
 

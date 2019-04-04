@@ -1,6 +1,6 @@
 // Tests write-concern-related bulk api functionality
 //
-// This test asserts that a journaled write to a mongod running with --nojournal should be rejected,
+// This test asserts that a journaled write to a merizod running with --nojournal should be rejected,
 // so cannot be run on the ephemeralForTest storage engine, as it accepts all journaled writes.
 // @tags: [SERVER-21420]
 
@@ -21,8 +21,8 @@
     var rst = new ReplSetTest({nodes: 2});
     rst.startSet({nojournal: ""});
     rst.initiate();
-    var mongod = rst.getPrimary();
-    var coll = mongod.getCollection("test.bulk_api_wc");
+    var merizod = rst.getPrimary();
+    var coll = merizod.getCollection("test.bulk_api_wc");
 
     var executeTests = function() {
 

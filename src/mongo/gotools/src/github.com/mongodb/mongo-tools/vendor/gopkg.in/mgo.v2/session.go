@@ -1,4 +1,4 @@
-// mgo - MongoDB driver for Go
+// mgo - MerizoDB driver for Go
 //
 // Copyright (c) 2010-2012 - Gustavo Niemeyer <gustavo@niemeyer.net>
 //
@@ -49,7 +49,7 @@ type Mode int
 const (
 	// Relevant documentation on read preference modes:
 	//
-	//     http://docs.mongodb.org/manual/reference/read-preference/
+	//     http://docs.merizodb.org/manual/reference/read-preference/
 	//
 	Primary            Mode = 2 // Default mode. All operations read from the current replica set primary.
 	PrimaryPreferred   Mode = 3 // Read from the primary if available. Read from the secondary otherwise.
@@ -76,9 +76,9 @@ const (
 // See the documentation on Session.SetMode for more details.
 type Session struct {
 	m                sync.RWMutex
-	cluster_         *mongoCluster
-	slaveSocket      *mongoSocket
-	masterSocket     *mongoSocket
+	cluster_         *merizoCluster
+	slaveSocket      *merizoSocket
+	masterSocket     *merizoSocket
 	slaveOk          bool
 	consistency      Mode
 	queryConfig      query
@@ -128,7 +128,7 @@ type Iter struct {
 	m              sync.Mutex
 	gotReply       sync.Cond
 	session        *Session
-	server         *mongoServer
+	server         *merizoServer
 	docData        queue
 	err            error
 	op             getMoreOp
@@ -172,7 +172,7 @@ const (
 //
 // The seed servers must be provided in the following format:
 //
-//     [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]
+//     [merizodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]
 //
 // For example, it may be as simple as:
 //
@@ -180,7 +180,7 @@ const (
 //
 // Or more involved like:
 //
-//     mongodb://myuser:mypass@localhost:40001,otherhost:40001/mydb
+//     merizodb://myuser:mypass@localhost:40001,otherhost:40001/mydb
 //
 // If the port number is not provided for a server, it defaults to 27017.
 //
@@ -215,7 +215,7 @@ const (
 //     authSource=<db>
 //
 //         Informs the database used to establish credentials and privileges
-//         with a MongoDB server. Defaults to the database name provided via
+//         with a MerizoDB server. Defaults to the database name provided via
 //         the URL path, and "admin" if that's unset.
 //
 //
@@ -228,7 +228,7 @@ const (
 //     gssapiServiceName=<name>
 //
 //        Defines the service name to use when authenticating with the GSSAPI
-//        mechanism. Defaults to "mongodb".
+//        mechanism. Defaults to "merizodb".
 //
 //
 //     maxPoolSize=<limit>
@@ -239,7 +239,7 @@ const (
 //
 // Relevant documentation:
 //
-//     http://docs.mongodb.org/manual/reference/connection-string/
+//     http://docs.merizodb.org/manual/reference/connection-string/
 //
 func Dial(url string) (*Session, error) {
 	session, err := DialWithTimeout(url, 10*time.Second)
@@ -265,7 +265,7 @@ func DialWithTimeout(url string, timeout time.Duration) (*Session, error) {
 	return DialWithInfo(info)
 }
 
-// ParseURL parses a MongoDB URL as accepted by the Dial function and returns
+// ParseURL parses a MerizoDB URL as accepted by the Dial function and returns
 // a value suitable for providing into DialWithInfo.
 //
 // See Dial for more details on the format of url.
@@ -385,7 +385,7 @@ func ParseURL(url string) (*DialInfo, error) {
 	return &info, nil
 }
 
-// DialInfo holds options for establishing a session with a MongoDB cluster.
+// DialInfo holds options for establishing a session with a MerizoDB cluster.
 // To use a URL, see the Dial function.
 type DialInfo struct {
 	// Addrs holds the addresses for the seed servers.
@@ -421,16 +421,16 @@ type DialInfo struct {
 	ReplicaSetName string
 
 	// Source is the database used to establish credentials and privileges
-	// with a MongoDB server. Defaults to the value of Database, if that is
+	// with a MerizoDB server. Defaults to the value of Database, if that is
 	// set, or "admin" otherwise.
 	Source string
 
 	// Service defines the service name to use when authenticating with the GSSAPI
-	// mechanism. Defaults to "mongodb".
+	// mechanism. Defaults to "merizodb".
 	Service string
 
 	// ServiceHost defines which hostname to use when authenticating
-	// with the GSSAPI mechanism. If not specified, defaults to the MongoDB
+	// with the GSSAPI mechanism. If not specified, defaults to the MerizoDB
 	// server's address.
 	ServiceHost string
 
@@ -455,7 +455,7 @@ type DialInfo struct {
 	WriteConcern *Safe
 
 	// DialServer optionally specifies the dial function for establishing
-	// connections with the MongoDB servers.
+	// connections with the MerizoDB servers.
 	DialServer func(addr *ServerAddr) (net.Conn, error)
 
 	// WARNING: This field is obsolete. See DialServer above.
@@ -474,7 +474,7 @@ type ReadPreference struct {
 // mgo.v3: Drop DialInfo.Dial.
 
 // ServerAddr represents the address for establishing a connection to an
-// individual MongoDB server.
+// individual MerizoDB server.
 type ServerAddr struct {
 	str string
 	tcp *net.TCPAddr
@@ -576,7 +576,7 @@ type urlInfoOption struct {
 }
 
 func extractURL(s string) (*urlInfo, error) {
-	if strings.HasPrefix(s, "mongodb://") {
+	if strings.HasPrefix(s, "merizodb://") {
 		s = s[10:]
 	}
 	info := &urlInfo{}
@@ -616,7 +616,7 @@ func extractURL(s string) (*urlInfo, error) {
 	return info, nil
 }
 
-func newSession(consistency Mode, cluster *mongoCluster, timeout time.Duration) (session *Session) {
+func newSession(consistency Mode, cluster *merizoCluster, timeout time.Duration) (session *Session) {
 	cluster.Acquire()
 	session = &Session{
 		cluster_:    cluster,
@@ -678,7 +678,7 @@ func (s *Session) ReadableServer() (string, error) {
 // DB returns a value representing the named database. If name
 // is empty, the database name provided in the dialed URL is
 // used instead. If that is also empty, "test" is used as a
-// fallback in a way equivalent to the mongo shell.
+// fallback in a way equivalent to the merizo shell.
 //
 // Creating this value is a very lightweight operation, and
 // involves no network communication.
@@ -723,9 +723,9 @@ func (c *Collection) With(s *Session) *Collection {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/GridFS
-//     http://www.mongodb.org/display/DOCS/GridFS+Tools
-//     http://www.mongodb.org/display/DOCS/GridFS+Specification
+//     http://www.merizodb.org/display/DOCS/GridFS
+//     http://www.merizodb.org/display/DOCS/GridFS+Tools
+//     http://www.merizodb.org/display/DOCS/GridFS+Specification
 //
 func (db *Database) GridFS(prefix string) *GridFS {
 	return newGridFS(db, prefix)
@@ -736,7 +736,7 @@ func (db *Database) GridFS(prefix string) *GridFS {
 // a string with the command name itself, in which case an empty document of
 // the form bson.M{cmd: 1} will be used, or it may be a full command document.
 //
-// Note that MongoDB considers the first marshalled key as the command
+// Note that MerizoDB considers the first marshalled key as the command
 // name, so when providing a command with options, it's important to
 // use an ordering-preserving document, such as a struct value or an
 // instance of bson.D.  For instance:
@@ -748,8 +748,8 @@ func (db *Database) GridFS(prefix string) *GridFS {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Commands
-//     http://www.mongodb.org/display/DOCS/List+of+Database+CommandSkips
+//     http://www.merizodb.org/display/DOCS/Commands
+//     http://www.merizodb.org/display/DOCS/List+of+Database+CommandSkips
 //
 func (db *Database) Run(cmd interface{}, result interface{}) error {
 	socket, err := db.Session.acquireSocket(true)
@@ -762,7 +762,7 @@ func (db *Database) Run(cmd interface{}, result interface{}) error {
 	return db.run(socket, cmd, result)
 }
 
-// Credential holds details to authenticate with a MongoDB server.
+// Credential holds details to authenticate with a MerizoDB server.
 type Credential struct {
 	// Username and Password hold the basic details for authentication.
 	// Password is optional with some authentication mechanisms.
@@ -770,16 +770,16 @@ type Credential struct {
 	Password string
 
 	// Source is the database used to establish credentials and privileges
-	// with a MongoDB server. Defaults to the default database provided
+	// with a MerizoDB server. Defaults to the default database provided
 	// during dial, or "admin" if that was unset.
 	Source string
 
 	// Service defines the service name to use when authenticating with the GSSAPI
-	// mechanism. Defaults to "mongodb".
+	// mechanism. Defaults to "merizodb".
 	Service string
 
 	// ServiceHost defines which hostname to use when authenticating
-	// with the GSSAPI mechanism. If not specified, defaults to the MongoDB
+	// with the GSSAPI mechanism. If not specified, defaults to the MerizoDB
 	// server's address.
 	ServiceHost string
 
@@ -788,7 +788,7 @@ type Credential struct {
 	Mechanism string
 }
 
-// Login authenticates with MongoDB using the provided credential.  The
+// Login authenticates with MerizoDB using the provided credential.  The
 // authentication is valid for the whole session and will stay valid until
 // Logout is explicitly called for the same database, or the session is
 // closed.
@@ -796,7 +796,7 @@ func (db *Database) Login(user, pass string) error {
 	return db.Session.Login(&Credential{Username: user, Password: pass, Source: db.Name})
 }
 
-// Login authenticates with MongoDB using the provided credential.  The
+// Login authenticates with MerizoDB using the provided credential.  The
 // authentication is valid for the whole session and will stay valid until
 // Logout is explicitly called for the same database, or the session is
 // closed.
@@ -826,7 +826,7 @@ func (s *Session) Login(cred *Credential) error {
 	return nil
 }
 
-func (s *Session) socketLogin(socket *mongoSocket) error {
+func (s *Session) socketLogin(socket *merizoSocket) error {
 	for _, cred := range s.creds {
 		if err := socket.Login(cred); err != nil {
 			return err
@@ -875,12 +875,12 @@ func (s *Session) LogoutAll() {
 	s.m.Unlock()
 }
 
-// User represents a MongoDB user.
+// User represents a MerizoDB user.
 //
 // Relevant documentation:
 //
-//     http://docs.mongodb.org/manual/reference/privilege-documents/
-//     http://docs.mongodb.org/manual/reference/user-privileges/
+//     http://docs.merizodb.org/manual/reference/privilege-documents/
+//     http://docs.merizodb.org/manual/reference/user-privileges/
 //
 type User struct {
 	// Username is how the user identifies itself to the system.
@@ -891,7 +891,7 @@ type User struct {
 	// unset it before the user is added to the database.
 	Password string `bson:",omitempty"`
 
-	// PasswordHash is the MD5 hash of Username+":mongo:"+Password.
+	// PasswordHash is the MD5 hash of Username+":merizo:"+Password.
 	PasswordHash string `bson:"pwd,omitempty"`
 
 	// CustomData holds arbitrary data admins decide to associate
@@ -912,7 +912,7 @@ type User struct {
 	// consulting an external resource such as Kerberos. UserSource
 	// must not be set if Password or PasswordHash are present.
 	//
-	// WARNING: This setting was only ever supported in MongoDB 2.4,
+	// WARNING: This setting was only ever supported in MerizoDB 2.4,
 	// and is now obsolete.
 	UserSource string `bson:"userSource,omitempty"`
 }
@@ -922,7 +922,7 @@ type Role string
 const (
 	// Relevant documentation:
 	//
-	//     http://docs.mongodb.org/manual/reference/user-privileges/
+	//     http://docs.merizodb.org/manual/reference/user-privileges/
 	//
 	RoleRoot         Role = "root"
 	RoleRead         Role = "read"
@@ -937,16 +937,16 @@ const (
 )
 
 // UpsertUser updates the authentication credentials and the roles for
-// a MongoDB user within the db database. If the named user doesn't exist
+// a MerizoDB user within the db database. If the named user doesn't exist
 // it will be created.
 //
-// This method should only be used from MongoDB 2.4 and on. For older
-// MongoDB releases, use the obsolete AddUser method instead.
+// This method should only be used from MerizoDB 2.4 and on. For older
+// MerizoDB releases, use the obsolete AddUser method instead.
 //
 // Relevant documentation:
 //
-//     http://docs.mongodb.org/manual/reference/user-privileges/
-//     http://docs.mongodb.org/manual/reference/privilege-documents/
+//     http://docs.merizodb.org/manual/reference/user-privileges/
+//     http://docs.merizodb.org/manual/reference/privilege-documents/
 //
 func (db *Database) UpsertUser(user *User) error {
 	if user.Username == "" {
@@ -962,7 +962,7 @@ func (db *Database) UpsertUser(user *User) error {
 	// Attempt to run this using 2.6+ commands.
 	rundb := db
 	if user.UserSource != "" {
-		// Compatibility logic for the userSource field of MongoDB <= 2.4.X
+		// Compatibility logic for the userSource field of MerizoDB <= 2.4.X
 		rundb = db.Session.DB(user.UserSource)
 	}
 	err := rundb.runUserCmd("updateUser", user)
@@ -978,7 +978,7 @@ func (db *Database) UpsertUser(user *User) error {
 	var set, unset bson.D
 	if user.Password != "" {
 		psum := md5.New()
-		psum.Write([]byte(user.Username + ":mongo:" + user.Password))
+		psum.Write([]byte(user.Username + ":merizo:" + user.Password))
 		set = append(set, bson.DocElem{"pwd", hex.EncodeToString(psum.Sum(nil))})
 		unset = append(unset, bson.DocElem{"userSource", 1})
 	} else if user.PasswordHash != "" {
@@ -1002,7 +1002,7 @@ func (db *Database) UpsertUser(user *User) error {
 	if err == ErrNotFound {
 		set = append(set, bson.DocElem{"user", user.Username})
 		if user.Roles == nil && user.OtherDBRoles == nil {
-			// Roles must be sent, as it's the way MongoDB distinguishes
+			// Roles must be sent, as it's the way MerizoDB distinguishes
 			// old-style documents from new-style documents in pre-2.6.
 			set = append(set, bson.DocElem{"roles", user.Roles})
 		}
@@ -1056,7 +1056,7 @@ func (db *Database) runUserCmd(cmdName string, user *User) error {
 	}
 	err := db.Run(cmd, nil)
 	if !isNoCmd(err) && user.UserSource != "" && (user.UserSource != "$external" || db.Name != "$external") {
-		return fmt.Errorf("MongoDB 2.6+ does not support the UserSource setting")
+		return fmt.Errorf("MerizoDB 2.6+ does not support the UserSource setting")
 	}
 	return err
 }
@@ -1064,8 +1064,8 @@ func (db *Database) runUserCmd(cmdName string, user *User) error {
 // AddUser creates or updates the authentication credentials of user within
 // the db database.
 //
-// WARNING: This method is obsolete and should only be used with MongoDB 2.2
-// or earlier. For MongoDB 2.4 and on, use UpsertUser instead.
+// WARNING: This method is obsolete and should only be used with MerizoDB 2.2
+// or earlier. For MerizoDB 2.4 and on, use UpsertUser instead.
 func (db *Database) AddUser(username, password string, readOnly bool) error {
 	// Try to emulate the old behavior on 2.6+
 	user := &User{Username: username, Password: password}
@@ -1092,7 +1092,7 @@ func (db *Database) AddUser(username, password string, readOnly bool) error {
 
 	// Command doesn't exist. Fallback to pre-2.6 behavior.
 	psum := md5.New()
-	psum.Write([]byte(username + ":mongo:" + password))
+	psum.Write([]byte(username + ":merizo:" + password))
 	digest := hex.EncodeToString(psum.Sum(nil))
 	c := db.C("system.users")
 	_, err = c.Upsert(bson.M{"user": username}, bson.M{"$set": bson.M{"user": username, "pwd": digest, "readOnly": readOnly}})
@@ -1360,7 +1360,7 @@ func (c *Collection) EnsureIndexKey(key ...string) error {
 // and remove documents containing an indexed time.Time field with a value
 // older than ExpireAfter. See the documentation for details:
 //
-//     http://docs.mongodb.org/manual/tutorial/expire-data
+//     http://docs.merizodb.org/manual/tutorial/expire-data
 //
 // Other kinds of indexes are also supported through that API. Here is an example:
 //
@@ -1382,11 +1382,11 @@ func (c *Collection) EnsureIndexKey(key ...string) error {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Indexes
-//     http://www.mongodb.org/display/DOCS/Indexing+Advice+and+FAQ
-//     http://www.mongodb.org/display/DOCS/Indexing+as+a+Background+Operation
-//     http://www.mongodb.org/display/DOCS/Geospatial+Indexing
-//     http://www.mongodb.org/display/DOCS/Multikeys
+//     http://www.merizodb.org/display/DOCS/Indexes
+//     http://www.merizodb.org/display/DOCS/Indexing+Advice+and+FAQ
+//     http://www.merizodb.org/display/DOCS/Indexing+as+a+Background+Operation
+//     http://www.merizodb.org/display/DOCS/Geospatial+Indexing
+//     http://www.merizodb.org/display/DOCS/Multikeys
 //
 func (c *Collection) EnsureIndex(index Index) error {
 	keyInfo, err := parseIndexKey(index.Key)
@@ -1743,7 +1743,7 @@ func (s *Session) Close() {
 	s.m.Unlock()
 }
 
-func (s *Session) cluster() *mongoCluster {
+func (s *Session) cluster() *merizoCluster {
 	if s.cluster_ == nil {
 		panic("Session already closed")
 	}
@@ -1884,11 +1884,11 @@ func (s *Session) SetPoolLimit(limit int) {
 // The default is to not bypass, and thus to perform the validation
 // expressions registered for modified collections.
 //
-// Document validation was introuced in MongoDB 3.2.
+// Document validation was introuced in MerizoDB 3.2.
 //
 // Relevant documentation:
 //
-//   https://docs.mongodb.org/manual/release-notes/3.2/#bypass-validation
+//   https://docs.merizodb.org/manual/release-notes/3.2/#bypass-validation
 //
 func (s *Session) SetBypassValidation(bypass bool) {
 	s.m.Lock()
@@ -1901,7 +1901,7 @@ func (s *Session) SetBypassValidation(bypass bool) {
 // well, using the Query.Batch method.
 //
 // The default batch size is defined by the database itself.  As of this
-// writing, MongoDB will use an initial size of min(100 docs, 4MB) on the
+// writing, MerizoDB will use an initial size of min(100 docs, 4MB) on the
 // first batch, and 4MB on remaining ones.
 func (s *Session) SetBatch(n int) {
 	if n == 1 {
@@ -1935,7 +1935,7 @@ func (s *Session) SetPrefetch(p float64) {
 // See SetSafe for details on the Safe type.
 type Safe struct {
 	W        int    // Min # of servers to ack before success
-	WMode    string // Write mode for MongoDB 2.0+ (e.g. "majority")
+	WMode    string // Write mode for MerizoDB 2.0+ (e.g. "majority")
 	WTimeout int    // Milliseconds to wait for W before timing out
 	FSync    bool   // Sync via the journal if present, or via data files sync otherwise
 	J        bool   // Sync via the journal if present
@@ -1977,18 +1977,18 @@ func (s *Session) Safe() (safe *Safe) {
 // If safe.WTimeout is greater than zero, it determines how many milliseconds
 // to wait for the safe.W servers to respond before returning an error.
 //
-// Starting with MongoDB 2.0.0 the safe.WMode parameter can be used instead
+// Starting with MerizoDB 2.0.0 the safe.WMode parameter can be used instead
 // of W to request for richer semantics. If set to "majority" the server will
 // wait for a majority of members from the replica set to respond before
 // returning. Custom modes may also be defined within the server to create
 // very detailed placement schemas. See the data awareness documentation in
-// the links below for more details (note that MongoDB internally reuses the
+// the links below for more details (note that MerizoDB internally reuses the
 // "w" field name for WMode).
 //
 // If safe.J is true, servers will block until write operations have been
 // committed to the journal. Cannot be used in combination with FSync. Prior
-// to MongoDB 2.6 this option was ignored if the server was running without
-// journaling. Starting with MongoDB 2.6 write operations will fail with an
+// to MerizoDB 2.6 this option was ignored if the server was running without
+// journaling. Starting with MerizoDB 2.6 write operations will fail with an
 // exception if this option is used when the server is running without
 // journaling.
 //
@@ -1998,7 +1998,7 @@ func (s *Session) Safe() (safe *Safe) {
 // operations have been committed to the journal. Cannot be used in
 // combination with J.
 //
-// Since MongoDB 2.0.0, the safe.J option can also be used instead of FSync
+// Since MerizoDB 2.0.0, the safe.J option can also be used instead of FSync
 // to force the server to wait for a group commit in case journaling is
 // enabled. The option has no effect if the server has journaling disabled.
 //
@@ -2008,7 +2008,7 @@ func (s *Session) Safe() (safe *Safe) {
 //     session.SetSafe(&mgo.Safe{})
 //
 // The following statement will force the server to wait for a majority of
-// members of a replica set to return (MongoDB 2.0+ only):
+// members of a replica set to return (MerizoDB 2.0+ only):
 //
 //     session.SetSafe(&mgo.Safe{WMode: "majority"})
 //
@@ -2027,9 +2027,9 @@ func (s *Session) Safe() (safe *Safe) {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/getLastError+Command
-//     http://www.mongodb.org/display/DOCS/Verifying+Propagation+of+Writes+with+getLastError
-//     http://www.mongodb.org/display/DOCS/Data+Center+Awareness
+//     http://www.merizodb.org/display/DOCS/getLastError+Command
+//     http://www.merizodb.org/display/DOCS/Verifying+Propagation+of+Writes+with+getLastError
+//     http://www.merizodb.org/display/DOCS/Data+Center+Awareness
 //
 func (s *Session) SetSafe(safe *Safe) {
 	s.m.Lock()
@@ -2061,9 +2061,9 @@ func (s *Session) SetSafe(safe *Safe) {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/getLastError+Command
-//     http://www.mongodb.org/display/DOCS/Verifying+Propagation+of+Writes+with+getLastError
-//     http://www.mongodb.org/display/DOCS/Data+Center+Awareness
+//     http://www.merizodb.org/display/DOCS/getLastError+Command
+//     http://www.merizodb.org/display/DOCS/Verifying+Propagation+of+Writes+with+getLastError
+//     http://www.merizodb.org/display/DOCS/Data+Center+Awareness
 //
 func (s *Session) EnsureSafe(safe *Safe) {
 	s.m.Lock()
@@ -2119,7 +2119,7 @@ func (s *Session) ensureSafe(safe *Safe) {
 // which case an empty document of the form bson.M{cmd: 1} will be used,
 // or it may be a full command document.
 //
-// Note that MongoDB considers the first marshalled key as the command
+// Note that MerizoDB considers the first marshalled key as the command
 // name, so when providing a command with options, it's important to
 // use an ordering-preserving document, such as a struct value or an
 // instance of bson.D.  For instance:
@@ -2131,8 +2131,8 @@ func (s *Session) ensureSafe(safe *Safe) {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Commands
-//     http://www.mongodb.org/display/DOCS/List+of+Database+CommandSkips
+//     http://www.merizodb.org/display/DOCS/Commands
+//     http://www.merizodb.org/display/DOCS/List+of+Database+CommandSkips
 //
 func (s *Session) Run(cmd interface{}, result interface{}) error {
 	return s.DB("admin").Run(cmd, result)
@@ -2154,7 +2154,7 @@ func (s *Session) Run(cmd interface{}, result interface{}) error {
 //
 // Relevant documentation:
 //
-//     http://docs.mongodb.org/manual/tutorial/configure-replica-set-tag-sets
+//     http://docs.merizodb.org/manual/tutorial/configure-replica-set-tag-sets
 //
 func (s *Session) SelectServers(tags ...bson.D) {
 	s.m.Lock()
@@ -2189,15 +2189,15 @@ func (s *Session) Fsync(async bool) error {
 // blocks, follow up reads will block as well due to the way the
 // lock is internally implemented in the server. More details at:
 //
-//     https://jira.mongodb.org/browse/SERVER-4243
+//     https://jira.merizodb.org/browse/SERVER-4243
 //
 // FsyncLock is often used for performing consistent backups of
 // the database files on disk.
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/fsync+Command
-//     http://www.mongodb.org/display/DOCS/Backups
+//     http://www.merizodb.org/display/DOCS/fsync+Command
+//     http://www.merizodb.org/display/DOCS/Backups
 //
 func (s *Session) FsyncLock() error {
 	return s.Run(bson.D{{"fsync", 1}, {"lock", true}}, nil)
@@ -2223,7 +2223,7 @@ func (s *Session) FsyncUnlock() error {
 // Iter, or Tail.
 //
 // In case the resulting document includes a field named $err or errmsg, which
-// are standard ways for MongoDB to return query errors, the returned err will
+// are standard ways for MerizoDB to return query errors, the returned err will
 // be set to a *QueryError value including the Err message and the Code.  In
 // those cases, the result argument is still unmarshalled into with the
 // received document so that any other custom values may be obtained if
@@ -2231,8 +2231,8 @@ func (s *Session) FsyncUnlock() error {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Querying
-//     http://www.mongodb.org/display/DOCS/Advanced+Queries
+//     http://www.merizodb.org/display/DOCS/Querying
+//     http://www.merizodb.org/display/DOCS/Advanced+Queries
 //
 func (c *Collection) Find(query interface{}) *Query {
 	session := c.Database.Session
@@ -2258,7 +2258,7 @@ type repairCmdCursor struct {
 // damaged data files. Multiple copies of the same document may be returned
 // by the iterator.
 //
-// Repair is supported in MongoDB 2.7.8 and later.
+// Repair is supported in MerizoDB 2.7.8 and later.
 func (c *Collection) Repair() *Iter {
 	// Clone session and set it to Monotonic mode so that the server
 	// used for the query may be safely obtained afterwards, if
@@ -2320,9 +2320,9 @@ type pipeCmdCursor struct {
 //
 // Relevant documentation:
 //
-//     http://docs.mongodb.org/manual/reference/aggregation
-//     http://docs.mongodb.org/manual/applications/aggregation
-//     http://docs.mongodb.org/manual/tutorial/aggregation-examples
+//     http://docs.merizodb.org/manual/reference/aggregation
+//     http://docs.merizodb.org/manual/applications/aggregation
+//     http://docs.merizodb.org/manual/tutorial/aggregation-examples
 //
 func (c *Collection) Pipe(pipeline interface{}) *Pipe {
 	session := c.Database.Session
@@ -2392,7 +2392,7 @@ func (p *Pipe) Iter() *Iter {
 // parameter may be in any mode or state, though.
 //
 func (c *Collection) NewIter(session *Session, firstBatch []bson.Raw, cursorId int64, err error) *Iter {
-	var server *mongoServer
+	var server *merizoServer
 	csession := c.Database.Session
 	csession.m.RLock()
 	socket := csession.masterSocket
@@ -2464,7 +2464,7 @@ func (p *Pipe) One(result interface{}) error {
 	return ErrNotFound
 }
 
-// Explain returns a number of details about how the MongoDB server would
+// Explain returns a number of details about how the MerizoDB server would
 // execute the requested pipeline, such as the number of objects examined,
 // the number of times the read lock was yielded to allow writes to go in,
 // and so on.
@@ -2545,7 +2545,7 @@ func (err *QueryError) Error() string {
 // a primary key index or a secondary unique index already has an entry
 // with the given value.
 func IsDup(err error) bool {
-	// Besides being handy, helps with MongoDB bugs SERVER-7164 and SERVER-11493.
+	// Besides being handy, helps with MerizoDB bugs SERVER-7164 and SERVER-11493.
 	// What follows makes me sad. Hopefully conventions will be more clear over time.
 	switch e := err.(type) {
 	case *LastError:
@@ -2580,8 +2580,8 @@ func (c *Collection) Insert(docs ...interface{}) error {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Updating
-//     http://www.mongodb.org/display/DOCS/Atomic+Operations
+//     http://www.merizodb.org/display/DOCS/Updating
+//     http://www.merizodb.org/display/DOCS/Atomic+Operations
 //
 func (c *Collection) Update(selector interface{}, update interface{}) error {
 	if selector == nil {
@@ -2612,7 +2612,7 @@ func (c *Collection) UpdateId(id interface{}, update interface{}) error {
 type ChangeInfo struct {
 	// Updated reports the number of existing documents modified.
 	// Due to server limitations, this reports the same value as the Matched field when
-	// talking to MongoDB <= 2.4 and on Upsert and Apply (findAndModify) operations.
+	// talking to MerizoDB <= 2.4 and on Upsert and Apply (findAndModify) operations.
 	Updated    int
 	Removed    int         // Number of documents removed
 	Matched    int         // Number of documents matched but not necessarily changed
@@ -2628,8 +2628,8 @@ type ChangeInfo struct {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Updating
-//     http://www.mongodb.org/display/DOCS/Atomic+Operations
+//     http://www.merizodb.org/display/DOCS/Updating
+//     http://www.merizodb.org/display/DOCS/Atomic+Operations
 //
 func (c *Collection) UpdateAll(selector interface{}, update interface{}) (info *ChangeInfo, err error) {
 	if selector == nil {
@@ -2659,8 +2659,8 @@ func (c *Collection) UpdateAll(selector interface{}, update interface{}) (info *
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Updating
-//     http://www.mongodb.org/display/DOCS/Atomic+Operations
+//     http://www.merizodb.org/display/DOCS/Updating
+//     http://www.merizodb.org/display/DOCS/Atomic+Operations
 //
 func (c *Collection) Upsert(selector interface{}, update interface{}) (info *ChangeInfo, err error) {
 	if selector == nil {
@@ -2677,7 +2677,7 @@ func (c *Collection) Upsert(selector interface{}, update interface{}) (info *Cha
 	for i := 0; i < maxUpsertRetries; i++ {
 		lerr, err = c.writeOp(&op, true)
 		// Retry duplicate key errors on upserts.
-		// https://docs.mongodb.com/v3.2/reference/method/db.collection.update/#use-unique-indexes
+		// https://docs.merizodb.com/v3.2/reference/method/db.collection.update/#use-unique-indexes
 		if !IsDup(err) {
 			break
 		}
@@ -2711,7 +2711,7 @@ func (c *Collection) UpsertId(id interface{}, update interface{}) (info *ChangeI
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Removing
+//     http://www.merizodb.org/display/DOCS/Removing
 //
 func (c *Collection) Remove(selector interface{}) error {
 	if selector == nil {
@@ -2740,7 +2740,7 @@ func (c *Collection) RemoveId(id interface{}) error {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Removing
+//     http://www.merizodb.org/display/DOCS/Removing
 //
 func (c *Collection) RemoveAll(selector interface{}) (info *ChangeInfo, err error) {
 	if selector == nil {
@@ -2767,8 +2767,8 @@ func (c *Collection) DropCollection() error {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/createCollection+Command
-//     http://www.mongodb.org/display/DOCS/Capped+Collections
+//     http://www.merizodb.org/display/DOCS/createCollection+Command
+//     http://www.merizodb.org/display/DOCS/Capped+Collections
 //
 type CollectionInfo struct {
 	// DisableIdIndex prevents the automatic creation of the index
@@ -2794,13 +2794,13 @@ type CollectionInfo struct {
 	Validator interface{}
 
 	// ValidationLevel may be set to "strict" (the default) to force
-	// MongoDB to validate all documents on inserts and updates, to
+	// MerizoDB to validate all documents on inserts and updates, to
 	// "moderate" to apply the validation rules only to documents
 	// that already fulfill the validation criteria, or to "off" for
 	// disabling validation entirely.
 	ValidationLevel string
 
-	// ValidationAction determines how MongoDB handles documents that
+	// ValidationAction determines how MerizoDB handles documents that
 	// violate the validation rules. It may be set to "error" (the default)
 	// to reject inserts or updates that violate the rules, or to "warn"
 	// to log invalid operations but allow them to proceed.
@@ -2813,14 +2813,14 @@ type CollectionInfo struct {
 }
 
 // Create explicitly creates the c collection with details of info.
-// MongoDB creates collections automatically on use, so this method
+// MerizoDB creates collections automatically on use, so this method
 // is only necessary when creating collection with non-default
 // characteristics, such as capped collections.
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/createCollection+Command
-//     http://www.mongodb.org/display/DOCS/Capped+Collections
+//     http://www.merizodb.org/display/DOCS/createCollection+Command
+//     http://www.merizodb.org/display/DOCS/Capped+Collections
 //
 func (c *Collection) Create(info *CollectionInfo) error {
 	cmd := make(bson.D, 0, 4)
@@ -2861,7 +2861,7 @@ func (c *Collection) Create(info *CollectionInfo) error {
 // the Batch method of Session.
 
 // The default batch size is defined by the database itself.  As of this
-// writing, MongoDB will use an initial size of min(100 docs, 4MB) on the
+// writing, MerizoDB will use an initial size of min(100 docs, 4MB) on the
 // first batch, and 4MB on remaining ones.
 func (q *Query) Batch(n int) *Query {
 	if n == 1 {
@@ -2932,7 +2932,7 @@ func (q *Query) Limit(n int) *Query {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Retrieving+a+Subset+of+Fields
+//     http://www.merizodb.org/display/DOCS/Retrieving+a+Subset+of+Fields
 //
 func (q *Query) Select(selector interface{}) *Query {
 	q.m.Lock()
@@ -2954,7 +2954,7 @@ func (q *Query) Select(selector interface{}) *Query {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Sorting+and+Natural+Order
+//     http://www.merizodb.org/display/DOCS/Sorting+and+Natural+Order
 //
 func (q *Query) Sort(fields ...string) *Query {
 	q.m.Lock()
@@ -3000,7 +3000,7 @@ func (q *Query) Collation(collation *Collation) *Query {
 	return q
 }
 
-// Explain returns a number of details about how the MongoDB server would
+// Explain returns a number of details about how the MerizoDB server would
 // execute the requested query, such as the number of objects examined,
 // the number of times the read lock was yielded to allow writes to go in,
 // and so on.
@@ -3015,8 +3015,8 @@ func (q *Query) Collation(collation *Collation) *Query {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Optimization
-//     http://www.mongodb.org/display/DOCS/Query+Optimizer
+//     http://www.merizodb.org/display/DOCS/Optimization
+//     http://www.merizodb.org/display/DOCS/Query+Optimizer
 //
 func (q *Query) Explain(result interface{}) error {
 	q.m.Lock()
@@ -3049,8 +3049,8 @@ func (q *Query) Explain(result interface{}) error {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Optimization
-//     http://www.mongodb.org/display/DOCS/Query+Optimizer
+//     http://www.merizodb.org/display/DOCS/Optimization
+//     http://www.merizodb.org/display/DOCS/Query+Optimizer
 //
 func (q *Query) Hint(indexKey ...string) *Query {
 	q.m.Lock()
@@ -3079,7 +3079,7 @@ func (q *Query) SetMaxScan(n int) *Query {
 
 // SetMaxTime constrains the query to stop after running for the specified time.
 //
-// When the time limit is reached MongoDB automatically cancels the query.
+// When the time limit is reached MerizoDB automatically cancels the query.
 // This can be used to efficiently prevent and identify unexpectedly slow queries.
 //
 // A few important notes about the mechanism enforcing this limit:
@@ -3101,11 +3101,11 @@ func (q *Query) SetMaxScan(n int) *Query {
 //  - This limit does not override the inactive cursor timeout for idle cursors
 //    (default is 10 min).
 //
-// This mechanism was introduced in MongoDB 2.6.
+// This mechanism was introduced in MerizoDB 2.6.
 //
 // Relevant documentation:
 //
-//   http://blog.mongodb.org/post/83621787773/maxtimems-and-query-optimizer-introspection-in
+//   http://blog.merizodb.org/post/83621787773/maxtimems-and-query-optimizer-introspection-in
 //
 func (q *Query) SetMaxTime(d time.Duration) *Query {
 	q.m.Lock()
@@ -3136,7 +3136,7 @@ func (q *Query) SetMaxTime(d time.Duration) *Query {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/How+to+do+Snapshotted+Queries+in+the+Mongo+Database
+//     http://www.merizodb.org/display/DOCS/How+to+do+Snapshotted+Queries+in+the+Mongo+Database
 //
 func (q *Query) Snapshot() *Query {
 	q.m.Lock()
@@ -3150,9 +3150,9 @@ func (q *Query) Snapshot() *Query {
 //
 // Relevant documentation:
 //
-//     http://docs.mongodb.org/manual/reference/operator/meta/comment
-//     http://docs.mongodb.org/manual/reference/command/profile
-//     http://docs.mongodb.org/manual/administration/analyzing-mongodb-performance/#database-profiling
+//     http://docs.merizodb.org/manual/reference/operator/meta/comment
+//     http://docs.merizodb.org/manual/reference/command/profile
+//     http://docs.merizodb.org/manual/administration/analyzing-merizodb-performance/#database-profiling
 //
 func (q *Query) Comment(comment string) *Query {
 	q.m.Lock()
@@ -3163,7 +3163,7 @@ func (q *Query) Comment(comment string) *Query {
 }
 
 // LogReplay enables an option that optimizes queries that are typically
-// made on the MongoDB oplog for replaying it. This is an internal
+// made on the MerizoDB oplog for replaying it. This is an internal
 // implementation aspect and most likely uninteresting for other uses.
 // It has seen at least one use case, though, so it's exposed via the API.
 func (q *Query) LogReplay() *Query {
@@ -3214,7 +3214,7 @@ Error:
 //     err := collection.Find(bson.M{"a": 1}).One(&result)
 //
 // In case the resulting document includes a field named $err or errmsg, which
-// are standard ways for MongoDB to return query errors, the returned err will
+// are standard ways for MerizoDB to return query errors, the returned err will
 // be set to a *QueryError value including the Err message and the Code.  In
 // those cases, the result argument is still unmarshalled into with the
 // received document so that any other custom values may be obtained if
@@ -3277,10 +3277,10 @@ func (q *Query) One(result interface{}) (err error) {
 }
 
 // prepareFindOp translates op from being an old-style wire protocol query into
-// a new-style find command if that's supported by the MongoDB server (3.2+).
+// a new-style find command if that's supported by the MerizoDB server (3.2+).
 // It returns whether to expect a find command result or not. Note op may be
 // translated into an explain command, in which case the function returns false.
-func prepareFindOp(socket *mongoSocket, op *queryOp, limit int32) bool {
+func prepareFindOp(socket *merizoSocket, op *queryOp, limit int32) bool {
 	if socket.ServerInfo().MaxWireVersion < 4 || op.collection == "admin.$cmd" {
 		return false
 	}
@@ -3338,11 +3338,11 @@ type cursorData struct {
 	Id         int64
 }
 
-// findCmd holds the command used for performing queries on MongoDB 3.2+.
+// findCmd holds the command used for performing queries on MerizoDB 3.2+.
 //
 // Relevant documentation:
 //
-//     https://docs.mongodb.org/master/reference/command/find/#dbcmd.find
+//     https://docs.merizodb.org/master/reference/command/find/#dbcmd.find
 //
 type findCmd struct {
 	Collection          string      `bson:"find"`
@@ -3371,11 +3371,11 @@ type findCmd struct {
 	Collation           *Collation  `bson:"collation,omitempty"`
 }
 
-// getMoreCmd holds the command used for requesting more query results on MongoDB 3.2+.
+// getMoreCmd holds the command used for requesting more query results on MerizoDB 3.2+.
 //
 // Relevant documentation:
 //
-//     https://docs.mongodb.org/master/reference/command/getMore/#dbcmd.getMore
+//     https://docs.merizodb.org/master/reference/command/getMore/#dbcmd.getMore
 //
 type getMoreCmd struct {
 	CursorId   int64  `bson:"getMore"`
@@ -3387,7 +3387,7 @@ type getMoreCmd struct {
 // run duplicates the behavior of collection.Find(query).One(&result)
 // as performed by Database.Run, specializing the logic for running
 // database commands on a given socket.
-func (db *Database) run(socket *mongoSocket, cmd, result interface{}) (err error) {
+func (db *Database) run(socket *merizoSocket, cmd, result interface{}) (err error) {
 	// Database.Run:
 	if name, ok := cmd.(string); ok {
 		cmd = bson.D{{name, 1}}
@@ -3427,7 +3427,7 @@ func (db *Database) run(socket *mongoSocket, cmd, result interface{}) (err error
 	return checkQueryError(op.collection, data)
 }
 
-// The DBRef type implements support for the database reference MongoDB
+// The DBRef type implements support for the database reference MerizoDB
 // convention as supported by multiple drivers.  This convention enables
 // cross-referencing documents between collections and databases using
 // a structure which includes a collection name, a document id, and
@@ -3437,7 +3437,7 @@ func (db *Database) run(socket *mongoSocket, cmd, result interface{}) (err error
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Database+References
+//     http://www.merizodb.org/display/DOCS/Database+References
 //
 type DBRef struct {
 	Collection string      `bson:"$ref"`
@@ -3455,7 +3455,7 @@ type DBRef struct {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Database+References
+//     http://www.merizodb.org/display/DOCS/Database+References
 //
 func (db *Database) FindRef(ref *DBRef) *Query {
 	var c *Collection
@@ -3475,7 +3475,7 @@ func (db *Database) FindRef(ref *DBRef) *Query {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Database+References
+//     http://www.merizodb.org/display/DOCS/Database+References
 //
 func (s *Session) FindRef(ref *DBRef) *Query {
 	if ref.Database == "" {
@@ -3659,9 +3659,9 @@ func (q *Query) Iter() *Iter {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Tailable+Cursors
-//     http://www.mongodb.org/display/DOCS/Capped+Collections
-//     http://www.mongodb.org/display/DOCS/Sorting+and+Natural+Order
+//     http://www.merizodb.org/display/DOCS/Tailable+Cursors
+//     http://www.merizodb.org/display/DOCS/Capped+Collections
+//     http://www.merizodb.org/display/DOCS/Sorting+and+Natural+Order
 //
 func (q *Query) Tail(timeout time.Duration) *Iter {
 	q.m.Lock()
@@ -3712,7 +3712,7 @@ func (s *Session) prepareQuery(op *queryOp) {
 // error otherwise.
 //
 // In case a resulting document included a field named $err or errmsg, which are
-// standard ways for MongoDB to report an improper query, the returned value has
+// standard ways for MerizoDB to report an improper query, the returned value has
 // a *QueryError type, and includes the Err message and the Code.
 func (iter *Iter) Err() error {
 	iter.m.Lock()
@@ -3737,7 +3737,7 @@ func (iter *Iter) Err() error {
 // return the same result every time.
 //
 // In case a resulting document included a field named $err or errmsg, which are
-// standard ways for MongoDB to report an improper query, the returned value has
+// standard ways for MerizoDB to report an improper query, the returned value has
 // a *QueryError type.
 func (iter *Iter) Close() error {
 	iter.m.Lock()
@@ -4015,7 +4015,7 @@ func (iter *Iter) For(result interface{}, f func() error) (err error) {
 // WARNING: This method must not be called with iter.m locked. Acquiring the
 // socket depends on the cluster sync loop, and the cluster sync loop might
 // attempt actions which cause replyFunc to be called, inducing a deadlock.
-func (iter *Iter) acquireSocket() (*mongoSocket, error) {
+func (iter *Iter) acquireSocket() (*merizoSocket, error) {
 	if iter.session.cluster_ == nil {
 		return nil, errors.New("Closed explicitly")
 	}
@@ -4150,7 +4150,7 @@ type distinctCmd struct {
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/Aggregation
+//     http://www.merizodb.org/display/DOCS/Aggregation
 //
 func (q *Query) Distinct(key string, result interface{}) error {
 	q.m.Lock()
@@ -4275,11 +4275,11 @@ type MapReduceTime struct {
 //         fmt.Println(item.Value)
 //     }
 //
-// This function is compatible with MongoDB 1.7.4+.
+// This function is compatible with MerizoDB 1.7.4+.
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/MapReduce
+//     http://www.merizodb.org/display/DOCS/MapReduce
 //
 func (q *Query) MapReduce(job *MapReduce, result interface{}) (info *MapReduceInfo, err error) {
 	q.m.Lock()
@@ -4358,7 +4358,7 @@ func (q *Query) MapReduce(job *MapReduce, result interface{}) (info *MapReduceIn
 // The "out" option in the MapReduce command must be ordered. This was
 // found after the implementation was accepting maps for a long time,
 // so rather than breaking the API, we'll fix the order if necessary.
-// Details about the order requirement may be seen in MongoDB's code:
+// Details about the order requirement may be seen in MerizoDB's code:
 //
 //     http://goo.gl/L8jwJX
 //
@@ -4385,7 +4385,7 @@ func fixMROut(out interface{}) interface{} {
 	return outs
 }
 
-// Change holds fields for running a findAndModify MongoDB command via
+// Change holds fields for running a findAndModify MerizoDB command via
 // the Query.Apply method.
 type Change struct {
 	Update    interface{} // The update document
@@ -4405,7 +4405,7 @@ type valueResult struct {
 	LastError LastError "lastErrorObject"
 }
 
-// Apply runs the findAndModify MongoDB command, which allows updating, upserting
+// Apply runs the findAndModify MerizoDB command, which allows updating, upserting
 // or removing a document matching a query and atomically returning either the old
 // version (the default) or the new version of the document (when ReturnNew is true).
 // If no objects are found Apply returns ErrNotFound.
@@ -4424,13 +4424,13 @@ type valueResult struct {
 //     info, err = col.Find(M{"_id": id}).Apply(change, &doc)
 //     fmt.Println(doc.N)
 //
-// This method depends on MongoDB >= 2.0 to work properly.
+// This method depends on MerizoDB >= 2.0 to work properly.
 //
 // Relevant documentation:
 //
-//     http://www.mongodb.org/display/DOCS/findAndModify+Command
-//     http://www.mongodb.org/display/DOCS/Updating
-//     http://www.mongodb.org/display/DOCS/Atomic+Operations
+//     http://www.merizodb.org/display/DOCS/findAndModify+Command
+//     http://www.merizodb.org/display/DOCS/Updating
+//     http://www.merizodb.org/display/DOCS/Atomic+Operations
 //
 func (q *Query) Apply(change Change, result interface{}) (info *ChangeInfo, err error) {
 	q.m.Lock()
@@ -4470,7 +4470,7 @@ func (q *Query) Apply(change Change, result interface{}) (info *ChangeInfo, err 
 		}
 		if change.Upsert && IsDup(err) {
 			// Retry duplicate key errors on upserts.
-			// https://docs.mongodb.com/v3.2/reference/method/db.collection.update/#use-unique-indexes
+			// https://docs.merizodb.com/v3.2/reference/method/db.collection.update/#use-unique-indexes
 			continue
 		}
 		if qerr, ok := err.(*QueryError); ok && qerr.Message == "No matching object found" {
@@ -4501,17 +4501,17 @@ func (q *Query) Apply(change Change, result interface{}) (info *ChangeInfo, err 
 	return info, nil
 }
 
-// The BuildInfo type encapsulates details about the running MongoDB server.
+// The BuildInfo type encapsulates details about the running MerizoDB server.
 //
-// Note that the VersionArray field was introduced in MongoDB 2.0+, but it is
+// Note that the VersionArray field was introduced in MerizoDB 2.0+, but it is
 // internally assembled from the Version information for previous versions.
 // In both cases, VersionArray is guaranteed to have at least 4 entries.
 type BuildInfo struct {
 	Version        string
-	VersionArray   []int  `bson:"versionArray"` // On MongoDB 2.0+; assembled from Version otherwise
+	VersionArray   []int  `bson:"versionArray"` // On MerizoDB 2.0+; assembled from Version otherwise
 	GitVersion     string `bson:"gitVersion"`
 	OpenSSLVersion string `bson:"OpenSSLVersion"`
-	SysInfo        string `bson:"sysInfo"` // Deprecated and empty on MongoDB 3.2+.
+	SysInfo        string `bson:"sysInfo"` // Deprecated and empty on MerizoDB 3.2+.
 	Bits           int
 	Debug          bool
 	MaxObjectSize  int `bson:"maxBsonObjectSize"`
@@ -4533,7 +4533,7 @@ func (bi *BuildInfo) VersionAtLeast(version ...int) bool {
 }
 
 // BuildInfo retrieves the version and other details about the
-// running MongoDB server.
+// running MerizoDB server.
 func (s *Session) BuildInfo() (info BuildInfo, err error) {
 	err = s.Run(bson.D{{"buildInfo", "1"}}, &info)
 	if len(info.VersionArray) == 0 {
@@ -4562,7 +4562,7 @@ func (s *Session) BuildInfo() (info BuildInfo, err error) {
 // ---------------------------------------------------------------------------
 // Internal session handling helpers.
 
-func (s *Session) acquireSocket(slaveOk bool) (*mongoSocket, error) {
+func (s *Session) acquireSocket(slaveOk bool) (*merizoSocket, error) {
 
 	// Read-only lock to check for previously reserved socket.
 	s.m.RLock()
@@ -4626,7 +4626,7 @@ func (s *Session) acquireSocket(slaveOk bool) (*mongoSocket, error) {
 }
 
 // setSocket binds socket to this section.
-func (s *Session) setSocket(socket *mongoSocket) {
+func (s *Session) setSocket(socket *merizoSocket) {
 	info := socket.Acquire()
 	if info.Master {
 		if s.masterSocket != nil {
@@ -4841,7 +4841,7 @@ func (c *Collection) writeOp(op interface{}, ordered bool) (lerr *LastError, err
 	return c.writeOpQuery(socket, safeOp, op, ordered)
 }
 
-func (c *Collection) writeOpQuery(socket *mongoSocket, safeOp *queryOp, op interface{}, ordered bool) (lerr *LastError, err error) {
+func (c *Collection) writeOpQuery(socket *merizoSocket, safeOp *queryOp, op interface{}, ordered bool) (lerr *LastError, err error) {
 	if safeOp == nil {
 		return nil, socket.Query(op)
 	}
@@ -4882,12 +4882,12 @@ func (c *Collection) writeOpQuery(socket *mongoSocket, safeOp *queryOp, op inter
 		}
 		return result, result
 	}
-	// With MongoDB <2.6 we don't know how many actually changed, so make it the same as matched.
+	// With MerizoDB <2.6 we don't know how many actually changed, so make it the same as matched.
 	result.modified = result.N
 	return result, nil
 }
 
-func (c *Collection) writeOpCommand(socket *mongoSocket, safeOp *queryOp, op interface{}, ordered, bypassValidation bool) (lerr *LastError, err error) {
+func (c *Collection) writeOpCommand(socket *merizoSocket, safeOp *queryOp, op interface{}, ordered, bypassValidation bool) (lerr *LastError, err error) {
 	var writeConcern interface{}
 	if safeOp == nil {
 		writeConcern = bson.D{{"w", 0}}
@@ -4898,7 +4898,7 @@ func (c *Collection) writeOpCommand(socket *mongoSocket, safeOp *queryOp, op int
 	var cmd bson.D
 	switch op := op.(type) {
 	case *insertOp:
-		// http://docs.mongodb.org/manual/reference/command/insert
+		// http://docs.merizodb.org/manual/reference/command/insert
 		cmd = bson.D{
 			{"insert", c.Name},
 			{"documents", op.documents},
@@ -4906,7 +4906,7 @@ func (c *Collection) writeOpCommand(socket *mongoSocket, safeOp *queryOp, op int
 			{"ordered", op.flags&1 == 0},
 		}
 	case *updateOp:
-		// http://docs.mongodb.org/manual/reference/command/update
+		// http://docs.merizodb.org/manual/reference/command/update
 		cmd = bson.D{
 			{"update", c.Name},
 			{"updates", []interface{}{op}},
@@ -4914,7 +4914,7 @@ func (c *Collection) writeOpCommand(socket *mongoSocket, safeOp *queryOp, op int
 			{"ordered", ordered},
 		}
 	case bulkUpdateOp:
-		// http://docs.mongodb.org/manual/reference/command/update
+		// http://docs.merizodb.org/manual/reference/command/update
 		cmd = bson.D{
 			{"update", c.Name},
 			{"updates", op},
@@ -4922,7 +4922,7 @@ func (c *Collection) writeOpCommand(socket *mongoSocket, safeOp *queryOp, op int
 			{"ordered", ordered},
 		}
 	case *deleteOp:
-		// http://docs.mongodb.org/manual/reference/command/delete
+		// http://docs.merizodb.org/manual/reference/command/delete
 		cmd = bson.D{
 			{"delete", c.Name},
 			{"deletes", []interface{}{op}},
@@ -4930,7 +4930,7 @@ func (c *Collection) writeOpCommand(socket *mongoSocket, safeOp *queryOp, op int
 			{"ordered", ordered},
 		}
 	case bulkDeleteOp:
-		// http://docs.mongodb.org/manual/reference/command/delete
+		// http://docs.merizodb.org/manual/reference/command/delete
 		cmd = bson.D{
 			{"delete", c.Name},
 			{"deletes", op},

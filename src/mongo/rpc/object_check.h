@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/data_type_validated.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/server_options.h"
+#include "merizo/base/data_type_validated.h"
+#include "merizo/bson/bson_validate.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/db/server_options.h"
 
 // We do not use the rpc namespace here so we can specialize Validator.
-namespace mongo {
+namespace merizo {
 class BSONObj;
 class Status;
 
@@ -59,4 +59,4 @@ struct Validator<BSONObj> {
 
     static Status validateStore(const BSONObj& toStore);
 };
-}  // namespace mongo
+}  // namespace merizo

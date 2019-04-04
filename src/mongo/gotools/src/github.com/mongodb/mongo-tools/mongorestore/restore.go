@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongorestore
+package merizorestore
 
 import (
 	"fmt"
@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -85,7 +85,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 	return nil
 }
 
-// RestoreIntent attempts to restore a given intent into MongoDB.
+// RestoreIntent attempts to restore a given intent into MerizoDB.
 func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 	collectionExists, err := restore.CollectionExists(intent)

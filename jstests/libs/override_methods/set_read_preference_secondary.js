@@ -73,7 +73,7 @@
             // originally established on. This makes it possible to use the
             // set_read_preference_secondary.js override without needing to update calls of
             // DB#runCommand() to explicitly track the connection that was used. If the connection
-            // is actually a direct connection to a mongod or mongos process, or if the cursor id
+            // is actually a direct connection to a merizod or merizos process, or if the cursor id
             // cannot be found in the CursorTracker, then we'll fall back to using DBClientRS's
             // server selection and send the operation to the current primary. It is possible that
             // the test is trying to exercise the behavior around when an unknown cursor id is sent
@@ -157,7 +157,7 @@
             // to establish it so that we can attempt to automatically route subsequent "getMore"
             // and "killCursors" commands.
             CursorTracker.setConnectionUsedForCursor(serverResponse.cursor.id,
-                                                     serverResponse._mongo);
+                                                     serverResponse._merizo);
         }
 
         return serverResponse;

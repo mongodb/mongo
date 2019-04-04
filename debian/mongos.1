@@ -1,8 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOS" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
+.TH "MONGOS" "1" "Jun 21, 2018" "4.0" "merizodb-manual"
 .SH NAME
-mongos \- MongoDB Sharded Cluster Query Router
+merizos \- MerizoDB Sharded Cluster Query Router
 .
 .nr rst2man-indent-level 0
 .
@@ -41,47 +41,47 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .UNINDENT
 .SH SYNOPSIS
 .sp
-\fI\%mongos\fP for “MongoDB Shard,” is a routing service for
-MongoDB shard configurations that processes queries from the
+\fI\%merizos\fP for “MerizoDB Shard,” is a routing service for
+MerizoDB shard configurations that processes queries from the
 application layer, and determines the location of this data in the
 sharded cluster, in order to complete these operations.
 From the perspective of the application, a
-\fI\%mongos\fP instance behaves identically to any other MongoDB
+\fI\%merizos\fP instance behaves identically to any other MerizoDB
 instance.
 .sp
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
-Starting in version 4.0, MongoDB disables support for TLS 1.0
+Starting in version 4.0, MerizoDB disables support for TLS 1.0
 encryption on systems where TLS 1.1+ is available. For
 more details, see 4.0\-disable\-tls\&.
 .UNINDENT
 .UNINDENT
 .SH CONSIDERATIONS
 .sp
-Never change the name of the \fI\%mongos\fP binary.
+Never change the name of the \fI\%merizos\fP binary.
 .SH OPTIONS
 .SS Core Options
 .INDENT 0.0
 .TP
 .B \-\-help, \-h
-Returns information on the options and use of \fBmongos\fP\&.
+Returns information on the options and use of \fBmerizos\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-version
-Returns the \fBmongos\fP release number.
+Returns the \fBmerizos\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-config <filename>, \-f <filename>
 Specifies a configuration file for runtime configuration options. The
 configuration file is the preferred method for runtime configuration of
-\fBmongos\fP\&. The options are equivalent to the command\-line
+\fBmerizos\fP\&. The options are equivalent to the command\-line
 configuration options. See /reference/configuration\-options for
 more information.
 .sp
-Ensure the configuration file uses ASCII encoding. The \fBmongos\fP
+Ensure the configuration file uses ASCII encoding. The \fBmerizos\fP
 instance does not support configuration files with non\-ASCII encoding,
 including UTF\-8.
 .UNINDENT
@@ -95,7 +95,7 @@ including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .INDENT 0.0
 .TP
 .B \-\-quiet
-Runs \fBmongos\fP in a quiet mode that attempts to limit the amount
+Runs \fBmerizos\fP in a quiet mode that attempts to limit the amount
 of output.
 .sp
 This option suppresses:
@@ -115,7 +115,7 @@ connection closed events
 .B \-\-port <port>
 \fIDefault\fP: 27017
 .sp
-Specifies the TCP port on which the MongoDB instance listens for
+Specifies the TCP port on which the MerizoDB instance listens for
 client connections.
 .UNINDENT
 .INDENT 0.0
@@ -126,20 +126,20 @@ client connections.
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Starting in MongoDB 3.6, \fBmongos\fP bind to localhost
+Starting in MerizoDB 3.6, \fBmerizos\fP bind to localhost
 (\fB127.0.0.1\fP) by default. See 3.6\-bind\-to\-localhost\&.
 .UNINDENT
 .UNINDENT
 .sp
 The IP addresses and/or full Unix domain socket paths on which
-\fBmongos\fP should listen for client connections. You may attach
-\fBmongos\fP to any interface. To bind to multiple addresses, enter a
+\fBmerizos\fP should listen for client connections. You may attach
+\fBmerizos\fP to any interface. To bind to multiple addresses, enter a
 list of comma\-separated values.
 .INDENT 7.0
 .INDENT 3.5
 .SS Example
 .sp
-\fBlocalhost,/tmp/mongod.sock\fP
+\fBlocalhost,/tmp/merizod.sock\fP
 .UNINDENT
 .UNINDENT
 .sp
@@ -172,8 +172,8 @@ is, you can specify one or the other, but not both.
 New in version 3.6.
 
 .sp
-If specified, the \fBmongos\fP instance binds to all ip addresses. When
-attaching \fBmongos\fP to a publicly accessible interface, ensure
+If specified, the \fBmerizos\fP instance binds to all ip addresses. When
+attaching \fBmerizos\fP to a publicly accessible interface, ensure
 that you have implemented proper authentication and firewall
 restrictions to protect the integrity of your database.
 .sp
@@ -201,14 +201,14 @@ is, you can specify one or the other, but not both.
 .INDENT 0.0
 .TP
 .B \-\-maxConns <number>
-The maximum number of simultaneous connections that \fBmongos\fP will
+The maximum number of simultaneous connections that \fBmerizos\fP will
 accept. This setting has no effect if it is higher than your operating
 system’s configured maximum connection tracking threshold.
 .sp
 Do not assign too low of a value to this option, or you will
 encounter errors during normal application operation.
 .sp
-This is particularly useful for a \fI\%mongos\fP if you have a client
+This is particularly useful for a \fI\%merizos\fP if you have a client
 that creates multiple connections and allows them to timeout rather
 than closing them.
 .sp
@@ -216,14 +216,14 @@ In this case, set \fBmaxIncomingConnections\fP to a value slightly
 higher than the maximum number of connections that the client creates, or the
 maximum size of the connection pool.
 .sp
-This setting prevents the \fI\%mongos\fP from causing connection spikes on
+This setting prevents the \fI\%merizos\fP from causing connection spikes on
 the individual shards\&. Spikes like these may disrupt the
 operation and memory allocation of the sharded cluster\&.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Changed in version 2.6: MongoDB removed the upward limit on the \fBmaxIncomingConnections\fP
+Changed in version 2.6: MerizoDB removed the upward limit on the \fBmaxIncomingConnections\fP
 setting.
 
 .UNINDENT
@@ -241,7 +241,7 @@ The \fI\%\-\-syslog\fP option is not supported on Windows.
 .INDENT 7.0
 .INDENT 3.5
 The \fBsyslog\fP daemon generates timestamps when it logs a message, not
-when MongoDB issues the message. This can lead to misleading timestamps
+when MerizoDB issues the message. This can lead to misleading timestamps
 for log entries, especially when the system is under heavy load. We
 recommend using the \fI\%\-\-logpath\fP option for production systems to
 ensure accurate timestamps.
@@ -262,27 +262,27 @@ must  enable the \fI\%\-\-syslog\fP option.
 .TP
 .B \-\-logpath <path>
 Sends all diagnostic logging information to a log file instead of to
-standard output or to the host’s syslog system. MongoDB creates
+standard output or to the host’s syslog system. MerizoDB creates
 the log file at the path you specify.
 .sp
-By default, MongoDB will move any existing log file rather than overwrite
+By default, MerizoDB will move any existing log file rather than overwrite
 it. To instead append to the log file, set the \fI\%\-\-logappend\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-logappend
-Appends new entries to the end of the existing log file when the \fBmongos\fP
-instance restarts. Without this option, \fBmongod\fP will back up the
+Appends new entries to the end of the existing log file when the \fBmerizos\fP
+instance restarts. Without this option, \fBmerizod\fP will back up the
 existing log and create a new file.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-redactClientLogData
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 
 .sp
-A \fBmongos\fP running with \fI\%\-\-redactClientLogData\fP redacts any message accompanying a given
-log event before logging. This prevents the \fBmongos\fP from writing
+A \fBmerizos\fP running with \fI\%\-\-redactClientLogData\fP redacts any message accompanying a given
+log event before logging. This prevents the \fBmerizos\fP from writing
 potentially sensitive data stored on the database to the diagnostic log.
 Metadata such as error or operation codes, line numbers, and source file
 names are still visible in the logs.
@@ -290,20 +290,20 @@ names are still visible in the logs.
 Use \fI\%\-\-redactClientLogData\fP in conjunction with encryption to assist compliance with regulatory
 requirements.
 .sp
-For example, a MongoDB deployment might store Personally Identifiable
-Information (PII) in one or more collections. The \fBmongos\fP logs events
+For example, a MerizoDB deployment might store Personally Identifiable
+Information (PII) in one or more collections. The \fBmerizos\fP logs events
 such as those related to CRUD operations, sharding metadata, etc. It is
-possible that the \fBmongos\fP may expose PII as a part of these logging
-operations. A \fBmongos\fP running with \fI\%\-\-redactClientLogData\fP removes any message
+possible that the \fBmerizos\fP may expose PII as a part of these logging
+operations. A \fBmerizos\fP running with \fI\%\-\-redactClientLogData\fP removes any message
 accompanying these events before being output to the log, effectively
 removing the PII.
 .sp
-Diagnostics on a \fBmongos\fP running with \fI\%\-\-redactClientLogData\fP may be more difficult
+Diagnostics on a \fBmerizos\fP running with \fI\%\-\-redactClientLogData\fP may be more difficult
 due to the lack of data related to a log event. See the
 process logging manual page for an
 example of the effect of \fI\%\-\-redactClientLogData\fP on log output.
 .sp
-You can enable or disable log redaction on a running \fBmongos\fP
+You can enable or disable log redaction on a running \fBmerizos\fP
 using the \fBsetParameter\fP database command.
 .INDENT 7.0
 .INDENT 3.5
@@ -363,9 +363,9 @@ _
 .INDENT 0.0
 .TP
 .B \-\-pidfilepath <path>
-Specifies a file location to hold the process ID of the \fBmongos\fP
-process where \fBmongos\fP will write its PID. This is useful for
-tracking the \fBmongos\fP process in combination with
+Specifies a file location to hold the process ID of the \fBmerizos\fP
+process where \fBmerizos\fP will write its PID. This is useful for
+tracking the \fBmerizos\fP process in combination with
 the \fI\%\-\-fork\fP option. Without a specified \fI\%\-\-pidfilepath\fP option, the
 process creates no PID file.
 .UNINDENT
@@ -373,7 +373,7 @@ process creates no PID file.
 .TP
 .B \-\-keyFile <file>
 Specifies the path to a key file that stores the shared secret
-that MongoDB instances use to authenticate to each other in a
+that MerizoDB instances use to authenticate to each other in a
 sharded cluster or replica set\&. \fI\%\-\-keyFile\fP implies
 \fBclient authorization\fP\&. See inter\-process\-auth for more
 information.
@@ -381,7 +381,7 @@ information.
 .INDENT 0.0
 .TP
 .B \-\-setParameter <options>
-Specifies one of the MongoDB parameters described in
+Specifies one of the MerizoDB parameters described in
 /reference/parameters\&. You can specify multiple \fBsetParameter\fP
 fields.
 .UNINDENT
@@ -391,7 +391,7 @@ fields.
 Disables listening on the UNIX domain socket. \fI\%\-\-nounixsocket\fP applies only
 to Unix\-based systems.
 .sp
-The \fBmongos\fP process
+The \fBmerizos\fP process
 always listens on the UNIX socket unless one of the following is true:
 .INDENT 7.0
 .IP \(bu 2
@@ -402,7 +402,7 @@ always listens on the UNIX socket unless one of the following is true:
 \fBnet.bindIp\fP does not specify \fB127.0.0.1\fP
 .UNINDENT
 .sp
-New in version 2.6: \fBmongos\fP installed from official \&.deb and \&.rpm packages
+New in version 2.6: \fBmerizos\fP installed from official \&.deb and \&.rpm packages
 have the \fBbind_ip\fP configuration set to \fB127.0.0.1\fP by
 default.
 
@@ -416,7 +416,7 @@ The path for the UNIX socket. \fI\%\-\-unixSocketPrefix\fP applies only
 to Unix\-based systems.
 .sp
 If this option has no value, the
-\fBmongos\fP process creates a socket with \fB/tmp\fP as a prefix. MongoDB
+\fBmerizos\fP process creates a socket with \fB/tmp\fP as a prefix. MerizoDB
 creates and listens on a UNIX socket unless one of the following is true:
 .INDENT 7.0
 .IP \(bu 2
@@ -441,18 +441,18 @@ Sets the permission for the UNIX domain socket file.
 .INDENT 0.0
 .TP
 .B \-\-fork
-Enables a daemon mode that runs the \fBmongos\fP process in the
-background. By default \fBmongos\fP does not run as a daemon:
-typically you will run \fBmongos\fP as a daemon, either by using
+Enables a daemon mode that runs the \fBmerizos\fP process in the
+background. By default \fBmerizos\fP does not run as a daemon:
+typically you will run \fBmerizos\fP as a daemon, either by using
 \fI\%\-\-fork\fP or by using a controlling process that handles the
 daemonization process (e.g. as with \fBupstart\fP and \fBsystemd\fP).
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-transitionToAuth
-New in version 3.4: Allows the \fBmongos\fP to accept and create authenticated and
-non\-authenticated connections to and from other \fBmongod\fP
-and \fI\%mongos\fP instances in the deployment. Used for
+New in version 3.4: Allows the \fBmerizos\fP to accept and create authenticated and
+non\-authenticated connections to and from other \fBmerizod\fP
+and \fI\%merizos\fP instances in the deployment. Used for
 performing rolling transition of replica sets or sharded clusters
 from a no\-auth configuration to internal authentication\&. Requires specifying a internal
 authentication mechanism such as
@@ -460,22 +460,22 @@ authentication mechanism such as
 
 .sp
 For example, if using keyfiles for
-internal authentication, the \fBmongos\fP creates
-an authenticated connection with any \fBmongod\fP or \fI\%mongos\fP
+internal authentication, the \fBmerizos\fP creates
+an authenticated connection with any \fBmerizod\fP or \fI\%merizos\fP
 in the deployment using a matching keyfile. If the security mechanisms do
-not match, the \fBmongos\fP utilizes a non\-authenticated connection instead.
+not match, the \fBmerizos\fP utilizes a non\-authenticated connection instead.
 .sp
-A \fBmongos\fP running with \fI\%\-\-transitionToAuth\fP does not enforce user access
+A \fBmerizos\fP running with \fI\%\-\-transitionToAuth\fP does not enforce user access
 controls\&. Users may connect to your deployment without any
 access control checks and perform read, write, and administrative operations.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-A \fBmongos\fP running with internal authentication and \fIwithout\fP \fI\%\-\-transitionToAuth\fP requires clients to connect
+A \fBmerizos\fP running with internal authentication and \fIwithout\fP \fI\%\-\-transitionToAuth\fP requires clients to connect
 using user access controls\&. Update clients to
-connect to the \fBmongos\fP using the appropriate user
-prior to restarting \fBmongos\fP without \fI\%\-\-transitionToAuth\fP\&.
+connect to the \fBmerizos\fP using the appropriate user
+prior to restarting \fBmerizos\fP without \fI\%\-\-transitionToAuth\fP\&.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -489,12 +489,12 @@ Changed in version 3.6: Add support for zlib compressor.
 
 .sp
 Enables network compression for communication between this
-\fBmongos\fP instance and:
+\fBmerizos\fP instance and:
 .INDENT 7.0
 .IP \(bu 2
 other members of the sharded cluster
 .IP \(bu 2
-a \fBmongo\fP shell.
+a \fBmerizo\fP shell.
 .UNINDENT
 .sp
 \fBIMPORTANT:\fP
@@ -516,16 +516,16 @@ zlib
 .sp
 If you specify multiple compressors, then the order in which you list
 the compressors matter as well as the communication initiator. For
-example, if a \fBmongo\fP shell specifies the following network
-compressors \fBzlib,snappy\fP and the \fBmongod\fP specifies
-\fBsnappy,zlib\fP, messages between \fBmongo\fP shell and
-\fBmongod\fP uses \fBzlib\fP\&.
+example, if a \fBmerizo\fP shell specifies the following network
+compressors \fBzlib,snappy\fP and the \fBmerizod\fP specifies
+\fBsnappy,zlib\fP, messages between \fBmerizo\fP shell and
+\fBmerizod\fP uses \fBzlib\fP\&.
 .sp
 If the parties do not share at least one common compressor, messages
 between the parties are uncompressed. For example, if a
-\fBmongo\fP shell specifies the network compressor
-\fBzlib\fP and \fBmongod\fP specifies \fBsnappy\fP, messages
-between \fBmongo\fP shell and \fBmongod\fP are not compressed.
+\fBmerizo\fP shell specifies the network compressor
+\fBzlib\fP and \fBmerizod\fP specifies \fBsnappy\fP, messages
+between \fBmerizo\fP shell and \fBmerizod\fP are not compressed.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -535,7 +535,7 @@ between \fBmongo\fP shell and \fBmongod\fP are not compressed.
 New in version 3.6.
 
 .sp
-Determines the threading and execution model \fBmongos\fP uses to
+Determines the threading and execution model \fBmerizos\fP uses to
 execute client requests. The \fB\-\-serviceExecutor\fP option accepts one
 of the following values:
 .TS
@@ -551,15 +551,15 @@ _
 T{
 \fBsynchronous\fP
 T}	T{
-The \fBmongos\fP uses synchronous networking and manages its
+The \fBmerizos\fP uses synchronous networking and manages its
 networking thread pool on a per connection basis. Previous
-versions of MongoDB managed threads in this way.
+versions of MerizoDB managed threads in this way.
 T}
 _
 T{
 \fBadaptive\fP
 T}	T{
-The \fBmongos\fP uses the new experimental asynchronous
+The \fBmerizos\fP uses the new experimental asynchronous
 networking mode with an adaptive thread pool which manages
 threads on a per request basis. This mode should have more
 consistent performance and use less resources when there are
@@ -572,25 +572,25 @@ _
 .TP
 .B \-\-timeZoneInfo <path>
 The full path from which to load the time zone database. If this option
-is not provided, then MongoDB will use its built\-in time zone database.
+is not provided, then MerizoDB will use its built\-in time zone database.
 .sp
 The configuration file included with Linux and macOS packages sets the time
 zone database path to \fB/usr/share/zoneinfo\fP by default.
 .sp
 The built\-in time zone database is a copy of the \fI\%Olson/IANA time zone
-database\fP\&. It is updated along with MongoDB
+database\fP\&. It is updated along with MerizoDB
 releases, but the release cycle of the time zone database differs from the
-release cycle of MongoDB. A copy of the most recent release of the time zone
+release cycle of MerizoDB. A copy of the most recent release of the time zone
 database can be downloaded from
-\fI\%https://downloads.mongodb.org/olson_tz_db/timezonedb\-latest.zip\fP\&.
+\fI\%https://downloads.merizodb.org/olson_tz_db/timezonedb\-latest.zip\fP\&.
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-wget https://downloads.mongodb.org/olson_tz_db/timezonedb\-latest.zip
+wget https://downloads.merizodb.org/olson_tz_db/timezonedb\-latest.zip
 unzip timezonedb\-latest.zip
-mongos \-\-timeZoneInfo timezonedb\-2017b/
+merizos \-\-timeZoneInfo timezonedb\-2017b/
 .ft P
 .fi
 .UNINDENT
@@ -606,10 +606,10 @@ Changed in version 3.2.
 Specifies the configuration servers for the
 sharded cluster\&.
 .sp
-Starting in MongoDB 3.2, config servers for sharded clusters can be
+Starting in MerizoDB 3.2, config servers for sharded clusters can be
 deployed as a replica set\&. The
-replica set config servers must run the WiredTiger storage engine\&. MongoDB 3.2 deprecates the use of three mirrored
-\fBmongod\fP instances for config servers.
+replica set config servers must run the WiredTiger storage engine\&. MerizoDB 3.2 deprecates the use of three mirrored
+\fBmerizod\fP instances for config servers.
 .sp
 Specify the config server replica set name and the hostname and port of
 at least one of the members of the config server replica set.
@@ -625,7 +625,7 @@ sharding:
 .UNINDENT
 .UNINDENT
 .sp
-The \fI\%mongos\fP instances for the sharded cluster must specify
+The \fI\%merizos\fP instances for the sharded cluster must specify
 the same config server replica set name but can specify hostname and
 port of different members of the replica set.
 .UNINDENT
@@ -634,13 +634,13 @@ port of different members of the replica set.
 .B \-\-localThreshold
 \fIDefault\fP: 15
 .sp
-Specifies the ping time, in milliseconds, that \fI\%mongos\fP uses
+Specifies the ping time, in milliseconds, that \fI\%merizos\fP uses
 to determine which secondary replica set members to pass read
 operations from clients. The default value of \fB15\fP corresponds to
 the default value in all of the client drivers\&.
 .sp
-When \fI\%mongos\fP receives a request that permits reads to
-secondary members, the \fI\%mongos\fP will:
+When \fI\%merizos\fP receives a request that permits reads to
+secondary members, the \fI\%merizos\fP will:
 .INDENT 7.0
 .IP \(bu 2
 Find the member of the set with the lowest ping time.
@@ -648,7 +648,7 @@ Find the member of the set with the lowest ping time.
 Construct a list of replica set members that is within a ping time of
 15 milliseconds of the nearest suitable member of the set.
 .sp
-If you specify a value for the \fI\%\-\-localThreshold\fP option, \fI\%mongos\fP will
+If you specify a value for the \fI\%\-\-localThreshold\fP option, \fI\%merizos\fP will
 construct the list of replica members that are within the latency
 allowed by this value.
 .IP \(bu 2
@@ -658,7 +658,7 @@ Select a member to read from at random from this list.
 The ping time used for a member compared by the \fI\%\-\-localThreshold\fP setting is a
 moving average of recent ping times, calculated at most every 10
 seconds. As a result, some queries may reach members above the threshold
-until the \fI\%mongos\fP recalculates the average.
+until the \fI\%merizos\fP recalculates the average.
 .sp
 See the replica\-set\-read\-preference\-behavior\-member\-selection
 section of the read preference
@@ -670,7 +670,7 @@ documentation for more information.
 .SS See
 .sp
 /tutorial/configure\-ssl for full
-documentation of MongoDB’s support.
+documentation of MerizoDB’s support.
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
@@ -679,14 +679,14 @@ documentation of MongoDB’s support.
 Deprecated since version 2.6: Use \fI\%\-\-sslMode requireSSL\fP instead.
 
 .sp
-Enables TLS/SSL for \fBmongos\fP\&.
+Enables TLS/SSL for \fBmerizos\fP\&.
 .sp
-With \fI\%\-\-sslOnNormalPorts\fP, a \fBmongos\fP requires TLS/SSL encryption for all
-connections on the default MongoDB port, or the port specified by
+With \fI\%\-\-sslOnNormalPorts\fP, a \fBmerizos\fP requires TLS/SSL encryption for all
+connections on the default MerizoDB port, or the port specified by
 \fI\%\-\-port\fP\&. By default, \fI\%\-\-sslOnNormalPorts\fP is
 disabled.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -744,7 +744,7 @@ TLS/SSL\-enabled server.
 If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
 must be specified.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -757,7 +757,7 @@ or absolute paths.
 .sp
 You must specify \fI\%\-\-sslPEMKeyFile\fP when TLS/SSL is enabled.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -766,15 +766,15 @@ For more information about TLS/SSL and MongoDB, see
 .B \-\-sslPEMKeyPassword <value>
 Specifies the password to de\-crypt the certificate\-key file (i.e.
 \fI\%\-\-sslPEMKeyFile\fP). Use the \fI\%\-\-sslPEMKeyPassword\fP option only if the
-certificate\-key file is encrypted. In all cases, the \fBmongos\fP will
+certificate\-key file is encrypted. In all cases, the \fBmerizos\fP will
 redact the password from all logging and reporting output.
 .sp
 Changed in version 2.6: If the private key in the PEM file is encrypted and you do not
-specify the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongos\fP will prompt for a
+specify the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmerizos\fP will prompt for a
 passphrase. See ssl\-certificate\-password\&.
 
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -839,7 +839,7 @@ TLS/SSL\-enabled server.
 If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
 must be specified.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -860,7 +860,7 @@ authentication, the cluster uses the \fB\&.pem\fP file specified in the
 If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
 must be specified.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -872,14 +872,14 @@ New in version 2.6.
 .sp
 Specifies the password to de\-crypt the x.509 certificate\-key file
 specified with \fB\-\-sslClusterFile\fP\&. Use the \fI\%\-\-sslClusterPassword\fP option only
-if the certificate\-key file is encrypted. In all cases, the \fBmongos\fP
+if the certificate\-key file is encrypted. In all cases, the \fBmerizos\fP
 will redact the password from all logging and reporting output.
 .sp
 If the x.509 key file is encrypted and you do not specify the
-\fI\%\-\-sslClusterPassword\fP option, the \fBmongos\fP will prompt for a passphrase. See
+\fI\%\-\-sslClusterPassword\fP option, the \fBmerizos\fP will prompt for a passphrase. See
 ssl\-certificate\-password\&.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -898,7 +898,7 @@ TLS/SSL\-enabled server.
 If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
 must be specified.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -909,7 +909,7 @@ Specifies the the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -917,19 +917,19 @@ For more information about TLS/SSL and MongoDB, see
 .TP
 .B \-\-sslAllowConnectionsWithoutCertificates
 Disables the requirement for TLS/SSL certificate validation that
-\fB\-\-sslCAFile\fP enables. With the \fI\%\-\-sslAllowConnectionsWithoutCertificates\fP option, the \fBmongos\fP
+\fB\-\-sslCAFile\fP enables. With the \fI\%\-\-sslAllowConnectionsWithoutCertificates\fP option, the \fBmerizos\fP
 will accept connections when the client does not present a certificate
 when establishing the connection.
 .sp
-If the client presents a certificate and the \fBmongos\fP has \fI\%\-\-sslAllowConnectionsWithoutCertificates\fP
-enabled, the \fBmongos\fP will validate the certificate using the root
+If the client presents a certificate and the \fBmerizos\fP has \fI\%\-\-sslAllowConnectionsWithoutCertificates\fP
+enabled, the \fBmerizos\fP will validate the certificate using the root
 certificate chain specified by \fB\-\-sslCAFile\fP and reject clients
 with invalid certificates.
 .sp
 Use the \fI\%\-\-sslAllowConnectionsWithoutCertificates\fP option if you have a mixed deployment that includes
-clients that do not or cannot present certificates to the \fBmongos\fP\&.
+clients that do not or cannot present certificates to the \fBmerizos\fP\&.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -943,7 +943,7 @@ connect.
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Starting in MongoDB 4.0, if you specify
+Starting in MerizoDB 4.0, if you specify
 \fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
 true\fP when using x.509 authentication, an invalid certificate is
 only sufficient to establish a TLS/SSL connection but is
@@ -952,10 +952,10 @@ only sufficient to establish a TLS/SSL connection but is
 .UNINDENT
 .sp
 When using
-the \fI\%\-\-sslAllowInvalidCertificates\fP setting, MongoDB
+the \fI\%\-\-sslAllowInvalidCertificates\fP setting, MerizoDB
 logs a warning regarding the use of the invalid certificate.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -967,11 +967,11 @@ New in version 3.0.
 .sp
 Disables the validation of the hostnames in TLS/SSL certificates,
 when connecting to other members of the replica set or sharded cluster
-for inter\-process authentication. This allows \fBmongos\fP to connect
+for inter\-process authentication. This allows \fBmerizos\fP to connect
 to other members if the hostnames in their certificates do not match
 their configured hostname.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -981,7 +981,7 @@ For more information about TLS/SSL and MongoDB, see
 New in version 3.0.7.
 
 .sp
-Prevents a MongoDB server running with TLS/SSL from accepting
+Prevents a MerizoDB server running with TLS/SSL from accepting
 incoming connections that use a specific protocol or protocols. To
 specify multiple protocols, use a comma separated list of protocols.
 .sp
@@ -1003,7 +1003,7 @@ The specified disabled protocols overrides any default disabled
 protocols.
 .UNINDENT
 .sp
-Starting in version 4.0, MongoDB disables the use of TLS 1.0 if TLS
+Starting in version 4.0, MerizoDB disables the use of TLS 1.0 if TLS
 1.1+ is available on the system. To enable the disabled TLS 1.0,
 specify \fBnone\fP to \fI\%\-\-sslDisabledProtocols\fP\&. 4.0\-disable\-tls
 .sp
@@ -1020,7 +1020,7 @@ ssl\-disallow\-protocols
 .INDENT 0.0
 .TP
 .B \-\-sslFIPSMode
-Directs the \fBmongos\fP to use the FIPS mode of the installed OpenSSL
+Directs the \fBmerizos\fP to use the FIPS mode of the installed OpenSSL
 library. Your system must have a FIPS
 compliant OpenSSL library to use the \fI\%\-\-sslFIPSMode\fP option.
 .sp
@@ -1028,7 +1028,7 @@ compliant OpenSSL library to use the \fI\%\-\-sslFIPSMode\fP option.
 .INDENT 7.0
 .INDENT 3.5
 FIPS\-compatible TLS/SSL is
-available only in \fI\%MongoDB Enterprise\fP\&. See
+available only in \fI\%MerizoDB Enterprise\fP\&. See
 /tutorial/configure\-fips for more information.
 .UNINDENT
 .UNINDENT
@@ -1038,7 +1038,7 @@ available only in \fI\%MongoDB Enterprise\fP\&. See
 .TP
 .B \-\-auditDestination
 Enables auditing and specifies where
-\fBmongos\fP sends all audit events.
+\fBmerizos\fP sends all audit events.
 .sp
 \fI\%\-\-auditDestination\fP can have one of the following values:
 .TS
@@ -1082,7 +1082,7 @@ _
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Available only in \fI\%MongoDB Enterprise\fP\&.
+Available only in \fI\%MerizoDB Enterprise\fP\&.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -1126,7 +1126,7 @@ performance more than printing to a file in BSON format.
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Available only in \fI\%MongoDB Enterprise\fP\&.
+Available only in \fI\%MerizoDB Enterprise\fP\&.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -1143,7 +1143,7 @@ option can take either a full path name or a relative path name.
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Available only in \fI\%MongoDB Enterprise\fP\&.
+Available only in \fI\%MerizoDB Enterprise\fP\&.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -1179,7 +1179,7 @@ the configuration file.
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Available only in \fI\%MongoDB Enterprise\fP\&.
+Available only in \fI\%MerizoDB Enterprise\fP\&.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -1195,15 +1195,15 @@ New in version 4.0.
 The \fIslow\fP operation time threshold, in milliseconds. Operations
 that run for longer than this threshold are considered \fIslow\fP\&.
 .sp
-When \fBlogLevel\fP is set to \fB0\fP, MongoDB
+When \fBlogLevel\fP is set to \fB0\fP, MerizoDB
 records \fIslow\fP operations to the diagnostic log at a rate determined by
 \fBslowOpSampleRate\fP\&. At higher
 \fBlogLevel\fP settings, all operations appear in the diagnostic
 log regardless of their latency.
 .sp
-For \fI\%mongos\fP instances,  affects the diagnostic
+For \fI\%merizos\fP instances,  affects the diagnostic
 log only and not the profiler since profiling is not available on
-\fI\%mongos\fP\&.
+\fI\%merizos\fP\&.
 .sp
 New in version 4.0.
 
@@ -1216,9 +1216,9 @@ New in version 4.0.
 The fraction of \fIslow\fP operations that should be logged.
 \fI\%\-\-slowOpSampleRate\fP accepts values between 0 and 1, inclusive.
 .sp
-For \fI\%mongos\fP instances, \fI\%\-\-slowOpSampleRate\fP affects the diagnostic log
+For \fI\%merizos\fP instances, \fI\%\-\-slowOpSampleRate\fP affects the diagnostic log
 only and not the profiler since profiling is not available on
-\fI\%mongos\fP\&.
+\fI\%merizos\fP\&.
 .sp
 New in version 4.0.
 
@@ -1237,7 +1237,7 @@ text search operations.
 .INDENT 3.5
 .IP "Enterprise Feature"
 .sp
-Available in MongoDB Enterprise only.
+Available in MerizoDB Enterprise only.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -1245,10 +1245,10 @@ Available in MongoDB Enterprise only.
 .INDENT 0.0
 .TP
 .B \-\-ldapServers <host1>:<port>,<host2>:<port>,...,<hostN>:<port>
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 
 .sp
-The LDAP server against which the \fBmongos\fP executes LDAP operations
+The LDAP server against which the \fBmerizos\fP executes LDAP operations
 against to authenticate users or determine what actions a user is authorized
 to perform on a given database. If the LDAP server specified has any
 replicated instances, you may specify the host and port of each replicated
@@ -1256,22 +1256,22 @@ server in a comma\-delimited list.
 .sp
 If your LDAP infrastrucure partitions the LDAP directory over multiple LDAP
 servers, specify \fIone\fP LDAP server any of its replicated instances to
-\fI\%\-\-ldapServers\fP\&. MongoDB supports following LDAP referrals as defined in \fI\%RFC 4511
+\fI\%\-\-ldapServers\fP\&. MerizoDB supports following LDAP referrals as defined in \fI\%RFC 4511
 4.1.10\fP\&. Do not use \fI\%\-\-ldapServers\fP
 for listing every LDAP server in your infrastucture.
 .sp
-This setting can be configured on a running \fBmongos\fP using
+This setting can be configured on a running \fBmerizos\fP using
 \fBsetParameter\fP\&.
 .sp
-If unset, \fBmongos\fP cannot use LDAP authentication or authorization\&.
+If unset, \fBmerizos\fP cannot use LDAP authentication or authorization\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ldapQueryUser <string>
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 
 .sp
-The identity with which \fBmongos\fP binds as, when connecting to or
+The identity with which \fBmerizos\fP binds as, when connecting to or
 performing queries on an LDAP server.
 .sp
 Only required if any of the following are true:
@@ -1286,15 +1286,15 @@ The LDAP server disallows anonymous binds
 .sp
 You must use \fI\%\-\-ldapQueryUser\fP with \fI\%\-\-ldapQueryPassword\fP\&.
 .sp
-If unset, \fBmongos\fP will not attempt to bind to the LDAP server.
+If unset, \fBmerizos\fP will not attempt to bind to the LDAP server.
 .sp
-This setting can be configured on a running \fBmongos\fP using
+This setting can be configured on a running \fBmerizos\fP using
 \fBsetParameter\fP\&.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Windows MongoDB deployments can use \fI\%\-\-ldapBindWithOSDefaults\fP
+Windows MerizoDB deployments can use \fI\%\-\-ldapBindWithOSDefaults\fP
 instead of \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapQueryPassword\fP\&. You cannot specify
 both \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the same time.
 .UNINDENT
@@ -1303,22 +1303,22 @@ both \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the sam
 .INDENT 0.0
 .TP
 .B \-\-ldapQueryPassword <string>
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 .sp
 The password used to bind to an LDAP server when using
 \fI\%\-\-ldapQueryUser\fP\&. You must use \fI\%\-\-ldapQueryPassword\fP with
 \fI\%\-\-ldapQueryUser\fP\&.
 
 .sp
-If unset, \fBmongos\fP will not attempt to bind to the LDAP server.
+If unset, \fBmerizos\fP will not attempt to bind to the LDAP server.
 .sp
-This setting can be configured on a running \fBmongos\fP using
+This setting can be configured on a running \fBmerizos\fP using
 \fBsetParameter\fP\&.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Windows MongoDB deployments can use \fI\%\-\-ldapBindWithOSDefaults\fP
+Windows MerizoDB deployments can use \fI\%\-\-ldapBindWithOSDefaults\fP
 instead of \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapQueryPassword\fP\&. You cannot specify
 both \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the same time.
 .UNINDENT
@@ -1329,10 +1329,10 @@ both \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the
 .B \-\-ldapBindWithOSDefaults <bool>
 \fIDefault\fP: False
 .sp
-New in version 3.4: Available in MongoDB Enterprise for the Windows platform only.
+New in version 3.4: Available in MerizoDB Enterprise for the Windows platform only.
 
 .sp
-Allows \fBmongos\fP to authenticate, or bind, using your Windows login
+Allows \fBmerizos\fP to authenticate, or bind, using your Windows login
 credentials when connecting to the LDAP server.
 .sp
 Only required if:
@@ -1353,23 +1353,23 @@ Use \fI\%\-\-ldapBindWithOSDefaults\fP to replace \fI\%\-\-ldapQueryUser\fP and
 .B \-\-ldapBindMethod <string>
 \fIDefault\fP: simple
 .sp
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 
 .sp
-The method \fBmongos\fP uses to authenticate to an LDAP server.
+The method \fBmerizos\fP uses to authenticate to an LDAP server.
 Use with \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapQueryPassword\fP to
 connect to the LDAP server.
 .sp
 \fI\%\-\-ldapBindMethod\fP supports the following values:
 .INDENT 7.0
 .IP \(bu 2
-\fBsimple\fP \- \fBmongos\fP uses simple authentication.
+\fBsimple\fP \- \fBmerizos\fP uses simple authentication.
 .IP \(bu 2
-\fBsasl\fP \- \fBmongos\fP uses SASL protocol for authentication
+\fBsasl\fP \- \fBmerizos\fP uses SASL protocol for authentication
 .UNINDENT
 .sp
 If you specify \fBsasl\fP, you can configure the available SASL mechanisms
-using \fI\%\-\-ldapBindSASLMechanisms\fP\&. \fBmongos\fP defaults to
+using \fI\%\-\-ldapBindSASLMechanisms\fP\&. \fBmerizos\fP defaults to
 using \fBDIGEST\-MD5\fP mechanism.
 .UNINDENT
 .INDENT 0.0
@@ -1377,24 +1377,24 @@ using \fBDIGEST\-MD5\fP mechanism.
 .B \-\-ldapBindSASLMechanisms <string>
 \fIDefault\fP: DIGEST\-MD5
 .sp
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 
 .sp
-A comma\-separated list of SASL mechanisms \fBmongos\fP can
-use when authenticating to the LDAP server. The \fBmongos\fP and the
-LDAP server must agree on at least one mechanism. The \fBmongos\fP
+A comma\-separated list of SASL mechanisms \fBmerizos\fP can
+use when authenticating to the LDAP server. The \fBmerizos\fP and the
+LDAP server must agree on at least one mechanism. The \fBmerizos\fP
 dynamically loads any SASL mechanism libraries installed on the host
 machine at runtime.
 .sp
 Install and configure the appropriate libraries for the selected
-SASL mechanism(s) on both the \fBmongos\fP host and the remote
+SASL mechanism(s) on both the \fBmerizos\fP host and the remote
 LDAP server host. Your operating system may include certain SASL
 libraries by default. Defer to the documentation associated with each
 SASL mechanism for guidance on installation and configuration.
 .sp
 If using the \fBGSSAPI\fP SASL mechanism for use with
 security\-kerberos, verify the following for the
-\fBmongos\fP host machine:
+\fBmerizos\fP host machine:
 .INDENT 7.0
 .TP
 .B \fBLinux\fP
@@ -1407,7 +1407,7 @@ variables, please defer to the
 \fI\%Kerberos documentation\fP\&.
 .IP \(bu 2
 The client keytab includes a
-kerberos\-user\-principal for the \fBmongos\fP to use when
+kerberos\-user\-principal for the \fBmerizos\fP to use when
 connecting to the LDAP server and execute LDAP queries.
 .UNINDENT
 .TP
@@ -1416,7 +1416,7 @@ If connecting to an Active Directory server, the Windows
 Kerberos configuration automatically generates a
 \fI\%Ticket\-Granting\-Ticket\fP
 when the user logs onto the system. Set \fI\%\-\-ldapBindWithOSDefaults\fP to
-\fBtrue\fP to allow \fBmongos\fP to use the generated credentials when
+\fBtrue\fP to allow \fBmerizos\fP to use the generated credentials when
 connecting to the Active Directory server and execute queries.
 .UNINDENT
 .sp
@@ -1431,8 +1431,8 @@ Defer to the documentation for your LDAP or Active Directory
 service for identifying the SASL mechanisms compatible with the
 service.
 .sp
-MongoDB is not a source of SASL mechanism libraries, nor
-is the MongoDB documentation a definitive source for
+MerizoDB is not a source of SASL mechanism libraries, nor
+is the MerizoDB documentation a definitive source for
 installing or configuring any given SASL mechanism. For
 documentation and support, defer to the SASL mechanism
 library vendor or owner.
@@ -1452,15 +1452,15 @@ For Windows, please see the \fI\%Windows SASL documentation\fP\&.
 .B \-\-ldapTransportSecurity <string>
 \fIDefault\fP: tls
 .sp
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 
 .sp
-By default, \fBmongos\fP creates a TLS/SSL secured connection to the LDAP
+By default, \fBmerizos\fP creates a TLS/SSL secured connection to the LDAP
 server.
 .sp
 For Linux deployments, you must configure the appropriate TLS Options in
 \fB/etc/openldap/ldap.conf\fP file. Your operating system’s package manager
-creates this file as part of the MongoDB Enterprise installation, via the
+creates this file as part of the MerizoDB Enterprise installation, via the
 \fBlibldap\fP dependency. See the documentation for \fBTLS Options\fP in the
 \fI\%ldap.conf OpenLDAP documentation\fP
 for more complete instructions.
@@ -1471,14 +1471,14 @@ tool may vary depending on operating system version. Please see the
 documentation for your version of Windows for more information on
 certificate management.
 .sp
-Set \fI\%\-\-ldapTransportSecurity\fP to \fBnone\fP to disable TLS/SSL between \fBmongos\fP and the LDAP
+Set \fI\%\-\-ldapTransportSecurity\fP to \fBnone\fP to disable TLS/SSL between \fBmerizos\fP and the LDAP
 server.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
 Setting \fI\%\-\-ldapTransportSecurity\fP to \fBnone\fP transmits plaintext information and possibly
-credentials between \fBmongos\fP and the LDAP server.
+credentials between \fBmerizos\fP and the LDAP server.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -1487,33 +1487,33 @@ credentials between \fBmongos\fP and the LDAP server.
 .B \-\-ldapTimeoutMS <long>
 \fIDefault\fP: 10000
 .sp
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 
 .sp
-The amount of time in milliseconds \fBmongos\fP should wait for an LDAP server
+The amount of time in milliseconds \fBmerizos\fP should wait for an LDAP server
 to respond to a request.
 .sp
 Increasing the value of \fI\%\-\-ldapTimeoutMS\fP may prevent connection failure between the
-MongoDB server and the LDAP server, if the source of the failure is a
+MerizoDB server and the LDAP server, if the source of the failure is a
 connection timeout. Decreasing the value of \fI\%\-\-ldapTimeoutMS\fP reduces the time
-MongoDB waits for a response from the LDAP server.
+MerizoDB waits for a response from the LDAP server.
 .sp
-This setting can be configured on a running \fBmongos\fP using
+This setting can be configured on a running \fBmerizos\fP using
 \fBsetParameter\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ldapUserToDNMapping <string>
-New in version 3.4: Available in MongoDB Enterprise only.
+New in version 3.4: Available in MerizoDB Enterprise only.
 
 .sp
-Maps the username provided to \fBmongos\fP for authentication to a LDAP
+Maps the username provided to \fBmerizos\fP for authentication to a LDAP
 Distinguished Name (DN). You may need to use \fI\%\-\-ldapUserToDNMapping\fP to transform a
 username into an LDAP DN in the following scenarios:
 .INDENT 7.0
 .IP \(bu 2
 Performing LDAP authentication with simple LDAP binding, where users
-authenticate to MongoDB with usernames that are not full LDAP DNs.
+authenticate to MerizoDB with usernames that are not full LDAP DNs.
 .IP \(bu 2
 Using an \fBLDAP authorization query template\fP that requires a DN.
 .IP \(bu 2
@@ -1585,10 +1585,10 @@ name matched by the \fBmatch\fP regex into an LDAP query URI encoded
 respecting RFC4515 and RFC4516. Each curly bracket\-enclosed numeric
 value is replaced by the corresponding \fI\%regex capture group\fP extracted
 from the authentication username via the \fBmatch\fP expression.
-\fBmongos\fP executes the query against the LDAP server to retrieve
-the LDAP DN for the authenticated user. \fBmongos\fP requires
+\fBmerizos\fP executes the query against the LDAP server to retrieve
+the LDAP DN for the authenticated user. \fBmerizos\fP requires
 exactly one returned result for the transformation to be
-successful, or \fBmongos\fP skips this transformation.
+successful, or \fBmerizos\fP skips this transformation.
 T}	T{
 \fB"ou=engineering,dc=example,
 dc=com??one?(user={0})"\fP
@@ -1599,17 +1599,17 @@ _
 For each document in the array, you must use either \fBsubstitution\fP or
 \fBldapQuery\fP\&. You \fIcannot\fP specify both in the same document.
 .sp
-When performing authentication or authorization, \fBmongos\fP steps through
+When performing authentication or authorization, \fBmerizos\fP steps through
 each document in the array in the given order, checking the authentication
 username against the \fBmatch\fP filter.  If a match is found,
-\fBmongos\fP applies the transformation and uses the output for
-authenticating the user. \fBmongos\fP does not check the remaining documents
+\fBmerizos\fP applies the transformation and uses the output for
+authenticating the user. \fBmerizos\fP does not check the remaining documents
 in the array.
 .sp
 If the given document does not match the provided authentication name, or
-the transformation described by the document fails, \fBmongos\fP continues
+the transformation described by the document fails, \fBmerizos\fP continues
 through the list of documents to find additional matches. If no matches are
-found in any document, \fBmongos\fP returns an error.
+found in any document, \fBmerizos\fP returns an error.
 .INDENT 7.0
 .INDENT 3.5
 .SS Example
@@ -1656,16 +1656,16 @@ document. The regex capture group \fB{0}\fP corresponds to the string
 A user with username \fBbob@DBA.EXAMPLE.COM\fP matches the second document.
 The regex capture group \fB{0}\fP corresponds to the string \fBbob\fP\&.  The
 resulting output is the LDAP query
-\fB"ou=dba,dc=example,dc=com??one?(user=bob)"\fP\&. \fBmongos\fP executes this
+\fB"ou=dba,dc=example,dc=com??one?(user=bob)"\fP\&. \fBmerizos\fP executes this
 query against the LDAP server, returning the result
 \fB"cn=bob,ou=dba,dc=example,dc=com"\fP\&.
 .UNINDENT
 .UNINDENT
 .sp
-If \fI\%\-\-ldapUserToDNMapping\fP is unset, \fBmongos\fP applies no transformations to the username
+If \fI\%\-\-ldapUserToDNMapping\fP is unset, \fBmerizos\fP applies no transformations to the username
 when attempting to authenticate or authorize a user against the LDAP server.
 .sp
-This setting can be configured on a running \fBmongos\fP using the
+This setting can be configured on a running \fBmerizos\fP using the
 \fBsetParameter\fP database command.
 .sp
 \fBNOTE:\fP
@@ -1673,7 +1673,7 @@ This setting can be configured on a running \fBmongos\fP using the
 .INDENT 3.5
 An explanation of \fI\%RFC4515\fP,
 \fI\%RFC4516\fP or LDAP queries is out
-of scope for the MongoDB Documentation. Please review the RFC directly or
+of scope for the MerizoDB Documentation. Please review the RFC directly or
 use your preferred LDAP resource.
 .UNINDENT
 .UNINDENT
@@ -1682,7 +1682,7 @@ use your preferred LDAP resource.
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support. \fBmongos\fP disables IPv6 support by default.
+Enables IPv6 support. \fBmerizos\fP disables IPv6 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1690,7 +1690,7 @@ Enables IPv6 support. \fBmongos\fP disables IPv6 support by default.
 Disables the scripting engine.
 .UNINDENT
 .SH AUTHOR
-MongoDB Documentation Project
+MerizoDB Documentation Project
 .SH COPYRIGHT
 2008-2018
 .\" Generated by docutils manpage writer.

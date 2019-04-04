@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,13 +31,13 @@
 
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
 
-namespace mongo {
+namespace merizo {
 
 class Client;
 class OperationContext;
@@ -66,7 +66,7 @@ constexpr auto kMetadataDocumentName = "client"_sd;
  *            "architecture" : "string", // Optional, Informational Only
  *            "version" : "string"       // Optional, Informational Only
  *        }
- *        "mongos" : {                   // Optional, Informational Only
+ *        "merizos" : {                   // Optional, Informational Only
  *            "host" : "string",         // Optional, Informational Only
  *            "client" : "string",       // Optional, Informational Only
  *            "version" : "string"       // Optional, Informational Only
@@ -80,7 +80,7 @@ constexpr auto kMetadataDocumentName = "client"_sd;
  * "unknown" in Mongo Drivers). The "driver", and "os" documents while required, are for
  * informational purposes only. The content is logged to disk but otherwise ignored.
  *
- * See Driver Specification: "MongoDB Handshake" for more information.
+ * See Driver Specification: "MerizoDB Handshake" for more information.
  */
 class ClientMetadata {
     ClientMetadata(const ClientMetadata&) = delete;
@@ -155,19 +155,19 @@ public:
                             BSONObjBuilder* builder);
 
     /**
-     * Modify the existing client metadata document to include a mongos section.
+     * Modify the existing client metadata document to include a merizos section.
      *
      * hostAndPort is "host:port" of the running MongoS.
      * monogsClient is "host:port" of the connected driver.
      * version is the version string of MongoS.
      *
-     * "mongos" : {
+     * "merizos" : {
      *     "host" : "string",
      *     "client" : "string",
      *     "version" : "string"
      * }
      */
-    void setMongoSMetadata(StringData hostAndPort, StringData mongosClient, StringData version);
+    void setMongoSMetadata(StringData hostAndPort, StringData merizosClient, StringData version);
 
     /**
      * Get the Application Name for the client metadata document.
@@ -252,4 +252,4 @@ private:
     StringData _appName;
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -19,8 +19,8 @@
 
 #include "asio/detail/throw_error.hpp"
 #include "asio/error.hpp"
-#include "mongo/util/net/ssl/detail/engine.hpp"
-#include "mongo/util/net/ssl/error.hpp"
+#include "merizo/util/net/ssl/detail/engine.hpp"
+#include "merizo/util/net/ssl/error.hpp"
 
 #include "asio/detail/push_options.hpp"
 

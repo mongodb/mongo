@@ -1,6 +1,6 @@
 // Tests whether a split and a migrate in a sharded cluster preserve the epoch
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+var st = new ShardingTest({shards: 2, merizos: 1});
 // Balancer is by default stopped, thus it will not interfere
 
 var config = st.s.getDB("config");

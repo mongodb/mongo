@@ -1,9 +1,9 @@
-// Ensures that if the primary config server is blackholed from the point of view of mongos, CRUD
+// Ensures that if the primary config server is blackholed from the point of view of merizos, CRUD
 // and read-only config operations continue to work.
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 1, useBridge: true});
+    var st = new ShardingTest({shards: 2, merizos: 1, useBridge: true});
 
     var testDB = st.s.getDB('BlackHoleDB');
     var configDB = st.s.getDB('config');
@@ -23,7 +23,7 @@
 
     // Set the priority and votes to 0 for secondary config servers so that in the case
     // of an election, they cannot step up. If a different node were to step up, the
-    // config server would no longer be blackholed from mongos.
+    // config server would no longer be blackholed from merizos.
     let conf = admin.runCommand({replSetGetConfig: 1}).config;
     for (let i = 0; i < conf.members.length; i++) {
         if (conf.members[i].host !== configPrimary.host) {
@@ -35,7 +35,7 @@
     const response = admin.runCommand({replSetReconfig: conf});
     assert.commandWorked(response);
 
-    jsTest.log('Partitioning the config server primary from the mongos');
+    jsTest.log('Partitioning the config server primary from the merizos');
     configPrimary.discardMessagesFrom(st.s, 1.0);
     st.s.discardMessagesFrom(configPrimary, 1.0);
 

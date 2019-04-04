@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/security_key.h"
+#include "merizo/db/auth/security_key.h"
 
 #include <algorithm>
 #include <cctype>
@@ -39,12 +39,12 @@
 #include <sys/stat.h>
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status_with.h"
+#include "merizo/util/merizoutils/str.h"
 
 #include "yaml-cpp/yaml.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 std::string stripString(const std::string& filename, const std::string& str) {
     std::string out;
@@ -117,4 +117,4 @@ StatusWith<std::vector<std::string>> readSecurityFile(const std::string& filenam
     return e.toStatus();
 }
 
-}  // namespace mongo
+}  // namespace merizo

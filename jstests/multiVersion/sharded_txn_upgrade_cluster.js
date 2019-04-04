@@ -43,8 +43,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     jsTestLog("Upgrading shard servers.");
     st.upgradeCluster("latest", {upgradeConfigs: false, upgradeMongos: false, upgradeShards: true});
 
-    // Then upgrade mongos servers.
-    jsTestLog("Upgrading mongos servers.");
+    // Then upgrade merizos servers.
+    jsTestLog("Upgrading merizos servers.");
     st.upgradeCluster("latest", {upgradeConfigs: false, upgradeMongos: true, upgradeShards: false});
     checkFCV(st.configRS.getPrimary().getDB("admin"), lastStableFCV);
 
@@ -53,7 +53,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // Can still retry the retryable write.
     assertMultiShardRetryableWriteCanBeRetried(testDB, collName, txnIds.write);
 
-    // Transactions that don't use prepare are allowed in FCV 4.0 with a 4.2 binary mongos.
+    // Transactions that don't use prepare are allowed in FCV 4.0 with a 4.2 binary merizos.
     assert.commandWorked(runTxn(testDB, collName, txnIds.commit, {multiShard: false}));
 
     // Multi shard transactions will fail because coordinateCommit is not allowed in FCV 4.0.

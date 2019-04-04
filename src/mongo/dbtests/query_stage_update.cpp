@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,36 +31,36 @@
  * This file tests the UpdateStage class
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/eof.h"
-#include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/exec/update_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/update/update_driver.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/exec/collection_scan.h"
+#include "merizo/db/exec/eof.h"
+#include "merizo/db/exec/queued_data_stage.h"
+#include "merizo/db/exec/update_stage.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/update/update_driver.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/stdx/memory.h"
 
 #define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
     try {                                                                          \
         EXPRESSION;                                                                \
     } catch (const AssertionException& e) {                                        \
-        ::mongoutils::str::stream err;                                             \
+        ::merizoutils::str::stream err;                                             \
         err << "Threw an exception incorrectly: " << e.toString();                 \
-        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
+        ::merizo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
     }
 
 namespace QueryStageUpdate {

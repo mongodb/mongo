@@ -10,7 +10,7 @@
 
     let st = new ShardingTest({
         shards: [{binVersion: "latest"}, {binVersion: "last-stable"}],
-        mongos: {binVersion: "latest"},
+        merizos: {binVersion: "latest"},
         other: {shardAsReplicaSet: false},
     });
 

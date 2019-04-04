@@ -18,14 +18,14 @@ MongoRunner.stopMongod(conn);
 var SERVER_CERT = "jstests/libs/server.pem";
 var CA_CERT = "jstests/libs/ca.pem";
 
-var SERVER_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=server";
-var INTERNAL_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=internal";
-var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
-var INVALID_CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=invalid";
+var SERVER_USER = "C=US,ST=New York,L=New York City,O=MerizoDB,OU=Kernel,CN=server";
+var INTERNAL_USER = "C=US,ST=New York,L=New York City,O=MerizoDB,OU=Kernel,CN=internal";
+var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MerizoDB,OU=KernelUser,CN=client";
+var INVALID_CLIENT_USER = "C=US,ST=New York,L=New York City,O=MerizoDB,OU=KernelUser,CN=invalid";
 
-function authAndTest(mongo) {
-    external = mongo.getDB("$external");
-    test = mongo.getDB("test");
+function authAndTest(merizo) {
+    external = merizo.getDB("$external");
+    test = merizo.getDB("test");
 
     // It should be impossible to create users with the same name as the server's subject
     assert.throws(function() {
@@ -90,24 +90,24 @@ function authAndTest(mongo) {
     }, [], "read after logout");
 }
 
-print("1. Testing x.509 auth to mongod");
+print("1. Testing x.509 auth to merizod");
 var x509_options = {sslMode: "requireSSL", sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT};
 
-var mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
+var merizo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
 
-authAndTest(mongo);
-MongoRunner.stopMongod(mongo);
+authAndTest(merizo);
+MongoRunner.stopMongod(merizo);
 
-print("2. Testing x.509 auth to mongos");
+print("2. Testing x.509 auth to merizos");
 
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 var st = new ShardingTest({
     shards: 1,
-    mongos: 1,
+    merizos: 1,
     other: {
         keyFile: 'jstests/libs/key1',
         configOptions: x509_options,
-        mongosOptions: x509_options,
+        merizosOptions: x509_options,
         shardOptions: x509_options,
         useHostname: false,
         shardAsReplicaSet: false

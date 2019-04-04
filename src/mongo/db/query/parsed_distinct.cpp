@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/parsed_distinct.h"
+#include "merizo/db/query/parsed_distinct.h"
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/distinct_command_gen.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/distinct_command_gen.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/idl/idl_parser.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 const char ParsedDistinct::kKeyField[] = "key";
 const char ParsedDistinct::kQueryField[] = "query";
@@ -57,7 +57,7 @@ namespace {
 std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
     // Check if field contains an array index.
     std::vector<std::string> res;
-    mongo::splitStringDelim(field, &res, '.');
+    merizo::splitStringDelim(field, &res, '.');
 
     // Since we could exit early from the loop,
     // we should check _id here and set '*isIDOut' accordingly.
@@ -67,7 +67,7 @@ std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
     // with a number, the number cannot be an array index.
     int arrayIndex = 0;
     for (size_t i = 1; i < res.size(); ++i) {
-        if (mongo::parseNumberFromStringWithBase(res[i], 10, &arrayIndex).isOK()) {
+        if (merizo::parseNumberFromStringWithBase(res[i], 10, &arrayIndex).isOK()) {
             // Array indices cannot be negative numbers (this is not $slice).
             // Negative numbers are allowed as field names.
             if (arrayIndex >= 0) {
@@ -78,7 +78,7 @@ std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
                 // string
                 // to the end of projectedField.
                 std::string projectedField;
-                mongo::joinStringDelim(prefixStrings, &projectedField, '.');
+                merizo::joinStringDelim(prefixStrings, &projectedField, '.');
                 return projectedField;
             }
         }
@@ -270,4 +270,4 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     return ParsedDistinct(std::move(cq.getValue()), parsedDistinct.getKey().toString());
 }
 
-}  // namespace mongo
+}  // namespace merizo

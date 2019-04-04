@@ -1,8 +1,8 @@
-# Copyright (C) 2019-present MongoDB, Inc.
+# Copyright (C) 2019-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -26,14 +26,14 @@
 # it in the license file.
 
 global:
-    cpp_namespace: mongo
+    cpp_namespace: merizo
 
 server_parameters:
     failIndexKeyTooLong:
         description: >-
           Fail update/insert if indexed field is longer than the index key limit. 
-          This parameter is deprecated in MongoDB 4.2 and only used when FCV is 
-          set to 4.0. It will be removed in MongoDB 4.4.
+          This parameter is deprecated in MerizoDB 4.2 and only used when FCV is 
+          set to 4.0. It will be removed in MerizoDB 4.4.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: failIndexKeyTooLong

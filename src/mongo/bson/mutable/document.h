@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,14 +31,14 @@
 
 #include <cstdint>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/const_element.h"
-#include "mongo/bson/mutable/damage_vector.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/util/safe_num.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/mutable/const_element.h"
+#include "merizo/bson/mutable/damage_vector.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/util/safe_num.h"
 
-namespace mongo {
+namespace merizo {
 namespace mutablebson {
 
 /** Mutable BSON Overview
@@ -56,7 +56,7 @@ namespace mutablebson {
  *  The classes in this library (Document, Element, and ConstElement) present a tree-like
  *  (or DOM like) interface. Elements are logically equivalent to BSONElements: they carry
  *  a type, a field name, and a value. Every Element belongs to a Document, which roots the
- *  tree, and Elements of proper type (mongo::Object or mongo::Array) may have child
+ *  tree, and Elements of proper type (merizo::Object or merizo::Array) may have child
  *  Elements of their own. Given an Element, you may navigate to the Element's parent, to
  *  its siblings to the left or right of the Element in the tree, and to the leftmost or
  *  rightmost children of the Element. Note that some Elements may not offer all of these
@@ -69,7 +69,7 @@ namespace mutablebson {
  *
  *  Elements within the Document may be modified in various ways: the value of the Element
  *  may be changed, the Element may be removed, it may be renamed, and if it is eligible
- *  for children (i.e. it represents a mongo::Array or mongo::Object) it may have child
+ *  for children (i.e. it represents a merizo::Array or merizo::Object) it may have child
  *  Elements added to it. Once you have completed building or modifying the Document, you
  *  may write it back out to a BSONObjBuilder by calling Document::writeTo. You may also
  *  serialize individual Elements within the Document to BSONObjBuilder or BSONArrayBuilder
@@ -81,7 +81,7 @@ namespace mutablebson {
  *
  *  Example 1: Building up a document from scratch, reworking it, and then serializing it:
 
-     namespace mmb = mongo::mutablebson;
+     namespace mmb = merizo::mutablebson;
      // Create a new document
      mmb::Document doc;
      // doc contents: '{}'
@@ -89,25 +89,25 @@ namespace mutablebson {
      // Get the root of the document.
      mmb::Element root = doc.root();
 
-     // Create a new mongo::NumberInt typed Element to represent life, the universe, and
+     // Create a new merizo::NumberInt typed Element to represent life, the universe, and
      // everything, then push that Element into the root object, making it a child of root.
      mmb::Element e0 = doc.makeElementInt("ltuae", 42);
      root.pushBack(e0);
      // doc contents: '{ ltuae : 42 }'
 
-     // Create a new empty mongo::Object-typed Element named 'magic', and push it back as a
+     // Create a new empty merizo::Object-typed Element named 'magic', and push it back as a
      // child of the root, making it a sibling of e0.
      mmb::Element e1 = doc.makeElementObject("magic");
      root.pushBack(e1);
      // doc contents: '{ ltuae : 42, magic : {} }'
 
-     // Create a new mongo::NumberDouble typed Element to represent Pi, and insert it as child
+     // Create a new merizo::NumberDouble typed Element to represent Pi, and insert it as child
      // of the new object we just created.
      mmb::Element e3 = doc.makeElementDouble("pi", 3.14);
      e1.pushBack(e3);
      // doc contents: '{ ltuae : 42, magic : { pi : 3.14 } }'
 
-     // Create a new mongo::NumberDouble to represent Plancks constant in electrovolt
+     // Create a new merizo::NumberDouble to represent Plancks constant in electrovolt
      // micrometers, and add it as a child of the 'magic' object.
      mmb::Element e4 = doc.makeElementDouble("hbar", 1.239);
      e1.pushBack(e4);
@@ -125,9 +125,9 @@ namespace mutablebson {
      mmb::sortChildren(doc.root().rightChild(), mmb::FieldNameLessThan());
      // doc contents: '{ answer : 42, constants : { hbar : 1.239, pi : 3.14 } }'
 
-     mongo::BSONObjBuilder builder;
+     merizo::BSONObjBuilder builder;
      doc.writeTo(&builder);
-     mongo::BSONObj result = builder.obj();
+     merizo::BSONObj result = builder.obj();
      // result contents: '{ answer : 42, constants : { hbar : 1.239, pi : 3.14 } }'
 
  *  While you can use this library to build Documents from scratch, its real purpose is to
@@ -140,14 +140,14 @@ namespace mutablebson {
  *
  *  Example 2: Modifying an existing BSONObj (some error handling removed for length)
 
-     namespace mmb = mongo::mutablebson;
+     namespace mmb = merizo::mutablebson;
 
      static const char inJson[] =
          "{"
          "  'whale': { 'alive': true, 'dv': -9.8, 'height': 50, attrs : [ 'big' ] },"
          "  'petunias': { 'alive': true, 'dv': -9.8, 'height': 50 } "
          "}";
-     mongo::BSONObj obj = mongo::fromjson(inJson);
+     merizo::BSONObj obj = merizo::fromjson(inJson);
 
      // Create a new document representing the BSONObj with the above contents.
      mmb::Document doc(obj);
@@ -174,7 +174,7 @@ namespace mutablebson {
      petunias_deltav.setValueDouble(0);
 
      // Replace the whale by its wreckage, saving only its attributes:
-     // Construct a new mongo::Object element for the ex-whale.
+     // Construct a new merizo::Object element for the ex-whale.
      mmb::Element ex_whale = doc.makeElementObject("ex-whale");
      doc.root().pushBack(ex_whale);
      // Find the attributes of the old 'whale' element.
@@ -348,7 +348,7 @@ public:
     Element makeElementNewOID(StringData fieldName);
 
     /** Create a new OID Element with the given value and field name. */
-    Element makeElementOID(StringData fieldName, mongo::OID value);
+    Element makeElementOID(StringData fieldName, merizo::OID value);
 
     /** Create a new bool Element with the given value and field name. */
     Element makeElementBool(StringData fieldName, bool value);
@@ -363,7 +363,7 @@ public:
     Element makeElementRegex(StringData fieldName, StringData regex, StringData flags);
 
     /** Create a new DBRef Element with the given data and field name. */
-    Element makeElementDBRef(StringData fieldName, StringData ns, mongo::OID oid);
+    Element makeElementDBRef(StringData fieldName, StringData ns, merizo::OID oid);
 
     /** Create a new code Element with the given value and field name. */
     Element makeElementCode(StringData fieldName, StringData value);
@@ -519,6 +519,6 @@ private:
 };
 
 }  // namespace mutablebson
-}  // namespace mongo
+}  // namespace merizo
 
-#include "mongo/bson/mutable/document-inl.h"
+#include "merizo/bson/mutable/document-inl.h"

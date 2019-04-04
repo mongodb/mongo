@@ -20,7 +20,7 @@
 # Suite 330, Boston, MA 02111-1307 USA
 #
 ### BEGIN INIT INFO
-# Provides:          mongod
+# Provides:          merizod
 # Required-Start:    $network $local_fs $remote_fs
 # Required-Stop:     $network $local_fs $remote_fs
 # Should-Start:      $named
@@ -28,7 +28,7 @@
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: An object/document-oriented database
-# Description:       MongoDB is a high-performance, open source, schema-free
+# Description:       MerizoDB is a high-performance, open source, schema-free
 #                    document-oriented data store that's easy to deploy, manage
 #                    and use. It's network accessible, written in C++ and offers
 #                    the following features:
@@ -47,18 +47,18 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=/usr/bin/mongod
+DAEMON=/usr/bin/merizod
 DESC=database
 
-NAME=mongod
+NAME=merizod
 # Defaults.  Can be overridden by the /etc/default/$NAME
 # Other configuration options are located in $CONF file. See here for more:
-# http://dochub.mongodb.org/core/configurationoptions
-CONF=/etc/mongod.conf
+# http://dochub.merizodb.org/core/configurationoptions
+CONF=/etc/merizod.conf
 PIDFILE=/var/run/$NAME.pid
 ENABLE_MONGOD=yes
 
-# Include mongodb defaults if available.
+# Include merizodb defaults if available.
 # All variables set before this point can be overridden by users, by
 # setting them directly in the defaults file. Use this to explicitly
 # override these values, at your own risk.
@@ -96,8 +96,8 @@ DIETIME=10                  # Time to wait for the server to die, in seconds
                             # let some servers to die gracefully and
                             # 'restart' will not work
 
-DAEMONUSER=${DAEMONUSER:-mongodb}
-DAEMONGROUP=${DAEMONGROUP:-mongodb}
+DAEMONUSER=${DAEMONUSER:-merizodb}
+DAEMONGROUP=${DAEMONGROUP:-merizodb}
 
 set -e
 
@@ -125,8 +125,8 @@ running() {
 }
 
 start_server() {
-            # Recommended ulimit values for mongod or mongos
-            # See http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
+            # Recommended ulimit values for merizod or merizos
+            # See http://docs.merizodb.org/manual/reference/ulimit/#recommended-settings
             #
             ulimit -f unlimited
             ulimit -t unlimited
@@ -256,7 +256,7 @@ case "$1" in
             exit 1
         fi
         ;;
-  # MongoDB can't reload its configuration.
+  # MerizoDB can't reload its configuration.
   reload)
         log_warning_msg "Reloading $NAME daemon: not implemented, as the daemon"
         log_warning_msg "cannot re-read the config file (use restart)."

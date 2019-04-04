@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,19 +31,19 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/database_version_gen.h"
-#include "mongo/util/concurrency/notification.h"
-#include "mongo/util/string_map.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/s/chunk_version.h"
+#include "merizo/s/database_version_gen.h"
+#include "merizo/util/concurrency/notification.h"
+#include "merizo/util/string_map.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 
 /**
- * A decoration on OperationContext representing per-operation shard version metadata sent to mongod
- * from mongos as a command parameter.
+ * A decoration on OperationContext representing per-operation shard version metadata sent to merizod
+ * from merizos as a command parameter.
  *
  * The metadata for a particular operation can be retrieved using the get() method.
  *
@@ -206,4 +206,4 @@ private:
     boost::optional<Status> _shardingOperationFailedStatus;
 };
 
-}  // namespace mongo
+}  // namespace merizo

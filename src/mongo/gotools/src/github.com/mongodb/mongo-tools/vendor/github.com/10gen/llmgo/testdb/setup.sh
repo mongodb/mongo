@@ -9,7 +9,7 @@ start() {
     echo keyfile > keyfile
     chmod 600 keyfile
     COUNT=$(grep '^\[program' supervisord.conf | wc -l | tr -d ' ')
-    if ! mongod --help | grep -q -- --ssl; then
+    if ! merizod --help | grep -q -- --ssl; then
         COUNT=$(($COUNT - 1))
     fi
     echo "Running supervisord..."
@@ -19,8 +19,8 @@ start() {
         RUNNING=$(supervisorctl status | grep RUNNING | wc -l | tr -d ' ')
         echo "$RUNNING processes running..."
         if [ x$COUNT = x$RUNNING ]; then
-            echo "Running setup.js with mongo..."
-            mongo --nodb ../testdb/init.js
+            echo "Running setup.js with merizo..."
+            merizo --nodb ../testdb/init.js
             exit 0
         fi
         sleep 1

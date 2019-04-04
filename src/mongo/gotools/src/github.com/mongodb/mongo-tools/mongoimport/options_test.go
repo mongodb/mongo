@@ -1,18 +1,18 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoimport
+package merizoimport
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -29,7 +29,7 @@ func TestWriteConcernWithURIParsing(t *testing.T) {
 		opts := options.New("", "", enabled)
 
 		// create an 'IngestOptions', which holds the value of the write concern
-		// for mongoimport.
+		// for merizoimport.
 		ingestOpts := &IngestOptions{}
 		opts.AddOptions(ingestOpts)
 
@@ -51,7 +51,7 @@ func TestWriteConcernWithURIParsing(t *testing.T) {
 
 		Convey("Parsing with no writeconcern in URI should not error", func() {
 			args := []string{
-				"--uri", "mongodb://localhost:27017/test",
+				"--uri", "merizodb://localhost:27017/test",
 			}
 			_, err := opts.ParseArgs(args)
 			So(err, ShouldBeNil)
@@ -66,7 +66,7 @@ func TestWriteConcernWithURIParsing(t *testing.T) {
 		})
 		Convey("Parsing with both writeconcern in URI and command line should error", func() {
 			args := []string{
-				"--uri", "mongodb://localhost:27017/test",
+				"--uri", "merizodb://localhost:27017/test",
 				"--writeConcern", "majority",
 			}
 			_, err := opts.ParseArgs(args)

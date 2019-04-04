@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,18 +31,18 @@
 
 #include <string>
 
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/future.h"
-#include "mongo/util/md5.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/executor/remote_command_response.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/future.h"
+#include "merizo/util/md5.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObj;
 
@@ -80,10 +80,10 @@ constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
  *     "user": The std::string name of the user to authenticate.  Mandatory.
  *     "db": The database target of the auth command, which identifies the location
  *         of the credential information for the user.  May be "$external" if
- *         credential information is stored outside of the mongo cluster.  Mandatory.
+ *         credential information is stored outside of the merizo cluster.  Mandatory.
  *     "pwd": The password data.
  *     "digestPassword": Boolean, set to true if the "pwd" is undigested (default).
- *     "serviceName": The GSSAPI service name to use.  Defaults to "mongodb".
+ *     "serviceName": The GSSAPI service name to use.  Defaults to "merizodb".
  *     "serviceHostname": The GSSAPI hostname to use.  Defaults to the name of the remote
  *          host.
  *
@@ -168,4 +168,4 @@ StringData getSaslCommandUserDBFieldName();
 StringData getSaslCommandUserFieldName();
 
 }  // namespace auth
-}  // namespace mongo
+}  // namespace merizo

@@ -12,7 +12,7 @@
     const dbName = "test";
 
     const st = new ShardingTest({
-        mongos: 2,
+        merizos: 2,
         rs0: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]},
         rs1: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]},
         verbose: 2
@@ -139,9 +139,9 @@
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry1);
     checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
 
-    // Run listCollections with readPref=secondary from the stale mongos. First, this should cause
+    // Run listCollections with readPref=secondary from the stale merizos. First, this should cause
     // the old primary shard's secondary to provoke the old primary shard's primary to refresh. Then
-    // once the stale mongos refreshes, it should cause the new primary shard's secondary to provoke
+    // once the stale merizos refreshes, it should cause the new primary shard's secondary to provoke
     // the new primary shard's primary to refresh.
     jsTest.log("About to do listCollections with readPref=secondary after movePrimary");
     assert.commandWorked(staleMongos.getDB(dbName).runCommand(
@@ -177,7 +177,7 @@
     checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry2);
 
     // Confirm that we have a bug (SERVER-34431), where if a database is dropped and recreated on a
-    // different shard, a stale mongos that has cached the old database's primary shard will *not*
+    // different shard, a stale merizos that has cached the old database's primary shard will *not*
     // be routed to the new database's primary shard (and will see an empty database).
 
     // Use 'enableSharding' to create the database only in the sharding catalog (the database will

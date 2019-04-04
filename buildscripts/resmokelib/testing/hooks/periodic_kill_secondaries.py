@@ -5,8 +5,8 @@ from __future__ import absolute_import
 import time
 
 import bson
-import pymongo
-import pymongo.errors
+import pymerizo
+import pymerizo.errors
 
 from . import dbhash
 from . import interface
@@ -94,29 +94,29 @@ class PeriodicKillSecondaries(interface.Hook):
     def _enable_rssyncapplystop(self, secondary):
         # Enable the "rsSyncApplyStop" failpoint on the secondary to prevent them from
         # applying any oplog entries while the test is running.
-        client = secondary.mongo_client()
+        client = secondary.merizo_client()
         try:
             client.admin.command(
                 bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "alwaysOn")]))
-        except pymongo.errors.OperationFailure as err:
-            self.logger.exception("Unable to disable oplog application on the mongod on port %d",
+        except pymerizo.errors.OperationFailure as err:
+            self.logger.exception("Unable to disable oplog application on the merizod on port %d",
                                   secondary.port)
             raise errors.ServerFailure(
-                "Unable to disable oplog application on the mongod on port {}: {}".format(
+                "Unable to disable oplog application on the merizod on port {}: {}".format(
                     secondary.port, err.args[0]))
 
     def _disable_rssyncapplystop(self, secondary):
         # Disable the "rsSyncApplyStop" failpoint on the secondary to have it resume applying
         # oplog entries.
-        client = secondary.mongo_client()
+        client = secondary.merizo_client()
         try:
             client.admin.command(
                 bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "off")]))
-        except pymongo.errors.OperationFailure as err:
-            self.logger.exception("Unable to re-enable oplog application on the mongod on port %d",
+        except pymerizo.errors.OperationFailure as err:
+            self.logger.exception("Unable to re-enable oplog application on the merizod on port %d",
                                   secondary.port)
             raise errors.ServerFailure(
-                "Unable to re-enable oplog application on the mongod on port {}: {}".format(
+                "Unable to re-enable oplog application on the merizod on port {}: {}".format(
                     secondary.port, err.args[0]))
 
 
@@ -160,18 +160,18 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             self._hook._disable_rssyncapplystop(secondary)  # pylint: disable=protected-access
 
             # Wait a little bit for the secondary to start apply oplog entries so that we are more
-            # likely to kill the mongod process while it is partway into applying a batch.
+            # likely to kill the merizod process while it is partway into applying a batch.
             time.sleep(0.1)
 
             # Check that the secondary is still running before forcibly terminating it. This ensures
             # we still detect some cases in which the secondary has already crashed.
             if not secondary.is_running():
                 raise errors.ServerFailure(
-                    "mongod on port {} was expected to be running in"
+                    "merizod on port {} was expected to be running in"
                     " PeriodicKillSecondaries.after_test(), but wasn't.".format(secondary.port))
 
             self.logger.info("Killing the secondary on port %d...", secondary.port)
-            secondary.mongod.stop(kill=True)
+            secondary.merizod.stop(kill=True)
 
         try:
             self.fixture.teardown()
@@ -191,7 +191,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
             self.logger.info("Restarting the secondary on port %d as a replica set node with"
                              " its data files intact...", secondary.port)
-            # Start the 'secondary' mongod back up as part of the replica set and wait for it to
+            # Start the 'secondary' merizod back up as part of the replica set and wait for it to
             # reach state SECONDARY.
             secondary.setup()
             secondary.await_ready()
@@ -256,7 +256,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
     def _check_invariants_as_standalone(self, secondary):
         # pylint: disable=too-many-branches,too-many-statements
         # We remove the --replSet option in order to start the node as a standalone.
-        replset_name = secondary.mongod_options.pop("replSet")
+        replset_name = secondary.merizod_options.pop("replSet")
         self.logger.info("Restarting the secondary on port %d as a standalone node with"
                          " its data files intact...", secondary.port)
 
@@ -264,13 +264,13 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             secondary.setup()
             secondary.await_ready()
 
-            client = secondary.mongo_client()
+            client = secondary.merizo_client()
             minvalid_doc = client.local["replset.minvalid"].find_one()
             oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
             recovery_timestamp_res = client.admin.command("replSetTest",
                                                           getLastStableRecoveryTimestamp=True)
             latest_oplog_doc = client.local["oplog.rs"].find_one(sort=[("$natural",
-                                                                        pymongo.DESCENDING)])
+                                                                        pymerizo.DESCENDING)])
 
             self.logger.info("Checking invariants: minValid: {}, oplogTruncateAfterPoint: {},"
                              " stable recovery timestamp: {}, latest oplog doc: {}".format(
@@ -411,21 +411,21 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                 raise errors.ServerFailure(
                     "{} did not exit cleanly after being started up as a standalone".format(
                         secondary))
-        except pymongo.errors.OperationFailure as err:
+        except pymerizo.errors.OperationFailure as err:
             self.logger.exception(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
                 " the last stable recovery timestamp, or the latest oplog entry from the"
-                " mongod on port %d", secondary.port)
+                " merizod on port %d", secondary.port)
             raise errors.ServerFailure(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
                 " the last stable recovery timestamp, or the latest oplog entry from the"
-                " mongod on port {}: {}".format(secondary.port, err.args[0]))
+                " merizod on port {}: {}".format(secondary.port, err.args[0]))
         finally:
             # Set the secondary's options back to their original values.
-            secondary.mongod_options["replSet"] = replset_name
+            secondary.merizod_options["replSet"] = replset_name
 
     def _await_secondary_state(self, secondary):
-        client = secondary.mongo_client()
+        client = secondary.merizo_client()
         try:
             client.admin.command(
                 bson.SON([
@@ -433,10 +433,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                     ("waitForMemberState", 2),  # 2 = SECONDARY
                     ("timeoutMillis", fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)
                 ]))
-        except pymongo.errors.OperationFailure as err:
+        except pymerizo.errors.OperationFailure as err:
             self.logger.exception(
-                "mongod on port %d failed to reach state SECONDARY after %d seconds",
+                "merizod on port %d failed to reach state SECONDARY after %d seconds",
                 secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
             raise errors.ServerFailure(
-                "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".format(
+                "merizod on port {} failed to reach state SECONDARY after {} seconds: {}".format(
                     secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))

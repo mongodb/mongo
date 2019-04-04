@@ -154,7 +154,7 @@ message BuildOptions {
     bool debug = 4;
 }
 
-message MongoDBDownloadOptions {
+message MerizoDBDownloadOptions {
     BuildOptions build_options = 1;
     string path = 2;
     repeated string releases = 3;
@@ -218,7 +218,7 @@ service JasperProcessManager {
   rpc ResetTags(JasperProcessID) returns (OperationOutcome);
   rpc GetTags(JasperProcessID) returns (ProcessTags);
   rpc DownloadFile(DownloadInfo) returns (OperationOutcome);
-  rpc DownloadMongoDB(MongoDBDownloadOptions) returns (OperationOutcome);
+  rpc DownloadMerizoDB(MerizoDBDownloadOptions) returns (OperationOutcome);
   rpc ConfigureCache(CacheOptions) returns (OperationOutcome);
   rpc GetBuildloggerURLs(JasperProcessID) returns (BuildloggerURLs);
   rpc RegisterSignalTriggerID(SignalTriggerParams) returns (OperationOutcome);

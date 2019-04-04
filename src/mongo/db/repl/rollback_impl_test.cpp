@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,35 +26,35 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplicationRollback
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/oplog_interface_mock.h"
-#include "mongo/db/repl/rollback_impl.h"
-#include "mongo/db/repl/rollback_test_fixture.h"
-#include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/s/type_shard_identity.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/catalog/type_config_version.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/uuid.h"
+#include "merizo/db/catalog/collection_mock.h"
+#include "merizo/db/catalog/drop_collection.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/oplog_interface_local.h"
+#include "merizo/db/repl/oplog_interface_mock.h"
+#include "merizo/db/repl/rollback_impl.h"
+#include "merizo/db/repl/rollback_test_fixture.h"
+#include "merizo/db/s/shard_identity_rollback_notifier.h"
+#include "merizo/db/s/type_shard_identity.h"
+#include "merizo/db/service_context.h"
+#include "merizo/s/catalog/type_config_version.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/uuid.h"
 
 namespace {
 
-using namespace mongo;
-using namespace mongo::repl;
+using namespace merizo;
+using namespace merizo::repl;
 
 NamespaceString kOplogNSS("local.oplog.rs");
 NamespaceString nss("test.coll");
@@ -1207,7 +1207,7 @@ DEATH_TEST_F(RollbackImplTest,
     }
 
     auto status = _rollback->runRollback(_opCtx.get());
-    unittest::log() << "mongod did not crash when expected; status: " << status;
+    unittest::log() << "merizod did not crash when expected; status: " << status;
 }
 
 DEATH_TEST_F(RollbackImplTest,
@@ -1221,7 +1221,7 @@ DEATH_TEST_F(RollbackImplTest,
     _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     auto status = _rollback->runRollback(_opCtx.get());
-    unittest::log() << "mongod did not crash when expected; status: " << status;
+    unittest::log() << "merizod did not crash when expected; status: " << status;
 }
 
 TEST_F(RollbackImplTest, RollbackSetsMultipleCollectionCounts) {

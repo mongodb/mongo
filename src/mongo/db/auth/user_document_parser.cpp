@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/db/auth/user_document_parser.h"
+#include "merizo/db/auth/user_document_parser.h"
 
 #include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/db/auth/address_restriction.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/db/auth/address_restriction.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/privilege_parser.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 constexpr StringData ADMIN_DBNAME = "admin"_sd;
@@ -153,7 +153,7 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
     StringData userDBStr = userDBElement.valueStringData();
     if (!NamespaceString::validDBName(userDBStr, NamespaceString::DollarInDbNameBehavior::Allow) &&
         userDBStr != "$external") {
-        return _badValue(mongoutils::str::stream() << "'" << userDBStr
+        return _badValue(merizoutils::str::stream() << "'" << userDBStr
                                                    << "' is not a valid value for the db field.");
     }
 
@@ -488,4 +488,4 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -2,7 +2,7 @@
 // relates to SERVER-808
 //
 // This file tests that options are not restored upon
-// mongorestore with --noOptionsRestore
+// merizorestore with --noOptionsRestore
 //
 // It checks that this works both when doing a full
 // database dump/restore and when doing it just for a

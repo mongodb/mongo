@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,18 +28,18 @@
  */
 #pragma once
 
-#include "mongo/bson/oid.h"
-#include "mongo/util/background.h"
+#include "merizo/bson/oid.h"
+#include "merizo/util/background.h"
 
 #include <string>
 
-namespace mongo {
+namespace merizo {
 
 class AuthorizationManager;
 class OperationContext;
 
 /**
- * Background job that runs only in mongos and periodically checks in with the config servers
+ * Background job that runs only in merizos and periodically checks in with the config servers
  * to determine whether any authorization information has changed, and if so causes the
  * AuthorizationManager to throw out its in-memory cache of User objects (which contains the
  * users' credentials, roles, privileges, etc).
@@ -62,4 +62,4 @@ private:
 
 Status userCacheInvalidationIntervalSecsNotify(const int& newValue);
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,6 +1,6 @@
-// Tests that specifying a maxTimeMS on a getMore request to mongos is not interpreted as a deadline
+// Tests that specifying a maxTimeMS on a getMore request to merizos is not interpreted as a deadline
 // for the operationfor a tailable + awaitData cursor.
-// This test was designed to reproduce SERVER-33942 against a mongos.
+// This test was designed to reproduce SERVER-33942 against a merizos.
 // @tags: [requires_sharding, requires_capped]
 (function() {
     "use strict";

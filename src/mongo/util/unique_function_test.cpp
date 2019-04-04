@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/util/functional.h"
+#include "merizo/util/functional.h"
 
-#include "mongo/unittest/unittest.h"
+#include "merizo/unittest/unittest.h"
 
 namespace {
 template <int channel>
@@ -54,7 +54,7 @@ TEST(UniqueFunctionTest, construct_simple_unique_function_from_lambda) {
     // Implicit construction
     {
         RunDetection<0> runDetection;
-        mongo::unique_function<void()> uf = [] { RunDetection<0>::itRan = true; };
+        merizo::unique_function<void()> uf = [] { RunDetection<0>::itRan = true; };
 
         uf();
 
@@ -64,7 +64,7 @@ TEST(UniqueFunctionTest, construct_simple_unique_function_from_lambda) {
     // Explicit construction
     {
         RunDetection<0> runDetection;
-        mongo::unique_function<void()> uf{[] { RunDetection<0>::itRan = true; }};
+        merizo::unique_function<void()> uf{[] { RunDetection<0>::itRan = true; }};
 
         uf();
 
@@ -75,7 +75,7 @@ TEST(UniqueFunctionTest, construct_simple_unique_function_from_lambda) {
 TEST(UniqueFunctionTest, assign_simple_unique_function_from_lambda) {
     // Implicit construction
     RunDetection<0> runDetection;
-    mongo::unique_function<void()> uf;
+    merizo::unique_function<void()> uf;
     uf = [] { RunDetection<0>::itRan = true; };
 
     uf();
@@ -88,7 +88,7 @@ TEST(UniqueFunctionTest, reassign_simple_unique_function_from_lambda) {
     RunDetection<0> runDetection0;
     RunDetection<1> runDetection1;
 
-    mongo::unique_function<void()> uf = [] { RunDetection<0>::itRan = true; };
+    merizo::unique_function<void()> uf = [] { RunDetection<0>::itRan = true; };
 
     uf = [] { RunDetection<1>::itRan = true; };
 
@@ -101,9 +101,9 @@ TEST(UniqueFunctionTest, reassign_simple_unique_function_from_lambda) {
 TEST(UniqueFunctionTest, accepts_a_functor_that_is_move_only) {
     struct Checker {};
 
-    mongo::unique_function<void()> uf = [checkerPtr = std::make_unique<Checker>()]{};
+    merizo::unique_function<void()> uf = [checkerPtr = std::make_unique<Checker>()]{};
 
-    mongo::unique_function<void()> uf2 = std::move(uf);
+    merizo::unique_function<void()> uf2 = std::move(uf);
 
     uf = std::move(uf2);
 }
@@ -119,7 +119,7 @@ TEST(UniqueFunctionTest, dtor_releases_functor_object_and_does_not_call_function
     };
 
     {
-        mongo::unique_function<void()> uf = [checkerPtr = std::make_unique<Checker>()] {
+        merizo::unique_function<void()> uf = [checkerPtr = std::make_unique<Checker>()] {
             RunDetection<1>::itRan = true;
         };
 
@@ -132,7 +132,7 @@ TEST(UniqueFunctionTest, dtor_releases_functor_object_and_does_not_call_function
 }
 
 TEST(UniqueFunctionTest, comparison_checks) {
-    mongo::unique_function<void()> uf;
+    merizo::unique_function<void()> uf;
 
     // Using true/false assertions, as we're testing the actual operators and commutativity here.
     ASSERT_TRUE(uf == nullptr);
@@ -156,15 +156,15 @@ TEST(UniqueFunctionTest, comparison_checks) {
 }
 
 TEST(UniqueFunctionTest, simple_instantiations) {
-    mongo::unique_function<void()> a;
+    merizo::unique_function<void()> a;
 
-    mongo::unique_function<void()> x = []() -> int { return 42; };
+    merizo::unique_function<void()> x = []() -> int { return 42; };
     x = []() -> int { return 42; };
 }
 
 namespace conversion_checking {
 template <typename FT>
-using uf = mongo::unique_function<FT>;
+using uf = merizo::unique_function<FT>;
 template <typename FT>
 using sf = std::function<FT>;
 
@@ -173,7 +173,7 @@ using sf = std::function<FT>;
 TEST(UniqueFunctionTest, convertability_tests) {
 // TODO when on C++17, see if the new MSVC can handle these `std::isconvertible` static assertions.
 #ifndef _MSC_VER
-    // Note that `mongo::unique_function` must never convert to `std::function` in any of the
+    // Note that `merizo::unique_function` must never convert to `std::function` in any of the
     // following cases.
 
     // No arguments, return variants
@@ -369,7 +369,7 @@ bool accept(T arg, U) {
 }
 
 TEST(UniqueFunctionTest, functionDominanceExample) {
-    mongo::unique_function<void()> uf = [] {};
+    merizo::unique_function<void()> uf = [] {};
 
     ASSERT_TRUE(accept(std::move(uf), nullptr));
 }

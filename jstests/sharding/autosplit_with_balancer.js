@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({shards: 2, mongos: 2, other: {enableAutoSplit: true}});
+    var s = new ShardingTest({shards: 2, merizos: 2, other: {enableAutoSplit: true}});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', s.shard1.shardName);

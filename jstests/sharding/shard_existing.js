@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({name: "shard_existing", shards: 2, mongos: 1, other: {chunkSize: 1}});
+    var s = new ShardingTest({name: "shard_existing", shards: 2, merizos: 1, other: {chunkSize: 1}});
     var db = s.getDB("test");
 
     var stringSize = 10000;

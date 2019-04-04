@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,39 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
+#include "merizo/db/s/migration_chunk_cloner_source_legacy.h"
 
-#include "mongo/base/status.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/s/start_chunk_clone_request.h"
-#include "mongo/db/service_context.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/elapsed_tracker.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/status.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/s/sharding_statistics.h"
+#include "merizo/db/s/start_chunk_clone_request.h"
+#include "merizo/db/service_context.h"
+#include "merizo/executor/remote_command_request.h"
+#include "merizo/executor/remote_command_response.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/elapsed_tracker.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const char kRecvChunkStatus[] = "_recvChunkStatus";
@@ -848,4 +848,4 @@ MigrationChunkClonerSourceLegacy::getNotificationForNextSessionMigrationBatch() 
     return _sessionCatalogSource->getNotificationForNewOplog();
 }
 
-}  // namespace mongo
+}  // namespace merizo

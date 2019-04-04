@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/write_ops/chunk_manager_targeter.h"
+#include "merizo/s/write_ops/chunk_manager_targeter.h"
 
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 enum CompareResult { CompareResult_Unknown, CompareResult_GTE, CompareResult_LT };
@@ -92,7 +92,7 @@ StatusWith<UpdateType> getUpdateExprType(const write_ops::UpdateOpEntry& updateD
 /**
  * Obtain the update expression from the given update doc. If this is a replacement-style update,
  * and the shard key includes _id but the replacement document does not, we attempt to find an exact
- * _id match in the query component and add it to the doc. We do this because mongoD will propagate
+ * _id match in the query component and add it to the doc. We do this because merizoD will propagate
  * _id from the existing document if this is an update, and will extract _id from the query when
  * generating the new document in the case of an upsert. It is therefore always correct to target
  * the operation on the basis of the combined updateExpr and query.
@@ -403,7 +403,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     // into the query doc, and to correctly support upsert we must target a single shard.
     //
     // The rule is simple - If the update is replacement style (no '$set'), we target using the
-    // update. If the update is not replacement style, we target using the query. Because mongoD
+    // update. If the update is not replacement style, we target using the query. Because merizoD
     // will automatically propagate '_id' from an existing document, and will extract it from an
     // exact-match in the query in the case of an upsert, we augment the replacement doc with the
     // query's '_id' for targeting purposes, if it exists.
@@ -809,4 +809,4 @@ Status ChunkManagerTargeter::_refreshNow(OperationContext* opCtx) {
     return init(opCtx);
 }
 
-}  // namespace mongo
+}  // namespace merizo

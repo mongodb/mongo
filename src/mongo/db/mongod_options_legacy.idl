@@ -1,8 +1,8 @@
-# Copyright (C) 2019-present MongoDB, Inc.
+# Copyright (C) 2019-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -27,7 +27,7 @@
 #
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "merizo"
     configs:
         source: [ cli, ini ]
         initializer:
@@ -40,8 +40,8 @@ configs:
 
     # This is a deprecated option that we are supporting for backwards compatibility	
     # The first value for this option can be either 'dbpath' or 'run'.	
-    # If it is 'dbpath', mongod prints the dbpath and exits.  Any extra values are ignored.	
-    # If it is 'run', mongod runs normally.  Providing extra values is an error.
+    # If it is 'dbpath', merizod prints the dbpath and exits.  Any extra values are ignored.	
+    # If it is 'run', merizod runs normally.  Providing extra values is an error.
     command:
         description: Command
         arg_vartype: StringVector

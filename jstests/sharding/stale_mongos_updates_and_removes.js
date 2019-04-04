@@ -1,5 +1,5 @@
 /**
- * Tests correctness of single and multi updates and removes sent by a *stale* mongos in the
+ * Tests correctness of single and multi updates and removes sent by a *stale* merizos in the
  * absence of concurrent writes or migrations.
  *
  * Single updates and removes are always targeted and versioned, because they can be retried
@@ -38,7 +38,7 @@
     }
 
     // Create a new sharded collection, then split it into two chunks on different shards using the
-    // stale mongos. Then use the fresh mongos to consolidate the chunks onto one of the shards.
+    // stale merizos. Then use the fresh merizos to consolidate the chunks onto one of the shards.
     // staleMongos will see:
     //  shard0: (-inf, splitPoint]
     //  shard1: (splitPoint, inf]
@@ -66,7 +66,7 @@
     }
 
     // Create a new sharded collection with a single chunk, then move that chunk from the primary
-    // shard to another shard using the fresh mongos.
+    // shard to another shard using the fresh merizos.
     // staleMongos will see:
     //  shard0: (-inf, inf]
     //  shard1:
@@ -87,7 +87,7 @@
     }
 
     // Create a new sharded collection, then split it into two chunks on different shards using the
-    // fresh mongos.
+    // fresh merizos.
     // staleMongos will see:
     //  shard0: (-inf, inf]
     //  shard1:
@@ -186,8 +186,8 @@
         }
 
         // Note on the tests below: single-doc updates are able to succeed even in cases where the
-        // stale mongoS incorrectly believes that the update targets multiple shards, because the
-        // mongoS write path swallows the first error encountered in each batch, then internally
+        // stale merizoS incorrectly believes that the update targets multiple shards, because the
+        // merizoS write path swallows the first error encountered in each batch, then internally
         // refreshes its routing table and tries the write again. Because all chunks are actually
         // on a single shard in two of the three test cases, this second update attempt succeeds.
 
@@ -230,7 +230,7 @@
     }
 
     // TODO: SERVER-33954 remove shardAsReplicaSet: false.
-    const st = new ShardingTest({shards: 2, mongos: 2, other: {shardAsReplicaSet: false}});
+    const st = new ShardingTest({shards: 2, merizos: 2, other: {shardAsReplicaSet: false}});
 
     const dbName = 'test';
     const collNS = dbName + '.foo';

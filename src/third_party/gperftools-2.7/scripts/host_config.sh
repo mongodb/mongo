@@ -23,7 +23,7 @@ function set_define () {
 
 NAME=gperftools
 VERSION=2.7
-REVISION=$VERSION-mongodb
+REVISION=$VERSION-merizodb
 MACOSX_VERSION_MIN=10.12
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
@@ -68,7 +68,7 @@ HOST_CONFIG="$PLATFORM_DIR/$TARGET_UNAME"
 mkdir -p $HOST_CONFIG/internal
 pushd $HOST_CONFIG/internal
 
-PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+PATH=/opt/merizodbtoolchain/v3/bin:$PATH
 env \
     ${ENV_CPPFLAGS:-} \
     ${ENV_CFLAGS:-} \

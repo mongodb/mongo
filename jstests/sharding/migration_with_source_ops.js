@@ -26,11 +26,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
      * Start up new sharded cluster, stop balancer that would interfere in manual chunk management.
      */
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, merizos: 1});
     st.stopBalancer();
 
-    var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns = dbName + ".foo",
-        coll = mongos.getCollection(ns), donor = st.shard0, recipient = st.shard1,
+    var merizos = st.s0, admin = merizos.getDB('admin'), dbName = "testDB", ns = dbName + ".foo",
+        coll = merizos.getCollection(ns), donor = st.shard0, recipient = st.shard1,
         donorColl = donor.getCollection(ns), recipientColl = recipient.getCollection(ns);
 
     /**

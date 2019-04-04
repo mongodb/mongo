@@ -3,11 +3,11 @@
 
 // Remember the global 'db' var
 var lastDB = db;
-var mongo = new Mongo(db.getMongo().host);
-mongo.writeMode = function() {
+var merizo = new Mongo(db.getMongo().host);
+merizo.writeMode = function() {
     return "legacy";
 };
-db = mongo.getDB(db.toString());
+db = merizo.getDB(db.toString());
 
 var t = db.opcounters;
 var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
@@ -16,14 +16,14 @@ var opCounters;
 //
 // 1. Insert.
 //
-// - mongod, single insert:
+// - merizod, single insert:
 //     counted as 1 op if successful, else 0
-// - mongod, bulk insert of N with continueOnError=true:
+// - merizod, bulk insert of N with continueOnError=true:
 //     counted as K ops, where K is number of docs successfully inserted
-// - mongod, bulk insert of N with continueOnError=false:
+// - merizod, bulk insert of N with continueOnError=false:
 //     counted as K ops, where K is number of docs successfully inserted
 //
-// - mongos
+// - merizos
 //     count ops attempted like insert commands
 //
 
@@ -106,8 +106,8 @@ assert.eq(opCounters.delete + 1, db.serverStatus().opcounters.delete);
 //
 // 4. Query.
 //
-// - mongod: counted as 1 op, regardless of errors
-// - mongos: counted as 1 op if successful, else 0
+// - merizod: counted as 1 op, regardless of errors
+// - merizos: counted as 1 op if successful, else 0
 //
 
 t.drop();

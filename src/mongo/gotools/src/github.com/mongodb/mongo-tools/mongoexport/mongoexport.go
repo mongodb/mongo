@@ -1,11 +1,11 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package mongoexport produces a JSON or CSV export of data stored in a MongoDB instance.
-package mongoexport
+// Package merizoexport produces a JSON or CSV export of data stored in a MerizoDB instance.
+package merizoexport
 
 import (
 	"fmt"
@@ -14,18 +14,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/bsonutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
-// Output types supported by mongoexport.
+// Output types supported by merizoexport.
 const (
 	CSV                            = "csv"
 	JSON                           = "json"
@@ -33,9 +33,9 @@ const (
 )
 
 // MongoExport is a container for the user-specified options and
-// internal state used for running mongoexport.
+// internal state used for running merizoexport.
 type MongoExport struct {
-	// generic mongo tool options
+	// generic merizo tool options
 	ToolOptions options.ToolOptions
 
 	// OutputOpts controls options for how the exported data should be formatted
@@ -165,9 +165,9 @@ func makeFieldSelector(fields string) bson.M {
 
 	for _, field := range strings.Split(fields, ",") {
 		// Projections like "a.0" work fine for nested documents not for arrays
-		// - if passed directly to mongod. To handle this, we have to retrieve
+		// - if passed directly to merizod. To handle this, we have to retrieve
 		// the entire top-level document and then filter afterwards. An exception
-		// is made for '$' projections - which are passed directly to mongod.
+		// is made for '$' projections - which are passed directly to merizod.
 		if i := strings.LastIndex(field, "."); i != -1 && field[i+1:] != "$" {
 			field = field[:strings.Index(field, ".")]
 		}
@@ -222,7 +222,7 @@ func (exp *MongoExport) getCount() (c int, err error) {
 }
 
 // getCursor returns a cursor that can be iterated over to get all the documents
-// to export, based on the options given to mongoexport. Also returns the
+// to export, based on the options given to merizoexport. Also returns the
 // associated session, so that it can be closed once the cursor is used up.
 func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 	sortFields := []string{}

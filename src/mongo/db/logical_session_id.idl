@@ -1,8 +1,8 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -31,13 +31,13 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+  cpp_namespace: "merizo"
   cpp_includes:
-    - "mongo/util/uuid.h"
+    - "merizo/util/uuid.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
-  - "mongo/crypto/sha256_block.idl"
+  - "merizo/idl/basic_types.idl"
+  - "merizo/crypto/sha256_block.idl"
 
 types:
 
@@ -47,13 +47,13 @@ types:
                   LogicalSessionId:TxnNumber is referred to as the transaction identifier."
     bson_serialization_type: long
     cpp_type: "std::int64_t"
-    deserializer: "mongo::BSONElement::_numberLong"
+    deserializer: "merizo::BSONElement::_numberLong"
 
   StmtId:
     description: "A number representing an operation within a transaction."
     bson_serialization_type: int
     cpp_type: "std::int32_t"
-    deserializer: "mongo::BSONElement::_numberInt"
+    deserializer: "merizo::BSONElement::_numberInt"
 
 structs:
 

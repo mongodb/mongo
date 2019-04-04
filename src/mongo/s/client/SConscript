@@ -11,15 +11,15 @@ env.Library(
          env.Idlc('shard_remote.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/fetcher',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/lasterror',
-        '$BUILD_DIR/mongo/executor/task_executor_pool',
-        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/merizo/client/fetcher',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/lasterror',
+        '$BUILD_DIR/merizo/executor/task_executor_pool',
+        '$BUILD_DIR/merizo/s/grid',
         'shard_interface',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
@@ -29,8 +29,8 @@ env.CppUnitTest(
         'shard_remote_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-        '$BUILD_DIR/mongo/s/query/async_results_merger',
+        '$BUILD_DIR/merizo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/merizo/s/query/async_results_merger',
         'sharding_client',
     ],
 )
@@ -41,8 +41,8 @@ env.CppUnitTest(
         'shard_registry_data_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/merizo/s/coreshard',
+        '$BUILD_DIR/merizo/s/sharding_router_test_fixture',
     ],
 )
 
@@ -52,10 +52,10 @@ env.Library(
         'shard.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/remote_command_retry_scheduler',
-        '$BUILD_DIR/mongo/s/common_s',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/client/remote_command_retry_scheduler',
+        '$BUILD_DIR/merizo/s/common_s',
+        '$BUILD_DIR/merizo/s/write_ops/batch_write_types',
     ],
 )
 
@@ -65,9 +65,9 @@ env.Library(
         'rs_local_client.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/client/clientdriver_minimal',
+        '$BUILD_DIR/merizo/db/dbdirectclient',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
     ],
 )
 
@@ -77,8 +77,8 @@ env.Library(
         'shard_local.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/client/clientdriver_minimal',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
         'rs_local_client',
         'shard_interface',
     ],
@@ -90,10 +90,10 @@ env.CppUnitTest(
         'shard_local_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/s/grid',
         'shard_local',
     ],
 )

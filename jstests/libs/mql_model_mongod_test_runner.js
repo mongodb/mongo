@@ -43,7 +43,7 @@
     const testList = JSON.parse(cat(jsonFilename));
     testList.forEach(function(singleTest) {
         if (singleTest.hasOwnProperty("match")) {
-            // Skip the match test type as it is not directly supported by mongod.
+            // Skip the match test type as it is not directly supported by merizod.
         } else if (singleTest.hasOwnProperty("find")) {
             // Run the find test type.
             assert(singleTest.hasOwnProperty("data"), "MQL model test requires a 'data'");

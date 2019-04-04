@@ -12,15 +12,15 @@
     // Set up a 2-shard cluster.
     const st = new ShardingTest({name: jsTestName(), shards: 2, rs: {nodes: 1}});
 
-    // Obtain a connection to the mongoS and one direct connection to each shard.
+    // Obtain a connection to the merizoS and one direct connection to each shard.
     const shard0 = st.rs0.getPrimary();
     const shard1 = st.rs1.getPrimary();
-    const mongos = st.s;
+    const merizos = st.s;
 
-    const configDB = mongos.getDB("config");
+    const configDB = merizos.getDB("config");
 
-    const mongosDB = mongos.getDB(jsTestName());
-    const mongosColl = mongosDB.test;
+    const merizosDB = merizos.getDB(jsTestName());
+    const merizosColl = merizosDB.test;
 
     const shard0DB = shard0.getDB(jsTestName());
     const shard0Coll = shard0DB.test;
@@ -35,14 +35,14 @@
     // Helper function that runs a $sample aggregation, confirms that the results are correct, and
     // verifies that the expected optimized or unoptimized $sample stage ran on each shard.
     function runSampleAndConfirmResults({sampleSize, comment, expectedPlanSummaries}) {
-        // Run the aggregation via mongoS with the given 'comment' parameter.
+        // Run the aggregation via merizoS with the given 'comment' parameter.
         assert.eq(
-            mongosColl.aggregate([{$sample: {size: sampleSize}}], {comment: comment}).itcount(),
+            merizosColl.aggregate([{$sample: {size: sampleSize}}], {comment: comment}).itcount(),
             sampleSize);
 
         // Obtain the explain output for the aggregation.
         const explainOut =
-            assert.commandWorked(mongosColl.explain().aggregate([{$sample: {size: sampleSize}}]));
+            assert.commandWorked(merizosColl.explain().aggregate([{$sample: {size: sampleSize}}]));
 
         // Verify that the expected $sample stage, optimized or unoptimized, ran on each shard.
         for (let idx in expectedPlanSummaries) {
@@ -54,15 +54,15 @@
     }
 
     // Enable sharding on the the test database and ensure that the primary is shard0.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), shard0.name);
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), shard0.name);
 
     // Shard the collection on {_id: 1}, split at {_id: 0} and move the empty upper chunk to shard1.
-    st.shardColl(mongosColl.getName(), {_id: 1}, {_id: 0}, {_id: 0}, mongosDB.getName());
+    st.shardColl(merizosColl.getName(), {_id: 1}, {_id: 0}, {_id: 0}, merizosDB.getName());
 
     // Write some documents to the lower chunk on shard0.
     for (let i = (-200); i < 0; ++i) {
-        assert.commandWorked(mongosColl.insert({_id: i}));
+        assert.commandWorked(merizosColl.insert({_id: i}));
     }
 
     // Set a failpoint to hang after cloning documents to shard1 but before committing.
@@ -72,13 +72,13 @@
     // Spawn a parallel shell to move the lower chunk from shard0 to shard1.
     const awaitMoveChunkShell = startParallelShell(`
         assert.commandWorked(db.adminCommand({
-            moveChunk: "${mongosColl.getFullName()}",
+            moveChunk: "${merizosColl.getFullName()}",
             find: {_id: -1},
             to: "${shard1.name}",
             waitForDelete: true
         }));
     `,
-                                                   mongosDB.getMongo().port);
+                                                   merizosDB.getMongo().port);
 
     // Wait until we see that all documents have been cloned to shard1.
     assert.soon(() => {
@@ -111,8 +111,8 @@
     assert.eq(configDB.chunks.count({max: {_id: 0}, shard: `${jsTestName()}-rs1`}), 1);
 
     // Move the lower chunk back to shard0.
-    assert.commandWorked(mongosDB.adminCommand({
-        moveChunk: mongosColl.getFullName(),
+    assert.commandWorked(merizosDB.adminCommand({
+        moveChunk: merizosColl.getFullName(),
         find: {_id: -1},
         to: shard0.name,
         waitForDelete: true
@@ -124,8 +124,8 @@
         assert.commandWorked(shard1Coll.insert({_id: i}));
     }
 
-    // Confirm that there are 101 documents on shard1 and mongoS can see the 1 non-orphan.
-    assert.eq(mongosColl.find({_id: {$gte: 0}}).itcount(), 1);
+    // Confirm that there are 101 documents on shard1 and merizoS can see the 1 non-orphan.
+    assert.eq(merizosColl.find({_id: {$gte: 0}}).itcount(), 1);
     assert.eq(shard1Coll.count(), 101);
 
     // Re-run the $sample aggregation. On shard1 we should again use the non-optimized stage, since
@@ -139,7 +139,7 @@
     // Write 199 additional documents to the upper chunk which still resides on shard1.
     assert.eq(configDB.chunks.count({min: {_id: 0}, shard: `${jsTestName()}-rs1`}), 1);
     for (let i = 1; i < 200; ++i) {
-        assert.commandWorked(mongosColl.insert({_id: i}));
+        assert.commandWorked(merizosColl.insert({_id: i}));
     }
 
     // Re-run the $sample aggregation and confirm that the optimized stage now runs on both shards.

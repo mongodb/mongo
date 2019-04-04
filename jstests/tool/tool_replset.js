@@ -38,61 +38,61 @@
     var replSetConnString =
         "tool_replset/127.0.0.1:" + replTest.ports[0] + ",127.0.0.1:" + replTest.ports[1];
 
-    // Test with mongodump/mongorestore
+    // Test with merizodump/merizorestore
     var data = MongoRunner.dataDir + "/tool_replset-dump1/";
-    print("using mongodump to dump the db to " + data);
-    var exitCode = MongoRunner.runMongoTool("mongodump", {
+    print("using merizodump to dump the db to " + data);
+    var exitCode = MongoRunner.runMongoTool("merizodump", {
         host: replSetConnString,
         out: data,
     });
-    assert.eq(0, exitCode, "mongodump failed to dump from the replica set");
+    assert.eq(0, exitCode, "merizodump failed to dump from the replica set");
 
     print("db successfully dumped to " + data +
           ". dropping collection before testing the restore process");
     assert(master.getDB("foo").bar.drop());
     replTest.awaitReplication();
 
-    print("using mongorestore to restore the db from " + data);
-    exitCode = MongoRunner.runMongoTool("mongorestore", {
+    print("using merizorestore to restore the db from " + data);
+    exitCode = MongoRunner.runMongoTool("merizorestore", {
         host: replSetConnString,
         dir: data,
     });
-    assert.eq(0, exitCode, "mongorestore failed to restore data to the replica set");
+    assert.eq(0, exitCode, "merizorestore failed to restore data to the replica set");
 
     print("db successfully restored, checking count");
     var x = master.getDB("foo").getCollection("bar").count();
-    assert.eq(x, 100, "mongorestore should have successfully restored the collection");
+    assert.eq(x, 100, "merizorestore should have successfully restored the collection");
 
     replTest.awaitReplication();
 
-    // Test with mongoexport/mongoimport
+    // Test with merizoexport/merizoimport
     print("export the collection");
     var extFile = MongoRunner.dataDir + "/tool_replset/export";
-    exitCode = MongoRunner.runMongoTool("mongoexport", {
+    exitCode = MongoRunner.runMongoTool("merizoexport", {
         host: replSetConnString,
         out: extFile,
         db: "foo",
         collection: "bar",
     });
     assert.eq(
-        0, exitCode, "mongoexport failed to export collection 'foo.bar' from the replica set");
+        0, exitCode, "merizoexport failed to export collection 'foo.bar' from the replica set");
 
     print("collection successfully exported, dropping now");
     master.getDB("foo").getCollection("bar").drop();
     replTest.awaitReplication();
 
     print("import the collection");
-    exitCode = MongoRunner.runMongoTool("mongoimport", {
+    exitCode = MongoRunner.runMongoTool("merizoimport", {
         host: replSetConnString,
         file: extFile,
         db: "foo",
         collection: "bar",
     });
     assert.eq(
-        0, exitCode, "mongoimport failed to import collection 'foo.bar' into the replica set");
+        0, exitCode, "merizoimport failed to import collection 'foo.bar' into the replica set");
 
     var x = master.getDB("foo").getCollection("bar").count();
-    assert.eq(x, 100, "mongoimport should have successfully imported the collection");
+    assert.eq(x, 100, "merizoimport should have successfully imported the collection");
 
     print("all tests successful, stopping replica set");
 

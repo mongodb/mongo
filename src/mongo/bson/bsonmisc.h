@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonobj.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONElementCmpWithoutField {
 public:
@@ -65,7 +65,7 @@ private:
     BSON( "a" << GT << 23.4 << NE << 30 << "b" << 2 ) produces the object
     { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
 */
-#define BSON(x) ((::mongo::BSONObjBuilder(64) << x).obj())
+#define BSON(x) ((::merizo::BSONObjBuilder(64) << x).obj())
 
 /** Use BSON_ARRAY macro like BSON macro, but without keys
 
@@ -73,7 +73,7 @@ private:
                         BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
 
  */
-#define BSON_ARRAY(x) ((::mongo::BSONArrayBuilder() << x).arr())
+#define BSON_ARRAY(x) ((::merizo::BSONArrayBuilder() << x).arr())
 
 /* Utility class to auto assign object IDs.
    Example:

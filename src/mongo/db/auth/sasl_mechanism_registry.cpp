@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,22 +26,22 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "merizo/db/auth/sasl_mechanism_registry.h"
 
-#include "mongo/base/init.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/util/icu.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/sequence_util.h"
+#include "merizo/base/init.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/util/icu.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/sequence_util.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 const auto getSASLServerMechanismRegistry =
@@ -78,7 +78,7 @@ StatusWith<std::unique_ptr<ServerMechanismBase>> SASLServerMechanismRegistry::ge
     }
 
     return Status(ErrorCodes::BadValue,
-                  mongoutils::str::stream() << "Unsupported mechanism '" << mechanismName
+                  merizoutils::str::stream() << "Unsupported mechanism '" << mechanismName
                                             << "' on authentication database '"
                                             << authenticationDatabase
                                             << "'");
@@ -147,4 +147,4 @@ ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializ
     }};
 }  // namespace
 
-}  // namespace mongo
+}  // namespace merizo

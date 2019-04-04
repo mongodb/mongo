@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,41 +27,41 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/query_planner.h"
+#include "merizo/db/query/query_planner.h"
 
 #include <boost/optional.hpp>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/index/wildcard_key_generator.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_text.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_enumerator.h"
-#include "mongo/db/query/planner_access.h"
-#include "mongo/db/query/planner_analysis.h"
-#include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/util/log.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/index/wildcard_key_generator.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/matcher/expression_algo.h"
+#include "merizo/db/matcher/expression_geo.h"
+#include "merizo/db/matcher/expression_text.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/db/query/plan_cache.h"
+#include "merizo/db/query/plan_enumerator.h"
+#include "merizo/db/query/planner_access.h"
+#include "merizo/db/query/planner_analysis.h"
+#include "merizo/db/query/planner_ixselect.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/db/query/query_solution.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::numeric_limits;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 // Copied verbatim from db/index.h
 static bool isIdIndex(const BSONObj& pattern) {
@@ -87,7 +87,7 @@ static bool is2DIndex(const BSONObj& pattern) {
 }
 
 string optionString(size_t options) {
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
 
     if (QueryPlannerParams::DEFAULT == options) {
         ss << "DEFAULT ";
@@ -175,7 +175,7 @@ static bool indexCompatibleMaxMin(const BSONObj& obj,
         // Field names must match and be in the same order.
         BSONElement kpElt = kpIt.next();
         BSONElement objElt = objIt.next();
-        if (!mongoutils::str::equals(kpElt.fieldName(), objElt.fieldName())) {
+        if (!merizoutils::str::equals(kpElt.fieldName(), objElt.fieldName())) {
             return false;
         }
 
@@ -308,7 +308,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
         taggedTree->getTag()->getType() == MatchExpression::TagData::Type::IndexTag) {
         IndexTag* itag = static_cast<IndexTag*>(taggedTree->getTag());
         if (itag->index >= relevantIndices.size()) {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             ss << "Index number is " << itag->index << " but there are only "
                << relevantIndices.size() << " relevant indices.";
             return Status(ErrorCodes::BadValue, ss);
@@ -384,7 +384,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
     verify(NULL == filter->getTag());
 
     if (filter->numChildren() != indexTree->children.size()) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "Cache topology and query did not match: "
            << "query has " << filter->numChildren() << " children "
            << "and cache has " << indexTree->children.size() << " children.";
@@ -419,7 +419,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
     if (indexTree->entry.get()) {
         const auto got = indexMap.find(indexTree->entry->identifier);
         if (got == indexMap.end()) {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             ss << "Did not find index with name: " << indexTree->entry->identifier.catalogName;
             return Status(ErrorCodes::BadValue, ss);
         }
@@ -1020,4 +1020,4 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     return {std::move(out)};
 }
 
-}  // namespace mongo
+}  // namespace merizo

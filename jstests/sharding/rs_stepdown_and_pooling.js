@@ -5,13 +5,13 @@
     "use strict";
     load("jstests/replsets/rslib.js");
 
-    var st = new ShardingTest({shards: {rs0: {nodes: 2}}, mongos: 1});
+    var st = new ShardingTest({shards: {rs0: {nodes: 2}}, merizos: 1});
 
     // Stop balancer to eliminate weird conn stuff
     st.stopBalancer();
 
-    var mongos = st.s0;
-    var coll = mongos.getCollection("foo.bar");
+    var merizos = st.s0;
+    var coll = merizos.getCollection("foo.bar");
     var db = coll.getDB();
 
     // Test is not valid for Win32
@@ -28,11 +28,11 @@
 
         jsTest.log("Creating new connections...");
 
-        // Create a bunch of connections to the primary node through mongos.
-        // jstest ->(x10)-> mongos ->(x10)-> primary
+        // Create a bunch of connections to the primary node through merizos.
+        // jstest ->(x10)-> merizos ->(x10)-> primary
         var conns = [];
         for (var i = 0; i < 50; i++) {
-            conns.push(new Mongo(mongos.host));
+            conns.push(new Mongo(merizos.host));
             conns[i].getCollection(coll + "").findOne();
         }
 
@@ -46,7 +46,7 @@
 
         // Don't make test fragile by linking to format of shardConnPoolStats, but this is useful if
         // something goes wrong.
-        var connPoolStats = mongos.getDB("admin").runCommand({shardConnPoolStats: 1});
+        var connPoolStats = merizos.getDB("admin").runCommand({shardConnPoolStats: 1});
         printjson(connPoolStats);
 
         jsTest.log("Stepdown primary and then step back up...");
@@ -58,9 +58,9 @@
 
         stepDown(primary, 0);
 
-        jsTest.log("Waiting for mongos to acknowledge stepdown...");
+        jsTest.log("Waiting for merizos to acknowledge stepdown...");
 
-        awaitRSClientHosts(mongos,
+        awaitRSClientHosts(merizos,
                            secondary,
                            {ismaster: true},
                            st.rs0,
@@ -70,9 +70,9 @@
 
         stepDown(secondary, 10000);
 
-        jsTest.log("Waiting for mongos to acknowledge step up...");
+        jsTest.log("Waiting for merizos to acknowledge step up...");
 
-        awaitRSClientHosts(mongos, primary, {ismaster: true}, st.rs0, 2 * 60 * 1000);
+        awaitRSClientHosts(merizos, primary, {ismaster: true}, st.rs0, 2 * 60 * 1000);
 
         jsTest.log("Waiting for socket timeout time...");
 
@@ -83,7 +83,7 @@
 
         var numErrors = 0;
         for (var i = 0; i < conns.length; i++) {
-            var newConn = new Mongo(mongos.host);
+            var newConn = new Mongo(merizos.host);
             try {
                 printjson(newConn.getCollection("foo.bar").findOne());
             } catch (e) {

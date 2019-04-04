@@ -10,13 +10,13 @@ env.Library(
         'deferred_writer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/catalog/collection',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/merizo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/util/concurrency/thread_pool',
     ],
 )
 
@@ -27,12 +27,12 @@ env.Library(
         env.Idlc('write_conflict_exception.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/log_and_backoff',
+        '$BUILD_DIR/merizo/idl/server_parameter',
+        '$BUILD_DIR/merizo/util/fail_point',
+        '$BUILD_DIR/merizo/util/log_and_backoff',
     ],
 )
 
@@ -47,15 +47,15 @@ env.Library(
         'replication_state_transition_lock_guard.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
-        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/background_job',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/util/concurrency/spin_lock',
+        '$BUILD_DIR/merizo/util/concurrency/ticketholder',
         '$BUILD_DIR/third_party/shim_boost',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
+        '$BUILD_DIR/merizo/db/concurrency/flow_control_ticketholder',
     ],
 )
 
@@ -65,7 +65,7 @@ env.Library(
         'flow_control_ticketholder.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -87,10 +87,10 @@ env.CppUnitTest(
             'lock_stats_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/util/progress_meter',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/curop',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/util/progress_meter',
         'lock_manager',
         'write_conflict_exception',
     ]

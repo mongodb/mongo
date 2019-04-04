@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -27,7 +27,7 @@ func ParseURIConnectionString(s string) (ConnString, error) {
 	return p.ConnString, err
 }
 
-// ConnString represents a connection string to mongodb.
+// ConnString represents a connection string to merizodb.
 type ConnString struct {
 	Original                string
 	AppName                 string
@@ -94,7 +94,7 @@ func (p *parser) parse(original string) error {
 
 	var err error
 	var isSRV bool
-	if strings.HasPrefix(uri, "mongodb+srv://") {
+	if strings.HasPrefix(uri, "merizodb+srv://") {
 		isSRV = true
 
 		p.UsingSRV = true
@@ -105,11 +105,11 @@ func (p *parser) parse(original string) error {
 
 		// remove the scheme
 		uri = uri[14:]
-	} else if strings.HasPrefix(uri, "mongodb://") {
+	} else if strings.HasPrefix(uri, "merizodb://") {
 		// remove the scheme
 		uri = uri[10:]
 	} else {
-		return fmt.Errorf("scheme must be \"mongodb\" or \"mongodb+srv\"")
+		return fmt.Errorf("scheme must be \"merizodb\" or \"merizodb+srv\"")
 	}
 
 	if idx := strings.Index(uri, "@"); idx != -1 {
@@ -243,7 +243,7 @@ func fetchSeedlistFromSRV(host string) ([]string, error) {
 		return nil, fmt.Errorf("URI with srv must not include a port number")
 	}
 
-	_, addresses, err := net.LookupSRV("mongodb", "tcp", host)
+	_, addresses, err := net.LookupSRV("merizodb", "tcp", host)
 	if err != nil {
 		return nil, err
 	}

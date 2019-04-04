@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source_current_op.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/pipeline/aggregation_context_fixture.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_source_current_op.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
+#include "merizo/db/pipeline/stub_merizo_process_interface.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -202,7 +202,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldNotSerializeOmittedOptionalArguments) 
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
-    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>();
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>();
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -214,7 +214,7 @@ TEST_F(DocumentSourceCurrentOpTest,
     getExpCtx()->fromMongos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
-    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -231,7 +231,7 @@ TEST_F(DocumentSourceCurrentOpTest,
     getExpCtx()->fromMongos = false;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
-    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -244,7 +244,7 @@ TEST_F(DocumentSourceCurrentOpTest,
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRequest) {
     getExpCtx()->fromMongos = true;
 
-    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(false);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(false);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -255,7 +255,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInS
     getExpCtx()->fromMongos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 'string' }")};
-    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -263,4 +263,4 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInS
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

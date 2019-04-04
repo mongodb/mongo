@@ -30,9 +30,9 @@ load("jstests/free_mon/libs/free_mon.js");
     rst.awaitReplication();
 
     sleep(10 * 1000);
-    assert.eq(0, mock_web.queryStats().registers, "mongod registered without enabling free_mod");
+    assert.eq(0, mock_web.queryStats().registers, "merizod registered without enabling free_mod");
     assert.eq(
-        0, mock_web_sec.queryStats().registers, "mongod registered without enabling free_mod");
+        0, mock_web_sec.queryStats().registers, "merizod registered without enabling free_mod");
 
     assert.commandWorked(rst.getPrimary().adminCommand({setFreeMonitoring: 1, action: "enable"}));
     WaitForRegistration(rst.getPrimary());

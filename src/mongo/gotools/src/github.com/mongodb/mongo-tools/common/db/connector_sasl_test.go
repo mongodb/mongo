@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -14,10 +14,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -43,7 +43,7 @@ func TestKerberosAuthMechanism(t *testing.T) {
 				Mechanism: "GSSAPI",
 			},
 			Kerberos: &options.Kerberos{
-				Service:     "mongodb",
+				Service:     "merizodb",
 				ServiceHost: KERBEROS_HOST,
 			},
 		}

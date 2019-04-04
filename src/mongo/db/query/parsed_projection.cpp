@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/parsed_projection.h"
+#include "merizo/db/query/parsed_projection.h"
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/query/query_request.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/query/query_request.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::string;
@@ -78,7 +78,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
             }
 
             BSONElement e2 = obj.firstElement();
-            if (mongoutils::str::equals(e2.fieldName(), "$slice")) {
+            if (merizoutils::str::equals(e2.fieldName(), "$slice")) {
                 if (e2.isNumber()) {
                     // This is A-OK.
                 } else if (e2.type() == Array) {
@@ -102,7 +102,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 // Projections with $slice aren't covered.
                 requiresDocument = true;
                 pp->_arrayFields.push_back(elem.fieldNameStringData());
-            } else if (mongoutils::str::equals(e2.fieldName(), "$elemMatch")) {
+            } else if (merizoutils::str::equals(e2.fieldName(), "$elemMatch")) {
                 // Validate $elemMatch arguments and dependencies.
                 if (Object != e2.type()) {
                     return Status(ErrorCodes::BadValue,
@@ -114,7 +114,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
                                   "Cannot specify positional operator and $elemMatch.");
                 }
 
-                if (mongoutils::str::contains(elem.fieldName(), '.')) {
+                if (merizoutils::str::contains(elem.fieldName(), '.')) {
                     return Status(ErrorCodes::BadValue,
                                   "Cannot use $elemMatch projection on a nested field.");
                 }
@@ -147,9 +147,9 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 // Projections with $elemMatch aren't covered.
                 requiresDocument = true;
                 pp->_arrayFields.push_back(elem.fieldNameStringData());
-            } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
+            } else if (merizoutils::str::equals(e2.fieldName(), "$meta")) {
                 // Field for meta must be top level.  We can relax this at some point.
-                if (mongoutils::str::contains(elem.fieldName(), '.')) {
+                if (merizoutils::str::contains(elem.fieldName(), '.')) {
                     return Status(ErrorCodes::BadValue, "field for $meta cannot be nested");
                 }
 
@@ -190,7 +190,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 return Status(ErrorCodes::BadValue,
                               string("Unsupported projection option: ") + elem.toString());
             }
-        } else if (mongoutils::str::equals(elem.fieldName(), "_id") && !elem.trueValue()) {
+        } else if (merizoutils::str::equals(elem.fieldName(), "_id") && !elem.trueValue()) {
             pp->_hasId = false;
         } else {
             pp->_hasDottedFieldPath = pp->_hasDottedFieldPath ||
@@ -231,17 +231,17 @@ Status ParsedProjection::make(OperationContext* opCtx,
                               "Cannot specify positional operator and $elemMatch.");
             }
 
-            std::string after = mongoutils::str::after(elem.fieldName(), ".$");
-            if (mongoutils::str::contains(after, ".$")) {
-                mongoutils::str::stream ss;
+            std::string after = merizoutils::str::after(elem.fieldName(), ".$");
+            if (merizoutils::str::contains(after, ".$")) {
+                merizoutils::str::stream ss;
                 ss << "Positional projection '" << elem.fieldName() << "' contains "
                    << "the positional operator more than once.";
                 return Status(ErrorCodes::BadValue, ss);
             }
 
-            std::string matchfield = mongoutils::str::before(elem.fieldName(), '.');
+            std::string matchfield = merizoutils::str::before(elem.fieldName(), '.');
             if (query && !_hasPositionalOperatorMatch(query, matchfield)) {
-                mongoutils::str::stream ss;
+                merizoutils::str::stream ss;
                 ss << "Positional projection '" << elem.fieldName() << "' does not "
                    << "match the query document.";
                 return Status(ErrorCodes::BadValue, ss);
@@ -291,7 +291,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
         while (srcIt.more()) {
             BSONElement elt = srcIt.next();
             // We've already handled the _id field before entering this loop.
-            if (pp->_hasId && mongoutils::str::equals(elt.fieldName(), "_id")) {
+            if (pp->_hasId && merizoutils::str::equals(elt.fieldName(), "_id")) {
                 continue;
             }
             // $meta sortKey should not be checked as a part of _requiredFields, since it can
@@ -382,10 +382,10 @@ bool ParsedProjection::isFieldRetainedExactly(StringData path) const {
 
 // static
 bool ParsedProjection::_isPositionalOperator(const char* fieldName) {
-    return mongoutils::str::contains(fieldName, ".$") &&
-        !mongoutils::str::contains(fieldName, ".$ref") &&
-        !mongoutils::str::contains(fieldName, ".$id") &&
-        !mongoutils::str::contains(fieldName, ".$db");
+    return merizoutils::str::contains(fieldName, ".$") &&
+        !merizoutils::str::contains(fieldName, ".$ref") &&
+        !merizoutils::str::contains(fieldName, ".$id") &&
+        !merizoutils::str::contains(fieldName, ".$db");
 }
 
 // static
@@ -406,10 +406,10 @@ bool ParsedProjection::_hasPositionalOperatorMatch(const MatchExpression* const 
         if (!pathRawData) {
             return false;
         }
-        std::string pathPrefix = mongoutils::str::before(pathRawData, '.');
+        std::string pathPrefix = merizoutils::str::before(pathRawData, '.');
         return pathPrefix == matchfield;
     }
     return false;
 }
 
-}  // namespace mongo
+}  // namespace merizo

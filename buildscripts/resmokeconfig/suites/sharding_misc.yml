@@ -3,16 +3,16 @@
 # of running parts of the test suite in Evergreen. It was generated against commit range:
 #   566526740cf7f6a0de6dd5df427d939ce89018ef - 1d0a162b662c0592954570b15a7c9b4e55e090fe
 # with the following options:
-#   Namespace(branch='master', duration_days=14, end_commit=None, execution_time_minutes=20, owner='mongodb', project='mongo', start_commit=None, task=['sharding'], variants='linux-64-debug,enterprise-rhel-62-64-bit,enterprise-windows-64-2k8', verbose=True)
+#   Namespace(branch='master', duration_days=14, end_commit=None, execution_time_minutes=20, owner='merizodb', project='merizo', start_commit=None, task=['sharding'], variants='linux-64-debug,enterprise-rhel-62-64-bit,enterprise-windows-64-2k8', verbose=True)
 test_kind: js_test
 
 selector:
   roots:
   - jstests/sharding/*.js
   exclude_files:
-  - jstests/sharding/mongos_rs_shard_failure_tolerance.js
+  - jstests/sharding/merizos_rs_shard_failure_tolerance.js
   - jstests/sharding/top_chunk_autosplit.js
-  - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
+  - jstests/sharding/merizos_rs_auth_shard_failure_tolerance.js
   - jstests/sharding/zbigMapReduce.js
   - jstests/sharding/remove2.js
   - jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
@@ -24,12 +24,12 @@ selector:
   - jstests/sharding/commands_that_write_accept_wc_shards.js
   - jstests/sharding/shard_config_db_collections.js
   - jstests/sharding/safe_secondary_reads_drop_recreate.js
-  - jstests/sharding/stale_mongos_updates_and_removes.js
+  - jstests/sharding/stale_merizos_updates_and_removes.js
   - jstests/sharding/read_pref.js
   - jstests/sharding/drop_sharded_db.js
   - jstests/sharding/enforce_zone_policy.js
   - jstests/sharding/rs_stepdown_and_pooling.js
-  - jstests/sharding/primary_config_server_blackholed_from_mongos.js
+  - jstests/sharding/primary_config_server_blackholed_from_merizos.js
   - jstests/sharding/commands_that_write_accept_wc_configRS.js
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   - jstests/sharding/mr_and_agg_versioning.js
@@ -42,7 +42,7 @@ selector:
   - jstests/sharding/all_shard_and_config_hosts_brought_down_one_by_one.js
   - jstests/sharding/auth.js
   - jstests/sharding/jumbo1.js
-  - jstests/sharding/mongos_no_replica_set_refresh.js
+  - jstests/sharding/merizos_no_replica_set_refresh.js
   - jstests/sharding/sharding_migrate_cursor1.js
   - jstests/sharding/repl_monitor_refresh.js
   - jstests/sharding/aggregation_currentop.js
@@ -54,14 +54,14 @@ selector:
   - jstests/sharding/convert_to_and_from_sharded.js
   - jstests/sharding/sharding_rs2.js
   - jstests/sharding/multi_coll_drop.js
-  - jstests/sharding/mongos_shard_failure_tolerance.js
+  - jstests/sharding/merizos_shard_failure_tolerance.js
   - jstests/sharding/index_and_collection_option_propagation.js
   - jstests/sharding/change_stream_update_lookup_read_concern.js
   - jstests/sharding/count_slaveok.js
   - jstests/sharding/rename.js
   - jstests/sharding/shard_identity_config_update.js
   - jstests/sharding/recovering_slaveok.js
-  - jstests/sharding/all_config_servers_blackholed_from_mongos.js
+  - jstests/sharding/all_config_servers_blackholed_from_merizos.js
   - jstests/sharding/authCommands.js
   - jstests/sharding/addshard4.js
   - jstests/sharding/split_with_force.js
@@ -77,7 +77,7 @@ selector:
   - jstests/sharding/move_chunk_insert_with_write_retryability.js
   - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
   - jstests/sharding/replmonitor_bad_seed.js
-  - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+  - jstests/sharding/merizod_returns_no_cluster_time_without_keys.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/shard_identity_rollback.js
   - jstests/sharding/sharding_multiple_ns_rs.js
@@ -104,13 +104,13 @@ selector:
   - jstests/sharding/diffservers1.js
   - jstests/sharding/write_cmd_auto_split.js
   - jstests/sharding/geo_near_random1.js
-  - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
+  - jstests/sharding/merizos_does_not_gossip_logical_time_without_keys.js
   - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/explain_read_pref.js
   - jstests/sharding/movechunk_parallel.js
   - jstests/sharding/write_commands_sharding_state.js
   - jstests/sharding/shard_insert_getlasterror_w2.js
-  - jstests/sharding/read_pref_multi_mongos_stale_config.js
+  - jstests/sharding/read_pref_multi_merizos_stale_config.js
   - jstests/sharding/in_memory_sort_limit.js
   - jstests/sharding/shard6.js
   - jstests/sharding/change_streams_whole_db.js
@@ -127,10 +127,10 @@ selector:
   - jstests/sharding/sharding_balance2.js
   - jstests/sharding/shard3.js
   - jstests/sharding/merge_chunks_test.js
-  - jstests/sharding/move_stale_mongos.js
+  - jstests/sharding/move_stale_merizos.js
   - jstests/sharding/cleanup_orphaned_basic.js
   - jstests/sharding/validate_collection.js
-  - jstests/sharding/change_stream_enforce_max_time_ms_on_mongos.js
+  - jstests/sharding/change_stream_enforce_max_time_ms_on_merizos.js
   - jstests/sharding/unowned_doc_filtering.js
   - jstests/sharding/migration_ignore_interrupts_1.js
   - jstests/sharding/cursor_valid_after_shard_stepdown.js
@@ -153,10 +153,10 @@ selector:
   - jstests/sharding/names.js
   - jstests/sharding/explain_agg_read_pref.js
   - jstests/sharding/mrShardedOutput.js
-  - jstests/sharding/split_stale_mongos.js
+  - jstests/sharding/split_stale_merizos.js
   - jstests/sharding/multi_write_target.js
   - jstests/sharding/array_shard_key.js
-  - jstests/sharding/resume_change_stream_from_stale_mongos.js
+  - jstests/sharding/resume_change_stream_from_stale_merizos.js
   - jstests/sharding/migration_id_index.js
   - jstests/sharding/session_info_in_oplog.js
   - jstests/sharding/secondary_shard_versioning.js
@@ -166,11 +166,11 @@ selector:
   - jstests/sharding/move_chunk_open_cursors.js
   - jstests/sharding/basic_split.js
   - jstests/sharding/merge_chunks_test_with_md_ops.js
-  - jstests/sharding/multi_mongos2.js
+  - jstests/sharding/multi_merizos2.js
   - jstests/sharding/cursor_timeout.js
   - jstests/sharding/geo_near_sharded.js
   - jstests/sharding/findandmodify2.js
-  - jstests/sharding/mongos_validate_writes.js
+  - jstests/sharding/merizos_validate_writes.js
   - jstests/sharding/coll_epoch_test2.js
   - jstests/sharding/cursor1.js
   - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
@@ -215,7 +215,7 @@ selector:
   - jstests/sharding/migration_sets_fromMigrate_flag.js
   - jstests/sharding/change_stream_metadata_notifications.js
   - jstests/sharding/bulk_insert.js
-  - jstests/sharding/multi_mongos2a.js
+  - jstests/sharding/multi_merizos2a.js
   - jstests/sharding/movechunk_commit_changelog_stats.js
   - jstests/sharding/findandmodify1.js
   - jstests/sharding/move_chunk_missing_idx.js
@@ -258,7 +258,7 @@ selector:
   - jstests/sharding/shard_keycount.js
   - jstests/sharding/sharding_system_namespaces.js
   - jstests/sharding/logical_time_metadata.js
-  - jstests/sharding/time_zone_info_mongos.js
+  - jstests/sharding/time_zone_info_merizos.js
   - jstests/sharding/mr_noscripting.js
   - jstests/sharding/addshard_idempotent.js
   - jstests/sharding/covered_shard_key_indexes.js
@@ -304,11 +304,11 @@ selector:
   - jstests/sharding/drop_configdb.js
   - jstests/sharding/conn_pool_stats.js
   - jstests/sharding/hash_shard_unique_compound.js
-  - jstests/sharding/mongos_no_detect_sharding.js
+  - jstests/sharding/merizos_no_detect_sharding.js
   - jstests/sharding/split_with_force_small.js
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/listDatabases.js
-  - jstests/sharding/rename_across_mongos.js
+  - jstests/sharding/rename_across_merizos.js
   - jstests/sharding/stale_version_write.js
   - jstests/sharding/keys_rotation_interval_sec.js
   - jstests/sharding/major_version_check.js
@@ -331,9 +331,9 @@ selector:
   - jstests/sharding/update_zone_key_range.js
   - jstests/sharding/auth2.js
   - jstests/sharding/change_stream_update_lookup_collation.js
-  - jstests/sharding/mongos_query_comment.js
+  - jstests/sharding/merizos_query_comment.js
   - jstests/sharding/kill_op_overflow.js
-  - jstests/sharding/mongos_local_explain.js
+  - jstests/sharding/merizos_local_explain.js
   - jstests/sharding/add_and_remove_shard_from_zone.js
   - jstests/sharding/authwhere.js
   - jstests/sharding/authmr.js
@@ -354,7 +354,7 @@ selector:
   - jstests/sharding/count_config_servers.js
   - jstests/sharding/sharding_options.js
   - jstests/sharding/advance_cluster_time_action_type.js
-  - jstests/sharding/mongos_wait_csrs_initiate.js
+  - jstests/sharding/merizos_wait_csrs_initiate.js
   - jstests/sharding/config_rs_change.js
   - jstests/sharding/current_op_no_shards.js
   - jstests/sharding/movechunk_include.js

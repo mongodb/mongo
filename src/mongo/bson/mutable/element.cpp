@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/mutable/element.h"
+#include "merizo/bson/mutable/element.h"
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
 
-namespace mongo {
+namespace merizo {
 namespace mutablebson {
 
 // Many of the methods of Element are actually implemented in document.cpp, since they need
@@ -80,7 +80,7 @@ Status Element::appendArray(StringData fieldName, const BSONObj& value) {
 
 Status Element::appendBinary(StringData fieldName,
                              uint32_t len,
-                             mongo::BinDataType binType,
+                             merizo::BinDataType binType,
                              const void* data) {
     return pushBack(getDocument().makeElementBinary(fieldName, len, binType, data));
 }
@@ -167,9 +167,9 @@ std::string Element::toString() const {
     const BSONType type = getType();
 
     // The only types that sometimes don't have a value are Object and Array nodes.
-    dassert((type == mongo::Object) || (type == mongo::Array));
+    dassert((type == merizo::Object) || (type == merizo::Array));
 
-    if (type == mongo::Object) {
+    if (type == merizo::Object) {
         BSONObjBuilder builder;
         writeTo(&builder);
         BSONObj obj = builder.obj();
@@ -186,4 +186,4 @@ std::string Element::toString() const {
 }
 
 }  // namespace mutablebson
-}  // namespace mongo
+}  // namespace merizo

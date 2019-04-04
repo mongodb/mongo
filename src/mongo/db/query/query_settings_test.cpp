@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,23 +28,23 @@
  */
 
 /**
- * This file contains tests for mongo/db/query/query_settings.h
+ * This file contains tests for merizo/db/query/query_settings.h
  */
 
-#include "mongo/db/query/query_settings.h"
+#include "merizo/db/query/query_settings.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/query/index_entry.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/json.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/query/index_entry.h"
+#include "merizo/unittest/unittest.h"
 
-using mongo::AllowedIndicesFilter;
-using mongo::BSONObj;
-using mongo::IndexEntry;
-using mongo::SimpleBSONObjComparator;
-using mongo::fromjson;
+using merizo::AllowedIndicesFilter;
+using merizo::BSONObj;
+using merizo::IndexEntry;
+using merizo::SimpleBSONObjComparator;
+using merizo::fromjson;
 
 namespace {
 TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
@@ -52,7 +52,7 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
     AllowedIndicesFilter filter(bsonCmp.makeBSONObjSet({fromjson("{a:1}")}), {"a_1"});
     auto keyPat = fromjson("{a:1, b:1}");
     IndexEntry a_idx(keyPat,
-                     mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat)),
+                     merizo::IndexNames::nameToType(merizo::IndexNames::findPluginName(keyPat)),
                      false,
                      {},
                      {},
@@ -64,7 +64,7 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
                      nullptr,
                      nullptr);
     IndexEntry ab_idx(keyPat,
-                      mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat)),
+                      merizo::IndexNames::nameToType(merizo::IndexNames::findPluginName(keyPat)),
                       false,
                       {},
                       {},
@@ -85,7 +85,7 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByKeyPattern) {
     AllowedIndicesFilter filter(bsonCmp.makeBSONObjSet({fromjson("{a:1}")}), {"a"});
     auto keyPat_a = fromjson("{a:1}");
     IndexEntry a_idx(keyPat_a,
-                     mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat_a)),
+                     merizo::IndexNames::nameToType(merizo::IndexNames::findPluginName(keyPat_a)),
                      false,
                      {},
                      {},
@@ -98,7 +98,7 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByKeyPattern) {
                      nullptr);
     auto keyPat_ab = fromjson("{a:1, b:1}");
     IndexEntry ab_idx(keyPat_ab,
-                      mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat_ab)),
+                      merizo::IndexNames::nameToType(merizo::IndexNames::findPluginName(keyPat_ab)),
                       false,
                       {},
                       {},

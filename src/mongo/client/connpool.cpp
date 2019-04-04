@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,25 +29,25 @@
 
 // _ todo: reconnect?
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/connpool.h"
+#include "merizo/client/connpool.h"
 
 #include <limits>
 #include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/client/global_conn_pool.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/executor/connection_pool_stats.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_exception.h"
+#include "merizo/base/init.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/client/global_conn_pool.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/executor/connection_pool_stats.h"
+#include "merizo/stdx/chrono.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_exception.h"
 
 #if !defined(__has_feature)
 #define __has_feature(x) 0
@@ -57,7 +57,7 @@
 #include <sanitizer/lsan_interface.h>
 #endif
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 const int kDefaultIdleTimeout = std::numeric_limits<int>::max();
@@ -682,4 +682,4 @@ MONGO_INITIALIZER(SetupDBClientBaseWithConnection)(InitializerContext*) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

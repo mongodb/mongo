@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/balancer/cluster_statistics_impl.h"
+#include "merizo/db/s/balancer/cluster_statistics_impl.h"
 
 #include <algorithm>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/shard_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const char kVersionField[] = "version";
@@ -133,16 +133,16 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(Operati
                                       << shard.getName());
         }
 
-        std::string mongoDVersion;
+        std::string merizoDVersion;
 
-        auto mongoDVersionStatus = retrieveShardMongoDVersion(opCtx, shard.getName());
-        if (mongoDVersionStatus.isOK()) {
-            mongoDVersion = std::move(mongoDVersionStatus.getValue());
+        auto merizoDVersionStatus = retrieveShardMongoDVersion(opCtx, shard.getName());
+        if (merizoDVersionStatus.isOK()) {
+            merizoDVersion = std::move(merizoDVersionStatus.getValue());
         } else {
-            // Since the mongod version is only used for reporting, there is no need to fail the
+            // Since the merizod version is only used for reporting, there is no need to fail the
             // entire round if it cannot be retrieved, so just leave it empty
             log() << "Unable to obtain shard version for " << shard.getName()
-                  << causedBy(mongoDVersionStatus.getStatus());
+                  << causedBy(merizoDVersionStatus.getStatus());
         }
 
         std::set<std::string> shardTags;
@@ -156,10 +156,10 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(Operati
                            shardSizeStatus.getValue() / 1024 / 1024,
                            shard.getDraining(),
                            std::move(shardTags),
-                           std::move(mongoDVersion));
+                           std::move(merizoDVersion));
     }
 
     return stats;
 }
 
-}  // namespace mongo
+}  // namespace merizo

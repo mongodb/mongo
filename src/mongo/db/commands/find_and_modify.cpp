@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,51 +27,51 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/find_and_modify_common.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update_stage.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/delete_request.h"
-#include "mongo/db/ops/find_and_modify_result.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/parsed_delete.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/write_ops_retryability.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/find_and_modify_request.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/retryable_writes_stats.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/find_and_modify_common.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/delete.h"
+#include "merizo/db/exec/update_stage.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/ops/delete_request.h"
+#include "merizo/db/ops/find_and_modify_result.h"
+#include "merizo/db/ops/insert.h"
+#include "merizo/db/ops/parsed_delete.h"
+#include "merizo/db/ops/parsed_update.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/ops/write_ops_retryability.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/find_and_modify_request.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/retryable_writes_stats.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/stats/top.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 /**
@@ -505,4 +505,4 @@ public:
 } cmdFindAndModify;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

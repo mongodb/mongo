@@ -1,10 +1,10 @@
 
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,25 +31,25 @@
 // This file is only constants used by resource compiler. It is not to be used in C or C++ files.
 
 #ifndef RC_INVOKED
-#error "Cannot include mongo/util/resource_constants.h by non resource compiler files."
+#error "Cannot include merizo/util/resource_constants.h by non resource compiler files."
 #endif
 
 #include <sdkddkver.h>
 
 // This is a single number, not a string
-#define MONGO_VERSION_MAJOR @mongo_version_major@
+#define MONGO_VERSION_MAJOR @merizo_version_major@
 
 // This is a single number, not a string
-#define MONGO_VERSION_MINOR @mongo_version_minor@
+#define MONGO_VERSION_MINOR @merizo_version_minor@
 
 // This is a single number, not a string
-#define MONGO_VERSION_PATCH @mongo_version_patch@
+#define MONGO_VERSION_PATCH @merizo_version_patch@
 
 // This is a string, it should be the product version
-#define MONGO_FILE_VERSION_STR "@mongo_version@"
+#define MONGO_FILE_VERSION_STR "@merizo_version@"
 
 // This is a string, it should be the file version. We use the product version.
-#define MONGO_PRODUCT_VERSION_STR "@mongo_version@"
+#define MONGO_PRODUCT_VERSION_STR "@merizo_version@"
 
 #if (NTDDI_VERSION >= NTDDI_WIN7)
     #define MONGO_PRODUCT_WINDOWS_VERSION "Windows 7/Windows Server 2008 R2";
@@ -65,8 +65,8 @@
 #define MONGO_PRODUCT_EDITION_STR "Legacy"
 #endif
 
-#define MONGO_PRODUCT_NAME_STR "MongoDB " MONGO_PRODUCT_EDITION_STR " " MONGO_PRODUCT_WINDOWS_VERSION
+#define MONGO_PRODUCT_NAME_STR "MerizoDB " MONGO_PRODUCT_EDITION_STR " " MONGO_PRODUCT_WINDOWS_VERSION
 
-#define MONGO_VERSION_COMMENT_STR "Git @mongo_git_hash@"
+#define MONGO_VERSION_COMMENT_STR "Git @merizo_git_hash@"
 
 

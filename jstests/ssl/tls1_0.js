@@ -47,8 +47,8 @@
             serverOpts.sslDisabledProtocols = serverDP;
         }
         clearRawMongoProgramOutput();
-        const mongod = MongoRunner.runMongod(serverOpts);
-        assert(mongod);
+        const merizod = MongoRunner.runMongod(serverOpts);
+        assert(merizod);
 
         let clientOpts = [];
         if (clientDP !== null) {
@@ -57,10 +57,10 @@
         const didSucceed = (function() {
             try {
                 assert.soon(function() {
-                    return 0 == runMongoProgram('mongo',
+                    return 0 == runMongoProgram('merizo',
                                                 '--ssl',
                                                 '--port',
-                                                mongod.port,
+                                                merizod.port,
                                                 '--sslPEMKeyFile',
                                                 'jstests/libs/client.pem',
                                                 '--sslCAFile',
@@ -68,7 +68,7 @@
                                                 ...clientOpts,
                                                 '--eval',
                                                 ';');
-                }, "Connecting to mongod", 30 * 1000);
+                }, "Connecting to merizod", 30 * 1000);
                 return true;
             } catch (e) {
                 return false;

@@ -5,8 +5,8 @@ from __future__ import absolute_import
 import os.path
 import time
 
-import pymongo
-import pymongo.errors
+import pymerizo
+import pymerizo.errors
 
 from ... import config
 from ... import errors
@@ -101,32 +101,32 @@ class Fixture(object):
         """Return the connection string for this fixture.
 
         This is NOT a driver connection string, but a connection string of the format
-        expected by the mongo::ConnectionString class.
+        expected by the merizo::ConnectionString class.
         """
         raise NotImplementedError(
             "get_internal_connection_string must be implemented by Fixture subclasses")
 
     def get_driver_connection_url(self):
-        """Return the mongodb connection string as defined below.
+        """Return the merizodb connection string as defined below.
 
-        https://docs.mongodb.com/manual/reference/connection-string/
+        https://docs.merizodb.com/manual/reference/connection-string/
         """
         raise NotImplementedError(
             "get_driver_connection_url must be implemented by Fixture subclasses")
 
-    def mongo_client(self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000):
-        """Return a pymongo.MongoClient connecting to this fixture with specified 'read_preference'.
+    def merizo_client(self, read_preference=pymerizo.ReadPreference.PRIMARY, timeout_millis=30000):
+        """Return a pymerizo.MongoClient connecting to this fixture with specified 'read_preference'.
 
         The PyMongo driver will wait up to 'timeout_millis' milliseconds
         before concluding that the server is unavailable.
         """
 
         kwargs = {"connectTimeoutMS": timeout_millis}
-        if pymongo.version_tuple[0] >= 3:
+        if pymerizo.version_tuple[0] >= 3:
             kwargs["serverSelectionTimeoutMS"] = timeout_millis
             kwargs["connect"] = True
 
-        return pymongo.MongoClient(host=self.get_driver_connection_url(),
+        return pymerizo.MongoClient(host=self.get_driver_connection_url(),
                                    read_preference=read_preference, **kwargs)
 
     def __str__(self):
@@ -170,18 +170,18 @@ class ReplFixture(Fixture):
                 remaining = deadline - time.time()
                 insert_fn(remaining)
                 break
-            except pymongo.errors.ConnectionFailure:
+            except pymerizo.errors.ConnectionFailure:
                 remaining = deadline - time.time()
                 if remaining <= 0.0:
                     message = "Failed to connect to {} within {} minutes".format(
                         self.get_driver_connection_url(), ReplFixture.AWAIT_REPL_TIMEOUT_MINS)
                     self.logger.error(message)
                     raise errors.ServerFailure(message)
-            except pymongo.errors.WTimeoutError:
+            except pymerizo.errors.WTimeoutError:
                 message = "Replication of write operation timed out."
                 self.logger.error(message)
                 raise errors.ServerFailure(message)
-            except pymongo.errors.PyMongoError as err:
+            except pymerizo.errors.PyMongoError as err:
                 message = "Write operation on {} failed: {}".format(
                     self.get_driver_connection_url(), err)
                 raise errors.ServerFailure(message)
@@ -190,15 +190,15 @@ class ReplFixture(Fixture):
 class NoOpFixture(Fixture):
     """A Fixture implementation that does not start any servers.
 
-    Used when the MongoDB deployment is started by the JavaScript test itself with MongoRunner,
+    Used when the MerizoDB deployment is started by the JavaScript test itself with MongoRunner,
     ReplSetTest, or ShardingTest.
     """
 
     REGISTERED_NAME = "NoOpFixture"
 
-    def mongo_client(self, read_preference=None, timeout_millis=None):
-        """Return the mongo_client connection."""
-        raise NotImplementedError("NoOpFixture does not support a mongo_client")
+    def merizo_client(self, read_preference=None, timeout_millis=None):
+        """Return the merizo_client connection."""
+        raise NotImplementedError("NoOpFixture does not support a merizo_client")
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,11 +34,11 @@
 #include <set>
 #include <string>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/concurrency/mutex.h"
 
-namespace mongo {
+namespace merizo {
 
 class Scope;
 class DBClientBase;
@@ -89,7 +89,7 @@ extern ConnectionRegistry connectionRegistry;
 
 // This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
 // it also protects the global dbexitCalled.
-extern stdx::mutex& mongoProgramOutputMutex;
+extern stdx::mutex& merizoProgramOutputMutex;
 
 // Helper to tell if a file exists cross platform
 // TODO: Remove this when we have a cross platform file utility library

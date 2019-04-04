@@ -1,8 +1,8 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -29,14 +29,14 @@
 # IDL Unit Tests IDL file
 global:
     # Use a nested namespace simply to exercise nested namespace support for the code generator.
-    cpp_namespace: "mongo::idl::test"
+    cpp_namespace: "merizo::idl::test"
     cpp_includes:
-        - "mongo/idl/idl_test_types.h"
-        - "mongo/idl/idl_test.h"
+        - "merizo/idl/idl_test_types.h"
+        - "merizo/idl/idl_test.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
-    - "mongo/idl/unittest_import.idl"
+    - "merizo/idl/basic_types.idl"
+    - "merizo/idl/unittest_import.idl"
 
 types:
 
@@ -49,10 +49,10 @@ types:
     bindata_custom:
         bson_serialization_type: bindata
         bindata_subtype: generic
-        description: "A MongoDB BinDataCustomType"
-        cpp_type: "mongo::BinDataCustomType"
-        serializer: mongo::BinDataCustomType::serializeToBSON
-        deserializer: mongo::BinDataCustomType::parseFromBSON
+        description: "A MerizoDB BinDataCustomType"
+        cpp_type: "merizo::BinDataCustomType"
+        serializer: merizo::BinDataCustomType::serializeToBSON
+        deserializer: merizo::BinDataCustomType::parseFromBSON
 
 ##################################################################################################
 #
@@ -63,9 +63,9 @@ types:
     any_basic_type:
         bson_serialization_type: any
         description: "An Any Type"
-        cpp_type: "mongo::AnyBasicType"
-        serializer: mongo::AnyBasicType::serializeToBSON
-        deserializer: mongo::AnyBasicType::parseFromBSON
+        cpp_type: "merizo::AnyBasicType"
+        serializer: merizo::AnyBasicType::serializeToBSON
+        deserializer: merizo::AnyBasicType::parseFromBSON
 
 ##################################################################################################
 #
@@ -76,9 +76,9 @@ types:
     object_basic_type:
         bson_serialization_type: object
         description: "An object Type"
-        cpp_type: "mongo::ObjectBasicType"
-        serializer: mongo::ObjectBasicType::serializeToBSON
-        deserializer: mongo::ObjectBasicType::parseFromBSON
+        cpp_type: "merizo::ObjectBasicType"
+        serializer: merizo::ObjectBasicType::serializeToBSON
+        deserializer: merizo::ObjectBasicType::parseFromBSON
 
 ##################################################################################################
 #
@@ -89,16 +89,16 @@ types:
     ChainedType:
         bson_serialization_type: chain
         description: "An Chain Type to test chaining"
-        cpp_type: "mongo::ChainedType"
-        serializer: mongo::ChainedType::serializeToBSON
-        deserializer: mongo::ChainedType::parseFromBSON
+        cpp_type: "merizo::ChainedType"
+        serializer: merizo::ChainedType::serializeToBSON
+        deserializer: merizo::ChainedType::parseFromBSON
 
     AnotherChainedType:
         bson_serialization_type: chain
         description: "Another Chain Type to test chaining"
-        cpp_type: "mongo::AnotherChainedType"
-        serializer: mongo::AnotherChainedType::serializeToBSON
-        deserializer: mongo::AnotherChainedType::parseFromBSON
+        cpp_type: "merizo::AnotherChainedType"
+        serializer: merizo::AnotherChainedType::serializeToBSON
+        deserializer: merizo::AnotherChainedType::parseFromBSON
 
 
 ##################################################################################################

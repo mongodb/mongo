@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,7 +29,7 @@
 
 #pragma once
 
-namespace mongo {
+namespace merizo {
 
 // Sets SIGTRAP handler to launch GDB
 // Noop unless on *NIX and compiled with MONGO_CONFIG_DEBUG_BUILD
@@ -37,4 +37,4 @@ void setupSIGTRAPforGDB();
 
 void breakpoint();
 
-}  // namespace mongo
+}  // namespace merizo

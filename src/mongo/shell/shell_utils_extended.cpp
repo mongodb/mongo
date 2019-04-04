@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #ifndef _WIN32
 #include <sys/stat.h>
@@ -39,19 +39,19 @@
 #include <boost/filesystem.hpp>
 #include <fstream>
 
-#include "mongo/scripting/engine.h"
-#include "mongo/shell/shell_utils.h"
-#include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/util/file.h"
-#include "mongo/util/log.h"
-#include "mongo/util/md5.hpp"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/password.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/text.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/shell/shell_utils.h"
+#include "merizo/shell/shell_utils_launcher.h"
+#include "merizo/util/file.h"
+#include "merizo/util/log.h"
+#include "merizo/util/md5.hpp"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/password.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::ifstream;
 using std::string;
@@ -140,7 +140,7 @@ BSONObj cd(const BSONObj& args, void* data) {
         return BSONObj();
     }
 #endif
-    uasserted(16832, mongoutils::str::stream() << "cd command failed: " << errnoWithDescription());
+    uasserted(16832, merizoutils::str::stream() << "cd command failed: " << errnoWithDescription());
     return BSONObj();
 }
 
@@ -161,7 +161,7 @@ BSONObj cat(const BSONObj& args, void* data) {
     auto filePath = it.next();
     uassert(51012,
             "the first argument to cat() must be a string containing the path to the file",
-            filePath.type() == mongo::String);
+            filePath.type() == merizo::String);
 
     std::ios::openmode mode = std::ios::in;
 
@@ -170,7 +170,7 @@ BSONObj cat(const BSONObj& args, void* data) {
         uassert(51013,
                 "the second argument to cat(), must be a boolean indicating whether "
                 "or not to read the file in binary mode. If omitted, the default is 'false'.",
-                useBinary.type() == mongo::Bool);
+                useBinary.type() == merizo::Bool);
 
         if (useBinary.Bool())
             mode |= std::ios::binary;
@@ -283,12 +283,12 @@ BSONObj writeFile(const BSONObj& args, void* data) {
     auto filePathElem = it.next();
     uassert(40341,
             "the first argument to writeFile() must be a string containing the path to the file",
-            filePathElem.type() == mongo::String);
+            filePathElem.type() == merizo::String);
 
     auto fileContentElem = it.next();
     uassert(40342,
             "the second argument to writeFile() must be a string to write to the file",
-            fileContentElem.type() == mongo::String);
+            fileContentElem.type() == merizo::String);
 
     // Limit the capability to writing only new, regular files in existing directories.
 
@@ -312,7 +312,7 @@ BSONObj writeFile(const BSONObj& args, void* data) {
         uassert(51014,
                 "the third argument to writeFile(), must be a boolean indicating whether "
                 "or not to read the file in binary mode. If omitted, the default is 'false'.",
-                useBinary.type() == mongo::Bool);
+                useBinary.type() == merizo::Bool);
 
         if (useBinary.Bool())
             mode |= std::ios::binary;

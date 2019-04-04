@@ -1,22 +1,22 @@
-// Test mongos implementation of time-limited operations: verify that mongos correctly forwards max
-// time to shards, and that mongos correctly times out max time sharded getmore operations (which
+// Test merizos implementation of time-limited operations: verify that merizos correctly forwards max
+// time to shards, and that merizos correctly times out max time sharded getmore operations (which
 // are run in series on shards).
 //
-// Note that mongos does not time out commands or query ops (which remains responsibility of mongod,
-// pending development of an interrupt framework for mongos).
+// Note that merizos does not time out commands or query ops (which remains responsibility of merizod,
+// pending development of an interrupt framework for merizos).
 (function() {
     'use strict';
 
     var st = new ShardingTest({shards: 2});
 
-    var mongos = st.s0;
+    var merizos = st.s0;
     var shards = [st.shard0, st.shard1];
-    var coll = mongos.getCollection("foo.bar");
-    var admin = mongos.getDB("admin");
+    var coll = merizos.getCollection("foo.bar");
+    var admin = merizos.getDB("admin");
     var cursor;
     var res;
 
-    // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces mongod
+    // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces merizod
     // to throw if it receives an operation with a max time. See fail point declaration for complete
     // description.
     var configureMaxTimeAlwaysTimeOut = function(mode) {
@@ -27,7 +27,7 @@
     };
 
     // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which prohibits
-    // mongod from enforcing time limits. See fail point declaration for complete description.
+    // merizod from enforcing time limits. See fail point declaration for complete description.
     var configureMaxTimeNeverTimeOut = function(mode) {
         assert.commandWorked(shards[0].getDB("admin").runCommand(
             {configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
@@ -58,8 +58,8 @@
     assert.eq(nDocsPerShard, shards[1].getCollection(coll.getFullName()).count());
 
     //
-    // Test that mongos correctly forwards max time to shards for sharded queries.  Uses
-    // maxTimeAlwaysTimeOut to ensure mongod throws if it receives a max time.
+    // Test that merizos correctly forwards max time to shards for sharded queries.  Uses
+    // maxTimeAlwaysTimeOut to ensure merizod throws if it receives a max time.
     //
 
     // Positive test.
@@ -68,7 +68,7 @@
     cursor.maxTimeMS(60 * 1000);
     assert.throws(function() {
         cursor.next();
-    }, [], "expected query to fail in mongod due to maxTimeAlwaysTimeOut fail point");
+    }, [], "expected query to fail in merizod due to maxTimeAlwaysTimeOut fail point");
 
     // Negative test.
     configureMaxTimeAlwaysTimeOut("off");
@@ -76,11 +76,11 @@
     cursor.maxTimeMS(60 * 1000);
     assert.doesNotThrow(function() {
         cursor.next();
-    }, [], "expected query to not hit time limit in mongod");
+    }, [], "expected query to not hit time limit in merizod");
 
     //
-    // Test that mongos correctly times out max time sharded getmore operations.  Uses
-    // maxTimeNeverTimeOut to ensure mongod doesn't enforce a time limit.
+    // Test that merizos correctly times out max time sharded getmore operations.  Uses
+    // maxTimeNeverTimeOut to ensure merizod doesn't enforce a time limit.
     //
 
     configureMaxTimeNeverTimeOut("alwaysOn");
@@ -96,8 +96,8 @@
     cursor.batchSize(2);
     cursor.maxTimeMS(2 * 1000);
     assert.doesNotThrow(
-        () => cursor.next(), [], "did not expect mongos to time out first batch of query");
-    assert.throws(() => cursor.itcount(), [], "expected mongos to abort getmore due to time limit");
+        () => cursor.next(), [], "did not expect merizos to time out first batch of query");
+    assert.throws(() => cursor.itcount(), [], "expected merizos to abort getmore due to time limit");
 
     // Negative test. ~5s operation, with a high (1-day) limit.
     cursor = coll.find({
@@ -110,7 +110,7 @@
     cursor.maxTimeMS(1000 * 60 * 60 * 24);
     assert.doesNotThrow(function() {
         cursor.next();
-    }, [], "did not expect mongos to time out first batch of query");
+    }, [], "did not expect merizos to time out first batch of query");
     assert.doesNotThrow(function() {
         cursor.itcount();
     }, [], "did not expect getmore ops to hit the time limit");
@@ -118,8 +118,8 @@
     configureMaxTimeNeverTimeOut("off");
 
     //
-    // Test that mongos correctly forwards max time to shards for sharded commands.  Uses
-    // maxTimeAlwaysTimeOut to ensure mongod throws if it receives a max time.
+    // Test that merizos correctly forwards max time to shards for sharded commands.  Uses
+    // maxTimeAlwaysTimeOut to ensure merizod throws if it receives a max time.
     //
 
     // Positive test for "validate".
@@ -133,7 +133,7 @@
     // Negative test for "validate".
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(coll.runCommand("validate", {maxTimeMS: 60 * 1000}),
-                         "expected validate to not hit time limit in mongod");
+                         "expected validate to not hit time limit in merizod");
 
     // Positive test for "count".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -146,7 +146,7 @@
     // Negative test for "count".
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(coll.runCommand("count", {maxTimeMS: 60 * 1000}),
-                         "expected count to not hit time limit in mongod");
+                         "expected count to not hit time limit in merizod");
 
     // Positive test for "collStats".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -159,7 +159,7 @@
     // Negative test for "collStats".
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(coll.runCommand("collStats", {maxTimeMS: 60 * 1000}),
-                         "expected collStats to not hit time limit in mongod");
+                         "expected collStats to not hit time limit in merizod");
 
     // Positive test for "mapReduce".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -191,7 +191,7 @@
         out: {inline: 1},
         maxTimeMS: 60 * 1000
     }),
-                         "expected mapReduce to not hit time limit in mongod");
+                         "expected mapReduce to not hit time limit in merizod");
 
     // Positive test for "aggregate".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -205,10 +205,10 @@
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(
         coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
-        "expected aggregate to not hit time limit in mongod");
+        "expected aggregate to not hit time limit in merizod");
 
     // Test that the maxTimeMS is still enforced on the shards even if we do not spend much time in
-    // mongos blocking.
+    // merizos blocking.
 
     // Manually run a find here so we can be sure cursor establishment happens with batch size 0.
     res = assert.commandWorked(coll.runCommand({
@@ -233,14 +233,14 @@
     // The fast shard should return relatively quickly.
     for (let i = 0; i < nDocsPerShard; ++i) {
         let next = assert.doesNotThrow(
-            () => cursor.next(), [], "did not expect mongos to time out first batch of query");
+            () => cursor.next(), [], "did not expect merizos to time out first batch of query");
         assert.gte(next._id, 0);
     }
-    // Sleep on the client-side so mongos's time budget is not being used.
+    // Sleep on the client-side so merizos's time budget is not being used.
     sleep(3 * 1000);
-    // Even though mongos has not been blocking this whole time, the shard has been busy computing
+    // Even though merizos has not been blocking this whole time, the shard has been busy computing
     // the next batch and should have timed out.
-    assert.throws(() => cursor.next(), [], "expected mongos to abort getMore due to time limit");
+    assert.throws(() => cursor.next(), [], "expected merizos to abort getMore due to time limit");
 
     // The moveChunk tests are disabled due to SERVER-30179
     //
@@ -265,7 +265,7 @@
     // to: st.shard0.shardName,
     // maxTimeMS: 1000 * 60 * 60 * 24
     // }),
-    // "expected moveChunk to not hit time limit in mongod");
+    // "expected moveChunk to not hit time limit in merizod");
 
     st.stop();
 })();

@@ -1,14 +1,14 @@
 LIBRARY MONGO_EMBEDDED
 EXPORTS
-    mongo_embedded_v1_status_create
-    mongo_embedded_v1_status_destroy
-    mongo_embedded_v1_status_get_error
-    mongo_embedded_v1_status_get_explanation
-    mongo_embedded_v1_status_get_code
-    mongo_embedded_v1_lib_init
-    mongo_embedded_v1_lib_fini
-    mongo_embedded_v1_instance_create
-    mongo_embedded_v1_instance_destroy
-    mongo_embedded_v1_client_create
-    mongo_embedded_v1_client_destroy
-    mongo_embedded_v1_client_invoke
+    merizo_embedded_v1_status_create
+    merizo_embedded_v1_status_destroy
+    merizo_embedded_v1_status_get_error
+    merizo_embedded_v1_status_get_explanation
+    merizo_embedded_v1_status_get_code
+    merizo_embedded_v1_lib_init
+    merizo_embedded_v1_lib_fini
+    merizo_embedded_v1_instance_create
+    merizo_embedded_v1_instance_destroy
+    merizo_embedded_v1_client_create
+    merizo_embedded_v1_client_destroy
+    merizo_embedded_v1_client_invoke

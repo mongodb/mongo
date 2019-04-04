@@ -8,29 +8,29 @@
 
     let st = new ShardingTest({
         shards: [{binVersion: "latest"}, {binVersion: "latest"}],
-        mongos: 1,
-        other: {mongosOptions: {binVersion: "latest"}, configOptions: {binVersion: "latest"}}
+        merizos: 1,
+        other: {merizosOptions: {binVersion: "latest"}, configOptions: {binVersion: "latest"}}
     });
-    let mongos = st.s0;
+    let merizos = st.s0;
     let kDbName = "test";
     let collName = "foo";
     let ns = kDbName + "." + collName;
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(merizos.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
     function shardCollectionAndMoveChunks(docsToInsert, shardKey, splitDoc, moveDoc) {
         for (let i = 0; i < docsToInsert.length; i++) {
-            assert.writeOK(mongos.getDB(kDbName).foo.insert(docsToInsert[i]));
+            assert.writeOK(merizos.getDB(kDbName).foo.insert(docsToInsert[i]));
         }
 
-        assert.commandWorked(mongos.getDB(kDbName).foo.createIndex(shardKey));
-        assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: shardKey}));
-        assert.commandWorked(mongos.adminCommand({split: ns, find: splitDoc}));
+        assert.commandWorked(merizos.getDB(kDbName).foo.createIndex(shardKey));
+        assert.commandWorked(merizos.adminCommand({shardCollection: ns, key: shardKey}));
+        assert.commandWorked(merizos.adminCommand({split: ns, find: splitDoc}));
         assert.commandWorked(
-            mongos.adminCommand({moveChunk: ns, find: moveDoc, to: st.shard1.shardName}));
+            merizos.adminCommand({moveChunk: ns, find: moveDoc, to: st.shard1.shardName}));
 
-        assert.commandWorked(mongos.adminCommand({flushRouterConfig: 1}));
+        assert.commandWorked(merizos.adminCommand({flushRouterConfig: 1}));
         st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns});
         st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns});
         st.rs0.getPrimary().adminCommand({_flushDatabaseCacheUpdates: kDbName});
@@ -64,8 +64,8 @@
         // TODO: SERVER-39158. Currently, this update will not fail but will not update the doc.
         // After SERVER-39158 is finished, this should fail.
         assert.writeOK(sessionDB.foo.update({x: 30}, {x: 100}));
-        assert.eq(1, mongos.getDB(kDbName).foo.find({x: 30}).toArray().length);
-        assert.eq(0, mongos.getDB(kDbName).foo.find({x: 100}).toArray().length);
+        assert.eq(1, merizos.getDB(kDbName).foo.find({x: 30}).toArray().length);
+        assert.eq(0, merizos.getDB(kDbName).foo.find({x: 100}).toArray().length);
 
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: {x: 80}, update: {$set: {x: 3}}});
@@ -74,7 +74,7 @@
             sessionDB.foo.findAndModify({query: {x: 80}, update: {x: 3}});
         });
 
-        mongos.getDB(kDbName).foo.drop();
+        merizos.getDB(kDbName).foo.drop();
 
         // Updates to partial shard key
         shardCollectionAndMoveChunks([{x: 30, y: 4}, {x: 50, y: 50}, {x: 80, y: 100}],
@@ -107,7 +107,7 @@
             sessionDB.foo.findAndModify({query: {x: 80}, update: {x: 3}});
         });
 
-        mongos.getDB(kDbName).foo.drop();
+        merizos.getDB(kDbName).foo.drop();
 
         // Test that we fail when attempt to run in a transaction as well
         session = st.s.startSession();
@@ -130,7 +130,7 @@
         });
         session.abortTransaction();
 
-        mongos.getDB(kDbName).foo.drop();
+        merizos.getDB(kDbName).foo.drop();
     }
 
     // Check that updating the shard key fails when all shards are in FCV 4.0

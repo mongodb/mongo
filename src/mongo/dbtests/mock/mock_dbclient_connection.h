@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,16 +32,16 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/dbtests/mock/mock_remote_db_server.h"
 
-namespace mongo {
+namespace merizo {
 /**
- * A simple class for mocking mongo::DBClientConnection.
+ * A simple class for mocking merizo::DBClientConnection.
  *
  * Also check out sample usage in dbtests/mock_dbclient_conn_test.cpp
  */
-class MockDBClientConnection : public mongo::DBClientConnection {
+class MockDBClientConnection : public merizo::DBClientConnection {
 public:
     /**
      * Create a mock connection to a mock server.
@@ -74,11 +74,11 @@ public:
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
 
-    std::unique_ptr<mongo::DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
-                                                 mongo::Query query = mongo::Query(),
+    std::unique_ptr<merizo::DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
+                                                 merizo::Query query = merizo::Query(),
                                                  int nToReturn = 0,
                                                  int nToSkip = 0,
-                                                 const mongo::BSONObj* fieldsToReturn = 0,
+                                                 const merizo::BSONObj* fieldsToReturn = 0,
                                                  int queryOptions = 0,
                                                  int batchSize = 0) override;
 
@@ -94,7 +94,7 @@ public:
     // Getters
     //
 
-    mongo::ConnectionString::ConnectionType type() const override;
+    merizo::ConnectionString::ConnectionType type() const override;
     bool isFailed() const override;
     double getSoTimeout() const override;
     std::string getServerAddress() const override;
@@ -104,10 +104,10 @@ public:
     // Unsupported methods (defined to get rid of virtual function was hidden error)
     //
 
-    unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
+    unsigned long long query(stdx::function<void(merizo::DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
-                             mongo::Query query,
-                             const mongo::BSONObj* fieldsToReturn = 0,
+                             merizo::Query query,
+                             const merizo::BSONObj* fieldsToReturn = 0,
                              int queryOptions = 0,
                              int batchSize = 0) override;
 
@@ -116,11 +116,11 @@ public:
     //
 
     void killCursor(const NamespaceString& ns, long long cursorID) override;
-    bool call(mongo::Message& toSend,
-              mongo::Message& response,
+    bool call(merizo::Message& toSend,
+              merizo::Message& response,
               bool assertOk,
               std::string* actualServer) override;
-    void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0) override;
+    void say(merizo::Message& toSend, bool isRetry = false, std::string* actualServer = 0) override;
     bool lazySupported() const override;
 
 private:

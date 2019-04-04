@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,19 +34,19 @@
 #include <string>
 #include <wiredtiger.h>
 
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/storage/capped_callback.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/util/fail_point_service.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/storage/capped_callback.h"
+#include "merizo/db/storage/kv/kv_prefix.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_cursor.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_size_storer.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/util/fail_point_service.h"
 
 /**
  * Either executes the specified operation and returns it's value or randomly throws a write
@@ -61,7 +61,7 @@
 #define WT_READ_CHECK(x) \
     (((MONGO_FAIL_POINT(WTWriteConflictExceptionForReads))) ? (WT_ROLLBACK) : (x))
 
-namespace mongo {
+namespace merizo {
 
 class RecoveryUnit;
 class WiredTigerSessionCache;

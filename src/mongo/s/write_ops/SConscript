@@ -13,13 +13,13 @@ env.Library(
         'write_error_detail.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/merizo/db/repl/optime',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/rpc/command_status',
+        '$BUILD_DIR/merizo/s/common_s',
     ],
 )
 
@@ -32,7 +32,7 @@ env.Library(
         'write_op.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/merizo/s/sharding_router_api',
         'batch_write_types',
     ],
 )
@@ -54,7 +54,7 @@ env.CppUnitTest(
         'batched_command_response_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
+        '$BUILD_DIR/merizo/db/ops/write_ops_parsers_test_helpers',
         'batch_write_types',
     ]
 )
@@ -67,9 +67,9 @@ env.CppUnitTest(
         'write_op_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/logical_clock',
+        '$BUILD_DIR/merizo/s/sharding_router_test_fixture',
         'cluster_write_op',
     ]
 )

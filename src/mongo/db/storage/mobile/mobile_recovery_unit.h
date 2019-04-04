@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,16 +33,16 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/storage/mobile/mobile_session.h"
-#include "mongo/db/storage/mobile/mobile_session_pool.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/snapshot.h"
-#include "mongo/platform/atomic_word.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/record_id.h"
+#include "merizo/db/storage/mobile/mobile_session.h"
+#include "merizo/db/storage/mobile/mobile_session_pool.h"
+#include "merizo/db/storage/recovery_unit.h"
+#include "merizo/db/storage/snapshot.h"
+#include "merizo/platform/atomic_word.h"
 
-namespace mongo {
+namespace merizo {
 
 class SortedDataInterface;
 
@@ -110,4 +110,4 @@ private:
     Changes _changes;
 };
 
-}  // namespace mongo
+}  // namespace merizo

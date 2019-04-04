@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-TOOLS=bsondump mongodump mongoexport mongofiles mongoimport mongorestore mongostat mongotop
+TOOLS=bsondump merizodump merizoexport merizofiles merizoimport merizorestore merizostat merizotop
 
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
@@ -20,16 +20,16 @@ build-stamp: configure-stamp
 
 	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
 	# scons 
-	#docbook-to-man debian/mongodb.sgml > mongodb.1
-	echo -n > debian/mongodb-org-tools.manpages
+	#docbook-to-man debian/merizodb.sgml > merizodb.1
+	echo -n > debian/merizodb-org-tools.manpages
 	for binary in ${TOOLS} ; \
 	do \
-	  echo debian/$$binary.1 >> debian/mongodb-org-tools.manpages ; \
+	  echo debian/$$binary.1 >> debian/merizodb-org-tools.manpages ; \
 	done
 
-	echo debian/mongo.1 > debian/mongodb-org-shell.manpages
-	echo debian/mongod.1 > debian/mongodb-org-server.manpages
-	echo debian/mongos.1 > debian/mongodb-org-mongos.manpages
+	echo debian/merizo.1 > debian/merizodb-org-shell.manpages
+	echo debian/merizod.1 > debian/merizodb-org-server.manpages
+	echo debian/merizos.1 > debian/merizodb-org-merizos.manpages
 
 	touch $@
 
@@ -39,27 +39,27 @@ clean:
 	rm -f build-stamp configure-stamp
 
 	# FIXME: scons freaks out at the presence of target files
-	# under debian/mongodb.
+	# under debian/merizodb.
 	#scons -c
 
 	rm -f debian/*.manpages
 
-	rm -rf $(CURDIR)/debian/mongodb-org
-	rm -rf $(CURDIR)/debian/mongodb-org-shell
-	rm -rf $(CURDIR)/debian/mongodb-org-server
-	rm -rf $(CURDIR)/debian/mongodb-org-mongos
-	rm -rf $(CURDIR)/debian/mongodb-org-tools
+	rm -rf $(CURDIR)/debian/merizodb-org
+	rm -rf $(CURDIR)/debian/merizodb-org-shell
+	rm -rf $(CURDIR)/debian/merizodb-org-server
+	rm -rf $(CURDIR)/debian/merizodb-org-merizos
+	rm -rf $(CURDIR)/debian/merizodb-org-tools
 	rm -f config.log
-	rm -f mongo
-	rm -f mongod
-	rm -f mongoimportjson
-	rm -f mongoexport
-	rm -f mongorestore
-	rm -f mongodump
-	rm -f mongofiles
+	rm -f merizo
+	rm -f merizod
+	rm -f merizoimportjson
+	rm -f merizoexport
+	rm -f merizorestore
+	rm -f merizodump
+	rm -f merizofiles
 	rm -f install_compass
 	rm -f .sconsign.dblite
-	rm -f libmongoclient.a
+	rm -f libmerizoclient.a
 	rm -rf client/*.o
 	rm -rf tools/*.o
 	rm -rf shell/*.o
@@ -76,32 +76,32 @@ install: build
 	dh_installdirs
 
 	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
-	# scons --prefix=$(CURDIR)/debian/mongodb/usr install
-	mkdir -p $(CURDIR)/debian/mongodb-org-shell/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-org-server/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-org-mongos/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-org-tools/usr/bin
-	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-org-shell/usr/bin
-	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-org-server/usr/bin
-	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-org-mongos/usr/bin
-	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-org-tools/usr/bin
+	# scons --prefix=$(CURDIR)/debian/merizodb/usr install
+	mkdir -p $(CURDIR)/debian/merizodb-org-shell/usr/bin
+	mkdir -p $(CURDIR)/debian/merizodb-org-server/usr/bin
+	mkdir -p $(CURDIR)/debian/merizodb-org-merizos/usr/bin
+	mkdir -p $(CURDIR)/debian/merizodb-org-tools/usr/bin
+	cp -v $(CURDIR)/bin/merizo $(CURDIR)/debian/merizodb-org-shell/usr/bin
+	cp -v $(CURDIR)/bin/merizod $(CURDIR)/debian/merizodb-org-server/usr/bin
+	cp -v $(CURDIR)/bin/merizos $(CURDIR)/debian/merizodb-org-merizos/usr/bin
+	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/merizodb-org-tools/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-org-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/merizodb-org-tools/usr/bin ; \
 	done
 
-	mkdir -p $(CURDIR)/debian/mongodb-org-server/etc
-	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-org-server/etc/mongod.conf 
+	mkdir -p $(CURDIR)/debian/merizodb-org-server/etc
+	cp $(CURDIR)/debian/merizod.conf $(CURDIR)/debian/merizodb-org-server/etc/merizod.conf 
 
-	mkdir -p $(CURDIR)/debian/mongodb-org-shell/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-org-server/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-org-mongos/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-org-tools/usr/share/lintian/overrides/
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-shell/usr/share/lintian/overrides/mongodb-org-shell
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-server/usr/share/lintian/overrides/mongodb-org-server
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-mongos/usr/share/lintian/overrides/mongodb-org-mongos
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-tools/usr/share/lintian/overrides/mongodb-org-tools
+	mkdir -p $(CURDIR)/debian/merizodb-org-shell/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/merizodb-org-server/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/merizodb-org-merizos/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/merizodb-org-tools/usr/share/lintian/overrides/
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/merizodb-org-shell/usr/share/lintian/overrides/merizodb-org-shell
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/merizodb-org-server/usr/share/lintian/overrides/merizodb-org-server
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/merizodb-org-merizos/usr/share/lintian/overrides/merizodb-org-merizos
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/merizodb-org-tools/usr/share/lintian/overrides/merizodb-org-tools
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -121,7 +121,7 @@ binary-arch: build install
 #	dh_installemacsen
 #	dh_installpam
 #	dh_installmime
-	dh_installinit -pmongodb-org-server --name=mongod
+	dh_installinit -pmerizodb-org-server --name=merizod
 #	dh_installinfo
 	dh_installman
 	dh_link

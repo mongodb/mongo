@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,34 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/write_commands/write_commands_common.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/json.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/ops/delete_request.h"
-#include "mongo/db/ops/parsed_delete.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/s/stale_exception.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/write_commands/write_commands_common.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/json.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/ops/delete_request.h"
+#include "merizo/db/ops/parsed_delete.h"
+#include "merizo/db/ops/parsed_update.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/ops/write_ops_exec.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/storage/duplicate_key_error_info.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/s/stale_exception.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
@@ -174,7 +174,7 @@ void serializeReply(OperationContext* opCtx,
     // writeConcernError field is handled by command processor.
 
     {
-        // Undocumented repl fields that mongos depends on.
+        // Undocumented repl fields that merizos depends on.
         auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
         const auto replMode = replCoord->getReplicationMode();
         if (replMode != repl::ReplicationCoordinator::modeNone) {
@@ -475,4 +475,4 @@ private:
 } cmdDelete;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

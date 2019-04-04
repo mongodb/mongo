@@ -26,7 +26,7 @@
         return;
     }
 
-    // No support for UUIDs on mongos.
+    // No support for UUIDs on merizos.
     const isMaster = db.runCommand("ismaster");
     assert.commandWorked(isMaster);
     const isMongos = (isMaster.msg === "isdbgrid");

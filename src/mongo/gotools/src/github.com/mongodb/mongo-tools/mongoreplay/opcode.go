@@ -1,15 +1,15 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import "fmt"
 
 // OpCode allow identifying the type of operation:
-// http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#request-opcodes
+// http://docs.merizodb.org/meta-driver/latest/legacy/merizodb-wire-protocol/#request-opcodes
 type OpCode int32
 
 // String returns a human readable representation of the OpCode.
@@ -43,7 +43,7 @@ func (c OpCode) String() string {
 }
 
 // The full set of known request op codes:
-// http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#request-opcodes
+// http://docs.merizodb.org/meta-driver/latest/legacy/merizodb-wire-protocol/#request-opcodes
 const (
 	OpCodeReply        = OpCode(1)
 	OpCodeUpdate       = OpCode(2001)

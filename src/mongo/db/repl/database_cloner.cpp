@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplicationInitialSync
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationInitialSync
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/database_cloner.h"
+#include "merizo/db/repl/database_cloner.h"
 
 #include <algorithm>
 #include <iterator>
 #include <set>
 
-#include "mongo/client/remote_command_retry_scheduler.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/client/remote_command_retry_scheduler.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/commands/list_collections_filter.h"
+#include "merizo/db/repl/repl_server_parameters_gen.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/destructor_guard.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 // Failpoint which causes the initial sync function to hang before running listCollections.
@@ -186,7 +186,7 @@ Status DatabaseCloner::startup() noexcept {
             log() << "initial sync - initialSyncHangBeforeListCollections fail point "
                      "enabled. Blocking until fail point is disabled.";
             while (MONGO_FAIL_POINT(initialSyncHangBeforeListCollections) && !_isShuttingDown()) {
-                mongo::sleepsecs(1);
+                merizo::sleepsecs(1);
             }
             lk.lock();
         }
@@ -301,7 +301,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
             log() << "initial sync - initialSyncHangAfterListCollections fail point "
                      "enabled. Blocking until fail point is disabled.";
             while (MONGO_FAIL_POINT(initialSyncHangAfterListCollections)) {
-                mongo::sleepsecs(1);
+                merizo::sleepsecs(1);
             }
         }
     }
@@ -319,7 +319,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                                << info});
             return;
         }
-        if (nameElement.type() != mongo::String) {
+        if (nameElement.type() != merizo::String) {
             _finishCallback_inlock(
                 lk,
                 {ErrorCodes::TypeMismatch,
@@ -528,4 +528,4 @@ std::ostream& operator<<(std::ostream& os, const DatabaseCloner::State& state) {
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

@@ -1,6 +1,6 @@
 /**
  * Characterizes the actions (rebuilds or drops the index) taken upon unfinished indexes when
- * restarting mongod from (standalone -> standalone) and (replica set member -> standalone).
+ * restarting merizod from (standalone -> standalone) and (replica set member -> standalone).
  * @tags: [requires_replication, requires_persistence, requires_majority_read_concern]
  */
 (function() {
@@ -25,20 +25,20 @@
     ];
 
     function startStandalone() {
-        let mongod = MongoRunner.runMongod({cleanData: true});
-        let db = mongod.getDB(dbName);
+        let merizod = MongoRunner.runMongod({cleanData: true});
+        let db = merizod.getDB(dbName);
         db.dropDatabase();
-        return mongod;
+        return merizod;
     }
 
     function restartStandalone(old) {
-        jsTest.log("Restarting mongod");
+        jsTest.log("Restarting merizod");
         MongoRunner.stopMongod(old);
         return MongoRunner.runMongod({restart: true, dbpath: old.dbpath, cleanData: false});
     }
 
-    function shutdownStandalone(mongod) {
-        MongoRunner.stopMongod(mongod);
+    function shutdownStandalone(merizod) {
+        MongoRunner.stopMongod(merizod);
     }
 
     function startReplSet() {
@@ -110,9 +110,9 @@
         }
     }
 
-    function checkForIndexRebuild(mongod, indexName, shouldExist) {
-        let adminDB = mongod.getDB("admin");
-        let collDB = mongod.getDB(dbName);
+    function checkForIndexRebuild(merizod, indexName, shouldExist) {
+        let adminDB = merizod.getDB("admin");
+        let collDB = merizod.getDB(dbName);
         let logs = adminDB.runCommand({getLog: "global"});
 
         let rebuildIndexLogEntry = false;
@@ -166,8 +166,8 @@
     }
 
     function standaloneToStandaloneTest() {
-        let mongod = startStandalone();
-        let collDB = mongod.getDB(dbName);
+        let merizod = startStandalone();
+        let collDB = merizod.getDB(dbName);
 
         addTestDocuments(collDB);
 
@@ -183,14 +183,14 @@
                 {configureFailPoint: "leaveIndexBuildUnfinishedForShutdown", mode: "off"}));
         }
 
-        mongod = restartStandalone(mongod);
+        merizod = restartStandalone(merizod);
 
-        checkForIndexRebuild(mongod, firstIndex, /*shouldExist=*/false);
-        checkForIndexRebuild(mongod, secondIndex, /*shouldExist=*/false);
-        checkForIndexRebuild(mongod, thirdIndex, /*shouldExist=*/false);
-        checkForIndexRebuild(mongod, fourthIndex, /*shouldExist=*/false);
+        checkForIndexRebuild(merizod, firstIndex, /*shouldExist=*/false);
+        checkForIndexRebuild(merizod, secondIndex, /*shouldExist=*/false);
+        checkForIndexRebuild(merizod, thirdIndex, /*shouldExist=*/false);
+        checkForIndexRebuild(merizod, fourthIndex, /*shouldExist=*/false);
 
-        shutdownStandalone(mongod);
+        shutdownStandalone(merizod);
     }
 
     function secondaryToStandaloneTest() {
@@ -212,14 +212,14 @@
         replSet.stop(secondaryId);
         replSet.remove(secondaryId);
 
-        let mongod = restartStandalone(secondary);
+        let merizod = restartStandalone(secondary);
 
-        checkForIndexRebuild(mongod, firstIndex, /*shouldExist=*/true);
-        checkForIndexRebuild(mongod, secondIndex, /*shouldExist=*/true);
-        checkForIndexRebuild(mongod, thirdIndex, /*shouldExist=*/true);
-        checkForIndexRebuild(mongod, fourthIndex, /*shouldExist=*/true);
+        checkForIndexRebuild(merizod, firstIndex, /*shouldExist=*/true);
+        checkForIndexRebuild(merizod, secondIndex, /*shouldExist=*/true);
+        checkForIndexRebuild(merizod, thirdIndex, /*shouldExist=*/true);
+        checkForIndexRebuild(merizod, fourthIndex, /*shouldExist=*/true);
 
-        shutdownStandalone(mongod);
+        shutdownStandalone(merizod);
         stopReplSet(replSet);
     }
 
@@ -227,10 +227,10 @@
     jsTest.log("Restarting nodes as standalone with unfinished indexes.");
 
     // Standalone restarts as standalone
-    jsTest.log("Restarting standalone mongod.");
+    jsTest.log("Restarting standalone merizod.");
     standaloneToStandaloneTest();
 
     // Replica set node restarts as standalone
-    jsTest.log("Restarting replica set node mongod.");
+    jsTest.log("Restarting replica set node merizod.");
     secondaryToStandaloneTest();
 })();

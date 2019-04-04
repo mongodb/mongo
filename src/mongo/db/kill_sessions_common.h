@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,18 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/kill_sessions.h"
+#include "merizo/db/kill_sessions.h"
 
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/session_killer.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/status.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/session_killer.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Local killing involves looping over all local operations, checking to see if they have matching
@@ -76,7 +76,7 @@ private:
 
 /**
  * This elaborate bit of artiface helps us to adapt the shape of a cursor manager that we know from
- * logical sessions with the different ways to cancel cursors in mongos versus mongod.  I.e. the
+ * logical sessions with the different ways to cancel cursors in merizos versus merizod.  I.e. the
  * two types share no code, but do share enough shape to re-use some boilerplate.
  */
 template <typename Eraser>
@@ -156,4 +156,4 @@ auto makeKillCursorsBySessionAdaptor(OperationContext* opCtx,
         opCtx, matcher, std::forward<Eraser>(eraser)};
 }
 
-}  // namespace mongo
+}  // namespace merizo

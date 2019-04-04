@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/clonable_ptr.h"
+#include "merizo/base/clonable_ptr.h"
 
 #include <functional>
 #include <memory>
 #include <tuple>
 
-#include "mongo/unittest/unittest.h"
+#include "merizo/unittest/unittest.h"
 
 #include <boost/lexical_cast.hpp>
 
@@ -46,7 +46,7 @@ void runSyntaxTest(Test&& t) {
 }
 
 // These testing helper classes model various kinds of class which should be compatible with
-// `mongo::clonable_ptr`.  The basic use cases satisfied by each class are described in each class's
+// `merizo::clonable_ptr`.  The basic use cases satisfied by each class are described in each class's
 // documentation.
 
 // This class models the `Clonable` concept, and is used to test the simple case of `clonable_ptr`.
@@ -80,7 +80,7 @@ public:
 };
 
 // This class requires a companion cloning function models `CloneFactory<Alt2ClonableTest>`.  There
-// is an attendant specialization of the `mongo::clonable_traits` metafunction to provide the clone
+// is an attendant specialization of the `merizo::clonable_traits` metafunction to provide the clone
 // factory for this type.  That `CloneFactory` is stateless.
 class Alt2ClonableTest {
 private:
@@ -90,8 +90,8 @@ private:
 };
 }  // namespace
 
-namespace mongo {
-// This specialization of the `mongo::clonable_traits` metafunction provides a model of a stateless
+namespace merizo {
+// This specialization of the `merizo::clonable_traits` metafunction provides a model of a stateless
 // `CloneFactory<Alt2ClonableTest>`
 template <>
 struct clonable_traits<::Alt2ClonableTest> {
@@ -101,7 +101,7 @@ struct clonable_traits<::Alt2ClonableTest> {
         }
     };
 };
-}  // namespace mongo
+}  // namespace merizo
 
 namespace {
 // This class uses a stateful cloning function provided by the `getCloningFunction` static member.
@@ -179,51 +179,51 @@ TEST(ClonablePtrTest, syntax_smoke_test) {
 //       default.  MSVC doesn't make its tuple compressed, which causes this test to fail on MSVC.
 #ifndef _MSC_VER
     {
-        mongo::clonable_ptr<ClonableTest> p;
+        merizo::clonable_ptr<ClonableTest> p;
 
         p = std::make_unique<ClonableTest>();
 
-        mongo::clonable_ptr<ClonableTest> p2 = p;
+        merizo::clonable_ptr<ClonableTest> p2 = p;
 
         ASSERT_TRUE(p != p2);
 
         static_assert(sizeof(p) == sizeof(ClonableTest*),
-                      "`mongo::clonable_ptr< T >` should be `sizeof` a pointer when there is no "
+                      "`merizo::clonable_ptr< T >` should be `sizeof` a pointer when there is no "
                       "CloneFactory");
     }
 #endif
 
     {
-        mongo::clonable_ptr<AltClonableTest> p;
+        merizo::clonable_ptr<AltClonableTest> p;
 
         p = std::make_unique<AltClonableTest>();
 
-        mongo::clonable_ptr<AltClonableTest> p2 = p;
+        merizo::clonable_ptr<AltClonableTest> p2 = p;
 
         ASSERT_TRUE(p != p2);
     }
 
     {
-        mongo::clonable_ptr<Alt2ClonableTest> p;
+        merizo::clonable_ptr<Alt2ClonableTest> p;
 
         p = std::make_unique<Alt2ClonableTest>();
 
-        mongo::clonable_ptr<Alt2ClonableTest> p2 = p;
+        merizo::clonable_ptr<Alt2ClonableTest> p2 = p;
 
         ASSERT_TRUE(p != p2);
     }
 
     {
-        mongo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p{
+        merizo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p{
             FunctorClonable::getCloningFunction()};
 
         p = std::make_unique<FunctorClonable>();
 
-        mongo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p2 = p;
+        merizo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p2 = p;
 
         ASSERT_TRUE(p != p2);
 
-        mongo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p3{
+        merizo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p3{
             FunctorClonable::getCloningFunction()};
 
         auto tmp = std::make_unique<FunctorClonable>();
@@ -236,7 +236,7 @@ TEST(ClonablePtrTest, syntax_smoke_test) {
 }
 
 // These tests check that all expected valid syntactic forms of use for the
-// `mongo::clonable_ptr<Clonable>` are valid.  These tests assert nothing but provide a single
+// `merizo::clonable_ptr<Clonable>` are valid.  These tests assert nothing but provide a single
 // unified place to check the syntax of this component.  Build failures in these parts indicate that
 // a change to the component has broken an expected valid syntactic usage.  Any expected valid usage
 // which is not in this list should be added.
@@ -244,55 +244,55 @@ namespace SyntaxTests {
 template <typename Clonable>
 void construction() {
     // Test default construction
-    { mongo::clonable_ptr<Clonable>{}; }
+    { merizo::clonable_ptr<Clonable>{}; }
 
     // Test construction from a nullptr
-    { mongo::clonable_ptr<Clonable>{nullptr}; }
+    { merizo::clonable_ptr<Clonable>{nullptr}; }
 
     // Test construction from a Clonable pointer.
     {
         Clonable* const local = nullptr;
-        mongo::clonable_ptr<Clonable>{local};
+        merizo::clonable_ptr<Clonable>{local};
     }
 
     // Test move construction.
-    { std::ignore = mongo::clonable_ptr<Clonable>{mongo::clonable_ptr<Clonable>{}}; }
+    { std::ignore = merizo::clonable_ptr<Clonable>{merizo::clonable_ptr<Clonable>{}}; }
 
     // Test copy construction.
     {
-        mongo::clonable_ptr<Clonable> a;
-        mongo::clonable_ptr<Clonable> b{a};
+        merizo::clonable_ptr<Clonable> a;
+        merizo::clonable_ptr<Clonable> b{a};
     }
 
     // Test move assignment.
     {
-        mongo::clonable_ptr<Clonable> a;
-        a = mongo::clonable_ptr<Clonable>{};
+        merizo::clonable_ptr<Clonable> a;
+        a = merizo::clonable_ptr<Clonable>{};
     }
 
     // Test copy assignment.
     {
-        mongo::clonable_ptr<Clonable> a;
-        mongo::clonable_ptr<Clonable> b;
+        merizo::clonable_ptr<Clonable> a;
+        merizo::clonable_ptr<Clonable> b;
         b = a;
     }
 
     // Test unique pointer construction
-    { mongo::clonable_ptr<Clonable>{std::make_unique<Clonable>()}; }
+    { merizo::clonable_ptr<Clonable>{std::make_unique<Clonable>()}; }
 
     // Test unique pointer construction (conversion)
     {
-        auto acceptor = [](const mongo::clonable_ptr<Clonable>&) {};
+        auto acceptor = [](const merizo::clonable_ptr<Clonable>&) {};
         acceptor(std::make_unique<Clonable>());
     }
 
     // Test non-conversion pointer construction
-    { static_assert(!std::is_convertible<Clonable*, mongo::clonable_ptr<Clonable>>::value, ""); }
+    { static_assert(!std::is_convertible<Clonable*, merizo::clonable_ptr<Clonable>>::value, ""); }
 
     // Test conversion unique pointer construction
     {
         static_assert(
-            std::is_convertible<std::unique_ptr<Clonable>, mongo::clonable_ptr<Clonable>>::value,
+            std::is_convertible<std::unique_ptr<Clonable>, merizo::clonable_ptr<Clonable>>::value,
             "");
     }
 }
@@ -303,31 +303,31 @@ void augmentedConstruction() {
     // Test default construction
     {
         static_assert(
-            !std::is_default_constructible<mongo::clonable_ptr<Clonable, CloneFactory>>::value, "");
+            !std::is_default_constructible<merizo::clonable_ptr<Clonable, CloneFactory>>::value, "");
     }
 
     // Test Clone Factory construction
-    { mongo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()}; }
+    { merizo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()}; }
 
 // TODO: Revist this when MSVC's enable-if and deletion on ctors works.
 #ifndef _MSC_VER
     // Test non-construction from a nullptr
     {
-        static_assert(!std::is_constructible<mongo::clonable_ptr<Clonable, CloneFactory>,
+        static_assert(!std::is_constructible<merizo::clonable_ptr<Clonable, CloneFactory>,
                                              std::nullptr_t>::value,
                       "");
     }
 #endif
 
     // Test construction from a nullptr with factory
-    { mongo::clonable_ptr<Clonable, CloneFactory>{nullptr, Clonable::getCloningFunction()}; }
+    { merizo::clonable_ptr<Clonable, CloneFactory>{nullptr, Clonable::getCloningFunction()}; }
 
 // TODO: Revist this when MSVC's enable-if and deletion on ctors works.
 #ifndef _MSC_VER
     // Test construction from a raw Clonable pointer.
     {
         static_assert(
-            !std::is_constructible<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value,
+            !std::is_constructible<merizo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value,
             "");
     }
 #endif
@@ -336,79 +336,79 @@ void augmentedConstruction() {
     // Test initialization of a raw Clonable pointer with factory, using reset.
     {
         Clonable* const local = nullptr;
-        mongo::clonable_ptr<Clonable, CloneFactory> p{Clonable::getCloningFunction()};
+        merizo::clonable_ptr<Clonable, CloneFactory> p{Clonable::getCloningFunction()};
         p.reset(local);
     }
 
     // Test move construction.
     {
-        std::ignore = mongo::clonable_ptr<Clonable, CloneFactory>{
-            mongo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()}};
+        std::ignore = merizo::clonable_ptr<Clonable, CloneFactory>{
+            merizo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()}};
     }
 
     // Test copy construction.
     {
-        mongo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
-        mongo::clonable_ptr<Clonable, CloneFactory> b{a};
+        merizo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
+        merizo::clonable_ptr<Clonable, CloneFactory> b{a};
     }
 
     // Test augmented copy construction.
     {
-        mongo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
-        mongo::clonable_ptr<Clonable, CloneFactory> b{a, Clonable::getCloningFunction()};
+        merizo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
+        merizo::clonable_ptr<Clonable, CloneFactory> b{a, Clonable::getCloningFunction()};
     }
 
 
     // Test move assignment.
     {
-        mongo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
-        a = mongo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()};
+        merizo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
+        a = merizo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()};
     }
 
     // Test copy assignment.
     {
-        mongo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
-        mongo::clonable_ptr<Clonable, CloneFactory> b{Clonable::getCloningFunction()};
+        merizo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
+        merizo::clonable_ptr<Clonable, CloneFactory> b{Clonable::getCloningFunction()};
         b = a;
     }
 
     // Test unique pointer construction
     {
-        mongo::clonable_ptr<Clonable, CloneFactory>{std::make_unique<Clonable>(),
+        merizo::clonable_ptr<Clonable, CloneFactory>{std::make_unique<Clonable>(),
                                                     Clonable::getCloningFunction()};
     }
 
     // Test augmented unique pointer construction
     {
-        mongo::clonable_ptr<Clonable, CloneFactory>{std::make_unique<Clonable>(),
+        merizo::clonable_ptr<Clonable, CloneFactory>{std::make_unique<Clonable>(),
                                                     Clonable::getCloningFunction()};
     }
 
     // Test non-conversion pointer construction
     {
         static_assert(
-            !std::is_convertible<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value,
+            !std::is_convertible<merizo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value,
             "");
     }
 
     // Test non-conversion from factory
     {
         static_assert(
-            !std::is_convertible<mongo::clonable_ptr<Clonable, CloneFactory>, CloneFactory>::value,
+            !std::is_convertible<merizo::clonable_ptr<Clonable, CloneFactory>, CloneFactory>::value,
             "");
     }
 
     // Test conversion unique pointer construction
     {
         static_assert(!std::is_convertible<std::unique_ptr<Clonable>,
-                                           mongo::clonable_ptr<Clonable, CloneFactory>>::value,
+                                           merizo::clonable_ptr<Clonable, CloneFactory>>::value,
                       "");
     }
 }
 
 template <typename Clonable>
 void pointerOperations() {
-    mongo::clonable_ptr<Clonable> a;
+    merizo::clonable_ptr<Clonable> a;
 
     // Test `.get()` functionality:
     {
@@ -439,8 +439,8 @@ void pointerOperations() {
 
 template <typename Clonable>
 void equalityOperations() {
-    mongo::clonable_ptr<Clonable> a;
-    mongo::clonable_ptr<Clonable> b;
+    merizo::clonable_ptr<Clonable> a;
+    merizo::clonable_ptr<Clonable> b;
 
     std::unique_ptr<Clonable> ua;
 
@@ -554,26 +554,26 @@ TEST(ClonablePtrTest, basic_construction_test) {
     // Do not default construct the object
     {
         DestructionGuard check;
-        mongo::clonable_ptr<DetectDestruction> p;
+        merizo::clonable_ptr<DetectDestruction> p;
         ASSERT_EQ(DetectDestruction::activeCount, 0);
     }
 
     // Do not make unnecessary copies of the object from ptr
     {
         DestructionGuard check;
-        mongo::clonable_ptr<DetectDestruction> p{new DetectDestruction};
+        merizo::clonable_ptr<DetectDestruction> p{new DetectDestruction};
         ASSERT_EQ(DetectDestruction::activeCount, 1);
     }
 
     // Do not make unnecessary copies of the object from unique_ptr
     {
         DestructionGuard check;
-        mongo::clonable_ptr<DetectDestruction> p{std::make_unique<DetectDestruction>()};
+        merizo::clonable_ptr<DetectDestruction> p{std::make_unique<DetectDestruction>()};
         ASSERT_EQ(DetectDestruction::activeCount, 1);
     }
     {
         DestructionGuard check;
-        mongo::clonable_ptr<DetectDestruction> p = std::make_unique<DetectDestruction>();
+        merizo::clonable_ptr<DetectDestruction> p = std::make_unique<DetectDestruction>();
         ASSERT_EQ(DetectDestruction::activeCount, 1);
     }
 
@@ -581,11 +581,11 @@ TEST(ClonablePtrTest, basic_construction_test) {
     {
         DestructionGuard check;
 
-        mongo::clonable_ptr<DetectDestruction> p1{std::make_unique<DetectDestruction>()};
+        merizo::clonable_ptr<DetectDestruction> p1{std::make_unique<DetectDestruction>()};
         ASSERT_EQ(DetectDestruction::activeCount, 1);
 
         {
-            mongo::clonable_ptr<DetectDestruction> p2{std::make_unique<DetectDestruction>()};
+            merizo::clonable_ptr<DetectDestruction> p2{std::make_unique<DetectDestruction>()};
             ASSERT_EQ(DetectDestruction::activeCount, 2);
         }
         ASSERT_EQ(DetectDestruction::activeCount, 1);
@@ -595,11 +595,11 @@ TEST(ClonablePtrTest, basic_construction_test) {
     {
         DestructionGuard check;
 
-        auto p1 = std::make_unique<mongo::clonable_ptr<DetectDestruction>>(
+        auto p1 = std::make_unique<merizo::clonable_ptr<DetectDestruction>>(
             std::make_unique<DetectDestruction>());
         ASSERT_EQ(DetectDestruction::activeCount, 1);
 
-        auto p2 = std::make_unique<mongo::clonable_ptr<DetectDestruction>>(
+        auto p2 = std::make_unique<merizo::clonable_ptr<DetectDestruction>>(
             std::make_unique<DetectDestruction>());
         ASSERT_EQ(DetectDestruction::activeCount, 2);
 
@@ -638,20 +638,20 @@ TEST(ClonablePtrTest, basic_construction_test) {
 TEST(ClonablePtrTest, basicEqualityTest) {
     DestructionGuard check;
 
-    mongo::clonable_ptr<DetectDestruction> n1;
-    mongo::clonable_ptr<DetectDestruction> n2;
-    mongo::clonable_ptr<DetectDestruction> n3;
+    merizo::clonable_ptr<DetectDestruction> n1;
+    merizo::clonable_ptr<DetectDestruction> n2;
+    merizo::clonable_ptr<DetectDestruction> n3;
 
-    mongo::clonable_ptr<DetectDestruction> a = std::make_unique<DetectDestruction>();
-    mongo::clonable_ptr<DetectDestruction> b = std::make_unique<DetectDestruction>();
-    mongo::clonable_ptr<DetectDestruction> c = std::make_unique<DetectDestruction>();
+    merizo::clonable_ptr<DetectDestruction> a = std::make_unique<DetectDestruction>();
+    merizo::clonable_ptr<DetectDestruction> b = std::make_unique<DetectDestruction>();
+    merizo::clonable_ptr<DetectDestruction> c = std::make_unique<DetectDestruction>();
 
-    const mongo::clonable_ptr<DetectDestruction>& ap = a;
-    const mongo::clonable_ptr<DetectDestruction>& bp = b;
-    const mongo::clonable_ptr<DetectDestruction>& cp = c;
-    const mongo::clonable_ptr<DetectDestruction>& ap2 = a;
-    const mongo::clonable_ptr<DetectDestruction>& bp2 = b;
-    const mongo::clonable_ptr<DetectDestruction>& cp2 = c;
+    const merizo::clonable_ptr<DetectDestruction>& ap = a;
+    const merizo::clonable_ptr<DetectDestruction>& bp = b;
+    const merizo::clonable_ptr<DetectDestruction>& cp = c;
+    const merizo::clonable_ptr<DetectDestruction>& ap2 = a;
+    const merizo::clonable_ptr<DetectDestruction>& bp2 = b;
+    const merizo::clonable_ptr<DetectDestruction>& cp2 = c;
 
     // Equals operator
 
@@ -804,15 +804,15 @@ TEST(ClonablePtrTest, ownershipStabilityTest) {
         auto ptr_init = std::make_unique<DetectDestruction>();
         const auto* rp = ptr_init.get();
 
-        mongo::clonable_ptr<DetectDestruction> cp = std::move(ptr_init);
+        merizo::clonable_ptr<DetectDestruction> cp = std::move(ptr_init);
 
         ASSERT(rp == cp.get());
 
-        mongo::clonable_ptr<DetectDestruction> cp2 = std::move(cp);
+        merizo::clonable_ptr<DetectDestruction> cp2 = std::move(cp);
 
         ASSERT(rp == cp2.get());
 
-        mongo::clonable_ptr<DetectDestruction> cp3;
+        merizo::clonable_ptr<DetectDestruction> cp3;
 
         ASSERT(nullptr == cp3);
 
@@ -825,15 +825,15 @@ TEST(ClonablePtrTest, ownershipStabilityTest) {
         auto ptr_init = std::make_unique<DetectDestruction>();
         const auto* rp = ptr_init.get();
 
-        mongo::clonable_ptr<DetectDestruction> cp{ptr_init.release()};
+        merizo::clonable_ptr<DetectDestruction> cp{ptr_init.release()};
 
         ASSERT(rp == cp.get());
 
-        mongo::clonable_ptr<DetectDestruction> cp2 = std::move(cp);
+        merizo::clonable_ptr<DetectDestruction> cp2 = std::move(cp);
 
         ASSERT(rp == cp2.get());
 
-        mongo::clonable_ptr<DetectDestruction> cp3;
+        merizo::clonable_ptr<DetectDestruction> cp3;
 
         ASSERT(nullptr == cp3.get());
 
@@ -870,28 +870,28 @@ bool operator!=(const ClonableObject& lhs, const ClonableObject& rhs) {
 }
 
 TEST(ClonablePtrTest, noObjectCopySemanticTest) {
-    mongo::clonable_ptr<ClonableObject> p;
+    merizo::clonable_ptr<ClonableObject> p;
 
-    mongo::clonable_ptr<ClonableObject> p2 = p;
+    merizo::clonable_ptr<ClonableObject> p2 = p;
     ASSERT(p == p2);
 
-    mongo::clonable_ptr<ClonableObject> p3;
+    merizo::clonable_ptr<ClonableObject> p3;
 
     p3 = p;
     ASSERT(p == p3);
 }
 
 TEST(ClonablePtrTest, objectCopySemanticTest) {
-    mongo::clonable_ptr<ClonableObject> p = std::make_unique<ClonableObject>(1);
-    mongo::clonable_ptr<ClonableObject> q = std::make_unique<ClonableObject>(2);
+    merizo::clonable_ptr<ClonableObject> p = std::make_unique<ClonableObject>(1);
+    merizo::clonable_ptr<ClonableObject> q = std::make_unique<ClonableObject>(2);
     ASSERT(p != q);
     ASSERT(*p != *q);
 
-    mongo::clonable_ptr<ClonableObject> p2 = p;
+    merizo::clonable_ptr<ClonableObject> p2 = p;
     ASSERT(p != p2);
     ASSERT(*p == *p2);
 
-    mongo::clonable_ptr<ClonableObject> q2 = q;
+    merizo::clonable_ptr<ClonableObject> q2 = q;
     ASSERT(q2 != q);
     ASSERT(q2 != p);
     ASSERT(q2 != p2);
@@ -956,10 +956,10 @@ public:
 
 
 TEST(ClonablePtrSimpleTest, simpleUsageExample) {
-    mongo::clonable_ptr<Interface> source;
-    mongo::clonable_ptr<Interface> sink;
+    merizo::clonable_ptr<Interface> source;
+    merizo::clonable_ptr<Interface> sink;
 
-    mongo::clonable_ptr<Interface> instance = std::make_unique<StorageImplementation>();
+    merizo::clonable_ptr<Interface> instance = std::make_unique<StorageImplementation>();
 
     sink = instance;
 

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/util/log.h"
-#include "mongo/util/log_and_backoff.h"
-#include "mongo/util/stacktrace.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/util/log.h"
+#include "merizo/util/log_and_backoff.h"
+#include "merizo/util/stacktrace.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 
@@ -48,8 +48,8 @@ WriteConflictException::WriteConflictException()
 }
 
 void WriteConflictException::logAndBackoff(int attempt, StringData operation, StringData ns) {
-    mongo::logAndBackoff(
-        ::mongo::logger::LogComponent::kWrite,
+    merizo::logAndBackoff(
+        ::merizo::logger::LogComponent::kWrite,
         logger::LogSeverity::Debug(1),
         static_cast<size_t>(attempt),
         str::stream() << "Caught WriteConflictException doing " << operation << " on " << ns);

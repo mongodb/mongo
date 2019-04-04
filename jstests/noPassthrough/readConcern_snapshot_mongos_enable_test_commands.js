@@ -1,4 +1,4 @@
-// Verifies that snapshot readConcern on mongos is not gated by the enableTestCommands flag.
+// Verifies that snapshot readConcern on merizos is not gated by the enableTestCommands flag.
 //
 // @tags: [requires_sharding]
 (function() {

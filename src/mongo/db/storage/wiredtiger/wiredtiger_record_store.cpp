@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,46 +27,46 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 #define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/static_assert.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/server_recovery.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/oplog_hack.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_stones.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/concurrency/locker.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/global_settings.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/server_recovery.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/oplog_hack.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_record_store_oplog_stones.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/time_support.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::string;
@@ -2197,4 +2197,4 @@ Status WiredTigerRecordStore::updateCappedSize(OperationContext* opCtx, long lon
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

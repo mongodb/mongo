@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/runtime_constants_gen.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/string_map.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/runtime_constants_gen.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/string_map.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * The state used as input and working space for Expressions.
@@ -223,4 +223,4 @@ private:
     Variables::Id _lastSeen = -1;
 };
 
-}  // namespace mongo
+}  // namespace merizo

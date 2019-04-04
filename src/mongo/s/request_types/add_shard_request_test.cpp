@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/request_types/add_shard_request_type.h"
+#include "merizo/s/request_types/add_shard_request_type.h"
 
-#include "mongo/unittest/unittest.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -43,12 +43,12 @@ const char kShardName[] = "shardName";
 const long long kMaxSizeMB = 10;
 
 // Test parsing the internal fields from a command BSONObj. The internal fields (besides the
-// top-level command name) are identical between the external mongos version and internal config
+// top-level command name) are identical between the external merizos version and internal config
 // version.
 
 TEST(AddShardRequest, ParseInternalFieldsInvalidConnectionString) {
     {
-        BSONObj obj = BSON(AddShardRequest::mongosAddShard << ",,,");
+        BSONObj obj = BSON(AddShardRequest::merizosAddShard << ",,,");
 
         auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
         ASSERT_NOT_OK(swAddShardRequest.getStatus());
@@ -67,7 +67,7 @@ TEST(AddShardRequest, ParseInternalFieldsInvalidConnectionString) {
 TEST(AddShardRequest, ParseInternalFieldsMissingMaxSize) {
     {
         BSONObj obj =
-            BSON(AddShardRequest::mongosAddShard << kConnString << AddShardRequest::shardName
+            BSON(AddShardRequest::merizosAddShard << kConnString << AddShardRequest::shardName
                                                  << kShardName);
 
         auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
@@ -100,7 +100,7 @@ TEST(AddShardRequest, ParseInternalFieldsMissingMaxSize) {
 TEST(AddShardRequest, ParseInternalFieldsMissingName) {
     {
         BSONObj obj =
-            BSON(AddShardRequest::mongosAddShard << kConnString << AddShardRequest::maxSizeMB
+            BSON(AddShardRequest::merizosAddShard << kConnString << AddShardRequest::maxSizeMB
                                                  << kMaxSizeMB);
 
         auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
@@ -132,7 +132,7 @@ TEST(AddShardRequest, ParseInternalFieldsMissingName) {
 TEST(AddShardRequest, ParseInternalFieldsAllFieldsPresent) {
     {
         BSONObj obj =
-            BSON(AddShardRequest::mongosAddShard << kConnString << AddShardRequest::shardName
+            BSON(AddShardRequest::merizosAddShard << kConnString << AddShardRequest::shardName
                                                  << kShardName
                                                  << AddShardRequest::maxSizeMB
                                                  << kMaxSizeMB);
@@ -170,12 +170,12 @@ TEST(AddShardRequest, ParseInternalFieldsAllFieldsPresent) {
 // Test converting a valid AddShardRequest to the internal config version of the command.
 
 TEST(AddShardRequest, ToCommandForConfig) {
-    BSONObj mongosCmdObj = BSON(
-        AddShardRequest::mongosAddShard << kConnString << AddShardRequest::shardName << kShardName
+    BSONObj merizosCmdObj = BSON(
+        AddShardRequest::merizosAddShard << kConnString << AddShardRequest::shardName << kShardName
                                         << AddShardRequest::maxSizeMB
                                         << kMaxSizeMB);
 
-    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
+    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
     auto req = swAddShardRequest.getValue();
 
@@ -186,10 +186,10 @@ TEST(AddShardRequest, ToCommandForConfig) {
 }
 
 TEST(AddShardRequest, ToCommandForConfigMissingName) {
-    BSONObj mongosCmdObj = BSON(
-        AddShardRequest::mongosAddShard << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
+    BSONObj merizosCmdObj = BSON(
+        AddShardRequest::merizosAddShard << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
 
-    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
+    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
     auto req = swAddShardRequest.getValue();
 
@@ -200,10 +200,10 @@ TEST(AddShardRequest, ToCommandForConfigMissingName) {
 }
 
 TEST(AddShardRequest, ToCommandForConfigMissingMaxSize) {
-    BSONObj mongosCmdObj = BSON(
-        AddShardRequest::mongosAddShard << kConnString << AddShardRequest::shardName << kShardName);
+    BSONObj merizosCmdObj = BSON(
+        AddShardRequest::merizosAddShard << kConnString << AddShardRequest::shardName << kShardName);
 
-    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
+    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
     auto req = swAddShardRequest.getValue();
 
@@ -218,9 +218,9 @@ TEST(AddShardRequest, ToCommandForConfigMissingMaxSize) {
 TEST(AddShardRequest, ValidateLocalHostAllowed) {
     // Using a connection string with localhost should succeed.
     {
-        BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard << kConnString);
+        BSONObj merizosCmdObj = BSON(AddShardRequest::merizosAddShard << kConnString);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
+        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
         ASSERT_OK(swAddShardRequest.getStatus());
         auto req = swAddShardRequest.getValue();
 
@@ -230,9 +230,9 @@ TEST(AddShardRequest, ValidateLocalHostAllowed) {
 
     // Using a connection string with non-localhost hostnames should fail.
     {
-        BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard << kConnStringNonLocalHost);
+        BSONObj merizosCmdObj = BSON(AddShardRequest::merizosAddShard << kConnStringNonLocalHost);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
+        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
         ASSERT_OK(swAddShardRequest.getStatus());
         auto req = swAddShardRequest.getValue();
 
@@ -245,9 +245,9 @@ TEST(AddShardRequest, ValidateLocalHostAllowed) {
 TEST(AddShardRequest, ValidateLocalHostNotAllowed) {
     // Using a connection string with localhost should fail.
     {
-        BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard << kConnString);
+        BSONObj merizosCmdObj = BSON(AddShardRequest::merizosAddShard << kConnString);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
+        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
         ASSERT_OK(swAddShardRequest.getStatus());
         auto req = swAddShardRequest.getValue();
 
@@ -258,9 +258,9 @@ TEST(AddShardRequest, ValidateLocalHostNotAllowed) {
 
     // Using a connection string with non-localhost hostnames should succeed.
     {
-        BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard << kConnStringNonLocalHost);
+        BSONObj merizosCmdObj = BSON(AddShardRequest::merizosAddShard << kConnStringNonLocalHost);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
+        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
         ASSERT_OK(swAddShardRequest.getStatus());
         auto req = swAddShardRequest.getValue();
 
@@ -270,4 +270,4 @@ TEST(AddShardRequest, ValidateLocalHostNotAllowed) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

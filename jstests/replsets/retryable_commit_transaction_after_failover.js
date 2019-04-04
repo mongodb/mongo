@@ -12,7 +12,7 @@
     rst.startSet();
     rst.initiate();
 
-    // Get the connection to the replica set using MongoDB URI.
+    // Get the connection to the replica set using MerizoDB URI.
     const conn = new Mongo(rst.getURL());
     const testDB = conn.getDB(dbName);
     const testColl = testDB[collName];

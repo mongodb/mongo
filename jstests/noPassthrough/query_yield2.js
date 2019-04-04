@@ -13,7 +13,7 @@
         var insertTime;
 
         const conn = MongoRunner.runMongod({nojournal: ""});
-        assert.neq(null, conn, "mongod failed to start.");
+        assert.neq(null, conn, "merizod failed to start.");
         db = conn.getDB("test");
 
         t = db.query_yield2;

@@ -22,7 +22,7 @@
 
     var st = new ShardingTest({
         shards: 0,
-        mongos: 1,
+        merizos: 1,
     });
 
     var configRS = new ReplSetTest({name: "configsvrReplicaSet", nodes: 1});

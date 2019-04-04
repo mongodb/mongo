@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/transport/session.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/dbmessage.h"
+#include "merizo/transport/session.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
- * This is the entrypoint from the transport layer into mongod or mongos.
+ * This is the entrypoint from the transport layer into merizod or merizos.
  *
  * The ServiceEntryPoint accepts new Sessions from the TransportLayer, and is
  * responsible for running these Sessions in a get-Message, run-Message,
@@ -88,4 +88,4 @@ protected:
     ServiceEntryPoint() = default;
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -18,7 +18,7 @@
 #include "asio/detail/config.hpp"
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-#include "mongo/util/net/ssl/detail/openssl_types.hpp"
+#include "merizo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 
 #include "asio/detail/push_options.hpp"

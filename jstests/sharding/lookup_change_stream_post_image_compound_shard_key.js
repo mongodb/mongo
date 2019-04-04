@@ -22,36 +22,36 @@
         }
     });
 
-    const mongosDB = st.s0.getDB(jsTestName());
-    const mongosColl = mongosDB['coll'];
+    const merizosDB = st.s0.getDB(jsTestName());
+    const merizosColl = merizosDB['coll'];
 
-    assert.commandWorked(mongosDB.dropDatabase());
+    assert.commandWorked(merizosDB.dropDatabase());
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.rs0.getURL());
 
     // Shard the test collection with a compound shard key: a, b, c. Then split it into two chunks,
     // and put one chunk on each shard.
-    assert.commandWorked(mongosDB.adminCommand(
-        {shardCollection: mongosColl.getFullName(), key: {a: 1, b: 1, c: 1}}));
+    assert.commandWorked(merizosDB.adminCommand(
+        {shardCollection: merizosColl.getFullName(), key: {a: 1, b: 1, c: 1}}));
 
     // Split the collection into 2 chunks:
     // [{a: MinKey, b: MinKey, c: MinKey}, {a: 1,      b: MinKey, c: MinKey})
     // and
     // [{a: 1,      b: MinKey, c: MinKey}, {a: MaxKey, b: MaxKey, c: MaxKey}).
-    assert.commandWorked(mongosDB.adminCommand(
-        {split: mongosColl.getFullName(), middle: {a: 1, b: MinKey, c: MinKey}}));
+    assert.commandWorked(merizosDB.adminCommand(
+        {split: merizosColl.getFullName(), middle: {a: 1, b: MinKey, c: MinKey}}));
 
     // Move the upper chunk to shard 1.
-    assert.commandWorked(mongosDB.adminCommand({
-        moveChunk: mongosColl.getFullName(),
+    assert.commandWorked(merizosDB.adminCommand({
+        moveChunk: merizosColl.getFullName(),
         find: {a: 1, b: MinKey, c: MinKey},
         to: st.rs1.getURL()
     }));
 
-    const changeStreamSingleColl = mongosColl.watch([], {fullDocument: "updateLookup"});
-    const changeStreamWholeDb = mongosDB.watch([], {fullDocument: "updateLookup"});
+    const changeStreamSingleColl = merizosColl.watch([], {fullDocument: "updateLookup"});
+    const changeStreamWholeDb = merizosDB.watch([], {fullDocument: "updateLookup"});
 
     const nDocs = 6;
     const bValues = ["one", "two", "three", "four", "five", "six"];
@@ -64,8 +64,8 @@
     // Do some writes.
     for (let id = 0; id < nDocs; ++id) {
         const documentKey = Object.merge({_id: id}, shardKeyFromId(id));
-        assert.writeOK(mongosColl.insert(documentKey));
-        assert.writeOK(mongosColl.update(documentKey, {$set: {updatedCount: 1}}));
+        assert.writeOK(merizosColl.insert(documentKey));
+        assert.writeOK(merizosColl.update(documentKey, {$set: {updatedCount: 1}}));
     }
 
     [changeStreamSingleColl, changeStreamWholeDb].forEach(function(changeStream) {
@@ -89,12 +89,12 @@
     // migrated.
     for (let id = 0; id < nDocs; ++id) {
         const documentKey = Object.merge({_id: id}, shardKeyFromId(id));
-        assert.writeOK(mongosColl.update(documentKey, {$set: {updatedCount: 2}}));
+        assert.writeOK(merizosColl.update(documentKey, {$set: {updatedCount: 2}}));
     }
 
     // Move the upper chunk back to shard 0.
-    assert.commandWorked(mongosDB.adminCommand({
-        moveChunk: mongosColl.getFullName(),
+    assert.commandWorked(merizosDB.adminCommand({
+        moveChunk: merizosColl.getFullName(),
         find: {a: 1, b: MinKey, c: MinKey},
         to: st.rs0.getURL()
     }));

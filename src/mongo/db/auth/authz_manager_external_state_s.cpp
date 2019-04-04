@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authz_manager_external_state_s.h"
+#include "merizo/db/auth/authz_manager_external_state_s.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/db/auth/authz_session_external_state_s.h"
-#include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/grid.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/db/auth/authz_session_external_state_s.h"
+#include "merizo/db/auth/user_document_parser.h"
+#include "merizo/db/auth/user_management_commands_parser.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/grid.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/ssl_types.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
 ()->std::unique_ptr<AuthzManagerExternalState> {
@@ -101,7 +101,7 @@ AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(AuthorizationMana
 Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* opCtx,
                                                                       int* outVersion) {
     // NOTE: We are treating the command "{ 'getParameter' : 1, 'authSchemaVersion' : 1 }" as a user
-    // management command since this is the *only* part of mongos that runs this command.
+    // management command since this is the *only* part of merizos that runs this command.
     BSONObj getParameterCmd = BSON("getParameter" << 1 << "authSchemaVersion" << 1);
     BSONObjBuilder builder;
     const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
@@ -340,4 +340,4 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
     return foundRoles.size() > 0;
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -12,7 +12,7 @@ requireSSLProvider(['openssl', 'windows'], function() {
         sslCRLFile: "jstests/libs/crl_client_revoked.pem"
     });
 
-    var mongo = runMongoProgram("mongo",
+    var merizo = runMongoProgram("merizo",
                                 "--port",
                                 md.port,
                                 "--ssl",
@@ -24,6 +24,6 @@ requireSSLProvider(['openssl', 'windows'], function() {
 
     // 1 is the exit code for the shell failing to connect, which is what we want
     // for a successful test.
-    assert(mongo == 1);
+    assert(merizo == 1);
     MongoRunner.stopMongod(md);
 });

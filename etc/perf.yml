@@ -6,7 +6,7 @@ pre:
       params:
         silent: true
         script: |
-          ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 python2; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
+          ${killall_mci|pkill -9 merizod; pkill -9 merizos; pkill -9 merizo; pkill -9 bsondump; pkill -9 merizoimport; pkill -9 merizoexport; pkill -9 merizodump; pkill -9 merizorestore; pkill -9 merizostat; pkill -9 merizofiles; pkill -9 merizotop; pkill -9 merizobridge; pkill -9 merizod-2.6; pkill -9 merizos-2.6; pkill -9 merizo-2.6; pkill -9 bsondump-2.6; pkill -9 merizoimport-2.6; pkill -9 merizoexport-2.6; pkill -9 merizodump-2.6; pkill -9 merizorestore-2.6; pkill -9 merizostat-2.6; pkill -9 merizofiles-2.6; pkill -9 merizotop-2.6; pkill -9 merizobridge-2.6; pkill -9 merizod-2.4; pkill -9 merizos-2.4; pkill -9 merizo-2.4; pkill -9 bsondump-2.4; pkill -9 merizoimport-2.4; pkill -9 merizoexport-2.4; pkill -9 merizodump-2.4; pkill -9 merizorestore-2.4; pkill -9 merizostat-2.4; pkill -9 merizofiles-2.4; pkill -9 merizotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 python2; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
           exit 0
 
 post:
@@ -17,17 +17,17 @@ post:
       params:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
-            local_file: src/mongod.log
-            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/mongod-${build_id}.log
+            local_file: src/merizod.log
+            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/merizod-${build_id}.log
             bucket: mciuploads
             permissions: public-read
             content_type: ${content_type|text/plain}
-            display_name: mongod.log
+            display_name: merizod.log
     - command: shell.exec
       params:
         silent: true
         script: |
-          ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 python2; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
+          ${killall_mci|pkill -9 merizod; pkill -9 merizos; pkill -9 merizo; pkill -9 bsondump; pkill -9 merizoimport; pkill -9 merizoexport; pkill -9 merizodump; pkill -9 merizorestore; pkill -9 merizostat; pkill -9 merizofiles; pkill -9 merizotop; pkill -9 merizobridge; pkill -9 merizod-2.6; pkill -9 merizos-2.6; pkill -9 merizo-2.6; pkill -9 bsondump-2.6; pkill -9 merizoimport-2.6; pkill -9 merizoexport-2.6; pkill -9 merizodump-2.6; pkill -9 merizorestore-2.6; pkill -9 merizostat-2.6; pkill -9 merizofiles-2.6; pkill -9 merizotop-2.6; pkill -9 merizobridge-2.6; pkill -9 merizod-2.4; pkill -9 merizos-2.4; pkill -9 merizo-2.4; pkill -9 bsondump-2.4; pkill -9 merizoimport-2.4; pkill -9 merizoexport-2.4; pkill -9 merizodump-2.4; pkill -9 merizorestore-2.4; pkill -9 merizostat-2.4; pkill -9 merizofiles-2.4; pkill -9 merizotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 python2; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
           exit 0
     - command: shell.exec
       params:
@@ -38,14 +38,14 @@ post:
           # these default values in the distro config in evergreen.
 
           if [ -d "${scons_cache_path}" ]; then
-              /opt/mongodbtoolchain/v3/bin/python2 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+              /opt/merizodbtoolchain/v3/bin/python2 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
 
 
 modules:
 - name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
+  repo: git@github.com:10gen/merizo-enterprise-modules.git
+  prefix: src/merizo/db/modules
   branch: master
 
 
@@ -58,7 +58,7 @@ functions:
           rm -rf ./dsi
           mkdir -p ./src
           git clone git@github.com:10gen/dsi.git
-    # get the mongo source, note the s3.get calls put the
+    # get the merizo source, note the s3.get calls put the
     # exe files in their respective make locations.
     - command: git.get_project
       params:
@@ -73,25 +73,25 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/merizod-${version_id}
         bucket: mciuploads
-        local_file: src/mongod
+        local_file: src/merizod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/merizo-${version_id}
         bucket: mciuploads
-        local_file: src/mongo
+        local_file: src/merizo
     - command: shell.exec
       params:
         working_dir: src
         script: |
           set -e
           set -v
-          chmod +x mongod
-          chmod +x mongo
-          git clone git@github.com:mongodb/mongo-perf.git perf
+          chmod +x merizod
+          chmod +x merizo
+          git clone git@github.com:merizodb/merizo-perf.git perf
           cd perf
           git describe --tags
     - command: shell.exec
@@ -102,7 +102,7 @@ functions:
           set -e
           set -o verbose
           mkdir -p ./dbdata
-          ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
+          ${merizod_exec_wrapper} ./merizod --dbpath ./dbdata ${merizod_flags}
     - command: shell.exec
       params:
         working_dir: src
@@ -114,24 +114,24 @@ functions:
           # if we started a replset, initiate it and wait for it to become primary
           #
           # Note: This process is always currently started with --nojournal (not a recommended production configuration, see
-          #       https://docs.mongodb.com/manual/tutorial/manage-journaling/#disable-journaling).
+          #       https://docs.merizodb.com/manual/tutorial/manage-journaling/#disable-journaling).
           #       As a result, writeConcernMajorityJournalDefault can be set to false. If this becomes configurable later
           #       then the correct value should be passed to rs.initiate or getCmdLineOpts needs to interrogated (but
           #       only after db.createUser).
-          ./mongo --eval "if(db.isMaster().isreplicaset){\
+          ./merizo --eval "if(db.isMaster().isreplicaset){\
                              rs.initiate({_id: 'test', version: 1, members: [ { _id: 0, host : 'localhost:27017' }], writeConcernMajorityJournalDefault:false});\
                              assert.soon(function(){return db.isMaster().ismaster}, 'no primary');\
                           }"
 
           # benchRun() authenticates against the admin db, with a user that must has admin access.
           # Note: This is possibly a legacy requirement from times when it would call serverStatus.
-          # Btw, when mongod is started without --auth, these should be harmless no-ops
-          ./mongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
+          # Btw, when merizod is started without --auth, these should be harmless no-ops
+          ./merizo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
                          [ { role: 'root', db: 'admin' } ] })"\
                            admin
 
           # print the replset config unless this is a standalone
-          ./mongo --eval "if( db.isMaster().hosts ) { printjson(rs.config()); }" --username admin --password password admin
+          ./merizo --eval "if( db.isMaster().hosts ) { printjson(rs.config()); }" --username admin --password password admin
           echo "MONGOD STARTED."
   "analyze":
     - command: shell.exec
@@ -148,7 +148,7 @@ functions:
           cat > bootstrap.yml <<EOF
           infrastructure_provisioning: ${cluster}
           platform: ${platform}
-          mongodb_setup: ${setup}
+          merizodb_setup: ${setup}
           storageEngine: ${storageEngine}
           test_control: ${test}
           production: true
@@ -197,7 +197,7 @@ functions:
           set -o verbose
           source ./venv/bin/activate
 
-          # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
+          # Any tasks that want the analysis scripts to analyze merizod.log files should pass in
           # `reports_analysis: true` as a var to this function. The following line will select the
           # appropriate flags if it's `true`.
           reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
@@ -224,11 +224,11 @@ functions:
           set -v
           source ./venv/bin/activate
           cd perf
-          #  give mongod a few seconds to start up so that we can connect.
+          #  give merizod a few seconds to start up so that we can connect.
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed --username admin --password password
+          ${perf_exec_wrapper} python benchrun.py --shell ../merizo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed --username admin --password password
           echo "Oplog size at end of tests..."
-          ../mongo --username admin --password password --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" admin
+          ../merizo --username admin --password password --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" admin
     - command: "json.send"
       params:
         name: "perf"
@@ -250,7 +250,7 @@ tasks:
           set -o errexit
           set -o verbose
 
-          /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python2 "${workdir}/venv"
+          /opt/merizodbtoolchain/v3/bin/virtualenv --python /opt/merizodbtoolchain/v3/bin/python2 "${workdir}/venv"
           source "${workdir}/venv/bin/activate"
 
           python2 -m pip install -r etc/pip/compile-requirements.txt
@@ -285,27 +285,27 @@ tasks:
           set -o verbose
 
           source "${workdir}/venv/bin/activate"
-          python2 ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo mongod
+          python2 ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} merizo merizod
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongod
-        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
+        local_file: src/merizod
+        remote_file: ${project}/${version_id}/${revision}/merizod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
-        display_name: mongod
+        display_name: merizod
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/build/cached/mongo/mongo
-        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
+        local_file: src/build/cached/merizo/merizo
+        remote_file: ${project}/${version_id}/${revision}/merizo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
-        display_name: mongo
+        display_name: merizo
 - name: query
   depends_on:
   - variant: linux-wt-standalone
@@ -538,15 +538,15 @@ buildvariants:
     # We are explicitly tracking the rhel62 variant compile options from evergreen.yml for
     # microbenchmarks, since they run on the centos6 boxes.  If we can get proper artifacts directly
     # from that project, we should do that and remove the compile tasks.
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    merizod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: >-
+    merizod_flags: >-
       --auth
       --fork
       --inMemoryEngineConfigString 'eviction=(threads_min=1),'
       --inMemorySizeGB 60
-      --logpath ./mongod.log
+      --logpath ./merizod.log
       --networkMessageCompressors noop
       --setParameter diagnosticDataCollectionEnabled=false
       --setParameter enableTestCommands=1
@@ -579,14 +579,14 @@ buildvariants:
   display_name: 1-Node ReplSet Linux inMemory
   batchtime: 90  # 1.5 hours
   expansions:
-    mongod_exec_wrapper: *exec_wrapper
+    merizod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: >-
+    merizod_flags: >-
       --auth
       --fork
       --inMemoryEngineConfigString 'eviction=(threads_min=1),'
       --inMemorySizeGB 60
-      --logpath ./mongod.log
+      --logpath ./merizod.log
       --networkMessageCompressors noop
       --oplogSize 30000
       --replSet test

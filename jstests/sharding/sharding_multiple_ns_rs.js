@@ -9,7 +9,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     load("jstests/replsets/rslib.js");
 
-    var s = new ShardingTest({shards: 1, mongos: 1, other: {rs: true, chunkSize: 1}});
+    var s = new ShardingTest({shards: 1, merizos: 1, other: {rs: true, chunkSize: 1}});
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
@@ -39,7 +39,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     s.rs0.awaitReplication();
     s.rs0.stopMaster(15);
 
-    // Wait for mongos and the config server primary to recognize the new shard primary
+    // Wait for merizos and the config server primary to recognize the new shard primary
     awaitRSClientHosts(db.getMongo(), s.rs0.getPrimary(), {ismaster: true});
     awaitRSClientHosts(db.getMongo(), s.configRS.getPrimary(), {ismaster: true});
 

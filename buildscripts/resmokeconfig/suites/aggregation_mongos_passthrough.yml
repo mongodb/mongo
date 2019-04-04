@@ -6,7 +6,7 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  # The following tests start their own mongod.
+  # The following tests start their own merizod.
   - jstests/aggregation/bugs/cursor_timeout.js
   - jstests/aggregation/bugs/lookup_unwind_getmore.js
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
@@ -27,16 +27,16 @@ executor:
     shell_options:
       # Use an override to error if a test starts its own test fixture since such a test should not
       # be part of this passthrough.
-      eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+      eval: load("jstests/libs/override_methods/detect_spawning_own_merizod.js");
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections
   fixture:
     class: ShardedClusterFixture
-    mongos_options:
+    merizos_options:
       set_parameters:
         enableTestCommands: 1
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1
     enable_sharding:

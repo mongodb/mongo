@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/path_support.h"
+#include "merizo/db/update/path_support.h"
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonelement_comparator.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/mutable_bson_test_utils.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/matcher/expression_leaf.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/merizoutils/str.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 using namespace pathsupport;
-using mongoutils::str::stream;
+using merizoutils::str::stream;
 using mutablebson::Element;
 using std::unique_ptr;
 using std::string;
 
-class EmptyDoc : public mongo::unittest::Test {
+class EmptyDoc : public merizo::unittest::Test {
 public:
     EmptyDoc() : _doc() {}
 
@@ -129,7 +129,7 @@ TEST_F(EmptyDoc, NewPath) {
     ASSERT_EQUALS(fromjson("{a: {b: {c: 1}}}"), doc());
 }
 
-class SimpleDoc : public mongo::unittest::Test {
+class SimpleDoc : public merizo::unittest::Test {
 public:
     SimpleDoc() : _doc() {}
 
@@ -231,7 +231,7 @@ TEST_F(SimpleDoc, CreatePathAtFailsIfElemFoundIsNonObjectNonArray) {
     ASSERT_EQ(result.getStatus().reason(), "Cannot create field 'b' in element {a: 1}");
 }
 
-class NestedDoc : public mongo::unittest::Test {
+class NestedDoc : public merizo::unittest::Test {
 public:
     NestedDoc() : _doc() {}
 
@@ -344,7 +344,7 @@ TEST_F(NestedDoc, NotStartingFromRoot) {
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"], nullptr), 0);
 }
 
-class ArrayDoc : public mongo::unittest::Test {
+class ArrayDoc : public merizo::unittest::Test {
 public:
     ArrayDoc() : _doc() {}
 
@@ -509,7 +509,7 @@ TEST_F(ArrayDoc, ArrayPaddingNecessary) {
 TEST_F(ArrayDoc, ExcessivePaddingRequested) {
     // Try to create an array item beyond what we're allowed to pad. The index is two beyond the max
     // padding since the array already has one element.
-    string paddedField = stream() << "b." << mongo::pathsupport::kMaxPaddingAllowed + 2;
+    string paddedField = stream() << "b." << merizo::pathsupport::kMaxPaddingAllowed + 2;
     setField(paddedField);
 
     size_t idxFound;
@@ -527,14 +527,14 @@ TEST_F(ArrayDoc, ExcessivePaddingRequested) {
 
 TEST_F(ArrayDoc, ExcessivePaddingNotRequestedIfArrayAlreadyPadded) {
     // We will try to set an array element whose index is 5 beyond the max padding.
-    string paddedField = stream() << "a." << mongo::pathsupport::kMaxPaddingAllowed + 5;
+    string paddedField = stream() << "a." << merizo::pathsupport::kMaxPaddingAllowed + 5;
     setField(paddedField);
 
     // Add 5 elements to the array.
     for (size_t i = 0; i < 5; ++i) {
         Element arrayA = doc().root().leftChild();
         ASSERT_EQ(arrayA.getFieldName(), "a");
-        ASSERT_EQ(arrayA.getType(), mongo::Array);
+        ASSERT_EQ(arrayA.getType(), merizo::Array);
         arrayA.appendInt("", 1).transitional_ignore();
     }
 
@@ -551,13 +551,13 @@ TEST_F(ArrayDoc, ExcessivePaddingNotRequestedIfArrayAlreadyPadded) {
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(
         firstNewElem.getValue().compareWithElement(
-            root()["a"].findNthChild(mongo::pathsupport::kMaxPaddingAllowed + 5), nullptr),
+            root()["a"].findNthChild(merizo::pathsupport::kMaxPaddingAllowed + 5), nullptr),
         0);
 
     // Array should now have maxPadding + 6 elements, since the highest array index is maxPadding +
     // 5. maxPadding of these elements are nulls adding as padding, 5 were appended at the
     // beginning, and 1 was added by createPathAt().
-    ASSERT_EQ(countChildren(doc().root().leftChild()), mongo::pathsupport::kMaxPaddingAllowed + 6);
+    ASSERT_EQ(countChildren(doc().root().leftChild()), merizo::pathsupport::kMaxPaddingAllowed + 6);
 }
 
 TEST_F(ArrayDoc, NonNumericPathInArray) {

@@ -22,7 +22,7 @@
     // PlanExecutor.
     const options = {setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'};
     const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+    assert.neq(null, conn, 'merizod was unable to start up with options: ' + tojson(options));
 
     const testDB = conn.getDB('test');
 
@@ -380,5 +380,5 @@
     // Test that a cursor will properly be cleaned up on server shutdown.
     setup();
     res = assert.commandWorked(testDB.runCommand(defaultAggregateCmdSmallBatch));
-    assert.eq(0, MongoRunner.stopMongod(conn), 'expected mongod to shutdown cleanly');
+    assert.eq(0, MongoRunner.stopMongod(conn), 'expected merizod to shutdown cleanly');
 })();

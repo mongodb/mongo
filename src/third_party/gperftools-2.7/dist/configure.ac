@@ -158,7 +158,7 @@ AS_IF([test "x$enable_tcmalloc_unclamped_transfer_sizes" = "xyes"],
                           [A detail of the "blocks_to_move" loop of "SizeMap::Init"])],
       [])
 
-# MongoDB modification needed because we don't run configure everywhere we build.
+# MerizoDB modification needed because we don't run configure everywhere we build.
 # We don't use mallinfo anyway. It's an obsolete int-based stats API.
 AC_ARG_ENABLE([tcmalloc-mallinfo],
               [AS_HELP_STRING([--disable-tcmalloc-mallinfo],

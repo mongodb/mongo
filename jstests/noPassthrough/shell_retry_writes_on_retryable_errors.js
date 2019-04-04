@@ -1,5 +1,5 @@
 /**
- * Tests that the mongo shell retries exactly once on retryable errors.
+ * Tests that the merizo shell retries exactly once on retryable errors.
  *
  * @tags: [requires_replication]
  */
@@ -23,16 +23,16 @@
     const rsConn = new Mongo(rst.getURL());
     const db = rsConn.startSession({retryWrites: true}).getDatabase(dbName);
 
-    // We configure the mongo shell to log its retry attempts so there are more diagnostics
+    // We configure the merizo shell to log its retry attempts so there are more diagnostics
     // available in case this test ever fails.
     TestData.logRetryAttempts = true;
 
     /**
      * The testCommandIsRetried() function serves as the fixture for writing test cases which run
-     * commands against the server and assert that the mongo shell retries them correctly.
+     * commands against the server and assert that the merizo shell retries them correctly.
      *
      * The 'testFn' parameter is a function that performs an arbitrary number of operations against
-     * the database. The command requests that the mongo shell attempts to send to the server
+     * the database. The command requests that the merizo shell attempts to send to the server
      * (including any command requests which are retried) are then specified as the sole argument to
      * the 'assertFn' parameter.
      *
@@ -41,7 +41,7 @@
      * parameters, respectively.
      */
     function testCommandIsRetried(testFn, assertFn) {
-        const mongoRunCommandOriginal = Mongo.prototype.runCommand;
+        const merizoRunCommandOriginal = Mongo.prototype.runCommand;
         const cmdObjsSeen = [];
 
         let shouldCaptureCmdObjs = true;
@@ -51,7 +51,7 @@
                 cmdObjsSeen.push(cmdObj);
             }
 
-            return mongoRunCommandOriginal.apply(this, arguments);
+            return merizoRunCommandOriginal.apply(this, arguments);
         };
 
         try {
@@ -63,7 +63,7 @@
                                         shouldCaptureCmdObjs = false;
                                     }));
         } finally {
-            Mongo.prototype.runCommand = mongoRunCommandOriginal;
+            Mongo.prototype.runCommand = merizoRunCommandOriginal;
         }
 
         if (cmdObjsSeen.length === 0) {

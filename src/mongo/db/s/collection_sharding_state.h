@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,20 +29,20 @@
 
 #pragma once
 
-#include "mongo/db/logical_time.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/s/sharding_state_lock.h"
+#include "merizo/db/logical_time.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/s/scoped_collection_metadata.h"
+#include "merizo/db/s/sharding_migration_critical_section.h"
+#include "merizo/db/s/sharding_state_lock.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
- * Each collection on a mongod instance is dynamically assigned two pieces of information for the
+ * Each collection on a merizod instance is dynamically assigned two pieces of information for the
  * duration of its lifetime:
  *  CollectionShardingState - this is a passive data-only state, which represents what is the
  * shard's knowledge of its the shard version and the set of chunks that it owns.
- *  CollectionShardingRuntime (missing from the embedded mongod) - this is the heavyweight machinery
+ *  CollectionShardingRuntime (missing from the embedded merizod) - this is the heavyweight machinery
  * which implements the sharding protocol functions and is what controls the data-only state.
  *
  * The CollectionShardingStateFactory class below is used in order to allow for the collection
@@ -164,7 +164,7 @@ private:
      * known
      */
     virtual boost::optional<ScopedCollectionMetadata> _getMetadata(
-        const boost::optional<mongo::LogicalTime>& atClusterTime) = 0;
+        const boost::optional<merizo::LogicalTime>& atClusterTime) = 0;
 };
 
 /**
@@ -198,4 +198,4 @@ protected:
     ServiceContext* const _serviceContext;
 };
 
-}  // namespace mongo
+}  // namespace merizo

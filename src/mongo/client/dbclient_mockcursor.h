@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,18 +29,18 @@
 
 #pragma once
 
-#include "mongo/client/dbclient_cursor.h"
+#include "merizo/client/dbclient_cursor.h"
 
-namespace mongo {
+namespace merizo {
 // DBClientMockCursor supports only a small subset of DBClientCursor operations.
 // It supports only iteration, including use of DBClientCursorBatchIterator.  If a batchsize
 // is given, iteration is broken up into multiple batches at batchSize boundaries.
 class DBClientMockCursor : public DBClientCursor {
 public:
-    DBClientMockCursor(mongo::DBClientBase* client,
+    DBClientMockCursor(merizo::DBClientBase* client,
                        const BSONArray& mockCollection,
                        unsigned long batchSize = 0)
-        : mongo::DBClientCursor(client, NamespaceString(), 0, 0, 0),
+        : merizo::DBClientCursor(client, NamespaceString(), 0, 0, 0),
           _collectionArray(mockCollection),
           _iter(_collectionArray),
           _batchSize(batchSize) {
@@ -78,4 +78,4 @@ private:
     DBClientMockCursor& operator=(const DBClientMockCursor&);
 };
 
-}  // namespace mongo
+}  // namespace merizo

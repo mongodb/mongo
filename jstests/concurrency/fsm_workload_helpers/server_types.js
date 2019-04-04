@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Returns true if the process is a mongos, and false otherwise.
+ * Returns true if the process is a merizos, and false otherwise.
  *
  */
 function isMongos(db) {
@@ -12,7 +12,7 @@ function isMongos(db) {
 }
 
 /**
- * Returns true if the process is a mongod, and false otherwise.
+ * Returns true if the process is a merizod, and false otherwise.
  *
  */
 function isMongod(db) {
@@ -20,7 +20,7 @@ function isMongod(db) {
 }
 
 /**
- * Returns true if the process is a mongod configsvr, and false otherwise.
+ * Returns true if the process is a merizod configsvr, and false otherwise.
  *
  */
 function isMongodConfigsvr(db) {
@@ -36,13 +36,13 @@ function isMongodConfigsvr(db) {
 /**
  * Returns the name of the current storage engine.
  *
- * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
+ * Throws an error if db is connected to a merizos, or if there is no reported storage engine.
  */
 function getStorageEngineName(db) {
     var status = db.serverStatus();
     assert.commandWorked(status);
 
-    assert(isMongod(db), 'no storage engine is reported when connected to mongos');
+    assert(isMongod(db), 'no storage engine is reported when connected to merizos');
     assert.neq(
         'undefined', typeof status.storageEngine, 'missing storage engine info in server status');
 
@@ -83,13 +83,13 @@ function supportsDocumentLevelConcurrency(db) {
 /**
  * Returns true if the current storage engine supports committed reads.
  *
- * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
+ * Throws an error if db is connected to a merizos, or if there is no reported storage engine.
  */
 function supportsCommittedReads(db) {
     var status = db.serverStatus();
     assert.commandWorked(status);
 
-    assert(isMongod(db), 'no storage engine is reported when connected to mongos');
+    assert(isMongod(db), 'no storage engine is reported when connected to merizos');
     assert.neq(
         'undefined', typeof status.storageEngine, 'missing storage engine info in server status');
 

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,39 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/explain.h"
+#include "merizo/db/query/explain.h"
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/exec/cached_plan.h"
-#include "mongo/db/exec/count_scan.h"
-#include "mongo/db/exec/distinct_scan.h"
-#include "mongo/db/exec/idhack.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/near.h"
-#include "mongo/db/exec/pipeline_proxy.h"
-#include "mongo/db/exec/text.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_settings.h"
-#include "mongo/db/query/stage_builder.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/version.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/exec/cached_plan.h"
+#include "merizo/db/exec/count_scan.h"
+#include "merizo/db/exec/distinct_scan.h"
+#include "merizo/db/exec/idhack.h"
+#include "merizo/db/exec/index_scan.h"
+#include "merizo/db/exec/multi_plan.h"
+#include "merizo/db/exec/near.h"
+#include "merizo/db/exec/pipeline_proxy.h"
+#include "merizo/db/exec/text.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/query/canonical_query_encoder.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/query_settings.h"
+#include "merizo/db/query/stage_builder.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/version.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -294,9 +294,9 @@ unique_ptr<PlanStageStats> getWinningPlanStatsTree(const PlanExecutor* exec) {
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
-using mongoutils::str::stream;
+using merizoutils::str::stream;
 
 // static
 void Explain::statsToBSON(const PlanStageStats& stats,
@@ -1057,4 +1057,4 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
     out->append("indexFilterSet", entry.plannerData[0]->indexFilterApplied);
 }
 
-}  // namespace mongo
+}  // namespace merizo

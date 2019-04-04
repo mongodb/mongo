@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/logger/console.h"
+#include "merizo/logger/console.h"
 
 #include <iostream>
 
-#include "mongo/base/init.h"
-#include "mongo/config.h"
+#include "merizo/base/init.h"
+#include "merizo/config.h"
 
 #ifdef _WIN32
 #include <io.h>
 #endif
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 stdx::mutex& consoleMutex() {
@@ -252,7 +252,7 @@ Console::Console() : _consoleLock() {
     // that we create this at the right time. Some systems (like
     // VS2013 and older), don't actually implement magic statics
     // yet. But that is OK! We ensure that this is called from
-    // single-threaded context via a mongo initializer above.
+    // single-threaded context via a merizo initializer above.
     static const std::ios_base::Init initializeCout;
 
     stdx::unique_lock<stdx::mutex> lk(consoleMutex());
@@ -270,4 +270,4 @@ std::ostream& Console::out() {
     return std::cout;
 }
 
-}  // namespace mongo
+}  // namespace merizo

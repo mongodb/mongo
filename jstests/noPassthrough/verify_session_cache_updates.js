@@ -61,13 +61,13 @@
     }
 
     {
-        var mongod = MongoRunner.runMongod({nojournal: ""});
-        runTest(mongod);
-        MongoRunner.stopMongod(mongod);
+        var merizod = MongoRunner.runMongod({nojournal: ""});
+        runTest(merizod);
+        MongoRunner.stopMongod(merizod);
     }
 
     {
-        var st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+        var st = new ShardingTest({shards: 1, merizos: 1, config: 1});
         runTest(st.s0);
         st.stop();
     }

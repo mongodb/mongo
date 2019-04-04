@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -39,20 +39,20 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
-#include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/inline_decls.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/itoa.h"
-#include "mongo/util/shared_buffer.h"
+#include "merizo/base/data_type_endian.h"
+#include "merizo/base/data_view.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/bson/inline_decls.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/stdx/type_traits.h"
+#include "merizo/util/allocator.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/itoa.h"
+#include "merizo/util/shared_buffer.h"
 
-namespace mongo {
+namespace merizo {
 
 /* Note the limit here is rather arbitrary and is simply a standard. generally the code works
    with any object that fits in ram.
@@ -123,16 +123,16 @@ public:
     enum { SZ = 512 };
     void malloc(size_t sz) {
         if (sz > SZ)
-            _ptr = mongoMalloc(sz);
+            _ptr = merizoMalloc(sz);
     }
     void realloc(size_t sz) {
         if (_ptr == _buf) {
             if (sz > SZ) {
-                _ptr = mongoMalloc(sz);
+                _ptr = merizoMalloc(sz);
                 memcpy(_ptr, _buf, SZ);
             }
         } else {
-            _ptr = mongoRealloc(_ptr, sz);
+            _ptr = merizoRealloc(_ptr, sz);
         }
     }
     void free() {
@@ -536,4 +536,4 @@ private:
 
 typedef StringBuilderImpl<SharedBufferAllocator> StringBuilder;
 typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
-}  // namespace mongo
+}  // namespace merizo

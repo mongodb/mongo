@@ -22,7 +22,7 @@ env.Library(
         'field_path.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         ]
     )
 
@@ -45,9 +45,9 @@ env.Library(
         ],
     LIBDEPS=[
         'field_path',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
-        '$BUILD_DIR/mongo/util/intrusive_counter',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/query/datetime/date_time_support',
+        '$BUILD_DIR/merizo/util/intrusive_counter',
         ]
     )
 
@@ -57,7 +57,7 @@ env.Library(
         'document_value_test_util.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/unittest/unittest',
         'document_value',
     ],
 )
@@ -72,7 +72,7 @@ env.CppUnitTest(
         'value_comparator_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
         'document_value',
         'document_value_test_util',
         ],
@@ -84,14 +84,14 @@ env.Library(
         'aggregation_request.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/explain_options',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/query/command_request_response',
+        '$BUILD_DIR/merizo/db/query/explain_options',
+        '$BUILD_DIR/merizo/db/query/query_request',
+        '$BUILD_DIR/merizo/db/repl/read_concern_args',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/write_concern_options',
         'document_sources_idl',
         'document_value',
     ]
@@ -114,9 +114,9 @@ env.Library(
     ],
     LIBDEPS=[
         'aggregation_request',
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/intrusive_counter',
+        '$BUILD_DIR/merizo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/util/intrusive_counter',
     ]
 )
 
@@ -138,10 +138,10 @@ env.Library(
         'expression_trigonometric.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/util/regex_util',
-        '$BUILD_DIR/mongo/util/summation',
+        '$BUILD_DIR/merizo/db/query/datetime/date_time_support',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/util/regex_util',
+        '$BUILD_DIR/merizo/util/summation',
         'dependencies',
         'document_value',
         'expression_context',
@@ -164,7 +164,7 @@ env.Library(
         ],
     LIBDEPS=[
         'document_value',
-        '$BUILD_DIR/mongo/util/summation',
+        '$BUILD_DIR/merizo/util/summation',
         'expression',
         'field_path',
     ]
@@ -190,7 +190,7 @@ env.Library(
         'document_source_mock.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'pipeline',
     ]
 )
@@ -202,9 +202,9 @@ env.Library(
     ],
     LIBDEPS=[
         'aggregation',
-        '$BUILD_DIR/mongo/s/async_requests_sender',
-        '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
-        '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
+        '$BUILD_DIR/merizo/s/async_requests_sender',
+        '$BUILD_DIR/merizo/s/query/cluster_aggregation_planner',
+        '$BUILD_DIR/merizo/s/commands/shared_cluster_commands',
     ],
 )
 
@@ -242,14 +242,14 @@ env.CppUnitTest(
         'sequential_document_cache_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/oplog_entry',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/s/query/router_exec_stage',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/repl/oplog_entry',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/merizo/s/query/router_exec_stage',
+        '$BUILD_DIR/merizo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/merizo/util/clock_source_mock',
         'document_source_mock',
         'document_value_test_util',
         'pipeline',
@@ -260,9 +260,9 @@ env.CppUnitTest(
     target='document_source_facet_test',
     source='document_source_facet_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/s/is_merizos',
         'pipeline',
         'document_source_mock',
         'document_value_test_util',
@@ -281,24 +281,24 @@ env.Library(
 )
 
 env.Library(
-    target='mongo_process_interface',
+    target='merizo_process_interface',
     source=[
-        'mongo_process_interface.cpp',
+        'merizo_process_interface.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
 env.Library(
-    target='mongo_process_common',
+    target='merizo_process_common',
     source=[
-        'mongo_process_common.cpp',
+        'merizo_process_common.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/generic_cursor',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/generic_cursor',
+        '$BUILD_DIR/merizo/s/sharding_router_api',
         'field_path',
     ]
 )
@@ -309,15 +309,15 @@ env.Library(
         'process_interface_standalone.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/repl/speculative_majority_read_info',
-        'mongo_process_common',
+        '$BUILD_DIR/merizo/db/ops/write_ops_exec',
+        '$BUILD_DIR/merizo/db/query_exec',
+        '$BUILD_DIR/merizo/db/repl/speculative_majority_read_info',
+        'merizo_process_common',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/session_catalog',
-        '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
-        '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/merizo/db/session_catalog',
+        '$BUILD_DIR/merizo/db/storage/backup_cursor_hooks',
+        '$BUILD_DIR/merizo/db/transaction',
     ],
 )
 
@@ -327,32 +327,32 @@ env.Library(
         'process_interface_shardsvr.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/s/sharding_api',
+        '$BUILD_DIR/merizo/db/transaction',
+        '$BUILD_DIR/merizo/s/sharding_api',
         'process_interface_standalone',
         'sharded_agg_helpers',
     ],
 )
 
 env.Library(
-    target='mongos_process_interface',
+    target='merizos_process_interface',
     source=[
-        'mongos_process_interface.cpp',
+        'merizos_process_interface.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/s/query/async_results_merger',
-        '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
-        '$BUILD_DIR/mongo/s/query/cluster_query',
-        'mongo_process_common',
+        '$BUILD_DIR/merizo/db/pipeline/pipeline',
+        '$BUILD_DIR/merizo/s/query/async_results_merger',
+        '$BUILD_DIR/merizo/s/query/cluster_aggregation_planner',
+        '$BUILD_DIR/merizo/s/query/cluster_query',
+        'merizo_process_common',
         'sharded_agg_helpers',
     ]
 )
 
 env.Library(
-    target="process_interface_factory_mongod",
+    target="process_interface_factory_merizod",
     source=[
-        "process_interface_factory_mongod.cpp",
+        "process_interface_factory_merizod.cpp",
     ],
     LIBDEPS_PRIVATE=[
         'process_interface_shardsvr',
@@ -412,28 +412,28 @@ pipelineeEnv.Library(
         'tee_buffer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
-        '$BUILD_DIR/mongo/db/generic_cursor',
-        '$BUILD_DIR/mongo/db/index/key_generator',
-        '$BUILD_DIR/mongo/db/logical_session_cache',
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
-        '$BUILD_DIR/mongo/db/repl/oplog_entry',
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/speculative_majority_read_info',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/sessions_collection',
-        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/merizo/client/clientdriver_minimal',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/bson/dotted_path_support',
+        '$BUILD_DIR/merizo/db/curop',
+        '$BUILD_DIR/merizo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/merizo/db/generic_cursor',
+        '$BUILD_DIR/merizo/db/index/key_generator',
+        '$BUILD_DIR/merizo/db/logical_session_cache',
+        '$BUILD_DIR/merizo/db/logical_session_id_helpers',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/pipeline/lite_parsed_document_source',
+        '$BUILD_DIR/merizo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface',
+        '$BUILD_DIR/merizo/db/repl/oplog_entry',
+        '$BUILD_DIR/merizo/db/repl/read_concern_args',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/speculative_majority_read_info',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/sessions_collection',
+        '$BUILD_DIR/merizo/db/storage/encryption_hooks',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/s/is_merizos',
         '$BUILD_DIR/third_party/shim_snappy',
         'accumulator',
         'dependencies',
@@ -445,8 +445,8 @@ pipelineeEnv.Library(
         'parsed_aggregation_projection',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/rpc/command_status',
     ]
 )
 
@@ -454,8 +454,8 @@ env.CppUnitTest(
     target='tee_buffer_test',
     source='tee_buffer_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/s/is_merizos',
         'document_source_mock',
         'document_value_test_util',
     ],
@@ -470,8 +470,8 @@ env.CppUnitTest(
         'expression_trigonometric_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
         'accumulator',
         'document_value_test_util',
         'expression',
@@ -482,8 +482,8 @@ env.CppUnitTest(
     target='accumulator_test',
     source='accumulator_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'accumulator',
         'document_value_test_util',
         ],
@@ -496,12 +496,12 @@ env.CppUnitTest(
         'pipeline_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/s/is_mongos',
-        '$BUILD_DIR/mongo/s/query/cluster_aggregate',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/s/is_merizos',
+        '$BUILD_DIR/merizo/s/query/cluster_aggregate',
         'document_source_mock',
         'document_value_test_util',
         'pipeline',
@@ -514,8 +514,8 @@ env.CppUnitTest(
         'lookup_set_cache_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
         'document_value',
     ]
 )
@@ -532,7 +532,7 @@ env.Library(
     LIBDEPS=[
         'expression',
         'field_path',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
     ]
 )
 
@@ -540,7 +540,7 @@ env.CppUnitTest(
     target='parsed_exclusion_projection_test',
     source='parsed_exclusion_projection_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'document_value_test_util',
         'parsed_aggregation_projection',
     ],
@@ -550,7 +550,7 @@ env.CppUnitTest(
     target='parsed_aggregation_projection_test',
     source='parsed_aggregation_projection_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'parsed_aggregation_projection',
     ],
 )
@@ -559,7 +559,7 @@ env.CppUnitTest(
     target='parsed_inclusion_projection_test',
     source='parsed_inclusion_projection_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'document_value_test_util',
         'parsed_aggregation_projection',
     ],
@@ -572,7 +572,7 @@ env.CppUnitTest(
         'granularity_rounder_preferred_numbers_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'document_value_test_util',
         'granularity_rounder',
     ],
@@ -582,7 +582,7 @@ env.CppUnitTest(
     target='parsed_add_fields_test',
     source='parsed_add_fields_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'document_value_test_util',
         'parsed_aggregation_projection',
     ],
@@ -599,10 +599,10 @@ env.Library(
         'resume_token.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/storage/key_string',
+        '$BUILD_DIR/merizo/idl/idl_parser',
+        '$BUILD_DIR/merizo/s/common_s',
         'document_value',
     ],
 )
@@ -611,7 +611,7 @@ env.CppUnitTest(
     target='resume_token_test',
     source='resume_token_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
         'document_sources_idl',
     ],
 )

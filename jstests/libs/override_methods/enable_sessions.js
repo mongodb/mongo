@@ -27,7 +27,7 @@
         }
 
         if (!cmdObjUnwrapped.hasOwnProperty("lsid")) {
-            // TODO: SERVER-30848 fixes getMore requests to use a session in the mongo shell.
+            // TODO: SERVER-30848 fixes getMore requests to use a session in the merizo shell.
             // Until that happens, we bypass throwing an error for getMore and only throw an error
             // for other requests not using sessions.
             if (cmdName !== "getMore") {

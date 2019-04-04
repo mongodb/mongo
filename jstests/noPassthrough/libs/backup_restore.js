@@ -6,7 +6,7 @@
  * - fsyncLock, stop or open a backupCursor on a Secondary
  * - cp (or rsync) DB files
  * - fsyncUnlock, start or close a backupCursor on the Secondary
- * - Start mongod as hidden secondary
+ * - Start merizod as hidden secondary
  * - Wait until new hidden node becomes secondary
  *
  * @param {Object} options An object with the following fields:
@@ -107,9 +107,9 @@ var BackupRestoreTest = function(options) {
             }
         };
 
-        // Returns the pid of the started mongo shell so the CRUD test client can be terminated
+        // Returns the pid of the started merizo shell so the CRUD test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect(MongoRunner.mongoShellPath,
+        return startMongoProgramNoConnect(MongoRunner.merizoShellPath,
                                           '--eval',
                                           '(' + crudClientCmds + ')("' + dbName + '", "' +
                                               collectionName + '", ' + numNodes + ')',
@@ -123,8 +123,8 @@ var BackupRestoreTest = function(options) {
         // Launch FSM client
         const suite = 'concurrency_replication_for_backup_restore';
         const resmokeCmd = 'python buildscripts/resmoke.py --shuffle --continueOnFailure' +
-            ' --repeat=99999 --mongo=' + MongoRunner.mongoShellPath +
-            ' --shellConnString=mongodb://' + host + ' --suites=' + suite;
+            ' --repeat=99999 --merizo=' + MongoRunner.merizoShellPath +
+            ' --shellConnString=merizodb://' + host + ' --suites=' + suite;
 
         // Returns the pid of the FSM test client so it can be terminated without waiting for its
         // execution to finish.
@@ -164,7 +164,7 @@ var BackupRestoreTest = function(options) {
         // Set the dbpath for the replica set
         var dbpathPrefix = MongoRunner.dataPath + 'backupRestore';
         resetDbpath(dbpathPrefix);
-        var dbpathFormat = dbpathPrefix + '/mongod-$port';
+        var dbpathFormat = dbpathPrefix + '/merizod-$port';
 
         // Start numNodes node replSet
         var rst = new ReplSetTest({
@@ -213,7 +213,7 @@ var BackupRestoreTest = function(options) {
 
         // Configure new hidden secondary
         var dbpathSecondary = secondary.dbpath;
-        var hiddenDbpath = dbpathPrefix + '/mongod-hiddensecondary';
+        var hiddenDbpath = dbpathPrefix + '/merizod-hiddensecondary';
         resetDbpath(hiddenDbpath);
 
         var sourcePath = dbpathSecondary + "/";
@@ -241,7 +241,7 @@ var BackupRestoreTest = function(options) {
 
             dbHash = secondary.getDB(crudDb).runCommand({dbhash: 1}).md5;
             copyDbpath(dbpathSecondary, hiddenDbpath);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + '/merizod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
@@ -256,23 +256,23 @@ var BackupRestoreTest = function(options) {
                 sleep(10000);
             }
 
-            // Stop the mongod process
+            // Stop the merizod process
             rst.stop(secondary.nodeId);
 
             // One final rsync
             _runCmd(rsyncCmd);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + '/merizod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
             assert.gt(copiedFiles.length, 0, testName + ' no files copied');
             rst.start(secondary.nodeId, {}, true);
         } else if (options.backup == 'stopStart') {
-            // Stop the mongod process
+            // Stop the merizod process
             rst.stop(secondary.nodeId);
 
             copyDbpath(dbpathSecondary, hiddenDbpath);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + '/merizod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));

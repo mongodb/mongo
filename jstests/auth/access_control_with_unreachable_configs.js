@@ -1,5 +1,5 @@
-// Validates that, when it cannot reach a config server, mongos assumes that the
-// localhost exception does not apply.  That is, if mongos cannot verify that there
+// Validates that, when it cannot reach a config server, merizos assumes that the
+// localhost exception does not apply.  That is, if merizos cannot verify that there
 // are user documents stored in the configuration information, it must assume that
 // there are.
 // @tags: [requires_sharding]
@@ -7,24 +7,24 @@
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 var st = new ShardingTest({
     shards: 1,
-    mongos: 1,
+    merizos: 1,
     config: 1,
     keyFile: 'jstests/libs/key1',
     useHostname: false,  // Needed when relying on the localhost exception
-    other: {mongosOptions: {verbose: 1}, shardAsReplicaSet: false}
+    other: {merizosOptions: {verbose: 1}, shardAsReplicaSet: false}
 });
-var mongos = st.s;
+var merizos = st.s;
 var config = st.config0;
 var authzErrorCode = 13;
 
 // set up user/pwd on admin db with clusterAdmin role (for serverStatus)
-var conn = new Mongo(mongos.host);
+var conn = new Mongo(merizos.host);
 var db = conn.getDB('admin');
 db.createUser({user: 'user', pwd: 'pwd', roles: ['clusterAdmin']});
 db.auth('user', 'pwd');
 
-// open a new connection to mongos (unauthorized)
-var conn = new Mongo(mongos.host);
+// open a new connection to merizos (unauthorized)
+var conn = new Mongo(merizos.host);
 db = conn.getDB('admin');
 
 // first serverStatus should fail since user is not authorized
@@ -39,8 +39,8 @@ jsTest.log('repeat without config server');
 // shut down only config server
 MongoRunner.stopMongod(config);
 
-// open a new connection to mongos (unauthorized)
-var conn2 = new Mongo(mongos.host);
+// open a new connection to merizos (unauthorized)
+var conn2 = new Mongo(merizos.host);
 var db2 = conn2.getDB('admin');
 
 // should fail since user is not authorized.

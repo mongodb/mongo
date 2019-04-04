@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,13 +31,13 @@
 
 #include <string>
 
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_view.h"
-#include "mongo/base/static_assert.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/data_range.h"
+#include "merizo/base/data_view.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 class SecureRandom;
 
 /**
@@ -252,7 +252,7 @@ inline StringBuilder& operator<<(StringBuilder& s, const OID& o) {
 }
 
 /** Formatting mode for generating JSON from BSON.
-    See <http://dochub.mongodb.org/core/mongodbextendedjson>
+    See <http://dochub.merizodb.org/core/merizodbextendedjson>
     for details.
 */
 enum JsonStringFormat {
@@ -276,4 +276,4 @@ inline bool operator<=(const OID& lhs, const OID& rhs) {
     return lhs.compare(rhs) <= 0;
 }
 
-}  // namespace mongo
+}  // namespace merizo

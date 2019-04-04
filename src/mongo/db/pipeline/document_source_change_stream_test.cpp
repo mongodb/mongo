@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_change_stream_transform.h"
-#include "mongo/db/pipeline/document_source_check_resume_token.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/json.h"
+#include "merizo/db/catalog/collection_mock.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/pipeline/aggregation_context_fixture.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_change_stream.h"
+#include "merizo/db/pipeline/document_source_change_stream_transform.h"
+#include "merizo/db/pipeline/document_source_check_resume_token.h"
+#include "merizo/db/pipeline/document_source_limit.h"
+#include "merizo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/document_source_mock.h"
+#include "merizo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
+#include "merizo/db/pipeline/stub_merizo_process_interface.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/db/pipeline/value_comparator.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using boost::intrusive_ptr;
@@ -132,7 +132,7 @@ public:
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.toBSON(), spec);
         auto closeCursor = stages.back();
 
-        getExpCtx()->mongoProcessInterface =
+        getExpCtx()->merizoProcessInterface =
             stdx::make_unique<MockMongoInterface>(docKeyFields, preparedTransaction);
 
         auto next = closeCursor->getNext();
@@ -159,7 +159,7 @@ public:
         list<intrusive_ptr<DocumentSource>> result =
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
         vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
-        getExpCtx()->mongoProcessInterface =
+        getExpCtx()->merizoProcessInterface =
             stdx::make_unique<MockMongoInterface>(std::vector<FieldPath>{});
 
         // This match stage is a DocumentSourceOplogMatch, which we explicitly disallow from
@@ -1339,7 +1339,7 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
 
     auto stages = makeStages(insert.toBSON(), kDefaultSpec);
 
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
 
     getExpCtx()->mergeByPBRT = false;
@@ -1364,7 +1364,7 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfMergeByPBRTIsTrue) {
 
     auto stages = makeStages(insert.toBSON(), kDefaultSpec);
 
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
 
     getExpCtx()->mergeByPBRT = true;
@@ -1389,7 +1389,7 @@ TEST_F(ChangeStreamStageTest, UsesOldSortKeyFormatIfMergeByPBRTIsFalse) {
 
     auto stages = makeStages(insert.toBSON(), kDefaultSpec);
 
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
 
     getExpCtx()->mergeByPBRT = false;
@@ -1912,4 +1912,4 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

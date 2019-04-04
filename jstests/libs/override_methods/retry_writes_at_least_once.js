@@ -16,15 +16,15 @@
     // Store a session to access ServerSession#canRetryWrites.
     let _serverSession;
 
-    const mongoRunCommandOriginal = Mongo.prototype.runCommand;
-    const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
+    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
+    const merizoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
     Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
         if (typeof _serverSession === "undefined") {
             _serverSession = this.startSession()._serverSession;
         }
 
-        return runWithRetries(this, cmdObj, mongoRunCommandOriginal, arguments);
+        return runWithRetries(this, cmdObj, merizoRunCommandOriginal, arguments);
     };
 
     Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
@@ -33,10 +33,10 @@
             _serverSession = this.startSession()._serverSession;
         }
 
-        return runWithRetries(this, cmdObj, mongoRunCommandWithMetadataOriginal, arguments);
+        return runWithRetries(this, cmdObj, merizoRunCommandWithMetadataOriginal, arguments);
     };
 
-    function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) {
+    function runWithRetries(merizo, cmdObj, clientFunction, clientFunctionArguments) {
         let cmdName = Object.keys(cmdObj)[0];
 
         // If the command is in a wrapped form, then we look for the actual command object
@@ -49,7 +49,7 @@
         const isRetryableWriteCmd = RetryableWritesUtil.isRetryableWriteCmdName(cmdName);
         const canRetryWrites = _serverSession.canRetryWrites(cmdObj);
 
-        let res = clientFunction.apply(mongo, clientFunctionArguments);
+        let res = clientFunction.apply(merizo, clientFunctionArguments);
 
         if (isRetryableWriteCmd && canRetryWrites) {
             let retryAttempt = 1;
@@ -58,7 +58,7 @@
                       " with txnNumber: " + tojson(cmdObj.txnNumber) + ", and lsid: " +
                       tojson(cmdObj.lsid));
                 ++retryAttempt;
-                res = clientFunction.apply(mongo, clientFunctionArguments);
+                res = clientFunction.apply(merizo, clientFunctionArguments);
             } while (Random.rand() <= kExtraRetryProbability);
         }
 

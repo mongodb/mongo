@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,42 +27,42 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/commands/authentication_commands.h"
+#include "merizo/db/commands/authentication_commands.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/config.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/security_key.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/platform/random.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/text.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/client/sasl_client_authenticate.h"
+#include "merizo/config.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/auth/security_key.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/platform/random.h"
+#include "merizo/rpc/metadata/client_metadata.h"
+#include "merizo/rpc/metadata/client_metadata_ismaster.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/transport/session.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_types.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 static bool _isX509AuthDisabled;
@@ -114,9 +114,9 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
                                       .getField("name"_sd)
                                       .checkAndGetStringData();
                 if (!clientMetadata->getApplicationName().empty() ||
-                    (driverName != "MongoDB Internal Client" &&
+                    (driverName != "MerizoDB Internal Client" &&
                      driverName != "NetworkInterfaceTL")) {
-                    warning() << "Client isn't a mongod or mongos, but is connecting with a "
+                    warning() << "Client isn't a merizod or merizos, but is connecting with a "
                                  "certificate with cluster membership";
                 }
             }
@@ -186,14 +186,14 @@ private:
  *
  * Previously, this command would have been called prior to {authenticate: ...}
  * when using the MONGODB-CR authentication mechanism.
- * Since that mechanism has been removed from MongoDB 3.8,
+ * Since that mechanism has been removed from MerizoDB 3.8,
  * it is nominally no longer required.
  *
- * Unfortunately, mongo-tools uses a connection library
+ * Unfortunately, merizo-tools uses a connection library
  * which optimistically invokes {getnonce: 1} upon connection
  * under the assumption that it will eventually be used as part
  * of "classic" authentication.
- * If the command dissapeared, then all of mongo-tools would
+ * If the command dissapeared, then all of merizo-tools would
  * fail to connect, despite using SCRAM-SHA-1 or another valid
  * auth mechanism. Thus, we have to keep this command around for now.
  *
@@ -275,8 +275,8 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     if (getTestCommandsEnabled() && user.getDB() == "admin" &&
         user.getUser() == internalSecurity.user->getName().getUser()) {
         // Allows authenticating as the internal user against the admin database.  This is to
-        // support the auth passthrough test framework on mongos (since you can't use the local
-        // database on a mongos, so you can't auth as the internal user without this).
+        // support the auth passthrough test framework on merizos (since you can't use the local
+        // database on a merizos, so you can't auth as the internal user without this).
         user = internalSecurity.user->getName();
     }
 
@@ -345,8 +345,8 @@ public:
         if (getTestCommandsEnabled() && dbname == "admin") {
             // Allows logging out as the internal user against the admin database, however
             // this actually logs out of the local database as well. This is to
-            // support the auth passthrough test framework on mongos (since you can't use the
-            // local database on a mongos, so you can't logout as the internal user
+            // support the auth passthrough test framework on merizos (since you can't use the
+            // local database on a merizos, so you can't logout as the internal user
             // without this).
             authSession->logoutDatabase(opCtx, "local");
         }
@@ -362,4 +362,4 @@ void disableAuthMechanism(StringData authMechanism) {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

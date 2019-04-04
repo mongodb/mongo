@@ -41,7 +41,7 @@
 
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     const st =
-        new ShardingTest({shards: 1, mongos: 1, config: 1, other: {shardAsReplicaSet: false}});
+        new ShardingTest({shards: 1, merizos: 1, config: 1, other: {shardAsReplicaSet: false}});
     runTest(st.s0);
     st.stop();
 }());

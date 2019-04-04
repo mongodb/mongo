@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/mongo_uri.h"
+#include "merizo/client/merizo_uri.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/authenticate.h"
-#include "mongo/client/dbclient_base.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/password_digest.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/client/dbclient_base.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/password_digest.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
@@ -46,7 +46,7 @@
 
 #include <iterator>
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 const char kAuthMechanismPropertiesKey[] = "mechanism_properties";
@@ -197,4 +197,4 @@ DBClientBase* MongoURI::connect(StringData applicationName,
     return ret.release();
 }
 
-}  // namespace mongo
+}  // namespace merizo

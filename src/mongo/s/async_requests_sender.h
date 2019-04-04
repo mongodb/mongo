@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,19 +32,19 @@
 #include <boost/optional.hpp>
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/util/interruptible.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/producer_consumer_queue.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/executor/remote_command_response.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/shard_id.h"
+#include "merizo/util/interruptible.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/producer_consumer_queue.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * The AsyncRequestsSender allows for sending requests to a set of remote shards in parallel.
@@ -293,4 +293,4 @@ private:
     bool _stopRetrying = false;
 };
 
-}  // namespace mongo
+}  // namespace merizo

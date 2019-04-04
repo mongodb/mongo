@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 #define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
 
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "merizo/db/storage/kv/kv_storage_engine.h"
 
 #include <algorithm>
 
-#include "mongo/db/catalog/catalog_control.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
-#include "mongo/db/storage/kv/kv_database_catalog_entry.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/temporary_kv_record_store.h"
-#include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/unclean_shutdown.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/catalog/catalog_control.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/storage/kv/kv_catalog_feature_tracker.h"
+#include "merizo/db/storage/kv/kv_database_catalog_entry.h"
+#include "merizo/db/storage/kv/kv_engine.h"
+#include "merizo/db/storage/kv/temporary_kv_record_store.h"
+#include "merizo/db/storage/storage_repair_observer.h"
+#include "merizo/db/unclean_shutdown.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::vector;
@@ -137,7 +137,7 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
     _catalogRecordStore = _engine->getGroupedRecordStore(
         opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
-    if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
+    if (shouldLog(::merizo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
         _dumpCatalog(opCtx);
     }
@@ -265,7 +265,7 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
 void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isLocked());
-    if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
+    if (shouldLog(::merizo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
         _dumpCatalog(opCtx);
     }
@@ -848,7 +848,7 @@ void KVStorageEngine::_onMinOfCheckpointAndOldestTimestampChanged(const Timestam
             log() << "Removing drop-pending idents with drop timestamps before timestamp "
                   << timestamp;
             auto opCtx = cc().getOperationContext();
-            mongo::ServiceContext::UniqueOperationContext uOpCtx;
+            merizo::ServiceContext::UniqueOperationContext uOpCtx;
             if (!opCtx) {
                 uOpCtx = cc().makeOperationContext();
                 opCtx = uOpCtx.get();
@@ -898,15 +898,15 @@ void KVStorageEngine::TimestampMonitor::startup() {
             // rollback-to-stable isn't running concurrently.
             {
                 auto opCtx = client->getOperationContext();
-                mongo::ServiceContext::UniqueOperationContext uOpCtx;
+                merizo::ServiceContext::UniqueOperationContext uOpCtx;
                 if (!opCtx) {
                     uOpCtx = client->makeOperationContext();
                     opCtx = uOpCtx.get();
                 }
                 Lock::GlobalLock lock(opCtx, MODE_IS);
 
-                // The checkpoint timestamp is not cached in mongod and needs to be fetched with a
-                // call into WiredTiger, all the other timestamps are cached in mongod.
+                // The checkpoint timestamp is not cached in merizod and needs to be fetched with a
+                // call into WiredTiger, all the other timestamps are cached in merizod.
                 checkpoint = _engine->getCheckpointTimestamp();
                 oldest = _engine->getOldestTimestamp();
                 stable = _engine->getStableTimestamp();
@@ -970,4 +970,4 @@ void KVStorageEngine::TimestampMonitor::removeListener(TimestampListener* listen
 }
 
 
-}  // namespace mongo
+}  // namespace merizo

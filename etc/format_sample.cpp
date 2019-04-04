@@ -137,8 +137,8 @@ int Example::manyVariableFunction(unsigned long long argWithLongName,
     // BinPackParameters: false
     printf("A short function call %s %s %d - %ld\n", "", "tgz", 4, ULONG_MAX);
     printf("A long function call %s %s %d - %ld\n",
-           "http://www.mongodbo.org/downloads",
-           "mongodb-latest.tgz",
+           "http://www.merizodbo.org/downloads",
+           "merizodb-latest.tgz",
            4,
            ULONG_MAX);
     printf("Thing1 %s\n", "Thing2");

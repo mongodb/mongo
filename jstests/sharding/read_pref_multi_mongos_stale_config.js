@@ -1,17 +1,17 @@
-// Tests that a mongos will correctly retry a stale shard version when read preference is used
+// Tests that a merizos will correctly retry a stale shard version when read preference is used
 (function() {
     'use strict';
 
     var st = new ShardingTest({
         shards: {rs0: {quiet: ''}, rs1: {quiet: ''}},
-        mongos: 2,
-        other: {mongosOptions: {verbose: 2}}
+        merizos: 2,
+        other: {merizosOptions: {verbose: 2}}
     });
 
     var testDB1 = st.s0.getDB('test');
     var testDB2 = st.s1.getDB('test');
 
-    // Trigger a query on mongos 1 so it will have a view of test.user as being unsharded.
+    // Trigger a query on merizos 1 so it will have a view of test.user as being unsharded.
     testDB1.user.findOne();
 
     assert.commandWorked(testDB2.adminCommand({enableSharding: 'test'}));
@@ -28,7 +28,7 @@
     assert.writeOK(testDB2.user.insert({x: 30}));
     assert.writeOK(testDB2.user.insert({x: 130}));
 
-    // The testDB1 mongos does not know the chunk has been moved, and will retry
+    // The testDB1 merizos does not know the chunk has been moved, and will retry
     var cursor = testDB1.user.find({x: 30}).readPref('primary');
     assert(cursor.hasNext());
     assert.eq(30, cursor.next().x);

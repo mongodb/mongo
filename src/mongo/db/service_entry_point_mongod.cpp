@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,41 +27,41 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/service_entry_point_mongod.h"
+#include "merizo/db/service_entry_point_merizod.h"
 
-#include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/read_concern.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/s/implicit_create_collection.h"
-#include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharding_config_optime_gossip.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_entry_point_common.h"
-#include "mongo/logger/redaction.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/config_server_metadata.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/util/log.h"
+#include "merizo/db/commands/fsync_locked.h"
+#include "merizo/db/concurrency/global_lock_acquisition_tracker.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/read_concern.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/speculative_majority_read_info.h"
+#include "merizo/db/s/implicit_create_collection.h"
+#include "merizo/db/s/scoped_operation_completion_sharding_actions.h"
+#include "merizo/db/s/shard_filtering_metadata_refresh.h"
+#include "merizo/db/s/sharding_config_optime_gossip.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/service_entry_point_common.h"
+#include "merizo/logger/redaction.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/metadata/config_server_metadata.h"
+#include "merizo/rpc/metadata/sharding_metadata.h"
+#include "merizo/s/cannot_implicitly_create_collection_info.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 constexpr auto kLastCommittedOpTimeFieldName = "lastCommittedOpTime"_sd;
 
 class ServiceEntryPointMongod::Hooks final : public ServiceEntryPointCommon::Hooks {
 public:
     bool lockedForWriting() const override {
-        return mongo::lockedForWriting();
+        return merizo::lockedForWriting();
     }
 
     void waitForReadConcern(OperationContext* opCtx,
@@ -71,7 +71,7 @@ public:
             ? PrepareConflictBehavior::kIgnore
             : PrepareConflictBehavior::kEnforce;
 
-        Status rcStatus = mongo::waitForReadConcern(opCtx,
+        Status rcStatus = merizo::waitForReadConcern(opCtx,
                                                     repl::ReadConcernArgs::get(opCtx),
                                                     invocation->allowsAfterClusterTime(),
                                                     prepareConflictBehavior);
@@ -95,7 +95,7 @@ public:
         if (!speculativeReadInfo.isSpeculativeRead()) {
             return;
         }
-        uassertStatusOK(mongo::waitForSpeculativeMajorityReadConcern(opCtx, speculativeReadInfo));
+        uassertStatusOK(merizo::waitForSpeculativeMajorityReadConcern(opCtx, speculativeReadInfo));
     }
 
 
@@ -114,7 +114,7 @@ public:
 
         WriteConcernResult res;
         auto waitForWCStatus =
-            mongo::waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
+            merizo::waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
 
         CommandHelpers::appendCommandWCStatus(commandResponseBuilder, waitForWCStatus, res);
     }
@@ -124,7 +124,7 @@ public:
         // from the primary.
         if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
             repl::ReadConcernLevel::kLinearizableReadConcern) {
-            uassertStatusOK(mongo::waitForLinearizableReadConcern(opCtx, 0));
+            uassertStatusOK(merizo::waitForLinearizableReadConcern(opCtx, 0));
         }
     }
 
@@ -187,7 +187,7 @@ public:
             repl::OpTime lastOpTimeFromClient =
                 repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
-            // For commands from mongos, append some info to help getLastError(w) work.
+            // For commands from merizos, append some info to help getLastError(w) work.
             // TODO: refactor out of here as part of SERVER-18236
             if (isShardingAware || isConfig) {
                 rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
@@ -224,4 +224,4 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
     return ServiceEntryPointCommon::handleRequest(opCtx, m, Hooks{});
 }
 
-}  // namespace mongo
+}  // namespace merizo

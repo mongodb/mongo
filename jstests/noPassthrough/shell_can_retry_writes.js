@@ -1,5 +1,5 @@
 /**
- * Tests that write operations executed through the mongo shell's CRUD API are assigned a
+ * Tests that write operations executed through the merizo shell's CRUD API are assigned a
  * transaction number so that they can be retried.
  * @tags: [requires_replication]
  */
@@ -22,20 +22,20 @@
     const coll = db.shell_can_retry_writes;
 
     function testCommandCanBeRetried(func, expected = true) {
-        const mongoRunCommandOriginal = Mongo.prototype.runCommand;
+        const merizoRunCommandOriginal = Mongo.prototype.runCommand;
 
         const sentinel = {};
         let cmdObjSeen = sentinel;
 
         Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
             cmdObjSeen = cmdObj;
-            return mongoRunCommandOriginal.apply(this, arguments);
+            return merizoRunCommandOriginal.apply(this, arguments);
         };
 
         try {
             assert.doesNotThrow(func);
         } finally {
-            Mongo.prototype.runCommand = mongoRunCommandOriginal;
+            Mongo.prototype.runCommand = merizoRunCommandOriginal;
         }
 
         if (cmdObjSeen === sentinel) {

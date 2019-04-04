@@ -2,12 +2,12 @@
 (function() {
     var st = new ShardingTest({shards: 2});
 
-    var mongos = st.s0;
-    var config = mongos.getDB("config");
+    var merizos = st.s0;
+    var config = merizos.getDB("config");
 
-    var dbA = mongos.getDB("DropSharded_A");
-    var dbB = mongos.getDB("DropSharded_B");
-    var dbC = mongos.getDB("DropSharded_C");
+    var dbA = merizos.getDB("DropSharded_A");
+    var dbB = merizos.getDB("DropSharded_B");
+    var dbC = merizos.getDB("DropSharded_C");
 
     // Dropping a database that doesn't exist will result in an info field in the response.
     var res = assert.commandWorked(dbA.dropDatabase());
@@ -37,7 +37,7 @@
 
     // Drop the non-suffixed db and ensure that it is the only one that was dropped.
     assert.commandWorked(dbA.dropDatabase());
-    var dbs = mongos.getDBNames();
+    var dbs = merizos.getDBNames();
     for (var i = 0; i < dbs.length; i++) {
         assert.neq(dbs[i], "" + dbA);
     }

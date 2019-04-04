@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/ftdc/util.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/ftdc/util.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 
 void checkTime(int expected, int now_time, int period) {
     ASSERT_TRUE(Date_t::fromMillisSinceEpoch(expected) ==
@@ -51,18 +51,18 @@ TEST(FTDCUtilTest, TestRoundTime) {
 TEST(FTDCUtilTest, TestMongoSPath) {
 
     std::vector<std::pair<std::string, std::string>> testCases = {
-        {"/var/log/mongos.log", "/var/log/mongos.diagnostic.data"},
-        {"/var/log/mongos.foo.log", "/var/log/mongos.diagnostic.data"},
+        {"/var/log/merizos.log", "/var/log/merizos.diagnostic.data"},
+        {"/var/log/merizos.foo.log", "/var/log/merizos.diagnostic.data"},
         {"/var/log/log_file", "/var/log/log_file.diagnostic.data"},
-        {"./mongos.log", "./mongos.diagnostic.data"},
-        {"../mongos.log", "../mongos.diagnostic.data"},
-        {"c:\\var\\log\\mongos.log", "c:\\var\\log\\mongos.diagnostic.data"},
-        {"c:\\var\\log\\mongos.foo.log", "c:\\var\\log\\mongos.diagnostic.data"},
+        {"./merizos.log", "./merizos.diagnostic.data"},
+        {"../merizos.log", "../merizos.diagnostic.data"},
+        {"c:\\var\\log\\merizos.log", "c:\\var\\log\\merizos.diagnostic.data"},
+        {"c:\\var\\log\\merizos.foo.log", "c:\\var\\log\\merizos.diagnostic.data"},
         {"c:\\var\\log\\log_file", "c:\\var\\log\\log_file.diagnostic.data"},
-        {"/var/some.log/mongos.log", "/var/some.log/mongos.diagnostic.data"},
+        {"/var/some.log/merizos.log", "/var/some.log/merizos.diagnostic.data"},
         {"/var/some.log/log_file", "/var/some.log/log_file.diagnostic.data"},
 
-        {"foo/mongos.log", "foo/mongos.diagnostic.data"},
+        {"foo/merizos.log", "foo/merizos.diagnostic.data"},
     };
 
     for (const auto& p : testCases) {
@@ -70,4 +70,4 @@ TEST(FTDCUtilTest, TestMongoSPath) {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

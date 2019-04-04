@@ -76,12 +76,12 @@ assert.eq(gle.wtimeout, null);
 
 replTest.stopSet();
 
-// Next check that it still works on a standalone mongod.
+// Next check that it still works on a standalone merizod.
 // Need to start a single server manually to keep this test in the jstests/replsets test suite
 var baseName = "SERVER-9005";
 
-var mongod = MongoRunner.runMongod({});
-var sdb = mongod.getDB("test");
+var merizod = MongoRunner.runMongod({});
+var sdb = merizod.getDB("test");
 
 sdb.foo.drop();
 sdb.foo.insert({_id: "1"});
@@ -103,4 +103,4 @@ printjson(gle);
 assert.eq(gle.ok, 0);
 assert(gle.badGLE);
 
-MongoRunner.stopMongod(mongod);
+MongoRunner.stopMongod(merizod);

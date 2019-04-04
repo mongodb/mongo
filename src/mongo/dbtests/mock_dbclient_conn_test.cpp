@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,29 +31,29 @@
  * This file includes integration testing between the MockDBClientBase and MockRemoteDB.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/timer.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/timer.h"
 
 #include <ctime>
 #include <string>
 #include <vector>
 
-using mongo::BSONObj;
-using mongo::ConnectionString;
-using mongo::MockDBClientConnection;
-using mongo::MockRemoteDBServer;
-using mongo::NamespaceString;
-using mongo::Query;
+using merizo::BSONObj;
+using merizo::ConnectionString;
+using merizo::MockDBClientConnection;
+using merizo::MockRemoteDBServer;
+using merizo::NamespaceString;
+using merizo::Query;
 
 using std::string;
 using std::vector;
 
-namespace mongo_test {
+namespace merizo_test {
 
 TEST(MockDBClientConnTest, ServerAddress) {
     MockRemoteDBServer server("test");
@@ -88,7 +88,7 @@ TEST(MockDBClientConnTest, InsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
         ASSERT(!cursor->more());
 
         server.insert(ns, BSON("x" << 1));
@@ -97,7 +97,7 @@ TEST(MockDBClientConnTest, InsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -113,7 +113,7 @@ TEST(MockDBClientConnTest, InsertAndQuery) {
     // Make sure that repeated calls will still give you the same result
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -135,7 +135,7 @@ TEST(MockDBClientConnTest, InsertAndQueryTwice) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -146,7 +146,7 @@ TEST(MockDBClientConnTest, InsertAndQueryTwice) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -166,7 +166,7 @@ TEST(MockDBClientConnTest, QueryWithNoResults) {
 
     server.insert(ns, BSON("x" << 1));
     MockDBClientConnection conn(&server);
-    std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString("other.ns"));
+    std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString("other.ns"));
 
     ASSERT(!cursor->more());
 }
@@ -175,7 +175,7 @@ TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
     MockRemoteDBServer server("test");
     const string ns1("test.user");
     const string ns2("foo.bar");
-    const string ns3("mongo.db");
+    const string ns3("merizo.db");
 
     {
         MockDBClientConnection conn(&server);
@@ -197,7 +197,7 @@ TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns1));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns1));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -212,7 +212,7 @@ TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns2));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns2));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -231,7 +231,7 @@ TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns3));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns3));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -247,7 +247,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
         ASSERT(!cursor->more());
 
         conn.insert(ns, BSON("x" << 1));
@@ -261,7 +261,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(!cursor->more());
     }
@@ -269,7 +269,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
     // Make sure that repeated calls will still give you the same result
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(!cursor->more());
     }
@@ -279,7 +279,7 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
     MockRemoteDBServer server("test");
     const string ns1("test.user");
     const string ns2("foo.bar");
-    const string ns3("mongo.db");
+    const string ns3("merizo.db");
 
     {
         MockDBClientConnection conn(&server);
@@ -303,13 +303,13 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
         MockDBClientConnection conn(&server);
         conn.remove(ns2, Query(), false);
 
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns2));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns2));
         ASSERT(!cursor->more());
     }
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns1));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns1));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -324,7 +324,7 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns3));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns3));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -359,7 +359,7 @@ TEST(MockDBClientConnTest, InsertAfterRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
+        std::unique_ptr<merizo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -536,14 +536,14 @@ TEST(MockDBClientConnTest, Shutdown) {
         server.shutdown();
         ASSERT(!server.isRunning());
 
-        ASSERT_THROWS(conn.query(NamespaceString("test.user")), mongo::NetworkException);
+        ASSERT_THROWS(conn.query(NamespaceString("test.user")), merizo::NetworkException);
     }
 
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
         ASSERT_THROWS(conn.runCommand("test.user", BSON("serverStatus" << 1), response),
-                      mongo::NetworkException);
+                      merizo::NetworkException);
     }
 
     ASSERT_EQUALS(0U, server.getQueryCount());
@@ -563,11 +563,11 @@ TEST(MockDBClientConnTest, Restart) {
     conn1.runCommand("test.user", BSON("serverStatus" << 1), response);
 
     server.shutdown();
-    ASSERT_THROWS(conn1.query(NamespaceString("test.user")), mongo::NetworkException);
+    ASSERT_THROWS(conn1.query(NamespaceString("test.user")), merizo::NetworkException);
 
     // New connections shouldn't work either
     MockDBClientConnection conn2(&server);
-    ASSERT_THROWS(conn2.query(NamespaceString("test.user")), mongo::NetworkException);
+    ASSERT_THROWS(conn2.query(NamespaceString("test.user")), merizo::NetworkException);
 
     ASSERT_EQUALS(1U, server.getQueryCount());
     ASSERT_EQUALS(1U, server.getCmdCount());
@@ -581,8 +581,8 @@ TEST(MockDBClientConnTest, Restart) {
     }
 
     // Old connections still shouldn't work
-    ASSERT_THROWS(conn1.query(NamespaceString("test.user")), mongo::NetworkException);
-    ASSERT_THROWS(conn2.query(NamespaceString("test.user")), mongo::NetworkException);
+    ASSERT_THROWS(conn1.query(NamespaceString("test.user")), merizo::NetworkException);
+    ASSERT_THROWS(conn2.query(NamespaceString("test.user")), merizo::NetworkException);
 
     ASSERT_EQUALS(2U, server.getQueryCount());
     ASSERT_EQUALS(1U, server.getCmdCount());
@@ -610,7 +610,7 @@ TEST(MockDBClientConnTest, Delay) {
     MockDBClientConnection conn(&server);
 
     {
-        mongo::Timer timer;
+        merizo::Timer timer;
         conn.query(NamespaceString("x.x"));
         const int nowInMilliSec = timer.millis();
         // Use a more lenient lower bound since some platforms like Windows
@@ -620,7 +620,7 @@ TEST(MockDBClientConnTest, Delay) {
     }
 
     {
-        mongo::Timer timer;
+        merizo::Timer timer;
         BSONObj response;
         conn.runCommand("x.x", BSON("serverStatus" << 1), response);
         const int nowInMilliSec = timer.millis();

@@ -1,5 +1,5 @@
 /**
- * For FCV 4.2, MongoDB uses a new internal format for unique indexes that is incompatible with 4.0.
+ * For FCV 4.2, MerizoDB uses a new internal format for unique indexes that is incompatible with 4.0.
  * The new format applies to both existing unique indexes as well as newly created/rebuilt unique
  * indexes. This helper function rebuilds all unique indexes on an instance after downgrading to FCV
  * 4.0, for backwards compatibility with binary 4.0. Because this is an internal change, the index

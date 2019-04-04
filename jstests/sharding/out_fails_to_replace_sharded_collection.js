@@ -7,9 +7,9 @@
 
     const st = new ShardingTest({shards: 2});
 
-    const mongosDB = st.s.getDB("test");
-    const sourceColl = mongosDB.source;
-    const targetColl = mongosDB.target;
+    const merizosDB = st.s.getDB("test");
+    const sourceColl = merizosDB.source;
+    const targetColl = merizosDB.target;
 
     assert.commandWorked(sourceColl.insert(Array.from({length: 10}, (_, i) => ({_id: i}))));
 
@@ -22,13 +22,13 @@
     // Then test that the $out fails if the collection becomes sharded between establishing the
     // cursor and performing the $out.
     targetColl.drop();
-    const cursorResponse = assert.commandWorked(mongosDB.runCommand({
+    const cursorResponse = assert.commandWorked(merizosDB.runCommand({
         aggregate: sourceColl.getName(),
         pipeline: [{$out: targetColl.getName()}],
         cursor: {batchSize: 0}
     }));
     st.shardColl(targetColl, {_id: 1}, false);
-    let error = assert.throws(() => new DBCommandCursor(mongosDB, cursorResponse).itcount());
+    let error = assert.throws(() => new DBCommandCursor(merizosDB, cursorResponse).itcount());
     // On master, we check whether the output collection is sharded at parse time so this error code
     // is simply 'CommandFailed' because it is a failed rename going through the DBDirectClient. The
     // message should indicate that the rename failed. In a mixed-version environment we can end up

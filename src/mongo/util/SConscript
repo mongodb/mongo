@@ -28,7 +28,7 @@ env.Library(
         'version_impl.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
@@ -38,7 +38,7 @@ env.Library(
         'intrusive_counter.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         ]
     )
 
@@ -48,7 +48,7 @@ env.Library(
         'log_and_backoff.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -58,7 +58,7 @@ env.Library(
         'regex_util.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -105,7 +105,7 @@ env.CppUnitTest(
         'represent_as_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         '$BUILD_DIR/third_party/shim_boost',
     ],
 )
@@ -125,7 +125,7 @@ env.CppUnitTest(
         'invalidating_lru_cache_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -135,7 +135,7 @@ env.Library(
         'summation.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -146,7 +146,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'summation',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         '$BUILD_DIR/third_party/shim_boost',
     ],
 )
@@ -158,7 +158,7 @@ env.Library(
         'thread_safe_string.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -197,7 +197,7 @@ env.Library(
         'clock_source_mock.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -219,7 +219,7 @@ env.Library(
     ],
     LIBDEPS=[
         'clock_sources',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -248,7 +248,7 @@ env.CppUnitTest(
         'text_test.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -258,7 +258,7 @@ env.CppUnitTest(
         'time_support_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -268,7 +268,7 @@ env.CppUnitTest(
         "stringutils_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -279,7 +279,7 @@ env.Library(
         "processinfo_${TARGET_OS}.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -302,9 +302,9 @@ env.Library(
         env.Idlc('fail_point_server_parameter.idl')[0],
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/idl/server_parameter",
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/bson/util/bson_extract",
+        "$BUILD_DIR/merizo/idl/server_parameter",
     ],
 )
 
@@ -333,8 +333,8 @@ env.Library(
         "periodic_runner_impl.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/db/service_context",
         "periodic_runner",
     ],
 )
@@ -345,7 +345,7 @@ env.CppUnitTest(
         "periodic_runner_impl_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "$BUILD_DIR/merizo/db/service_context_test_fixture",
         "clock_source_mock",
         "periodic_runner_impl",
     ],
@@ -357,7 +357,7 @@ env.Library(
         'periodic_runner_factory.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/merizo/db/service_context",
         'periodic_runner',
         'periodic_runner_impl',
     ],
@@ -369,7 +369,7 @@ env.Library(
         "background.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'concurrency/spin_lock',
     ],
 )
@@ -414,16 +414,16 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
             'heap_profiler.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/transport/service_executor',
+            '$BUILD_DIR/merizo/transport/service_executor',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/db/commands/server_status',
-            '$BUILD_DIR/mongo/idl/server_parameter',
+            '$BUILD_DIR/merizo/db/commands/server_status',
+            '$BUILD_DIR/merizo/idl/server_parameter',
             'processinfo',
         ],
         PROGDEPS_DEPENDENTS=[
-            '$BUILD_DIR/mongo/mongod',
-            '$BUILD_DIR/mongo/mongos',
+            '$BUILD_DIR/merizo/merizod',
+            '$BUILD_DIR/merizo/merizos',
         ],
     )
 
@@ -441,7 +441,7 @@ env.Library(
     ],
     LIBDEPS=[
         'signal_handlers',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ],
 )
 
@@ -453,7 +453,7 @@ env.Library(
         'fast_clock_source_factory.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -500,7 +500,7 @@ env.Library(
         'elapsed_tracker.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'net/network', # this is for using listener to check elapsed time
     ],
 )
@@ -542,7 +542,7 @@ env.Library(
         'secure_compare_memory.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -552,7 +552,7 @@ env.Library(
         'dns_query.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -561,7 +561,7 @@ env.CppUnitTest(
     source=['dns_query_test.cpp'],
     LIBDEPS=[
         'dns_query',
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -569,7 +569,7 @@ env.CppUnitTest(
     target='dns_name_test',
     source=['dns_name_test.cpp'],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -579,7 +579,7 @@ env.Library(
         'secure_zero_memory.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -598,7 +598,7 @@ if not env.TargetOSIs('windows'):
             'signal_handlers_synchronous_test.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/merizo/base',
         ],
     )
 
@@ -609,10 +609,10 @@ env.Library(
         "signal_win32.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/log_process_details",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/server_options_core",
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/db/log_process_details",
+        "$BUILD_DIR/merizo/db/service_context",
+        "$BUILD_DIR/merizo/db/server_options_core",
     ],
 )
 
@@ -632,7 +632,7 @@ env.Library(
         'safe_num.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -642,7 +642,7 @@ env.CppUnitTest(
         'safe_num_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'safe_num',
     ],
 )
@@ -653,7 +653,7 @@ env.CppUnitTest(
         'string_map_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -663,7 +663,7 @@ env.Library(
         'password.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -680,7 +680,7 @@ env.CppUnitTest(
         'itoa_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
@@ -690,8 +690,8 @@ env.CppUnitTest(
         'producer_consumer_queue_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/service_context',
     ]
 )
 
@@ -701,7 +701,7 @@ env.CppUnitTest(
         'duration_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ])
 
 env.CppUnitTest(
@@ -710,7 +710,7 @@ env.CppUnitTest(
         'assert_util_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
@@ -720,7 +720,7 @@ env.CppUnitTest(
         'base64_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -736,7 +736,7 @@ env.CppUnitTest(
         'future_test_promise_void.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -746,8 +746,8 @@ env.CppUnitTest(
         'keyed_executor_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/concurrency/thread_pool',
     ],
 )
 
@@ -783,7 +783,7 @@ if env.TargetOSIs('linux'):
             "procparser.cpp",
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/merizo/base',
         ],
     )
 
@@ -803,7 +803,7 @@ if env.TargetOSIs('windows'):
             "perfctr_collect.cpp",
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/merizo/base',
         ],
     )
 
@@ -823,9 +823,9 @@ if not use_system_version_of_library("icu"):
         target="icu_init.cpp",
         source=[
             "generate_icu_init_cpp.py",
-            ("$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57l.dat"
+            ("$BUILD_DIR/third_party/icu4c-57.1/source/merizo_sources/icudt57l.dat"
                 if endian == "little"
-                else "$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57b.dat"),
+                else "$BUILD_DIR/third_party/icu4c-57.1/source/merizo_sources/icudt57b.dat"),
         ],
         action="$PYTHON ${SOURCES[0]} -o $TARGET -i ${SOURCES[1]}",
     )
@@ -857,7 +857,7 @@ icuEnv.Library(
         'icu_init.cpp' if not use_system_version_of_library('icu') else 'icu_init_stub.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         '$BUILD_DIR/third_party/shim_icu',
     ],
 )
@@ -869,7 +869,7 @@ icuEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         'icu_init',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         '$BUILD_DIR/third_party/shim_icu',
     ],
 )

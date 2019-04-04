@@ -1,16 +1,16 @@
-// Tests bulk inserts to mongos
+// Tests bulk inserts to merizos
 (function() {
     'use strict';
 
     // TODO: SERVER-33601 remove shardAsReplicaSet: false
-    var st = new ShardingTest({shards: 2, mongos: 2, other: {shardAsReplicaSet: false}});
+    var st = new ShardingTest({shards: 2, merizos: 2, other: {shardAsReplicaSet: false}});
 
-    var mongos = st.s;
+    var merizos = st.s;
     var staleMongos = st.s1;
-    var admin = mongos.getDB("admin");
+    var admin = merizos.getDB("admin");
 
-    var collSh = mongos.getCollection(jsTestName() + ".collSharded");
-    var collUn = mongos.getCollection(jsTestName() + ".collUnsharded");
+    var collSh = merizos.getCollection(jsTestName() + ".collSharded");
+    var collUn = merizos.getCollection(jsTestName() + ".collUnsharded");
     var collDi = st.shard0.getCollection(jsTestName() + ".collDirect");
 
     jsTest.log('Checking write to config collections...');
@@ -64,7 +64,7 @@
     assert.writeOK(collDi.insert(inserts));
     assert.eq(2, collDi.find().itcount());
 
-    jsTest.log("Bulk insert (no COE) with mongos error...");
+    jsTest.log("Bulk insert (no COE) with merizos error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {hello: "world"}, {ukey: 1}];
@@ -72,7 +72,7 @@
     assert.writeError(collSh.insert(inserts));
     assert.eq(1, collSh.find().itcount());
 
-    jsTest.log("Bulk insert (no COE) with mongod error...");
+    jsTest.log("Bulk insert (no COE) with merizod error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {ukey: 0}, {ukey: 1}];
@@ -86,7 +86,7 @@
     assert.writeError(collDi.insert(inserts));
     assert.eq(1, collDi.find().itcount());
 
-    jsTest.log("Bulk insert (no COE) with mongod and mongos error...");
+    jsTest.log("Bulk insert (no COE) with merizod and merizos error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {ukey: 0}, {ukey: 1}, {hello: "world"}];
@@ -117,7 +117,7 @@
     assert.writeOK(collDi.insert(inserts));
     assert.eq(2, collDi.find().itcount());
 
-    jsTest.log("Bulk insert to second shard (no COE) with mongos error...");
+    jsTest.log("Bulk insert to second shard (no COE) with merizos error...");
 
     resetColls();
     var inserts = [
@@ -130,7 +130,7 @@
     assert.writeError(collSh.insert(inserts));
     assert.eq(3, collSh.find().itcount());
 
-    jsTest.log("Bulk insert to second shard (no COE) with mongod error...");
+    jsTest.log("Bulk insert to second shard (no COE) with merizod error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {ukey: 1}, {ukey: -1}, {ukey: -2}, {ukey: -2}];
@@ -144,7 +144,7 @@
     assert.writeError(collDi.insert(inserts));
     assert.eq(4, collDi.find().itcount());
 
-    jsTest.log("Bulk insert to third shard (no COE) with mongod and mongos error...");
+    jsTest.log("Bulk insert to third shard (no COE) with merizod and merizos error...");
 
     resetColls();
     var inserts =
@@ -166,7 +166,7 @@
     // CONTINUE-ON-ERROR
     //
 
-    jsTest.log("Bulk insert (yes COE) with mongos error...");
+    jsTest.log("Bulk insert (yes COE) with merizos error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {hello: "world"}, {ukey: 1}];
@@ -174,7 +174,7 @@
     assert.writeError(collSh.insert(inserts, 1));  // COE
     assert.eq(2, collSh.find().itcount());
 
-    jsTest.log("Bulk insert (yes COE) with mongod error...");
+    jsTest.log("Bulk insert (yes COE) with merizod error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {ukey: 0}, {ukey: 1}];
@@ -188,19 +188,19 @@
     assert.writeError(collDi.insert(inserts, 1));
     assert.eq(2, collDi.find().itcount());
 
-    jsTest.log("Bulk insert to third shard (yes COE) with mongod and mongos error...");
+    jsTest.log("Bulk insert to third shard (yes COE) with merizod and merizos error...");
 
     resetColls();
     var inserts =
         [{ukey: 0}, {ukey: 1}, {ukey: -2}, {ukey: -3}, {ukey: 4}, {ukey: 4}, {hello: "world"}];
 
-    // Last error here is mongos error
+    // Last error here is merizos error
     res = assert.writeError(collSh.insert(inserts, 1));
     assert(!isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg),
            res.toString());
     assert.eq(5, collSh.find().itcount());
 
-    // Extra insert goes through, since mongos error "doesn't count"
+    // Extra insert goes through, since merizos error "doesn't count"
     res = assert.writeError(collUn.insert(inserts, 1));
     assert.eq(6, res.nInserted, res.toString());
     assert.eq(6, collUn.find().itcount());
@@ -209,19 +209,19 @@
     assert.eq(6, res.nInserted, res.toString());
     assert.eq(6, collDi.find().itcount());
 
-    jsTest.log("Bulk insert to third shard (yes COE) with mongod and mongos error " +
-               "(mongos error first)...");
+    jsTest.log("Bulk insert to third shard (yes COE) with merizod and merizos error " +
+               "(merizos error first)...");
 
     resetColls();
     var inserts =
         [{ukey: 0}, {ukey: 1}, {ukey: -2}, {ukey: -3}, {hello: "world"}, {ukey: 4}, {ukey: 4}];
 
-    // Last error here is mongos error
+    // Last error here is merizos error
     res = assert.writeError(collSh.insert(inserts, 1));
     assert(isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
     assert.eq(5, collSh.find().itcount());
 
-    // Extra insert goes through, since mongos error "doesn't count"
+    // Extra insert goes through, since merizos error "doesn't count"
     res = assert.writeError(collUn.insert(inserts, 1));
     assert(isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
     assert.eq(6, collUn.find().itcount());

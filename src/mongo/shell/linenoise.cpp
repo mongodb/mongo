@@ -83,7 +83,7 @@
  *
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #ifdef _WIN32
 
@@ -119,7 +119,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/util/errno_util.h"
+#include "merizo/util/errno_util.h"
 
 using std::string;
 using std::vector;
@@ -2764,33 +2764,33 @@ int linenoiseHistorySetMaxLen(int len) {
 }
 
 namespace {
-mongo::Status linenoiseFileError(mongo::ErrorCodes::Error code,
+merizo::Status linenoiseFileError(merizo::ErrorCodes::Error code,
                                  const char* what,
                                  const char* filename) {
     std::stringstream ss;
-    ss << "Unable to " << what << " file " << filename << ": " << mongo::errnoWithDescription();
+    ss << "Unable to " << what << " file " << filename << ": " << merizo::errnoWithDescription();
     return {code, ss.str()};
 }
 }  // namespace
 
 /* Save the history in the specified file. */
-mongo::Status linenoiseHistorySave(const char* filename) {
+merizo::Status linenoiseHistorySave(const char* filename) {
     FILE* fp;
 #if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE || defined(__APPLE__)
     int fd = open(filename, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd == -1) {
-        return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "open()", filename);
+        return linenoiseFileError(merizo::ErrorCodes::FileOpenFailed, "open()", filename);
     }
     fp = fdopen(fd, "wt");
     if (fp == NULL) {
         // We've already failed, so no need to report any close() failure.
         (void)close(fd);
-        return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "fdopen()", filename);
+        return linenoiseFileError(merizo::ErrorCodes::FileOpenFailed, "fdopen()", filename);
     }
 #else
     fp = fopen(filename, "wt");
     if (fp == NULL) {
-        return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "fopen()", filename);
+        return linenoiseFileError(merizo::ErrorCodes::FileOpenFailed, "fopen()", filename);
     }
 #endif  // _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE || defined(__APPLE__)
 
@@ -2800,27 +2800,27 @@ mongo::Status linenoiseHistorySave(const char* filename) {
                 // We've already failed, so no need to report any fclose() failure.
                 (void)fclose(fp);
                 return linenoiseFileError(
-                    mongo::ErrorCodes::FileStreamFailed, "fprintf() to", filename);
+                    merizo::ErrorCodes::FileStreamFailed, "fprintf() to", filename);
             }
         }
     }
     // Closing fp also causes fd to be closed.
     if (fclose(fp) != 0) {
-        return linenoiseFileError(mongo::ErrorCodes::FileStreamFailed, "fclose()", filename);
+        return linenoiseFileError(merizo::ErrorCodes::FileStreamFailed, "fclose()", filename);
     }
-    return mongo::Status::OK();
+    return merizo::Status::OK();
 }
 
 /* Load the history from the specified file. */
-mongo::Status linenoiseHistoryLoad(const char* filename) {
+merizo::Status linenoiseHistoryLoad(const char* filename) {
     FILE* fp = fopen(filename, "rt");
     if (fp == NULL) {
         if (errno == ENOENT) {
             // Not having a history file isn't an error condition.
             // For example, it's always the case when the shell is run for the first time.
-            return mongo::Status::OK();
+            return merizo::Status::OK();
         }
-        return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "fopen()", filename);
+        return linenoiseFileError(merizo::ErrorCodes::FileOpenFailed, "fopen()", filename);
     }
 
     char buf[LINENOISE_MAX_LINE];
@@ -2841,10 +2841,10 @@ mongo::Status linenoiseHistoryLoad(const char* filename) {
     if (!feof(fp)) {
         // We've already failed, so no need to report any fclose() failure.
         (void)fclose(fp);
-        return linenoiseFileError(mongo::ErrorCodes::FileStreamFailed, "fgets() from", filename);
+        return linenoiseFileError(merizo::ErrorCodes::FileStreamFailed, "fgets() from", filename);
     }
     if (fclose(fp) != 0) {
-        return linenoiseFileError(mongo::ErrorCodes::FileStreamFailed, "fclose()", filename);
+        return linenoiseFileError(merizo::ErrorCodes::FileStreamFailed, "fclose()", filename);
     }
-    return mongo::Status::OK();
+    return merizo::Status::OK();
 }

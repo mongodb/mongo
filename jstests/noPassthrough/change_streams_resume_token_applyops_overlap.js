@@ -24,28 +24,28 @@
         rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
     });
 
-    const mongosDB = st.s.getDB(jsTestName());
-    const mongosColl = mongosDB.test;
+    const merizosDB = st.s.getDB(jsTestName());
+    const merizosColl = merizosDB.test;
 
     // Enable sharding on the test DB and ensure its primary is shard0.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.rs0.getURL());
 
     // Shard on {shard:1}, split at {shard:1}, and move the upper chunk to shard1.
-    st.shardColl(mongosColl, {shard: 1}, {shard: 1}, {shard: 1}, mongosDB.getName(), true);
+    st.shardColl(merizosColl, {shard: 1}, {shard: 1}, {shard: 1}, merizosDB.getName(), true);
 
     // Seed each shard with one document.
     assert.commandWorked(
-        mongosColl.insert([{shard: 0, _id: "initial_doc"}, {shard: 1, _id: "initial doc"}]));
+        merizosColl.insert([{shard: 0, _id: "initial_doc"}, {shard: 1, _id: "initial doc"}]));
 
     // Start a transaction which will be used to write documents across both shards.
-    const session = mongosDB.getMongo().startSession();
-    const sessionDB = session.getDatabase(mongosDB.getName());
-    const sessionColl = sessionDB[mongosColl.getName()];
+    const session = merizosDB.getMongo().startSession();
+    const sessionDB = session.getDatabase(merizosDB.getName());
+    const sessionColl = sessionDB[merizosColl.getName()];
     session.startTransaction({readConcern: {level: "majority"}});
 
     // Open a change stream on the test collection. We will capture events in 'changeList'.
-    const changeStreamCursor = mongosColl.watch();
+    const changeStreamCursor = merizosColl.watch();
     const changeList = [];
 
     // Insert four documents on each shard under the transaction.
@@ -77,7 +77,7 @@
 
     // Test that resuming from each event returns the expected set of subsequent documents.
     for (let i = 0; i < changeList.length; ++i) {
-        const resumeCursor = mongosColl.watch([], {startAfter: changeList[i]._id});
+        const resumeCursor = merizosColl.watch([], {startAfter: changeList[i]._id});
 
         // Confirm that the first event in the resumed stream matches the next event recorded in
         // 'changeList' from the original stream. The order of the events should be stable across

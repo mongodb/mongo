@@ -1,4 +1,4 @@
-"""The unittest.TestCase for tests using a MongoDB vendored version of Google Benchmark."""
+"""The unittest.TestCase for tests using a MerizoDB vendored version of Google Benchmark."""
 
 from __future__ import absolute_import
 

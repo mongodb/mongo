@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/json.h"
-#include "mongo/db/bson/bson_helper.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/schema/json_schema_parser.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/json.h"
+#include "merizo/db/bson/bson_helper.h"
+#include "merizo/db/matcher/expression_always_boolean.h"
+#include "merizo/db/matcher/schema/json_schema_parser.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 #define ASSERT_SERIALIZES_TO(match, expected)   \
@@ -861,7 +861,7 @@ TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsidePropertiesWithSiblin
 TEST(JSONSchemaParserTest, SharedJsonAndBsonTypeAliasesTranslateIdentically) {
     for (auto&& mapEntry : MatcherTypeSet::kJsonSchemaTypeAliasMap) {
         auto typeAlias = mapEntry.first;
-        // JSON Schema spells its bool type as "boolean", whereas MongoDB calls it "bool".
+        // JSON Schema spells its bool type as "boolean", whereas MerizoDB calls it "bool".
         auto bsonTypeAlias =
             (typeAlias == JSONSchemaParser::kSchemaTypeBoolean) ? "bool" : typeAlias;
 
@@ -2084,4 +2084,4 @@ TEST(JSONSchemaParserTest, FailsToParseWithNonUUIDArrayElement) {
     ASSERT_EQ(result.getStatus().code(), 51084);
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

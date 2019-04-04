@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/request_types/add_shard_request_type.h"
+#include "merizo/s/request_types/add_shard_request_type.h"
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using str::stream;
@@ -44,8 +44,8 @@ class BSONObj;
 template <typename T>
 class StatusWith;
 
-const BSONField<std::string> AddShardRequest::mongosAddShard("addShard");
-const BSONField<std::string> AddShardRequest::mongosAddShardDeprecated("addshard");
+const BSONField<std::string> AddShardRequest::merizosAddShard("addShard");
+const BSONField<std::string> AddShardRequest::merizosAddShardDeprecated("addshard");
 const BSONField<std::string> AddShardRequest::configsvrAddShard("_configsvrAddShard");
 const BSONField<std::string> AddShardRequest::shardName("name");
 const BSONField<long long> AddShardRequest::maxSizeMB("maxSize");
@@ -61,8 +61,8 @@ AddShardRequest::AddShardRequest(ConnectionString connString)
 
 StatusWith<AddShardRequest> AddShardRequest::parseFromMongosCommand(const BSONObj& obj) {
     invariant(obj.nFields() >= 1);
-    invariant(mongosAddShard.name() == obj.firstElement().fieldNameStringData() ||
-              mongosAddShardDeprecated.name() == obj.firstElement().fieldNameStringData());
+    invariant(merizosAddShard.name() == obj.firstElement().fieldNameStringData() ||
+              merizosAddShardDeprecated.name() == obj.firstElement().fieldNameStringData());
     return parseInternalFields(obj);
 }
 
@@ -166,4 +166,4 @@ string AddShardRequest::toString() const {
     return ss;
 }
 
-}  // namespace mongo
+}  // namespace merizo

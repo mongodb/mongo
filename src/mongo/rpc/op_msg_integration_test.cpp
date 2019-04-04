@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/query/getmore_request.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/query/getmore_request.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/unittest/integration_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
     std::string errMsg;
@@ -400,4 +400,4 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     ASSERT(!cursor->more());
     ASSERT(cursor->isDead());
 }
-}  // namespace mongo
+}  // namespace merizo

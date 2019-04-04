@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/dbtests/mock/mock_replica_set.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/dbtests/mock/mock_replica_set.h"
+#include "merizo/unittest/unittest.h"
 
 #include <set>
 #include <string>
 
-using mongo::BSONArrayBuilder;
-using mongo::BSONElement;
-using mongo::BSONObj;
-using mongo::BSONObjBuilder;
-using mongo::BSONObjIterator;
-using mongo::ConnectionString;
-using mongo::HostAndPort;
-using mongo::MockDBClientConnection;
-using mongo::MockRemoteDBServer;
-using mongo::MockReplicaSet;
-using mongo::repl::ReplSetConfig;
+using merizo::BSONArrayBuilder;
+using merizo::BSONElement;
+using merizo::BSONObj;
+using merizo::BSONObjBuilder;
+using merizo::BSONObjIterator;
+using merizo::ConnectionString;
+using merizo::HostAndPort;
+using merizo::MockDBClientConnection;
+using merizo::MockRemoteDBServer;
+using merizo::MockReplicaSet;
+using merizo::repl::ReplSetConfig;
 
 using std::set;
 using std::string;
 using std::vector;
 
-namespace mongo_test {
+namespace merizo_test {
 TEST(MockReplicaSetTest, SetName) {
     MockReplicaSet replSet("n", 3);
     ASSERT_EQUALS("n", replSet.getSetName());

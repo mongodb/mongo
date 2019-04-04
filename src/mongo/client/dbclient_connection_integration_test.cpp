@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/dbclient_connection.h"
+#include "merizo/client/dbclient_connection.h"
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/unittest/integration_test.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const auto sleepCmd = fromjson(R"({sleep: 1, locks: 'none', secs: 100})");
@@ -109,4 +109,4 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfRunCommandInProgress) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

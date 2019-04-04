@@ -11,11 +11,11 @@ load('jstests/libs/trace_missing_docs.js');
             rsOptions: {nodes: 1, oplogSize: 10}
         };
 
-        var st = new ShardingTest({shards: 2, mongos: 1, other: options});
+        var st = new ShardingTest({shards: 2, merizos: 1, other: options});
 
-        var mongos = st.s0;
-        var coll = mongos.getCollection("foo.bar");
-        var admin = mongos.getDB("admin");
+        var merizos = st.s0;
+        var coll = merizos.getCollection("foo.bar");
+        var admin = merizos.getDB("admin");
 
         assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
         st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);

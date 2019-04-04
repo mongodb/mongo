@@ -1,6 +1,6 @@
 /**
  * This test is only for the WiredTiger storage engine. Test to reproduce recovery bugs in WT from
- * WT-2696 and WT-2706.  Have several threads inserting unique data.  Kill -9 mongod.  After
+ * WT-2696 and WT-2706.  Have several threads inserting unique data.  Kill -9 merizod.  After
  * restart and recovery verify that all expected records inserted are there and no records in the
  * middle of the data set are lost.
  *
@@ -33,7 +33,7 @@ load('jstests/libs/parallelTester.js');  // For ScopedThread
         wiredTigerEngineConfigString:
             'checkpoint=(wait=60,log_size=0),log=(archive=false,compressor=none,file_max=10M)'
     });
-    assert.neq(null, conn, 'mongod was unable to start up');
+    assert.neq(null, conn, 'merizod was unable to start up');
 
     var insertWorkload = function(host, start, end) {
         var conn = new Mongo(host);
@@ -54,11 +54,11 @@ load('jstests/libs/parallelTester.js');  // For ScopedThread
             try {
                 testDB.coll.insert(doc);
             } catch (e) {
-                // Terminate the loop when mongod is killed.
+                // Terminate the loop when merizod is killed.
                 break;
             }
         }
-        // Return i, the last record we were trying to insert.  It is possible that mongod gets
+        // Return i, the last record we were trying to insert.  It is possible that merizod gets
         // killed in the middle but not finding a record at the end is okay.  We're only
         // interested in records missing in the middle.
         return {start: start, end: i};
@@ -76,7 +76,7 @@ load('jstests/libs/parallelTester.js');  // For ScopedThread
         t.start();
     }
 
-    // Sleep for sometime less than a minute so that mongod has not yet written a checkpoint.
+    // Sleep for sometime less than a minute so that merizod has not yet written a checkpoint.
     // That will force WT to run recovery all the way from the beginning and we can detect missing
     // records.  Sleep for 40 seconds to generate plenty of workload.
     sleep(40000);
@@ -92,13 +92,13 @@ load('jstests/libs/parallelTester.js');  // For ScopedThread
         retData.push(t.returnData());
     });
 
-    // Restart the mongod.  This forces WT to run recovery.
+    // Restart the merizod.  This forces WT to run recovery.
     conn = MongoRunner.runMongod({
         dbpath: dbpath,
         noCleanData: true,
         wiredTigerEngineConfigString: 'log=(archive=false,compressor=none,file_max=10M)'
     });
-    assert.neq(null, conn, 'mongod should have restarted');
+    assert.neq(null, conn, 'merizod should have restarted');
 
     // Verify that every item between start and end for every thread exists in the collection now
     // that recovery has completed.
@@ -111,7 +111,7 @@ load('jstests/libs/parallelTester.js');  // For ScopedThread
         for (var j = thread_data.start; j <= thread_data.end; j++) {
             var idExists = coll.find({_id: j}).count() > 0;
             // The verification is a bit complex.  We only want to fail if records in the middle
-            // of the range are missing.  Records at the end may be missing due to when mongod
+            // of the range are missing.  Records at the end may be missing due to when merizod
             // was killed and records in memory are lost.  It is only a bug if a record is missing
             // and a subsequent record exists.
             if (!idExists) {

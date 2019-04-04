@@ -76,7 +76,7 @@
     }
 
     // Tests that a tailable cursor over an empty capped collection produces a dead cursor, intended
-    // to be run on both mongod and mongos. For SERVER-20720.
+    // to be run on both merizod and merizos. For SERVER-20720.
     t.drop();
     assert.commandWorked(db.createCollection(t.getName(), {capped: true, size: 1024}));
 

@@ -1,4 +1,4 @@
-test_kind: mongos_test
+test_kind: merizos_test
 
 selector:
   test: ''

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/db/query/plan_enumerator.h"
+#include "merizo/db/query/plan_enumerator.h"
 
 #include <set>
 
-#include "mongo/db/query/index_tag.h"
-#include "mongo/db/query/indexability.h"
-#include "mongo/util/log.h"
-#include "mongo/util/string_map.h"
+#include "merizo/db/query/index_tag.h"
+#include "merizo/db/query/indexability.h"
+#include "merizo/util/log.h"
+#include "merizo/util/string_map.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 using std::unique_ptr;
 using std::endl;
 using std::set;
@@ -48,8 +48,8 @@ using std::string;
 using std::vector;
 
 std::string getPathPrefix(std::string path) {
-    if (mongoutils::str::contains(path, '.')) {
-        return mongoutils::str::before(path, '.');
+    if (merizoutils::str::contains(path, '.')) {
+        return merizoutils::str::before(path, '.');
     } else {
         return path;
     }
@@ -255,7 +255,7 @@ void tagForSort(MatchExpression* tree) {
 }  // namespace
 
 
-namespace mongo {
+namespace merizo {
 
 PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
     : _root(params.root),
@@ -282,7 +282,7 @@ Status PlanEnumerator::init() {
 }
 
 std::string PlanEnumerator::dumpMemo() {
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
 
     // Note that this needs to be kept in sync with allocateAssignment which assigns memo IDs.
     for (size_t i = 1; i <= _memo.size(); ++i) {
@@ -293,7 +293,7 @@ std::string PlanEnumerator::dumpMemo() {
 
 string PlanEnumerator::NodeAssignment::toString() const {
     if (NULL != andAssignment) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "AND enumstate counter " << andAssignment->counter;
         for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
             ss << "\n\tchoice " << i << ":\n";
@@ -319,7 +319,7 @@ string PlanEnumerator::NodeAssignment::toString() const {
         }
         return ss;
     } else if (NULL != arrayAssignment) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [ ";
         for (size_t i = 0; i < arrayAssignment->subnodes.size(); ++i) {
             ss << arrayAssignment->subnodes[i] << " ";
@@ -328,7 +328,7 @@ string PlanEnumerator::NodeAssignment::toString() const {
         return ss;
     } else {
         verify(NULL != orAssignment);
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "ALL OF: [ ";
         for (size_t i = 0; i < orAssignment->subnodes.size(); ++i) {
             ss << orAssignment->subnodes[i] << " ";
@@ -1685,4 +1685,4 @@ bool PlanEnumerator::nextMemo(size_t id) {
     return false;
 }
 
-}  // namespace mongo
+}  // namespace merizo

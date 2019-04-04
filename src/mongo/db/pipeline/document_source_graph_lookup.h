@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/lookup_set_cache.h"
-#include "mongo/db/pipeline/value_comparator.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_unwind.h"
+#include "merizo/db/pipeline/expression.h"
+#include "merizo/db/pipeline/lookup_set_cache.h"
+#include "merizo/db/pipeline/value_comparator.h"
 
-namespace mongo {
+namespace merizo {
 
 class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
@@ -56,10 +56,10 @@ public:
     GetModPathsReturn getModifiedPaths() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        // TODO SERVER-27533 Until we remove the restriction of only performing lookups from mongos,
-        // this stage must run on mongos if the output collection is sharded.
+        // TODO SERVER-27533 Until we remove the restriction of only performing lookups from merizos,
+        // this stage must run on merizos if the output collection is sharded.
         HostTypeRequirement hostRequirement =
-            (pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from))
+            (pExpCtx->inMongos && pExpCtx->merizoProcessInterface->isSharded(pExpCtx->opCtx, _from))
             ? HostTypeRequirement::kMongoS
             : HostTypeRequirement::kPrimaryShard;
 
@@ -228,4 +228,4 @@ private:
     long long _outputIndex;
 };
 
-}  // namespace mongo
+}  // namespace merizo

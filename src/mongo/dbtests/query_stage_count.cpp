@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,21 +29,21 @@
 
 #include <memory>
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/exec/count.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/dbtests/dbtests.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/collection_scan.h"
+#include "merizo/db/exec/collection_scan_common.h"
+#include "merizo/db/exec/count.h"
+#include "merizo/db/exec/index_scan.h"
+#include "merizo/db/exec/plan_stage.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/dbtests/dbtests.h"
 
 namespace QueryStageCount {
 

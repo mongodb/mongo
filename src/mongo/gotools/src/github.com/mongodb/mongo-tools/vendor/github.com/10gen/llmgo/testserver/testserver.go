@@ -55,7 +55,7 @@ func (ts *TestServer) start() {
 		"--nojournal",
 	}
 	ts.tomb = tomb.Tomb{}
-	ts.server = exec.Command("mongod", args...)
+	ts.server = exec.Command("merizod", args...)
 	ts.server.Stdout = &ts.output
 	ts.server.Stderr = &ts.output
 	err = ts.server.Start()
@@ -70,16 +70,16 @@ func (ts *TestServer) monitor() error {
 	ts.server.Process.Wait()
 	if ts.tomb.Alive() {
 		// Present some debugging information.
-		fmt.Fprintf(os.Stderr, "---- mongod process died unexpectedly:\n")
+		fmt.Fprintf(os.Stderr, "---- merizod process died unexpectedly:\n")
 		fmt.Fprintf(os.Stderr, "%s", ts.output.Bytes())
-		fmt.Fprintf(os.Stderr, "---- mongod processes running right now:\n")
-		cmd := exec.Command("/bin/sh", "-c", "ps auxw | grep mongod")
+		fmt.Fprintf(os.Stderr, "---- merizod processes running right now:\n")
+		cmd := exec.Command("/bin/sh", "-c", "ps auxw | grep merizod")
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
 		cmd.Run()
 		fmt.Fprintf(os.Stderr, "----------------------------------------\n")
 
-		panic("mongod process died unexpectedly")
+		panic("merizod process died unexpectedly")
 	}
 	return nil
 }
@@ -99,7 +99,7 @@ func (ts *TestServer) Stop() {
 		select {
 		case <-ts.tomb.Dead():
 		case <-time.After(5 * time.Second):
-			panic("timeout waiting for mongod process to die")
+			panic("timeout waiting for merizod process to die")
 		}
 		ts.server = nil
 	}

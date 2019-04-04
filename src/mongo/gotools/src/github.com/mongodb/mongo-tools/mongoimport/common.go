@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoimport
+package merizoimport
 
 import (
 	"bufio"
@@ -17,10 +17,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/bsonutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/tomb.v2"
 )
@@ -77,7 +77,7 @@ type importWorker struct {
 	tomb *tomb.Tomb
 }
 
-// an interface for tracking the number of bytes, which is used in mongoimport to feed
+// an interface for tracking the number of bytes, which is used in merizoimport to feed
 // the progress bar.
 type sizeTracker interface {
 	Size() int64
@@ -434,7 +434,7 @@ func validateFields(fields []string) error {
 				return fmt.Errorf("fields '%v' and '%v' are incompatible", field, latterField)
 			}
 			// NOTE: this means we will not support imports that have fields like
-			// a, a - since this is invalid in MongoDB
+			// a, a - since this is invalid in MerizoDB
 			if field == latterField {
 				return fmt.Errorf("fields cannot be identical: '%v' and '%v'", field, latterField)
 			}

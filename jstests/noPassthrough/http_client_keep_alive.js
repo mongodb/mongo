@@ -1,4 +1,4 @@
-// Test keep-alive when using mongod's internal HttpClient.
+// Test keep-alive when using merizod's internal HttpClient.
 // @tags: [requires_http_client]
 
 (function() {
@@ -6,9 +6,9 @@
 
     load('jstests/noPassthrough/libs/configExpand/lib.js');
 
-    function runTest(mongod, web) {
-        assert(mongod);
-        const admin = mongod.getDB('admin');
+    function runTest(merizod, web) {
+        assert(merizod);
+        const admin = merizod.getDB('admin');
 
         // Only bother with this test when using curl >= 7.57.0.
         const http_status = admin.adminCommand({serverStatus: 1, http_client: 1});
@@ -55,8 +55,8 @@
 
     const web = new ConfigExpandRestServer();
     web.start();
-    const mongod = MongoRunner.runMongod({setParameter: 'enableTestCommands=1'});
-    runTest(mongod, web);
-    MongoRunner.stopMongod(mongod);
+    const merizod = MongoRunner.runMongod({setParameter: 'enableTestCommands=1'});
+    runTest(merizod, web);
+    MongoRunner.stopMongod(merizod);
     web.stop();
 })();

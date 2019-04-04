@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/valuereader.h"
+#include "merizo/scripting/mozjs/valuereader.h"
 
 #include <cmath>
 #include <cstdio>
 #include <js/CharacterEncoding.h>
 #include <js/Date.h>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/log.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/scripting/mozjs/implscope.h"
+#include "merizo/scripting/mozjs/objectwrapper.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 ValueReader::ValueReader(JSContext* cx, JS::MutableHandleValue value)
@@ -55,7 +55,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
     auto scope = getScope(_context);
 
     switch (elem.type()) {
-        case mongo::Code:
+        case merizo::Code:
             // javascriptProtection prevents Code and CodeWScope BSON types from
             // being automatically marshalled into executable functions.
             if (scope->isJavaScriptProtectionEnabled()) {
@@ -68,7 +68,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                 scope->newFunction(elem.valueStringData(), _value);
             }
             return;
-        case mongo::CodeWScope:
+        case merizo::CodeWScope:
             if (scope->isJavaScriptProtectionEnabled()) {
                 JS::AutoValueArray<2> args(_context);
 
@@ -83,42 +83,42 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                                    _value);
             }
             return;
-        case mongo::Symbol:
-        case mongo::String:
+        case merizo::Symbol:
+        case merizo::String:
             fromStringData(elem.valueStringData());
             return;
-        case mongo::jstOID: {
+        case merizo::jstOID: {
             OIDInfo::make(_context, elem.OID(), _value);
             return;
         }
-        case mongo::NumberDouble:
+        case merizo::NumberDouble:
             fromDouble(elem.Number());
             return;
-        case mongo::NumberInt:
+        case merizo::NumberInt:
             _value.setInt32(elem.Int());
             return;
-        case mongo::Array: {
+        case merizo::Array: {
             fromBSONArray(elem.embeddedObject(), &parent, readOnly);
             return;
         }
-        case mongo::Object:
+        case merizo::Object:
             fromBSON(elem.embeddedObject(), &parent, readOnly);
             return;
-        case mongo::Date:
+        case merizo::Date:
             _value.setObjectOrNull(
                 JS::NewDateObject(_context, JS::TimeClip(elem.Date().toMillisSinceEpoch())));
             return;
-        case mongo::Bool:
+        case merizo::Bool:
             _value.setBoolean(elem.Bool());
             return;
-        case mongo::jstNULL:
+        case merizo::jstNULL:
             _value.setNull();
             return;
-        case mongo::EOO:
-        case mongo::Undefined:
+        case merizo::EOO:
+        case merizo::Undefined:
             _value.setUndefined();
             return;
-        case mongo::RegEx: {
+        case merizo::RegEx: {
             // TODO parse into a custom type that can support any patterns and flags SERVER-9803
 
             JS::AutoValueArray<2> args(_context);
@@ -133,7 +133,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
             return;
         }
-        case mongo::BinData: {
+        case merizo::BinData: {
             int len;
             const char* data = elem.binData(len);
             std::stringstream ss;
@@ -148,7 +148,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             scope->getProto<BinDataInfo>().newInstance(args, _value);
             return;
         }
-        case mongo::bsonTimestamp: {
+        case merizo::bsonTimestamp: {
             JS::AutoValueArray<2> args(_context);
 
             ValueReader(_context, args[0])
@@ -159,14 +159,14 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
             return;
         }
-        case mongo::NumberLong: {
+        case merizo::NumberLong: {
             JS::RootedObject thisv(_context);
             scope->getProto<NumberLongInfo>().newObject(&thisv);
             JS_SetPrivate(thisv, scope->trackedNew<int64_t>(elem.numberLong()));
             _value.setObjectOrNull(thisv);
             return;
         }
-        case mongo::NumberDecimal: {
+        case merizo::NumberDecimal: {
             Decimal128 decimal = elem.numberDecimal();
             JS::AutoValueArray<1> args(_context);
             ValueReader(_context, args[0]).fromDecimal128(decimal);
@@ -177,13 +177,13 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
             return;
         }
-        case mongo::MinKey:
+        case merizo::MinKey:
             scope->getProto<MinKeyInfo>().newInstance(_value);
             return;
-        case mongo::MaxKey:
+        case merizo::MaxKey:
             scope->getProto<MaxKeyInfo>().newInstance(_value);
             return;
-        case mongo::DBRef: {
+        case merizo::DBRef: {
             JS::AutoValueArray<1> oidArgs(_context);
             ValueReader(_context, oidArgs[0]).fromStringData(elem.dbrefOID().toString());
 
@@ -312,4 +312,4 @@ void ValueReader::fromInt64(int64_t i) {
 }
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

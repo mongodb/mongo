@@ -42,7 +42,7 @@
     session.endSession();
 
     function runMongoShellWithRetryWritesEnabled(func) {
-        const args = [MongoRunner.mongoShellPath];
+        const args = [MongoRunner.merizoShellPath];
         args.push("--port", conn.port);
         args.push("--retryWrites");
 
@@ -50,7 +50,7 @@
         args.push("--eval", jsCode);
 
         const exitCode = runMongoProgram.apply(null, args);
-        assert.eq(0, exitCode, "Encountered an error in the other mongo shell");
+        assert.eq(0, exitCode, "Encountered an error in the other merizo shell");
     }
 
     runMongoShellWithRetryWritesEnabled(function() {

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/expression_params.h"
+#include "merizo/db/index/expression_params.h"
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/s2_common.h"
-#include "mongo/db/index_names.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/geo/geoconstants.h"
+#include "merizo/db/hasher.h"
+#include "merizo/db/index/2d_common.h"
+#include "merizo/db/index/s2_common.h"
+#include "merizo/db/index_names.h"
+#include "merizo/util/merizoutils/str.h"
 #include "third_party/s2/s2.h"
 
-namespace mongo {
+namespace merizo {
 
-using mongoutils::str::stream;
+using merizoutils::str::stream;
 
 void ExpressionParams::parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParams* out) {
     BSONObjIterator i(infoObj.getObjectField("key"));
@@ -204,4 +204,4 @@ void ExpressionParams::initialize2dsphereParams(const BSONObj& infoObj,
             out->indexVersion == S2_INDEX_VERSION_3 || out->indexVersion == S2_INDEX_VERSION_2 ||
                 out->indexVersion == S2_INDEX_VERSION_1);
 }
-}  // namespace mongo
+}  // namespace merizo

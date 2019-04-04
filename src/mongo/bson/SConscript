@@ -20,7 +20,7 @@ env.CppUnitTest(
         'bson_field_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -31,7 +31,7 @@ env.CppUnitTest(
         'simple_bsonobj_comparator_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -41,7 +41,7 @@ env.CppUnitTest(
         'bson_obj_data_type_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
@@ -51,7 +51,7 @@ env.CppUnitTest(
         'bson_validate_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -61,7 +61,7 @@ env.CppUnitTest(
         'bsonobjbuilder_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -71,7 +71,7 @@ env.Benchmark(
         'bsonobjbuilder_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -81,7 +81,7 @@ env.CppUnitTest(
         'bsonelement_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -91,7 +91,7 @@ env.CppUnitTest(
         'oid_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -104,8 +104,8 @@ asioEnv.CppIntegrationTest(
         'ugly_bson_integration_test.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/network_interface_fixture',
-        '$BUILD_DIR/mongo/rpc/protocol',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/merizo/executor/network_interface_fixture',
+        '$BUILD_DIR/merizo/rpc/protocol',
+        '$BUILD_DIR/merizo/transport/transport_layer_egress_init',
     ],
 )

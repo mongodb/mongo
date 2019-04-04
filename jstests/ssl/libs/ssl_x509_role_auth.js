@@ -6,7 +6,7 @@
     let ret = db.getSiblingDB("$external").auth({
         mechanism: "MONGODB-X509",
         user:
-            "CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York City,ST=New York,C=US"
+            "CN=Kernel Client Peer Role,OU=Kernel Users,O=MerizoDB,L=New York City,ST=New York,C=US"
     });
     assert.eq(ret, 1, "Auth failed");
 

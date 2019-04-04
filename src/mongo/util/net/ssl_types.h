@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,18 +31,18 @@
 
 #include <string>
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/auth/role_name.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/transport/session.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/auth/role_name.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/transport/session.h"
 
-namespace mongo {
+namespace merizo {
 
 constexpr StringData kOID_CommonName = "2.5.4.3"_sd;
 
 /**
  * Represents a structed X509 certificate subject name.
- * For example: C=US,O=MongoDB,OU=KernelTeam,CN=server
+ * For example: C=US,O=MerizoDB,OU=KernelTeam,CN=server
  * would be held as a four element vector of Entries.
  * The first entry of which yould be broken down something like:
  * {{"2.5.4.6", 19, "US"}}.
@@ -125,4 +125,4 @@ struct SSLPeerInfo {
     static SSLPeerInfo& forSession(const transport::SessionHandle& session);
 };
 
-}  // namespace mongo
+}  // namespace merizo

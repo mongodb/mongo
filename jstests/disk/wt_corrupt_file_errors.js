@@ -1,5 +1,5 @@
 /**
- * Tests that MongoDB gives errors when certain data files are corrupted.
+ * Tests that MerizoDB gives errors when certain data files are corrupted.
  *
  * @tags: [requires_wiredtiger]
  */
@@ -17,10 +17,10 @@
      */
 
     assertErrorOnStartupWhenFilesAreCorruptOrMissing(
-        dbpath, baseName, collName, (mongod, testColl) => {
+        dbpath, baseName, collName, (merizod, testColl) => {
             const testCollUri = getUriForColl(testColl);
             const testCollFile = dbpath + testCollUri + ".wt";
-            MongoRunner.stopMongod(mongod);
+            MongoRunner.stopMongod(merizod);
             jsTestLog("corrupting collection file: " + testCollFile);
             corruptFile(testCollFile);
         }, "Fatal Assertion 50882");
@@ -30,8 +30,8 @@
      */
 
     assertErrorOnStartupWhenFilesAreCorruptOrMissing(
-        dbpath, baseName, collName, (mongod, testColl) => {
-            MongoRunner.stopMongod(mongod);
+        dbpath, baseName, collName, (merizod, testColl) => {
+            MongoRunner.stopMongod(merizod);
             const mdbCatalogFile = dbpath + "_mdb_catalog.wt";
             jsTestLog("corrupting catalog file: " + mdbCatalogFile);
             corruptFile(mdbCatalogFile);
@@ -42,8 +42,8 @@
      */
 
     assertErrorOnStartupWhenFilesAreCorruptOrMissing(
-        dbpath, baseName, collName, (mongod, testColl) => {
-            MongoRunner.stopMongod(mongod);
+        dbpath, baseName, collName, (merizod, testColl) => {
+            MongoRunner.stopMongod(merizod);
             const WiredTigerWTFile = dbpath + "WiredTiger.wt";
             jsTestLog("corrupting WiredTiger.wt");
             corruptFile(WiredTigerWTFile);
@@ -57,11 +57,11 @@
         dbpath,
         baseName,
         collName,
-        (mongod, testColl) => {
+        (merizod, testColl) => {
             const indexName = "a_1";
             assert.commandWorked(testColl.createIndex({a: 1}, {name: indexName}));
             const indexUri = getUriForIndex(testColl, indexName);
-            MongoRunner.stopMongod(mongod);
+            MongoRunner.stopMongod(merizod);
             const indexFile = dbpath + indexUri + ".wt";
             jsTestLog("corrupting index file: " + indexFile);
             corruptFile(indexFile);

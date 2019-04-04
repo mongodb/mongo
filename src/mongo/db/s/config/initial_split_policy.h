@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,17 +31,17 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/request_types/shard_collection_gen.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repl/read_concern_level.h"
+#include "merizo/s/catalog/type_chunk.h"
+#include "merizo/s/catalog/type_collection.h"
+#include "merizo/s/catalog/type_tags.h"
+#include "merizo/s/request_types/shard_collection_gen.h"
+#include "merizo/s/shard_id.h"
+#include "merizo/s/shard_key_pattern.h"
 
-namespace mongo {
+namespace merizo {
 
 class InitialSplitPolicy {
 public:
@@ -153,4 +153,4 @@ public:
         const ShardsvrShardCollection& request,
         repl::ReadConcernLevel readConcernLevel);
 };
-}  // namespace mongo
+}  // namespace merizo

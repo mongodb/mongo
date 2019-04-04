@@ -1,5 +1,5 @@
 //
-// Tests that merging chunks via mongos works/doesn't work with different chunk configurations
+// Tests that merging chunks via merizos works/doesn't work with different chunk configurations
 // with a compound shard key.
 //
 
@@ -30,13 +30,13 @@
         assert.gt(newVersion.i, oldVersion.i);
     };
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, merizos: 1});
 
-    var mongos = st.s;
-    var admin = mongos.getDB("admin");
-    var shards = mongos.getCollection("config.shards").find().toArray();
-    var chunks = mongos.getCollection("config.chunks");
-    var coll = mongos.getCollection("foo.bar");
+    var merizos = st.s;
+    var admin = merizos.getDB("admin");
+    var shards = merizos.getCollection("config.shards").find().toArray();
+    var chunks = merizos.getCollection("config.chunks");
+    var coll = merizos.getCollection("foo.bar");
 
     jsTest.log("Create a sharded collection with a compound shard key.");
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));

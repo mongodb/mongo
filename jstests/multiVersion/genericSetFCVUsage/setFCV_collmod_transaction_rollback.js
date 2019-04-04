@@ -14,7 +14,7 @@
 
     let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
     assert.neq(
-        null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+        null, conn, "merizod was unable to start up with version=" + latest + " and no data files");
     let adminDB = conn.getDB("admin");
 
     var collName = "collModTest";

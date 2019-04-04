@@ -3,17 +3,17 @@
 var {runMongoeBench} = (function() {
 
     /**
-     * Spawns a mongoebench process with the specified options.
+     * Spawns a merizoebench process with the specified options.
      *
      * If a plain JavaScript object is specified as the 'config' parameter, then it is serialized to
-     * a file as a JSON string which is then specified as the config file for the mongoebench
+     * a file as a JSON string which is then specified as the config file for the merizoebench
      * process.
      */
     function runMongoeBench(config, options = {}) {
-        const args = ["mongoebench"];
+        const args = ["merizoebench"];
 
         if (typeof config === "object") {
-            const filename = MongoRunner.dataPath + "mongoebench_config.json";
+            const filename = MongoRunner.dataPath + "merizoebench_config.json";
             writeFile(filename, tojson(config));
             args.push(filename);
         } else if (typeof config === "string") {
@@ -42,7 +42,7 @@ var {runMongoeBench} = (function() {
         }
 
         const exitCode = _runMongoProgram(...args);
-        assert.eq(0, exitCode, "encountered an error in mongoebench");
+        assert.eq(0, exitCode, "encountered an error in merizoebench");
     }
 
     return {runMongoeBench};

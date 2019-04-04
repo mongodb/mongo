@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,60 +27,60 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplicationRollback
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/rs_rollback.h"
+#include "merizo/db/repl/rs_rollback.h"
 
 #include <algorithm>
 #include <memory>
 
-#include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_interface.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/roll_back_local_operations.h"
-#include "mongo/db/repl/rollback_source.h"
-#include "mongo/db/repl/rslog.h"
-#include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/storage/remove_saver.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/bson/bsonelement_comparator.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/rename_collection.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/ops/delete.h"
+#include "merizo/db/ops/update.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/bgsync.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_interface.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_impl.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/roll_back_local_operations.h"
+#include "merizo/db/repl/rollback_source.h"
+#include "merizo/db/repl/rslog.h"
+#include "merizo/db/s/shard_identity_rollback_notifier.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/storage/remove_saver.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::shared_ptr;
 using std::unique_ptr;
@@ -623,7 +623,7 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
                  "enabled. Blocking until fail point is disabled.";
         while (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
             invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
-            mongo::sleepsecs(1);
+            merizo::sleepsecs(1);
         }
         uasserted(40502,
                   "failing rollback due to rollbackHangThenFailAfterWritingMinValid fail point");
@@ -958,7 +958,7 @@ Status _syncRollback(OperationContext* opCtx,
                  "enabled. Blocking until fail point is disabled.";
         while (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {
             invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
-            mongo::sleepsecs(1);
+            merizo::sleepsecs(1);
         }
     }
 
@@ -1646,4 +1646,4 @@ void rollback(OperationContext* opCtx,
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

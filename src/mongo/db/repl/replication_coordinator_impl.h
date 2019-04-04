@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,28 +33,28 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/repl/initial_syncer.h"
-#include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/db/repl/sync_source_resolver.h"
-#include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/repl/update_position_args.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/repl/initial_syncer.h"
+#include "merizo/db/repl/member_state.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_external_state.h"
+#include "merizo/db/repl/sync_source_resolver.h"
+#include "merizo/db/repl/topology_coordinator.h"
+#include "merizo/db/repl/update_position_args.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/platform/random.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/util/concurrency/with_lock.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 
 class Timer;
 template <typename T>
@@ -1456,4 +1456,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

@@ -151,7 +151,7 @@ load("jstests/libs/fixture_helpers.js");
     assert(!cursor.hasNext());
 
     //
-    // Test on collection with no indexes.  The local database is not accessible via mongos.
+    // Test on collection with no indexes.  The local database is not accessible via merizos.
     //
 
     if (!FixtureHelpers.isMongos(db)) {

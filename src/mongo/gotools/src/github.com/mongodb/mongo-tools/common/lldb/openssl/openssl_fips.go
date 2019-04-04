@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -12,7 +12,7 @@ import (
 	"fmt"
 
 	"github.com/10gen/openssl"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/options"
 )
 
 func init() {

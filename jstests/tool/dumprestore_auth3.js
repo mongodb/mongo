@@ -1,19 +1,19 @@
 // dumprestore_auth3.js
-// Tests that mongodump and mongorestore properly handle access control information when doing
+// Tests that merizodump and merizorestore properly handle access control information when doing
 // single-db dumps and restores
 
-// Runs the tool with the given name against the given mongod.
-function runTool(toolName, mongod, options) {
-    var opts = {host: mongod.host};
+// Runs the tool with the given name against the given merizod.
+function runTool(toolName, merizod, options) {
+    var opts = {host: merizod.host};
     Object.extend(opts, options);
     MongoRunner.runMongoTool(toolName, opts);
 }
 
 var dumpRestoreAuth3 = function(backup_role, restore_role) {
 
-    var mongod = MongoRunner.runMongod();
-    var admindb = mongod.getDB("admin");
-    var db = mongod.getDB("foo");
+    var merizod = MongoRunner.runMongod();
+    var admindb = merizod.getDB("admin");
+    var db = merizod.getDB("foo");
 
     jsTestLog("Creating Admin user & initial data");
     admindb.createUser({user: 'root', pwd: 'pass', roles: ['root']});
@@ -52,8 +52,8 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
 
     jsTestLog("Dump foo database without dumping user data");
     var dumpDir = MongoRunner.getAndPrepareDumpDirectory("dumprestore_auth3");
-    runTool("mongodump", mongod, {out: dumpDir, db: "foo"});
-    db = mongod.getDB('foo');
+    runTool("merizodump", merizod, {out: dumpDir, db: "foo"});
+    db = merizod.getDB('foo');
 
     db.dropDatabase();
     db.dropAllUsers();
@@ -62,11 +62,11 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     jsTestLog("Restore foo database from dump that doesn't contain user data ");
     // This test depends on W=0 to mask unique index violations.
     // This should be fixed once we implement TOOLS-341
-    runTool("mongorestore",
-            mongod,
+    runTool("merizorestore",
+            merizod,
             {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: "", writeConcern: "0"});
 
-    db = mongod.getDB('foo');
+    db = merizod.getDB('foo');
 
     assert.soon(function() {
         return db.bar.findOne();
@@ -86,8 +86,8 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     assert.eq(rolesCount, db.getRoles().length, "didn't create role");
 
     jsTestLog("Dump foo database *with* user data");
-    runTool("mongodump", mongod, {out: dumpDir, db: "foo", dumpDbUsersAndRoles: ""});
-    db = mongod.getDB('foo');
+    runTool("merizodump", merizod, {out: dumpDir, db: "foo", dumpDbUsersAndRoles: ""});
+    db = merizod.getDB('foo');
 
     db.dropDatabase();
     db.dropAllUsers();
@@ -98,8 +98,8 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     assert.eq(0, db.bar.count(), "didn't drop 'bar' collection");
 
     jsTestLog("Restore foo database without restoring user data, even though it's in the dump");
-    runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', writeConcern: "0"});
-    db = mongod.getDB('foo');
+    runTool("merizorestore", merizod, {dir: dumpDir + "foo/", db: 'foo', writeConcern: "0"});
+    db = merizod.getDB('foo');
 
     assert.soon(function() {
         return db.bar.findOne();
@@ -109,12 +109,12 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     assert.eq(0, db.getRoles().length, "Restored roles even though it shouldn't have");
 
     jsTestLog("Restore foo database *with* user data");
-    // SERVER-23290: removed writeConcern: "0" from the mongorestore command line options because,
+    // SERVER-23290: removed writeConcern: "0" from the merizorestore command line options because,
     // with it, sometimes the following assert.soon would succeed and then then userCount assert
     // would fail because it was not yet available
-    runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: ""});
-    db = mongod.getDB('foo');
-    admindb = mongod.getDB('admin');
+    runTool("merizorestore", merizod, {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: ""});
+    db = merizod.getDB('foo');
+    admindb = merizod.getDB('admin');
 
     assert.soon(function() {
         return db.bar.findOne();
@@ -136,15 +136,15 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
 
     jsTestLog("Restore foo database (and user data) with --drop so it overrides the changes made");
     // Restore with --drop to override the changes to user data
-    runTool("mongorestore", mongod, {
+    runTool("merizorestore", merizod, {
         dir: dumpDir + "foo/",
         db: 'foo',
         drop: "",
         restoreDbUsersAndRoles: "",
         writeConcern: "0"
     });
-    db = mongod.getDB('foo');
-    admindb = mongod.getDB('admin');
+    db = merizod.getDB('foo');
+    admindb = merizod.getDB('admin');
 
     assert.soon(function() {
         return db.bar.findOne();
@@ -165,8 +165,8 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     db.getSiblingDB('bar').createUser({user: "user", pwd: 'pwd', roles: []});
     db.getSiblingDB('admin').createUser({user: "user", pwd: 'pwd', roles: []});
     adminUsersCount += 1;
-    runTool("mongodump", mongod, {out: dumpDir, db: "admin"});
-    db = mongod.getDB('foo');
+    runTool("merizodump", merizod, {out: dumpDir, db: "admin"});
+    db = merizod.getDB('foo');
 
     // Change user data a bit.
     db.dropAllUsers();
@@ -174,10 +174,10 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     db.getSiblingDB('admin').dropAllUsers();
 
     jsTestLog("Restore just the admin database. User data should be restored by default");
-    runTool("mongorestore",
-            mongod,
+    runTool("merizorestore",
+            merizod,
             {dir: dumpDir + "admin/", db: 'admin', drop: "", writeConcern: "0"});
-    db = mongod.getDB('foo');
+    db = merizod.getDB('foo');
     var otherdb = db.getSiblingDB('bar');
     var admindb = db.getSiblingDB('admin');
 
@@ -201,8 +201,8 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
                  "version doc was changed by restore");
 
     jsTestLog("Dump all databases");
-    runTool("mongodump", mongod, {out: dumpDir});
-    db = mongod.getDB('foo');
+    runTool("merizodump", merizod, {out: dumpDir});
+    db = merizod.getDB('foo');
 
     db.dropDatabase();
     db.dropAllUsers();
@@ -213,8 +213,8 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     assert.eq(0, db.bar.count(), "didn't drop 'bar' collection");
 
     jsTestLog("Restore all databases");
-    runTool("mongorestore", mongod, {dir: dumpDir, writeConcern: "0"});
-    db = mongod.getDB('foo');
+    runTool("merizorestore", merizod, {dir: dumpDir, writeConcern: "0"});
+    db = merizod.getDB('foo');
 
     assert.soon(function() {
         return db.bar.findOne();
@@ -226,7 +226,7 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
                  db.getSiblingDB('admin').system.version.findOne(),
                  "version doc was changed by restore");
 
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 };
 
 // Tests that the default auth roles of backup and restore work properly.

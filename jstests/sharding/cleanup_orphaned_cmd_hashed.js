@@ -5,11 +5,11 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, merizos: 1});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var coll = mongos.getCollection("foo.bar");
+    var merizos = st.s0;
+    var admin = merizos.getDB("admin");
+    var coll = merizos.getCollection("foo.bar");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));

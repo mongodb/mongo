@@ -15,7 +15,7 @@
                   isSharded);
 
         // Fail with retryable error.
-        // Sharding tests require failInternalCommands: true, since the mongos appears to mongod to
+        // Sharding tests require failInternalCommands: true, since the merizos appears to merizod to
         // be an internal client.
         const retryableError = ErrorCodes.InterruptedDueToStepDown;
         assert.commandWorked(st.rs0.getPrimary().adminCommand({

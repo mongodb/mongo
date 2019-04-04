@@ -2,7 +2,7 @@
 
 // Test script from SERVER-1742
 
-// MongoDB test script for mapreduce with geo query
+// MerizoDB test script for mapreduce with geo query
 
 // setup test collection
 db.apples.drop();
@@ -49,7 +49,7 @@ res = db.apples.mapReduce(m, r, {out: {inline: 1}, query: {apples: {'$lt': 9}}})
 total = res.results[0];
 assert.eq(11, total.value.apples);
 
-// mapreduce with geo query gives error on mongodb version 1.6.2
+// mapreduce with geo query gives error on merizodb version 1.6.2
 // uncaught exception: map reduce failed: {
 // "assertion" : "manual matcher config not allowed",
 // "assertionCode" : 13285,

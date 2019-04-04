@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,45 +34,45 @@
  *
  * #include <normal/include/files.h>
  *
- * #include "mongo/db/sorter/sorter.h"
+ * #include "merizo/db/sorter/sorter.h"
  *
- * namespace mongo {
+ * namespace merizo {
  *     // Your code
  * }
  *
- * #include "mongo/db/sorter/sorter.cpp"
+ * #include "merizo/db/sorter/sorter.cpp"
  * MONGO_CREATE_SORTER(MyKeyType, MyValueType, MyComparatorType);
  *
  * Do this once for each unique set of parameters to MONGO_CREATE_SORTER.
  */
 
-#include "mongo/db/sorter/sorter.h"
+#include "merizo/db/sorter/sorter.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <snappy.h>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/config.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/encryption_hooks.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/bufreader.h"
-#include "mongo/util/destructor_guard.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/unowned_ptr.h"
+#include "merizo/base/string_data.h"
+#include "merizo/config.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/encryption_hooks.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/platform/overflow_arithmetic.h"
+#include "merizo/s/is_merizos.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/bufreader.h"
+#include "merizo/util/destructor_guard.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/unowned_ptr.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace sorter {
 
 using std::shared_ptr;
-using namespace mongoutils;
+using namespace merizoutils;
 
 // We need to use the "real" errno everywhere, not GetLastError() on Windows
 inline std::string myErrnoWithDescription() {
@@ -904,11 +904,11 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
                                                const std::streampos fileStartOffset,
                                                const Settings& settings)
     : _settings(settings) {
-    namespace str = mongoutils::str;
+    namespace str = merizoutils::str;
 
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(
-        16946, "Attempting to use external sort from mongos. This is not allowed.", !isMongos());
+        16946, "Attempting to use external sort from merizos. This is not allowed.", !isMongos());
 
     uassert(17148,
             "Attempting to use external sort without setting SortOptions::tempDir",
@@ -946,7 +946,7 @@ void SortedFileWriter<Key, Value>::addAlreadySorted(const Key& key, const Value&
 
 template <typename Key, typename Value>
 void SortedFileWriter<Key, Value>::spill() {
-    namespace str = mongoutils::str;
+    namespace str = merizoutils::str;
 
     int32_t size = _buffer.len();
     char* outBuffer = _buffer.buf();
@@ -1036,7 +1036,7 @@ Sorter<Key, Value>* Sorter<Key, Value>::make(const SortOptions& opts,
                                              const Settings& settings) {
     // This should be checked by consumers, but if it isn't try to fail early.
     uassert(16947,
-            "Attempting to use external sort from mongos. This is not allowed.",
+            "Attempting to use external sort from merizos. This is not allowed.",
             !(isMongos() && opts.extSortAllowed));
 
     uassert(17149,

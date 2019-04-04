@@ -22,7 +22,7 @@
         "date": 1,
         "time": 1,
         "renameCollection": 1,
-        "mongodb": 1,
+        "merizodb": 1,
         "testing": 1,
         "data": 1
     });

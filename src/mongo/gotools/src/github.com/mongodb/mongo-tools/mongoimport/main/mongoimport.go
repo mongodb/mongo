@@ -1,39 +1,39 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Main package for the mongoimport tool.
+// Main package for the merizoimport tool.
 package main
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongoimport"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/signals"
+	"github.com/merizodb/merizo-tools/common/util"
+	"github.com/merizodb/merizo-tools/merizoimport"
 )
 
 func main() {
 	// initialize command-line opts
-	opts := options.New("mongoimport", mongoimport.Usage,
+	opts := options.New("merizoimport", merizoimport.Usage,
 		options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
 
-	inputOpts := &mongoimport.InputOptions{}
+	inputOpts := &merizoimport.InputOptions{}
 	opts.AddOptions(inputOpts)
-	ingestOpts := &mongoimport.IngestOptions{}
+	ingestOpts := &merizoimport.IngestOptions{}
 	opts.AddOptions(ingestOpts)
 	opts.URI.AddKnownURIParameters(options.KnownURIOptionsWriteConcern)
 
 	args, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
-		log.Logvf(log.Always, "try 'mongoimport --help' for more information")
+		log.Logvf(log.Always, "try 'merizoimport --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -62,7 +62,7 @@ func main() {
 	defer sessionProvider.Close()
 	sessionProvider.SetBypassDocumentValidation(ingestOpts.BypassDocumentValidation)
 
-	m := mongoimport.MongoImport{
+	m := merizoimport.MongoImport{
 		ToolOptions:     opts,
 		InputOptions:    inputOpts,
 		IngestOptions:   ingestOpts,
@@ -71,7 +71,7 @@ func main() {
 
 	if err = m.ValidateSettings(args); err != nil {
 		log.Logvf(log.Always, "error validating settings: %v", err)
-		log.Logvf(log.Always, "try 'mongoimport --help' for more information")
+		log.Logvf(log.Always, "try 'merizoimport --help' for more information")
 		os.Exit(util.ExitError)
 	}
 

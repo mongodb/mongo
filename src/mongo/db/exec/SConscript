@@ -12,9 +12,9 @@ env.Library(
         "working_set_computed_data.cpp"
     ],
     LIBDEPS = [
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/db/bson/dotted_path_support",
+        "$BUILD_DIR/merizo/db/service_context",
     ],
 )
 
@@ -34,7 +34,7 @@ env.Library(
         "scoped_timer.cpp",
     ],
     LIBDEPS = [
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/util/net/network',
     ],
 )
 
@@ -44,11 +44,11 @@ env.Library(
         'stagedebug_cmd.cpp'
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/index/index_access_methods",
-        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/merizo/db/index/index_access_methods",
+        "$BUILD_DIR/merizo/db/query_exec",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
     ],
 )
 
@@ -58,11 +58,11 @@ env.CppUnitTest(
         "queued_data_stage_test.cpp",
     ],
     LIBDEPS = [
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/dbtests/mocklib",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        "$BUILD_DIR/merizo/db/query_exec",
+        "$BUILD_DIR/merizo/db/service_context_d_test_fixture",
+        "$BUILD_DIR/merizo/dbtests/mocklib",
+        "$BUILD_DIR/merizo/util/clock_source_mock",
     ],
 )
 
@@ -72,13 +72,13 @@ env.CppUnitTest(
         "sort_test.cpp",
     ],
     LIBDEPS = [
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/dbtests/mocklib",
-        "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        "$BUILD_DIR/merizo/db/query_exec",
+        "$BUILD_DIR/merizo/db/service_context_d_test_fixture",
+        "$BUILD_DIR/merizo/dbtests/mocklib",
+        "$BUILD_DIR/merizo/db/query/collation/collator_factory_mock",
+        "$BUILD_DIR/merizo/db/query/collation/collator_interface_mock",
+        "$BUILD_DIR/merizo/util/clock_source_mock",
     ],
 )
 
@@ -88,11 +88,11 @@ env.CppUnitTest(
         "projection_exec_test.cpp",
     ],
     LIBDEPS = [
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_d",
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        "$BUILD_DIR/merizo/db/query_exec",
+        "$BUILD_DIR/merizo/db/query/collation/collator_interface_mock",
+        "$BUILD_DIR/merizo/db/query/query_test_service_context",
+        "$BUILD_DIR/merizo/db/service_context_d",
     ],
 )
 
@@ -102,7 +102,7 @@ env.CppUnitTest(
         'projection_exec_agg_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/projection_exec_agg',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/projection_exec_agg',
     ],
 )

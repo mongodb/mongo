@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/cursor_manager.h"
+#include "merizo/db/cursor_manager.h"
 
-#include "mongo/base/data_cursor.h"
-#include "mongo/base/init.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/cursor_server_params.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/kill_sessions_common.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/service_context.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/startup_test.h"
+#include "merizo/base/data_cursor.h"
+#include "merizo/base/init.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/background.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/client.h"
+#include "merizo/db/cursor_server_params.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/kill_sessions_common.h"
+#include "merizo/db/logical_session_cache.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/service_context.h"
+#include "merizo/platform/random.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/startup_test.h"
 
-namespace mongo {
+namespace merizo {
 
 constexpr int CursorManager::kNumPartitions;
 
@@ -414,4 +414,4 @@ Status CursorManager::checkAuthForKillCursors(OperationContext* opCtx, CursorId 
     return as->checkAuthForKillCursors(cursor->nss(), cursor->getAuthenticatedUsers());
 }
 
-}  // namespace mongo
+}  // namespace merizo

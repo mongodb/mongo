@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/index_filter_commands.h"
-#include "mongo/db/commands/plan_cache_commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/log.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/index_filter_commands.h"
+#include "merizo/db/commands/plan_cache_commands.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/util/log.h"
 
 
 namespace {
 
 using std::string;
 using std::vector;
-using namespace mongo;
+using namespace merizo;
 
 /**
  * Retrieves a collection's query settings and plan cache from the database.
@@ -106,7 +106,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands, MONGO_NO_PREREQUI
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::stringstream;
@@ -360,7 +360,7 @@ Status SetFilter::set(OperationContext* opCtx,
     if (indexesElt.eoo()) {
         return Status(ErrorCodes::BadValue, "required field indexes missing");
     }
-    if (indexesElt.type() != mongo::Array) {
+    if (indexesElt.type() != merizo::Array) {
         return Status(ErrorCodes::BadValue, "required field indexes must be an array");
     }
     vector<BSONElement> indexesEltArray = indexesElt.Array();
@@ -405,4 +405,4 @@ Status SetFilter::set(OperationContext* opCtx,
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

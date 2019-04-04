@@ -1,4 +1,4 @@
-# wtperf options file to simulate populating a MongoDB oplog
+# wtperf options file to simulate populating a MerizoDB oplog
 # This creates a test database of 7.8GB
 conn_config="cache_size=2GB,checkpoint=(wait=60)"
 table_config="type=file"

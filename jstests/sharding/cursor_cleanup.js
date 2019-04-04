@@ -2,12 +2,12 @@
 // Tests cleanup of sharded and unsharded cursors
 //
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+var st = new ShardingTest({shards: 2, merizos: 1});
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
-var collUnsharded = mongos.getCollection("foo.baz");
+var merizos = st.s0;
+var admin = merizos.getDB("admin");
+var coll = merizos.getCollection("foo.bar");
+var collUnsharded = merizos.getCollection("foo.baz");
 
 // Shard collection
 printjson(admin.runCommand({enableSharding: coll.getDB() + ""}));

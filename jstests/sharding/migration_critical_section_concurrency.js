@@ -8,7 +8,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
-    var st = new ShardingTest({mongos: 1, shards: 2});
+    var st = new ShardingTest({merizos: 1, shards: 2});
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
     st.ensurePrimaryShard('TestDB', st.shard0.shardName);
 

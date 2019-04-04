@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,28 +33,28 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/client/fetcher.h"
-#include "mongo/client/remote_command_retry_scheduler.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/callback_completion_guard.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/task_runner.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/progress_meter.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/client/dbclient_connection.h"
+#include "merizo/client/fetcher.h"
+#include "merizo/client/remote_command_retry_scheduler.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/base_cloner.h"
+#include "merizo/db/repl/callback_completion_guard.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/repl/task_runner.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/concurrency/thread_pool.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/progress_meter.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 class StorageInterface;
@@ -311,4 +311,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

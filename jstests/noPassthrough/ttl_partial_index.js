@@ -2,7 +2,7 @@
 // SERVER-17984.
 (function() {
     "use strict";
-    // Launch mongod with shorter TTL monitor sleep interval.
+    // Launch merizod with shorter TTL monitor sleep interval.
     var runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
     var coll = runner.getDB("test").ttl_partial_index;
     coll.drop();

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/query.h"
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/client/query.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/client.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/s/collection_sharding_runtime.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/chunk_version.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/shard_server_test_fixture.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using unittest::assertGet;
@@ -386,4 +386,4 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

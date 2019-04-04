@@ -1,18 +1,18 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package lldb implements generic connection to MongoDB, and contains
+// Package lldb implements generic connection to MerizoDB, and contains
 // subpackages for specific methods of connection.
 package lldb
 
 import (
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/llmgo/bson"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/password"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/password"
 
 	"fmt"
 	"io"
@@ -33,7 +33,7 @@ const (
 	DisableSocketTimeout
 )
 
-// MongoDB enforced limits.
+// MerizoDB enforced limits.
 const (
 	MaxBSONSize = 16 * 1024 * 1024 // 16MB - maximum BSON document size
 )
@@ -47,7 +47,7 @@ const (
 	ErrLostConnection     = "lost connection to server"
 	ErrNoReachableServers = "no reachable servers"
 	ErrNsNotFound         = "ns not found"
-	// replication errors list the replset name if we are talking to a mongos,
+	// replication errors list the replset name if we are talking to a merizos,
 	// so we can only check for this universal prefix
 	ErrReplTimeoutPrefix            = "waiting for replication timed out"
 	ErrCouldNotContactPrimaryPrefix = "could not contact primary for replica set"
@@ -87,7 +87,7 @@ type ApplyOpsResponse struct {
 	ErrMsg string `bson:"errmsg"`
 }
 
-// Oplog represents a MongoDB oplog document.
+// Oplog represents a MerizoDB oplog document.
 type Oplog struct {
 	Timestamp bson.MongoTimestamp `bson:"ts"`
 	HistoryID int64               `bson:"h"`

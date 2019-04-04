@@ -1,6 +1,6 @@
 /**
  * Pins a cursor in a seperate shell and then runs the given function.
- * 'conn': a connection to an instance of a mongod or mongos.
+ * 'conn': a connection to an instance of a merizod or merizos.
  * 'sessionId': The id present if the database is currently in a session.
  * 'dbName': the database to use with the cursor.
  * 'assertFunction': a function containing the test to be run after a cursor is pinned and hanging.

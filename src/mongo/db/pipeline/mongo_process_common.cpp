@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/mongo_process_common.h"
+#include "merizo/db/pipeline/merizo_process_common.h"
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/net/socket_utils.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/client.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/db/service_context.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/net/socket_utils.h"
 
-namespace mongo {
+namespace merizo {
 
 std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -75,7 +75,7 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
             continue;
         }
 
-        // Delegate to the mongoD- or mongoS-specific implementation of _reportCurrentOpForClient.
+        // Delegate to the merizoD- or merizoS-specific implementation of _reportCurrentOpForClient.
         ops.emplace_back(_reportCurrentOpForClient(opCtx, client, truncateMode));
     }
 
@@ -92,7 +92,7 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
             if (auto lsid = cursor.getLsid()) {
                 cursorObj.append("lsid", lsid->toBSON());
             }
-            if (auto planSummaryData = cursor.getPlanSummary()) {  // Not present on mongos.
+            if (auto planSummaryData = cursor.getPlanSummary()) {  // Not present on merizos.
                 cursorObj.append("planSummary", *planSummaryData);
             }
 
@@ -105,7 +105,7 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
         }
     }
 
-    // If we need to report on idle Sessions, defer to the mongoD or mongoS implementations.
+    // If we need to report on idle Sessions, defer to the merizoD or merizoS implementations.
     if (sessionMode == CurrentOpSessionsMode::kIncludeIdle) {
         _reportCurrentOpsForIdleSessions(opCtx, userMode, &ops);
     }
@@ -167,4 +167,4 @@ std::vector<FieldPath> MongoProcessCommon::_shardKeyToDocumentKeyFields(
     return result;
 }
 
-}  // namespace mongo
+}  // namespace merizo

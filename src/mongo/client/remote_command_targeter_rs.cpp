@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/remote_command_targeter_rs.h"
+#include "merizo/client/remote_command_targeter_rs.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/base/status_with.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 
 RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
                                                  const std::vector<HostAndPort>& seedHosts)
@@ -74,7 +74,7 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCt
     }
 
     // Enforce a 20-second ceiling on the time spent looking for a host. This conforms with the
-    // behavior used throughout mongos prior to version 3.4, but is not fundamentally desirable.
+    // behavior used throughout merizos prior to version 3.4, but is not fundamentally desirable.
     // See comment in remote_command_targeter.h for details.
     return _rsMonitor
         ->getHostOrRefresh(readPref,
@@ -94,4 +94,4 @@ void RemoteCommandTargeterRS::markHostUnreachable(const HostAndPort& host, const
     _rsMonitor->failedHost(host, status);
 }
 
-}  // namespace mongo
+}  // namespace merizo

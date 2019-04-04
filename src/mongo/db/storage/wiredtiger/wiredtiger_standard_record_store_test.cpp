@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,41 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 #include <sstream>
 #include <string>
 #include <time.h>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
-#include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_stones.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/init.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/json.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/kv/kv_engine_test_harness.h"
+#include "merizo/db/storage/kv/kv_prefix.h"
+#include "merizo/db/storage/record_store_test_harness.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_record_store_oplog_stones.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_size_storer.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/clock_source_mock.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::unique_ptr;
@@ -199,7 +199,7 @@ std::unique_ptr<HarnessHelper> makeHarnessHelper() {
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+    merizo::registerHarnessHelperFactory(makeHarnessHelper);
     return Status::OK();
 }
 
@@ -297,7 +297,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     rs.reset(nullptr);  // this has to be deleted before ss
 }
 
-class SizeStorerUpdateTest : public mongo::unittest::Test {
+class SizeStorerUpdateTest : public merizo::unittest::Test {
 private:
     virtual void setUp() {
         harnessHelper.reset(new WiredTigerHarnessHelper());
@@ -345,4 +345,4 @@ TEST_F(SizeStorerUpdateTest, Basic) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

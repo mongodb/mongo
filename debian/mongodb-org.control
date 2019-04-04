@@ -1,23 +1,23 @@
-Source: mongodb-org
+Source: merizodb-org
 Section: database
 Priority: optional
-Maintainer: Ernie Hershey <ernie.hershey@mongodb.com>
+Maintainer: Ernie Hershey <ernie.hershey@merizodb.com>
 Build-Depends: 
 Standards-Version: 3.8.0
-Homepage: http://www.mongodb.org
+Homepage: http://www.merizodb.org
 
-Package: mongodb-org
-Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-org-unstable-server, mongodb-nightly, mongodb-nightly, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Package: merizodb-org
+Conflicts: merizo-10gen, merizo-10gen-enterprise, merizo-10gen-enterprise-server, merizo-10gen-server, merizo-10gen-unstable, merizo-10gen-unstable-enterprise, merizo-10gen-unstable-enterprise-merizos, merizo-10gen-unstable-enterprise-server, merizo-10gen-unstable-enterprise-shell, merizo-10gen-unstable-enterprise-tools, merizo-10gen-unstable-merizos, merizo-10gen-unstable-server, merizo-10gen-unstable-shell, merizo-10gen-unstable-tools, merizo18-10gen, merizo18-10gen-server, merizo20-10gen, merizo20-10gen-server, merizodb, merizodb-server, merizodb-dev, merizodb-clients, merizodb-10gen, merizodb-10gen-enterprise, merizodb-10gen-unstable, merizodb-10gen-unstable-enterprise, merizodb-10gen-unstable-enterprise-merizos, merizodb-10gen-unstable-enterprise-server, merizodb-10gen-unstable-enterprise-shell, merizodb-10gen-unstable-enterprise-tools, merizodb-10gen-unstable-merizos, merizodb-10gen-unstable-server, merizodb-10gen-unstable-shell, merizodb-10gen-unstable-tools, merizodb-enterprise-unstable, merizodb-enterprise-unstable-merizos, merizodb-enterprise-unstable-server, merizodb-enterprise-unstable-shell, merizodb-enterprise-unstable-tools, merizodb-org-unstable, merizodb-org-unstable-merizos, merizodb-org-unstable-shell, merizodb-org-unstable-tools, merizodb-org-unstable-server, merizodb-nightly, merizodb-nightly, merizodb-enterprise, merizodb-enterprise-merizos, merizodb-enterprise-server, merizodb-enterprise-shell, merizodb-enterprise-tools, merizodb-stable, merizodb18-10gen, merizodb20-10gen
 Architecture: any
-Depends: mongodb-org-shell, mongodb-org-server, mongodb-org-mongos, mongodb-org-tools
-Description: MongoDB open source document-oriented database system (metapackage)
- MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+Depends: merizodb-org-shell, merizodb-org-server, merizodb-org-merizos, merizodb-org-tools
+Description: MerizoDB open source document-oriented database system (metapackage)
+ MerizoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MerizoDB provides high performance for both reads and writes. MerizoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
  .
- MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ MerizoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
  .
- MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ MerizoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
  .
- MongoDB features:
+ MerizoDB features:
  * JSON Data Model with Dynamic Schemas
  * Auto-Sharding for Horizontal Scalability
  * Built-In Replication for High Availability
@@ -26,20 +26,20 @@ Description: MongoDB open source document-oriented database system (metapackage)
  * Text Search
  * Aggregation Framework & Native MapReduce
  .
- This metapackage will install the mongo shell, import/export tools, other client utilities, server software, default configuration, and init.d scripts.
+ This metapackage will install the merizo shell, import/export tools, other client utilities, server software, default configuration, and init.d scripts.
 
-Package: mongodb-org-shell
-Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-org-unstable-server, mongodb-nightly, mongodb-nightly, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Package: merizodb-org-shell
+Conflicts: merizo-10gen, merizo-10gen-enterprise, merizo-10gen-enterprise-server, merizo-10gen-server, merizo-10gen-unstable, merizo-10gen-unstable-enterprise, merizo-10gen-unstable-enterprise-merizos, merizo-10gen-unstable-enterprise-server, merizo-10gen-unstable-enterprise-shell, merizo-10gen-unstable-enterprise-tools, merizo-10gen-unstable-merizos, merizo-10gen-unstable-server, merizo-10gen-unstable-shell, merizo-10gen-unstable-tools, merizo18-10gen, merizo18-10gen-server, merizo20-10gen, merizo20-10gen-server, merizodb, merizodb-server, merizodb-dev, merizodb-clients, merizodb-10gen, merizodb-10gen-enterprise, merizodb-10gen-unstable, merizodb-10gen-unstable-enterprise, merizodb-10gen-unstable-enterprise-merizos, merizodb-10gen-unstable-enterprise-server, merizodb-10gen-unstable-enterprise-shell, merizodb-10gen-unstable-enterprise-tools, merizodb-10gen-unstable-merizos, merizodb-10gen-unstable-server, merizodb-10gen-unstable-shell, merizodb-10gen-unstable-tools, merizodb-enterprise-unstable, merizodb-enterprise-unstable-merizos, merizodb-enterprise-unstable-server, merizodb-enterprise-unstable-shell, merizodb-enterprise-unstable-tools, merizodb-org-unstable, merizodb-org-unstable-merizos, merizodb-org-unstable-shell, merizodb-org-unstable-tools, merizodb-org-unstable-server, merizodb-nightly, merizodb-nightly, merizodb-enterprise, merizodb-enterprise-merizos, merizodb-enterprise-server, merizodb-enterprise-shell, merizodb-enterprise-tools, merizodb-stable, merizodb18-10gen, merizodb20-10gen
 Architecture: any
 Depends: ${shlibs:Depends}
-Description: MongoDB shell client
- MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+Description: MerizoDB shell client
+ MerizoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MerizoDB provides high performance for both reads and writes. MerizoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
  .
- MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ MerizoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
  .
- MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ MerizoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
  .
- MongoDB features:
+ MerizoDB features:
  * JSON Data Model with Dynamic Schemas
  * Auto-Sharding for Horizontal Scalability
  * Built-In Replication for High Availability
@@ -48,20 +48,20 @@ Description: MongoDB shell client
  * Text Search
  * Aggregation Framework & Native MapReduce
  .
- This package contains the mongo shell.
+ This package contains the merizo shell.
 
-Package: mongodb-org-server
-Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-org-unstable-server, mongodb-nightly, mongodb-nightly, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Package: merizodb-org-server
+Conflicts: merizo-10gen, merizo-10gen-enterprise, merizo-10gen-enterprise-server, merizo-10gen-server, merizo-10gen-unstable, merizo-10gen-unstable-enterprise, merizo-10gen-unstable-enterprise-merizos, merizo-10gen-unstable-enterprise-server, merizo-10gen-unstable-enterprise-shell, merizo-10gen-unstable-enterprise-tools, merizo-10gen-unstable-merizos, merizo-10gen-unstable-server, merizo-10gen-unstable-shell, merizo-10gen-unstable-tools, merizo18-10gen, merizo18-10gen-server, merizo20-10gen, merizo20-10gen-server, merizodb, merizodb-server, merizodb-dev, merizodb-clients, merizodb-10gen, merizodb-10gen-enterprise, merizodb-10gen-unstable, merizodb-10gen-unstable-enterprise, merizodb-10gen-unstable-enterprise-merizos, merizodb-10gen-unstable-enterprise-server, merizodb-10gen-unstable-enterprise-shell, merizodb-10gen-unstable-enterprise-tools, merizodb-10gen-unstable-merizos, merizodb-10gen-unstable-server, merizodb-10gen-unstable-shell, merizodb-10gen-unstable-tools, merizodb-enterprise-unstable, merizodb-enterprise-unstable-merizos, merizodb-enterprise-unstable-server, merizodb-enterprise-unstable-shell, merizodb-enterprise-unstable-tools, merizodb-org-unstable, merizodb-org-unstable-merizos, merizodb-org-unstable-shell, merizodb-org-unstable-tools, merizodb-org-unstable-server, merizodb-nightly, merizodb-nightly, merizodb-enterprise, merizodb-enterprise-merizos, merizodb-enterprise-server, merizodb-enterprise-shell, merizodb-enterprise-tools, merizodb-stable, merizodb18-10gen, merizodb20-10gen
 Architecture: any
 Depends: ${shlibs:Depends}, adduser, tzdata
-Description: MongoDB database server
- MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+Description: MerizoDB database server
+ MerizoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MerizoDB provides high performance for both reads and writes. MerizoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
  .
- MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ MerizoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
  .
- MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ MerizoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
  .
- MongoDB features:
+ MerizoDB features:
  * JSON Data Model with Dynamic Schemas
  * Auto-Sharding for Horizontal Scalability
  * Built-In Replication for High Availability
@@ -70,20 +70,20 @@ Description: MongoDB database server
  * Text Search
  * Aggregation Framework & Native MapReduce
  .
- This package contains the MongoDB server software, default configuration files, and init.d scripts.
+ This package contains the MerizoDB server software, default configuration files, and init.d scripts.
 
-Package: mongodb-org-mongos
-Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-org-unstable-server, mongodb-nightly, mongodb-nightly, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Package: merizodb-org-merizos
+Conflicts: merizo-10gen, merizo-10gen-enterprise, merizo-10gen-enterprise-server, merizo-10gen-server, merizo-10gen-unstable, merizo-10gen-unstable-enterprise, merizo-10gen-unstable-enterprise-merizos, merizo-10gen-unstable-enterprise-server, merizo-10gen-unstable-enterprise-shell, merizo-10gen-unstable-enterprise-tools, merizo-10gen-unstable-merizos, merizo-10gen-unstable-server, merizo-10gen-unstable-shell, merizo-10gen-unstable-tools, merizo18-10gen, merizo18-10gen-server, merizo20-10gen, merizo20-10gen-server, merizodb, merizodb-server, merizodb-dev, merizodb-clients, merizodb-10gen, merizodb-10gen-enterprise, merizodb-10gen-unstable, merizodb-10gen-unstable-enterprise, merizodb-10gen-unstable-enterprise-merizos, merizodb-10gen-unstable-enterprise-server, merizodb-10gen-unstable-enterprise-shell, merizodb-10gen-unstable-enterprise-tools, merizodb-10gen-unstable-merizos, merizodb-10gen-unstable-server, merizodb-10gen-unstable-shell, merizodb-10gen-unstable-tools, merizodb-enterprise-unstable, merizodb-enterprise-unstable-merizos, merizodb-enterprise-unstable-server, merizodb-enterprise-unstable-shell, merizodb-enterprise-unstable-tools, merizodb-org-unstable, merizodb-org-unstable-merizos, merizodb-org-unstable-shell, merizodb-org-unstable-tools, merizodb-org-unstable-server, merizodb-nightly, merizodb-nightly, merizodb-enterprise, merizodb-enterprise-merizos, merizodb-enterprise-server, merizodb-enterprise-shell, merizodb-enterprise-tools, merizodb-stable, merizodb18-10gen, merizodb20-10gen
 Architecture: any
 Depends: ${shlibs:Depends}, tzdata
-Description: MongoDB sharded cluster query router
- MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+Description: MerizoDB sharded cluster query router
+ MerizoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MerizoDB provides high performance for both reads and writes. MerizoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
  .
- MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ MerizoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
  .
- MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ MerizoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
  .
- MongoDB features:
+ MerizoDB features:
  * JSON Data Model with Dynamic Schemas
  * Auto-Sharding for Horizontal Scalability
  * Built-In Replication for High Availability
@@ -92,20 +92,20 @@ Description: MongoDB sharded cluster query router
  * Text Search
  * Aggregation Framework & Native MapReduce
  .
- This package contains mongos, the MongoDB sharded cluster query router.
+ This package contains merizos, the MerizoDB sharded cluster query router.
 
-Package: mongodb-org-tools
-Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-org-unstable-server, mongodb-nightly, mongodb-nightly, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Package: merizodb-org-tools
+Conflicts: merizo-10gen, merizo-10gen-enterprise, merizo-10gen-enterprise-server, merizo-10gen-server, merizo-10gen-unstable, merizo-10gen-unstable-enterprise, merizo-10gen-unstable-enterprise-merizos, merizo-10gen-unstable-enterprise-server, merizo-10gen-unstable-enterprise-shell, merizo-10gen-unstable-enterprise-tools, merizo-10gen-unstable-merizos, merizo-10gen-unstable-server, merizo-10gen-unstable-shell, merizo-10gen-unstable-tools, merizo18-10gen, merizo18-10gen-server, merizo20-10gen, merizo20-10gen-server, merizodb, merizodb-server, merizodb-dev, merizodb-clients, merizodb-10gen, merizodb-10gen-enterprise, merizodb-10gen-unstable, merizodb-10gen-unstable-enterprise, merizodb-10gen-unstable-enterprise-merizos, merizodb-10gen-unstable-enterprise-server, merizodb-10gen-unstable-enterprise-shell, merizodb-10gen-unstable-enterprise-tools, merizodb-10gen-unstable-merizos, merizodb-10gen-unstable-server, merizodb-10gen-unstable-shell, merizodb-10gen-unstable-tools, merizodb-enterprise-unstable, merizodb-enterprise-unstable-merizos, merizodb-enterprise-unstable-server, merizodb-enterprise-unstable-shell, merizodb-enterprise-unstable-tools, merizodb-org-unstable, merizodb-org-unstable-merizos, merizodb-org-unstable-shell, merizodb-org-unstable-tools, merizodb-org-unstable-server, merizodb-nightly, merizodb-nightly, merizodb-enterprise, merizodb-enterprise-merizos, merizodb-enterprise-server, merizodb-enterprise-shell, merizodb-enterprise-tools, merizodb-stable, merizodb18-10gen, merizodb20-10gen
 Architecture: any
 Depends: ${shlibs:Depends}
-Description: MongoDB tools
- MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+Description: MerizoDB tools
+ MerizoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MerizoDB provides high performance for both reads and writes. MerizoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
  .
- MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ MerizoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
  .
- MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ MerizoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
  .
- MongoDB features:
+ MerizoDB features:
  * JSON Data Model with Dynamic Schemas
  * Auto-Sharding for Horizontal Scalability
  * Built-In Replication for High Availability
@@ -114,4 +114,4 @@ Description: MongoDB tools
  * Text Search
  * Aggregation Framework & Native MapReduce
  .
- This package contains standard utilities for interacting with MongoDB.
+ This package contains standard utilities for interacting with MerizoDB.

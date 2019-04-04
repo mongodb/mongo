@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,30 +31,30 @@
  * Unit tests for DocumentSource classes.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/mock_yield_policies.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/stage_builder.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/client.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/exec/collection_scan.h"
+#include "merizo/db/exec/multi_plan.h"
+#include "merizo/db/exec/plan_stage.h"
+#include "merizo/db/pipeline/dependencies.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_cursor.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/pipeline/pipeline.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/mock_yield_policies.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/stage_builder.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using boost::intrusive_ptr;
@@ -481,4 +481,4 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

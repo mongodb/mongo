@@ -4617,7 +4617,7 @@ _ACEOF
 
 fi
 
-# MongoDB modification needed because we don't run configure everywhere we build.
+# MerizoDB modification needed because we don't run configure everywhere we build.
 # We don't use mallinfo anyway. It's an obsolete int-based stats API.
 # Check whether --enable-tcmalloc-mallinfo was given.
 if test "${enable_tcmalloc_mallinfo+set}" = set; then :

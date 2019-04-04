@@ -1220,7 +1220,7 @@ int main(int argc, char** argv) {
     RE re_testZ5("(*UCP)(*LIMIT_MATCH=1000)(*ANY)(*UTF)...");
     CHECK(re_testZ5.FullMatch(utf8_string));
 
-    // <Added by MongoDB>
+    // <Added by MerizoDB>
     {
       // Test case where user specifies an option but doesn't close the parens.
       RE re_test("(*LIMIT_MATCH=1000");
@@ -1238,7 +1238,7 @@ int main(int argc, char** argv) {
       CHECK(!re_test.FullMatch("a\nb"));
       CHECK(re_test.FullMatch("a\rb"));
     }
-    // </Added by MongoDB>
+    // </Added by MerizoDB>
 
     // Check that '.' matches one byte or UTF-8 character
     // according to the mode.

@@ -1,13 +1,13 @@
 /**
  * Tests that logged users will not show up in the log.
  *
- * @param mongo {Mongo} connection object.
+ * @param merizo {Mongo} connection object.
  * @tags: [requires_sharding]
  */
-var doTest = function(mongo, callSetParam) {
+var doTest = function(merizo, callSetParam) {
     var TEST_USER = 'foo';
     var TEST_PWD = 'bar';
-    var testDB = mongo.getDB('test');
+    var testDB = merizo.getDB('test');
 
     testDB.createUser({user: TEST_USER, pwd: TEST_PWD, roles: jsTest.basicUserRoles});
     testDB.auth(TEST_USER, TEST_PWD);
@@ -31,9 +31,9 @@ var doTest = function(mongo, callSetParam) {
     });
 };
 
-var mongo = MongoRunner.runMongod({verbose: 5});
-doTest(mongo);
-MongoRunner.stopMongod(mongo);
+var merizo = MongoRunner.runMongod({verbose: 5});
+doTest(merizo);
+MongoRunner.stopMongod(merizo);
 
 var st = new ShardingTest({shards: 1, verbose: 5});
 doTest(st.s);

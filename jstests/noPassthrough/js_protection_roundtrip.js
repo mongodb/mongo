@@ -3,7 +3,7 @@
  *
  * Ensure that:
  * 1. A function stored in a document can be loaded into a Code()
- *    object in the mongo shell with the --enableJavaScriptProtection flag.
+ *    object in the merizo shell with the --enableJavaScriptProtection flag.
  * 2. A Code object is correctly serialized as BSON type 'Code' or
  *    'CodeWScope'.
  */
@@ -11,7 +11,7 @@
     "use strict";
 
     var testServer = MongoRunner.runMongod();
-    assert.neq(null, testServer, "failed to start mongod");
+    assert.neq(null, testServer, "failed to start merizod");
     var db = testServer.getDB("test");
     var t = db.js_protection_roundtrip;
 
@@ -35,7 +35,7 @@
         var protectionFlag =
             jsProtection ? "--enableJavaScriptProtection" : "--disableJavaScriptProtection";
         var exitCode = runMongoProgram(
-            "mongo", "--port", testServer.port, protectionFlag, "--eval", evalString);
+            "merizo", "--port", testServer.port, protectionFlag, "--eval", evalString);
         assert.eq(exitCode, 0);
     }
 

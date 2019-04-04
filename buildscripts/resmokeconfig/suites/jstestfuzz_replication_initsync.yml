@@ -23,7 +23,7 @@ executor:
           skipValidationOnInvalidViewDefinitions: true
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       verbose: ''
       set_parameters:
         disableLogicalSessionCacheRefresh: false

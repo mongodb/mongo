@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,7 +30,7 @@
 #pragma once
 
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 class ServiceContext;
@@ -38,7 +38,7 @@ class ServiceContext;
 /**
  * Used to detect when a shard's shardIdentity document has been rolled back.  Since rolling back
  * the shardIdentity document is illegal (as we can't clear the in-memory state associated with it),
- * we force the mongod to shut down if it happens.  We detect shardIdentity rollback by checking in
+ * we force the merizod to shut down if it happens.  We detect shardIdentity rollback by checking in
  * the OpObserver for that document to be deleted.  We can't shut down right at that moment,
  * however, as doing so would interrupt the rollback process and leave the document in place for
  * when the server is restarted.  Instead, when we detect the shardIdentity document being deleted,
@@ -83,4 +83,4 @@ private:
     bool _rollbackHappened = false;
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MerizoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -46,7 +46,7 @@
 
 /*
  * We format timestamps in a couple of ways, declare appropriate sized buffers.
- * Hexadecimal is 2x the size of the value. MongoDB format (high/low pairs of
+ * Hexadecimal is 2x the size of the value. MerizoDB format (high/low pairs of
  * 4B unsigned integers, with surrounding parenthesis and dividing comma), is
  * 2x the maximum digits from a 4B unsigned integer + 3. Both sizes include a
  * trailing nul byte as well.

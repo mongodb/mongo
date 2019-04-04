@@ -1,4 +1,4 @@
-// Verifies mongos will implicitly abort a transaction on all involved shards on a transaction fatal
+// Verifies merizos will implicitly abort a transaction on all involved shards on a transaction fatal
 // error.
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
@@ -11,7 +11,7 @@
     const collName = "foo";
     const ns = dbName + '.' + collName;
 
-    const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+    const st = new ShardingTest({shards: 2, merizos: 1, config: 1});
 
     // Set up a sharded collection with one chunk on each shard.
 
@@ -38,7 +38,7 @@
     // Targets Shard0 successfully.
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: -1}}));
 
-    // Sharding tests require failInternalCommands: true, since the mongos appears to mongod to be
+    // Sharding tests require failInternalCommands: true, since the merizos appears to merizod to be
     // an internal client.
     assert.commandWorked(st.rs1.getPrimary().adminCommand({
         configureFailPoint: "failCommand",

@@ -56,12 +56,12 @@ baseEnv.Library('base_fts', [
         'stop_words.cpp',
         'stop_words_list.cpp',
         'tokenizer.cpp',
-        ], LIBDEPS=["$BUILD_DIR/mongo/base",
-                    "$BUILD_DIR/mongo/db/bson/dotted_path_support",
-                    "$BUILD_DIR/mongo/db/common",
-                    "$BUILD_DIR/mongo/db/fts/unicode/unicode",
-                    "$BUILD_DIR/mongo/db/matcher/expressions",
-                    "$BUILD_DIR/mongo/util/md5",
+        ], LIBDEPS=["$BUILD_DIR/merizo/base",
+                    "$BUILD_DIR/merizo/db/bson/dotted_path_support",
+                    "$BUILD_DIR/merizo/db/common",
+                    "$BUILD_DIR/merizo/db/fts/unicode/unicode",
+                    "$BUILD_DIR/merizo/db/matcher/expressions",
+                    "$BUILD_DIR/merizo/util/md5",
                     "$BUILD_DIR/third_party/shim_stemmer",
                     ])
 
@@ -71,13 +71,13 @@ env.Library(
         'fts_query_noop.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
-env.Library('ftsmongod', [
-    'ftsmongod.cpp',
-        ], LIBDEPS=["base_fts","$BUILD_DIR/mongo/base"])
+env.Library('ftsmerizod', [
+    'ftsmerizod.cpp',
+        ], LIBDEPS=["base_fts","$BUILD_DIR/merizo/base"])
 
 env.CppUnitTest(target='fts_test',
                 source=[
@@ -97,8 +97,8 @@ env.CppUnitTest(target='fts_test',
                     "tokenizer_test.cpp",
                 ],
                 LIBDEPS=[
-                    "$BUILD_DIR/mongo/db/fts/fts_query_noop",
-                    "$BUILD_DIR/mongo/db/matcher/expressions",
+                    "$BUILD_DIR/merizo/db/fts/fts_query_noop",
+                    "$BUILD_DIR/merizo/db/matcher/expressions",
                     "base_fts",
                 ],
 )

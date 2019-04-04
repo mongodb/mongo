@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 
-#include "mongo/client/remote_command_targeter_factory_mock.h"
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_source_out_gen.h"
-#include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/s/query/cluster_aggregation_planner.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/client/remote_command_targeter_factory_mock.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/pipeline/document_source_group.h"
+#include "merizo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/document_source_out.h"
+#include "merizo/db/pipeline/document_source_out_gen.h"
+#include "merizo/db/pipeline/document_source_project.h"
+#include "merizo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/pipeline/stub_merizo_process_interface.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/catalog_cache_test_fixture.h"
+#include "merizo/s/query/cluster_aggregation_planner.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -71,7 +71,7 @@ public:
         CatalogCacheTestFixture::setUp();
         _expCtx = new ExpressionContextForTest(operationContext(),
                                                AggregationRequest{kTestAggregateNss, {}});
-        _expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
+        _expCtx->merizoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
         _expCtx->inMongos = true;
     }
 
@@ -139,9 +139,9 @@ TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineEndsWithReplaceCollection
 
     // For this test pretend 'kTestOutNss' is not sharded so that we can use a "replaceCollection"
     // $out.
-    const auto originalMongoProcessInterface = expCtx()->mongoProcessInterface;
-    expCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
-    ON_BLOCK_EXIT([&]() { expCtx()->mongoProcessInterface = originalMongoProcessInterface; });
+    const auto originalMongoProcessInterface = expCtx()->merizoProcessInterface;
+    expCtx()->merizoProcessInterface = std::make_shared<StubMongoProcessInterface>();
+    ON_BLOCK_EXIT([&]() { expCtx()->merizoProcessInterface = originalMongoProcessInterface; });
 
     auto mergePipe = unittest::assertGet(Pipeline::create(
         {DocumentSourceOut::create(kTestOutNss, expCtx(), WriteModeEnum::kModeReplaceCollection)},
@@ -598,4 +598,4 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
     future.default_timed_get();
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

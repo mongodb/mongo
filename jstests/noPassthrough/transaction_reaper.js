@@ -37,7 +37,7 @@
     function Sharding(lifetime) {
         this.st = new ShardingTest({
             shards: 1,
-            mongos: 1,
+            merizos: 1,
             config: 1,
             other: {
                 rs: true,

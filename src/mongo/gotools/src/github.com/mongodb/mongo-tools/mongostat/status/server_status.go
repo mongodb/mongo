@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -190,7 +190,7 @@ type LockStats struct {
 	TimeAcquiringMicros ReadWriteLockTimes `bson:"timeAcquiringMicros"`
 
 	// AcquireCount and AcquireWaitCount are new fields of the lock stats only populated on 3.0 or newer.
-	// Typed as a pointer so that if it is nil, mongostat can assume the field is not populated
+	// Typed as a pointer so that if it is nil, merizostat can assume the field is not populated
 	// with real namespace data.
 	AcquireCount     *ReadWriteLockTimes `bson:"acquireCount,omitempty"`
 	AcquireWaitCount *ReadWriteLockTimes `bson:"acquireWaitCount,omitempty"`

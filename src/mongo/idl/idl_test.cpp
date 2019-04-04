@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <limits>
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/idl/unittest_gen.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/idl/unittest_gen.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/unittest/unittest.h"
 
-using namespace mongo::idl::test;
-using namespace mongo::idl::import;
+using namespace merizo::idl::test;
+using namespace merizo::idl::import;
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -716,9 +716,9 @@ TEST(IDLFieldTests, TestOptionalFields) {
 
         assert_same_types<decltype(testStruct.getField2()), const boost::optional<std::int32_t>>();
         assert_same_types<decltype(testStruct.getField1()),
-                          const boost::optional<mongo::StringData>>();
+                          const boost::optional<merizo::StringData>>();
         assert_same_types<decltype(testStruct.getField3()),
-                          const boost::optional<mongo::BSONObj>&>();
+                          const boost::optional<merizo::BSONObj>&>();
         assert_same_types<decltype(testStruct.getField4()),
                           const boost::optional<ConstDataRange>>();
         assert_same_types<decltype(testStruct.getField5()),
@@ -872,7 +872,7 @@ TEST(IDLArrayTests, TestSimpleArrays) {
                                                << BSONBinData(array16, 16, newUUID)));
     auto testStruct = Simple_array_fields::parse(ctxt, testDoc);
 
-    assert_same_types<decltype(testStruct.getField1()), const std::vector<mongo::StringData>>();
+    assert_same_types<decltype(testStruct.getField1()), const std::vector<merizo::StringData>>();
     assert_same_types<decltype(testStruct.getField2()), const std::vector<std::int32_t>&>();
     assert_same_types<decltype(testStruct.getField3()), const std::vector<double>&>();
     assert_same_types<decltype(testStruct.getField4()), const std::vector<ConstDataRange>>();
@@ -936,7 +936,7 @@ TEST(IDLArrayTests, TestSimpleOptionalArrays) {
     auto testStruct = Optional_array_fields::parse(ctxt, testDoc);
 
     assert_same_types<decltype(testStruct.getField1()),
-                      const boost::optional<std::vector<mongo::StringData>>>();
+                      const boost::optional<std::vector<merizo::StringData>>>();
     assert_same_types<decltype(testStruct.getField2()),
                       const boost::optional<std::vector<std::int32_t>>&>();
     assert_same_types<decltype(testStruct.getField3()),
@@ -1095,26 +1095,26 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
 
     assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int32_t>&>();
     assert_same_types<decltype(testStruct.getField2()),
-                      const std::vector<mongo::NamespaceString>&>();
-    assert_same_types<decltype(testStruct.getField3()), const std::vector<mongo::AnyBasicType>&>();
+                      const std::vector<merizo::NamespaceString>&>();
+    assert_same_types<decltype(testStruct.getField3()), const std::vector<merizo::AnyBasicType>&>();
     assert_same_types<decltype(testStruct.getField4()),
-                      const std::vector<mongo::ObjectBasicType>&>();
-    assert_same_types<decltype(testStruct.getField5()), const std::vector<mongo::BSONObj>&>();
+                      const std::vector<merizo::ObjectBasicType>&>();
+    assert_same_types<decltype(testStruct.getField5()), const std::vector<merizo::BSONObj>&>();
     assert_same_types<decltype(testStruct.getField6()),
-                      const std::vector<mongo::idl::import::One_string>&>();
+                      const std::vector<merizo::idl::import::One_string>&>();
 
     assert_same_types<decltype(testStruct.getField1o()),
                       const boost::optional<std::vector<std::int32_t>>&>();
     assert_same_types<decltype(testStruct.getField2o()),
-                      const boost::optional<std::vector<mongo::NamespaceString>>&>();
+                      const boost::optional<std::vector<merizo::NamespaceString>>&>();
     assert_same_types<decltype(testStruct.getField3o()),
-                      const boost::optional<std::vector<mongo::AnyBasicType>>&>();
+                      const boost::optional<std::vector<merizo::AnyBasicType>>&>();
     assert_same_types<decltype(testStruct.getField4o()),
-                      const boost::optional<std::vector<mongo::ObjectBasicType>>&>();
+                      const boost::optional<std::vector<merizo::ObjectBasicType>>&>();
     assert_same_types<decltype(testStruct.getField5o()),
-                      const boost::optional<std::vector<mongo::BSONObj>>&>();
+                      const boost::optional<std::vector<merizo::BSONObj>>&>();
     assert_same_types<decltype(testStruct.getField6o()),
-                      const boost::optional<std::vector<mongo::idl::import::One_string>>&>();
+                      const boost::optional<std::vector<merizo::idl::import::One_string>>&>();
 
     std::vector<std::int32_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());
@@ -1411,9 +1411,9 @@ TEST(IDLChainedType, TestChainedType) {
 
     auto testStruct = Chained_struct_only::parse(ctxt, testDoc);
 
-    assert_same_types<decltype(testStruct.getChainedType()), const mongo::ChainedType&>();
+    assert_same_types<decltype(testStruct.getChainedType()), const merizo::ChainedType&>();
     assert_same_types<decltype(testStruct.getAnotherChainedType()),
-                      const mongo::AnotherChainedType&>();
+                      const merizo::AnotherChainedType&>();
 
     ASSERT_EQUALS(testStruct.getChainedType().getField1(), "abc");
     ASSERT_EQUALS(testStruct.getAnotherChainedType().getField2(), 5);
@@ -1581,9 +1581,9 @@ TEST(IDLChainedType, TestChainedMixedStruct) {
 
     auto testStruct = Chained_struct_type_mixed::parse(ctxt, testDoc);
 
-    assert_same_types<decltype(testStruct.getChained_type()), const mongo::ChainedType&>();
+    assert_same_types<decltype(testStruct.getChained_type()), const merizo::ChainedType&>();
     assert_same_types<decltype(testStruct.getAnotherChainedType()),
-                      const mongo::AnotherChainedType&>();
+                      const merizo::AnotherChainedType&>();
 
     ASSERT_EQUALS(testStruct.getChained_type().getField1(), "abc");
     ASSERT_EQUALS(testStruct.getAnotherChainedType().getField2(), 5);
@@ -2896,7 +2896,7 @@ TEST(IDLTypeCommand, TestArrayObject) {
     ASSERT_EQUALS(testStruct.getCommandParameter().size(), 1UL);
 
     assert_same_types<decltype(testStruct.getCommandParameter()),
-                      const std::vector<mongo::BSONObj>&>();
+                      const std::vector<merizo::BSONObj>&>();
 
     // Positive: Test we can roundtrip from the just parsed document
     {
@@ -2933,7 +2933,7 @@ TEST(IDLTypeCommand, TestStruct) {
     ASSERT_EQUALS(testStruct.getCommandParameter().getValue(), "sample");
 
     assert_same_types<decltype(testStruct.getCommandParameter()),
-                      mongo::idl::import::One_string&>();
+                      merizo::idl::import::One_string&>();
 
     // Positive: Test we can roundtrip from the just parsed document
     {
@@ -2969,7 +2969,7 @@ TEST(IDLTypeCommand, TestStructArray) {
     ASSERT_EQUALS(testStruct.getCommandParameter().size(), 1UL);
 
     assert_same_types<decltype(testStruct.getCommandParameter()),
-                      const std::vector<mongo::idl::import::One_string>&>();
+                      const std::vector<merizo::idl::import::One_string>&>();
 
     // Positive: Test we can roundtrip from the just parsed document
     {
@@ -3047,4 +3047,4 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

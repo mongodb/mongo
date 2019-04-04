@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,24 +28,24 @@
  */
 
 /**
- * This file contains tests for mongo/db/query/planner_ixselect.cpp
+ * This file contains tests for merizo/db/query/planner_ixselect.cpp
  */
 
-#include "mongo/db/query/planner_ixselect.h"
+#include "merizo/db/query/planner_ixselect.h"
 
-#include "mongo/db/index/wildcard_key_generator.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/index_tag.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/text.h"
+#include "merizo/db/index/wildcard_key_generator.h"
+#include "merizo/db/json.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/db/query/index_tag.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/text.h"
 #include <memory>
 
-using namespace mongo;
+using namespace merizo;
 
 namespace {
 
@@ -70,7 +70,7 @@ unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
  */
 template <typename Iter>
 string toString(Iter begin, Iter end) {
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     ss << "[";
     for (Iter i = begin; i != end; i++) {
         if (i != begin) {
@@ -100,7 +100,7 @@ void testGetFields(const char* query, const char* prefix, const char* expectedFi
     for (vector<string>::const_iterator i = expectedFields.begin(); i != expectedFields.end();
          i++) {
         if (fields.find(*i) == fields.end()) {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             ss << "getFields(query=" << query << ", prefix=" << prefix << "): unable to find " << *i
                << " in result: " << toString(fields.begin(), fields.end());
             FAIL(ss);
@@ -109,7 +109,7 @@ void testGetFields(const char* query, const char* prefix, const char* expectedFi
 
     // Next, confirm that results do not contain any unexpected fields.
     if (fields.size() != expectedFields.size()) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "getFields(query=" << query << ", prefix=" << prefix
            << "): unexpected fields in result. expected: "
            << toString(expectedFields.begin(), expectedFields.end())
@@ -173,7 +173,7 @@ void findRelevantTaggedNodePathsAndIndices(MatchExpression* root,
         tag->debugString(&buf);
         RelevantTag* r = dynamic_cast<RelevantTag*>(tag);
         if (!r) {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             ss << "tag is not instance of RelevantTag. tree: " << root->debugString()
                << "; tag: " << buf.str();
             FAIL(ss);
@@ -235,7 +235,7 @@ void testRateIndices(const char* query,
 
     // Compare the expected indices with the actual indices.
     if (actualIndices != expectedIndices) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "rateIndices(query=" << query << ", prefix=" << prefix
            << "): expected indices did not match actual indices. expected: "
            << toString(expectedIndices.begin(), expectedIndices.end())
@@ -247,7 +247,7 @@ void testRateIndices(const char* query,
     // First verify number of paths retrieved.
     vector<string> expectedPaths = StringSplitter::split(expectedPathsStr, ",");
     if (paths.size() != expectedPaths.size()) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "rateIndices(query=" << query << ", prefix=" << prefix
            << "): unexpected number of tagged nodes found. expected: "
            << toString(expectedPaths.begin(), expectedPaths.end())
@@ -262,7 +262,7 @@ void testRateIndices(const char* query,
         if (*i == *j) {
             continue;
         }
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "rateIndices(query=" << query << ", prefix=" << prefix
            << "): unexpected path found. expected: " << *j << " "
            << toString(expectedPaths.begin(), expectedPaths.end()) << ". actual: " << *i << " "

@@ -1,4 +1,4 @@
-// Returns non-localhost ipaddr of host running the mongo shell process
+// Returns non-localhost ipaddr of host running the merizo shell process
 function get_ipaddr() {
     // set temp path, if it exists
     var path = "";

@@ -2,7 +2,7 @@
 // collections.
 (function() {
 
-    const st = new ShardingTest({shards: 2, mongos: 2});
+    const st = new ShardingTest({shards: 2, merizos: 2});
 
     const dbName = 'test';
     const coll = 'foo';
@@ -15,7 +15,7 @@
     assert.commandWorked(freshMongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
     // Test that commands that should not be runnable on sharded collection do not work on sharded
-    // collections, using both fresh mongos and stale mongos instances.
+    // collections, using both fresh merizos and stale merizos instances.
     assert.commandFailedWithCode(freshMongos.runCommand({convertToCapped: coll, size: 64 * 1024}),
                                  ErrorCodes.IllegalOperation);
     assert.commandFailedWithCode(staleMongos.runCommand({convertToCapped: coll, size: 32 * 1024}),

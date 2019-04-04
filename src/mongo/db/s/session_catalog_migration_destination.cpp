@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/session_catalog_migration_destination.h"
+#include "merizo/db/s/session_catalog_migration_destination.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/s/migration_session_id.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/s/migration_session_id.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/shard_id.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const auto kOplogField = "oplog";
@@ -514,4 +514,4 @@ void SessionCatalogMigrationDestination::forceFail(StringData errMsg) {
     _errorOccurred(errMsg);
 }
 
-}  // namespace mongo
+}  // namespace merizo

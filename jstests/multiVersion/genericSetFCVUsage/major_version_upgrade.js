@@ -121,33 +121,33 @@
     let authSchemaUpgraded = false;
     for (let i = 0; i < versions.length; i++) {
         let version = versions[i];
-        let mongodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
+        let merizodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
 
-        // Start a mongod with specified version.
-        let conn = MongoRunner.runMongod(mongodOptions);
+        // Start a merizod with specified version.
+        let conn = MongoRunner.runMongod(merizodOptions);
 
         if ((conn === null) && (i > 0) && !authSchemaUpgraded) {
-            // As of 4.0, mongod will refuse to start up with authSchema 3
+            // As of 4.0, merizod will refuse to start up with authSchema 3
             // until the schema has been upgraded.
             // Step back a version (to 3.6) in order to perform the upgrade,
             // Then try startuing 4.0 again.
             print(
-                "Failed starting mongod, going to try upgrading the auth schema on the prior version");
+                "Failed starting merizod, going to try upgrading the auth schema on the prior version");
             conn = MongoRunner.runMongod(
                 Object.extend({binVersion: versions[i - 1].binVersion}, defaultOptions));
             assert.neq(null,
                        conn,
-                       'mongod was previously able to start with version ' +
+                       'merizod was previously able to start with version ' +
                            tojson(version.binVersion) + " but now can't");
             assert.commandWorked(conn.getDB('admin').runCommand({authSchemaUpgrade: 1}));
             MongoRunner.stopMongod(conn);
 
             authSchemaUpgraded = true;
-            conn = MongoRunner.runMongod(mongodOptions);
+            conn = MongoRunner.runMongod(merizodOptions);
         }
 
         assert.neq(
-            null, conn, 'mongod was unable to start up with options: ' + tojson(mongodOptions));
+            null, conn, 'merizod was unable to start up with options: ' + tojson(merizodOptions));
         assert.binVersion(conn, version.binVersion);
 
         if ((i === 0) && (version.binVersion <= 3.6)) {
@@ -166,12 +166,12 @@
             assert.eq(1,
                       testDB[oldVersionCollection].count(),
                       `data from ${oldVersionCollection} should be available; options: ` +
-                          tojson(mongodOptions));
+                          tojson(merizodOptions));
             assert.neq(
                 null,
                 GetIndexHelpers.findByKeyPattern(testDB[oldVersionCollection].getIndexes(), {a: 1}),
                 `index from ${oldVersionCollection} should be available; options: ` +
-                    tojson(mongodOptions));
+                    tojson(merizodOptions));
         }
 
         // Create a new collection.
@@ -182,8 +182,8 @@
         assert.eq(
             1,
             testDB[version.testCollection].count(),
-            `mongo should have inserted 1 document into collection ${version.testCollection}; ` +
-                'options: ' + tojson(mongodOptions));
+            `merizo should have inserted 1 document into collection ${version.testCollection}; ` +
+                'options: ' + tojson(merizodOptions));
 
         // Create an index on the new collection.
         assert.commandWorked(testDB[version.testCollection].createIndex({a: 1}));
@@ -203,7 +203,7 @@
                 {"setFeatureCompatibilityVersion": version.featureCompatibilityVersion}));
         }
 
-        // Shutdown the current mongod.
+        // Shutdown the current merizod.
         MongoRunner.stopMongod(conn);
     }
 
@@ -244,7 +244,7 @@
         assert.eq(
             1,
             testDB[version.testCollection].count(),
-            `mongo should have inserted 1 document into collection ${version.testCollection}; ` +
+            `merizo should have inserted 1 document into collection ${version.testCollection}; ` +
                 'nodes: ' + tojson(nodes));
 
         // Create an index on the new collection.
@@ -272,7 +272,7 @@
         assert.eq(
             2,
             testDB[version.testCollection].count(),
-            `mongo should have inserted 2 documents into collection ${version.testCollection}; ` +
+            `merizo should have inserted 2 documents into collection ${version.testCollection}; ` +
                 'nodes: ' + tojson(nodes));
 
         assert.commandWorked(testDB[version.testCollection].createIndex({b: 1}));

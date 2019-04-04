@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,25 +31,25 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/status_with.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/db/operation_context.h"
+#include "merizo/base/status_with.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/db/operation_context.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObj;
 template <typename T>
 class StatusWith;
 
 /**
- * Specifies a representation of the external mongos and internal config versions of the addShard
+ * Specifies a representation of the external merizos and internal config versions of the addShard
  * command, and provides methods to convert the representation to and from BSON.
  */
 class AddShardRequest {
 public:
     // Field names and types in the addShard request.
-    static const BSONField<std::string> mongosAddShard;
-    static const BSONField<std::string> mongosAddShardDeprecated;
+    static const BSONField<std::string> merizosAddShard;
+    static const BSONField<std::string> merizosAddShardDeprecated;
     static const BSONField<std::string> configsvrAddShard;
     static const BSONField<std::string> shardName;
     static const BSONField<long long> maxSizeMB;
@@ -110,7 +110,7 @@ private:
      */
     static StatusWith<AddShardRequest> parseInternalFields(const BSONObj& obj);
 
-    // If the shard to be added is standalone, then the hostname and port of the mongod instance to
+    // If the shard to be added is standalone, then the hostname and port of the merizod instance to
     // be added. If the shard to be added is a replica set, the name of the replica set and the
     // hostname and port of at least one member of the replica set.
     ConnectionString _connString;
@@ -122,4 +122,4 @@ private:
     boost::optional<long long> _maxSizeMB;
 };
 
-}  // namespace mongo
+}  // namespace merizo

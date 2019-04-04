@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/db/server_options_server_helpers.h"
+#include "merizo/db/server_options_server_helpers.h"
 
 #include <algorithm>
 #include <boost/algorithm/string/classification.hpp>
@@ -40,32 +40,32 @@
 #include <ios>
 #include <iostream>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/config.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_options_base.h"
-#include "mongo/db/server_options_helpers.h"
-#include "mongo/logger/log_component.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/transport/message_compressor_registry.h"
-#include "mongo/util/cmdline_utils/censor_cmdline.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/sock.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/config.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/server_options_base.h"
+#include "merizo/db/server_options_helpers.h"
+#include "merizo/logger/log_component.h"
+#include "merizo/logger/message_event_utf8_encoder.h"
+#include "merizo/transport/message_compressor_registry.h"
+#include "merizo/util/cmdline_utils/censor_cmdline.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/map_util.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/sock.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/options_parser/options_parser.h"
+#include "merizo/util/options_parser/startup_options.h"
 
 using std::endl;
 using std::string;
 
-namespace moe = ::mongo::optionenvironment;
+namespace moe = ::merizo::optionenvironment;
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 // Helpers for option storage
@@ -447,4 +447,4 @@ Status storeServerOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

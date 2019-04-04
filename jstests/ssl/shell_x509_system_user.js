@@ -4,7 +4,7 @@
 (function() {
     'use strict';
 
-    // The mongo shell cannot authenticate as the internal __system user in tests that use x509 for
+    // The merizo shell cannot authenticate as the internal __system user in tests that use x509 for
     // cluster authentication. Choosing the default value for wcMajorityJournalDefault in
     // ReplSetTest cannot be done automatically without the shell performing such authentication, so
     // in this test we must make the choice explicitly, based on the global test options.
@@ -37,7 +37,7 @@
 
     const subShellCommands = function() {
         TestData = {
-            authUser: 'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=server',
+            authUser: 'C=US,ST=New York,L=New York City,O=MerizoDB,OU=Kernel,CN=server',
             authenticationDatabase: '$external',
             keyFile: 'dummyKeyFile',
             clusterAuthMode: 'x509',
@@ -57,7 +57,7 @@
     };
 
     const subShellArgs = [
-        'mongo',
+        'merizo',
         '--ssl',
         '--sslCAFile=jstests/libs/ca.pem',
         '--sslPEMKeyFile=jstests/libs/server.pem',
@@ -70,7 +70,7 @@
     ];
 
     const retVal = _runMongoProgram(...subShellArgs);
-    assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+    assert.eq(retVal, 0, 'merizo shell did not succeed with exit code 0');
 
     rst.stopSet();
 })();

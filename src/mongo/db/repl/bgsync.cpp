@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,42 +27,42 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/bgsync.h"
+#include "merizo/db/repl/bgsync.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/connection_pool.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/repl/data_replicator_external_state_impl.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/oplog_interface_remote.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/rollback_source_impl.h"
-#include "mongo/db/repl/rs_rollback.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/counter.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/connection_pool.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/repl/data_replicator_external_state_impl.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_interface_local.h"
+#include "merizo/db/repl/oplog_interface_remote.h"
+#include "merizo/db/repl/repl_server_parameters_gen.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_impl.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/rollback_source_impl.h"
+#include "merizo/db/repl/rs_rollback.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/s/shard_identity_rollback_notifier.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/metadata/repl_set_metadata.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 
@@ -223,9 +223,9 @@ void BackgroundSync::_produce() {
         // Currently we cannot block here or we prevent primaries from being fully elected since
         // we'll never call _signalNoNewDataForApplier.
         //        while (MONGO_FAIL_POINT(stopReplProducer) && !inShutdown()) {
-        //            mongo::sleepsecs(1);
+        //            merizo::sleepsecs(1);
         //        }
-        mongo::sleepsecs(1);
+        merizo::sleepsecs(1);
         return;
     }
 
@@ -319,7 +319,7 @@ void BackgroundSync::_produce() {
         error() << "too stale to catch up -- entering maintenance mode";
         log() << "Our newest OpTime : " << lastOpTimeFetched;
         log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
-        log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
+        log() << "See http://dochub.merizodb.org/core/resyncingaverystalereplicasetmember";
 
         // Activate maintenance mode and transition to RECOVERING.
         auto status = _replCoord->setMaintenanceMode(true);
@@ -430,7 +430,7 @@ void BackgroundSync::_produce() {
         }
         _oplogFetcher = std::move(oplogFetcherPtr);
         oplogFetcher = _oplogFetcher.get();
-    } catch (const mongo::DBException&) {
+    } catch (const merizo::DBException&) {
         fassertFailedWithStatus(34440, exceptionToStatus());
     }
 
@@ -576,7 +576,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         log() << "rollback - rollbackHangBeforeStart fail point "
                  "enabled. Blocking until fail point is disabled.";
         while (MONGO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
-            mongo::sleepsecs(1);
+            merizo::sleepsecs(1);
         }
     }
 
@@ -787,4 +787,4 @@ void BackgroundSync::startProducerIfStopped() {
 
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

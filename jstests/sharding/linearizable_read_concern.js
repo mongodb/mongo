@@ -3,9 +3,9 @@
  * Note that a full linearizable read concern test exists in
  * "replsets/linearizable_read_concern.js". This test exists mainly to affirm that a
  * readConcern "linearizable" propagates correctly through a sharded cluster i.e. we
- * execute database commands only through a mongos, not directly on a replica set.
+ * execute database commands only through a merizos, not directly on a replica set.
  *
- * There is one mongos and two shards (each a 3-node replica set). We put one
+ * There is one merizos and two shards (each a 3-node replica set). We put one
  * chunk on each shard, each containing five documents. We then execute a
  * linearizable read targeting both shards with readPreference "secondary", to
  * make sure it fails. We next execute a linearizable read targeting both
@@ -38,7 +38,7 @@ load("jstests/libs/write_concern_util.js");
         name: testName,
         shards: 2,
         other: {rs0: {nodes: 3}, rs1: {nodes: 3}, useBridge: true},
-        mongos: 1,
+        merizos: 1,
         config: 1,
         enableBalancer: false
     });

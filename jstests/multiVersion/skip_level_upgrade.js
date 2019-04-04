@@ -40,15 +40,15 @@
     // the top of this test file.
     for (let i = 0; i < versions.length; i++) {
         let version = versions[i];
-        let mongodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
+        let merizodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
 
-        // Start up an old binary version mongod.
-        let conn = MongoRunner.runMongod(mongodOptions);
+        // Start up an old binary version merizod.
+        let conn = MongoRunner.runMongod(merizodOptions);
         let port = conn.port;
 
         assert.neq(null,
                    conn,
-                   'mongod was unable able to start with version ' + tojson(version.binVersion));
+                   'merizod was unable able to start with version ' + tojson(version.binVersion));
 
         // Set up a collection on an old binary version node with one document and an index, and
         // then shut it down.
@@ -58,32 +58,32 @@
         assert.commandWorked(testDB[version.testCollection].createIndex({a: 1}));
         MongoRunner.stopMongod(conn);
 
-        // Restart the mongod with the latest binary version on the old version's data files.
+        // Restart the merizod with the latest binary version on the old version's data files.
         // Should fail due to being a skip level upgrade.
-        mongodOptions = Object.extend({binVersion: 'latest'}, defaultOptions);
-        conn = MongoRunner.runMongod(mongodOptions);
+        merizodOptions = Object.extend({binVersion: 'latest'}, defaultOptions);
+        conn = MongoRunner.runMongod(merizodOptions);
         assert.eq(null, conn);
 
-        // Restart the mongod with the latest version with --repair. Should fail due to being a
+        // Restart the merizod with the latest version with --repair. Should fail due to being a
         // skip level upgrade.
-        let returnCode = runMongoProgram("mongod", "--port", port, "--repair", "--dbpath", dbpath);
-        assert.neq(returnCode, 0, "expected mongod --repair to fail with a skip level upgrade");
+        let returnCode = runMongoProgram("merizod", "--port", port, "--repair", "--dbpath", dbpath);
+        assert.neq(returnCode, 0, "expected merizod --repair to fail with a skip level upgrade");
 
-        // Restart the mongod in the originally specified version. Should succeed.
-        mongodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
-        conn = MongoRunner.runMongod(mongodOptions);
+        // Restart the merizod in the originally specified version. Should succeed.
+        merizodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
+        conn = MongoRunner.runMongod(merizodOptions);
 
         // Verify that the data and indices from previous iterations are still accessible.
         testDB = conn.getDB('test');
         assert.eq(1,
                   testDB[version.testCollection].count(),
                   `data from ${version.testCollection} should be available; options: ` +
-                      tojson(mongodOptions));
+                      tojson(merizodOptions));
         assert.neq(
             null,
             GetIndexHelpers.findByKeyPattern(testDB[version.testCollection].getIndexes(), {a: 1}),
             `index from ${version.testCollection} should be available; options: ` +
-                tojson(mongodOptions));
+                tojson(merizodOptions));
 
         MongoRunner.stopMongod(conn);
 

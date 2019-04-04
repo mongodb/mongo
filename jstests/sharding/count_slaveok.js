@@ -11,7 +11,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     load("jstests/replsets/rslib.js");
 
-    var st = new ShardingTest({shards: 1, mongos: 1, other: {rs: true, rs0: {nodes: 2}}});
+    var st = new ShardingTest({shards: 1, merizos: 1, other: {rs: true, rs0: {nodes: 2}}});
     var rst = st.rs0;
 
     // Insert data into replica set
@@ -42,10 +42,10 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     rst.stop(rst.getPrimary());
     printjson(rst.status());
 
-    // Wait for the mongos to recognize the slave
+    // Wait for the merizos to recognize the slave
     awaitRSClientHosts(conn, sec, {ok: true, secondary: true});
 
-    // Make sure that mongos realizes that primary is already down
+    // Make sure that merizos realizes that primary is already down
     awaitRSClientHosts(conn, primary, {ok: false});
 
     // Need to check slaveOk=true first, since slaveOk=false will destroy conn in pool when

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,10 +32,10 @@
 #include <boost/intrusive_ptr.hpp>
 #include <numeric>
 
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 /**
  * A struct describing various constraints about where this stage can run, where it must be in
  * the pipeline, what resources it may require, etc.
@@ -59,16 +59,16 @@ struct StageConstraints {
      * pipeline is run on a sharded cluster.
      */
     enum class HostTypeRequirement {
-        // Indicates that the stage can run either on mongoD or mongoS.
+        // Indicates that the stage can run either on merizoD or merizoS.
         kNone,
         // Indicates that the stage must run on the host to which it was originally sent and
-        // cannot be forwarded from mongoS to the shards.
+        // cannot be forwarded from merizoS to the shards.
         kLocalOnly,
         // Indicates that the stage must run on the primary shard.
         kPrimaryShard,
         // Indicates that the stage must run on any participating shard.
         kAnyShard,
-        // Indicates that the stage can only run on mongoS.
+        // Indicates that the stage can only run on merizoS.
         kMongoS,
     };
 
@@ -163,7 +163,7 @@ struct StageConstraints {
         invariant(!(isAllowedInChangeStream() && streamType == StreamType::kBlocking));
 
         // A stage which is whitelisted for $changeStream cannot have a requirement to run on a
-        // shard, since it needs to be able to run on mongoS in a cluster.
+        // shard, since it needs to be able to run on merizoS in a cluster.
         invariant(!(changeStreamRequirement == ChangeStreamRequirement::kWhitelist &&
                     (hostRequirement == HostTypeRequirement::kAnyShard ||
                      hostRequirement == HostTypeRequirement::kPrimaryShard)));
@@ -290,4 +290,4 @@ struct StageConstraints {
     // a random sort which shuffles the order.
     bool canSwapWithLimitAndSample = false;
 };
-}  // namespace mongo
+}  // namespace merizo

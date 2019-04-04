@@ -1,11 +1,11 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package mongorestore writes BSON data to a MongoDB instance.
-package mongorestore
+// Package merizorestore writes BSON data to a MerizoDB instance.
+package merizorestore
 
 import (
 	"compress/gzip"
@@ -16,21 +16,21 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/auth"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongorestore/ns"
+	"github.com/merizodb/merizo-tools/common/archive"
+	"github.com/merizodb/merizo-tools/common/auth"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/util"
+	"github.com/merizodb/merizo-tools/merizorestore/ns"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 // MongoRestore is a container for the user-specified options and
-// internal state used for running mongorestore.
+// internal state used for running merizorestore.
 type MongoRestore struct {
 	ToolOptions   *options.ToolOptions
 	InputOptions  *InputOptions
@@ -257,7 +257,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	return nil
 }
 
-// Restore runs the mongorestore program.
+// Restore runs the merizorestore program.
 func (restore *MongoRestore) Restore() error {
 	var target archive.DirLike
 	err := restore.ParseAndValidateOptions()
@@ -304,19 +304,19 @@ func (restore *MongoRestore) Restore() error {
 		target, err = newActualPath(restore.TargetDirectory)
 		if err != nil {
 			if usedDefaultTarget {
-				log.Logv(log.Always, "see mongorestore --help for usage information")
+				log.Logv(log.Always, "see merizorestore --help for usage information")
 			}
-			return fmt.Errorf("mongorestore target '%v' invalid: %v", restore.TargetDirectory, err)
+			return fmt.Errorf("merizorestore target '%v' invalid: %v", restore.TargetDirectory, err)
 		}
 		// handle cases where the user passes in a file instead of a directory
 		if !target.IsDir() {
-			log.Logv(log.DebugLow, "mongorestore target is a file, not a directory")
+			log.Logv(log.DebugLow, "merizorestore target is a file, not a directory")
 			err = restore.handleBSONInsteadOfDirectory(restore.TargetDirectory)
 			if err != nil {
 				return err
 			}
 		} else {
-			log.Logv(log.DebugLow, "mongorestore target is a directory, not a file")
+			log.Logv(log.DebugLow, "merizorestore target is a directory, not a file")
 		}
 	}
 	if restore.NSOptions.Collection != "" &&
@@ -391,7 +391,7 @@ func (restore *MongoRestore) Restore() error {
 		}
 	}
 	if restore.InputOptions.OplogReplay && restore.manager.Oplog() == nil {
-		return fmt.Errorf("no oplog file to replay; make sure you run mongodump with --oplog")
+		return fmt.Errorf("no oplog file to replay; make sure you run merizodump with --oplog")
 	}
 	if restore.manager.GetOplogConflict() {
 		return fmt.Errorf("cannot provide both an oplog.bson file and an oplog file with --oplogFile, " +

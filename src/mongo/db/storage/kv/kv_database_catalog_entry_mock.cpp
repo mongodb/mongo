@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
+#include "merizo/db/storage/kv/kv_database_catalog_entry_mock.h"
 
 #include <memory>
 
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
 
-std::unique_ptr<mongo::KVDatabaseCatalogEntryMock> mongo::kvDatabaseCatalogEntryMockFactory(
+std::unique_ptr<merizo::KVDatabaseCatalogEntryMock> merizo::kvDatabaseCatalogEntryMockFactory(
     const StringData name, KVStorageEngineInterface* const engine) {
     return stdx::make_unique<KVDatabaseCatalogEntryMock>(name, engine);
 }
 
 // Used to satisfy link dependencies in unit test - not invoked.
-mongo::IndexAccessMethod* mongo::KVDatabaseCatalogEntryMock::getIndex(
+merizo::IndexAccessMethod* merizo::KVDatabaseCatalogEntryMock::getIndex(
     OperationContext* opCtx, const CollectionCatalogEntry* collection, IndexCatalogEntry* index) {
     MONGO_UNREACHABLE;
 }

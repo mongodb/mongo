@@ -38,7 +38,7 @@ elif get_option('link-model') == 'dynamic-sdk':
         libdeps.dependency_visibility_honored
     )
 
-# Please see the note in ../mongo_embedded/SConscript about how to
+# Please see the note in ../merizo_embedded/SConscript about how to
 # interpret and adjust the current and compatibility versions.
 stitchSupportEnv.AppendUnique(
     SHLINKFLAGS=[
@@ -52,11 +52,11 @@ stitchSupportTargets = stitchSupportEnv.Library(
         'stitch_support.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/ops/parsed_update',
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_icu',
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/merizo/db/index/index_access_methods',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/ops/parsed_update',
+        '$BUILD_DIR/merizo/db/query/collation/collator_factory_icu',
+        '$BUILD_DIR/merizo/db/query/collation/collator_factory_interface',
     ],
     INSTALL_ALIAS=[
         'stitch-support',
@@ -80,7 +80,7 @@ if get_option('link-model') != 'dynamic-sdk':
             "stitch_support_test.cpp",
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/unittest/unittest',
+            '$BUILD_DIR/merizo/unittest/unittest',
             'stitch_support',
         ],
         INSTALL_ALIAS=[

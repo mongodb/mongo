@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -15,14 +15,14 @@ import (
 
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/llmgo/bson"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testtype"
 )
 
 const (
 	defaultTestPort      = "20000"
-	nonAuthTestServerURL = "mongodb://localhost"
-	authTestServerURL    = "mongodb://authorizedUser:authorizedPwd@localhost"
-	testDB               = "mongoreplay"
+	nonAuthTestServerURL = "merizodb://localhost"
+	authTestServerURL    = "merizodb://authorizedUser:authorizedPwd@localhost"
+	testDB               = "merizoreplay"
 	testCollection       = "test"
 	testCursorID         = int64(12345)
 	testSpeed            = float64(100)
@@ -129,9 +129,9 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// TestOpInsertLiveDB tests the functionality of mongoreplay replaying inserts
+// TestOpInsertLiveDB tests the functionality of merizoreplay replaying inserts
 // against a live database Generates 20 recorded inserts and passes them to the
-// main execution of mongoreplay and queries the database to verify they were
+// main execution of merizoreplay and queries the database to verify they were
 // completed. It then checks its BufferedStatCollector to ensure the inserts
 // match what we expected
 func TestOpInsertLiveDB(t *testing.T) {
@@ -166,13 +166,13 @@ func TestOpInsertLiveDB(t *testing.T) {
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, generator.opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	// prepare a query for the database
 	session, err := mgo.DialWithTimeout(currentTestURL, 30*time.Second)
@@ -210,10 +210,10 @@ func TestOpInsertLiveDB(t *testing.T) {
 	for i := 0; i < numInserts; i++ {
 		stat := statRec.Buffer[i]
 		t.Logf("Stat result: %#v\n", stat)
-		// All commands should be inserts into mongoreplay.test
+		// All commands should be inserts into merizoreplay.test
 		if stat.OpType != "insert" ||
-			stat.Ns != "mongoreplay.test" {
-			t.Errorf("Expected to see an insert into mongoreplay.test, but instead saw %v, %v\n", stat.OpType, stat.Command)
+			stat.Ns != "merizoreplay.test" {
+			t.Errorf("Expected to see an insert into merizoreplay.test, but instead saw %v, %v\n", stat.OpType, stat.Command)
 		}
 	}
 	stat := statRec.Buffer[numInserts]
@@ -228,9 +228,9 @@ func TestOpInsertLiveDB(t *testing.T) {
 	}
 }
 
-// TestUpdateOpLiveDB tests the functionality of mongoreplay replaying an update
+// TestUpdateOpLiveDB tests the functionality of merizoreplay replaying an update
 // against a live database Generates 20 recorded inserts and an update and
-// passes them to the main execution of mongoreplay and queries the database to
+// passes them to the main execution of merizoreplay and queries the database to
 // verify they were completed. It then checks its BufferedStatCollector to
 // ensure the update matches what we expected.
 func TestUpdateOpLiveDB(t *testing.T) {
@@ -287,13 +287,13 @@ func TestUpdateOpLiveDB(t *testing.T) {
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, generator.opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	// prepare a query for the database
 	session, err := mgo.DialWithTimeout(currentTestURL, 30*time.Second)
@@ -337,18 +337,18 @@ func TestUpdateOpLiveDB(t *testing.T) {
 
 	stat := statRec.Buffer[numInserts]
 	t.Logf("Stat result: %#v\n", stat)
-	// All commands should be inserts into mongoreplay.test
+	// All commands should be inserts into merizoreplay.test
 	if stat.OpType != "update" ||
-		stat.Ns != "mongoreplay.test" {
-		t.Errorf("Expected to see an update to mongoreplay.test, but instead saw %v, %v\n", stat.OpType, stat.Ns)
+		stat.Ns != "merizoreplay.test" {
+		t.Errorf("Expected to see an update to merizoreplay.test, but instead saw %v, %v\n", stat.OpType, stat.Ns)
 	}
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
 }
 
-// TestQueryOpLiveDB tests the functionality of some basic queries through mongoreplay.
-// It generates inserts and queries and sends them to the main execution of mongoreplay.
+// TestQueryOpLiveDB tests the functionality of some basic queries through merizoreplay.
+// It generates inserts and queries and sends them to the main execution of merizoreplay.
 // TestQueryOp then examines a BufferedStatCollector to ensure the queries executed as expected
 func TestQueryOpLiveDB(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
@@ -395,23 +395,23 @@ func TestQueryOpLiveDB(t *testing.T) {
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, generator.opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	t.Log("Examining collected stats to ensure they match expected")
 	// loop over the BufferedStatCollector for each of the numQueries queries
-	// created to ensure that they match what we expected mongoreplay to have
+	// created to ensure that they match what we expected merizoreplay to have
 	// executed
 	for i := 0; i < numQueries; i++ {
 		stat := statRec.Buffer[numInserts+i]
 		t.Logf("Stat result: %#v\n", stat)
 		if stat.OpType != "query" ||
-			stat.Ns != "mongoreplay.test" ||
+			stat.Ns != "merizoreplay.test" ||
 			stat.NumReturned != 5 {
 			t.Errorf("Query Not Matched %#v\n", stat)
 		}
@@ -421,7 +421,7 @@ func TestQueryOpLiveDB(t *testing.T) {
 	// ensure that the last query that was making a query on the 'success' field
 	// executed how we expected
 	if stat.OpType != "query" ||
-		stat.Ns != "mongoreplay.test" ||
+		stat.Ns != "merizoreplay.test" ||
 		stat.NumReturned != 20 {
 		t.Errorf("Query Not Matched %#v\n", stat)
 	}
@@ -432,7 +432,7 @@ func TestQueryOpLiveDB(t *testing.T) {
 }
 
 // TestOpGetMoreLiveDB tests the functionality of a getmore command played
-// through mongoreplay. It generates inserts, a query, and a series of getmores
+// through merizoreplay. It generates inserts, a query, and a series of getmores
 // based on the original query. It then Uses a BufferedStatCollector to ensure
 // the getmores executed as expected
 func TestOpGetMoreLiveDB(t *testing.T) {
@@ -446,7 +446,7 @@ func TestOpGetMoreLiveDB(t *testing.T) {
 	gmHelperNames := getmoreHelperNames{
 		findOpType:    "query",
 		getmoreOpType: "getmore",
-		namespace:     "mongoreplay.test",
+		namespace:     "merizoreplay.test",
 		insertName:    insertName,
 	}
 
@@ -480,7 +480,7 @@ func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
 		defer close(generator.opChan)
 
 		// generate numInserts RecordedOp inserts and send them to a channel to
-		// be played in mongoreplay's main Play function
+		// be played in merizoreplay's main Play function
 		t.Logf("Generating %v inserts\n", numInserts)
 		err := generator.generateInsertHelper(insertName, 0, numInserts)
 		if err != nil {
@@ -538,13 +538,13 @@ func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, generator.opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	shouldBeLimit5 := true
 	var limit int
@@ -568,7 +568,7 @@ func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
 		}
 		if stat.OpType != "getmore" ||
 			stat.NumReturned != limit ||
-			stat.Ns != "mongoreplay.test" {
+			stat.Ns != "merizoreplay.test" {
 			t.Errorf("Getmore Not matched: %#v\n", stat)
 		}
 	}
@@ -597,7 +597,7 @@ func TestOpKillCursorsLiveDB(t *testing.T) {
 	go func() {
 		defer close(generator.opChan)
 
-		// generate numInserts RecordedOp inserts and send them to a channel to be played in mongoreplay's main Play function
+		// generate numInserts RecordedOp inserts and send them to a channel to be played in merizoreplay's main Play function
 		t.Logf("Generating %v inserts\n", numInserts)
 		err := generator.generateInsertHelper(insertName, 0, numInserts)
 		if err != nil {
@@ -664,13 +664,13 @@ func TestOpKillCursorsLiveDB(t *testing.T) {
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, generator.opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	t.Log("Examining collected getMores and replies to ensure they match expected")
 
@@ -679,9 +679,9 @@ func TestOpKillCursorsLiveDB(t *testing.T) {
 		t.Logf("Stat result: %#v\n", stat)
 		if stat.OpType != "getmore" ||
 			stat.NumReturned != 2 ||
-			stat.Ns != "mongoreplay.test" {
+			stat.Ns != "merizoreplay.test" {
 			t.Errorf("Getmore Not matched: Expected OpType: %s NumReturned: %d NameSpace: %s --- Found OpType: %s NumReturned: %d NameSpace: %s",
-				"getmore", 2, "mongoreplay.test", stat.OpType, stat.NumReturned, stat.Ns)
+				"getmore", 2, "merizoreplay.test", stat.OpType, stat.NumReturned, stat.Ns)
 		}
 	}
 	stat := statRec.Buffer[numInserts+2+2]
@@ -695,9 +695,9 @@ func TestOpKillCursorsLiveDB(t *testing.T) {
 		t.Logf("Stat result: %#v\n", stat)
 		if stat.OpType != "getmore" ||
 			stat.NumReturned != 0 ||
-			stat.Ns != "mongoreplay.test" {
+			stat.Ns != "merizoreplay.test" {
 			t.Errorf("Getmore Not matched: Expected OpType: %s NumReturned: %d NameSpace: %s --- Found OpType: %s NumReturned: %d NameSpace: %s",
-				"getmore", 0, "mongoreplay.test", stat.OpType, stat.NumReturned, stat.Ns)
+				"getmore", 0, "merizoreplay.test", stat.OpType, stat.NumReturned, stat.Ns)
 		}
 	}
 
@@ -711,7 +711,7 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 		t.Error(err)
 	}
 	if isMongosTestServer {
-		t.Skipf("Skipping OpCommand test against mongos")
+		t.Skipf("Skipping OpCommand test against merizos")
 	}
 
 	numInserts := 20
@@ -735,13 +735,13 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, generator.opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	// prepare a query for the database
 	session, err := mgo.DialWithTimeout(currentTestURL, 30*time.Second)
@@ -779,11 +779,11 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 	for i := 0; i < numInserts; i++ {
 		stat := statRec.Buffer[i]
 		t.Logf("Stat result: %#v\n", stat)
-		// all commands should be inserts into mongoreplay.test
+		// all commands should be inserts into merizoreplay.test
 		if stat.OpType != "op_command" ||
 			stat.Command != "insert" ||
-			stat.Ns != "mongoreplay" {
-			t.Errorf("Expected to see an insert into mongoreplay, but instead saw %v, %v into %v\n", stat.OpType, stat.Command, stat.Ns)
+			stat.Ns != "merizoreplay" {
+			t.Errorf("Expected to see an insert into merizoreplay, but instead saw %v, %v into %v\n", stat.OpType, stat.Command, stat.Ns)
 		}
 	}
 
@@ -798,7 +798,7 @@ func TestCommandOpFindLiveDB(t *testing.T) {
 		t.Error(err)
 	}
 	if isMongosTestServer {
-		t.Skipf("Skipping OpCommand test against mongos")
+		t.Skipf("Skipping OpCommand test against merizos")
 	}
 
 	insertName := "LiveDB CommandOp Find Test"
@@ -840,20 +840,20 @@ func TestCommandOpFindLiveDB(t *testing.T) {
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, generator.opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	t.Log("Examining collected stats to ensure they match expected")
 	opType := "op_command"
-	ns := "mongoreplay"
+	ns := "merizoreplay"
 	numReturned := 5
 	// loop over the BufferedStatCollector for each of the numFinds queries
-	// created, and ensure that they match what we expected mongoreplay to have
+	// created, and ensure that they match what we expected merizoreplay to have
 	// executed
 	for i := 0; i < numFinds; i++ {
 		stat := statRec.Buffer[numInserts+i]
@@ -884,7 +884,7 @@ func TestCommandOpFindLiveDB(t *testing.T) {
 func TestCommandOpGetMoreLiveDB(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if isMongosTestServer {
-		t.Skipf("Skipping OpCommand test against mongos")
+		t.Skipf("Skipping OpCommand test against merizos")
 	}
 	if err := teardownDB(); err != nil {
 		t.Error(err)
@@ -897,7 +897,7 @@ func TestCommandOpGetMoreLiveDB(t *testing.T) {
 		findCommandName:    "find",
 		getmoreOpType:      "op_command",
 		getmoreCommandName: "getMore",
-		namespace:          "mongoreplay",
+		namespace:          "merizoreplay",
 		insertName:         insertName,
 	}
 
@@ -909,9 +909,9 @@ func TestCommandOpGetMoreLiveDB(t *testing.T) {
 	}
 }
 
-// TestMsgOpInsertLiveDB tests the functionality of mongoreplay replaying inserts
+// TestMsgOpInsertLiveDB tests the functionality of merizoreplay replaying inserts
 // against a live database Generates 20 recorded inserts and passes them to the
-// main execution of mongoreplay and queries the database to verify they were
+// main execution of merizoreplay and queries the database to verify they were
 // completed. It then checks its BufferedStatCollector to ensure the inserts
 // match what we expected
 func TestMsgOpInsertLiveDB(t *testing.T) {
@@ -941,13 +941,13 @@ func TestMsgOpInsertLiveDB(t *testing.T) {
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, generator.opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	// prepare a query for the database
 	session, err := mgo.DialWithTimeout(currentTestURL, 30*time.Second)
@@ -985,7 +985,7 @@ func TestMsgOpInsertLiveDB(t *testing.T) {
 	for i := 0; i < numInserts; i++ {
 		stat := statRec.Buffer[i]
 		t.Logf("Stat result: %#v\n", stat)
-		// All commands should be inserts into mongoreplay.test
+		// All commands should be inserts into merizoreplay.test
 		if stat.OpType != "op_msg" {
 			t.Errorf("Expected to see an op with type op_msg, but instead saw %v", stat.OpType)
 			continue
@@ -1009,7 +1009,7 @@ func TestMsgOpGetMoreLiveDB(t *testing.T) {
 		findCommandName:    "find",
 		getmoreOpType:      "op_msg",
 		getmoreCommandName: "getMore",
-		namespace:          "mongoreplay",
+		namespace:          "merizoreplay",
 		insertName:         insertName,
 	}
 	getmoreTestHelper(t, gmHelperNames, generator.opChan, generator.generateMsgOpInsertHelper,
@@ -1052,7 +1052,7 @@ func getmoreTestHelper(t *testing.T,
 		defer close(opChan)
 		t.Logf("Generating %d inserts\n", numInserts)
 		// generate numInserts RecordedOp inserts and push them into a channel
-		// for use in mongoreplay's Play()
+		// for use in merizoreplay's Play()
 		err := insertFunc(gmHelperNames.insertName, 0, numInserts)
 		if err != nil {
 			t.Error(err)
@@ -1060,7 +1060,7 @@ func getmoreTestHelper(t *testing.T,
 		querySelection := bson.D{}
 
 		t.Log("Generating find")
-		// generate a query with a known requestID to be played in mongoreplay
+		// generate a query with a known requestID to be played in merizoreplay
 		err = findFunc(querySelection, 5, requestID)
 		if err != nil {
 			t.Error(err)
@@ -1068,7 +1068,7 @@ func getmoreTestHelper(t *testing.T,
 		t.Log("Generating reply")
 		// generate a RecordedOp reply whose ResponseTo field matches that of
 		// the original with a known cursorID so that these pieces of
-		// information can be correlated by mongoreplay
+		// information can be correlated by merizoreplay
 		err = replyFunc(requestID, testCursorID)
 		if err != nil {
 			t.Error(err)
@@ -1091,13 +1091,13 @@ func getmoreTestHelper(t *testing.T,
 	}
 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+	// run merizoreplay's Play loop with the stubbed objects
+	t.Logf("Beginning merizoreplay playback of generated traffic against host: %v\n", currentTestURL)
 	err = Play(context, opChan, testSpeed, 1, 10)
 	if err != nil {
 		t.Errorf("Error Playing traffic: %v\n", err)
 	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+	t.Log("Completed merizoreplay playback of generated traffic")
 
 	t.Log("Examining collected stats to ensure they match expected")
 	find := statRec.Buffer[numInserts]

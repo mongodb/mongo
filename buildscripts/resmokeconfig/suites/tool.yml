@@ -9,7 +9,7 @@ selector:
   - jstests/tool/dumprestore_auth2.js
   - jstests/tool/dumprestore_auth3.js
 
-# Tool tests start their own mongod's.
+# Tool tests start their own merizod's.
 executor:
   config:
     shell_options:

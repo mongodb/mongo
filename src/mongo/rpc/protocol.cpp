@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/rpc/protocol.h"
+#include "merizo/rpc/protocol.h"
 
 #include <algorithm>
 #include <iterator>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace rpc {
 
 namespace {
@@ -57,8 +57,8 @@ struct ProtocolSetAndName {
 
 constexpr ProtocolSetAndName protocolSetNames[] = {
     // Most common ones go first.
-    {"all"_sd, supports::kAll},                  // new mongod and mongos or very new client.
-    {"opQueryOnly"_sd, supports::kOpQueryOnly},  // old mongos or mongod or moderately old client.
+    {"all"_sd, supports::kAll},                  // new merizod and merizos or very new client.
+    {"opQueryOnly"_sd, supports::kOpQueryOnly},  // old merizos or merizod or moderately old client.
 
     // Then the rest (these should never happen in production).
     {"none"_sd, supports::kNone},
@@ -69,9 +69,9 @@ constexpr ProtocolSetAndName protocolSetNames[] = {
 
 Protocol protocolForMessage(const Message& message) {
     switch (message.operation()) {
-        case mongo::dbMsg:
+        case merizo::dbMsg:
             return Protocol::kOpMsg;
-        case mongo::dbQuery:
+        case merizo::dbQuery:
             return Protocol::kOpQuery;
         default:
             uasserted(ErrorCodes::UnsupportedFormat,
@@ -125,7 +125,7 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
     auto minWireExtractStatus =
         bsonExtractIntegerField(isMasterReply, "minWireVersion", &minWireVersion);
 
-    // MongoDB 2.4 and earlier do not have maxWireVersion/minWireVersion in their 'isMaster' replies
+    // MerizoDB 2.4 and earlier do not have maxWireVersion/minWireVersion in their 'isMaster' replies
     if ((maxWireExtractStatus == minWireExtractStatus) &&
         (maxWireExtractStatus == ErrorCodes::NoSuchKey)) {
         return {{supports::kOpQueryOnly, {0, 0}}};
@@ -170,7 +170,7 @@ ProtocolSet computeProtocolSet(const WireVersionInfo version) {
 
 Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo server) {
     // Since this is defined in the code, it should always hold true since this is the versions that
-    // mongos/d wants to connect to.
+    // merizos/d wants to connect to.
     invariant(client.minWireVersion <= client.maxWireVersion);
 
     // Server may return bad data.
@@ -211,4 +211,4 @@ Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo s
 }
 
 }  // namespace rpc
-}  // namespace mongo
+}  // namespace merizo

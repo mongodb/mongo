@@ -1,27 +1,27 @@
 load("jstests/libs/parallelTester.js");  // for ScopedThread.
 
-function backupData(mongo, destinationDirectory) {
-    let backupCursor = openBackupCursor(mongo);
+function backupData(merizo, destinationDirectory) {
+    let backupCursor = openBackupCursor(merizo);
     let metadata = getBackupCursorMetadata(backupCursor);
     copyBackupCursorFiles(backupCursor, metadata.dbpath, destinationDirectory);
     backupCursor.close();
     return metadata;
 }
 
-function openBackupCursor(mongo) {
+function openBackupCursor(merizo) {
     // Opening a backup cursor can race with taking a checkpoint, resulting in a transient
     // error. Retry until it succeeds.
     while (true) {
         try {
-            return mongo.getDB("admin").aggregate([{$backupCursor: {}}]);
+            return merizo.getDB("admin").aggregate([{$backupCursor: {}}]);
         } catch (exc) {
             jsTestLog({"Failed to open a backup cursor, retrying.": exc});
         }
     }
 }
 
-function extendBackupCursor(mongo, backupId, extendTo) {
-    return mongo.getDB("admin").aggregate(
+function extendBackupCursor(merizo, backupId, extendTo) {
+    return merizo.getDB("admin").aggregate(
         [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}],
         {maxTimeMS: 180 * 1000});
 }

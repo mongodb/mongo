@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -38,35 +38,35 @@
 
 #if defined(MONGO_UTIL_LOG_H_)
 #error \
-    "mongo/util/log.h cannot be included multiple times. " \
+    "merizo/util/log.h cannot be included multiple times. " \
        "This may occur when log.h is included in a header. " \
        "Please check your #include's."
 #else  // MONGO_UTIL_LOG_H_
 #define MONGO_UTIL_LOG_H_
 
-#include "mongo/base/status.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/logger/log_component.h"
-#include "mongo/logger/log_severity_limiter.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/logstream_builder.h"
-#include "mongo/logger/redaction.h"
-#include "mongo/logger/tee.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/errno_util.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/logger/log_component.h"
+#include "merizo/logger/log_severity_limiter.h"
+#include "merizo/logger/logger.h"
+#include "merizo/logger/logstream_builder.h"
+#include "merizo/logger/redaction.h"
+#include "merizo/logger/tee.h"
+#include "merizo/util/concurrency/thread_name.h"
+#include "merizo/util/errno_util.h"
 
 // Provide log component in global scope so that MONGO_LOG will always have a valid component.
 // Global log component will be kDefault unless overridden by MONGO_LOG_DEFAULT_COMPONENT.
 #if defined(MONGO_LOG_DEFAULT_COMPONENT)
-const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
+const ::merizo::logger::LogComponent MongoLogDefaultComponent_component =
     MONGO_LOG_DEFAULT_COMPONENT;
 #else
 #error \
-    "mongo/util/log.h requires MONGO_LOG_DEFAULT_COMPONENT to be defined. " \
-       "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
+    "merizo/util/log.h requires MONGO_LOG_DEFAULT_COMPONENT to be defined. " \
+       "Please see http://www.merizodb.org/about/contributors/reference/server-logging-rules/ "
 #endif  // MONGO_LOG_DEFAULT_COMPONENT
 
-namespace mongo {
+namespace merizo {
 
 namespace logger {
 typedef void (*ExtraLogContextFn)(BufBuilder& builder);
@@ -175,46 +175,46 @@ inline bool shouldLog(logger::LogSeverity severity) {
 
 // MONGO_LOG uses log component from MongoLogDefaultComponent from current or global namespace.
 #define MONGO_LOG(DLEVEL)                                                              \
-    if (!(::mongo::logger::globalLogDomain())                                          \
+    if (!(::merizo::logger::globalLogDomain())                                          \
              ->shouldLog(MongoLogDefaultComponent_component,                           \
-                         ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {           \
+                         ::merizo::LogstreamBuilder::severityCast(DLEVEL))) {           \
     } else                                                                             \
-    ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),              \
-                                      ::mongo::getThreadName(),                        \
-                                      ::mongo::LogstreamBuilder::severityCast(DLEVEL), \
+    ::merizo::logger::LogstreamBuilder(::merizo::logger::globalLogDomain(),              \
+                                      ::merizo::getThreadName(),                        \
+                                      ::merizo::LogstreamBuilder::severityCast(DLEVEL), \
                                       MongoLogDefaultComponent_component)
 
 #define LOG MONGO_LOG
 
 #define MONGO_LOG_COMPONENT(DLEVEL, COMPONENT1)                                            \
-    if (!(::mongo::logger::globalLogDomain())                                              \
-             ->shouldLog((COMPONENT1), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) { \
+    if (!(::merizo::logger::globalLogDomain())                                              \
+             ->shouldLog((COMPONENT1), ::merizo::LogstreamBuilder::severityCast(DLEVEL))) { \
     } else                                                                                 \
-    ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                  \
-                                      ::mongo::getThreadName(),                            \
-                                      ::mongo::LogstreamBuilder::severityCast(DLEVEL),     \
+    ::merizo::logger::LogstreamBuilder(::merizo::logger::globalLogDomain(),                  \
+                                      ::merizo::getThreadName(),                            \
+                                      ::merizo::LogstreamBuilder::severityCast(DLEVEL),     \
                                       (COMPONENT1))
 
 #define MONGO_LOG_COMPONENT2(DLEVEL, COMPONENT1, COMPONENT2)                                     \
-    if (!(::mongo::logger::globalLogDomain())                                                    \
+    if (!(::merizo::logger::globalLogDomain())                                                    \
              ->shouldLog(                                                                        \
-                 (COMPONENT1), (COMPONENT2), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) { \
+                 (COMPONENT1), (COMPONENT2), ::merizo::LogstreamBuilder::severityCast(DLEVEL))) { \
     } else                                                                                       \
-    ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                        \
-                                      ::mongo::getThreadName(),                                  \
-                                      ::mongo::LogstreamBuilder::severityCast(DLEVEL),           \
+    ::merizo::logger::LogstreamBuilder(::merizo::logger::globalLogDomain(),                        \
+                                      ::merizo::getThreadName(),                                  \
+                                      ::merizo::LogstreamBuilder::severityCast(DLEVEL),           \
                                       (COMPONENT1))
 
 #define MONGO_LOG_COMPONENT3(DLEVEL, COMPONENT1, COMPONENT2, COMPONENT3)               \
-    if (!(::mongo::logger::globalLogDomain())                                          \
+    if (!(::merizo::logger::globalLogDomain())                                          \
              ->shouldLog((COMPONENT1),                                                 \
                          (COMPONENT2),                                                 \
                          (COMPONENT3),                                                 \
-                         ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {           \
+                         ::merizo::LogstreamBuilder::severityCast(DLEVEL))) {           \
     } else                                                                             \
-    ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),              \
-                                      ::mongo::getThreadName(),                        \
-                                      ::mongo::LogstreamBuilder::severityCast(DLEVEL), \
+    ::merizo::logger::LogstreamBuilder(::merizo::logger::globalLogDomain(),              \
+                                      ::merizo::getThreadName(),                        \
+                                      ::merizo::LogstreamBuilder::severityCast(DLEVEL), \
                                       (COMPONENT1))
 
 /**
@@ -243,6 +243,6 @@ void logContext(const char* msg = NULL);
  */
 void setPlainConsoleLogger();
 
-}  // namespace mongo
+}  // namespace merizo
 
 #endif  // MONGO_UTIL_LOG_H_

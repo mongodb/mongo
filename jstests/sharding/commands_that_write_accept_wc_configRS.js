@@ -33,14 +33,14 @@ load('jstests/multiVersion/libs/auth_helpers.js');
             }
         },
         configReplSetTestOptions: {settings: {chainingAllowed: false}},
-        mongos: 1
+        merizos: 1
     });
 
-    var mongos = st.s;
+    var merizos = st.s;
     var dbName = "wc-test-configRS";
-    var db = mongos.getDB(dbName);
-    var adminDB = mongos.getDB('admin');
-    // A database connection on a local shard, rather than through the mongos.
+    var db = merizos.getDB(dbName);
+    var adminDB = merizos.getDB('admin');
+    // A database connection on a local shard, rather than through the merizos.
     var localDB = st.shard0.getDB('localWCTest');
     var collName = 'leaves';
     var coll = db[collName];
@@ -62,7 +62,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     // command fails after only the database metadata is dropped from the config servers, but the
     // data on the shards still remains. This makes future operations, such as moveChunk, fail.
     function getNewDB() {
-        db = mongos.getDB(dbName + counter);
+        db = merizos.getDB(dbName + counter);
         counter++;
         coll = db[collName];
     }

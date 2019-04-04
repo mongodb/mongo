@@ -26,7 +26,7 @@ selector:
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
 
   # Disabled due to SERVER-20057, 'Concurrent, sharded mapReduces can fail when temporary
-  # namespaces collide across mongos processes'
+  # namespaces collide across merizos processes'
   - jstests/concurrency/fsm_workloads/map_reduce_drop.js
   - jstests/concurrency/fsm_workloads/map_reduce_inline.js
   - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
@@ -38,7 +38,7 @@ selector:
   - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
   - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
 
-  # Disabled due to MongoDB restrictions and/or workload restrictions
+  # Disabled due to MerizoDB restrictions and/or workload restrictions
 
   # These workloads sometimes trigger 'Could not lock auth data update lock'
   # errors because the AuthorizationManager currently waits for only five
@@ -52,11 +52,11 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_group_external.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
-  # compact can only be run against a standalone mongod
+  # compact can only be run against a standalone merizod
   - jstests/concurrency/fsm_workloads/compact.js
   - jstests/concurrency/fsm_workloads/compact_simultaneous_padding_bytes.js
 
-  # convertToCapped can't be run on mongos processes
+  # convertToCapped can't be run on merizos processes
   - jstests/concurrency/fsm_workloads/convert_to_capped_collection.js
   - jstests/concurrency/fsm_workloads/convert_to_capped_collection_index.js
 
@@ -77,7 +77,7 @@ selector:
   # cannot ensureIndex after dropDatabase without sharding first
   - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
 
-  # reIndex is not supported in mongos.
+  # reIndex is not supported in merizos.
   - jstests/concurrency/fsm_workloads/reindex.js
 
   # our .remove(query, {justOne: true}) calls lack shard keys
@@ -97,7 +97,7 @@ selector:
   # cannot use upsert command with $where with sharded collections
   - jstests/concurrency/fsm_workloads/upsert_where.js
 
-  # stagedebug can only be run against a standalone mongod
+  # stagedebug can only be run against a standalone merizod
   - jstests/concurrency/fsm_workloads/yield_and_hashed.js
   - jstests/concurrency/fsm_workloads/yield_and_sorted.js
 
@@ -138,17 +138,17 @@ executor:
     class: ShardedClusterFixture
     enable_balancer: false
     enable_autosplit: false
-    mongos_options:
+    merizos_options:
       set_parameters:
         enableTestCommands: 1
     shard_options:
-      mongod_options:
+      merizod_options:
         oplogSize: 1024
       # TODO SERVER-32572 remove voting_secondaries: true
       voting_secondaries: true
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1
     num_rs_nodes_per_shard: 3
     num_shards: 2
-    num_mongos: 2
+    num_merizos: 2

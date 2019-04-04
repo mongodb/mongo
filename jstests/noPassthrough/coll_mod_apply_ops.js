@@ -4,7 +4,7 @@
 (function() {
     "use strict";
     const conn = MongoRunner.runMongod();
-    assert.neq(null, conn, "mongod was unable to start up with empty options");
+    assert.neq(null, conn, "merizod was unable to start up with empty options");
 
     let dbCollModName = "db_coll_mod";
     const dbCollMod = conn.getDB(dbCollModName);

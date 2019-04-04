@@ -2,9 +2,9 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/snmp/*.js
+  - src/merizo/db/modules/*/jstests/snmp/*.js
 
-# snmp tests start their own mongod's.
+# snmp tests start their own merizod's.
 executor:
   config:
     shell_options:

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/config.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/config.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/db/pipeline/accumulator.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
+#include "merizo/db/pipeline/expression.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/pipeline/value_comparator.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/unittest/unittest.h"
 
 namespace ExpressionTests {
 
@@ -114,7 +114,7 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
             // parser
             bob << elem.fieldName() << BSONArray(constify(elem.Obj(), true));
         } else if (str::equals(elem.fieldName(), "$const") ||
-                   (elem.type() == mongo::String && elem.valuestrsafe()[0] == '$')) {
+                   (elem.type() == merizo::String && elem.valuestrsafe()[0] == '$')) {
             bob.append(elem);
         } else {
             bob.append(elem.fieldName(), BSON("$const" << elem));
@@ -3165,7 +3165,7 @@ public:
 }  // namespace FieldPath
 
 namespace Object {
-using mongo::ExpressionObject;
+using merizo::ExpressionObject;
 
 template <typename T>
 Document literal(T&& value) {
@@ -3839,7 +3839,7 @@ TEST(ParseObject, ShouldRecognizeKnownExpression) {
 
 namespace Expression {
 
-using mongo::Expression;
+using merizo::Expression;
 
 /**
  * Parses an expression from the given BSON specification.
@@ -3943,7 +3943,7 @@ TEST(ParseExpression, ShouldAcceptObjectInsideArrayAsSingleArgument) {
 
 namespace Operand {
 
-using mongo::Expression;
+using merizo::Expression;
 
 /**
  * Parses an operand from the given BSON specification. The field name is ignored, since it is

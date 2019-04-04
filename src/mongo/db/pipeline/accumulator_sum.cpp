@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <cmath>
 #include <limits>
 
-#include "mongo/db/pipeline/accumulator.h"
+#include "merizo/db/pipeline/accumulator.h"
 
-#include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/util/summation.h"
+#include "merizo/db/pipeline/accumulation_statement.h"
+#include "merizo/db/pipeline/expression.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/util/summation.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 
@@ -101,10 +101,10 @@ Value AccumulatorSum::getValue(bool toBeMerged) {
                 return Value(nonDecimalTotal.getLong());
             if (toBeMerged) {
                 // The value was too large for a NumberLong, so output a document with two values
-                // adding up to the desired total. Older MongoDB versions used to ignore signed
+                // adding up to the desired total. Older MerizoDB versions used to ignore signed
                 // integer overflow and cause undefined behavior, that in practice resulted in
-                // values that would wrap around modulo 2**64. Now an older mongos with a newer
-                // mongod will yield an error that $sum resulted in a non-numeric type, which is
+                // values that would wrap around modulo 2**64. Now an older merizos with a newer
+                // merizod will yield an error that $sum resulted in a non-numeric type, which is
                 // OK for this case. Output the error using the totalType, so in the future we can
                 // determine the correct totalType for the sum. For the error to exceed 2**63,
                 //  more than 2**53 integers would have to be summed, which is impossible.
@@ -146,4 +146,4 @@ void AccumulatorSum::reset() {
     nonDecimalTotal = {};
     decimalTotal = {};
 }
-}  // namespace mongo
+}  // namespace merizo

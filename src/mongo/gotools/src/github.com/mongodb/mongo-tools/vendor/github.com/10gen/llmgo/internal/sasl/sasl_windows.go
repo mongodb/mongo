@@ -52,7 +52,7 @@ func New(username, password, mechanism, service, host string) (saslStepper, erro
 	initOnce.Do(initSSPI)
 	ss := &saslSession{mech: mechanism, hasContext: 0, userPlusRealm: username}
 	if service == "" {
-		service = "mongodb"
+		service = "merizodb"
 	}
 	if i := strings.Index(host, ":"); i >= 0 {
 		host = host[:i]

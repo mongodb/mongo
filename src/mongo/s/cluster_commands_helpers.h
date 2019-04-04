@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,16 +32,16 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/s/async_requests_sender.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/commands/strategy.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/s/async_requests_sender.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/commands/strategy.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * This function appends the provided writeConcernError BSONElement to the sharded response.
@@ -80,10 +80,10 @@ BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
  * success and a list of responses from shards (including errors from the shards or errors reaching
  * the shards).
  *
- * Note, if this mongos has not refreshed its shard list since
- * 1) a shard has been *added* through a different mongos, a request will not be sent to the added
+ * Note, if this merizos has not refreshed its shard list since
+ * 1) a shard has been *added* through a different merizos, a request will not be sent to the added
  *    shard
- * 2) a shard has been *removed* through a different mongos, this function will return a
+ * 2) a shard has been *removed* through a different merizos, this function will return a
  *    ShardNotFound error status.
  */
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShards(
@@ -215,4 +215,4 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
 StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
     OperationContext* opCtx, const NamespaceString& nss);
 
-}  // namespace mongo
+}  // namespace merizo

@@ -37,7 +37,7 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
 } else {
     var name = "wt_nojournal_fsync";
 
-    jsTestLog("run mongod without journaling");
+    jsTestLog("run merizod without journaling");
     conn = MongoRunner.runMongod({storageEngine: "wiredTiger", nojournal: ""});
 
     // restart node without fsync and --nojournal.  Data should not be there after restart

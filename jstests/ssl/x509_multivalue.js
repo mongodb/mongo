@@ -13,7 +13,7 @@
         }
         const script = 'assert(db.getSiblingDB(\'$external\').auth(' + tojson(auth) + '));';
         clearRawMongoProgramOutput();
-        const exitCode = runMongoProgram('mongo',
+        const exitCode = runMongoProgram('merizo',
                                          '--ssl',
                                          '--sslAllowInvalidHostnames',
                                          '--sslPEMKeyFile',
@@ -29,7 +29,7 @@
     }
 
     function runTest(conn) {
-        const NAME = 'L=New York City+ST=New York+C=US,OU=KernelUser+O=MongoDB+CN=client';
+        const NAME = 'L=New York City+ST=New York+C=US,OU=KernelUser+O=MerizoDB+CN=client';
 
         const admin = conn.getDB('admin');
         admin.createUser({user: "admin", pwd: "admin", roles: ["root"]});
@@ -43,13 +43,13 @@
     }
 
     // Standalone.
-    const mongod = MongoRunner.runMongod({
+    const merizod = MongoRunner.runMongod({
         auth: '',
         sslMode: 'requireSSL',
         sslPEMKeyFile: SERVER_CERT,
         sslCAFile: CA_CERT,
         sslAllowInvalidCertificates: '',
     });
-    runTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    runTest(merizod);
+    MongoRunner.stopMongod(merizod);
 })();

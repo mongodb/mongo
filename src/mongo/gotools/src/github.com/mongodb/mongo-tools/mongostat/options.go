@@ -1,18 +1,18 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongostat
+package merizostat
 
 var Usage = `<options> <polling interval in seconds>
 
-Monitor basic MongoDB server statistics.
+Monitor basic MerizoDB server statistics.
 
-See http://docs.mongodb.org/manual/reference/program/mongostat/ for more information.`
+See http://docs.merizodb.org/manual/reference/program/merizostat/ for more information.`
 
-// StatOptions defines the set of options to use for configuring mongostat.
+// StatOptions defines the set of options to use for configuring merizostat.
 type StatOptions struct {
 	Columns       string `short:"o" value-name:"<field>[,<field>]*" description:"fields to show. For custom fields, use dot-syntax to index into serverStatus output, and optional methods .diff() and .rate() e.g. metrics.record.moves.diff()"`
 	AppendColumns string `short:"O" value-name:"<field>[,<field>]*" description:"like -o, but preloaded with default fields. Specified fields inserted after default output"`
@@ -27,7 +27,7 @@ type StatOptions struct {
 	Interactive   bool   `short:"i" long:"interactive" description:"display stats in a non-scrolling interface"`
 }
 
-// Name returns a human-readable group name for mongostat options.
+// Name returns a human-readable group name for merizostat options.
 func (*StatOptions) Name() string {
 	return "stat"
 }

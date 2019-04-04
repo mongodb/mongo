@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kFTDC
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/ftdc/file_writer.h"
+#include "merizo/db/ftdc/file_writer.h"
 
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include <string>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/ftdc/compressor.h"
-#include "mongo/db/ftdc/config.h"
-#include "mongo/db/ftdc/util.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/ftdc/compressor.h"
+#include "merizo/db/ftdc/config.h"
+#include "merizo/db/ftdc/util.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 FTDCFileWriter::~FTDCFileWriter() {
     close().transitional_ignore();
@@ -226,4 +226,4 @@ void FTDCFileWriter::closeWithoutFlushForTest() {
     _archiveStream.close();
 }
 
-}  // namespace mongo
+}  // namespace merizo

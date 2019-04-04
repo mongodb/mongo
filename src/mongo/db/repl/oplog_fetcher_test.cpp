@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 
-#include "mongo/db/repl/abstract_oplog_fetcher_test_fixture.h"
-#include "mongo/db/repl/data_replicator_external_state_mock.h"
-#include "mongo/db/repl/oplog_fetcher.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/oplog_query_metadata.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/ensure_fcv.h"
-#include "mongo/unittest/task_executor_proxy.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/repl/abstract_oplog_fetcher_test_fixture.h"
+#include "merizo/db/repl/data_replicator_external_state_mock.h"
+#include "merizo/db/repl/oplog_fetcher.h"
+#include "merizo/rpc/metadata.h"
+#include "merizo/rpc/metadata/oplog_query_metadata.h"
+#include "merizo/rpc/metadata/repl_set_metadata.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/ensure_fcv.h"
+#include "merizo/unittest/task_executor_proxy.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/scopeguard.h"
 
 namespace {
 
-using namespace mongo;
-using namespace mongo::repl;
+using namespace merizo;
+using namespace merizo::repl;
 using namespace unittest;
 
 using executor::RemoteCommandRequest;
@@ -229,7 +229,7 @@ TEST_F(
     OplogFetcherTest,
     FindQueryContainsTermAndStartTimestampIfGetCurrentTermAndLastCommittedOpTimeReturnsValidTerm) {
     auto cmdObj = makeOplogFetcher(_createConfig())->getFindQuery_forTest();
-    ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
+    ASSERT_EQUALS(merizo::BSONType::Object, cmdObj["filter"].type());
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
                       cmdObj["filter"].Obj());
     ASSERT_EQUALS(dataReplicatorExternalState->currentTerm, cmdObj["term"].numberLong());
@@ -240,7 +240,7 @@ TEST_F(OplogFetcherTest,
        FindQueryDoesNotContainTermIfGetCurrentTermAndLastCommittedOpTimeReturnsUninitializedTerm) {
     dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
     auto cmdObj = makeOplogFetcher(_createConfig())->getFindQuery_forTest();
-    ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
+    ASSERT_EQUALS(merizo::BSONType::Object, cmdObj["filter"].type());
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
                       cmdObj["filter"].Obj());
     ASSERT_FALSE(cmdObj.hasField("term"));

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/db/exec/sort.h"
+#include "merizo/db/exec/sort.h"
 
 #include <algorithm>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/index/btree_key_generator.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/exec/working_set_computed_data.h"
+#include "merizo/db/index/btree_key_generator.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 using std::unique_ptr;
@@ -103,7 +103,7 @@ bool SortStage::isEOF() {
 PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
     const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes.load());
     if (_memUsage > maxBytes) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "Sort operation used more than the maximum " << maxBytes
            << " bytes of RAM. Add an index, or specify a smaller limit.";
         Status status(ErrorCodes::OperationFailed, ss);
@@ -289,4 +289,4 @@ void SortStage::sortBuffer() {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

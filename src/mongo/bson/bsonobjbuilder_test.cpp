@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::string;
@@ -58,8 +58,8 @@ void assertBSONTypeEquals(BSONType actual, BSONType expected, T value, int i) {
     if (expected != actual) {
         std::stringstream ss;
         ss << "incorrect type in bson object for " << (i + 1) << "-th test value " << value
-           << ". actual: " << mongo::typeName(actual)
-           << "; expected: " << mongo::typeName(expected);
+           << ". actual: " << merizo::typeName(actual)
+           << "; expected: " << merizo::typeName(expected);
         const string msg = ss.str();
         FAIL(msg);
     }
@@ -83,15 +83,15 @@ TEST(BSONObjBuilderTest, AppendUnsignedInt) {
     struct {
         unsigned int v;
         BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {maxEncodableInt, mongo::NumberInt},
-                {maxEncodableInt + 1, mongo::NumberInt},
-                {static_cast<unsigned int>(maxInt), mongo::NumberInt},
-                {static_cast<unsigned int>(maxInt) + 1U, mongo::NumberInt},
-                {(std::numeric_limits<unsigned int>::max)(), mongo::NumberInt},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
+    } data[] = {{0, merizo::NumberInt},
+                {100, merizo::NumberInt},
+                {maxEncodableInt, merizo::NumberInt},
+                {maxEncodableInt + 1, merizo::NumberInt},
+                {static_cast<unsigned int>(maxInt), merizo::NumberInt},
+                {static_cast<unsigned int>(maxInt) + 1U, merizo::NumberInt},
+                {(std::numeric_limits<unsigned int>::max)(), merizo::NumberInt},
+                {0, merizo::Undefined}};
+    for (int i = 0; data[i].t != merizo::Undefined; i++) {
         unsigned int v = data[i].v;
         BSONObjBuilder b;
         b.append("a", v);
@@ -118,25 +118,25 @@ TEST(BSONObjBuilderTest, AppendIntOrLL) {
     struct {
         long long v;
         BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {-100, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {-(maxInt / 2 - 1), mongo::NumberInt},
-                {maxInt / 2 - 1, mongo::NumberInt},
-                {-(maxInt / 2), mongo::NumberLong},
-                {maxInt / 2, mongo::NumberLong},
-                {minEncodableInt, mongo::NumberLong},
-                {maxEncodableInt, mongo::NumberLong},
-                {minEncodableInt - 1, mongo::NumberLong},
-                {maxEncodableInt + 1, mongo::NumberLong},
-                {minInt, mongo::NumberLong},
-                {maxInt, mongo::NumberLong},
-                {minInt - 1, mongo::NumberLong},
-                {maxInt + 1, mongo::NumberLong},
-                {minLongLong, mongo::NumberLong},
-                {maxLongLong, mongo::NumberLong},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
+    } data[] = {{0, merizo::NumberInt},
+                {-100, merizo::NumberInt},
+                {100, merizo::NumberInt},
+                {-(maxInt / 2 - 1), merizo::NumberInt},
+                {maxInt / 2 - 1, merizo::NumberInt},
+                {-(maxInt / 2), merizo::NumberLong},
+                {maxInt / 2, merizo::NumberLong},
+                {minEncodableInt, merizo::NumberLong},
+                {maxEncodableInt, merizo::NumberLong},
+                {minEncodableInt - 1, merizo::NumberLong},
+                {maxEncodableInt + 1, merizo::NumberLong},
+                {minInt, merizo::NumberLong},
+                {maxInt, merizo::NumberLong},
+                {minInt - 1, merizo::NumberLong},
+                {maxInt + 1, merizo::NumberLong},
+                {minLongLong, merizo::NumberLong},
+                {maxLongLong, merizo::NumberLong},
+                {0, merizo::Undefined}};
+    for (int i = 0; data[i].t != merizo::Undefined; i++) {
         long long v = data[i].v;
         BSONObjBuilder b;
         b.appendIntOrLL("a", v);
@@ -160,15 +160,15 @@ TEST(BSONObjBuilderTest, AppendNumberSizeT) {
     struct {
         size_t v;
         BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {maxEncodableInt, mongo::NumberInt},
-                {maxEncodableInt + 1, mongo::NumberLong},
-                {size_t(maxInt), mongo::NumberLong},
-                {size_t(maxInt) + 1U, mongo::NumberLong},
-                {(std::numeric_limits<size_t>::max)(), mongo::NumberLong},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
+    } data[] = {{0, merizo::NumberInt},
+                {100, merizo::NumberInt},
+                {maxEncodableInt, merizo::NumberInt},
+                {maxEncodableInt + 1, merizo::NumberLong},
+                {size_t(maxInt), merizo::NumberLong},
+                {size_t(maxInt) + 1U, merizo::NumberLong},
+                {(std::numeric_limits<size_t>::max)(), merizo::NumberLong},
+                {0, merizo::Undefined}};
+    for (int i = 0; data[i].t != merizo::Undefined; i++) {
         size_t v = data[i].v;
         BSONObjBuilder b;
         b.appendNumber("a", v);
@@ -195,36 +195,36 @@ TEST(BSONObjBuilderTest, AppendNumberLongLong) {
     struct {
         long long v;
         BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {-100, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {minEncodableInt, mongo::NumberInt},
-                {maxEncodableInt, mongo::NumberInt},
-                {minEncodableInt - 1, mongo::NumberDouble},
-                {maxEncodableInt + 1, mongo::NumberDouble},
-                {minInt, mongo::NumberDouble},
-                {maxInt, mongo::NumberDouble},
-                {minInt - 1, mongo::NumberDouble},
-                {maxInt + 1, mongo::NumberDouble},
-                {minEncodableDouble, mongo::NumberDouble},
-                {maxEncodableDouble, mongo::NumberDouble},
-                {minEncodableDouble - 1, mongo::NumberLong},
-                {maxEncodableDouble + 1, mongo::NumberLong},
-                {minDouble, mongo::NumberLong},
-                {maxDouble, mongo::NumberLong},
-                {minDouble - 1, mongo::NumberLong},
-                {maxDouble + 1, mongo::NumberLong},
-                {minLongLong, mongo::NumberLong},
-                {maxLongLong, mongo::NumberLong},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
+    } data[] = {{0, merizo::NumberInt},
+                {-100, merizo::NumberInt},
+                {100, merizo::NumberInt},
+                {minEncodableInt, merizo::NumberInt},
+                {maxEncodableInt, merizo::NumberInt},
+                {minEncodableInt - 1, merizo::NumberDouble},
+                {maxEncodableInt + 1, merizo::NumberDouble},
+                {minInt, merizo::NumberDouble},
+                {maxInt, merizo::NumberDouble},
+                {minInt - 1, merizo::NumberDouble},
+                {maxInt + 1, merizo::NumberDouble},
+                {minEncodableDouble, merizo::NumberDouble},
+                {maxEncodableDouble, merizo::NumberDouble},
+                {minEncodableDouble - 1, merizo::NumberLong},
+                {maxEncodableDouble + 1, merizo::NumberLong},
+                {minDouble, merizo::NumberLong},
+                {maxDouble, merizo::NumberLong},
+                {minDouble - 1, merizo::NumberLong},
+                {maxDouble + 1, merizo::NumberLong},
+                {minLongLong, merizo::NumberLong},
+                {maxLongLong, merizo::NumberLong},
+                {0, merizo::Undefined}};
+    for (int i = 0; data[i].t != merizo::Undefined; i++) {
         long long v = data[i].v;
         BSONObjBuilder b;
         b.appendNumber("a", v);
         BSONObj o = b.obj();
         ASSERT_EQUALS(o.nFields(), 1);
         BSONElement e = o.getField("a");
-        if (data[i].t != mongo::NumberDouble) {
+        if (data[i].t != merizo::NumberDouble) {
             long long n = e.numberLong();
             ASSERT_EQUALS(n, v);
         } else {
@@ -255,13 +255,13 @@ TEST(BSONObjBuilderTest, AppendNumberLongLongMinCompareObject) {
 
 TEST(BSONObjBuilderTest, AppendMaxTimestampConversion) {
     BSONObjBuilder b;
-    b.appendMaxForType("a", mongo::bsonTimestamp);
+    b.appendMaxForType("a", merizo::bsonTimestamp);
     BSONObj o1 = b.obj();
 
     BSONElement e = o1.getField("a");
     ASSERT_FALSE(e.eoo());
 
-    mongo::Timestamp timestamp = e.timestamp();
+    merizo::Timestamp timestamp = e.timestamp();
     ASSERT_FALSE(timestamp.isNull());
 }
 
@@ -511,4 +511,4 @@ TEST(BSONObjBuilderTest, SizeChecks) {
 
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

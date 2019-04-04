@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/transformer_interface.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/pipeline/transformer_interface.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObj;
 class Document;
@@ -229,4 +229,4 @@ protected:
     ProjectionPolicies _policies;
 };
 }  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace merizo

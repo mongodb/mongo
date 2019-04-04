@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/ftdc/ftdc_test.h"
+#include "merizo/db/ftdc/ftdc_test.h"
 
 #include <boost/filesystem.hpp>
 
-#include "mongo/base/data_type_validated.h"
-#include "mongo/base/init.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/db/client.h"
-#include "mongo/db/ftdc/file_reader.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
+#include "merizo/base/data_type_validated.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/bson_validate.h"
+#include "merizo/db/client.h"
+#include "merizo/db/ftdc/file_reader.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/service_context.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/clock_source.h"
+#include "merizo/util/clock_source_mock.h"
+#include "merizo/util/tick_source_mock.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -146,4 +146,4 @@ FTDCTest::FTDCTest() {
     service->setTickSource(stdx::make_unique<TickSourceMock<>>());
 }
 
-}  // namespace mongo
+}  // namespace merizo

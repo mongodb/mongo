@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/geo/geometry_container.h"
+#include "merizo/db/geo/geometry_container.h"
 
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/geoparser.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/db/geo/geoconstants.h"
+#include "merizo/db/geo/geoparser.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
-namespace mongo {
+namespace merizo {
 
-using mongoutils::str::equals;
+using merizoutils::str::equals;
 
 bool GeometryContainer::isSimpleContainer() const {
     return NULL != _point || NULL != _line || NULL != _polygon;
@@ -1317,4 +1317,4 @@ const CapWithCRS* GeometryContainer::getCapGeometryHack() const {
     return _cap.get();
 }
 
-}  // namespace mongo
+}  // namespace merizo

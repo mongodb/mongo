@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/db/commands.h"
+#include "merizo/base/status.h"
+#include "merizo/db/commands.h"
 
-namespace mongo {
+namespace merizo {
 /**
- * An abstract base class which implements all functionality common to the mongoD and mongoS
+ * An abstract base class which implements all functionality common to the merizoD and merizoS
  * 'profile' command, and defines a number of virtual functions through which it delegates any
  * op-specific work to its derived classes.
  */
@@ -51,7 +51,7 @@ public:
         return "controls the behaviour of the performance profiler, the fraction of eligible "
                "operations which are sampled for logging/profiling, and the threshold duration at "
                "which ops become eligible. See "
-               "http://docs.mongodb.org/manual/reference/command/profile";
+               "http://docs.merizodb.org/manual/reference/command/profile";
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const final {
@@ -74,4 +74,4 @@ protected:
                                      const std::string& dbName,
                                      int profilingLevel) const = 0;
 };
-}  // namespace mongo
+}  // namespace merizo

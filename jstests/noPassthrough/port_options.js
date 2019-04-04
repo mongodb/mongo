@@ -10,18 +10,18 @@
         clearRawMongoProgramOutput();
 
         let pid = startMongoProgramNoConnect(
-            "mongod", "--ipv6", "--dbpath", MongoRunner.dataDir, "--bind_ip", bindIP, "--port", 0);
+            "merizod", "--ipv6", "--dbpath", MongoRunner.dataDir, "--bind_ip", bindIP, "--port", 0);
         jsTest.log("".concat("pid=[", pid, "]"));
 
         if (expectOk) {
             let port;
 
-            // We use assert.soonNoExcept() here because the mongod may not be logging yet.
+            // We use assert.soonNoExcept() here because the merizod may not be logging yet.
             assert.soonNoExcept(() => {
                 const logContents = rawMongoProgramOutput();
                 const found = logContents.match(/waiting for connections on port (\d+)/);
                 if (found !== null) {
-                    print("Found message from mongod with port it is listening on: " + found[0]);
+                    print("Found message from merizod with port it is listening on: " + found[0]);
                     port = found[1];
                     return true;
                 }

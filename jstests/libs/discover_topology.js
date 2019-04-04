@@ -4,7 +4,7 @@
 // Symbol type, so we just use unique string values instead.
 var Topology = {
     kStandalone: 'stand-alone',
-    kRouter: 'mongos router',
+    kRouter: 'merizos router',
     kReplicaSet: 'replica set',
     kShardedCluster: 'sharded cluster',
 };
@@ -16,8 +16,8 @@ var DiscoverTopology = (function() {
         const res = conn.adminCommand({isMaster: 1});
 
         if (!res.hasOwnProperty('setName')) {
-            // 'conn' represents a connection to a stand-alone mongod.
-            return {type: Topology.kStandalone, mongod: conn.host};
+            // 'conn' represents a connection to a stand-alone merizod.
+            return {type: Topology.kStandalone, merizod: conn.host};
         }
 
         // The "passives" field contains the list of unelectable (priority=0) secondaries
@@ -63,30 +63,30 @@ var DiscoverTopology = (function() {
             shardHosts[shardInfo._id] = getDataMemberConnectionStrings(shardConn);
         }
 
-        // Discover mongos URIs from the connection string. If a mongos is not passed in explicitly,
+        // Discover merizos URIs from the connection string. If a merizos is not passed in explicitly,
         // it will not be discovered.
-        const mongosUris = new MongoURI("mongodb://" + conn.host);
+        const merizosUris = new MongoURI("merizodb://" + conn.host);
 
-        const mongos = {
+        const merizos = {
             type: Topology.kRouter,
-            nodes: mongosUris.servers.map(uriObj => uriObj.server),
+            nodes: merizosUris.servers.map(uriObj => uriObj.server),
         };
 
         return {
             type: Topology.kShardedCluster,
             configsvr: configsvrHosts,
             shards: shardHosts,
-            mongos: mongos,
+            merizos: merizos,
         };
     }
 
     /**
-     * Returns an object describing the topology of the mongod processes reachable from 'conn'.
+     * Returns an object describing the topology of the merizod processes reachable from 'conn'.
      * The "connectFn" property can be optionally specified to support custom retry logic when
      * making connection attempts without overriding the Mongo constructor itself.
      *
-     * For a stand-alone mongod, an object of the form
-     *   {type: Topology.kStandalone, mongod: <conn-string>}
+     * For a stand-alone merizod, an object of the form
+     *   {type: Topology.kStandalone, merizod: <conn-string>}
      * is returned.
      *
      * For a replica set, an object of the form
@@ -102,13 +102,13 @@ var DiscoverTopology = (function() {
      *     type: Topology.kShardedCluster,
      *     configsvr: {nodes: [...]},
      *     shards: {
-     *       <shard-name1>: {type: Topology.kStandalone, mongod: ...},
+     *       <shard-name1>: {type: Topology.kStandalone, merizod: ...},
      *       <shard-name2>: {type: Topology.kReplicaSet,
      *                       primary: <primary-conn-string>,
      *                       nodes: [...]},
      *       ...
      *     },
-     *     mongos: {
+     *     merizos: {
      *       type: Topology.kRouter,
      *       nodes: [...],
      *     }
@@ -128,7 +128,7 @@ var DiscoverTopology = (function() {
 
     function addNonConfigNodesToList(topology, hostList) {
         if (topology.type === Topology.kStandalone) {
-            hostList.push(topology.mongod);
+            hostList.push(topology.merizod);
         } else if (topology.type === Topology.kReplicaSet) {
             hostList.push(...topology.nodes);
         } else if (topology.type === Topology.kShardedCluster) {
@@ -136,7 +136,7 @@ var DiscoverTopology = (function() {
                 const shardTopology = topology.shards[shardName];
                 addNonConfigNodesToList(shardTopology, hostList);
             }
-            hostList.push(...topology.mongos.nodes);
+            hostList.push(...topology.merizos.nodes);
         } else {
             throw new Error('Unrecognized topology format: ' + tojson(topology));
         }

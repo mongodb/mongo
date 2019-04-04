@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
-#include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/db/pipeline/stub_merizo_process_interface.h"
+#include "merizo/db/query/collation/collation_spec.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 
@@ -57,7 +57,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     allowDiskUse = request.shouldAllowDiskUse();
     bypassDocumentValidation = request.shouldBypassDocumentValidation();
     ns = request.getNamespaceString();
-    mongoProcessInterface = std::move(processInterface);
+    merizoProcessInterface = std::move(processInterface);
     collation = request.getCollation();
     _ownedCollator = std::move(collator);
     _resolvedNamespaces = std::move(resolvedNamespaces);
@@ -71,7 +71,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator)
     : opCtx(opCtx),
-      mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
+      merizoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
       timeZoneDatabase(opCtx && opCtx->getServiceContext()
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
@@ -84,7 +84,7 @@ ExpressionContext::ExpressionContext(NamespaceString nss,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
                                      const TimeZoneDatabase* tzDb)
     : ns(std::move(nss)),
-      mongoProcessInterface(std::move(processInterface)),
+      merizoProcessInterface(std::move(processInterface)),
       timeZoneDatabase(tzDb),
       variablesParseState(variables.useIdGenerator()) {}
 
@@ -143,7 +143,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> collator) const {
     intrusive_ptr<ExpressionContext> expCtx =
-        new ExpressionContext(std::move(ns), mongoProcessInterface, timeZoneDatabase);
+        new ExpressionContext(std::move(ns), merizoProcessInterface, timeZoneDatabase);
 
     expCtx->uuid = std::move(uuid);
     expCtx->explain = explain;
@@ -184,4 +184,4 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     return expCtx;
 }
 
-}  // namespace mongo
+}  // namespace merizo

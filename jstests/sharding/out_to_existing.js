@@ -6,9 +6,9 @@
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
 
-    const mongosDB = st.s0.getDB("source_db");
-    const sourceColl = mongosDB["source_coll"];
-    const outputCollSameDb = mongosDB[jsTestName() + "_out"];
+    const merizosDB = st.s0.getDB("source_db");
+    const sourceColl = merizosDB["source_coll"];
+    const outputCollSameDb = merizosDB[jsTestName() + "_out"];
 
     function testOut(sourceColl, targetColl, shardedSource, shardedTarget) {
         jsTestLog(`Testing $out from ${sourceColl.getFullName()} ` +

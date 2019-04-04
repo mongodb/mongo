@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongodump
+package merizodump
 
 import (
 	"bytes"
@@ -14,10 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/archive"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/log"
 )
 
 type NilPos struct{}
@@ -168,7 +168,7 @@ func shouldSkipSystemNamespace(dbName, collName string) bool {
 }
 
 // shouldSkipCollection returns true when a collection name is excluded
-// by the mongodump options.
+// by the merizodump options.
 func (dump *MongoDump) shouldSkipCollection(colName string) bool {
 	for _, excludedCollection := range dump.OutputOptions.ExcludedCollections {
 		if colName == excludedCollection {

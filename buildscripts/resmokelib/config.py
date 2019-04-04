@@ -8,13 +8,13 @@ import itertools
 import os.path
 import time
 
-# Subdirectory under the dbpath prefix that contains directories with data files of mongod's started
+# Subdirectory under the dbpath prefix that contains directories with data files of merizod's started
 # by resmoke.py.
 FIXTURE_SUBDIR = "resmoke"
 
-# Subdirectory under the dbpath prefix that contains directories with data files of mongod's started
+# Subdirectory under the dbpath prefix that contains directories with data files of merizod's started
 # by individual tests.
-MONGO_RUNNER_SUBDIR = "mongorunner"
+MONGO_RUNNER_SUBDIR = "merizorunner"
 
 ##
 # Default values. There are two types of default values: "DEFAULT_" prefixed module variables,
@@ -25,15 +25,15 @@ MONGO_RUNNER_SUBDIR = "mongorunner"
 
 # Default path for where to look for executables.
 DEFAULT_DBTEST_EXECUTABLE = os.path.join(os.curdir, "dbtest")
-DEFAULT_MONGO_EXECUTABLE = os.path.join(os.curdir, "mongo")
-DEFAULT_MONGOEBENCH_EXECUTABLE = os.path.join(os.curdir, "mongoebench")
-DEFAULT_MONGOD_EXECUTABLE = os.path.join(os.curdir, "mongod")
-DEFAULT_MONGOS_EXECUTABLE = os.path.join(os.curdir, "mongos")
+DEFAULT_MONGO_EXECUTABLE = os.path.join(os.curdir, "merizo")
+DEFAULT_MONGOEBENCH_EXECUTABLE = os.path.join(os.curdir, "merizoebench")
+DEFAULT_MONGOD_EXECUTABLE = os.path.join(os.curdir, "merizod")
+DEFAULT_MONGOS_EXECUTABLE = os.path.join(os.curdir, "merizos")
 
 DEFAULT_BENCHMARK_REPETITIONS = 3
 DEFAULT_BENCHMARK_MIN_TIME = datetime.timedelta(seconds=5)
 
-# Default root directory for where resmoke.py puts directories containing data files of mongod's it
+# Default root directory for where resmoke.py puts directories containing data files of merizod's it
 # starts, as well as those started by individual tests.
 DEFAULT_DBPATH_PREFIX = os.path.normpath("/data/db")
 
@@ -50,7 +50,7 @@ DEFAULTS = {
     "benchrun_device": "Desktop",
     "benchrun_embedded_root": "/data/local/tmp/benchrun_embedded",
     "benchrun_report_root": "benchrun_embedded/results",
-    "buildlogger_url": "https://logkeeper.mongodb.org",
+    "buildlogger_url": "https://logkeeper.merizodb.org",
     "continue_on_failure": False,
     "dbpath_prefix": None,
     "dbtest_executable": None,
@@ -59,12 +59,12 @@ DEFAULTS = {
     "genny_executable": None,
     "include_with_any_tags": None,
     "jobs": 1,
-    "mongo_executable": None,
-    "mongod_executable": None,
-    "mongod_set_parameters": None,
-    "mongoebench_executable": None,
-    "mongos_executable": None,
-    "mongos_set_parameters": None,
+    "merizo_executable": None,
+    "merizod_executable": None,
+    "merizod_set_parameters": None,
+    "merizoebench_executable": None,
+    "merizos_executable": None,
+    "merizos_set_parameters": None,
     "no_journal": False,
     "num_clients_per_fixture": 1,
     "perf_report_file": None,
@@ -96,7 +96,7 @@ DEFAULTS = {
     "execution_number": 0,
     "git_revision": None,
     "patch_build": False,
-    "project_name": "mongodb-mongo-master",
+    "project_name": "merizodb-merizo-master",
     "revision_order_id": None,
     "task_id": None,
     "task_name": None,
@@ -218,14 +218,14 @@ ARCHIVE_LIMIT_MB = None
 # The limit number of tests to archive for an Evergreen task.
 ARCHIVE_LIMIT_TESTS = None
 
-# The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
-# mongo shell.
+# The starting port number to use for merizod and merizos processes spawned by resmoke.py and the
+# merizo shell.
 BASE_PORT = None
 
 # The root url of the buildlogger server.
 BUILDLOGGER_URL = None
 
-# Root directory for where resmoke.py puts directories containing data files of mongod's it starts,
+# Root directory for where resmoke.py puts directories containing data files of merizod's it starts,
 # as well as those started by individual tests.
 DBPATH_PREFIX = None
 
@@ -291,25 +291,25 @@ INCLUDE_WITH_ANY_TAGS = None
 # If set, then resmoke.py starts the specified number of Job instances to run tests.
 JOBS = None
 
-# The path to the mongo executable used by resmoke.py.
+# The path to the merizo executable used by resmoke.py.
 MONGO_EXECUTABLE = None
 
-# The path to the mongod executable used by resmoke.py.
+# The path to the merizod executable used by resmoke.py.
 MONGOD_EXECUTABLE = None
 
-# The --setParameter options passed to mongod.
+# The --setParameter options passed to merizod.
 MONGOD_SET_PARAMETERS = None
 
-# The path to the mongoebench executable used by resmoke.py.
+# The path to the merizoebench executable used by resmoke.py.
 MONGOEBENCH_EXECUTABLE = None
 
-# The path to the mongos executable used by resmoke.py.
+# The path to the merizos executable used by resmoke.py.
 MONGOS_EXECUTABLE = None
 
-# The --setParameter options passed to mongos.
+# The --setParameter options passed to merizos.
 MONGOS_SET_PARAMETERS = None
 
-# If true, then all mongod's started by resmoke.py and by the mongo shell will not have journaling
+# If true, then all merizod's started by resmoke.py and by the merizo shell will not have journaling
 # enabled.
 NO_JOURNAL = None
 
@@ -346,17 +346,17 @@ REPORT_FAILURE_STATUS = None
 # If set, then resmoke.py will write out a report file with the status of each test that ran.
 REPORT_FILE = None
 
-# IF set, then mongod/mongos's started by resmoke.py will use the specified service executor
+# IF set, then merizod/merizos's started by resmoke.py will use the specified service executor
 SERVICE_EXECUTOR = None
 
 # If set, resmoke will override the default fixture and connect to the fixture specified by this
 # connection string instead.
 SHELL_CONN_STRING = None
 
-# If set, then mongo shells started by resmoke.py will use the specified read mode.
+# If set, then merizo shells started by resmoke.py will use the specified read mode.
 SHELL_READ_MODE = None
 
-# If set, then mongo shells started by resmoke.py will use the specified write mode.
+# If set, then merizo shells started by resmoke.py will use the specified write mode.
 SHELL_WRITE_MODE = None
 
 # If true, then the order the tests run in is randomized. Otherwise the tests will run in
@@ -373,29 +373,29 @@ STAGGER_JOBS = None
 # If set to true, it enables read concern majority. Else, read concern majority is disabled.
 MAJORITY_READ_CONCERN = None
 
-# If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
+# If set, then all merizod's started by resmoke.py and by the merizo shell will use the specified
 # storage engine.
 STORAGE_ENGINE = None
 
-# If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
+# If set, then all merizod's started by resmoke.py and by the merizo shell will use the specified
 # storage engine cache size.
 STORAGE_ENGINE_CACHE_SIZE = None
 
 # The tag file to use that associates tests with tags.
 TAG_FILE = None
 
-# If set, then mongod/mongos's started by resmoke.py will use the specified transport layer.
+# If set, then merizod/merizos's started by resmoke.py will use the specified transport layer.
 TRANSPORT_LAYER = None
 
-# If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
+# If set, then all merizod's started by resmoke.py and by the merizo shell will use the specified
 # WiredTiger collection configuration settings.
 WT_COLL_CONFIG = None
 
-# If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
+# If set, then all merizod's started by resmoke.py and by the merizo shell will use the specified
 # WiredTiger storage engine configuration settings.
 WT_ENGINE_CONFIG = None
 
-# If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
+# If set, then all merizod's started by resmoke.py and by the merizo shell will use the specified
 # WiredTiger index configuration settings.
 WT_INDEX_CONFIG = None
 
@@ -415,7 +415,7 @@ BENCHRUN_REPORT_ROOT = None
 ##
 
 # S3 Bucket to upload archive files.
-ARCHIVE_BUCKET = "mongodatafiles"
+ARCHIVE_BUCKET = "merizodatafiles"
 
 # Benchmark options set internally by resmoke.py
 BENCHMARK_OUT_FORMAT = "json"

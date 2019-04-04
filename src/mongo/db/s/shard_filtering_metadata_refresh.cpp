@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "merizo/db/s/shard_filtering_metadata_refresh.h"
 
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/sharding_statistics.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/commands/feature_compatibility_version.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/s/collection_sharding_runtime.h"
+#include "merizo/db/s/database_sharding_state.h"
+#include "merizo/db/s/operation_sharding_state.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/s/sharding_statistics.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
@@ -69,7 +69,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
     ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
     // Ensure any ongoing migrations have completed before trying to do the refresh. This wait is
-    // just an optimization so that mongos does not exhaust its maximum number of StaleShardVersion
+    // just an optimization so that merizos does not exhaust its maximum number of StaleShardVersion
     // retry attempts while the migration is being committed.
     OperationShardingState::get(opCtx).waitForMigrationCriticalSectionSignal(opCtx);
 
@@ -110,7 +110,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
     }
 
     // Ensure any ongoing movePrimary's have completed before trying to do the refresh. This wait is
-    // just an optimization so that mongos does not exhaust its maximum number of
+    // just an optimization so that merizos does not exhaust its maximum number of
     // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
     OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
 
@@ -277,4 +277,4 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     dss.setDbVersion(opCtx, std::move(refreshedDbVersion), dssLock);
 }
 
-}  // namespace mongo
+}  // namespace merizo

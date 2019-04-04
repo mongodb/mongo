@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,12 +31,12 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobj_comparator_interface.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/index/multikey_paths.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobj_comparator_interface.h"
+#include "merizo/db/hasher.h"
+#include "merizo/db/index/multikey_paths.h"
 
-namespace mongo {
+namespace merizo {
 
 class CollatorInterface;
 struct TwoDIndexingParams;
@@ -85,7 +85,7 @@ public:
     /**
      * Hashing function used by both getHashKeys and the cursors we create.
      * Exposed for testing in dbtests/namespacetests.cpp and
-     * so mongo/db/index_legacy.cpp can use it.
+     * so merizo/db/index_legacy.cpp can use it.
      */
     static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
 
@@ -128,4 +128,4 @@ public:
                           MultikeyPaths* multikeyPaths);
 };
 
-}  // namespace mongo
+}  // namespace merizo

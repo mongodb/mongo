@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <set>
 
-#include "mongo/bson/json.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/fts/fts_index_format.h"
-#include "mongo/db/fts/fts_spec.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/json.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/fts/fts_index_format.h"
+#include "merizo/db/fts/fts_spec.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace fts {
 
@@ -139,7 +139,7 @@ void assertEqualsIndexKeys(std::set<std::string>& expectedKeys, const BSONObjSet
         string s = key.firstElement().String();
         std::set<string>::const_iterator j = expectedKeys.find(s);
         if (j == expectedKeys.end()) {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             ss << "unexpected key " << s << " in FTSIndexFormat::getKeys result. "
                << "expected keys:";
             for (std::set<string>::const_iterator k = expectedKeys.begin(); k != expectedKeys.end();
@@ -166,7 +166,7 @@ TEST(FTSIndexFormat, LongWordsTextIndexVersion1) {
     string longWordCat = longPrefix + "cat";
     // "aaa...aaasat"
     string longWordSat = longPrefix + "sat";
-    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat;
+    string text = merizoutils::str::stream() << longWordCat << " " << longWordSat;
     FTSIndexFormat::getKeys(spec, BSON("data" << text), &keys);
 
     // Hard-coded expected computed keys for future-proofing.
@@ -196,10 +196,10 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion2) {
     string longWordCat = longPrefix + "cat";
     // "aaa...aaasat"
     string longWordSat = longPrefix + "sat";
-    // "aaa...aaamongodbfts"
-    string longWordMongoDBFts = longPrefix + "mongodbfts";
-    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat << " "
-                                            << longWordMongoDBFts;
+    // "aaa...aaamerizodbfts"
+    string longWordMerizoDBFts = longPrefix + "merizodbfts";
+    string text = merizoutils::str::stream() << longWordCat << " " << longWordSat << " "
+                                            << longWordMerizoDBFts;
     FTSIndexFormat::getKeys(spec, BSON("data" << text), &keys);
 
     // Hard-coded expected computed keys for future-proofing.
@@ -208,7 +208,7 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion2) {
     expectedKeys.insert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab8e78455d827ebb87cbe87f392bf45f6");
     // sat
     expectedKeys.insert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaf2d6f58bb3b81b97e611ae7ccac6dea7");
-    // mongodbfts
+    // merizodbfts
     expectedKeys.insert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaae1d6b34f5d9c92acecd8cce32f747b27");
 
     assertEqualsIndexKeys(expectedKeys, keys);
@@ -231,7 +231,7 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion3) {
     string longWordCat = longPrefix + "cat";
     // "aaa...aaasat"
     string longWordSat = longPrefix + "sat";
-    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat;
+    string text = merizoutils::str::stream() << longWordCat << " " << longWordSat;
     FTSIndexFormat::getKeys(spec, BSON("data" << text), &keys);
 
     // Hard-coded expected computed keys for future-proofing.
@@ -325,4 +325,4 @@ TEST(FTSIndexFormat, GetKeysWithPositionalPathAllowed) {
     }
 }
 }  // namespace fts
-}  // namespace mongo
+}  // namespace merizo

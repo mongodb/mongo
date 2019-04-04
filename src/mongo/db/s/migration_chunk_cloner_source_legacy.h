@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,21 +32,21 @@
 #include <list>
 #include <set>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/s/migration_chunk_cloner_source.h"
-#include "mongo/db/s/migration_session_id.h"
-#include "mongo/db/s/session_catalog_migration_source.h"
-#include "mongo/s/request_types/move_chunk_request.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/s/migration_chunk_cloner_source.h"
+#include "merizo/db/s/migration_session_id.h"
+#include "merizo/db/s/session_catalog_migration_source.h"
+#include "merizo/s/request_types/move_chunk_request.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONArrayBuilder;
 class BSONObjBuilder;
@@ -322,4 +322,4 @@ private:
     uint64_t _memoryUsed{0};
 };
 
-}  // namespace mongo
+}  // namespace merizo

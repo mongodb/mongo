@@ -1,8 +1,8 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+  cpp_namespace: "merizo"
   cpp_includes:
-    - "mongo/config.h"
+    - "merizo/config.h"
 
 server_parameters:
 
@@ -67,6 +67,6 @@ server_parameters:
       preprocessor: defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 
   tcmallocEnableMarkThreadTemporarilyIdle:
-    description: 'REMOVED: Setting this parameter has no effect and it will be removed in a future version of MongoDB.'
+    description: 'REMOVED: Setting this parameter has no effect and it will be removed in a future version of MerizoDB.'
     set_at: [ startup, runtime ]
     cpp_class: TCMallocEnableMarkThreadTemporarilyIdle

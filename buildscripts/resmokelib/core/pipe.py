@@ -59,7 +59,7 @@ class LoggerPipe(threading.Thread):  # pylint: disable=too-many-instance-attribu
 
                 # Convert the output of the process from a bytestring to a UTF-8 string, and replace
                 # any characters that cannot be decoded with the official Unicode replacement
-                # character, U+FFFD. The log messages of MongoDB processes are not always valid
+                # character, U+FFFD. The log messages of MerizoDB processes are not always valid
                 # UTF-8 sequences. See SERVER-7506.
                 line = line.decode("utf-8", "replace")
                 self.__logger.log(self.__level, line.rstrip())

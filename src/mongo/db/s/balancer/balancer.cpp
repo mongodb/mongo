@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/balancer/balancer.h"
+#include "merizo/db/s/balancer/balancer.h"
 
 #include <algorithm>
 #include <string>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/client.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
-#include "mongo/db/s/balancer/cluster_statistics_impl.h"
-#include "mongo/db/s/sharding_logging.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/timer.h"
-#include "mongo/util/version.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/client.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
+#include "merizo/db/s/balancer/cluster_statistics_impl.h"
+#include "merizo/db/s/sharding_logging.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/catalog/type_chunk.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/shard_util.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/timer.h"
+#include "merizo/util/version.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::map;
 using std::string;
@@ -128,7 +128,7 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
 
     bool isMultiVersion = false;
     for (const auto& stat : clusterStats) {
-        if (!vii.isSameMajorVersion(stat.mongoVersion.c_str())) {
+        if (!vii.isSameMajorVersion(stat.merizoVersion.c_str())) {
             isMultiVersion = true;
             break;
         }
@@ -143,7 +143,7 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
        << ", shard versions: ";
 
     for (const auto& stat : clusterStats) {
-        sb << stat.shardId << " is at " << stat.mongoVersion << "; ";
+        sb << stat.shardId << " is at " << stat.merizoVersion << "; ";
     }
 
     warning() << sb.str();
@@ -665,4 +665,4 @@ void Balancer::notifyPersistedBalancerSettingsChanged() {
     _condVar.notify_all();
 }
 
-}  // namespace mongo
+}  // namespace merizo

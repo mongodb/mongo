@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,7 +30,7 @@
 /*
  * A C++ unit testing framework.
  *
- * For examples of basic usage, see mongo/unittest/unittest_test.cpp.
+ * For examples of basic usage, see merizo/unittest/unittest_test.cpp.
  */
 
 #pragma once
@@ -42,19 +42,19 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/logger/logstream_builder.h"
-#include "mongo/logger/message_log_domain.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest_helpers.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status_with.h"
+#include "merizo/logger/logstream_builder.h"
+#include "merizo/logger/message_log_domain.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/unittest/bson_test_util.h"
+#include "merizo/unittest/unittest_helpers.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
 /**
  * Fail unconditionally, reporting the given message.
  */
-#define FAIL(MESSAGE) ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, MESSAGE).stream()
+#define FAIL(MESSAGE) ::merizo::unittest::TestAssertionFailure(__FILE__, __LINE__, MESSAGE).stream()
 
 /**
  * Fails unless "EXPRESSION" is true.
@@ -72,12 +72,12 @@
 /**
  * Asserts that a Status code is OK.
  */
-#define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
+#define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(::merizo::Status::OK(), (EXPRESSION))
 
 /**
  * Asserts that a status code is anything but OK.
  */
-#define ASSERT_NOT_OK(EXPRESSION) ASSERT_NOT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
+#define ASSERT_NOT_OK(EXPRESSION) ASSERT_NOT_EQUALS(::merizo::Status::OK(), (EXPRESSION))
 
 /*
  * Binary comparison assertions.
@@ -102,7 +102,7 @@
  * Binary comparison utility macro. Do not use directly.
  */
 #define ASSERT_COMPARISON_(OP, a, b)                                                           \
-    if (auto ca = ::mongo::unittest::ComparisonAssertion<::mongo::unittest::ComparisonOp::OP>( \
+    if (auto ca = ::merizo::unittest::ComparisonAssertion<::merizo::unittest::ComparisonOp::OP>( \
             __FILE__, __LINE__, #a, #b, a, b))                                                 \
     ca.failure().stream()
 
@@ -118,7 +118,7 @@
 #define ASSERT_IDENTITY(INPUT, FUNCTION)                                                      \
     [&](auto&& v) {                                                                           \
         if (auto ca =                                                                         \
-                ::mongo::unittest::ComparisonAssertion<::mongo::unittest::ComparisonOp::kEq>( \
+                ::merizo::unittest::ComparisonAssertion<::merizo::unittest::ComparisonOp::kEq>( \
                     __FILE__,                                                                 \
                     __LINE__,                                                                 \
                     #INPUT,                                                                   \
@@ -144,8 +144,8 @@
  */
 #define ASSERT_THROWS_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_WHAT)                     \
     ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
-                                 ASSERT_EQ(::mongo::StringData(ex.what()),               \
-                                           ::mongo::StringData(EXPECTED_WHAT));          \
+                                 ASSERT_EQ(::merizo::StringData(ex.what()),               \
+                                           ::merizo::StringData(EXPECTED_WHAT));          \
                              }))
 
 /**
@@ -165,8 +165,8 @@
 #define ASSERT_THROWS_CODE_AND_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE, EXPECTED_WHAT) \
     ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) {     \
                                  ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);             \
-                                 ASSERT_EQ(::mongo::StringData(ex.what()),                   \
-                                           ::mongo::StringData(EXPECTED_WHAT));              \
+                                 ASSERT_EQ(::merizo::StringData(ex.what()),                   \
+                                           ::merizo::StringData(EXPECTED_WHAT));              \
                              }))
 
 /**
@@ -206,10 +206,10 @@
         std::string myString(BIG_STRING);                                                       \
         std::string myContains(CONTAINS);                                                       \
         if (myString.find(myContains) == std::string::npos) {                                   \
-            ::mongoutils::str::stream err;                                                      \
+            ::merizoutils::str::stream err;                                                      \
             err << "Expected to find " #CONTAINS " (" << myContains << ") in " #BIG_STRING " (" \
                 << myString << ")";                                                             \
-            ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream();          \
+            ::merizo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream();          \
         }                                                                                       \
     } while (false)
 
@@ -223,13 +223,13 @@
  * }
  */
 #define TEST(CASE_NAME, TEST_NAME)                                                          \
-    class _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) : public ::mongo::unittest::Test {          \
+    class _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) : public ::merizo::unittest::Test {          \
     private:                                                                                \
         virtual void _doTest();                                                             \
                                                                                             \
         static const RegistrationAgent<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)> _agent;       \
     };                                                                                      \
-    const ::mongo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)> \
+    const ::merizo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)> \
         _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_agent(#CASE_NAME, #TEST_NAME);              \
     void _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_doTest()
 
@@ -239,7 +239,7 @@
  *
  * Usage:
  *
- * class FixtureClass : public mongo::unittest::Test {
+ * class FixtureClass : public merizo::unittest::Test {
  * protected:
  *   int myVar;
  *   void setUp() { myVar = 10; }
@@ -256,7 +256,7 @@
                                                                                                \
         static const RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)> _agent;       \
     };                                                                                         \
-    const ::mongo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)> \
+    const ::merizo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)> \
         _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_agent(#FIXTURE_NAME, #TEST_NAME);           \
     void _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_doTest()
 
@@ -266,7 +266,7 @@
  */
 #define _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) UnitTest__##CASE_NAME##__##TEST_NAME
 
-namespace mongo {
+namespace merizo {
 namespace unittest {
 
 class Result;
@@ -277,8 +277,8 @@ void setupTestLogger();
  * Gets a LogstreamBuilder for logging to the unittest log domain, which may have
  * different target from the global log domain.
  */
-mongo::logger::LogstreamBuilder log();
-mongo::logger::LogstreamBuilder warning();
+merizo::logger::LogstreamBuilder log();
+merizo::logger::LogstreamBuilder warning();
 
 /**
  * Type representing the function composing a test.
@@ -656,4 +656,4 @@ T assertGet(StatusWith<T>&& swt) {
 std::vector<std::string> getAllSuiteNames();
 
 }  // namespace unittest
-}  // namespace mongo
+}  // namespace merizo

@@ -9,7 +9,7 @@ if versionAtLeast 3 4; then
 	CONFIGDB="csrs3/$CONFIGDB"
 fi
 
-exec mongos $COMMONSOPTS \
+exec merizos $COMMONSOPTS \
 	--port 40203 \
 	--configdb $CONFIGDB \
 	--keyFile=../../certs/keyfile

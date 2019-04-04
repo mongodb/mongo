@@ -1,4 +1,4 @@
-// Package mgo offers a rich MongoDB driver for Go.
+// Package mgo offers a rich MerizoDB driver for Go.
 //
 // Details about the mgo project (pronounced as "mango") are found
 // in its web page:

@@ -1,8 +1,8 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -924,25 +924,25 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         # Generate user includes second
         header_list = [
-            'mongo/base/string_data.h',
-            'mongo/base/data_range.h',
-            'mongo/bson/bsonobj.h',
-            'mongo/bson/bsonobjbuilder.h',
-            'mongo/bson/simple_bsonobj_comparator.h',
-            'mongo/idl/idl_parser.h',
-            'mongo/rpc/op_msg.h',
+            'merizo/base/string_data.h',
+            'merizo/base/data_range.h',
+            'merizo/bson/bsonobj.h',
+            'merizo/bson/bsonobjbuilder.h',
+            'merizo/bson/simple_bsonobj_comparator.h',
+            'merizo/idl/idl_parser.h',
+            'merizo/rpc/op_msg.h',
         ] + spec.globals.cpp_includes
 
         if spec.configs:
-            header_list.append('mongo/util/options_parser/option_description.h')
+            header_list.append('merizo/util/options_parser/option_description.h')
             config_init = spec.globals.configs and spec.globals.configs.initializer
             if config_init and (config_init.register or config_init.store):
-                header_list.append('mongo/util/options_parser/option_section.h')
-                header_list.append('mongo/util/options_parser/environment.h')
+                header_list.append('merizo/util/options_parser/option_section.h')
+                header_list.append('merizo/util/options_parser/environment.h')
 
         if spec.server_parameters:
-            header_list.append('mongo/idl/server_parameter.h')
-            header_list.append('mongo/idl/server_parameter_with_storage.h')
+            header_list.append('merizo/idl/server_parameter.h')
+            header_list.append('merizo/idl/server_parameter_with_storage.h')
 
         header_list.sort()
 
@@ -1216,7 +1216,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def gen_doc_sequence_deserializer(self, field):
         # type: (ast.Field) -> None
-        """Generate the C++ deserializer piece for a C++ mongo::OpMsg::DocumentSequence."""
+        """Generate the C++ deserializer piece for a C++ merizo::OpMsg::DocumentSequence."""
         cpp_type_info = cpp_types.get_cpp_type(field)
         cpp_type = cpp_type_info.get_type_name()
 
@@ -1400,7 +1400,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     # should ignore regardless of strict mode.
                     command_predicate = None
                     if isinstance(struct, ast.Command):
-                        command_predicate = "!mongo::isGenericArgument(fieldName)"
+                        command_predicate = "!merizo::isGenericArgument(fieldName)"
 
                     with self._predicate(command_predicate):
                         self._writer.write_line('ctxt.throwUnknownField(fieldName);')
@@ -2110,7 +2110,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self.write_empty_line()
 
     def _gen_config_options_register(self, root_opts, sections):
-        self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
+        self._writer.write_line('namespace moe = ::merizo::optionenvironment;')
         self.write_empty_line()
 
         for opt in root_opts:
@@ -2133,7 +2133,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def _gen_config_options_store(self, configs):
         # Setup initializer for storing configured options in their variables.
-        self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
+        self._writer.write_line('namespace moe = ::merizo::optionenvironment;')
         self.write_empty_line()
 
         for opt in configs:
@@ -2224,7 +2224,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self.gen_file_header()
 
         # Include platform/basic.h
-        self.gen_include("mongo/platform/basic.h")
+        self.gen_include("merizo/platform/basic.h")
         self.write_empty_line()
 
         # Generate include for generated header first
@@ -2242,21 +2242,21 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-        # Generate mongo includes third
+        # Generate merizo includes third
         header_list = [
-            'mongo/bson/bsonobjbuilder.h',
-            'mongo/db/command_generic_argument.h',
-            'mongo/db/commands.h',
+            'merizo/bson/bsonobjbuilder.h',
+            'merizo/db/command_generic_argument.h',
+            'merizo/db/commands.h',
         ]
 
         if spec.server_parameters:
-            header_list.append('mongo/idl/server_parameter.h')
-            header_list.append('mongo/idl/server_parameter_with_storage.h')
+            header_list.append('merizo/idl/server_parameter.h')
+            header_list.append('merizo/idl/server_parameter_with_storage.h')
 
         if spec.configs:
-            header_list.append('mongo/util/options_parser/option_section.h')
-            header_list.append('mongo/util/options_parser/startup_option_init.h')
-            header_list.append('mongo/util/options_parser/startup_options.h')
+            header_list.append('merizo/util/options_parser/option_section.h')
+            header_list.append('merizo/util/options_parser/startup_option_init.h')
+            header_list.append('merizo/util/options_parser/startup_options.h')
 
         header_list.sort()
 

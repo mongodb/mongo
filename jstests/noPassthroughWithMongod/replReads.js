@@ -51,7 +51,7 @@ function testReadLoadBalancing(numReplicas) {
     var connections = [];
 
     for (var i = 0; i < secondaries.length * 10; i++) {
-        conn = new Mongo(s._mongos[0].host);
+        conn = new Mongo(s._merizos[0].host);
         conn.setSlaveOk();
         conn.getDB('test').foo.findOne();
         connections.push(conn);
@@ -87,7 +87,7 @@ function testReadLoadBalancing(numReplicas) {
         printjson(x);
         var numOk = 0;
         // Now wait until the host disappears, since now we actually update our
-        // replica sets via isMaster in mongos
+        // replica sets via isMaster in merizos
         if (x.hosts.length == c["members"].length - 1)
             return true;
         /*
@@ -102,7 +102,7 @@ function testReadLoadBalancing(numReplicas) {
     secondaries = s.rs0._slaves;
 
     for (var i = 0; i < secondaries.length * 10; i++) {
-        conn = new Mongo(s._mongos[0].host);
+        conn = new Mongo(s._merizos[0].host);
         conn.setSlaveOk();
         conn.getDB('test').foo.findOne();
         connections.push(conn);

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/embedded/embedded_options_helpers.h"
+#include "merizo/embedded/embedded_options_helpers.h"
 
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "merizo/util/options_parser/options_parser.h"
+#include "merizo/util/options_parser/startup_options.h"
 
 #include <iterator>
 #include <map>
 #include <vector>
 
-namespace mongo {
+namespace merizo {
 namespace embedded_integration_helpers {
 
 Status parseCommandLineOptions(int argc,
                                char* argv[],
                                const optionenvironment::OptionSection& startupOptions) {
     // We manually run the options parsing code that's equivalent to the logic in the
-    // MONGO_INITIALIZERs for mongod. We cannot do this in initializers because embedded uses a
+    // MONGO_INITIALIZERs for merizod. We cannot do this in initializers because embedded uses a
     // different options format and we therefore need to have parsed the command line options before
     // embedded::initialize() is called. However, as long as we store the options in the same place
     // they will be valid for embedded too.
@@ -60,4 +60,4 @@ Status parseCommandLineOptions(int argc,
 }
 
 }  // namespace embedded_integration_helpers
-}  // namepsace mongo
+}  // namepsace merizo

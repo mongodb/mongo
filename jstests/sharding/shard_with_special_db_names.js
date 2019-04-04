@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({shards: 2, mongos: 2});
+    var s = new ShardingTest({shards: 2, merizos: 2});
     var specialDB = "[a-z]+";
     var specialNS = specialDB + ".special";
 

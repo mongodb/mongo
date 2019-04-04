@@ -4,7 +4,7 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # Transactions are not supported on MongoDB standalone nodes.
+  # Transactions are not supported on MerizoDB standalone nodes.
   - jstests/core/txns/**/*.js
 
 executor:
@@ -25,6 +25,6 @@ executor:
     n: 20
   fixture:
     class: MongoDFixture
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1

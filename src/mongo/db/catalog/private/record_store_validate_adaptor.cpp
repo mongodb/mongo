@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/private/record_store_validate_adaptor.h"
+#include "merizo/db/catalog/private/record_store_validate_adaptor.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/wildcard_access_method.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/index_consistency.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index/wildcard_access_method.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/storage/key_string.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/rpc/object_check.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 // TODO SERVER-36385: Completely remove the key size check in 4.4
@@ -320,4 +320,4 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* id
         results.warnings.push_back(warning);
     }
 }
-}  // namespace mongo
+}  // namespace merizo

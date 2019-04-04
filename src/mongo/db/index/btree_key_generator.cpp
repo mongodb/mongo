@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/btree_key_generator.h"
+#include "merizo/db/index/btree_key_generator.h"
 
 #include <boost/optional.hpp>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 namespace {
 
@@ -88,14 +88,14 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
                                                    const PositionalPathInfo& positionalInfo,
                                                    const char** field,
                                                    bool* arrayNestedArray) const {
-    std::string firstField = mongoutils::str::before(*field, '.');
+    std::string firstField = merizoutils::str::before(*field, '.');
     bool haveObjField = !obj.getField(firstField).eoo();
     BSONElement arrField = positionalInfo.positionallyIndexedElt;
 
     // An index component field name cannot exist in both a document
     // array and one of that array's children.
     uassert(16746,
-            mongoutils::str::stream()
+            merizoutils::str::stream()
                 << "Ambiguous field name found in array (do not use numeric field names in "
                    "embedded elements in an array), field: '"
                 << arrField.fieldName()
@@ -387,4 +387,4 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

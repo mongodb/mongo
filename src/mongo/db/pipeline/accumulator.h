@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,23 +29,23 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/summation.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/db/pipeline/expression.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/db/pipeline/value_comparator.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/util/summation.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * This enum indicates which documents an accumulator needs to see in order to compute its output.

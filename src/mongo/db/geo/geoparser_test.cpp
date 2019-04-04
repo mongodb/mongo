@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,23 +28,23 @@
  */
 
 /**
- * This file contains tests for mongo/db/geo/geoparser.cpp.
+ * This file contains tests for merizo/db/geo/geoparser.cpp.
  */
 
 #include <sstream>
 #include <string>
 
-#include "mongo/db/geo/geoparser.h"
-#include "mongo/db/geo/shapes.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/db/geo/geoparser.h"
+#include "merizo/db/geo/shapes.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
 
 // Wrap a BSON object to a BSON element.
 #define BSON_ELT(bson) BSON("" << (bson)).firstElement()
 
-using namespace mongo;
+using namespace merizo;
 
 namespace {
 
@@ -292,7 +292,7 @@ TEST(GeoParser, parseLegacyPolygon) {
 }
 
 TEST(GeoParser, parseMultiPoint) {
-    mongo::MultiPointWithCRS mp;
+    merizo::MultiPointWithCRS mp;
 
     ASSERT_OK(GeoParser::parseMultiPoint(
         fromjson("{'type':'MultiPoint','coordinates':[[1,2],[3,4]]}"), &mp));
@@ -317,7 +317,7 @@ TEST(GeoParser, parseMultiPoint) {
 }
 
 TEST(GeoParser, parseMultiLine) {
-    mongo::MultiLineWithCRS ml;
+    merizo::MultiLineWithCRS ml;
 
     ASSERT_OK(GeoParser::parseMultiLine(
         fromjson("{'type':'MultiLineString','coordinates':[ [[1,1],[2,2],[3,3]],"
@@ -355,7 +355,7 @@ TEST(GeoParser, parseMultiLine) {
 }
 
 TEST(GeoParser, parseMultiPolygon) {
-    mongo::MultiPolygonWithCRS mp;
+    merizo::MultiPolygonWithCRS mp;
 
     ASSERT_OK(GeoParser::parseMultiPolygon(
         fromjson("{'type':'MultiPolygon','coordinates':["
@@ -379,7 +379,7 @@ TEST(GeoParser, parseMultiPolygon) {
 
 TEST(GeoParser, parseGeometryCollection) {
     {
-        mongo::GeometryCollection gc;
+        merizo::GeometryCollection gc;
         BSONObj obj = fromjson(
             "{ 'type': 'GeometryCollection', 'geometries': ["
             "{ 'type': 'Point','coordinates': [100.0,0.0]},"
@@ -399,7 +399,7 @@ TEST(GeoParser, parseGeometryCollection) {
             "]}"
             "]}");
 
-        mongo::GeometryCollection gc;
+        merizo::GeometryCollection gc;
         ASSERT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
         ASSERT_TRUE(gc.supportsContains());
     }
@@ -414,7 +414,7 @@ TEST(GeoParser, parseGeometryCollection) {
             "[[100.2, 0.2], [100.8, 0.2], [100.8, 0.8], [100.2, 0.8], [100.2, 0.2]]]"
             "]}"
             "]}");
-        mongo::GeometryCollection gc;
+        merizo::GeometryCollection gc;
         ASSERT_NOT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
     }
 
@@ -429,7 +429,7 @@ TEST(GeoParser, parseGeometryCollection) {
             "]}"
             "]}");
 
-        mongo::GeometryCollection gc;
+        merizo::GeometryCollection gc;
         ASSERT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
         ASSERT_TRUE(gc.supportsContains());
     }

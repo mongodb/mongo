@@ -1,6 +1,6 @@
 /**
  * Tests that a user's ability to view open cursors via $currentOp obeys authentication rules on
- * both mongoD and mongoS.
+ * both merizoD and merizoS.
  * @tags: [assumes_read_concern_unchanged, requires_auth, requires_journaling, requires_replication]
  */
 (function() {
@@ -16,7 +16,7 @@
     const st = new ShardingTest({name: jsTestName(), keyFile: key, shards: 1});
 
     const shardConn = st.rs0.getPrimary();
-    const mongosConn = st.s;
+    const merizosConn = st.s;
 
     shardConn.waitForClusterTime(60);
 
@@ -33,9 +33,9 @@
 
     // Create the necessary users at both cluster and shard-local level.
     createUsers(shardConn);
-    createUsers(mongosConn);
+    createUsers(merizosConn);
 
-    // Run the various auth tests on the given shard or mongoS connection.
+    // Run the various auth tests on the given shard or merizoS connection.
     function runCursorTests(conn) {
         const db = conn.getDB("test");
         const adminDB = db.getSiblingDB("admin");
@@ -87,7 +87,7 @@
                      .toArray();
         assert.eq(result.length, 0, result);
 
-        // Verify that the user without the 'inprog' privilege cannot view shard cursors via mongoS.
+        // Verify that the user without the 'inprog' privilege cannot view shard cursors via merizoS.
         if (FixtureHelpers.isMongos(db)) {
             assert.commandFailedWithCode(adminDB.runCommand({
                 aggregate: 1,
@@ -138,7 +138,7 @@
                      .toArray();
         assert.eq(result.length, 2, result);
 
-        // The root user can also see both cursors on the shard via mongoS with {localOps: false}.
+        // The root user can also see both cursors on the shard via merizoS with {localOps: false}.
         if (FixtureHelpers.isMongos(db)) {
             result = adminDB
                          .aggregate([
@@ -157,11 +157,11 @@
         assert.commandWorked(adminDB.logout());
     }
 
-    jsTestLog("Running cursor tests on mongoD");
+    jsTestLog("Running cursor tests on merizoD");
     runCursorTests(shardConn);
 
-    jsTestLog("Running cursor tests on mongoS");
-    runCursorTests(mongosConn);
+    jsTestLog("Running cursor tests on merizoS");
+    runCursorTests(merizosConn);
 
     st.stop();
 })();

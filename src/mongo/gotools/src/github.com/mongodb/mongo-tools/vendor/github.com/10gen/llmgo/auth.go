@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2015-present.
+// Copyright (C) MerizoDB, Inc. 2015-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -94,9 +94,9 @@ func (socket *MongoSocket) getNonce() (nonce string, err error) {
 		debugf("Socket %p to %s: waiting for nonce", socket, socket.addr)
 		socket.gotNonce.Wait()
 	}
-	if socket.cachedNonce == "mongos" {
+	if socket.cachedNonce == "merizos" {
 		socket.Unlock()
-		return "", errors.New("Can't authenticate with mongos; see http://j.mp/mongos-auth")
+		return "", errors.New("Can't authenticate with merizos; see http://j.mp/merizos-auth")
 	}
 	debugf("Socket %p to %s: got nonce", socket, socket.addr)
 	nonce, err = socket.cachedNonce, socket.dead
@@ -127,8 +127,8 @@ func (socket *MongoSocket) resetNonce() {
 		}
 		debugf("Socket %p to %s: nonce unmarshalled: %#v", socket, socket.addr, result)
 		if result.Code == 13390 {
-			// mongos doesn't yet support auth (see http://j.mp/mongos-auth)
-			result.Nonce = "mongos"
+			// merizos doesn't yet support auth (see http://j.mp/merizos-auth)
+			result.Nonce = "merizos"
 		} else if result.Nonce == "" {
 			var msg string
 			if result.Err != "" {
@@ -249,7 +249,7 @@ func (socket *MongoSocket) loginClassic(cred Credential) error {
 	}
 
 	psum := md5.New()
-	psum.Write([]byte(cred.Username + ":mongo:" + cred.Password))
+	psum.Write([]byte(cred.Username + ":merizo:" + cred.Password))
 
 	ksum := md5.New()
 	ksum.Write([]byte(nonce + cred.Username))
@@ -393,7 +393,7 @@ func (socket *MongoSocket) loginSASL(cred Credential) error {
 
 func saslNewScram1(cred Credential) *saslScram {
 	credsum := md5.New()
-	credsum.Write([]byte(cred.Username + ":mongo:" + cred.Password))
+	credsum.Write([]byte(cred.Username + ":merizo:" + cred.Password))
 	client := scram.NewClient(sha1.New, cred.Username, hex.EncodeToString(credsum.Sum(nil)))
 	return &saslScram{cred: cred, client: client}
 }

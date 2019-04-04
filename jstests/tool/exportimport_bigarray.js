@@ -29,12 +29,12 @@ assert.writeOK(bulk.execute());
 
 data = 'data/exportimport_array_test.json';
 
-print('About to call mongoexport on: ' + exportimport_db.getName() + '.' + src.getName() +
+print('About to call merizoexport on: ' + exportimport_db.getName() + '.' + src.getName() +
       ' with file: ' + data);
 tt.runTool(
     'export', '--out', data, '-d', exportimport_db.getName(), '-c', src.getName(), '--jsonArray');
 
-print('About to call mongoimport on: ' + exportimport_db.getName() + '.' + dst.getName() +
+print('About to call merizoimport on: ' + exportimport_db.getName() + '.' + dst.getName() +
       ' with file: ' + data);
 tt.runTool(
     'import', '--file', data, '-d', exportimport_db.getName(), '-c', dst.getName(), '--jsonArray');

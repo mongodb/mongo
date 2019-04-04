@@ -68,7 +68,7 @@
         },
         assertFunc: function(cursorId, result) {
             assert.eq(result.length, 1, result);
-            // Plan summary does not exist on mongos, so skip this test on mongos.
+            // Plan summary does not exist on merizos, so skip this test on merizos.
             if (!FixtureHelpers.isMongos(db)) {
                 assert.eq(result[0].planSummary, "COLLSCAN", result);
             } else {

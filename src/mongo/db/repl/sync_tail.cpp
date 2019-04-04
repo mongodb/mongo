@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,62 +27,62 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/sync_tail.h"
+#include "merizo/db/repl/sync_tail.h"
 
 #include "third_party/murmurhash3/MurmurHash3.h"
 #include <boost/functional/hash.hpp>
 #include <memory>
 
-#include "mongo/base/counter.h"
-#include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/fsync.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/multi_key_path_tracker.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/repl/applier_helpers.h"
-#include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/initial_syncer.h"
-#include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplogreader.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/transaction_oplog_application.h"
-#include "mongo/db/session.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/counter.h"
+#include "merizo/bson/bsonelement_comparator.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/fsync.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/commands/txn_cmds_gen.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/lock_state.h"
+#include "merizo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/multi_key_path_tracker.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/repl/applier_helpers.h"
+#include "merizo/db/repl/apply_ops.h"
+#include "merizo/db/repl/bgsync.h"
+#include "merizo/db/repl/initial_syncer.h"
+#include "merizo/db/repl/multiapplier.h"
+#include "merizo/db/repl/oplogreader.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/transaction_oplog_application.h"
+#include "merizo/db/session.h"
+#include "merizo/db/session_txn_record_gen.h"
+#include "merizo/db/stats/timer_stats.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 namespace {
 
@@ -955,7 +955,7 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplog
         log() << "initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled. "
                  "Blocking until fail point is disabled.";
         while (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
-            mongo::sleepsecs(1);
+            merizo::sleepsecs(1);
         }
     }
 
@@ -1493,4 +1493,4 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

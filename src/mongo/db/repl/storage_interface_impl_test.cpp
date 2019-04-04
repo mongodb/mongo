@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,42 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <memory>
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_interface_local.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/storage_interface_impl.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/merizoutils/str.h"
 
 namespace {
 
-using namespace mongo;
-using namespace mongo::repl;
+using namespace merizo;
+using namespace merizo::repl;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -121,7 +121,7 @@ void createCollection(OperationContext* opCtx,
         OldClientContext ctx(opCtx, nss.ns());
         auto db = ctx.db();
         ASSERT_TRUE(db);
-        mongo::WriteUnitOfWork wuow(opCtx);
+        merizo::WriteUnitOfWork wuow(opCtx);
         auto coll = db->createCollection(opCtx, nss.ns(), options);
         ASSERT_TRUE(coll);
         wuow.commit();
@@ -1882,7 +1882,7 @@ TEST_F(StorageInterfaceImplTest, UpdateSingletonNeverUpserts) {
 
     ASSERT_OK(storage.updateSingleton(opCtx, nss, {}, update));
     ASSERT_EQ(ErrorCodes::CollectionIsEmpty, storage.findSingleton(opCtx, nss));
-    _assertDocumentsInCollectionEquals(opCtx, nss, std::vector<mongo::BSONObj>());
+    _assertDocumentsInCollectionEquals(opCtx, nss, std::vector<merizo::BSONObj>());
 }
 
 TEST_F(StorageInterfaceImplTest, UpdateSingletonUpdatesDocumentWhenCollectionIsNotEmpty) {

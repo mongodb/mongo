@@ -24,15 +24,15 @@
 (function() {
     load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
 
-    const st = new ShardingTest({shards: 2, mongos: 2, config: 1});
+    const st = new ShardingTest({shards: 2, merizos: 2, config: 1});
 
-    // mongosForAgg will be used to perform all aggregations.
-    // mongosForMove does all chunk migrations, leaving mongosForAgg with stale config metadata.
-    const mongosForAgg = st.s0;
-    const mongosForMove = st.s1;
+    // merizosForAgg will be used to perform all aggregations.
+    // merizosForMove does all chunk migrations, leaving merizosForAgg with stale config metadata.
+    const merizosForAgg = st.s0;
+    const merizosForMove = st.s1;
 
-    const mongosDB = mongosForAgg.getDB(jsTestName());
-    const mongosColl = mongosDB.test;
+    const merizosDB = merizosForAgg.getDB(jsTestName());
+    const merizosColl = merizosDB.test;
 
     const shard0DB = primaryShardDB = st.shard0.getDB(jsTestName());
     const shard1DB = st.shard1.getDB(jsTestName());
@@ -44,39 +44,39 @@
     assert.commandWorked(st.shard1.getDB('admin').runCommand(
         {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
 
-    // Turn off automatic shard refresh in mongos when a stale config error is thrown.
-    assert.commandWorked(mongosForAgg.getDB('admin').runCommand(
+    // Turn off automatic shard refresh in merizos when a stale config error is thrown.
+    assert.commandWorked(merizosForAgg.getDB('admin').runCommand(
         {configureFailPoint: 'doNotRefreshShardsOnRetargettingError', mode: 'alwaysOn'}));
 
-    assert.commandWorked(mongosDB.dropDatabase());
+    assert.commandWorked(merizosDB.dropDatabase());
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.shard0.shardName);
 
     // Shard the test collection on _id.
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {_id: 1}}));
 
     // Split the collection into 4 chunks: [MinKey, -100), [-100, 0), [0, 100), [100, MaxKey).
     assert.commandWorked(
-        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: -100}}));
+        merizosDB.adminCommand({split: merizosColl.getFullName(), middle: {_id: -100}}));
     assert.commandWorked(
-        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
+        merizosDB.adminCommand({split: merizosColl.getFullName(), middle: {_id: 0}}));
     assert.commandWorked(
-        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 100}}));
+        merizosDB.adminCommand({split: merizosColl.getFullName(), middle: {_id: 100}}));
 
     // Move the [0, 100) and [100, MaxKey) chunks to st.shard1.shardName.
-    assert.commandWorked(mongosDB.adminCommand(
-        {moveChunk: mongosColl.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
-    assert.commandWorked(mongosDB.adminCommand(
-        {moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
+    assert.commandWorked(merizosDB.adminCommand(
+        {moveChunk: merizosColl.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
+    assert.commandWorked(merizosDB.adminCommand(
+        {moveChunk: merizosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
     // Write one document into each of the chunks.
-    assert.writeOK(mongosColl.insert({_id: -150}));
-    assert.writeOK(mongosColl.insert({_id: -50}));
-    assert.writeOK(mongosColl.insert({_id: 50}));
-    assert.writeOK(mongosColl.insert({_id: 150}));
+    assert.writeOK(merizosColl.insert({_id: -150}));
+    assert.writeOK(merizosColl.insert({_id: -50}));
+    assert.writeOK(merizosColl.insert({_id: 50}));
+    assert.writeOK(merizosColl.insert({_id: 150}));
 
     const shardExceptions =
         [ErrorCodes.StaleConfig, ErrorCodes.StaleShardVersion, ErrorCodes.StaleEpoch];
@@ -85,9 +85,9 @@
     const forcePrimaryMerge = [{$_internalSplitPipeline: {mergeType: "primaryShard"}}];
 
     function runAggShardTargetTest({splitPoint}) {
-        // Ensure that both mongoS have up-to-date caches, and enable the profiler on both shards.
-        assert.commandWorked(mongosForAgg.getDB("admin").runCommand({flushRouterConfig: 1}));
-        assert.commandWorked(mongosForMove.getDB("admin").runCommand({flushRouterConfig: 1}));
+        // Ensure that both merizoS have up-to-date caches, and enable the profiler on both shards.
+        assert.commandWorked(merizosForAgg.getDB("admin").runCommand({flushRouterConfig: 1}));
+        assert.commandWorked(merizosForMove.getDB("admin").runCommand({flushRouterConfig: 1}));
 
         assert.commandWorked(shard0DB.setProfilingLevel(2));
         assert.commandWorked(shard1DB.setProfilingLevel(2));
@@ -101,7 +101,7 @@
         // Test that a range query is passed through if the chunks encompassed by the query all lie
         // on a single shard, in this case st.shard0.shardName.
         testName = "agg_shard_targeting_range_single_shard_all_chunks_on_same_shard";
-        assert.eq(mongosColl
+        assert.eq(merizosColl
                       .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint),
                                  {comment: testName})
                       .itcount(),
@@ -111,16 +111,16 @@
         // primary shard).
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard0DB,
-            filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+            filter: {"command.aggregate": merizosColl.getName(), "command.comment": testName}
         });
         profilerHasZeroMatchingEntriesOrThrow({
             profileDB: shard1DB,
-            filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+            filter: {"command.aggregate": merizosColl.getName(), "command.comment": testName}
         });
         profilerHasZeroMatchingEntriesOrThrow({
             profileDB: primaryShardDB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: 1}
             }
@@ -130,10 +130,10 @@
         // case) is passed through if the chunk ranges encompassed by the query all lie on the
         // primary shard.
         testName = "agg_shard_targeting_range_all_chunks_on_primary_shard_out_no_merge";
-        outColl = mongosDB[testName];
+        outColl = merizosDB[testName];
 
-        assert.commandWorked(mongosDB.runCommand({
-            aggregate: mongosColl.getName(),
+        assert.commandWorked(merizosDB.runCommand({
+            aggregate: merizosColl.getName(),
             pipeline: [{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint).concat([
                 {$out: testName}
             ]),
@@ -145,16 +145,16 @@
         // primary shard).
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard0DB,
-            filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+            filter: {"command.aggregate": merizosColl.getName(), "command.comment": testName}
         });
         profilerHasZeroMatchingEntriesOrThrow({
             profileDB: shard1DB,
-            filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+            filter: {"command.aggregate": merizosColl.getName(), "command.comment": testName}
         });
         profilerHasZeroMatchingEntriesOrThrow({
             profileDB: primaryShardDB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: 1}
             }
@@ -166,19 +166,19 @@
         // Test that a passthrough will back out and split the pipeline if we try to target a single
         // shard, get a stale config exception, and find that more than one shard is now involved.
         // Move the _id: [-100, 0) chunk from st.shard0.shardName to st.shard1.shardName via
-        // mongosForMove.
-        assert.commandWorked(mongosForMove.getDB("admin").runCommand({
-            moveChunk: mongosColl.getFullName(),
+        // merizosForMove.
+        assert.commandWorked(merizosForMove.getDB("admin").runCommand({
+            moveChunk: merizosColl.getFullName(),
             find: {_id: -50},
             to: st.shard1.shardName,
         }));
 
-        // Run the same aggregation that targeted a single shard via the now-stale mongoS. It should
+        // Run the same aggregation that targeted a single shard via the now-stale merizoS. It should
         // attempt to send the aggregation to st.shard0.shardName, hit a stale config exception,
         // split the pipeline and redispatch. We append an $_internalSplitPipeline stage in order to
-        // force a shard merge rather than a mongoS merge.
+        // force a shard merge rather than a merizoS merge.
         testName = "agg_shard_targeting_backout_passthrough_and_split_if_cache_is_stale";
-        assert.eq(mongosColl
+        assert.eq(merizosColl
                       .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}]
                                      .concat(splitPoint)
                                      .concat(forcePrimaryMerge),
@@ -187,27 +187,27 @@
                   2);
 
         // Before the first dispatch:
-        // - mongosForMove and st.shard0.shardName (the donor shard) are up to date.
-        // - mongosForAgg and st.shard1.shardName are stale. mongosForAgg incorrectly believes that
+        // - merizosForMove and st.shard0.shardName (the donor shard) are up to date.
+        // - merizosForAgg and st.shard1.shardName are stale. merizosForAgg incorrectly believes that
         //   the necessary data is all on st.shard0.shardName.
         //
         // We therefore expect that:
-        // - mongosForAgg will throw a stale config error when it attempts to establish a
+        // - merizosForAgg will throw a stale config error when it attempts to establish a
         // single-shard cursor on st.shard0.shardName (attempt 1).
-        // - mongosForAgg will back out, refresh itself, and redispatch to both shards.
+        // - merizosForAgg will back out, refresh itself, and redispatch to both shards.
         // - st.shard1.shardName will throw a stale config and refresh itself when the split
         // pipeline is sent to it (attempt 2).
-        // - mongosForAgg will back out and redispatch (attempt 3).
+        // - merizosForAgg will back out and redispatch (attempt 3).
         // - The aggregation will succeed on the third dispatch.
 
         // We confirm this behaviour via the following profiler results:
 
         // - One aggregation on st.shard0.shardName with a shard version exception (indicating that
-        // the mongoS was stale).
+        // the merizoS was stale).
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard0DB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
                 errCode: {$in: shardExceptions}
@@ -219,7 +219,7 @@
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard1DB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
                 errCode: {$in: shardExceptions}
@@ -233,7 +233,7 @@
         profilerHasAtLeastOneAtMostNumMatchingEntriesOrThrow({
             profileDB: shard0DB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
                 errCode: {$exists: false}
@@ -245,7 +245,7 @@
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard1DB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
                 errCode: {$exists: false}
@@ -257,27 +257,27 @@
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: primaryShardDB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: true}
             }
         });
 
         // Move the _id: [-100, 0) chunk back from st.shard1.shardName to st.shard0.shardName via
-        // mongosForMove. Shard0 and mongosForAgg are now stale.
-        assert.commandWorked(mongosForMove.getDB("admin").runCommand({
-            moveChunk: mongosColl.getFullName(),
+        // merizosForMove. Shard0 and merizosForAgg are now stale.
+        assert.commandWorked(merizosForMove.getDB("admin").runCommand({
+            moveChunk: merizosColl.getFullName(),
             find: {_id: -50},
             to: st.shard0.shardName,
             _waitForDelete: true
         }));
 
-        // Run the same aggregation via the now-stale mongoS. It should split the pipeline, hit a
+        // Run the same aggregation via the now-stale merizoS. It should split the pipeline, hit a
         // stale config exception, and reset to the original single-shard pipeline upon refresh. We
         // append an $_internalSplitPipeline stage in order to force a shard merge rather than a
-        // mongoS merge.
+        // merizoS merge.
         testName = "agg_shard_targeting_backout_split_pipeline_and_reassemble_if_cache_is_stale";
-        assert.eq(mongosColl
+        assert.eq(merizosColl
                       .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}]
                                      .concat(splitPoint)
                                      .concat(forcePrimaryMerge),
@@ -286,27 +286,27 @@
                   2);
 
         // Before the first dispatch:
-        // - mongosForMove and st.shard1.shardName (the donor shard) are up to date.
-        // - mongosForAgg and st.shard0.shardName are stale. mongosForAgg incorrectly believes that
+        // - merizosForMove and st.shard1.shardName (the donor shard) are up to date.
+        // - merizosForAgg and st.shard0.shardName are stale. merizosForAgg incorrectly believes that
         // the necessary data is spread across both shards.
         //
         // We therefore expect that:
-        // - mongosForAgg will throw a stale config error when it attempts to establish a cursor on
+        // - merizosForAgg will throw a stale config error when it attempts to establish a cursor on
         // st.shard1.shardName (attempt 1).
-        // - mongosForAgg will back out, refresh itself, and redispatch to st.shard0.shardName.
+        // - merizosForAgg will back out, refresh itself, and redispatch to st.shard0.shardName.
         // - st.shard0.shardName will throw a stale config and refresh itself when the pipeline is
         // sent to it (attempt 2).
-        // - mongosForAgg will back out, and redispatch (attempt 3).
+        // - merizosForAgg will back out, and redispatch (attempt 3).
         // - The aggregation will succeed on the third dispatch.
 
         // We confirm this behaviour via the following profiler results:
 
         // - One aggregation on st.shard1.shardName with a shard version exception (indicating that
-        // the mongoS was stale).
+        // the merizoS was stale).
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard1DB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
                 errCode: {$in: shardExceptions}
@@ -318,7 +318,7 @@
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard0DB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
                 errCode: {$in: shardExceptions}
@@ -332,7 +332,7 @@
         profilerHasAtLeastOneAtMostNumMatchingEntriesOrThrow({
             profileDB: shard0DB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
                 errCode: {$exists: false}
@@ -345,7 +345,7 @@
         profilerHasZeroMatchingEntriesOrThrow({
             profileDB: primaryShardDB,
             filter: {
-                "command.aggregate": mongosColl.getName(),
+                "command.aggregate": merizosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: true}
             }

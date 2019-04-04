@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/update/update_node.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/service_context_test_fixture.h"
+#include "merizo/db/update/update_node.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 
 class UpdateNodeTest : public ServiceContextTest {
 public:
@@ -46,9 +46,9 @@ protected:
         resetApplyParams();
 
         // Set up the logical clock needed by CurrentDateNode and ObjectReplaceNode.
-        auto service = mongo::getGlobalServiceContext();
-        auto logicalClock = mongo::stdx::make_unique<mongo::LogicalClock>(service);
-        mongo::LogicalClock::set(service, std::move(logicalClock));
+        auto service = merizo::getGlobalServiceContext();
+        auto logicalClock = merizo::stdx::make_unique<merizo::LogicalClock>(service);
+        merizo::LogicalClock::set(service, std::move(logicalClock));
     }
 
     void resetApplyParams() {
@@ -146,4 +146,4 @@ private:
     FieldRefSetWithStorage _modifiedPaths;
 };
 
-}  // namespace mongo
+}  // namespace merizo

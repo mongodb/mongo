@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/run_aggregate.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/parsed_distinct.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/view_response_formatter.h"
-#include "mongo/db/views/resolved_view.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/client.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/run_aggregate.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/parsed_distinct.h"
+#include "merizo/db/query/plan_summary_stats.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/db/query/view_response_formatter.h"
+#include "merizo/db/views/resolved_view.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 namespace dps = dotted_path_support;
@@ -290,4 +290,4 @@ public:
 } distinctCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

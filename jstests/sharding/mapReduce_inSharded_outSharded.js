@@ -10,7 +10,7 @@
     };
 
     var st = new ShardingTest(
-        {shards: 2, verbose: 1, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
+        {shards: 2, verbose: 1, merizos: 1, other: {chunkSize: 1, enableBalancer: true}});
 
     var admin = st.s0.getDB('admin');
 

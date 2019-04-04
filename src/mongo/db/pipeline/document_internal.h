@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,11 +34,11 @@
 #include <bitset>
 #include <boost/intrusive_ptr.hpp>
 
-#include "mongo/base/static_assert.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/util/intrusive_counter.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/util/intrusive_counter.h"
 
-namespace mongo {
+namespace merizo {
 /** Helper class to make the position in a document abstract
  *  Warning: This is NOT guaranteed to be the ordered position.
  *           eg. the first field may not be at Position(0)

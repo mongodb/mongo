@@ -9,7 +9,7 @@
 // ]
 
 //
-// Ensures that mongod respects the batch write protocols for updates
+// Ensures that merizod respects the batch write protocols for updates
 //
 
 var coll = db.getCollection("batch_write_update");

@@ -1,7 +1,7 @@
 (function() {
     "use strict";
     const conn = MongoRunner.runMongod();
-    assert.neq(null, conn, "mongod failed to start.");
+    assert.neq(null, conn, "merizod failed to start.");
     let mydb = conn.getDB("test_ns1");
 
     const check = function(n, isNew) {

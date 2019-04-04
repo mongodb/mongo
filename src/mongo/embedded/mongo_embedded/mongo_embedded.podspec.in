@@ -1,28 +1,28 @@
 Pod::Spec.new do |s|
 
-  s.name         = "mongo_embedded"
+  s.name         = "merizo_embedded"
   s.version      = "@VERSION@"
-  s.summary      = "MongoDB Embedded"
+  s.summary      = "MerizoDB Embedded"
 
   s.description  = <<-DESC
-    An embedded library providing access to the MongoDB query language over local storage
+    An embedded library providing access to the MerizoDB query language over local storage
                    DESC
 
-  s.homepage     = "https://www.mongodb.com"
-  s.author       = { "MongoDB, Inc" => "cocoapods@mongodb.com" }
+  s.homepage     = "https://www.merizodb.com"
+  s.author       = { "MerizoDB, Inc" => "cocoapods@merizodb.com" }
 
-  s.license      = { :type => "MongoDB Embedded License", :file => "iPhoneOS/Frameworks/mongo_embedded.framework/LICENSE-Embedded.txt" }
+  s.license      = { :type => "MerizoDB Embedded License", :file => "iPhoneOS/Frameworks/merizo_embedded.framework/LICENSE-Embedded.txt" }
 
   s.ios.deployment_target = "11.0"
   s.watchos.deployment_target = "4.3"
   s.tvos.deployment_target = "10.2"
 
-  s.source       = { :http => "https://downloads.mongodb.org/mobile/apple/mongo-embedded-sdk-@VERSION@.tgz"
+  s.source       = { :http => "https://downloads.merizodb.org/mobile/apple/merizo-embedded-sdk-@VERSION@.tgz"
                      :sha256 => "@SHA256@" }
 
-  s.ios.vendored_frameworks = "iPhoneOS/Frameworks/mongo_embedded.framework"
-  s.watchos.vendored_frameworks = "WatchOS/Frameworks/mongo_embedded.framework"
-  s.tvos.vendored_frameworks = "AppleTVOS/Frameworks/mongo_embedded.framework"
+  s.ios.vendored_frameworks = "iPhoneOS/Frameworks/merizo_embedded.framework"
+  s.watchos.vendored_frameworks = "WatchOS/Frameworks/merizo_embedded.framework"
+  s.tvos.vendored_frameworks = "AppleTVOS/Frameworks/merizo_embedded.framework"
 
   # My current best understanding is that apple uses these to inject
   # back in when running dsymutil on their side after regenerating a

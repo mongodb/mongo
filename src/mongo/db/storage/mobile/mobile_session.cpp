@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <sqlite3.h>
 
-#include "mongo/db/storage/mobile/mobile_session.h"
-#include "mongo/db/storage/mobile/mobile_session_pool.h"
+#include "merizo/db/storage/mobile/mobile_session.h"
+#include "merizo/db/storage/mobile/mobile_session_pool.h"
 
-namespace mongo {
+namespace merizo {
 
 MobileSession::MobileSession(sqlite3* session, MobileSessionPool* sessionPool)
     : _session(session), _sessionPool(sessionPool) {}
@@ -47,4 +47,4 @@ MobileSession::~MobileSession() {
 sqlite3* MobileSession::getSession() const {
     return _session;
 }
-}  // namespace mongo
+}  // namespace merizo

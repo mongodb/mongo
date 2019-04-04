@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,25 +31,25 @@
 
 #include <utility>
 
-#include "mongo/base/system_error.h"
-#include "mongo/config.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/transport/asio_utils.h"
-#include "mongo/transport/baton.h"
-#include "mongo/transport/transport_layer_asio.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/net/socket_utils.h"
+#include "merizo/base/system_error.h"
+#include "merizo/config.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/transport/asio_utils.h"
+#include "merizo/transport/baton.h"
+#include "merizo/transport/transport_layer_asio.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/net/socket_utils.h"
 #ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_types.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_types.h"
 #endif
 
 #include "asio.hpp"
 #ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl.hpp"
+#include "merizo/util/net/ssl.hpp"
 #endif
 
-namespace mongo {
+namespace merizo {
 namespace transport {
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOshortOpportunisticReadWrite);
@@ -79,7 +79,7 @@ class TransportLayerASIO::ASIOSession final : public Session {
 
 public:
     // If the socket is disconnected while any of these options are being set, this constructor
-    // may throw, but it is guaranteed to throw a mongo DBException.
+    // may throw, but it is guaranteed to throw a merizo DBException.
     ASIOSession(TransportLayerASIO* tl, GenericSocket socket, bool isIngressSession) try
         : _socket(std::move(socket)),
           _tl(tl),
@@ -574,9 +574,9 @@ private:
         if (checkForHTTPRequest(buffer)) {
             return Future<bool>::makeReady(false);
         }
-        // This logic was taken from the old mongo/util/net/sock.cpp.
+        // This logic was taken from the old merizo/util/net/sock.cpp.
         //
-        // It lets us run both TLS and unencrypted mongo over the same port.
+        // It lets us run both TLS and unencrypted merizo over the same port.
         //
         // The first message received from the client should have the responseTo field of the wire
         // protocol message needs to be 0 or -1. Otherwise the connection is either sending
@@ -657,11 +657,11 @@ private:
     }
 
     // Called from read() to send an HTTP response back to a client that's trying to use HTTP
-    // over a native MongoDB port. This returns a Future<Message> to match its only caller, but it
+    // over a native MerizoDB port. This returns a Future<Message> to match its only caller, but it
     // always contains an error, so it could really return Future<Anything>
     Future<Message> sendHTTPResponse(const BatonHandle& baton = nullptr) {
         constexpr auto userMsg =
-            "It looks like you are trying to access MongoDB over HTTP"
+            "It looks like you are trying to access MerizoDB over HTTP"
             " on the native driver port.\r\n"_sd;
 
         static const std::string httpResp = str::stream() << "HTTP/1.0 200 OK\r\n"
@@ -677,14 +677,14 @@ private:
                     return Status(
                         ErrorCodes::ProtocolError,
                         str::stream()
-                            << "Client sent an HTTP request over a native MongoDB connection, "
+                            << "Client sent an HTTP request over a native MerizoDB connection, "
                                "but there was an error sending a response: "
                             << status.toString());
                 })
             .then([] {
                 return StatusWith<Message>(
                     ErrorCodes::ProtocolError,
-                    "Client sent an HTTP request over a native MongoDB connection");
+                    "Client sent an HTTP request over a native MerizoDB connection");
             });
     }
 
@@ -713,4 +713,4 @@ private:
 };
 
 }  // namespace transport
-}  // namespace mongo
+}  // namespace merizo

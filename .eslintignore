@@ -1,2 +1,2 @@
-src/mongo/gotools/*
+src/merizo/gotools/*
 *.tpl.js

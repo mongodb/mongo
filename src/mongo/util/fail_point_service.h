@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/init.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/fail_point_registry.h"
+#include "merizo/base/init.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/fail_point_registry.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * @return the global fail point registry.
@@ -52,16 +52,16 @@ void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
  * NOTE: Never use in header files, only sources.
  */
 #define MONGO_FAIL_POINT_DEFINE(fp)                                                   \
-    ::mongo::FailPoint fp;                                                            \
+    ::merizo::FailPoint fp;                                                            \
     MONGO_INITIALIZER_GENERAL(fp, ("FailPointRegistry"), ("AllFailPointsRegistered")) \
-    (::mongo::InitializerContext * context) {                                         \
-        return ::mongo::getGlobalFailPointRegistry()->addFailPoint(#fp, &fp);         \
+    (::merizo::InitializerContext * context) {                                         \
+        return ::merizo::getGlobalFailPointRegistry()->addFailPoint(#fp, &fp);         \
     }
 
 /**
  * Convenience macro for declaring a fail point in a header.
  */
-#define MONGO_FAIL_POINT_DECLARE(fp) extern ::mongo::FailPoint fp;
+#define MONGO_FAIL_POINT_DECLARE(fp) extern ::merizo::FailPoint fp;
 
 /**
  * Convenience class for enabling a failpoint and disabling it as this goes out of scope.
@@ -75,4 +75,4 @@ private:
     FailPoint* _failPoint;
 };
 
-}  // namespace mongo
+}  // namespace merizo

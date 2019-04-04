@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Script and library for symbolizing MongoDB stack traces.
+"""Script and library for symbolizing MerizoDB stack traces.
 
 To use as a script, paste the JSON object on the line after ----- BEGIN BACKTRACE ----- into the
 standard input of this script. There are numerous caveats. In the default mode, you need
@@ -11,7 +11,7 @@ is experimental.
 
 Sample usage:
 
-mongosymb.py --symbolizer-path=/path/to/llvm-symbolizer /path/to/executable </file/with/stacktrace
+merizosymb.py --symbolizer-path=/path/to/llvm-symbolizer /path/to/executable </file/with/stacktrace
 
 You can also pass --output-format=json, to get rich json output. It shows some extra information,
 but emits json instead of plain text.
@@ -26,7 +26,7 @@ import sys
 
 def symbolize_frames(  # pylint: disable=too-many-locals
         trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hint=None):
-    """Return a list of symbolized stack frames from a trace_doc in MongoDB stack dump format."""
+    """Return a list of symbolized stack frames from a trace_doc in MerizoDB stack dump format."""
 
     if symbolizer_path is None:
         symbolizer_path = os.environ.get("MONGOSYMB_SYMBOLIZER_PATH", "llvm-symbolizer")

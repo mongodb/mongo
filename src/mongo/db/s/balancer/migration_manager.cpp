@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,33 +27,33 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/balancer/migration_manager.h"
+#include "merizo/db/s/balancer/migration_manager.h"
 
 #include <memory>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/client.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/balancer/scoped_migration_request.h"
-#include "mongo/db/s/balancer/type_migration.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/move_chunk_request.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/remote_command_targeter.h"
+#include "merizo/db/client.h"
+#include "merizo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/balancer/scoped_migration_request.h"
+#include "merizo/db/s/balancer/type_migration.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/request_types/move_chunk_request.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
@@ -659,4 +659,4 @@ MigrationManager::Migration::~Migration() {
     invariant(completionNotification);
 }
 
-}  // namespace mongo
+}  // namespace merizo

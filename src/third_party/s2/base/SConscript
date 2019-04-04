@@ -15,6 +15,6 @@ env.Library(
 	"strtoint.cc",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/value.h"
+#include "merizo/db/pipeline/value.h"
 
 #include <boost/functional/hash.hpp>
 #include <cmath>
 #include <limits>
 
-#include "mongo/base/compare_numbers.h"
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/bson/bson_depth.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/represent_as.h"
+#include "merizo/base/compare_numbers.h"
+#include "merizo/base/data_type_endian.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/bson/bson_depth.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/query/datetime/date_time_support.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/represent_as.h"
 
-namespace mongo {
-using namespace mongoutils;
+namespace merizo {
+using namespace merizoutils;
 using boost::intrusive_ptr;
 using std::min;
 using std::numeric_limits;
@@ -849,7 +849,7 @@ void Value::hash_combine(size_t& seed,
             boost::hash_combine(seed, _storage.dateValue);
             break;
 
-        case mongo::NumberDecimal: {
+        case merizo::NumberDecimal: {
             const Decimal128 dcml = getDecimal();
             if (dcml.toAbs().isGreater(Decimal128(std::numeric_limits<double>::max(),
                                                   Decimal128::kRoundTo34Digits,
@@ -1355,4 +1355,4 @@ Value Value::deserializeForIDL(const BSONElement& element) {
     return Value(element);
 }
 
-}  // namespace mongo
+}  // namespace merizo

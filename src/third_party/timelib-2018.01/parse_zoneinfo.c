@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017 MongoDB, Inc.
+ * Copyright (c) 2017 MerizoDB, Inc.
  * Copyright (c) 2015 Red Hat, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy

@@ -297,7 +297,7 @@ jsTestOptions = function() {
             minPort: TestData.minPort,
             maxPort: TestData.maxPort,
             // Note: does not support the array version
-            mongosBinVersion: TestData.mongosBinVersion || "",
+            merizosBinVersion: TestData.merizosBinVersion || "",
             shardMixedBinVersions: TestData.shardMixedBinVersions || false,
             networkMessageCompressors: TestData.networkMessageCompressors,
             replSetFeatureCompatibilityVersion: TestData.replSetFeatureCompatibilityVersion,
@@ -306,7 +306,7 @@ jsTestOptions = function() {
             forceValidationWithFeatureCompatibilityVersion:
                 TestData.forceValidationWithFeatureCompatibilityVersion,
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
-            // We default skipValidationOnNamespaceNotFound to true because mongod can end up
+            // We default skipValidationOnNamespaceNotFound to true because merizod can end up
             // dropping a collection after calling listCollections (e.g. if a secondary applies an
             // oplog entry).
             skipValidationOnNamespaceNotFound:
@@ -430,7 +430,7 @@ defaultPrompt = function() {
         var buildInfo = db.runCommand({buildInfo: 1});
         try {
             if (buildInfo.modules.indexOf("enterprise") > -1) {
-                prefix += "MongoDB Enterprise ";
+                prefix += "MerizoDB Enterprise ";
             }
         } catch (e) {
             // Don't do anything here. Just throw the error away.
@@ -510,7 +510,7 @@ replSetMemberStatePrompt = function() {
                 state = member.stateStr;
             }
         });
-        // Otherwise fall back to reporting the numeric myState field (mongodb 1.6).
+        // Otherwise fall back to reporting the numeric myState field (merizodb 1.6).
         if (!state) {
             state = stateInfo.myState;
         }
@@ -518,7 +518,7 @@ replSetMemberStatePrompt = function() {
     } else {
         var info = stateInfo.info;
         if (info && info.length < 20) {
-            state = info;  // "mongos", "configsvr"
+            state = info;  // "merizos", "configsvr"
         } else {
             throw _getErrorWithCode(stateInfo, "Failed:" + info);
         }
@@ -533,7 +533,7 @@ isMasterStatePrompt = function(isMasterResponse) {
         var role = "";
 
         if (isMaster.msg == "isdbgrid") {
-            role = "mongos";
+            role = "merizos";
         }
 
         if (isMaster.setName) {
@@ -557,7 +557,7 @@ isMasterStatePrompt = function(isMasterResponse) {
 
 if (typeof _useWriteCommandsDefault === "undefined") {
     // We ensure the _useWriteCommandsDefault() function is always defined, in case the JavaScript
-    // engine is being used from someplace other than the mongo shell (e.g. map-reduce).
+    // engine is being used from someplace other than the merizo shell (e.g. map-reduce).
     _useWriteCommandsDefault = function _useWriteCommandsDefault() {
         return false;
     };
@@ -565,7 +565,7 @@ if (typeof _useWriteCommandsDefault === "undefined") {
 
 if (typeof _writeMode === "undefined") {
     // We ensure the _writeMode() function is always defined, in case the JavaScript engine is being
-    // used from someplace other than the mongo shell (e.g. map-reduce).
+    // used from someplace other than the merizo shell (e.g. map-reduce).
     _writeMode = function _writeMode() {
         return "commands";
     };
@@ -573,7 +573,7 @@ if (typeof _writeMode === "undefined") {
 
 if (typeof _readMode === "undefined") {
     // We ensure the _readMode() function is always defined, in case the JavaScript engine is being
-    // used from someplace other than the mongo shell (e.g. map-reduce).
+    // used from someplace other than the merizo shell (e.g. map-reduce).
     _readMode = function _readMode() {
         return "legacy";
     };
@@ -581,7 +581,7 @@ if (typeof _readMode === "undefined") {
 
 if (typeof _shouldRetryWrites === 'undefined') {
     // We ensure the _shouldRetryWrites() function is always defined, in case the JavaScript engine
-    // is being used from someplace other than the mongo shell (e.g. map-reduce).
+    // is being used from someplace other than the merizo shell (e.g. map-reduce).
     _shouldRetryWrites = function _shouldRetryWrites() {
         return false;
     };
@@ -589,7 +589,7 @@ if (typeof _shouldRetryWrites === 'undefined') {
 
 if (typeof _shouldUseImplicitSessions === 'undefined') {
     // We ensure the _shouldUseImplicitSessions() function is always defined, in case the JavaScript
-    // engine is being used from someplace other than the mongo shell (e.g. map-reduce). If the
+    // engine is being used from someplace other than the merizo shell (e.g. map-reduce). If the
     // function was not defined, implicit sessions are disabled to prevent unnecessary sessions from
     // being created.
     _shouldUseImplicitSessions = function _shouldUseImplicitSessions() {
@@ -900,13 +900,13 @@ shellHelper.show = function(what) {
     }
 
     if (what == "dbs" || what == "databases") {
-        var mongo = db.getMongo();
+        var merizo = db.getMongo();
         var dbs;
         try {
-            dbs = mongo.getDBs(db.getSession(), undefined, false);
+            dbs = merizo.getDBs(db.getSession(), undefined, false);
         } catch (ex) {
             // Unable to get detailed information, retry name-only.
-            mongo.getDBs(db.getSession(), undefined, true).forEach(function(x) {
+            merizo.getDBs(db.getSession(), undefined, true).forEach(function(x) {
                 print(x);
             });
             return "";
@@ -1073,12 +1073,12 @@ shellHelper.show = function(what) {
                 } else if (freemonStatus.state === 'undecided') {
                     print(
                         "---\n" +
-                        "Enable MongoDB's free cloud-based monitoring service, which will then receive and display\n" +
+                        "Enable MerizoDB's free cloud-based monitoring service, which will then receive and display\n" +
                         "metrics about your deployment (disk utilization, CPU, operation statistics, etc).\n" +
                         "\n" +
-                        "The monitoring data will be available on a MongoDB website with a unique URL accessible to you\n" +
-                        "and anyone you share the URL with. MongoDB may use this information to make product\n" +
-                        "improvements and to suggest MongoDB products and deployment options to you.\n" +
+                        "The monitoring data will be available on a MerizoDB website with a unique URL accessible to you\n" +
+                        "and anyone you share the URL with. MerizoDB may use this information to make product\n" +
+                        "improvements and to suggest MerizoDB products and deployment options to you.\n" +
                         "\n" +
                         "To enable free monitoring, run the following command: db.enableFreeMonitoring()\n" +
                         "To permanently disable this reminder, run the following command: db.disableFreeMonitoring()\n" +
@@ -1571,7 +1571,7 @@ rs.compareOpTimes = function(ot1, ot2) {
 
 help = shellHelper.help = function(x) {
     if (x == "mr") {
-        print("\nSee also http://dochub.mongodb.org/core/mapreduce");
+        print("\nSee also http://dochub.merizodb.org/core/mapreduce");
         print("\nfunction mapf() {");
         print("  // 'this' holds current document to inspect");
         print("  emit(key, value);");
@@ -1592,7 +1592,7 @@ help = shellHelper.help = function(x) {
         return;
     } else if (x == "connect") {
         print(
-            "\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
+            "\nNormally one specifies the server on the merizo shell command line.  Run merizo --help to see those options.");
         print("Additional connections may be opened:\n");
         print("    var x = new Mongo('host[:port]');");
         print("    var mydb = x.getDB('mydb');");
@@ -1654,7 +1654,7 @@ help = shellHelper.help = function(x) {
         print("\tgetMemInfo()                    diagnostic");
         return;
     } else if (x == "test") {
-        print("\tMongoRunner.runMongod(args)   DELETES DATA DIR and then starts mongod");
+        print("\tMongoRunner.runMongod(args)   DELETES DATA DIR and then starts merizod");
         print("\t                              returns a connection to the new server");
         return;
     } else if (x == "") {
@@ -1686,7 +1686,7 @@ help = shellHelper.help = function(x) {
             "it                           result of the last line evaluated; use to further iterate");
         print("\t" +
               "DBQuery.shellBatchSize = x   set default number of items to display on shell");
-        print("\t" + "exit                         quit the mongo shell");
+        print("\t" + "exit                         quit the merizo shell");
     } else
         print("unknown help option");
 };

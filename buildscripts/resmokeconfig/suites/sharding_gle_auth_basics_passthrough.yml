@@ -42,12 +42,12 @@ executor:
       <<: *authOptions
   fixture:
     class: ShardedClusterFixture
-    mongos_options:
+    merizos_options:
       keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
         enableLocalhostAuthBypass: false
-    mongod_options:
+    merizod_options:
       auth: ''
       keyFile: *keyFile
       set_parameters:

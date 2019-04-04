@@ -124,7 +124,7 @@ class TestCombineBenchmarkResults(CombineBenchrunEmbeddedResultsFixture):
         test_name = "test1"
         thread_num = 3
         file_name = os.path.join(self.cber_hook.report_root, test_name,
-                                 "thread{}".format(thread_num), "mongoebench.0.json")
+                                 "thread{}".format(thread_num), "merizoebench.0.json")
         report_threads = self.cber_hook._parse_report_name(file_name)
         self.assertEqual(thread_num, int(report_threads))
 

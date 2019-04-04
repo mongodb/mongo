@@ -4,12 +4,12 @@
 //
 
 // TODO: SERVER-33601 remove shardAsReplicaSet: false
-var st = new ShardingTest({shards: 2, mongos: 1, other: {shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 2, merizos: 1, other: {shardAsReplicaSet: false}});
 
-var mongos = st.s0;
-var coll = mongos.getCollection("foo.bar");
-var admin = mongos.getDB("admin");
-var shards = mongos.getCollection("config.shards").find().toArray();
+var merizos = st.s0;
+var coll = merizos.getCollection("foo.bar");
+var admin = merizos.getDB("admin");
+var shards = merizos.getCollection("config.shards").find().toArray();
 var shardAdmin = st.shard0.getDB("admin");
 
 assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
@@ -55,7 +55,7 @@ jsTest.log("Starting migration...");
 assert(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: shards[1]._id}).ok);
 assert(admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: shards[1]._id}).ok);
 
-// Ensure that the doc count is correct and that the mongos query path can handle docs near the 16MB
+// Ensure that the doc count is correct and that the merizos query path can handle docs near the 16MB
 // user BSON size limit.
 assert.eq(9, coll.find().itcount());
 

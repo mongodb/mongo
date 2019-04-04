@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <iterator>
 #include <set>
 #include <vector>
 
-#include "mongo/util/net/sockaddr.h"
+#include "merizo/util/net/sockaddr.h"
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>
@@ -51,11 +51,11 @@
 #endif
 #endif
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/util/itoa.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/util/itoa.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 constexpr int SOCK_FAMILY_UNKNOWN_ERROR = 13078;
 
@@ -134,7 +134,7 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
         _hostOrIp = "127.0.0.1";
     }
 
-    if (mongoutils::str::contains(_hostOrIp, '/') || familyHint == AF_UNIX) {
+    if (merizoutils::str::contains(_hostOrIp, '/') || familyHint == AF_UNIX) {
         initUnixDomainSocket(_hostOrIp, port);
         return;
     }
@@ -165,7 +165,7 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
 
 std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family_t familyHint) {
     std::string hostOrIp = target.toString();
-    if (mongoutils::str::contains(hostOrIp, '/')) {
+    if (merizoutils::str::contains(hostOrIp, '/')) {
         std::vector<SockAddr> ret = {SockAddr()};
         ret[0].initUnixDomainSocket(hostOrIp, port);
         // Currently, this is always valid since initUnixDomainSocket()
@@ -282,7 +282,7 @@ std::string SockAddr::getAddr() const {
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
             massert(13082,
-                    mongoutils::str::stream() << "getnameinfo error " << getAddrInfoStrError(ret),
+                    merizoutils::str::stream() << "getnameinfo error " << getAddrInfoStrError(ret),
                     ret == 0);
             return buffer;
         }
@@ -366,4 +366,4 @@ bool SockAddr::operator<(const SockAddr& r) const {
     return getPort() < r.getPort();
 }
 
-}  // namespace mongo
+}  // namespace merizo

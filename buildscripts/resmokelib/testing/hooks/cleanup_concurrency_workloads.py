@@ -58,7 +58,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
     def run_test(self):
         """Execute drop databases hook."""
         same_db_name = None
-        client = self._hook.fixture.mongo_client()
+        client = self._hook.fixture.merizo_client()
         db_names = client.database_names()
 
         exclude_dbs = copy.copy(self._hook.exclude_dbs)

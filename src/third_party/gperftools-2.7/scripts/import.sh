@@ -22,7 +22,7 @@ fi
 
 NAME=gperftools
 VERSION=2.7
-REVISION=$VERSION-mongodb
+REVISION=$VERSION-merizodb
 
 # If WSL, get Windows temp directory
 if $(grep -q Microsoft /proc/version); then
@@ -44,7 +44,7 @@ fi
 
 TARGET_UNAME=${UNAME}_${UNAME_PROCESSOR}
 
-git clone https://github.com/mongodb-labs/gperftools.git -c core.autocrlf=false $REPO
+git clone https://github.com/merizodb-labs/gperftools.git -c core.autocrlf=false $REPO
 
 pushd $REPO
 git checkout $REVISION

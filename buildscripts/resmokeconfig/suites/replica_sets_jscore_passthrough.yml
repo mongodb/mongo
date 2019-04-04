@@ -47,7 +47,7 @@ executor:
     n: 20
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1
         # TODO SERVER-39321: Remove the following block now that SERVER-35377 has been resolved.

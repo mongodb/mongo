@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/rpc/metadata/client_metadata.h"
+#include "merizo/rpc/metadata/client_metadata.h"
 
 #include <boost/filesystem.hpp>
 #include <map>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/s/is_merizos.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 constexpr auto kMetadataDoc = "client"_sd;
 constexpr auto kApplication = "application"_sd;
@@ -53,7 +53,7 @@ constexpr auto kType = "type"_sd;
 constexpr auto kVersion = "version"_sd;
 constexpr auto kOperatingSystem = "os"_sd;
 constexpr auto kArchitecture = "architecture"_sd;
-constexpr auto kMongos = "mongos"_sd;
+constexpr auto kMongos = "merizos"_sd;
 constexpr auto kClient = "client"_sd;
 constexpr auto kHost = "host"_sd;
 
@@ -303,7 +303,7 @@ TEST(ClientMetadatTest, TestNegativeLargeAppName) {
     }
 }
 
-// Serialize and attach mongos information
+// Serialize and attach merizos information
 TEST(ClientMetadatTest, TestMongoSAppend) {
     BSONObjBuilder builder;
     ASSERT_OK(ClientMetadata::serializePrivate("a", "b", "c", "d", "e", "f", "g", &builder));
@@ -318,7 +318,7 @@ TEST(ClientMetadatTest, TestMongoSAppend) {
 
     auto doc = swParseStatus.getValue().get().getDocument();
 
-    constexpr auto kMongos = "mongos"_sd;
+    constexpr auto kMongos = "merizos"_sd;
     constexpr auto kClient = "client"_sd;
     constexpr auto kHost = "host"_sd;
 
@@ -332,4 +332,4 @@ TEST(ClientMetadatTest, TestMongoSAppend) {
     ASSERT_BSONOBJ_EQ(doc, outDoc);
 }
 
-}  // namespace mongo
+}  // namespace merizo

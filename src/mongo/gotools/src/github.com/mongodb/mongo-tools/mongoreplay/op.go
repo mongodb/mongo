@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -72,7 +72,7 @@ type cursorsRewriteable interface {
 }
 
 // Replyable is an interface representing any operation that has the
-// functionality of a reply from a mongodb server. This includes both
+// functionality of a reply from a merizodb server. This includes both
 // ReplyOps and CommandOpReplies.
 type Replyable interface {
 	getCursorID() (int64, error)

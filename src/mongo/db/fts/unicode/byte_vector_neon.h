@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,15 +32,15 @@
 #include <arm_neon.h>
 #include <cstdint>
 
-#include "mongo/platform/bits.h"
+#include "merizo/platform/bits.h"
 
-namespace mongo {
+namespace merizo {
 namespace unicode {
 
 /**
  * A sequence of bytes that can be manipulated using vectorized instructions.
  *
- * This is specific to the use case in mongo::unicode::String and not intended as a general purpose
+ * This is specific to the use case in merizo::unicode::String and not intended as a general purpose
  * vector class.
  *
  * This specialization offers acceleration for aarch64.
@@ -155,4 +155,4 @@ private:
 };
 
 }  // namespace unicode
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/sharding_uptime_reporter.h"
+#include "merizo/s/sharding_uptime_reporter.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/server_options.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/type_mongos.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/hostname_canonicalization.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/version.h"
+#include "merizo/db/client.h"
+#include "merizo/db/server_options.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/catalog/type_merizos.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/hostname_canonicalization.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/version.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const Seconds kUptimeReportInterval(10);
@@ -67,7 +67,7 @@ void reportStatus(OperationContext* opCtx,
     mType.setName(instanceId);
     mType.setPing(jsTime());
     mType.setUptime(upTimeTimer.seconds());
-    // balancer is never active in mongos. Here for backwards compatibility only.
+    // balancer is never active in merizos. Here for backwards compatibility only.
     mType.setWaiting(true);
     mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
     mType.setAdvisoryHostFQDNs(
@@ -116,7 +116,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
                                   ->getBalancerConfiguration()
                                   ->refreshAndCheck(opCtx.get());
                 if (!status.isOK()) {
-                    warning() << "failed to refresh mongos settings" << causedBy(status);
+                    warning() << "failed to refresh merizos settings" << causedBy(status);
                 }
             }
 
@@ -127,4 +127,4 @@ void ShardingUptimeReporter::startPeriodicThread() {
 }
 
 
-}  // namespace mongo
+}  // namespace merizo

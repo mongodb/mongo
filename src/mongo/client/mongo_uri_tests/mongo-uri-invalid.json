@@ -14,7 +14,7 @@
             "description": "Missing host",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://",
+            "uri": "merizodb://",
             "valid": false,
             "warning": null
         },
@@ -23,7 +23,7 @@
             "description": "Double colon in host identifier",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost::27017",
+            "uri": "merizodb://localhost::27017",
             "valid": false,
             "warning": null
         },
@@ -32,7 +32,7 @@
             "description": "Double colon in host identifier and trailing slash",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost::27017/",
+            "uri": "merizodb://localhost::27017/",
             "valid": false,
             "warning": null
         },
@@ -41,7 +41,7 @@
             "description": "Double colon in host identifier with missing host and port",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://::",
+            "uri": "merizodb://::",
             "valid": false,
             "warning": null
         },
@@ -50,7 +50,7 @@
             "description": "Double colon in host identifier with missing port",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost,localhost::",
+            "uri": "merizodb://localhost,localhost::",
             "valid": false,
             "warning": null
         },
@@ -59,7 +59,7 @@
             "description": "Double colon in host identifier and second host",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost::27017,abc",
+            "uri": "merizodb://localhost::27017,abc",
             "valid": false,
             "warning": null
         },
@@ -68,7 +68,7 @@
             "description": "Invalid port (negative number) with hostname",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost:-1",
+            "uri": "merizodb://localhost:-1",
             "valid": false,
             "warning": null
         },
@@ -77,7 +77,7 @@
             "description": "Invalid port (zero) with hostname",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost:0/",
+            "uri": "merizodb://localhost:0/",
             "valid": false,
             "warning": null
         },
@@ -86,7 +86,7 @@
             "description": "Invalid port (positive number) with hostname",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost:65536",
+            "uri": "merizodb://localhost:65536",
             "valid": false,
             "warning": null
         },
@@ -95,7 +95,7 @@
             "description": "Invalid port (positive number) with hostname and trailing slash",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost:65536/",
+            "uri": "merizodb://localhost:65536/",
             "valid": false,
             "warning": null
         },
@@ -104,7 +104,7 @@
             "description": "Invalid port (non-numeric string) with hostname",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://localhost:foo",
+            "uri": "merizodb://localhost:foo",
             "valid": false,
             "warning": null
         },
@@ -113,7 +113,7 @@
             "description": "Invalid port (negative number) with IP literal",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://[::1]:-1",
+            "uri": "merizodb://[::1]:-1",
             "valid": false,
             "warning": null
         },
@@ -122,7 +122,7 @@
             "description": "Invalid port (zero) with IP literal",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://[::1]:0/",
+            "uri": "merizodb://[::1]:0/",
             "valid": false,
             "warning": null
         },
@@ -131,7 +131,7 @@
             "description": "Invalid port (positive number) with IP literal",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://[::1]:65536",
+            "uri": "merizodb://[::1]:65536",
             "valid": false,
             "warning": null
         },
@@ -140,7 +140,7 @@
             "description": "Invalid port (positive number) with IP literal and trailing slash",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://[::1]:65536/",
+            "uri": "merizodb://[::1]:65536/",
             "valid": false,
             "warning": null
         },
@@ -149,7 +149,7 @@
             "description": "Invalid port (non-numeric string) with IP literal",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://[::1]:foo",
+            "uri": "merizodb://[::1]:foo",
             "valid": false,
             "warning": null
         },
@@ -158,7 +158,7 @@
             "description": "Missing delimiting slash between hosts and options",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://example.com?w=1",
+            "uri": "merizodb://example.com?w=1",
             "valid": false,
             "warning": null
         },
@@ -167,7 +167,7 @@
             "description": "Incomplete key value pair for option",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://example.com/?w",
+            "uri": "merizodb://example.com/?w",
             "valid": false,
             "warning": null
         },
@@ -176,7 +176,7 @@
             "description": "Username with password containing an unescaped colon",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://alice:foo:bar@127.0.0.1",
+            "uri": "merizodb://alice:foo:bar@127.0.0.1",
             "valid": false,
             "warning": null
         },
@@ -185,7 +185,7 @@
             "description": "Username with password containing an unescaped colon",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://alice:foo:bar@127.0.0.1",
+            "uri": "merizodb://alice:foo:bar@127.0.0.1",
             "valid": false,
             "warning": null
         },
@@ -194,7 +194,7 @@
             "description": "Username containing an unescaped at-sign",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://alice@@127.0.0.1",
+            "uri": "merizodb://alice@@127.0.0.1",
             "valid": false,
             "warning": null
         },
@@ -203,7 +203,7 @@
             "description": "Username with password containing an unescaped at-sign",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://alice@foo:bar@127.0.0.1",
+            "uri": "merizodb://alice@foo:bar@127.0.0.1",
             "valid": false,
             "warning": null
         },
@@ -212,7 +212,7 @@
             "description": "Username containing an unescaped slash",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://alice/@localhost/db",
+            "uri": "merizodb://alice/@localhost/db",
             "valid": false,
             "warning": null
         },
@@ -221,7 +221,7 @@
             "description": "Username containing unescaped slash with password",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://alice/bob:foo@localhost/db",
+            "uri": "merizodb://alice/bob:foo@localhost/db",
             "valid": false,
             "warning": null
         },
@@ -230,7 +230,7 @@
             "description": "Username with password containing an unescaped slash",
             "hosts": null,
             "options": null,
-            "uri": "mongodb://alice:foo/bar@localhost/db",
+            "uri": "merizodb://alice:foo/bar@localhost/db",
             "valid": false,
             "warning": null
         },
@@ -239,7 +239,7 @@
             "description": "Host with unescaped slash",
             "hosts": null,
             "options": null,
-            "uri": "mongodb:///tmp/mongodb-27017.sock/",
+            "uri": "merizodb:///tmp/merizodb-27017.sock/",
             "valid": false,
             "warning": null
         }

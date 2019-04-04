@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,68 +27,68 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/get_executor.h"
+#include "merizo/db/query/get_executor.h"
 
 #include <boost/optional.hpp>
 #include <limits>
 #include <memory>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/parse_number.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/exec/cached_plan.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/count.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/eof.h"
-#include "mongo/db/exec/idhack.h"
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/projection.h"
-#include "mongo/db/exec/record_store_fast_count.h"
-#include "mongo/db/exec/shard_filter.h"
-#include "mongo/db/exec/sort_key_generator.h"
-#include "mongo/db/exec/subplan.h"
-#include "mongo/db/exec/update_stage.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/wildcard_access_method.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/planner_access.h"
-#include "mongo/db/query/planner_analysis.h"
-#include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_settings.h"
-#include "mongo/db/query/stage_builder.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/oplog_hack.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/parse_number.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/exec/cached_plan.h"
+#include "merizo/db/exec/collection_scan.h"
+#include "merizo/db/exec/count.h"
+#include "merizo/db/exec/delete.h"
+#include "merizo/db/exec/eof.h"
+#include "merizo/db/exec/idhack.h"
+#include "merizo/db/exec/multi_plan.h"
+#include "merizo/db/exec/projection.h"
+#include "merizo/db/exec/record_store_fast_count.h"
+#include "merizo/db/exec/shard_filter.h"
+#include "merizo/db/exec/sort_key_generator.h"
+#include "merizo/db/exec/subplan.h"
+#include "merizo/db/exec/update_stage.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index/wildcard_access_method.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/canonical_query_encoder.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/index_bounds_builder.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/query/plan_cache.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/query/planner_access.h"
+#include "merizo/db/query/planner_analysis.h"
+#include "merizo/db/query/planner_ixselect.h"
+#include "merizo/db/query/planner_wildcard_helpers.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/db/query/query_settings.h"
+#include "merizo/db/query/stage_builder.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/s/operation_sharding_state.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/oplog_hack.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::unique_ptr;
@@ -119,7 +119,7 @@ void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
 }
 
 namespace {
-namespace wcp = ::mongo::wildcard_planning;
+namespace wcp = ::merizo::wildcard_planning;
 // The body is below in the "count hack" section but getExecutor calls it.
 bool turnIxscanIntoCount(QuerySolution* soln);
 }  // namespace
@@ -574,9 +574,9 @@ namespace {
 /**
  * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
  */
-bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
-    if (mongo::MatchExpression::GT != me->matchType() &&
-        mongo::MatchExpression::GTE != me->matchType()) {
+bool isOplogTsLowerBoundPred(const merizo::MatchExpression* me) {
+    if (merizo::MatchExpression::GT != me->matchType() &&
+        merizo::MatchExpression::GTE != me->matchType()) {
         return false;
     }
 
@@ -1735,4 +1735,4 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

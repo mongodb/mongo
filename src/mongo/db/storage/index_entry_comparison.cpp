@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,17 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/index_entry_comparison.h"
+#include "merizo/db/storage/index_entry_comparison.h"
 
 #include <ostream>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/storage/duplicate_key_error_info.h"
 
-namespace mongo {
+namespace merizo {
 
 std::ostream& operator<<(std::ostream& stream, const IndexKeyEntry& entry) {
     return stream << entry.key << '@' << entry.loc;
@@ -198,4 +198,4 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
     return Status(DuplicateKeyErrorInfo(keyPattern, key), sb.str());
 }
 
-}  // namespace mongo
+}  // namespace merizo

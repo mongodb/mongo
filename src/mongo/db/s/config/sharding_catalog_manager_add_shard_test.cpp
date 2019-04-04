@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <vector>
 
-#include "mongo/client/connection_string.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
-#include "mongo/db/s/add_shard_util.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/type_shard_identity.h"
-#include "mongo/s/catalog/config_server_version.h"
-#include "mongo/s/catalog/type_changelog.h"
-#include "mongo/s/catalog/type_config_version.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/config_server_test_fixture.h"
-#include "mongo/s/database_version_helpers.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/remote_command_targeter_factory_mock.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/s/add_shard_cmd_gen.h"
+#include "merizo/db/s/add_shard_util.h"
+#include "merizo/db/s/config/sharding_catalog_manager.h"
+#include "merizo/db/s/type_shard_identity.h"
+#include "merizo/s/catalog/config_server_version.h"
+#include "merizo/s/catalog/type_changelog.h"
+#include "merizo/s/catalog/type_config_version.h"
+#include "merizo/s/catalog/type_database.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_identity_loader.h"
+#include "merizo/s/config_server_test_fixture.h"
+#include "merizo/s/database_version_helpers.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using executor::RemoteCommandRequest;
@@ -90,7 +90,7 @@ protected:
 
     /**
      * addShard validates the host as a shard. It calls "isMaster" on the host to determine what
-     * kind of host it is -- mongos, regular mongod, config mongod -- and whether the replica set
+     * kind of host it is -- merizos, regular merizod, config merizod -- and whether the replica set
      * details are correct. "isMasterResponse" defines the response of the "isMaster" request and
      * should be a command response BSONObj, or a failed Status.
      *
@@ -596,7 +596,7 @@ TEST_F(AddShardTest, UnreachableHost) {
     future.timed_get(kLongFutureTimeout);
 }
 
-// Cannot add mongos as a shard.
+// Cannot add merizos as a shard.
 TEST_F(AddShardTest, AddMongosAsShard) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
@@ -1343,4 +1343,4 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 (function() {
     'use strict';
-    var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
+    var test = new ShardingTest({shards: 1, merizos: 1, other: {chunkSize: 1}});
 
-    var mongos = test.s0;
-    var mongod = test.shard0;
+    var merizos = test.s0;
+    var merizod = test.shard0;
 
     var res;
     var dbArray;
@@ -31,11 +31,11 @@
 
     // Non-config-server db checks.
     {
-        assert.writeOK(mongos.getDB("blah").foo.insert({_id: 1}));
-        assert.writeOK(mongos.getDB("foo").foo.insert({_id: 1}));
-        assert.writeOK(mongos.getDB("raw").foo.insert({_id: 1}));
+        assert.writeOK(merizos.getDB("blah").foo.insert({_id: 1}));
+        assert.writeOK(merizos.getDB("foo").foo.insert({_id: 1}));
+        assert.writeOK(merizos.getDB("raw").foo.insert({_id: 1}));
 
-        res = mongos.adminCommand("listDatabases");
+        res = merizos.adminCommand("listDatabases");
         dbArray = res.databases;
 
         dbEntryCheck(getDBSection(dbArray, "blah"), false);
@@ -45,7 +45,7 @@
 
     // Local db is never returned.
     {
-        res = mongos.adminCommand("listDatabases");
+        res = merizos.adminCommand("listDatabases");
         dbArray = res.databases;
 
         assert(!getDBSection(dbArray, 'local'));
@@ -53,10 +53,10 @@
 
     // Admin and config are always reported on the config shard.
     {
-        assert.writeOK(mongos.getDB("admin").test.insert({_id: 1}));
-        assert.writeOK(mongos.getDB("config").test.insert({_id: 1}));
+        assert.writeOK(merizos.getDB("admin").test.insert({_id: 1}));
+        assert.writeOK(merizos.getDB("config").test.insert({_id: 1}));
 
-        res = mongos.adminCommand("listDatabases");
+        res = merizos.adminCommand("listDatabases");
         dbArray = res.databases;
 
         dbEntryCheck(getDBSection(dbArray, "config"), true);
@@ -65,9 +65,9 @@
 
     // Config db can be present on config shard and on other shards.
     {
-        mongod.getDB("config").foo.insert({_id: 1});
+        merizod.getDB("config").foo.insert({_id: 1});
 
-        res = mongos.adminCommand("listDatabases");
+        res = merizos.adminCommand("listDatabases");
         dbArray = res.databases;
 
         var entry = getDBSection(dbArray, "config");
@@ -78,9 +78,9 @@
 
     // Admin db is only reported on the config shard, never on other shards.
     {
-        mongod.getDB("admin").foo.insert({_id: 1});
+        merizod.getDB("admin").foo.insert({_id: 1});
 
-        res = mongos.adminCommand("listDatabases");
+        res = merizos.adminCommand("listDatabases");
         dbArray = res.databases;
 
         var entry = getDBSection(dbArray, "admin");

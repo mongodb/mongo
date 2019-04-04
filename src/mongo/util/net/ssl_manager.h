@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,19 +33,19 @@
 #include <memory>
 #include <string>
 
-#include "mongo/config.h"
+#include "merizo/config.h"
 
 #ifdef MONGO_CONFIG_SSL
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/net/sock.h"
-#include "mongo/util/net/ssl/apple.hpp"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/service_context.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/util/decorable.h"
+#include "merizo/util/net/sock.h"
+#include "merizo/util/net/ssl/apple.hpp"
+#include "merizo/util/net/ssl_types.h"
+#include "merizo/util/time_support.h"
 
 // SChannel implementation
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
@@ -54,7 +54,7 @@
 #endif
 #endif  // #ifdef MONGO_CONFIG_SSL
 
-namespace mongo {
+namespace merizo {
 /*
  * @return the SSL version std::string prefixed with prefix and suffixed with suffix
  */
@@ -72,7 +72,7 @@ Status validateDisableNonTLSConnectionLogging(const bool&);
 }
 
 #ifdef MONGO_CONFIG_SSL
-namespace mongo {
+namespace merizo {
 struct SSLParams;
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
@@ -151,9 +151,9 @@ public:
     std::string shortDescription;  // A brief description of the entity associated with the OID
     std::string longDescription;   // A long form description of the entity associated with the OID
 };
-const ASN1OID mongodbRolesOID("1.3.6.1.4.1.34601.2.1.1",
+const ASN1OID merizodbRolesOID("1.3.6.1.4.1.34601.2.1.1",
                               "MongoRoles",
-                              "Sequence of MongoDB Database Roles");
+                              "Sequence of MerizoDB Database Roles");
 
 /**
  * Counts of negogtiated version used by TLS connections.
@@ -311,5 +311,5 @@ StatusWith<TLSVersion> mapTLSVersion(SSLConnectionType conn);
 void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging);
 
 
-}  // namespace mongo
+}  // namespace merizo
 #endif  // #ifdef MONGO_CONFIG_SSL

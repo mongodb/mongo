@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Install multiple versions of MongoDB on a machine."""
+"""Install multiple versions of MerizoDB on a machine."""
 
 from __future__ import print_function
 
@@ -154,7 +154,7 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
     def download_links(self):
         """Return the download and generic download links."""
         temp_file = tempfile.mktemp()
-        download_file("https://downloads.mongodb.org/full.json", temp_file)
+        download_file("https://downloads.merizodb.org/full.json", temp_file)
         with open(temp_file) as file_handle:
             full_json = json.load(file_handle)
         os.remove(temp_file)
@@ -371,28 +371,28 @@ def main():
         print("Cannot catch signals on Windows")
 
     parser = optparse.OptionParser(usage="""
-Downloads and installs particular mongodb versions (each binary is renamed
+Downloads and installs particular merizodb versions (each binary is renamed
 to include its version) into an install directory and symlinks the binaries
 with versions to another directory. This script supports community and
 enterprise builds.
 
-Usage: setup_multiversion_mongodb.py [options] ver1 [vers2 ...]
+Usage: setup_multiversion_merizodb.py [options] ver1 [vers2 ...]
 
-Ex: setup_multiversion_mongodb.py --installDir ./install
+Ex: setup_multiversion_merizodb.py --installDir ./install
                                   --linkDir ./link
                                   --edition base
                                   --platform Linux 2.0.6 2.0.3-rc0
                                   --architecture x86_64
                                   2.0 2.2 2.3
-Ex: setup_multiversion_mongodb.py --installDir ./install
+Ex: setup_multiversion_merizodb.py --installDir ./install
                                   --linkDir ./link
                                   --edition enterprise
                                   --platform osx
                                   2.4 2.2
 
 After running the script you will have a directory structure like this:
-    ./install/[mongodb-osx-x86_64-2.4.9, mongodb-osx-x86_64-2.2.7]
-    ./link/[mongod-2.4.9, mongod-2.2.7, mongo-2.4.9...]
+    ./install/[merizodb-osx-x86_64-2.4.9, merizodb-osx-x86_64-2.2.7]
+    ./link/[merizod-2.4.9, merizod-2.2.7, merizo-2.4.9...]
 
 You should then add ./link/ to your path so multi-version tests will work.
 

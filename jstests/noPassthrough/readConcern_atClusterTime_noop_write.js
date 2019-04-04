@@ -15,7 +15,7 @@
     }
 
     const conn = MongoRunner.runMongod();
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
     if (!assert.commandWorked(conn.getDB("test").serverStatus())
              .storageEngine.supportsSnapshotReadConcern) {
         MongoRunner.stopMongod(conn);
@@ -57,7 +57,7 @@
 
         // Propagate 'clusterTime' to toRS or the config server. This ensures that its next
         // write will be at time >= 'clusterTime'. We cannot use toDBFromMongos to propagate
-        // 'clusterTime' to the config server, because mongos only routes to the config server
+        // 'clusterTime' to the config server, because merizos only routes to the config server
         // for the 'config' and 'admin' databases.
         if (propagationPreference == PropagationPreferenceOptions.kConfig) {
             configFromMongos.coll1.find().itcount();

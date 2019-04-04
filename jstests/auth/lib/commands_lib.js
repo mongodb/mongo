@@ -214,7 +214,7 @@ var authCommandsLib = {
                   configsvrConnectionString: "foobarbaz/host:20022,host:20023,host:20024"
               }
           },
-          skipSharded: true,  // Command doesn't exist on mongos
+          skipSharded: true,  // Command doesn't exist on merizos
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -4128,7 +4128,7 @@ var authCommandsLib = {
         {
           testname: "fsyncUnlock",
           command: {fsyncUnlock: 1},
-          skipSharded: true,  // TODO: remove when fsyncUnlock is implemented in mongos
+          skipSharded: true,  // TODO: remove when fsyncUnlock is implemented in merizos
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -4181,7 +4181,7 @@ var authCommandsLib = {
         {
           testname: "getDatabaseVersion",
           command: {getDatabaseVersion: "test"},
-          skipSharded: true,  // only available on mongod
+          skipSharded: true,  // only available on merizod
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -4208,7 +4208,7 @@ var authCommandsLib = {
                     {
                       resource: {cluster: true},
                       actions: ["connPoolStats"]
-                    },  // Only needed against mongos
+                    },  // Only needed against merizos
                 ]
               },
               {runOnDb: firstDbName, roles: {}},
@@ -5150,7 +5150,7 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "profile_mongos",
+          testname: "profile_merizos",
           command: {profile: 0, slowms: 10, sampleRate: 0.5},
           skipUnlessSharded: true,
           testcases: [
@@ -5167,7 +5167,7 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "profileGetLevel_mongos",
+          testname: "profileGetLevel_merizos",
           command: {profile: -1},
           skipUnlessSharded: true,
           testcases: [
@@ -6000,7 +6000,7 @@ var authCommandsLib = {
     /************* SHARED TEST LOGIC ****************/
 
     /**
-     * Returns true if conn is a connection to mongos,
+     * Returns true if conn is a connection to merizos,
      * and false otherwise.
      */
     isMongos: function(conn) {
@@ -6013,7 +6013,7 @@ var authCommandsLib = {
      * The actual implementation must be provided in "impls".
      *
      * Parameters:
-     *   conn -- a connection to either mongod or mongos
+     *   conn -- a connection to either merizod or merizos
      *   t -- a single test object from the tests array above
      *
      * Returns:

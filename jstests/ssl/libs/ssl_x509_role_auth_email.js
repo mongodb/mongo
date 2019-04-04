@@ -6,7 +6,7 @@
     const ret = db.getSiblingDB("$external").auth({
         mechanism: "MONGODB-X509",
         user:
-            "emailAddress=example@mongodb.com,CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US"
+            "emailAddress=example@merizodb.com,CN=client,OU=KernelUser,O=MerizoDB,L=New York City,ST=New York,C=US"
     });
     assert.eq(ret, 1, "Auth failed");
 }());

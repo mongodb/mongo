@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,7 +28,7 @@
  */
 
 #ifndef MONGO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
-#error Do not include the DNS Query platform implementation headers.  Please use "mongo/util/dns_query.h" instead.
+#error Do not include the DNS Query platform implementation headers.  Please use "merizo/util/dns_query.h" instead.
 #endif
 
 #include <windns.h>
@@ -48,13 +48,13 @@
 
 #include <boost/noncopyable.hpp>
 
-#include "mongo/util/errno_util.h"
+#include "merizo/util/errno_util.h"
 
 using std::begin;
 using std::end;
 using namespace std::literals::string_literals;
 
-namespace mongo {
+namespace merizo {
 namespace dns {
 // The anonymous namespace is safe, in this header, as it is not really a header.  It is only used
 // in the `dns_query.cpp` TU.
@@ -265,4 +265,4 @@ public:
 };
 }  // namespace
 }  // namespace dns
-}  // namespace mongo
+}  // namespace merizo

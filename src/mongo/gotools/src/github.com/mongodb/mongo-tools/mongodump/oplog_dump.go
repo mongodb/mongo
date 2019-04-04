@@ -1,17 +1,17 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongodump
+package merizodump
 
 import (
 	"fmt"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -30,7 +30,7 @@ func (dump *MongoDump) determineOplogCollectionName() error {
 		return nil
 	}
 	if isMaster := masterDoc["ismaster"]; util.IsFalsy(isMaster) {
-		log.Logvf(log.Info, "mongodump is not connected to a master")
+		log.Logvf(log.Info, "merizodump is not connected to a master")
 		return fmt.Errorf("not connected to master")
 	}
 
@@ -53,7 +53,7 @@ func (dump *MongoDump) getCurrentOplogTime() (bson.MongoTimestamp, error) {
 }
 
 // checkOplogTimestampExists checks to make sure the oplog hasn't rolled over
-// since mongodump started. It does this by checking the oldest oplog entry
+// since merizodump started. It does this by checking the oldest oplog entry
 // still in the database and making sure it happened at or before the timestamp
 // captured at the start of the dump.
 func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, error) {

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/collection_range_deleter.h"
+#include "merizo/db/s/collection_range_deleter.h"
 
 #include <algorithm>
 #include <utility>
 
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/remove_saver.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/exec/delete.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/query/plan_yield_policy.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/s/collection_sharding_runtime.h"
+#include "merizo/db/s/sharding_runtime_d_params_gen.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/s/sharding_statistics.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/remove_saver.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -510,4 +510,4 @@ Status CollectionRangeDeleter::DeleteNotification::waitStatus(OperationContext* 
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

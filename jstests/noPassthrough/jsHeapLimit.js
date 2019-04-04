@@ -8,7 +8,7 @@
     var assertLimit = function() {
         assert.eq(999, getJSHeapLimitMB());
     };
-    var exitCode = runMongoProgram("mongo",
+    var exitCode = runMongoProgram("merizo",
                                    conn.host,
                                    "--jsHeapLimitMB",
                                    999,

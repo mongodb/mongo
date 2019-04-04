@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,47 +31,47 @@
  * Connect to a Mongo database as a database, from C++.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/dbclient_base.h"
+#include "merizo/client/dbclient_base.h"
 
 #include <algorithm>
 #include <utility>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/client/authenticate.h"
-#include "mongo/client/constants.h"
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/killcursors_request.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/reply_interface.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/password_digest.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/client/constants.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/config.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/json.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/killcursors_request.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/executor/remote_command_request.h"
+#include "merizo/executor/remote_command_response.h"
+#include "merizo/rpc/factory.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/metadata.h"
+#include "merizo/rpc/metadata/client_metadata.h"
+#include "merizo/rpc/reply_interface.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/password_digest.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::endl;
@@ -158,8 +158,8 @@ rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
 
     // StaleConfig is thrown because clients acting as routers handle the exception at a higher
     // level. Routing clients only expect StaleConfig from shards, so the exception should not be
-    // thrown when connected to a mongos, which allows StaleConfig to be returned to clients that
-    // connect to a mongos with DBClient, e.g. the shell.
+    // thrown when connected to a merizos, which allows StaleConfig to be returned to clients that
+    // connect to a merizos with DBClient, e.g. the shell.
     if (!isMongos()) {
         auto status = getStatusFromCommandResult(commandReply->getCommandReply());
         if (status == ErrorCodes::StaleConfig) {
@@ -407,7 +407,7 @@ string DBClientBase::getLastErrorString(const BSONObj& info) {
 }
 
 string DBClientBase::createPasswordDigest(const string& username, const string& clearTextPassword) {
-    return mongo::createPasswordDigest(username, clearTextPassword);
+    return merizo::createPasswordDigest(username, clearTextPassword);
 }
 
 namespace {
@@ -949,4 +949,4 @@ string nsGetCollection(const string& ns) {
 }
 
 
-}  // namespace mongo
+}  // namespace merizo

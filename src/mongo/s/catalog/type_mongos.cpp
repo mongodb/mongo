@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,23 +26,23 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/s/catalog/type_mongos.h"
+#include "merizo/s/catalog/type_merizos.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
-const NamespaceString MongosType::ConfigNS("config.mongos");
+namespace merizo {
+const NamespaceString MongosType::ConfigNS("config.merizos");
 
 const BSONField<std::string> MongosType::name("_id");
 const BSONField<Date_t> MongosType::ping("ping");
 const BSONField<long long> MongosType::uptime("up");
 const BSONField<bool> MongosType::waiting("waiting");
-const BSONField<std::string> MongosType::mongoVersion("mongoVersion");
+const BSONField<std::string> MongosType::merizoVersion("merizoVersion");
 const BSONField<long long> MongosType::configVersion("configVersion");
 const BSONField<BSONArray> MongosType::advisoryHostFQDNs("advisoryHostFQDNs");
 
@@ -81,12 +81,12 @@ StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
         mt._waiting = mtWaiting;
     }
 
-    if (source.hasField(mongoVersion.name())) {
+    if (source.hasField(merizoVersion.name())) {
         std::string mtMongoVersion;
-        Status status = bsonExtractStringField(source, mongoVersion.name(), &mtMongoVersion);
+        Status status = bsonExtractStringField(source, merizoVersion.name(), &mtMongoVersion);
         if (!status.isOK())
             return status;
-        mt._mongoVersion = mtMongoVersion;
+        mt._merizoVersion = mtMongoVersion;
     }
 
     if (source.hasField(configVersion.name())) {
@@ -151,8 +151,8 @@ BSONObj MongosType::toBSON() const {
         builder.append(uptime.name(), getUptime());
     if (_waiting)
         builder.append(waiting.name(), getWaiting());
-    if (_mongoVersion)
-        builder.append(mongoVersion.name(), getMongoVersion());
+    if (_merizoVersion)
+        builder.append(merizoVersion.name(), getMongoVersion());
     if (_configVersion)
         builder.append(configVersion.name(), getConfigVersion());
     if (_advisoryHostFQDNs)
@@ -178,9 +178,9 @@ void MongosType::setWaiting(bool waiting) {
     _waiting = waiting;
 }
 
-void MongosType::setMongoVersion(const std::string& mongoVersion) {
-    invariant(!mongoVersion.empty());
-    _mongoVersion = mongoVersion;
+void MongosType::setMongoVersion(const std::string& merizoVersion) {
+    invariant(!merizoVersion.empty());
+    _merizoVersion = merizoVersion;
 }
 
 void MongosType::setConfigVersion(const long long configVersion) {
@@ -195,4 +195,4 @@ std::string MongosType::toString() const {
     return toBSON().toString();
 }
 
-}  // namespace mongo
+}  // namespace merizo

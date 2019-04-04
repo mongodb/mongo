@@ -221,7 +221,7 @@
         assertUniqueKeyIsInvalid({source: source, uniqueKey: {geo: 1, a: 1}, target: target});
 
         dropWithoutImplicitRecreate(target);
-        // MongoDB does not support unique hashed indexes.
+        // MerizoDB does not support unique hashed indexes.
         assert.commandFailedWithCode(target.createIndex({a: "hashed"}, {unique: true}), 16764);
         assert.commandWorked(target.createIndex({a: "hashed"}));
         assertUniqueKeyIsInvalid({source: source, uniqueKey: {a: 1}, target: target});

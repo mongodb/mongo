@@ -24,8 +24,8 @@
 #endif  // defined(ASIO_HAS_BOOST_DATE_TIME)
 
 #include "asio/buffer.hpp"
-#include "mongo/util/net/ssl/apple.hpp"
-#include "mongo/util/net/ssl/detail/engine.hpp"
+#include "merizo/util/net/ssl/apple.hpp"
+#include "merizo/util/net/ssl/detail/engine.hpp"
 
 #include "asio/detail/push_options.hpp"
 

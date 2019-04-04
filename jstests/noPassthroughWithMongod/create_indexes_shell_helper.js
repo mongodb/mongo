@@ -3,7 +3,7 @@
     var t = db.create_indexes_shell_helper;
     t.drop();
 
-    var mongo = db.getMongo();
+    var merizo = db.getMongo();
 
     try {
         var commandsRan = [];
@@ -29,16 +29,16 @@
                 return true;
             },
             getMinWireVersion: function() {
-                return mongo.getMinWireVersion();
+                return merizo.getMinWireVersion();
             },
             getMaxWireVersion: function() {
-                return mongo.getMaxWireVersion();
+                return merizo.getMaxWireVersion();
             },
             isReplicaSetMember: function() {
-                return mongo.isReplicaSetMember();
+                return merizo.isReplicaSetMember();
             },
             isMongos: function() {
-                return mongo.isMongos();
+                return merizo.isMongos();
             },
             isCausalConsistency: function() {
                 return false;
@@ -48,7 +48,7 @@
             },
         };
 
-        db._mongo = mockMongo;
+        db._merizo = mockMongo;
         db._session = new _DummyDriverSession(mockMongo);
 
         t.createIndexes([{x: 1}]);
@@ -71,7 +71,7 @@
         assert(commandsRan[0].cmd.hasOwnProperty("createIndexes"));
         assert.eq(commandsRan[0].cmd["indexes"][0], {key: {a: 1}, name: "a_1"});
     } finally {
-        db._mongo = mongo;
-        db._session = new _DummyDriverSession(mongo);
+        db._merizo = merizo;
+        db._session = new _DummyDriverSession(merizo);
     }
 }());

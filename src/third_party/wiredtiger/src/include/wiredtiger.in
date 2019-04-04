@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MerizoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -1867,7 +1867,7 @@ struct __wt_session {
 	 * Preparing a transaction will guarantee a subsequent commit will
 	 * succeed. Only commit and rollback are allowed on a transaction after
 	 * it has been prepared. The transaction prepare API is designed to
-	 * support MongoDB exclusively, and guarantees update conflicts have
+	 * support MerizoDB exclusively, and guarantees update conflicts have
 	 * been resolved, but does not guarantee durability.
 	 *
 	 * @requires_transaction

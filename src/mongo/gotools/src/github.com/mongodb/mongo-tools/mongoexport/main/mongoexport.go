@@ -1,23 +1,23 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Main package for the mongoexport tool.
+// Main package for the merizoexport tool.
 package main
 
 import (
 	"os"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongoexport"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/signals"
+	"github.com/merizodb/merizo-tools/common/util"
+	"github.com/merizodb/merizo-tools/merizoexport"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -29,23 +29,23 @@ const (
 
 func main() {
 	// initialize command-line opts
-	opts := options.New("mongoexport", mongoexport.Usage,
+	opts := options.New("merizoexport", merizoexport.Usage,
 		options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
 
-	outputOpts := &mongoexport.OutputFormatOptions{}
+	outputOpts := &merizoexport.OutputFormatOptions{}
 	opts.AddOptions(outputOpts)
-	inputOpts := &mongoexport.InputOptions{}
+	inputOpts := &merizoexport.InputOptions{}
 	opts.AddOptions(inputOpts)
 
 	args, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
-		log.Logvf(log.Always, "try 'mongoexport --help' for more information")
+		log.Logvf(log.Always, "try 'merizoexport --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 	if len(args) != 0 {
 		log.Logvf(log.Always, "too many positional arguments: %v", args)
-		log.Logvf(log.Always, "try 'mongoexport --help' for more information")
+		log.Logvf(log.Always, "try 'merizoexport --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -125,7 +125,7 @@ func main() {
 	progressManager.Start()
 	defer progressManager.Stop()
 
-	exporter := mongoexport.MongoExport{
+	exporter := merizoexport.MongoExport{
 		ToolOptions:     *opts,
 		OutputOpts:      outputOpts,
 		InputOpts:       inputOpts,
@@ -136,7 +136,7 @@ func main() {
 	err = exporter.ValidateSettings()
 	if err != nil {
 		log.Logvf(log.Always, "error validating settings: %v", err)
-		log.Logvf(log.Always, "try 'mongoexport --help' for more information")
+		log.Logvf(log.Always, "try 'merizoexport --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 

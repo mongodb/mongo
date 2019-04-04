@@ -12,12 +12,12 @@
 
     const options = {setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'};
     const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+    assert.neq(null, conn, 'merizod was unable to start up with options: ' + tojson(options));
 
     const testDB = conn.getDB('test');
 
     function runTest(pipeline) {
-        // We use a batch size of 2 to ensure that the mongo shell does not exhaust the cursor on
+        // We use a batch size of 2 to ensure that the merizo shell does not exhaust the cursor on
         // its first batch.
         const batchSize = 2;
 

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
-#include "mongo/db/repl/replication_coordinator_external_state_impl.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/client.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/last_vote.h"
+#include "merizo/db/repl/replication_consistency_markers_impl.h"
+#include "merizo/db/repl/replication_coordinator_external_state_impl.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/replication_recovery.h"
+#include "merizo/db/repl/storage_interface_mock.h"
+#include "merizo/db/service_context.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
 }
 
-class ReplicaSetTest : public mongo::unittest::Test {
+class ReplicaSetTest : public merizo::unittest::Test {
 protected:
     void setUp() {
         auto opCtx = makeOpCtx();
@@ -158,4 +158,4 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithEqualTerm) 
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

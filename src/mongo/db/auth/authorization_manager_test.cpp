@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,46 +27,46 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 /**
  * Unit tests of the AuthorizationManager type.
  */
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/config.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/map_util.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/config.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/crypto/sha256_block.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/authorization_manager_impl.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/authz_manager_external_state_mock.h"
+#include "merizo/db/auth/authz_session_external_state_mock.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context_test_fixture.h"
+#include "merizo/db/storage/recovery_unit_noop.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/transport/session.h"
+#include "merizo/transport/transport_layer_mock.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/map_util.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)
 
-namespace mongo {
+namespace merizo {
 namespace {
 
-// Construct a simple, structured X509 name equivalent to "CN=mongodb.com"
+// Construct a simple, structured X509 name equivalent to "CN=merizodb.com"
 SSLX509Name buildX509Name() {
     return SSLX509Name(std::vector<std::vector<SSLX509Name::Entry>>(
-        {{{kOID_CommonName.toString(), 19 /* Printable String */, "mongodb.com"}}}));
+        {{{kOID_CommonName.toString(), 19 /* Printable String */, "merizodb.com"}}}));
 }
 
 void setX509PeerInfo(const transport::SessionHandle& session, SSLPeerInfo info) {
@@ -183,7 +183,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
         session,
         SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("readWrite", "test")}));
 
-    auto swu = authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"));
+    auto swu = authzManager->acquireUser(opCtx.get(), UserName("CN=merizodb.com", "$external"));
     ASSERT_OK(swu.getStatus());
     auto x509User = std::move(swu.getValue());
     ASSERT(x509User->isValid());
@@ -217,7 +217,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
 TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
     setX509PeerInfo(session, {});
 
-    ASSERT_NOT_OK(authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"))
+    ASSERT_NOT_OK(authzManager->acquireUser(opCtx.get(), UserName("CN=merizodb.com", "$external"))
                       .getStatus());
 }
 
@@ -256,7 +256,7 @@ private:
         if (status == ErrorCodes::NoMatchingDocument) {
             status =
                 Status(ErrorCodes::UserNotFound,
-                       mongoutils::str::stream() << "Could not find user \"" << userName.getUser()
+                       merizoutils::str::stream() << "Could not find user \"" << userName.getUser()
                                                  << "\" for db \""
                                                  << userName.getDB()
                                                  << "\"");
@@ -265,7 +265,7 @@ private:
     }
 };
 
-class AuthorizationManagerWithExplicitUserPrivilegesTest : public ::mongo::unittest::Test {
+class AuthorizationManagerWithExplicitUserPrivilegesTest : public ::merizo::unittest::Test {
 public:
     virtual void setUp() {
         auto localExternalState =
@@ -457,4 +457,4 @@ TEST_F(AuthorizationManagerLogOpTest, testRawInsertAddsRecoveryUnits) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

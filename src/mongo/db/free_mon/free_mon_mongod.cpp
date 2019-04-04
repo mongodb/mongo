@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,48 +27,48 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/free_mon/free_mon_mongod.h"
+#include "merizo/db/free_mon/free_mon_merizod.h"
 
 #include <mutex>
 #include <snappy.h>
 #include <string>
 
-#include "mongo/base/data_type_validated.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/free_mon/free_mon_controller.h"
-#include "mongo/db/free_mon/free_mon_message.h"
-#include "mongo/db/free_mon/free_mon_mongod_gen.h"
-#include "mongo/db/free_mon/free_mon_network.h"
-#include "mongo/db/free_mon/free_mon_op_observer.h"
-#include "mongo/db/free_mon/free_mon_options.h"
-#include "mongo/db/free_mon/free_mon_protocol_gen.h"
-#include "mongo/db/free_mon/free_mon_storage.h"
-#include "mongo/db/ftdc/ftdc_server.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/http_client.h"
+#include "merizo/base/data_type_validated.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/free_mon/free_mon_controller.h"
+#include "merizo/db/free_mon/free_mon_message.h"
+#include "merizo/db/free_mon/free_mon_merizod_gen.h"
+#include "merizo/db/free_mon/free_mon_network.h"
+#include "merizo/db/free_mon/free_mon_op_observer.h"
+#include "merizo/db/free_mon/free_mon_options.h"
+#include "merizo/db/free_mon/free_mon_protocol_gen.h"
+#include "merizo/db/free_mon/free_mon_storage.h"
+#include "merizo/db/ftdc/ftdc_server.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/service_context.h"
+#include "merizo/executor/network_interface_factory.h"
+#include "merizo/executor/thread_pool_task_executor.h"
+#include "merizo/rpc/object_check.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/thread_pool.h"
+#include "merizo/util/future.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/http_client.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -401,4 +401,4 @@ void setupFreeMonitoringOpObserver(OpObserverRegistry* registry) {
     registry->addObserver(stdx::make_unique<FreeMonOpObserver>());
 }
 
-}  // namespace mongo
+}  // namespace merizo

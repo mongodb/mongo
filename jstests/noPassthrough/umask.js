@@ -20,14 +20,14 @@
     // Any files that have some explicit permissions set on them should be added to this list
     const exceptions = [
         // The lock file gets created with explicit 644 permissions
-        'mongod.lock',
+        'merizod.lock',
         // Mobile se files get created with 644 permissions when honoring the system umask
         'mobile.sqlite',
         'mobile.sqlite-shm',
         'mobile.sqlite-wal',
     ];
 
-    let mongodOptions = MongoRunner.mongodOptions({
+    let merizodOptions = MongoRunner.merizodOptions({
         useLogFiles: true,
         cleanData: true,
     });
@@ -35,9 +35,9 @@
     if (buildInfo()["modules"].some((mod) => {
             return mod == "enterprise";
         })) {
-        mongodOptions.auditDestination = "file";
-        mongodOptions.auditPath = mongodOptions.dbpath + "/audit.log";
-        mongodOptions.auditFormat = "JSON";
+        merizodOptions.auditDestination = "file";
+        merizodOptions.auditPath = merizodOptions.dbpath + "/audit.log";
+        merizodOptions.auditFormat = "JSON";
     }
 
     const checkMask = (topDir, expected, honoringUmask) => {
@@ -62,17 +62,17 @@
         processDirectory(topDir);
     };
 
-    // First we start up the mongod normally, all the files except mongod.lock should have the mode
+    // First we start up the merizod normally, all the files except merizod.lock should have the mode
     // 0600
-    let conn = MongoRunner.runMongod(mongodOptions);
+    let conn = MongoRunner.runMongod(merizodOptions);
 
     checkMask(conn.fullOptions.dbpath, defaultUmask, false);
 
     MongoRunner.stopMongod(conn);
 
-    // Restart the mongod with honorSystemUmask, all files should have the mode 0666
-    mongodOptions.setParameter = {honorSystemUmask: true};
-    conn = MongoRunner.runMongod(mongodOptions);
+    // Restart the merizod with honorSystemUmask, all files should have the mode 0666
+    merizodOptions.setParameter = {honorSystemUmask: true};
+    conn = MongoRunner.runMongod(merizodOptions);
     MongoRunner.stopMongod(conn);
     checkMask(conn.fullOptions.dbpath, permissiveUmask, false);
 

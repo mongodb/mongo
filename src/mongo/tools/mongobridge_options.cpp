@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kBridge
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kBridge
 
-#include "mongo/tools/mongobridge_options.h"
+#include "merizo/tools/merizobridge_options.h"
 
 #include <algorithm>
 #include <iostream>
 
-#include "mongo/base/status.h"
-#include "mongo/platform/random.h"
-#include "mongo/util/log.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "merizo/base/status.h"
+#include "merizo/platform/random.h"
+#include "merizo/util/log.h"
+#include "merizo/util/options_parser/startup_options.h"
 
-namespace mongo {
+namespace merizo {
 
-MongoBridgeGlobalParams mongoBridgeGlobalParams;
+MongoBridgeGlobalParams merizoBridgeGlobalParams;
 
 void printMongoBridgeHelp(std::ostream* out) {
-    *out << "Usage: mongobridge --port <port> --dest <dest> [ --seed <seed> ] [ --verbose <vvv> ]"
+    *out << "Usage: merizobridge --port <port> --dest <dest> [ --seed <seed> ] [ --verbose <vvv> ]"
             " [ --help ]"
          << std::endl;
     *out << moe::startupOptions.helpString();
@@ -71,9 +71,9 @@ Status storeMongoBridgeOptions(const moe::Environment& params,
 
     if (!params.count("seed")) {
         std::unique_ptr<SecureRandom> seedSource{SecureRandom::create()};
-        mongoBridgeGlobalParams.seed = seedSource->nextInt64();
+        merizoBridgeGlobalParams.seed = seedSource->nextInt64();
     } else {
-        mongoBridgeGlobalParams.seed = static_cast<int64_t>(params["seed"].as<long>());
+        merizoBridgeGlobalParams.seed = static_cast<int64_t>(params["seed"].as<long>());
     }
 
     if (params.count("verbose")) {
@@ -89,4 +89,4 @@ Status storeMongoBridgeOptions(const moe::Environment& params,
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

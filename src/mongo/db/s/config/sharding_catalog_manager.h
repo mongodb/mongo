@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,20 +29,20 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/repl/optime_with.h"
-#include "mongo/db/s/config/namespace_serializer.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/mutex.h"
+#include "merizo/base/status_with.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/repl/optime_with.h"
+#include "merizo/db/s/config/namespace_serializer.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/s/catalog/type_chunk.h"
+#include "merizo/s/catalog/type_database.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/stdx/mutex.h"
 
-namespace mongo {
+namespace merizo {
 
 struct CollectionOptions;
 class OperationContext;
@@ -312,7 +312,7 @@ public:
 
     /**
      *
-     * Adds a new shard. It expects a standalone mongod process or replica set to be running on the
+     * Adds a new shard. It expects a standalone merizod process or replica set to be running on the
      * provided address.
      *
      * 'shardProposedName' is an optional string with the proposed name of the shard. If it is
@@ -522,7 +522,7 @@ private:
      * requests).
      * TODO: Currently only taken during addShard requests, this should also be taken in X mode
      * during removeShard, once removeShard is moved to run on the config server primary instead of
-     * on mongos.  At that point we should also change any operations that expect the shard not to
+     * on merizos.  At that point we should also change any operations that expect the shard not to
      * be removed while they are running (such as removeShardFromZone) to take this in shared mode.
      */
     Lock::ResourceMutex _kShardMembershipLock;
@@ -530,4 +530,4 @@ private:
     NamespaceSerializer _namespaceSerializer;
 };
 
-}  // namespace mongo
+}  // namespace merizo

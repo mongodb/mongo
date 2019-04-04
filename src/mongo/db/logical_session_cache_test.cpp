@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/logical_session_cache_impl.h"
+#include "merizo/db/logical_session_cache_impl.h"
 
-#include "mongo/bson/oid.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session_for_test.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/service_liaison_mock.h"
-#include "mongo/db/sessions_collection_mock.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/ensure_fcv.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/oid.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/authorization_session_for_test.h"
+#include "merizo/db/auth/authz_manager_external_state_mock.h"
+#include "merizo/db/auth/authz_session_external_state_mock.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/logical_session_cache.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/logical_session_id_helpers.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/service_context_test_fixture.h"
+#include "merizo/db/service_liaison_mock.h"
+#include "merizo/db/sessions_collection_mock.h"
+#include "merizo/stdx/future.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/ensure_fcv.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const Milliseconds kSessionTimeout = duration_cast<Milliseconds>(kLogicalSessionDefaultTimeout);
@@ -383,4 +383,4 @@ TEST_F(LogicalSessionCacheTest, RefreshMatrixSessionState) {
 
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

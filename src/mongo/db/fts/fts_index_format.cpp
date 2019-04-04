@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <third_party/murmurhash3/MurmurHash3.h>
 
-#include "mongo/base/init.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/fts/fts_index_format.h"
-#include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/md5.hpp"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/init.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/fts/fts_index_format.h"
+#include "merizo/db/fts/fts_spec.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/md5.hpp"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace fts {
 
 using std::string;
 using std::vector;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 namespace {
 BSONObj nullObj;
@@ -165,7 +165,7 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet
         serverGlobalParams.featureCompatibility.getVersion() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
         uassert(16732,
-                mongoutils::str::stream() << "too many unique keys for a single document to"
+                merizoutils::str::stream() << "too many unique keys for a single document to"
                                           << " have a text index, max is "
                                           << term_freqs.size()
                                           << obj["_id"],
@@ -204,7 +204,7 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet
             serverGlobalParams.featureCompatibility.getVersion() ==
                 ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
             uassert(16733,
-                    mongoutils::str::stream()
+                    merizoutils::str::stream()
                         << "trying to index text where term list is too big, max is "
                         << MaxKeyBSONSizeMB
                         << "mb "
@@ -251,7 +251,7 @@ void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
             } t;
             uint32_t seed = 0;
             MurmurHash3_x64_128(term.data(), term.size(), seed, t.hash);
-            string keySuffix = mongo::toHexLower(t.data, sizeof(t.data));
+            string keySuffix = merizo::toHexLower(t.data, sizeof(t.data));
             invariant(termKeySuffixLengthV2 == keySuffix.size());
             b.append("", term.substr(0, termKeyPrefixLengthV2) + keySuffix);
         }

@@ -10,7 +10,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, merizos: 1});
 
     var dbname = "test";
     var coll = "foo";

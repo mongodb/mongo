@@ -343,7 +343,7 @@ let ContinuousStepdown;
              * specified by the stepdownOptions object.
              *
              * If waitForPrimary is true, blocks until each replica set has elected a primary.
-             * If waitForMongosRetarget is true, blocks until each mongos has an up to date view of
+             * If waitForMongosRetarget is true, blocks until each merizos has an up to date view of
              * the cluster.
              */
             this.stopContinuousFailover = function({
@@ -361,13 +361,13 @@ let ContinuousStepdown;
                 }
 
                 if (waitForMongosRetarget) {
-                    // Run validate on each collection in each database to ensure mongos can target
+                    // Run validate on each collection in each database to ensure merizos can target
                     // the primary for each shard with data, including the config servers.
-                    this._mongos.forEach(s => {
+                    this._merizos.forEach(s => {
                         const res = assert.commandWorked(s.adminCommand({listDatabases: 1}));
                         res.databases.forEach(dbInfo => {
                             const startTime = Date.now();
-                            print("Waiting for mongos: " + s.host + " to retarget db: " +
+                            print("Waiting for merizos: " + s.host + " to retarget db: " +
                                   dbInfo.name);
 
                             const db = s.getDB(dbInfo.name);
@@ -393,7 +393,7 @@ let ContinuousStepdown;
                                 return true;
                             });
                             const totalTime = Date.now() - startTime;
-                            print("Finished waiting for mongos: " + s.host + " to retarget db: " +
+                            print("Finished waiting for merizos: " + s.host + " to retarget db: " +
                                   dbInfo.name + ", in " + totalTime + " ms");
                         });
                     });

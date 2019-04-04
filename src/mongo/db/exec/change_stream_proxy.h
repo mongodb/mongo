@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include "mongo/db/exec/pipeline_proxy.h"
+#include "merizo/db/exec/pipeline_proxy.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * ChangeStreamProxyStage is a drop-in replacement for PipelineProxyStage, intended to manage the
  * serialization of change stream pipeline output from Document to BSON. In particular, it is
  * additionally responsible for tracking the latestOplogTimestamps and postBatchResumeTokens that
- * are necessary for correct merging on mongoS and, in the latter case, must also be provided to
- * mongoD clients.
+ * are necessary for correct merging on merizoS and, in the latter case, must also be provided to
+ * merizoD clients.
  */
 class ChangeStreamProxyStage final : public PipelineProxyStage {
 public:
@@ -59,7 +59,7 @@ public:
 
     /**
      * Passes through the latest oplog timestamp from the proxied pipeline. We only expose the oplog
-     * timestamp in the event that we need to merge on mongoS.
+     * timestamp in the event that we need to merge on merizoS.
      */
     Timestamp getLatestOplogTimestamp() const {
         return _includeMetaData ? _latestOplogTimestamp : Timestamp();
@@ -94,4 +94,4 @@ private:
     Timestamp _latestOplogTimestamp;
     BSONObj _postBatchResumeToken;
 };
-}  // namespace mongo
+}  // namespace merizo

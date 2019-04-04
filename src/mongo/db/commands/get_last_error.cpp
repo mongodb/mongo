@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/field_parser.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/util/log.h"
+#include "merizo/db/client.h"
+#include "merizo/db/command_generic_argument.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/field_parser.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/repl/bson_extract_optime.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::string;
@@ -134,7 +134,7 @@ public:
         // reported with ok : 0.0, to match legacy behavior.
         //
         // There is a special case when "wOpTime" and "wElectionId" are explicitly provided by
-        // the client (mongos) - in this case we *only* enforce the write concern if it is
+        // the client (merizos) - in this case we *only* enforce the write concern if it is
         // valid.
         //
         // We always need to either report "err" (if ok : 1) or "errmsg" (if ok : 0), even if
@@ -252,7 +252,7 @@ public:
         if (electionIdPresent) {
             if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
                 repl::ReplicationCoordinator::modeReplSet) {
-                // Ignore electionIds of 0 from mongos.
+                // Ignore electionIds of 0 from merizos.
                 if (electionId != OID()) {
                     errmsg = "wElectionId passed but no replication active";
                     result.append("code", ErrorCodes::BadValue);
@@ -297,4 +297,4 @@ public:
 } cmdGetLastError;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -22,7 +22,7 @@ load("jstests/replsets/rslib.js");
     // This keyFile has its permissions set to 644 later in the test.
     var key1_644 = path + "key1_644";
 
-    print("try starting mongod with auth");
+    print("try starting merizod with auth");
     var m = MongoRunner.runMongod(
         {auth: "", port: port[4], dbpath: MongoRunner.dataDir + "/wrong-auth"});
 
@@ -33,8 +33,8 @@ load("jstests/replsets/rslib.js");
     print("reset permissions");
     run("chmod", "644", key1_644);
 
-    print("try starting mongod");
-    m = runMongoProgram("mongod",
+    print("try starting merizod");
+    m = runMongoProgram("merizod",
                         "--keyFile",
                         key1_644,
                         "--port",
@@ -44,7 +44,7 @@ load("jstests/replsets/rslib.js");
 
     print("should fail with wrong permissions");
     assert.eq(
-        m, _isWindows() ? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
+        m, _isWindows() ? 100 : 1, "merizod should exit w/ 1 (EXIT_FAILURE): permissions too open");
 
     // Pre-populate the data directory for the first replica set node, to be started later, with
     // a user's credentials.

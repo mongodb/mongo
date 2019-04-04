@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/read_preference.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/config_server_test_fixture.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/s/config/sharding_catalog_manager.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/catalog/type_tags.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/config_server_test_fixture.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 
@@ -258,4 +258,4 @@ ShardingCatalogManager::get(operationContext())->removeShardFromZone(operationCo
 }
 */
 }  // unnamed namespace
-}  // namespace mongo
+}  // namespace merizo

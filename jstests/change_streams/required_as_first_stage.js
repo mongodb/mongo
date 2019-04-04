@@ -25,8 +25,8 @@
     assert.contains(error.code, [40602, 50988], "Unexpected error: " + tojson(error));
 
     // This one has a different error code because of conflicting host type requirements: the $group
-    // needs to merge on a shard, but the $changeStream needs to merge on mongos. This doesn't
-    // happen for the $sort because the half of the $sort running on mongos is pre-sorted, and so
+    // needs to merge on a shard, but the $changeStream needs to merge on merizos. This doesn't
+    // happen for the $sort because the half of the $sort running on merizos is pre-sorted, and so
     // won't need disk space.
     error = assert.throws(
         () => coll.aggregate([{$group: {_id: "$x"}}, {$changeStream: {}}], {allowDiskUse: true}));

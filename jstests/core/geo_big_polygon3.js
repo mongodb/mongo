@@ -14,7 +14,7 @@
 
 var crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
 var epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};
-var strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
+var strictCRS = {type: "name", properties: {name: "urn:x-merizodb:crs:strictwinding:EPSG:4326"}};
 
 var coll = db.geo_bigpoly_edgecases;
 coll.drop();

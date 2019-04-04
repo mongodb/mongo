@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,44 +33,44 @@
 #include <mutex>
 #include <set>
 
-#include "mongo/db/storage/biggie/biggie_record_store.h"
-#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
-#include "mongo/db/storage/biggie/store.h"
-#include "mongo/db/storage/kv/kv_engine.h"
+#include "merizo/db/storage/biggie/biggie_record_store.h"
+#include "merizo/db/storage/biggie/biggie_sorted_impl.h"
+#include "merizo/db/storage/biggie/store.h"
+#include "merizo/db/storage/kv/kv_engine.h"
 
-namespace mongo {
+namespace merizo {
 namespace biggie {
 
 class JournalListener;
 /**
  * The biggie storage engine is intended for unit and performance testing.
  */
-class KVEngine : public mongo::KVEngine {
+class KVEngine : public merizo::KVEngine {
 public:
-    KVEngine() : mongo::KVEngine() {}
+    KVEngine() : merizo::KVEngine() {}
 
     virtual ~KVEngine() {}
 
-    virtual mongo::RecoveryUnit* newRecoveryUnit();
+    virtual merizo::RecoveryUnit* newRecoveryUnit();
 
     virtual Status createRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
                                      const CollectionOptions& options);
 
-    virtual std::unique_ptr<mongo::RecordStore> getRecordStore(OperationContext* opCtx,
+    virtual std::unique_ptr<merizo::RecordStore> getRecordStore(OperationContext* opCtx,
                                                                StringData ns,
                                                                StringData ident,
                                                                const CollectionOptions& options);
 
-    virtual std::unique_ptr<mongo::RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+    virtual std::unique_ptr<merizo::RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                                          StringData ident) override;
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
                                              const IndexDescriptor* desc);
 
-    virtual mongo::SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+    virtual merizo::SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
                                                                StringData ident,
                                                                const IndexDescriptor* desc);
 
@@ -134,7 +134,7 @@ public:
 
     virtual void cleanShutdown(){};
 
-    void setJournalListener(mongo::JournalListener* jl) final {}
+    void setJournalListener(merizo::JournalListener* jl) final {}
 
     virtual Timestamp getAllCommittedTimestamp() const override {
         RecordId id = _visibilityManager->getAllCommittedRecord();
@@ -172,4 +172,4 @@ private:
     uint64_t _masterVersion = 0;
 };
 }  // namespace biggie
-}  // namespace mongo
+}  // namespace merizo

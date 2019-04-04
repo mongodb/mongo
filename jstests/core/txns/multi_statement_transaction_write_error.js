@@ -90,7 +90,7 @@
                 cmd[docsField] = [goodOp, badOp];
                 let expected = 1;
                 if (cmdName == 'delete' && db.getMongo().isMongos()) {
-                    // The bad delete write will cause mongos to fail during targetting and not
+                    // The bad delete write will cause merizos to fail during targetting and not
                     // do any write at all.
                     expected = 0;
                 }
@@ -107,7 +107,7 @@
                 cmd[docsField] = [goodOp, goodOp, badOp];
                 expected = 2;
                 if (cmdName == 'delete' && db.getMongo().isMongos()) {
-                    // The bad delete write will cause mongos to fail during targetting and not
+                    // The bad delete write will cause merizos to fail during targetting and not
                     // do any write at all.
                     expected = 0;
                 }
@@ -124,7 +124,7 @@
                 cmd[docsField] = [goodOp, goodOp, badOp, badOp];
                 expected = 2;
                 if (cmdName == 'delete' && db.getMongo().isMongos()) {
-                    // The bad delete write will cause mongos to fail during targetting and not
+                    // The bad delete write will cause merizos to fail during targetting and not
                     // do any write at all.
                     expected = 0;
                 }

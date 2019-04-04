@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,7 +31,7 @@
 
 #include <vector>
 
-#include "mongo/db/geo/s2.h"
+#include "merizo/db/geo/s2.h"
 #include "third_party/s2/s2cap.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2loop.h"
@@ -39,7 +39,7 @@
 #include "third_party/s2/s2polyline.h"
 #include "third_party/s2/s2region.h"
 
-namespace mongo {
+namespace merizo {
 
 // Simple GeoJSON polygon with a custom CRS identifier as having a strict winding order.
 // The winding order will determine unambiguously the inside/outside of the polygon even

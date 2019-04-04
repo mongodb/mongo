@@ -109,7 +109,7 @@
         "Restarting original primary a second time and waiting for it to successfully become " +
         "secondary");
     try {
-        // Join() with the crashed mongod and ignore its bad exit status.
+        // Join() with the crashed merizod and ignore its bad exit status.
         MongoRunner.stopMongod(priConn);
     } catch (e) {
         // expected

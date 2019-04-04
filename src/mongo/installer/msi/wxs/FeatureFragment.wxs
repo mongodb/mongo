@@ -2,11 +2,11 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <?if $(var.Edition) = Enterprise ?>
-      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongodecrypt, mongofiles, mongoldap)" />
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MerizoDB tools (bsondump, merizodecrypt, merizofiles, merizoldap)" />
     <?else?>
-      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongofiles)" />
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MerizoDB tools (bsondump, merizofiles)" />
     <?endif?>
-    <FeatureGroup Id="fg_MongoDBAll">
+    <FeatureGroup Id="fg_MerizoDBAll">
       <Feature Id="ProductFeature"
                Title="!(wix.ProductName)"
                Description="!(wix.ProductName)"
@@ -18,10 +18,10 @@
         <ComponentGroupRef Id="cg_License" />
         <Feature Id="Server"
                  Title ="Server"
-                 Description="The MongoDB server (mongod)"
+                 Description="The MerizoDB server (merizod)"
                  Level ="1">
-          <ComponentRef Id="c_mongodPdb"/>
-          <ComponentRef Id="c_mongodCfg"/>
+          <ComponentRef Id="c_merizodPdb"/>
+          <ComponentRef Id="c_merizodCfg"/>
 
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseServer" />
@@ -32,26 +32,26 @@
         </Feature>
         <Feature Id="ServerNoService"
                  Title ="ServerNoService"
-                 Description="The MongoDB server (mongod)"
+                 Description="The MerizoDB server (merizod)"
                  Display="hidden"
                  Level ="32767">
-             <ComponentRef Id="c_mongod"/>
+             <ComponentRef Id="c_merizod"/>
         </Feature>
         <Feature Id="ServerService"
                  Title ="ServerService"
-                 Description="The MongoDB server (mongod)"
+                 Description="The MerizoDB server (merizod)"
                  Display="hidden"
                  Level ="32767">
-             <ComponentRef Id="c_mongodWithService"/>
-             <ComponentRef Id="c_mongodWithServiceUser" />
+             <ComponentRef Id="c_merizodWithService"/>
+             <ComponentRef Id="c_merizodWithServiceUser" />
              <ComponentRef Id="c_MONGO_DATA_PATH"/>
              <ComponentRef Id="c_MONGO_LOG_PATH"/>
         </Feature>
         <Feature Id="Client"
                  Title ="Client"
-                 Description="The MongoDB client/shell (mongo)"
+                 Description="The MerizoDB client/shell (merizo)"
                  Level ="1">
-          <ComponentRef Id="c_mongo"/>
+          <ComponentRef Id="c_merizo"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
           <?endif ?>
@@ -61,10 +61,10 @@
         </Feature>
         <Feature Id="MonitoringTools"
                  Title ="Monitoring Tools"
-                 Description="MongoDB monitoring tools (mongostat, mongotop)"
+                 Description="MerizoDB monitoring tools (merizostat, merizotop)"
                  Level ="1">
-          <ComponentRef Id="c_mongostat"/>
-          <ComponentRef Id="c_mongotop"/>
+          <ComponentRef Id="c_merizostat"/>
+          <ComponentRef Id="c_merizotop"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
           <?endif ?>
@@ -74,12 +74,12 @@
         </Feature>
         <Feature Id="ImportExportTools"
                  Title ="Import/Export Tools"
-                 Description="MongoDB import/export tools (mongodump/mongorestore and mongoexport/mongoimport)"
+                 Description="MerizoDB import/export tools (merizodump/merizorestore and merizoexport/merizoimport)"
                  Level ="1">
-          <ComponentRef Id="c_mongodump"/>
-          <ComponentRef Id="c_mongorestore"/>
-          <ComponentRef Id="c_mongoexport"/>
-          <ComponentRef Id="c_mongoimport"/>
+          <ComponentRef Id="c_merizodump"/>
+          <ComponentRef Id="c_merizorestore"/>
+          <ComponentRef Id="c_merizoexport"/>
+          <ComponentRef Id="c_merizoimport"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
           <?endif ?>
@@ -89,10 +89,10 @@
         </Feature>
         <Feature Id="Router"
                  Title ="Router"
-                 Description="The MongoDB Router (mongos)"
+                 Description="The MerizoDB Router (merizos)"
                  Level ="1">
-          <ComponentRef Id="c_mongos"/>
-          <ComponentRef Id="c_mongosPdb"/>
+          <ComponentRef Id="c_merizos"/>
+          <ComponentRef Id="c_merizosPdb"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
           <?endif ?>
@@ -105,11 +105,11 @@
                 Description="!(wix.MiscToolsDesc)"
                 Level ="1">
           <ComponentRef Id="c_bsondump"/>
-          <ComponentRef Id="c_mongofiles"/>
+          <ComponentRef Id="c_merizofiles"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
-            <ComponentRef Id="c_mongodecrypt"/>
-            <ComponentRef Id="c_mongoldap"/>
+            <ComponentRef Id="c_merizodecrypt"/>
+            <ComponentRef Id="c_merizoldap"/>
           <?endif ?>
           <?if $(var.Edition) = SSL ?>
             <ComponentGroupRef Id="cg_SSLBase" />
@@ -118,10 +118,10 @@
         <?if $(var.Edition) = Enterprise ?>
         <Feature Id="MongoCryptD"
                 Title ="MongoCryptD"
-                Description="MongoDB Field Level Encryption Daemon"
+                Description="MerizoDB Field Level Encryption Daemon"
                 Level ="1">
-          <ComponentRef Id="c_mongocryptd"/>
-          <ComponentRef Id="c_mongocryptdPdb"/>
+          <ComponentRef Id="c_merizocryptd"/>
+          <ComponentRef Id="c_merizocryptdPdb"/>
         </Feature>
         <?endif ?>
       </Feature>

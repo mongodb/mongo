@@ -1,18 +1,18 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongorestore
+package merizorestore
 
 import (
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/intents"
-	commonOpts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
+	"github.com/merizodb/merizo-tools/common/intents"
+	commonOpts "github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -27,7 +27,7 @@ func TestCollectionExists(t *testing.T) {
 		t.Fatalf("No server available")
 	}
 
-	Convey("With a test mongorestore", t, func() {
+	Convey("With a test merizorestore", t, func() {
 		sessionProvider, _, err := testutil.GetBareSessionProvider()
 		So(err, ShouldBeNil)
 
@@ -85,7 +85,7 @@ func TestGetDumpAuthVersion(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	restore := &MongoRestore{}
 
-	Convey("With a test mongorestore", t, func() {
+	Convey("With a test merizorestore", t, func() {
 		Convey("and no --restoreDbUsersAndRoles", func() {
 			restore = &MongoRestore{
 				InputOptions: &InputOptions{},

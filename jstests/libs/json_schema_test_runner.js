@@ -27,7 +27,7 @@
                               {schema_test_wrapper: data},
                               valid);
 
-            // Run against a top-level schema if the data is an object, since MongoDB only stores
+            // Run against a top-level schema if the data is an object, since MerizoDB only stores
             // records as documents.
             // (Note: JS notion of an 'object' includes arrays and null.)
             if (typeof data === "object" && !Array.isArray(data) && data !== null &&

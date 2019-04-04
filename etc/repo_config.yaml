@@ -4,21 +4,21 @@ services:
 templates:
   deb:
     org: |
-      Origin: mongodb
-      Label: mongodb
+      Origin: merizodb
+      Label: merizodb
       Suite: {{ .CodeName }}
-      Codename: {{ .CodeName }}/mongodb-org
+      Codename: {{ .CodeName }}/merizodb-org
       Architectures: {{ .Architectures }}
       Components: {{ .Component }}
-      Description: MongoDB packages
+      Description: MerizoDB packages
     enterprise: |
-      Origin: mongodb
-      Label: mongodb
+      Origin: merizodb
+      Label: merizodb
       Suite: {{ .CodeName }}
-      Codename: {{ .CodeName }}/mongodb-enterprise
+      Codename: {{ .CodeName }}/merizodb-enterprise
       Architectures: {{ .Architectures }}
       Components: {{ .Component }}
-      Description: MongoDB packages
+      Description: MerizoDB packages
   index_page: |
     <!DOCTYPE html>
     <html>
@@ -69,140 +69,140 @@ repos:
   - name: rhel62
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     repos:
-      - yum/redhat/6/mongodb-org
-      - yum/redhat/6Server/mongodb-org
+      - yum/redhat/6/merizodb-org
+      - yum/redhat/6Server/merizodb-org
 
   - name: rhel67
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     repos:
-      - yum/redhat/6/mongodb-org
-      - yum/redhat/6Server/mongodb-org
+      - yum/redhat/6/merizodb-org
+      - yum/redhat/6Server/merizodb-org
 
   - name: rhel70
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     repos:
-      - yum/redhat/7/mongodb-org
-      - yum/redhat/7Server/mongodb-org
+      - yum/redhat/7/merizodb-org
+      - yum/redhat/7Server/merizodb-org
 
   - name: rhel72
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     repos:
-      - yum/redhat/7/mongodb-org
-      - yum/redhat/7Server/mongodb-org
+      - yum/redhat/7/merizodb-org
+      - yum/redhat/7Server/merizodb-org
 
   - name: amazon
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     repos:
-      - yum/amazon/2013.03/mongodb-org
+      - yum/amazon/2013.03/merizodb-org
 
   - name: amazon2
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     repos:
-      - yum/amazon/2/mongodb-org
+      - yum/amazon/2/merizodb-org
 
   - name: suse11
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     repos:
-      - zypper/suse/11/mongodb-org
+      - zypper/suse/11/merizodb-org
 
   - name: suse12
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     repos:
-      - zypper/suse/12/mongodb-org
+      - zypper/suse/12/merizodb-org
 
   - name: debian81
     type: deb
     code_name: "jessie"
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     edition: org
     component: main
     architectures:
       - amd64
       - i386
     repos:
-      - apt/debian/dists/jessie/mongodb-org
+      - apt/debian/dists/jessie/merizodb-org
 
   - name: debian92
     type: deb
     code_name: "stretch"
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     edition: org
     component: main
     architectures:
       - amd64
     repos:
-      - apt/debian/dists/stretch/mongodb-org
+      - apt/debian/dists/stretch/merizodb-org
 
   - name: debian71
     type: deb
     code_name: "wheezy"
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     edition: org
     component: main
     architectures:
       - amd64
       - i386
     repos:
-      - apt/debian/dists/wheezy/mongodb-org
+      - apt/debian/dists/wheezy/merizodb-org
 
   - name: ubuntu1204
     type: deb
     code_name: "precise"
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     component: multiverse
     architectures:
       - amd64
       - i386
     repos:
-      - apt/ubuntu/dists/precise/mongodb-org
+      - apt/ubuntu/dists/precise/merizodb-org
 
   - name: ubuntu1404
     type: deb
     code_name: "trusty"
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     component: multiverse
     architectures:
       - amd64
       - i386
     repos:
-      - apt/ubuntu/dists/trusty/mongodb-org
+      - apt/ubuntu/dists/trusty/merizodb-org
 
   - name: ubuntu1604
     type: deb
     code_name: "xenial"
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     component: multiverse
     architectures:
       - amd64
       - arm64
       - i386
     repos:
-      - apt/ubuntu/dists/xenial/mongodb-org
+      - apt/ubuntu/dists/xenial/merizodb-org
 
   - name: ubuntu1804
     type: deb
     code_name: "bionic"
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.merizodb.org
     component: multiverse
     architectures:
       - amd64
@@ -210,7 +210,7 @@ repos:
       - s390x
       - arm64
     repos:
-      - apt/ubuntu/dists/bionic/mongodb-org
+      - apt/ubuntu/dists/bionic/merizodb-org
 
 ####################
 #
@@ -221,87 +221,87 @@ repos:
   - name: rhel62
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - yum/redhat/6/mongodb-enterprise
-      - yum/redhat/6Server/mongodb-enterprise
+      - yum/redhat/6/merizodb-enterprise
+      - yum/redhat/6Server/merizodb-enterprise
 
   - name: rhel67
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - yum/redhat/6/mongodb-enterprise
-      - yum/redhat/6Server/mongodb-enterprise
+      - yum/redhat/6/merizodb-enterprise
+      - yum/redhat/6Server/merizodb-enterprise
 
   - name: rhel70
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - yum/redhat/7/mongodb-enterprise
-      - yum/redhat/7Server/mongodb-enterprise
+      - yum/redhat/7/merizodb-enterprise
+      - yum/redhat/7Server/merizodb-enterprise
 
   - name: rhel71
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - yum/redhat/7/mongodb-enterprise
-      - yum/redhat/7Server/mongodb-enterprise
+      - yum/redhat/7/merizodb-enterprise
+      - yum/redhat/7Server/merizodb-enterprise
 
   - name: rhel72
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - yum/redhat/7/mongodb-enterprise
-      - yum/redhat/7Server/mongodb-enterprise
+      - yum/redhat/7/merizodb-enterprise
+      - yum/redhat/7Server/merizodb-enterprise
 
   - name: amazon
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - yum/amazon/2013.03/mongodb-enterprise
+      - yum/amazon/2013.03/merizodb-enterprise
 
   - name: amazon2
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - yum/amazon/2/mongodb-enterprise
+      - yum/amazon/2/merizodb-enterprise
 
   - name: suse11
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - zypper/suse/11/mongodb-enterprise
+      - zypper/suse/11/merizodb-enterprise
 
   - name: suse12
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     repos:
-      - zypper/suse/12/mongodb-enterprise
+      - zypper/suse/12/merizodb-enterprise
 
   - name: debian92
     type: deb
     edition: enterprise
     code_name: "stretch"
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     component: main
     architectures:
       - amd64
     repos:
-      - apt/debian/dists/stretch/mongodb-enterprise
+      - apt/debian/dists/stretch/merizodb-enterprise
 
   - name: debian81
     type: deb
     edition: enterprise
     code_name: "jessie"
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     component: main
     architectures:
       - amd64
@@ -309,13 +309,13 @@ repos:
       - s390x
       - i386
     repos:
-      - apt/debian/dists/jessie/mongodb-enterprise
+      - apt/debian/dists/jessie/merizodb-enterprise
 
   - name: debian71
     type: deb
     code_name: "wheezy"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     component: main
     architectures:
       - amd64
@@ -323,13 +323,13 @@ repos:
       - s390x
       - i386
     repos:
-      - apt/debian/dists/wheezy/mongodb-enterprise
+      - apt/debian/dists/wheezy/merizodb-enterprise
 
   - name: ubuntu1204
     type: deb
     code_name: "precise"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     component: multiverse
     architectures:
       - amd64
@@ -337,13 +337,13 @@ repos:
       - s390x
       - i386
     repos:
-      - apt/ubuntu/dists/precise/mongodb-enterprise
+      - apt/ubuntu/dists/precise/merizodb-enterprise
 
   - name: ubuntu1404
     type: deb
     code_name: "trusty"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     component: multiverse
     architectures:
       - amd64
@@ -351,13 +351,13 @@ repos:
       - s390x
       - i386
     repos:
-      - apt/ubuntu/dists/trusty/mongodb-enterprise
+      - apt/ubuntu/dists/trusty/merizodb-enterprise
 
   - name: ubuntu1604
     type: deb
     code_name: "xenial"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     component: multiverse
     architectures:
       - amd64
@@ -366,13 +366,13 @@ repos:
       - arm64
       - i386
     repos:
-      - apt/ubuntu/dists/xenial/mongodb-enterprise
+      - apt/ubuntu/dists/xenial/merizodb-enterprise
 
   - name: ubuntu1804
     type: deb
     code_name: "bionic"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.merizodb.com
     component: multiverse
     architectures:
       - amd64
@@ -381,4 +381,4 @@ repos:
       - s390x
       - arm64
     repos:
-      - apt/ubuntu/dists/bionic/mongodb-enterprise
+      - apt/ubuntu/dists/bionic/merizodb-enterprise

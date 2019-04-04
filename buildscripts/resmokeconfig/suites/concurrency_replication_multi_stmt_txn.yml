@@ -5,7 +5,7 @@ selector:
   - jstests/concurrency/fsm_workloads/**/*.js
   exclude_files:
   ##
-  # Disabled due to MongoDB restrictions and/or workload restrictions
+  # Disabled due to MerizoDB restrictions and/or workload restrictions
   ##
   # These workloads use >100MB of data, which can overwhelm test hosts.
   - jstests/concurrency/fsm_workloads/agg_group_external.js
@@ -61,7 +61,7 @@ executor:
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1

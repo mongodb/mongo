@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,14 +32,14 @@
 #include <cstdint>
 #include <stack>
 
-#include "mongo/client/dbclient_base.h"
-#include "mongo/client/mongo_uri.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/background.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/time_support.h"
+#include "merizo/client/dbclient_base.h"
+#include "merizo/client/merizo_uri.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/util/background.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObjBuilder;
 class DBConnectionPool;
@@ -518,4 +518,4 @@ private:
     const double _socketTimeoutSecs;
 };
 
-}  // namespace mongo
+}  // namespace merizo

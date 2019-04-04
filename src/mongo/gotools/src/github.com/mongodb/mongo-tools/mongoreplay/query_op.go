@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -14,11 +14,11 @@ import (
 
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/llmgo/bson"
-	"github.com/mongodb/mongo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/json"
 )
 
 // QueryOp is used to query the database for documents in a collection.
-// http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-query
+// http://docs.merizodb.org/meta-driver/latest/legacy/merizodb-wire-protocol/#op-query
 type QueryOp struct {
 	Header MsgHeader
 	mgo.QueryOp

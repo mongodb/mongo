@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,61 +27,61 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/sharding_mongod_test_fixture.h"
+#include "merizo/s/sharding_merizod_test_fixture.h"
 
 #include <algorithm>
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/status_with.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_consistency_markers_mock.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery_mock.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/s/config_server_op_observer.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
-#include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/dist_lock_catalog.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_changelog.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/client/shard_factory.h"
-#include "mongo/s/client/shard_local.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/client/shard_remote.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/request_types/set_shard_version_request.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/base/status_with.h"
+#include "merizo/client/remote_command_targeter_factory_mock.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/replication_consistency_markers_mock.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/replication_recovery_mock.h"
+#include "merizo/db/repl/storage_interface_mock.h"
+#include "merizo/db/s/config_server_op_observer.h"
+#include "merizo/db/s/op_observer_sharding_impl.h"
+#include "merizo/db/s/shard_server_op_observer.h"
+#include "merizo/executor/network_interface_mock.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/executor/thread_pool_task_executor_test_fixture.h"
+#include "merizo/rpc/metadata/repl_set_metadata.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/catalog/dist_lock_catalog.h"
+#include "merizo/s/catalog/dist_lock_manager.h"
+#include "merizo/s/catalog/sharding_catalog_client.h"
+#include "merizo/s/catalog/type_changelog.h"
+#include "merizo/s/catalog/type_collection.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/catalog_cache_loader.h"
+#include "merizo/s/client/shard_factory.h"
+#include "merizo/s/client/shard_local.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/client/shard_remote.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/query/cluster_cursor_manager.h"
+#include "merizo/s/request_types/set_shard_version_request.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/clock_source_mock.h"
+#include "merizo/util/tick_source_mock.h"
 
-namespace mongo {
+namespace merizo {
 
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
@@ -363,4 +363,4 @@ RemoteCommandTargeterFactoryMock* ShardingMongodTestFixture::targeterFactory() c
     return _targeterFactory;
 }
 
-}  // namespace mongo
+}  // namespace merizo

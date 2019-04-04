@@ -24,10 +24,10 @@
         other: {keyFile: 'jstests/libs/key1', useHostname: false, chunkSize: 2},
     });
 
-    var mongos = st.s;
-    var adminDB = mongos.getDB('admin');
-    var configDB = mongos.getDB('config');
-    var testDB = mongos.getDB('test');
+    var merizos = st.s;
+    var adminDB = merizos.getDB('admin');
+    var configDB = merizos.getDB('config');
+    var testDB = merizos.getDB('test');
 
     jsTestLog('Setting up initial users');
     var rwUser = 'rwUser';
@@ -40,14 +40,14 @@
     assert(adminDB.auth(rwUser, password));
 
     // Secondaries should be up here, since we awaitReplication in the ShardingTest, but we *don't*
-    // wait for the mongos to explicitly detect them.
-    awaitRSClientHosts(mongos, st.rs0.getSecondaries(), {ok: true, secondary: true});
-    awaitRSClientHosts(mongos, st.rs1.getSecondaries(), {ok: true, secondary: true});
+    // wait for the merizos to explicitly detect them.
+    awaitRSClientHosts(merizos, st.rs0.getSecondaries(), {ok: true, secondary: true});
+    awaitRSClientHosts(merizos, st.rs1.getSecondaries(), {ok: true, secondary: true});
 
     testDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles});
     testDB.createUser({user: roUser, pwd: password, roles: jsTest.readOnlyUserRoles});
 
-    var authenticatedConn = new Mongo(mongos.host);
+    var authenticatedConn = new Mongo(merizos.host);
     authenticatedConn.getDB('admin').auth(rwUser, password);
 
     // Add user to shards to prevent localhost connections from having automatic full access

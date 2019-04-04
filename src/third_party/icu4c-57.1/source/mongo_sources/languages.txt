@@ -1,5 +1,5 @@
 # This file is taken as input to the ICU data packaging process, and contains the base names of all
-# ICU locales that have collation data included in MongoDB's custom data file for ICU.
+# ICU locales that have collation data included in MerizoDB's custom data file for ICU.
 af
 am
 ar

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,14 +31,14 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/bson/mutable/damage_vector.h"
-#include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/storage/record_data.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/bson/mutable/damage_vector.h"
+#include "merizo/db/exec/collection_scan_common.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/record_id.h"
+#include "merizo/db/storage/record_data.h"
 
-namespace mongo {
+namespace merizo {
 
 class CappedCallback;
 class Collection;
@@ -445,7 +445,7 @@ public:
     /**
      * Constructs a cursor over a record store that returns documents in a randomized order, and
      * allows storage engines to provide a more efficient way of random sampling of a record store
-     * than MongoDB's default sampling methods, which is used when this method returns {}.
+     * than MerizoDB's default sampling methods, which is used when this method returns {}.
      *
      * This method may be implemented using a pseudo-random walk over B-trees or a similar approach.
      * Different cursors should return documents in a different order. Random cursors may return

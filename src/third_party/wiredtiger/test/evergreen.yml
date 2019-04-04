@@ -1,6 +1,6 @@
 #
 # This file defines the tasks and platforms for WiredTiger in the
-# MongoDB continuous integration system (see https://mci.mongodb.com).
+# MerizoDB continuous integration system (see https://mci.merizodb.com).
 #
 
 functions:
@@ -16,11 +16,11 @@ functions:
         remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
         bucket: build_external
         extract_to: wiredtiger
-  "fetch mongo-tests repo" :
+  "fetch merizo-tests repo" :
     command: shell.exec
     params:
       script: | 
-        git clone https://github.com/wiredtiger/mongo-tests
+        git clone https://github.com/wiredtiger/merizo-tests
   "compile wiredtiger":
     command: shell.exec
     params:
@@ -954,10 +954,10 @@ tasks:
     run_on: 
       - rhel62-large
     commands: 
-      - func: "fetch mongo-tests repo"
+      - func: "fetch merizo-tests repo"
       - command: shell.exec
         params:
-          working_dir: mongo-tests
+          working_dir: merizo-tests
           script: | 
             set -o errexit
             set -o verbose
@@ -965,7 +965,7 @@ tasks:
             ulimit -c unlimited 
             largescale/run-million-collection-test.sh .
 
-  - name: compatibility-test-for-mongodb-releases
+  - name: compatibility-test-for-merizodb-releases
     commands:
       - func: "fetch source"
       - command: shell.exec
@@ -974,7 +974,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            test/evergreen/compatibility_test_for_mongodb_releases.sh
+            test/evergreen/compatibility_test_for_merizodb_releases.sh
 
 
 buildvariants:
@@ -984,10 +984,10 @@ buildvariants:
   - ubuntu1404-test
   expansions:
     # It's ugly, but we need the absolute path here, not the relative
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+    test_env_vars: PATH=/opt/merizodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    configure_env_vars: CC=/opt/merizodbtoolchain/v3/bin/gcc CXX=/opt/merizodbtoolchain/v3/bin/g++ PATH=/opt/merizodbtoolchain/v3/bin:$PATH
+    make_command: PATH=/opt/merizodbtoolchain/v3/bin:$PATH make
   tasks:
     - name: compile
     - name: lang-python-test
@@ -1050,7 +1050,7 @@ buildvariants:
   run_on:
   - rhel62-large
   expansions:
-    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++
+    configure_env_vars: CC=/opt/merizodbtoolchain/v3/bin/gcc CXX=/opt/merizodbtoolchain/v3/bin/g++
   tasks:
     - name: million-collection-test
 
@@ -1060,7 +1060,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   tasks:
-    - name: compatibility-test-for-mongodb-releases
+    - name: compatibility-test-for-merizodb-releases
 
 - name: windows-64
   display_name: Windows 64-bit
@@ -1086,9 +1086,9 @@ buildvariants:
   - macos-1012
   expansions:
     smp_command: -j $(sysctl -n hw.logicalcpu)
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs
+    configure_env_vars: PATH=/opt/merizodbtoolchain/v3/bin:$PATH
+    make_command: PATH=/opt/merizodbtoolchain/v3/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
+    test_env_vars: PATH=/opt/merizodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs
   tasks:
     - name: compile
     - name: make-check-test

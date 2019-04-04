@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
@@ -38,26 +38,26 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/collection_index_usage_tracker.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/generic_cursor.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/stage_constraints.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/intrusive_counter.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/collection_index_usage_tracker.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/generic_cursor.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/dependencies.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/pipeline/lite_parsed_document_source.h"
+#include "merizo/db/pipeline/pipeline.h"
+#include "merizo/db/pipeline/stage_constraints.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/db/query/explain_options.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/intrusive_counter.h"
 
-namespace mongo {
+namespace merizo {
 
 class AggregationRequest;
 class Document;
@@ -105,7 +105,7 @@ class Document;
 
 #define REGISTER_TEST_DOCUMENT_SOURCE(key, liteParser, fullParser) \
     REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                        \
-        key, liteParser, fullParser, ::mongo::getTestCommandsEnabled())
+        key, liteParser, fullParser, ::merizo::getTestCommandsEnabled())
 
 /**
  * Registers a multi-stage alias (such as $sortByCount) to have the single name 'key'. When a stage
@@ -521,4 +521,4 @@ private:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const = 0;
 };
 
-}  // namespace mongo
+}  // namespace merizo

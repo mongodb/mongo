@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,10 +32,10 @@
 
 #include <third_party/murmurhash3/MurmurHash3.h>
 
-#include "mongo/unittest/unittest.h"
+#include "merizo/unittest/unittest.h"
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
+#include "merizo/base/data_type_endian.h"
+#include "merizo/base/data_view.h"
 
 #define TEST_STRING32(str, seed, expected) ASSERT_EQUALS(compute32(str, seed), expected)
 #define TEST_STRING64(str, seed, a, b)     \
@@ -45,7 +45,7 @@
         ASSERT_EQUALS(pair.second, b);     \
     } while (0)
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 uint32_t compute32(StringData input, uint32_t seed) {
@@ -140,4 +140,4 @@ TEST(MurmurHash3, TestVectors64) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

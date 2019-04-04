@@ -3,7 +3,7 @@
 load('jstests/concurrency/fsm_libs/assert.js');
 load('jstests/concurrency/fsm_libs/cluster.js');       // for Cluster.isStandalone
 load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
-load('jstests/libs/specific_secondary_reader_mongo.js');
+load('jstests/libs/specific_secondary_reader_merizo.js');
 
 var workerThread = (function() {
 
@@ -24,7 +24,7 @@ var workerThread = (function() {
     function main(workloads, args, run) {
         var myDB;
         var configs = {};
-        var connectionString = 'mongodb://' + args.host + '/?appName=tid:' + args.tid;
+        var connectionString = 'merizodb://' + args.host + '/?appName=tid:' + args.tid;
         if (typeof args.replSetName !== 'undefined') {
             connectionString += '&replicaSet=' + args.replSetName;
         }
@@ -44,11 +44,11 @@ var workerThread = (function() {
                 gc();
             }
 
-            let mongo;
+            let merizo;
             if (TestData.pinningSecondary) {
-                mongo = new SpecificSecondaryReaderMongo(connectionString, args.secondaryHost);
+                merizo = new SpecificSecondaryReaderMongo(connectionString, args.secondaryHost);
             } else {
-                mongo = new Mongo(connectionString);
+                merizo = new Mongo(connectionString);
             }
 
             // Retry operations that fail due to in-progress background operations. Load this early
@@ -83,7 +83,7 @@ var workerThread = (function() {
                     delete args.sessionOptions.initialOperationTime;
                 }
 
-                const session = mongo.startSession(args.sessionOptions);
+                const session = merizo.startSession(args.sessionOptions);
                 const readPreference = session.getOptions().getReadPreference();
                 if (readPreference && readPreference.mode === 'secondary') {
                     // Unset the explicit read preference so set_read_preference_secondary.js can do
@@ -91,7 +91,7 @@ var workerThread = (function() {
                     session.getOptions().setReadPreference(undefined);
 
                     // We load() set_read_preference_secondary.js in order to avoid running
-                    // commands against the "admin" and "config" databases via mongos with
+                    // commands against the "admin" and "config" databases via merizos with
                     // readPreference={mode: "secondary"} when there's only a single node in
                     // the CSRS.
                     load('jstests/libs/override_methods/set_read_preference_secondary.js');
@@ -113,12 +113,12 @@ var workerThread = (function() {
 
                 myDB = session.getDatabase(args.dbName);
             } else {
-                myDB = mongo.getDB(args.dbName);
+                myDB = merizo.getDB(args.dbName);
             }
 
             {
                 let connectionDesc = '';
-                // In sharded environments, mongos is acting as a proxy for the mongo shell and
+                // In sharded environments, merizos is acting as a proxy for the merizo shell and
                 // therefore has a different outbound port than the 'whatsmyuri' command returns.
                 if (!Cluster.isSharded(args.clusterOptions)) {
                     let res = assert.commandWorked(myDB.runCommand({whatsmyuri: 1}));

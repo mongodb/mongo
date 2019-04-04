@@ -1,14 +1,14 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongodump
+package merizodump
 
 import (
-	"github.com/mongodb/mongo-tools/common/connstring"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/connstring"
+	"github.com/merizodb/merizo-tools/common/options"
 
 	"fmt"
 	"io/ioutil"
@@ -20,7 +20,7 @@ Export the content of a running server into .bson files.
 
 Specify a database with -d and a collection with -c to only dump that database or collection.
 
-See http://docs.mongodb.org/manual/reference/program/mongodump/ for more information.`
+See http://docs.merizodb.org/manual/reference/program/merizodump/ for more information.`
 
 // InputOptions defines the set of options to use in retrieving data from the server.
 type InputOptions struct {

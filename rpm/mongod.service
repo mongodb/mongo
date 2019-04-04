@@ -1,19 +1,19 @@
 [Unit]
-Description=MongoDB Database Server
+Description=MerizoDB Database Server
 After=multi-user.target
-Documentation=https://docs.mongodb.org/manual
+Documentation=https://docs.merizodb.org/manual
 
 [Service]
-User=mongod
-Group=mongod
-Environment="OPTIONS=-f /etc/mongod.conf"
-EnvironmentFile=-/etc/sysconfig/mongod
-ExecStart=/usr/bin/mongod $OPTIONS
-ExecStartPre=/usr/bin/mkdir -p /var/run/mongodb
-ExecStartPre=/usr/bin/chown mongod:mongod /var/run/mongodb
-ExecStartPre=/usr/bin/chmod 0755 /var/run/mongodb
+User=merizod
+Group=merizod
+Environment="OPTIONS=-f /etc/merizod.conf"
+EnvironmentFile=-/etc/sysconfig/merizod
+ExecStart=/usr/bin/merizod $OPTIONS
+ExecStartPre=/usr/bin/mkdir -p /var/run/merizodb
+ExecStartPre=/usr/bin/chown merizod:merizod /var/run/merizodb
+ExecStartPre=/usr/bin/chmod 0755 /var/run/merizodb
 PermissionsStartOnly=true
-PIDFile=/var/run/mongodb/mongod.pid
+PIDFile=/var/run/merizodb/merizod.pid
 Type=forking
 # file size
 LimitFSIZE=infinity
@@ -30,8 +30,8 @@ LimitMEMLOCK=infinity
 # total threads (user+kernel)
 TasksMax=infinity
 TasksAccounting=false
-# Recommended limits for for mongod as specified in
-# http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
+# Recommended limits for for merizod as specified in
+# http://docs.merizodb.org/manual/reference/ulimit/#recommended-settings
 
 [Install]
 WantedBy=multi-user.target

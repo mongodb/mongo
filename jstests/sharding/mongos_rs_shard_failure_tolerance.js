@@ -1,5 +1,5 @@
 //
-// Tests mongos's failure tolerance for replica set shards and read preference queries
+// Tests merizos's failure tolerance for replica set shards and read preference queries
 //
 // Sets up a cluster with three shards, the first shard of which has an unsharded collection and
 // half a sharded collection.  The second shard has the second half of the sharded collection, and
@@ -18,15 +18,15 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 3, mongos: 1, other: {rs: true, rsOptions: {nodes: 2}}});
+    var st = new ShardingTest({shards: 3, merizos: 1, other: {rs: true, rsOptions: {nodes: 2}}});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
+    var merizos = st.s0;
+    var admin = merizos.getDB("admin");
 
     assert.commandWorked(admin.runCommand({setParameter: 1, traceExceptions: true}));
 
-    var collSharded = mongos.getCollection("fooSharded.barSharded");
-    var collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
+    var collSharded = merizos.getCollection("fooSharded.barSharded");
+    var collUnsharded = merizos.getCollection("fooUnsharded.barUnsharded");
 
     // Create the unsharded database
     assert.writeOK(collUnsharded.insert({some: "doc"}));
@@ -50,9 +50,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // have loaded the routing table into memory.
     // TODO SERVER-30148: replace this with calls to awaitReplication() on each shard owning data
     // for the sharded collection once secondaries refresh proactively.
-    var mongosSetupConn = new Mongo(mongos.host);
-    mongosSetupConn.setReadPref("secondary");
-    assert(!mongosSetupConn.getCollection(collSharded.toString()).find({}).hasNext());
+    var merizosSetupConn = new Mongo(merizos.host);
+    merizosSetupConn.setReadPref("secondary");
+    assert(!merizosSetupConn.getCollection(collSharded.toString()).find({}).hasNext());
 
     gc();  // Clean up connections
 
@@ -64,63 +64,63 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     jsTest.log("Inserting initial data...");
 
-    var mongosConnActive = new Mongo(mongos.host);
-    var mongosConnIdle = null;
-    var mongosConnNew = null;
+    var merizosConnActive = new Mongo(merizos.host);
+    var merizosConnIdle = null;
+    var merizosConnNew = null;
 
     var wc = {writeConcern: {w: 2, wtimeout: 60000}};
 
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -1}, wc));
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 1}, wc));
-    assert.writeOK(mongosConnActive.getCollection(collUnsharded.toString()).insert({_id: 1}, wc));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: -1}, wc));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: 1}, wc));
+    assert.writeOK(merizosConnActive.getCollection(collUnsharded.toString()).insert({_id: 1}, wc));
 
     jsTest.log("Stopping primary of third shard...");
 
-    mongosConnIdle = new Mongo(mongos.host);
+    merizosConnIdle = new Mongo(merizos.host);
 
     st.rs2.stop(st.rs2.getPrimary());
 
     jsTest.log("Testing active connection with third primary down...");
 
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -2}, wc));
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 2}, wc));
-    assert.writeOK(mongosConnActive.getCollection(collUnsharded.toString()).insert({_id: 2}, wc));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: -2}, wc));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: 2}, wc));
+    assert.writeOK(merizosConnActive.getCollection(collUnsharded.toString()).insert({_id: 2}, wc));
 
     jsTest.log("Testing idle connection with third primary down...");
 
-    assert.writeOK(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: -3}, wc));
-    assert.writeOK(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: 3}, wc));
-    assert.writeOK(mongosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 3}, wc));
+    assert.writeOK(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: -3}, wc));
+    assert.writeOK(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: 3}, wc));
+    assert.writeOK(merizosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 3}, wc));
 
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     jsTest.log("Testing new connections with third primary down...");
 
-    mongosConnNew = new Mongo(mongos.host);
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeOK(mongosConnNew.getCollection(collSharded.toString()).insert({_id: -4}, wc));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeOK(mongosConnNew.getCollection(collSharded.toString()).insert({_id: 4}, wc));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeOK(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 4}, wc));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -4}, wc));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 4}, wc));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeOK(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 4}, wc));
 
     gc();  // Clean up new connections
 
     jsTest.log("Stopping primary of second shard...");
 
-    mongosConnIdle = new Mongo(mongos.host);
+    merizosConnIdle = new Mongo(merizos.host);
 
     // Need to save this node for later
     var rs1Secondary = st.rs1.getSecondary();
@@ -130,300 +130,300 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     jsTest.log("Testing active connection with second primary down...");
 
     // Reads with read prefs
-    mongosConnActive.setSlaveOk();
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
-    mongosConnActive.setSlaveOk(false);
+    merizosConnActive.setSlaveOk();
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnActive.setSlaveOk(false);
 
-    mongosConnActive.setReadPref("primary");
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnActive.setReadPref("primary");
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
     assert.throws(function() {
-        mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1});
+        merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1});
     });
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     // Ensure read prefs override slaveOK
-    mongosConnActive.setSlaveOk();
-    mongosConnActive.setReadPref("primary");
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnActive.setSlaveOk();
+    merizosConnActive.setReadPref("primary");
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
     assert.throws(function() {
-        mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1});
+        merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1});
     });
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
-    mongosConnActive.setSlaveOk(false);
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnActive.setSlaveOk(false);
 
-    mongosConnActive.setReadPref("secondary");
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnActive.setReadPref("secondary");
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnActive.setReadPref("primaryPreferred");
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnActive.setReadPref("primaryPreferred");
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnActive.setReadPref("secondaryPreferred");
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnActive.setReadPref("secondaryPreferred");
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnActive.setReadPref("nearest");
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnActive.setReadPref("nearest");
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     // Writes
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -5}, wc));
-    assert.writeError(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 5}, wc));
-    assert.writeOK(mongosConnActive.getCollection(collUnsharded.toString()).insert({_id: 5}, wc));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: -5}, wc));
+    assert.writeError(merizosConnActive.getCollection(collSharded.toString()).insert({_id: 5}, wc));
+    assert.writeOK(merizosConnActive.getCollection(collUnsharded.toString()).insert({_id: 5}, wc));
 
     jsTest.log("Testing idle connection with second primary down...");
 
     // Writes
-    assert.writeOK(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: -6}, wc));
-    assert.writeError(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: 6}, wc));
-    assert.writeOK(mongosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 6}, wc));
+    assert.writeOK(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: -6}, wc));
+    assert.writeError(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: 6}, wc));
+    assert.writeOK(merizosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 6}, wc));
 
     // Reads with read prefs
-    mongosConnIdle.setSlaveOk();
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
-    mongosConnIdle.setSlaveOk(false);
+    merizosConnIdle.setSlaveOk();
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnIdle.setSlaveOk(false);
 
-    mongosConnIdle.setReadPref("primary");
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnIdle.setReadPref("primary");
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
     assert.throws(function() {
-        mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1});
+        merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1});
     });
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     // Ensure read prefs override slaveOK
-    mongosConnIdle.setSlaveOk();
-    mongosConnIdle.setReadPref("primary");
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnIdle.setSlaveOk();
+    merizosConnIdle.setReadPref("primary");
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
     assert.throws(function() {
-        mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1});
+        merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1});
     });
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
-    mongosConnIdle.setSlaveOk(false);
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnIdle.setSlaveOk(false);
 
-    mongosConnIdle.setReadPref("secondary");
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnIdle.setReadPref("secondary");
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnIdle.setReadPref("primaryPreferred");
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnIdle.setReadPref("primaryPreferred");
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnIdle.setReadPref("secondaryPreferred");
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnIdle.setReadPref("secondaryPreferred");
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnIdle.setReadPref("nearest");
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnIdle.setReadPref("nearest");
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     jsTest.log("Testing new connections with second primary down...");
 
     // Reads with read prefs
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
 
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("primary");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("primary");
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("primary");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("primary");
     assert.throws(function() {
-        mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1});
+        merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1});
     });
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("primary");
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("primary");
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
 
     // Ensure read prefs override slaveok
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    mongosConnNew.setReadPref("primary");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    mongosConnNew.setReadPref("primary");
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    merizosConnNew.setReadPref("primary");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    merizosConnNew.setReadPref("primary");
     assert.throws(function() {
-        mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1});
+        merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1});
     });
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    mongosConnNew.setReadPref("primary");
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    merizosConnNew.setReadPref("primary");
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
 
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("secondary");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("secondary");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("secondary");
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("secondary");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("secondary");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("secondary");
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
 
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("primaryPreferred");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("primaryPreferred");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("primaryPreferred");
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("primaryPreferred");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("primaryPreferred");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("primaryPreferred");
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
 
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("secondaryPreferred");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("secondaryPreferred");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("secondaryPreferred");
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("secondaryPreferred");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("secondaryPreferred");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("secondaryPreferred");
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
 
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("nearest");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("nearest");
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setReadPref("nearest");
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("nearest");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("nearest");
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setReadPref("nearest");
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
 
     // Writes
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeOK(mongosConnNew.getCollection(collSharded.toString()).insert({_id: -7}, wc));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_id: 7}, wc));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeOK(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}, wc));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -7}, wc));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 7}, wc));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeOK(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}, wc));
 
     gc();  // Clean up new connections
 
     jsTest.log("Stopping primary of first shard...");
 
-    mongosConnIdle = new Mongo(mongos.host);
+    merizosConnIdle = new Mongo(merizos.host);
 
     st.rs0.stop(st.rs0.getPrimary());
 
     jsTest.log("Testing active connection with first primary down...");
 
-    mongosConnActive.setSlaveOk();
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnActive.setSlaveOk();
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    assert.writeError(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -8}));
-    assert.writeError(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 8}));
-    assert.writeError(mongosConnActive.getCollection(collUnsharded.toString()).insert({_id: 8}));
+    assert.writeError(merizosConnActive.getCollection(collSharded.toString()).insert({_id: -8}));
+    assert.writeError(merizosConnActive.getCollection(collSharded.toString()).insert({_id: 8}));
+    assert.writeError(merizosConnActive.getCollection(collUnsharded.toString()).insert({_id: 8}));
 
     jsTest.log("Testing idle connection with first primary down...");
 
-    assert.writeError(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: -9}));
-    assert.writeError(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: 9}));
-    assert.writeError(mongosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 9}));
+    assert.writeError(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: -9}));
+    assert.writeError(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: 9}));
+    assert.writeError(merizosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 9}));
 
-    mongosConnIdle.setSlaveOk();
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnIdle.setSlaveOk();
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     jsTest.log("Testing new connections with first primary down...");
 
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_id: -10}));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_id: 10}));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeError(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 10}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -10}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 10}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeError(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 10}));
 
     gc();  // Clean up new connections
 
     jsTest.log("Stopping second shard...");
 
-    mongosConnIdle = new Mongo(mongos.host);
+    merizosConnIdle = new Mongo(merizos.host);
 
     st.rs1.stop(rs1Secondary);
 
     jsTest.log("Testing active connection with second shard down...");
 
-    mongosConnActive.setSlaveOk();
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnActive.setSlaveOk();
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    assert.writeError(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -11}));
-    assert.writeError(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 11}));
-    assert.writeError(mongosConnActive.getCollection(collUnsharded.toString()).insert({_id: 11}));
+    assert.writeError(merizosConnActive.getCollection(collSharded.toString()).insert({_id: -11}));
+    assert.writeError(merizosConnActive.getCollection(collSharded.toString()).insert({_id: 11}));
+    assert.writeError(merizosConnActive.getCollection(collUnsharded.toString()).insert({_id: 11}));
 
     jsTest.log("Testing idle connection with second shard down...");
 
-    assert.writeError(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: -12}));
-    assert.writeError(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: 12}));
-    assert.writeError(mongosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 12}));
+    assert.writeError(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: -12}));
+    assert.writeError(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: 12}));
+    assert.writeError(merizosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 12}));
 
-    mongosConnIdle.setSlaveOk();
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnIdle.setSlaveOk();
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     jsTest.log("Testing new connections with second shard down...");
 
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(mongos.host);
-    mongosConnNew.setSlaveOk();
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(merizos.host);
+    merizosConnNew.setSlaveOk();
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_id: -13}));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_id: 13}));
-    mongosConnNew = new Mongo(mongos.host);
-    assert.writeError(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 13}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -13}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 13}));
+    merizosConnNew = new Mongo(merizos.host);
+    assert.writeError(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 13}));
 
     gc();  // Clean up new connections
 

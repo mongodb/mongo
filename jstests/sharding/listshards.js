@@ -16,19 +16,19 @@
     }
 
     var shardTest = new ShardingTest(
-        {name: 'listShardsTest', shards: 1, mongos: 1, other: {useHostname: true}});
+        {name: 'listShardsTest', shards: 1, merizos: 1, other: {useHostname: true}});
 
-    var mongos = shardTest.s0;
-    var res = mongos.adminCommand('listShards');
+    var merizos = shardTest.s0;
+    var res = merizos.adminCommand('listShards');
     assert.commandWorked(res, 'listShards command failed');
     var shardsArray = res.shards;
     assert.eq(shardsArray.length, 1);
 
-    // add standalone mongod
+    // add standalone merizod
     var standaloneShard = MongoRunner.runMongod({useHostName: true, shardsvr: ""});
     res = shardTest.admin.runCommand({addShard: standaloneShard.host, name: 'standalone'});
     assert.commandWorked(res, 'addShard command failed');
-    res = mongos.adminCommand('listShards');
+    res = merizos.adminCommand('listShards');
     assert.commandWorked(res, 'listShards command failed');
     shardsArray = res.shards;
     assert.eq(shardsArray.length, 2);
@@ -42,7 +42,7 @@
     rs1.initiate();
     res = shardTest.admin.runCommand({addShard: rs1.getURL()});
     assert.commandWorked(res, 'addShard command failed');
-    res = mongos.adminCommand('listShards');
+    res = merizos.adminCommand('listShards');
     assert.commandWorked(res, 'listShards command failed');
     shardsArray = res.shards;
     assert.eq(shardsArray.length, 3);
@@ -56,7 +56,7 @@
         return res.state === 'completed';
     }, 'failed to remove the replica set shard');
 
-    res = mongos.adminCommand('listShards');
+    res = merizos.adminCommand('listShards');
     assert.commandWorked(res, 'listShards command failed');
     shardsArray = res.shards;
     assert.eq(shardsArray.length, 2);

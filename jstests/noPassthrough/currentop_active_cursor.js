@@ -47,7 +47,7 @@
         assertEndCounts: true
     });
 
-    // Test OP_GET_MORE (legacy read mode) against a mongod.
+    // Test OP_GET_MORE (legacy read mode) against a merizod.
     failPointName = "waitWithPinnedCursorDuringGetMoreBatch";
     const db = conn.getDB("test");
     db.getMongo().forceReadMode("legacy");
@@ -72,7 +72,7 @@
 
     // Sharded test
     failPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
-    let st = new ShardingTest({shards: 2, mongos: 1});
+    let st = new ShardingTest({shards: 2, merizos: 1});
     withPinnedCursor({
         conn: st.s,
         sessionId: null,
@@ -86,7 +86,7 @@
         assertEndCounts: true
     });
 
-    // Test OP_GET_MORE (legacy reead mode) against a mongos.
+    // Test OP_GET_MORE (legacy reead mode) against a merizos.
     withPinnedCursor({
         conn: st.s,
         sessionId: null,

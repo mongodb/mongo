@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/initialize_operation_session_info.h"
+#include "merizo/db/initialize_operation_session_info.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/operation_context.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/logical_session_cache.h"
+#include "merizo/db/logical_session_id_helpers.h"
+#include "merizo/db/operation_context.h"
 
-namespace mongo {
+namespace merizo {
 
 OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
                                                               const BSONObj& requestBody,
@@ -83,7 +83,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         auto lsc = LogicalSessionCache::get(opCtx->getServiceContext());
         if (!lsc) {
             // Ignore session information if the logical session cache has not been set up, e.g. on
-            // the embedded version of mongod.
+            // the embedded version of merizod.
             return {};
         }
 
@@ -108,7 +108,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
         uassert(ErrorCodes::IllegalOperation,
-                "Transaction numbers are only allowed on a replica set member or mongos",
+                "Transaction numbers are only allowed on a replica set member or merizos",
                 isReplSetMemberOrMongos);
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on storage engines that support "
@@ -162,4 +162,4 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
     return osi;
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,30 +34,30 @@
 #include <ostream>
 #include <sstream>
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/options_parser/constraints.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/options_parser/constraints.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_description.h"
+#include "merizo/util/options_parser/option_section.h"
+#include "merizo/util/options_parser/options_parser.h"
 
 namespace {
 
-using mongo::ErrorCodes;
-using mongo::Status;
+using merizo::ErrorCodes;
+using merizo::Status;
 
-namespace moe = mongo::optionenvironment;
+namespace moe = merizo::optionenvironment;
 constexpr auto OptionParserTest = moe::OptionSection::OptionParserUsageType::OptionParserTest;
 
-#define TEST_CONFIG_PATH(x) "src/mongo/util/options_parser/test_config_files/" x
+#define TEST_CONFIG_PATH(x) "src/merizo/util/options_parser/test_config_files/" x
 
 class OptionsParserTester : public moe::OptionsParser {
 public:
     Status readConfigFile(const std::string& filename, std::string* config) {
         if (filename != _filename) {
-            ::mongo::StringBuilder sb;
+            ::merizo::StringBuilder sb;
             sb << "Parser using filename: " << filename
                << " which does not match expected filename: " << _filename;
             return Status(ErrorCodes::InternalError, sb.str());
@@ -80,8 +80,8 @@ TEST(Registration, EmptySingleName) {
     try {
         testOpts.addOptionChaining("dup", "", moe::Switch, "dup", {}, {}, OptionParserTest);
         testOpts.addOptionChaining("new", "", moe::Switch, "dup", {}, {}, OptionParserTest);
-    } catch (::mongo::DBException& e) {
-        ::mongo::StringBuilder sb;
+    } catch (::merizo::DBException& e) {
+        ::merizo::StringBuilder sb;
         sb << "Was not able to register two options with empty single name: " << e.what();
         FAIL(sb.str());
     }
@@ -100,8 +100,8 @@ TEST(Registration, EmptySingleName) {
             .setSources(moe::SourceYAMLConfig);
         testOptsValid.addOptionChaining("new", "", moe::Switch, "dup", {}, {}, OptionParserTest)
             .setSources(moe::SourceYAMLConfig);
-    } catch (::mongo::DBException& e) {
-        ::mongo::StringBuilder sb;
+    } catch (::merizo::DBException& e) {
+        ::merizo::StringBuilder sb;
         sb << "Was not able to register two options with empty single name" << e.what();
         FAIL(sb.str());
     }
@@ -117,7 +117,7 @@ TEST(Registration, DuplicateSingleName) {
         testOpts.addOptionChaining("dup", "dup", moe::Switch, "dup", {}, {}, OptionParserTest);
         testOpts.addOptionChaining("new", "dup", moe::Switch, "dup", {}, {}, OptionParserTest);
         FAIL("Was able to register duplicate single name");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -133,7 +133,7 @@ TEST(Registration, DuplicateSeingleNameAcrossSections) {
     ASSERT_NOT_OK(root.addSection(group2));
 
     ASSERT_THROWS(root.addOptionChaining("one", "", moe::Switch, "Tres", {}, {}, OptionParserTest),
-                  mongo::AssertionException);
+                  merizo::AssertionException);
     root.addOptionChaining("two", "", moe::Switch, "Quatro", {}, {}, OptionParserTest);
 
     moe::OptionSection group3;
@@ -147,7 +147,7 @@ TEST(Registration, DuplicateDottedName) {
         testOpts.addOptionChaining("dup", "dup", moe::Switch, "dup", {}, {}, OptionParserTest);
         testOpts.addOptionChaining("dup", "new", moe::Switch, "dup", {}, {}, OptionParserTest);
         FAIL("Was able to register duplicate single name");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -163,7 +163,7 @@ TEST(Registration, DuplicatePositional) {
                 "positional", "positional", moe::Int, "Positional", {}, {}, OptionParserTest)
             .positional(1, 1);
         FAIL("Was able to register duplicate positional option");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -175,7 +175,7 @@ TEST(Registration, BadRangesPositional) {
                 "positional1", "positional1", moe::String, "Positional", {}, {}, OptionParserTest)
             .positional(-1, 1);
         FAIL("Was able to register positional with negative start for range");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
     try {
         testOpts
@@ -183,7 +183,7 @@ TEST(Registration, BadRangesPositional) {
                 "positional1", "positional1", moe::String, "Positional", {}, {}, OptionParserTest)
             .positional(2, 1);
         FAIL("Was able to register positional with start of range larger than end");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
     try {
         testOpts
@@ -191,7 +191,7 @@ TEST(Registration, BadRangesPositional) {
                 "positional1", "positional1", moe::String, "Positional", {}, {}, OptionParserTest)
             .positional(1, -2);
         FAIL("Was able to register positional with bad end of range");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
     try {
         testOpts
@@ -199,7 +199,7 @@ TEST(Registration, BadRangesPositional) {
                 "positional1", "positional1", moe::String, "Positional", {}, {}, OptionParserTest)
             .positional(0, 1);
         FAIL("Was able to register positional with bad start of range");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
     try {
         testOpts
@@ -207,7 +207,7 @@ TEST(Registration, BadRangesPositional) {
                 "positional1", "positional1", moe::String, "Positional", {}, {}, OptionParserTest)
             .positional(1, 2);
         FAIL("Was able to register multi valued positional with non StringVector type");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -217,7 +217,7 @@ TEST(Registration, DefaultValueWrongType) {
         testOpts.addOptionChaining("port", "port", moe::Int, "Port", {}, {}, OptionParserTest)
             .setDefault(moe::Value("String"));
         FAIL("Was able to register default value with wrong type");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -227,7 +227,7 @@ TEST(Registration, ImplicitValueWrongType) {
         testOpts.addOptionChaining("port", "port", moe::Int, "Port", {}, {}, OptionParserTest)
             .setImplicit(moe::Value("String"));
         FAIL("Was able to register implicit value with wrong type");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -244,7 +244,7 @@ TEST(Registration, ComposableNotVectorOrMap) {
                                OptionParserTest)
             .composing();
         FAIL("Was able to register composable option with wrong type");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -264,7 +264,7 @@ TEST(Registration, ComposableWithImplicit) {
             .setImplicit(moe::Value(implicitVal))
             .composing();
         FAIL("Was able to register composable option with implicit value");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 
     try {
@@ -281,7 +281,7 @@ TEST(Registration, ComposableWithImplicit) {
             .composing()
             .setImplicit(moe::Value(implicitVal));
         FAIL("Was able to set implicit value on composable option");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -301,7 +301,7 @@ TEST(Registration, ComposableWithDefault) {
             .setDefault(moe::Value(defaultVal))
             .composing();
         FAIL("Was able to register composable option with default value");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 
     try {
@@ -318,7 +318,7 @@ TEST(Registration, ComposableWithDefault) {
             .composing()
             .setDefault(moe::Value(defaultVal));
         FAIL("Was able to set default value on composable option");
-    } catch (::mongo::DBException&) {
+    } catch (::merizo::DBException&) {
     }
 }
 
@@ -799,7 +799,7 @@ TEST(Parsing, DefaultValuesNotInBSON) {
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
 
-    mongo::BSONObj expected = BSON("val1" << 6);
+    merizo::BSONObj expected = BSON("val1" << 6);
     ASSERT_BSONOBJ_EQ(expected, environment.toBSON());
 }
 
@@ -2608,7 +2608,7 @@ TEST(ChainingInterface, GoodReference) {
         "ref", "ref", moe::String, "Save this Reference", {}, {}, OptionParserTest);
     int i;
     for (i = 0; i < 100; i++) {
-        ::mongo::StringBuilder sb;
+        ::merizo::StringBuilder sb;
         sb << "filler" << i;
         testOpts.addOptionChaining(
             sb.str(), sb.str(), moe::String, "Filler Option", {}, {}, OptionParserTest);
@@ -2664,7 +2664,7 @@ TEST(ChainingInterface, Basic) {
             ASSERT_TRUE(iterator->_implicit.isEmpty());
             ASSERT_EQUALS(iterator->_isComposing, false);
         } else {
-            ::mongo::StringBuilder sb;
+            ::merizo::StringBuilder sb;
             sb << "Found extra option: " << iterator->_dottedName << " which we did not register";
             FAIL(sb.str());
         }
@@ -2696,7 +2696,7 @@ TEST(ChainingInterface, Hidden) {
             ASSERT_TRUE(iterator->_implicit.isEmpty());
             ASSERT_EQUALS(iterator->_isComposing, false);
         } else {
-            ::mongo::StringBuilder sb;
+            ::merizo::StringBuilder sb;
             sb << "Found extra option: " << iterator->_dottedName << " which we did not register";
             FAIL(sb.str());
         }
@@ -2735,7 +2735,7 @@ TEST(ChainingInterface, DefaultValue) {
             ASSERT_TRUE(iterator->_implicit.isEmpty());
             ASSERT_EQUALS(iterator->_isComposing, false);
         } else {
-            ::mongo::StringBuilder sb;
+            ::merizo::StringBuilder sb;
             sb << "Found extra option: " << iterator->_dottedName << " which we did not register";
             FAIL(sb.str());
         }
@@ -2774,7 +2774,7 @@ TEST(ChainingInterface, ImplicitValue) {
             ASSERT_TRUE(iterator->_implicit.equal(implicitVal));
             ASSERT_EQUALS(iterator->_isComposing, false);
         } else {
-            ::mongo::StringBuilder sb;
+            ::merizo::StringBuilder sb;
             sb << "Found extra option: " << iterator->_dottedName << " which we did not register";
             FAIL(sb.str());
         }
@@ -2811,7 +2811,7 @@ TEST(ChainingInterface, Composing) {
             ASSERT_TRUE(iterator->_implicit.isEmpty());
             ASSERT_EQUALS(iterator->_isComposing, true);
         } else {
-            ::mongo::StringBuilder sb;
+            ::merizo::StringBuilder sb;
             sb << "Found extra option: " << iterator->_dottedName << " which we did not register";
             FAIL(sb.str());
         }
@@ -4093,7 +4093,7 @@ TEST(YAMLConfigFile, DeprecatedDottedNameSameAsCanonicalDottedName) {
                                              {"dotted.canonical"},
                                              {},
                                              OptionParserTest),
-                  ::mongo::DBException);
+                  ::merizo::DBException);
 }
 
 // Deprecated dotted name cannot be the empty string.
@@ -4101,7 +4101,7 @@ TEST(YAMLConfigFile, DeprecatedDottedNameEmptyString) {
     moe::OptionSection testOpts;
     ASSERT_THROWS(testOpts.addOptionChaining(
                       "dotted.canonical", "var1", moe::Int, "Var1", {""}, {}, OptionParserTest),
-                  ::mongo::DBException);
+                  ::merizo::DBException);
 }
 
 // Deprecated dotted name cannot be the same as another option's dotted name.
@@ -4116,7 +4116,7 @@ TEST(YAMLConfigFile, DeprecatedDottedNameSameAsOtherOptionsDottedName) {
                                              {"dotted.canonical1"},
                                              {},
                                              OptionParserTest),
-                  ::mongo::DBException);
+                  ::merizo::DBException);
 }
 
 // Deprecated dotted name cannot be the same as another option's deprecated dotted name.
@@ -4131,7 +4131,7 @@ TEST(YAMLConfigFile, DeprecatedDottedNameSameAsOtherOptionsDeprecatedDottedName)
                                              {"dotted.deprecated"},
                                              {},
                                              OptionParserTest),
-                  ::mongo::DBException);
+                  ::merizo::DBException);
 }
 
 // It is an error to have both canonical and deprecated dotted names in the same
@@ -4184,7 +4184,7 @@ TEST(YAMLConfigFile, DeprecatedDottedNameMultipleDeprecated) {
         moe::Environment environment;
         std::map<std::string, std::string> env_map;
 
-        ::mongo::StringBuilder sb;
+        ::merizo::StringBuilder sb;
         sb << *i << ": 6";
         parser.setConfig("config.yaml", sb.str());
 
@@ -4984,8 +4984,8 @@ TEST(YAMLConfigFile, OutputConfig) {
 
     OptionsParserTester parser;
     parser.setConfig("config.yaml",
-                     "systemLog: { path: /tmp/mongod.log }\n"
-                     "command: [ mongo, mongod, mongos ]");
+                     "systemLog: { path: /tmp/merizod.log }\n"
+                     "command: [ merizo, merizod, merizos ]");
 
     const std::vector<std::string> argv = {
         "binaryname",
@@ -5012,9 +5012,9 @@ TEST(YAMLConfigFile, OutputConfig) {
     ASSERT_EQ(env.toYAML(),
               "cacheSize: 12345\n"
               "command:\n"
-              "  - mongo\n"
-              "  - mongod\n"
-              "  - mongos\n"
+              "  - merizo\n"
+              "  - merizod\n"
+              "  - merizos\n"
               "config: config.yaml\n"
               "math:\n"
               "  pi: 3.14159265\n"
@@ -5027,11 +5027,11 @@ TEST(YAMLConfigFile, OutputConfig) {
               "setParameter:\n"
               "  scramSHAIterationCount: 12345\n"
               "systemLog:\n"
-              "  path: /tmp/mongod.log");
+              "  path: /tmp/merizod.log");
 }
 
 void TestFile(std::vector<unsigned char> contents, bool valid) {
-    mongo::unittest::TempDir tempdir("options_testpath");
+    merizo::unittest::TempDir tempdir("options_testpath");
     boost::filesystem::path p(tempdir.path());
     p /= "config.yaml";
 

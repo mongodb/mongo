@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,58 +27,58 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/private/record_store_validate_adaptor.h"
+#include "merizo/db/catalog/private/record_store_validate_adaptor.h"
 
-#include "mongo/db/catalog/collection_impl.h"
+#include "merizo/db/catalog/collection_impl.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/base/init.h"
-#include "mongo/base/owned_pointer_map.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/collection_info_cache_impl.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_catalog_impl.h"
-#include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog/namespace_uuid_cache.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/update/update_driver.h"
+#include "merizo/base/counter.h"
+#include "merizo/base/init.h"
+#include "merizo/base/owned_pointer_map.h"
+#include "merizo/bson/ordering.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/background.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/collection_info_cache_impl.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/index_catalog_impl.h"
+#include "merizo/db/catalog/index_consistency.h"
+#include "merizo/db/catalog/index_key_validate.h"
+#include "merizo/db/catalog/namespace_uuid_cache.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/key_string.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/db/update/update_driver.h"
 
-#include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
+#include "merizo/db/auth/user_document_parser.h"  // XXX-ANDY
+#include "merizo/rpc/object_check.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 //  This fail point injects insertion failures for all collections unless a collection name is
@@ -415,14 +415,14 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
         const auto firstIdElem = data["first_id"];
         // If the failpoint specifies no collection or matches the existing one, hang.
         if ((!collElem || _ns.ns() == collElem.str()) &&
-            (!firstIdElem || (begin != end && firstIdElem.type() == mongo::String &&
+            (!firstIdElem || (begin != end && firstIdElem.type() == merizo::String &&
                               begin->doc["_id"].str() == firstIdElem.str()))) {
             string whenFirst =
                 firstIdElem ? (string(" when first _id is ") + firstIdElem.str()) : "";
             while (MONGO_FAIL_POINT(hangAfterCollectionInserts)) {
                 log() << "hangAfterCollectionInserts fail point enabled for " << _ns.toString()
                       << whenFirst << ". Blocking until fail point is disabled.";
-                mongo::sleepsecs(1);
+                merizo::sleepsecs(1);
                 opCtx->checkForInterrupt();
             }
         }
@@ -1393,4 +1393,4 @@ void CollectionImpl::establishOplogCollectionForLogging(OperationContext* opCtx)
     repl::establishOplogCollectionForLogging(opCtx, this);
 }
 
-}  // namespace mongo
+}  // namespace merizo

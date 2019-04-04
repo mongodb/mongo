@@ -10,17 +10,17 @@ load("jstests/libs/uuid_util.js");
     'use strict';
 
     let st = new ShardingTest({shards: 2});
-    let mongos = st.s0;
+    let merizos = st.s0;
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: 'test'}));
+    assert.commandWorked(merizos.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard1.shardName);
 
-    assert.commandWorked(mongos.adminCommand(
+    assert.commandWorked(merizos.adminCommand(
         {shardCollection: 'test.user', key: {x: 'hashed'}, numInitialChunks: 2}));
 
     // Ensure that all the pending (received chunks) have been incorporated in the shard's filtering
     // metadata so they will show up in the getShardVersion command
-    assert.eq(0, mongos.getDB('test').user.find({}).itcount());
+    assert.eq(0, merizos.getDB('test').user.find({}).itcount());
 
     st.printShardingStatus();
 
@@ -47,7 +47,7 @@ load("jstests/libs/uuid_util.js");
                       .metadata);
 
     // Check that the shards' catalogs have the correct UUIDs
-    const configUUID = getUUIDFromConfigCollections(mongos, 'test.user');
+    const configUUID = getUUIDFromConfigCollections(merizos, 'test.user');
     const shard0UUID = getUUIDFromListCollections(st.shard0.getDB('test'), 'user');
     const shard1UUID = getUUIDFromListCollections(st.shard1.getDB('test'), 'user');
     assert.eq(configUUID, shard0UUID);

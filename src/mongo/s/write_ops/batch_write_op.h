@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,18 +33,18 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/base/status.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/s/ns_targeter.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/write_error_detail.h"
-#include "mongo/s/write_ops/write_op.h"
-#include "mongo/stdx/unordered_map.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/base/status.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/rpc/write_concern_error_detail.h"
+#include "merizo/s/ns_targeter.h"
+#include "merizo/s/write_ops/batched_command_request.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/s/write_ops/write_error_detail.h"
+#include "merizo/s/write_ops/write_op.h"
+#include "merizo/stdx/unordered_map.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 class TargetedWriteBatch;
@@ -89,7 +89,7 @@ struct EndpointComp {
 using TargetedBatchMap = std::map<const ShardEndpoint*, TargetedWriteBatch*, EndpointComp>;
 
 /**
- * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
+ * The BatchWriteOp class manages the lifecycle of a batched write received by merizos.  Each
  * item in a batch is tracked via a WriteOp, and the function of the BatchWriteOp is to
  * aggregate the dispatched requests and responses for the underlying WriteOps.
  *
@@ -175,7 +175,7 @@ public:
 
     /**
      * Disposes of all tracked targeted batches when an error is encountered during a transaction.
-     * This is safe because any partially written data on shards will be rolled back if mongos
+     * This is safe because any partially written data on shards will be rolled back if merizos
      * decides to abort.
      */
     void forgetTargetedBatchesOnTransactionAbortingError();
@@ -310,4 +310,4 @@ private:
     TrackedErrorMap _errorMap;
 };
 
-}  // namespace mongo
+}  // namespace merizo

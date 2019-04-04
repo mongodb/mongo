@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoimport
+package merizoimport
 
 import (
 	"fmt"
@@ -16,10 +16,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -145,7 +145,7 @@ func TestSplitInlineHeader(t *testing.T) {
 func TestMongoImportValidateSettings(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("Given a mongoimport instance for validation, ", t, func() {
+	Convey("Given a merizoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no collection is given", func() {
 			imp, err := NewMongoImport()
 			So(err, ShouldBeNil)
@@ -381,7 +381,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 func TestGetSourceReader(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
-	Convey("Given a mongoimport instance, on calling getSourceReader", t,
+	Convey("Given a merizoimport instance, on calling getSourceReader", t,
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
 				"the reader does not exist", func() {
@@ -517,7 +517,7 @@ func TestGetInputReader(t *testing.T) {
 
 func TestImportDocuments(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
-	Convey("With a mongoimport instance", t, func() {
+	Convey("With a merizoimport instance", t, func() {
 		Reset(func() {
 			sessionProvider, err := db.NewSessionProvider(*getBasicToolOptions())
 			if err != nil {
@@ -694,7 +694,7 @@ func TestImportDocuments(t *testing.T) {
 			So(numImported, ShouldEqual, 2)
 		})
 		Convey("EOF should be thrown for CSV import with --headerLine if file is empty", func() {
-			csvFile, err := ioutil.TempFile("", "mongoimport_")
+			csvFile, err := ioutil.TempFile("", "merizoimport_")
 			So(err, ShouldBeNil)
 			csvFile.Close()
 
@@ -835,7 +835,7 @@ func TestImportDocuments(t *testing.T) {
 // Regression test for TOOLS-1694 to prevent issue from TOOLS-1115
 func TestHiddenOptionsDefaults(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
-	Convey("With a new mongoimport with empty options", t, func() {
+	Convey("With a new merizoimport with empty options", t, func() {
 		imp, err := NewMongoImport()
 		imp.ToolOptions = options.New("", "", options.EnabledOptions{})
 		So(err, ShouldBeNil)

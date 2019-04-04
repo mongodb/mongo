@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,59 +27,59 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "merizo/db/s/config/sharding_catalog_manager.h"
 
 #include <iomanip>
 #include <pcrecpp.h>
 #include <set>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
-#include "mongo/db/s/add_shard_util.h"
-#include "mongo/db/s/sharding_logging.h"
-#include "mongo/db/s/type_shard_identity.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/config_server_version.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/database_version_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/client/remote_command_targeter.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/feature_compatibility_version.h"
+#include "merizo/db/commands/feature_compatibility_version_command_parser.h"
+#include "merizo/db/commands/feature_compatibility_version_parser.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/add_shard_cmd_gen.h"
+#include "merizo/db/s/add_shard_util.h"
+#include "merizo/db/s/sharding_logging.h"
+#include "merizo/db/s/type_shard_identity.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/catalog/config_server_version.h"
+#include "merizo/s/catalog/sharding_catalog_client.h"
+#include "merizo/s/catalog/type_database.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/s/client/shard_connection.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_identity_loader.h"
+#include "merizo/s/database_version_helpers.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/shard_util.h"
+#include "merizo/s/write_ops/batched_command_request.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
@@ -324,10 +324,10 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
 
     auto resIsMaster = std::move(swCommandResponse.getValue().response);
 
-    // Fail if the node being added is a mongos.
+    // Fail if the node being added is a merizos.
     const std::string msg = resIsMaster.getStringField("msg");
     if (msg == "isdbgrid") {
-        return {ErrorCodes::IllegalOperation, "cannot add a mongos as a shard"};
+        return {ErrorCodes::IllegalOperation, "cannot add a merizos as a shard"};
     }
 
     // Extract the maxWireVersion so we can verify that the node being added has a binary version
@@ -565,7 +565,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // replica set that has recently been removed, we have detached the ReplicaSetMonitor for the
     // set with that setName from the ReplicaSetMonitorManager and will create a new
     // ReplicaSetMonitor when targeting the set below.
-    // Note: This is necessary because as of 3.4, removeShard is performed by mongos (unlike
+    // Note: This is necessary because as of 3.4, removeShard is performed by merizos (unlike
     // addShard), so the ShardRegistry is not synchronously reloaded on the config server when a
     // shard is removed.
     if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
@@ -961,4 +961,4 @@ StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(Operation
     return result;
 }
 
-}  // namespace mongo
+}  // namespace merizo

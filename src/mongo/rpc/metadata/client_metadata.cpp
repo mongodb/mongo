@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/rpc/metadata/client_metadata.h"
+#include "merizo/rpc/metadata/client_metadata.h"
 
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/processinfo.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/s/is_merizos.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/processinfo.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 constexpr auto kClientMetadataFieldName = "$client"_sd;
@@ -60,7 +60,7 @@ constexpr auto kName = "name"_sd;
 constexpr auto kType = "type"_sd;
 constexpr auto kVersion = "version"_sd;
 
-constexpr auto kMongoS = "mongos"_sd;
+constexpr auto kMongoS = "merizos"_sd;
 constexpr auto kHost = "host"_sd;
 constexpr auto kClient = "client"_sd;
 
@@ -295,7 +295,7 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
 }
 
 void ClientMetadata::setMongoSMetadata(StringData hostAndPort,
-                                       StringData mongosClient,
+                                       StringData merizosClient,
                                        StringData version) {
     BSONObjBuilder builder;
     builder.appendElements(_document);
@@ -303,7 +303,7 @@ void ClientMetadata::setMongoSMetadata(StringData hostAndPort,
     {
         auto sub = BSONObjBuilder(builder.subobjStart(kMongoS));
         sub.append(kHost, hostAndPort);
-        sub.append(kClient, mongosClient);
+        sub.append(kClient, merizosClient);
         sub.append(kVersion, version);
     }
 
@@ -444,4 +444,4 @@ StringData ClientMetadata::fieldName() {
     return kClientMetadataFieldName;
 }
 
-}  // namespace mongo
+}  // namespace merizo

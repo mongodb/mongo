@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_facet.h"
+#include "merizo/db/pipeline/document_source_facet.h"
 
 #include <memory>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source_tee_consumer.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/tee_buffer.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_source_tee_consumer.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/pipeline/pipeline.h"
+#include "merizo/db/pipeline/tee_buffer.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 using std::pair;
@@ -239,7 +239,7 @@ void DocumentSourceFacet::reattachToOperationContext(OperationContext* opCtx) {
 StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
     // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
     // This means that if any stage in any of the $facet pipelines needs to run on the primary shard
-    // or on mongoS, then the entire $facet stage must run there.
+    // or on merizoS, then the entire $facet stage must run there.
     static const std::set<HostTypeRequirement> definitiveHosts = {
         HostTypeRequirement::kMongoS, HostTypeRequirement::kPrimaryShard};
 
@@ -336,7 +336,7 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
         }
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "$facet pipeline '" << *needsMongoS
-                              << "' must run on mongoS, but '"
+                              << "' must run on merizoS, but '"
                               << *needsShard
                               << "' requires a shard",
                 !(needsShard && needsMongoS));
@@ -346,4 +346,4 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
 
     return new DocumentSourceFacet(std::move(facetPipelines), expCtx);
 }
-}  // namespace mongo
+}  // namespace merizo

@@ -3,7 +3,7 @@
 
     var s = new ShardingTest({name: "add_shard1", shards: 1, useHostname: false});
 
-    // Create a shard and add a database; if the database is not duplicated the mongod should accept
+    // Create a shard and add a database; if the database is not duplicated the merizod should accept
     // it as shard
     var conn1 = MongoRunner.runMongod({'shardsvr': ""});
     var db1 = conn1.getDB("testDB");
@@ -25,7 +25,7 @@
     var newShardDoc = configDB.shards.findOne({_id: newShard});
     assert.eq(1024, newShardDoc.maxSize);
 
-    // a mongod with an existing database name should not be allowed to become a shard
+    // a merizod with an existing database name should not be allowed to become a shard
     var conn2 = MongoRunner.runMongod({'shardsvr': ""});
 
     var db2 = conn2.getDB("otherDB");
@@ -38,16 +38,16 @@
 
     var rejectedShard = "rejectedShard";
     assert(!s.admin.runCommand({addshard: "localhost:" + conn2.port, name: rejectedShard}).ok,
-           "accepted mongod with duplicate db");
+           "accepted merizod with duplicate db");
 
-    // Check that all collection that were local to the mongod's are accessible through the mongos
+    // Check that all collection that were local to the merizod's are accessible through the merizos
     var sdb1 = s.getDB("testDB");
     assert.eq(numObjs, sdb1.foo.count(), "wrong count for database that existed before addshard");
 
     var sdb2 = s.getDB("otherDB");
-    assert.eq(0, sdb2.foo.count(), "database of rejected shard appears through mongos");
+    assert.eq(0, sdb2.foo.count(), "database of rejected shard appears through merizos");
 
-    // make sure we can move a DB from the original mongod to a previoulsy existing shard
+    // make sure we can move a DB from the original merizod to a previoulsy existing shard
     assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
               newShard,
               "DB primary is wrong");

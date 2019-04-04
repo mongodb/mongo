@@ -1,15 +1,15 @@
 // Tests various cases of dropping and recreating collections in the same namespace with multiple
-// mongoses
+// merizoses
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 3, mongos: 3, causallyConsistent: true});
+    var st = new ShardingTest({shards: 3, merizos: 3, causallyConsistent: true});
 
     var config = st.s0.getDB("config");
     var admin = st.s0.getDB("admin");
     var coll = st.s0.getCollection("foo.bar");
 
-    // Use separate mongoses for admin, inserting data, and validating results, so no single-mongos
+    // Use separate merizoses for admin, inserting data, and validating results, so no single-merizos
     // tricks will work
     var staleMongos = st.s1;
     var insertMongos = st.s2;
@@ -18,7 +18,7 @@
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
-    // sharded from another mongos
+    // sharded from another merizos
     //
 
     jsTest.log("Enabling sharding for the first time...");
@@ -42,7 +42,7 @@
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
-    // resharded from another mongos, with a different key
+    // resharded from another merizos, with a different key
     //
 
     jsTest.log("Re-enabling sharding with a different key...");
@@ -65,7 +65,7 @@
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
-    // unsharded from another mongos
+    // unsharded from another merizos
     //
 
     jsTest.log("Re-creating unsharded collection from a sharded collection...");

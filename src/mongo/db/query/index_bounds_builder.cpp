@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/db/query/index_bounds_builder.h"
+#include "merizo/db/query/index_bounds_builder.h"
 
 #include <cmath>
 #include <limits>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/s2.h"
-#include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/s2_common.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_internal_expr_eq.h"
-#include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/expression_index.h"
-#include "mongo/db/query/expression_index_knobs_gen.h"
-#include "mongo/db/query/indexability.h"
-#include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/geo/geoconstants.h"
+#include "merizo/db/geo/s2.h"
+#include "merizo/db/index/expression_params.h"
+#include "merizo/db/index/s2_common.h"
+#include "merizo/db/matcher/expression_geo.h"
+#include "merizo/db/matcher/expression_internal_expr_eq.h"
+#include "merizo/db/query/collation/collation_index_key.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/db/query/expression_index.h"
+#include "merizo/db/query/expression_index_knobs_gen.h"
+#include "merizo/db/query/indexability.h"
+#include "merizo/db/query/planner_ixselect.h"
+#include "merizo/db/query/planner_wildcard_helpers.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
-namespace wcp = ::mongo::wildcard_planning;
+namespace wcp = ::merizo::wildcard_planning;
 
 // Helper for checking that an OIL "appears" to be ascending given one interval.
 void assertOILIsAscendingLocally(const vector<Interval>& intervals, size_t idx) {
@@ -194,7 +194,7 @@ string IndexBoundsBuilder::simpleRegex(const char* regex,
         }
     }
 
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
 
     string r = "";
     while (*regex) {
@@ -361,7 +361,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
     oilOut->name = elt.fieldName();
 
     bool isHashed = false;
-    if (mongoutils::str::equals("hashed", elt.valuestrsafe())) {
+    if (merizoutils::str::equals("hashed", elt.valuestrsafe())) {
         isHashed = true;
     }
 
@@ -717,14 +717,14 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
     } else if (MatchExpression::GEO == expr->matchType()) {
         const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
 
-        if (mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
+        if (merizoutils::str::equals("2dsphere", elt.valuestrsafe())) {
             verify(gme->getGeoExpression().getGeometry().hasS2Region());
             const S2Region& region = gme->getGeoExpression().getGeometry().getS2Region();
             S2IndexingParams indexParams;
             ExpressionParams::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
             ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
-        } else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {
+        } else if (merizoutils::str::equals("2d", elt.valuestrsafe())) {
             verify(gme->getGeoExpression().getGeometry().hasR2Region());
             const R2Region& region = gme->getGeoExpression().getGeometry().getR2Region();
 
@@ -1169,4 +1169,4 @@ bool IndexBoundsBuilder::isSingleInterval(const IndexBounds& bounds,
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

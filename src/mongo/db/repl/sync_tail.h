@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,21 +32,21 @@
 #include <deque>
 #include <memory>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_applier.h"
-#include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/replication_consistency_markers.h"
-#include "mongo/db/repl/session_update_tracker.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/repl/multiapplier.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_applier.h"
+#include "merizo/db/repl/oplog_buffer.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/replication_consistency_markers.h"
+#include "merizo/db/repl/session_update_tracker.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/concurrency/thread_pool.h"
 
-namespace mongo {
+namespace merizo {
 
 class Database;
 class OperationContext;
@@ -303,4 +303,4 @@ Status multiSyncApply(OperationContext* opCtx,
                       WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

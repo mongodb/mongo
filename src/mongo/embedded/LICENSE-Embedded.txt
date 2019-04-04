@@ -1,14 +1,14 @@
 License Agreement
 
 The software accompanying this License Agreement is Copyright (C) 2018
-MongoDB, Inc. and is licensed to you on the terms set forth below, or
+MerizoDB, Inc. and is licensed to you on the terms set forth below, or
 in the alternative and at your election, on the terms of the Server
 Side Public License, Version 1, a copy of which is either provided in
 the accompanying file entitled LICENSE-Community.txt, or available
-at https://www.mongodb.com/licensing/server-side-public-license.
+at https://www.merizodb.com/licensing/server-side-public-license.
 
 The following License Agreement establishes the terms on which
-MongoDB, Inc. (“Company”) grants a license to Company’s applicable
+MerizoDB, Inc. (“Company”) grants a license to Company’s applicable
 proprietary application software solely in machine-readable,
 executable, object-code form and related documentation (the
 “Software”) to you the licensee (“You” or “Your”) solely on the
@@ -130,4 +130,4 @@ agreement, oral or written, and any other communications between You
 and Company in relation to the subject matter of this Agreement.
 
 If You have any questions regarding this Agreement or the Software,
-please direct all correspondence to: legal@mongodb.com.
+please direct all correspondence to: legal@merizodb.com.

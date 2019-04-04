@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,10 +31,10 @@
 #include <string>
 #include <vector>
 
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/text.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/text.h"
 
-using namespace mongo;
+using namespace merizo;
 
 static std::vector<std::string> svec(const char* first, ...) {
     std::vector<std::string> result;
@@ -70,22 +70,22 @@ TEST(WindowsCommandLineConstruction, ThingsToQuote) {
 
 TEST(WindowsCommandLineConstruction, RegressionSERVER_7252) {
     ASSERT_EQUALS(
-        "mongod \"--serviceName=My Service\" --serviceDescription \"My Service\" "
-        "--serviceDisplayName \"My Service\" --dbpath C:\\mongo\\data\\config "
-        "--port 20001 --logpath C:\\mongo\\logs\\mongo_config.log.txt "
+        "merizod \"--serviceName=My Service\" --serviceDescription \"My Service\" "
+        "--serviceDisplayName \"My Service\" --dbpath C:\\merizo\\data\\config "
+        "--port 20001 --logpath C:\\merizo\\logs\\merizo_config.log.txt "
         "--configsvr --service",
-        constructUtf8WindowsCommandLine(svec("mongod",
+        constructUtf8WindowsCommandLine(svec("merizod",
                                              "--serviceName=My Service",
                                              "--serviceDescription",
                                              "My Service",
                                              "--serviceDisplayName",
                                              "My Service",
                                              "--dbpath",
-                                             "C:\\mongo\\data\\config",
+                                             "C:\\merizo\\data\\config",
                                              "--port",
                                              "20001",
                                              "--logpath",
-                                             "C:\\mongo\\logs\\mongo_config.log.txt",
+                                             "C:\\merizo\\logs\\merizo_config.log.txt",
                                              "--configsvr",
                                              "--service",
                                              NULL)));

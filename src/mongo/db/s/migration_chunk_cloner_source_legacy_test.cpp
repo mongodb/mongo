@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/s/migration_chunk_cloner_source_legacy.h"
+#include "merizo/s/catalog/sharding_catalog_client_mock.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/shard_server_test_fixture.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/clock_source_mock.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using executor::RemoteCommandRequest;
@@ -380,4 +380,4 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

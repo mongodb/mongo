@@ -8,7 +8,7 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({shards: 2, mongos: 1});
+    var s = new ShardingTest({shards: 2, merizos: 1});
     var dbForTest = s.getDB("test");
     var admin = s.getDB("admin");
     dbForTest.foo.drop();

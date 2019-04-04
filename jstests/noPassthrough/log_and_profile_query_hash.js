@@ -7,14 +7,14 @@
     // For getLatestProfilerEntry().
     load("jstests/libs/profiler.js");
 
-    // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
+    // Prevent the merizo shell from gossiping its cluster time, since this will increase the amount
     // of data logged for each op. For some of the testcases below, including the cluster time would
     // cause them to be truncated at the 512-byte RamLog limit, and some of the fields we need to
     // check would be lost.
     TestData.skipGossipingClusterTime = true;
 
     const conn = MongoRunner.runMongod();
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
     const testDB = conn.getDB("jstests_query_shape_hash");
     const coll = testDB.test;
 

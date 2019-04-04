@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,71 +27,71 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 #define LOG_FOR_ELECTION(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationElection)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationElection)
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/replication_coordinator_impl.h"
+#include "merizo/db/repl/replication_coordinator_impl.h"
 
 #include <algorithm>
 #include <limits>
 
-#include "mongo/base/status.h"
-#include "mongo/client/fetcher.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/check_quorum_for_config_change.h"
-#include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
-#include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_set_config_checks.h"
-#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
-#include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/repl_set_request_votes_args.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator_impl_gen.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/rslog.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/repl/vote_requester.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/rpc/metadata/oplog_query_metadata.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
+#include "merizo/base/status.h"
+#include "merizo/client/fetcher.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/catalog/commit_quorum_options.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/global_lock_acquisition_tracker.h"
+#include "merizo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index_builds_coordinator.h"
+#include "merizo/db/kill_sessions_local.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_time.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/repl/check_quorum_for_config_change.h"
+#include "merizo/db/repl/data_replicator_external_state_initial_sync.h"
+#include "merizo/db/repl/is_master_response.h"
+#include "merizo/db/repl/last_vote.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/repl_set_config_checks.h"
+#include "merizo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "merizo/db/repl/repl_set_heartbeat_response.h"
+#include "merizo/db/repl/repl_set_request_votes_args.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/replication_coordinator_impl_gen.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/rslog.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/repl/topology_coordinator.h"
+#include "merizo/db/repl/update_position_args.h"
+#include "merizo/db/repl/vote_requester.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/executor/connection_pool_stats.h"
+#include "merizo/executor/network_interface.h"
+#include "merizo/rpc/metadata/oplog_query_metadata.h"
+#include "merizo/rpc/metadata/repl_set_metadata.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/stacktrace.h"
+#include "merizo/util/time_support.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
@@ -433,7 +433,7 @@ LogicalTime ReplicationCoordinatorImpl::_getCurrentCommittedLogicalTime_inlock()
     return LogicalTime(_getCurrentCommittedSnapshotOpTime_inlock().getTimestamp());
 }
 
-void ReplicationCoordinatorImpl::appendDiagnosticBSON(mongo::BSONObjBuilder* bob) {
+void ReplicationCoordinatorImpl::appendDiagnosticBSON(merizo::BSONObjBuilder* bob) {
     BSONObjBuilder eBuilder(bob->subobjStart("executor"));
     _replExecutor->appendDiagnosticBSON(&eBuilder);
 }
@@ -489,14 +489,14 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
             severe()
                 << "This instance has been repaired and may contain modified replicated data that "
                    "would not match other replica set members. To see your repaired data, start "
-                   "mongod without the --replSet option. When you are finished recovering your "
+                   "merizod without the --replSet option. When you are finished recovering your "
                    "data and would like to perform a complete re-sync, please refer to the "
                    "documentation here: "
-                   "https://docs.mongodb.com/manual/tutorial/resync-replica-set-member/";
+                   "https://docs.merizodb.com/manual/tutorial/resync-replica-set-member/";
             fassertFailedNoTrace(50923);
         }
         error() << "Locally stored replica set configuration does not parse; See "
-                   "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
+                   "http://www.merizodb.org/dochub/core/recover-replica-set-from-invalid-config "
                    "for information on how to recover from this. Got \""
                 << status << "\" while parsing " << cfg.getValue();
         fassertFailedNoTrace(28545);
@@ -545,7 +545,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             myIndex = StatusWith<int>(-1);
         } else {
             error() << "Locally stored replica set configuration is invalid; See "
-                       "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config"
+                       "http://www.merizodb.org/dochub/core/recover-replica-set-from-invalid-config"
                        " for information on how to recover from this. Got \""
                     << myIndex.getStatus() << "\" while validating " << localConfig.toBSON();
             fassertFailedNoTrace(28544);
@@ -565,7 +565,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
               << startupWarningsLog;
         log() << "**          for this node. This is not a recommended configuration. Please see "
               << startupWarningsLog;
-        log() << "**          https://dochub.mongodb.org/core/psa-disable-rc-majority"
+        log() << "**          https://dochub.merizodb.org/core/psa-disable-rc-majority"
               << startupWarningsLog;
         log() << startupWarningsLog;
     }
@@ -777,7 +777,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
             // for the recoveryTimestamp just like on replica set recovery.
             const auto stableTimestamp = boost::none;
             _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
-            warning() << "Setting mongod to readOnly mode as a result of specifying "
+            warning() << "Setting merizod to readOnly mode as a result of specifying "
                          "'recoverFromOplogAsStandalone'.";
             storageGlobalParams.readOnly = true;
         }
@@ -1932,7 +1932,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                      "stepdownHangBeforePerformingPostMemberStateUpdateActions fail point enabled. "
                      "Blocking until fail point is disabled.";
             while (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
-                mongo::sleepsecs(1);
+                merizo::sleepsecs(1);
                 {
                     stdx::lock_guard<stdx::mutex> lock(_mutex);
                     if (_inShutdown) {
@@ -3912,4 +3912,4 @@ void ReplicationCoordinatorImpl::ReadWriteAbility::setCanServeNonLocalReads_UNSA
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

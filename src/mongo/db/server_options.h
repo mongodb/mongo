@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/process_id.h"
-#include "mongo/stdx/variant.h"
-#include "mongo/util/net/cidr.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/platform/process_id.h"
+#include "merizo/stdx/variant.h"
+#include "merizo/util/net/cidr.h"
 
-namespace mongo {
+namespace merizo {
 
 const int DEFAULT_UNIX_PERMS = 0700;
 constexpr size_t DEFAULT_MAX_CONN = 1000000;
@@ -43,7 +43,7 @@ constexpr size_t DEFAULT_MAX_CONN = 1000000;
 enum class ClusterRole { None, ShardServer, ConfigServer };
 
 struct ServerGlobalParams {
-    std::string binaryName;  // mongod or mongos
+    std::string binaryName;  // merizod or merizos
     std::string cwd;         // cwd of when process started
 
     int port = DefaultDBPort;  // --port
@@ -242,7 +242,7 @@ struct ServerGlobalParams {
 
     } featureCompatibility;
 
-    // Feature validation differs depending on the role of a mongod in a replica set. Replica set
+    // Feature validation differs depending on the role of a merizod in a replica set. Replica set
     // primaries can accept user-initiated writes and validate based on the feature compatibility
     // version. A secondary always validates in the upgraded mode so that it can sync new features,
     // even when in the downgraded feature compatibility mode.

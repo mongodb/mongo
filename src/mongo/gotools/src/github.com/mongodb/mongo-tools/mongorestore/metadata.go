@@ -1,22 +1,22 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongorestore
+package merizorestore
 
 import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/mongodb/mongo-tools/common"
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common"
+	"github.com/merizodb/merizo-tools/common/bsonutil"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -31,7 +31,7 @@ const (
 type authVersionPair struct {
 	// Dump is the auth version of the users/roles collection files in the target dump directory
 	Dump int
-	// Server is the auth version of the connected MongoDB server
+	// Server is the auth version of the connected MerizoDB server
 	Server int
 }
 
@@ -370,7 +370,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 	for _, arg := range args {
 
 		if arg.intent.Size == 0 {
-			// MongoDB complains if we try and remove a non-existent collection, so we should
+			// MerizoDB complains if we try and remove a non-existent collection, so we should
 			// just skip auth collections with empty .bson files to avoid gnarly logic later on.
 			log.Logvf(log.Always, "%v file '%v' is empty; skipping %v restoration", arg.intentType, arg.intent.Location, arg.intentType)
 		}
@@ -476,7 +476,7 @@ func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 			// so we can assume up to version 3.
 			log.Logvf(log.Always, "no system.version bson file found in '%v' database dump", restore.NSOptions.DB)
 			log.Logv(log.Always, "warning: assuming users and roles collections are of auth version 3")
-			log.Logv(log.Always, "if users are from an earlier version of MongoDB, they may not restore properly")
+			log.Logv(log.Always, "if users are from an earlier version of MerizoDB, they may not restore properly")
 			return 3, nil
 		}
 		log.Logv(log.Info, "no system.version bson file found in dump")
@@ -560,7 +560,7 @@ func (restore *MongoRestore) ValidateAuthVersions() error {
 
 }
 
-// ShouldRestoreUsersAndRoles returns true if mongorestore should go through
+// ShouldRestoreUsersAndRoles returns true if merizorestore should go through
 // through the process of restoring collections pertaining to authentication.
 func (restore *MongoRestore) ShouldRestoreUsersAndRoles() bool {
 	if restore.SkipUsersAndRoles {

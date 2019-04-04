@@ -10,11 +10,11 @@
     var configDB = st.s.getDB('config');
     var shardDoc = configDB.shards.findOne();
 
-    // Can't add mongos as shard.
+    // Can't add merizos as shard.
     assert.commandFailedWithCode(st.admin.runCommand({addshard: st.s.host}),
                                  ErrorCodes.IllegalOperation);
 
-    // Can't add a mongod with a lower binary version than our featureCompatibilityVersion.
+    // Can't add a merizod with a lower binary version than our featureCompatibilityVersion.
     var lastStableMongod = MongoRunner.runMongod({binVersion: "last-stable", shardsvr: ""});
     assert.commandFailedWithCode(st.admin.runCommand({addshard: lastStableMongod.host}),
                                  ErrorCodes.IncompatibleServerVersion);

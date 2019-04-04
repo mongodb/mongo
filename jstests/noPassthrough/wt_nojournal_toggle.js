@@ -1,6 +1,6 @@
 /**
  * Tests that journaled write operations that have occurred since the last checkpoint are replayed
- * when the mongod is killed and restarted with --nojournal.
+ * when the merizod is killed and restarted with --nojournal.
  */
 (function() {
     'use strict';
@@ -13,7 +13,7 @@
 
     // Returns a function that primarily executes unjournaled inserts, but periodically does a
     // journaled insert. If 'checkpoint' is true, then the fsync command is run to create a
-    // checkpoint prior to the mongod being terminated.
+    // checkpoint prior to the merizod being terminated.
     function insertFunctionFactory(checkpoint) {
         var insertFunction = function() {
             for (var iter = 0; iter < 1000; ++iter) {
@@ -39,18 +39,18 @@
         var dbpath = MongoRunner.dataPath + 'wt_nojournal_toggle';
         resetDbpath(dbpath);
 
-        // Start a mongod with journaling enabled.
+        // Start a merizod with journaling enabled.
         var conn = MongoRunner.runMongod({
             dbpath: dbpath,
             noCleanData: true,
             journal: '',
         });
-        assert.neq(null, conn, 'mongod was unable to start up');
+        assert.neq(null, conn, 'merizod was unable to start up');
 
-        // Run a mixture of journaled and unjournaled write operations against the mongod.
+        // Run a mixture of journaled and unjournaled write operations against the merizod.
         var awaitShell = startParallelShell(insertFunctionFactory(options.checkpoint), conn.port);
 
-        // After some journaled write operations have been performed against the mongod, send a
+        // After some journaled write operations have been performed against the merizod, send a
         // SIGKILL to the process to trigger an unclean shutdown.
         assert.soon(function() {
             var testDB = conn.getDB('test');
@@ -58,7 +58,7 @@
             if (count >= 100) {
                 // We saw 100 journaled inserts, but visibility does not guarantee durability, so
                 // do an extra journaled write to make all visible commits durable, before killing
-                // the mongod.
+                // the merizod.
                 assert.writeOK(testDB.nojournal.insert({final: true}, {writeConcern: {j: true}}));
                 MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
                 return true;
@@ -67,15 +67,15 @@
         }, 'the parallel shell did not perform at least 100 journaled inserts');
 
         var exitCode = awaitShell({checkExitSuccess: false});
-        assert.neq(0, exitCode, 'expected shell to exit abnormally due to mongod being terminated');
+        assert.neq(0, exitCode, 'expected shell to exit abnormally due to merizod being terminated');
 
-        // Restart the mongod with journaling disabled.
+        // Restart the merizod with journaling disabled.
         conn = MongoRunner.runMongod({
             dbpath: dbpath,
             noCleanData: true,
             nojournal: '',
         });
-        assert.neq(null, conn, 'mongod was unable to restart after receiving a SIGKILL');
+        assert.neq(null, conn, 'merizod was unable to restart after receiving a SIGKILL');
 
         var testDB = conn.getDB('test');
         assert.eq(1, testDB.nojournal.count({final: true}), 'final journaled write was not found');
@@ -91,15 +91,15 @@
 
         MongoRunner.stopMongod(conn);
 
-        // Restart the mongod with journaling enabled.
+        // Restart the merizod with journaling enabled.
         conn = MongoRunner.runMongod({
             dbpath: dbpath,
             noCleanData: true,
             journal: '',
         });
-        assert.neq(null, conn, 'mongod was unable to start up after re-enabling journaling');
+        assert.neq(null, conn, 'merizod was unable to start up after re-enabling journaling');
 
-        // Change the database object to connect to the restarted mongod.
+        // Change the database object to connect to the restarted merizod.
         testDB = conn.getDB('test');
         initialNumLogWrites = testDB.serverStatus().wiredTiger.log['log write operations'];
 
@@ -111,12 +111,12 @@
         MongoRunner.stopMongod(conn);
     }
 
-    // Operations from the journal should be replayed even when the mongod is terminated before
+    // Operations from the journal should be replayed even when the merizod is terminated before
     // anything is written to disk.
     jsTest.log('Running the test without ever creating a checkpoint');
     runTest({checkpoint: false});
 
-    // Repeat the test again, but ensure that some data is written to disk before the mongod is
+    // Repeat the test again, but ensure that some data is written to disk before the merizod is
     // terminated.
     jsTest.log('Creating a checkpoint part-way through running the test');
     runTest({checkpoint: true});

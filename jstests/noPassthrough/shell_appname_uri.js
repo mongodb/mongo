@@ -3,7 +3,7 @@
     "use strict";
 
     const conn = MongoRunner.runMongod();
-    const uri = "mongodb://" + conn.host + "/test";
+    const uri = "merizodb://" + conn.host + "/test";
     const tests = [];
 
     // Asserts that system.profile contains only entries
@@ -23,7 +23,7 @@
     tests.push(function testDefaultAppName() {
         const db = new Mongo(uri).getDB("test");
         assert.commandWorked(db.coll.insert({}));
-        assertProfileOnlyContainsAppName(db, "MongoDB Shell");
+        assertProfileOnlyContainsAppName(db, "MerizoDB Shell");
     });
 
     tests.push(function testAppName() {
@@ -39,8 +39,8 @@
     });
 
     tests.push(function testLongAppName() {
-        // From MongoDB Handshake specification:
-        // The client.application.name cannot exceed 128 bytes. MongoDB will return an error if
+        // From MerizoDB Handshake specification:
+        // The client.application.name cannot exceed 128 bytes. MerizoDB will return an error if
         // these limits are not adhered to, which will result in handshake failure. Drivers MUST
         // validate these values and truncate driver provided values if necessary.
         const longAppName = "a".repeat(129);

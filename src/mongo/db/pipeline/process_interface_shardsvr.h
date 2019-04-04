@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/process_interface_standalone.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/pipeline/pipeline.h"
+#include "merizo/db/pipeline/process_interface_standalone.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Specialized version of the MongoDInterface when this node is a shard server.
@@ -52,7 +52,7 @@ public:
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const final {
         // We don't expect anyone to use this method on the shard itself (yet). This is currently
-        // only used for $out. For $out in a sharded cluster, the mongos is responsible for
+        // only used for $out. For $out in a sharded cluster, the merizos is responsible for
         // collecting the document key fields before serializing them and sending them to the
         // shards. This is logically a MONGO_UNREACHABLE, but a malicious user could construct a
         // request to send directly to the shards which does not include the uniqueKey, so we must
@@ -87,4 +87,4 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
 };
 
-}  // namespace mongo
+}  // namespace merizo

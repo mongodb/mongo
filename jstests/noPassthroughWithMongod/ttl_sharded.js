@@ -8,7 +8,7 @@
  */
 
 // start up a new sharded cluster
-var s = new ShardingTest({shards: 2, mongos: 1});
+var s = new ShardingTest({shards: 2, merizos: 1});
 
 var dbname = "testDB";
 var coll = "ttl_sharded";

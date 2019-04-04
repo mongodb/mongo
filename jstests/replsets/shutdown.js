@@ -24,7 +24,7 @@ load('jstests/replsets/rslib.js');
     let program = rst.start(
         secondary,
         {waitForConnect: false, setParameter: "failpoint.shutdownAtStartup={mode:'alwaysOn'}"});
-    // mongod should exit automatically, since failpoint was set.
+    // merizod should exit automatically, since failpoint was set.
     let exitCode = waitProgram(program.pid);
     assert.eq(0, exitCode);
     rst.stopSet();

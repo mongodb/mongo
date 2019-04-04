@@ -22,7 +22,7 @@
 
     if (typeof db === 'undefined') {
         throw new Error(
-            "Expected mongo shell to be connected a server, but global 'db' object isn't defined");
+            "Expected merizo shell to be connected a server, but global 'db' object isn't defined");
     }
 
     let debugInfo = [];

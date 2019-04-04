@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/shell/linenoise_utf8.h"
+#include "merizo/shell/linenoise_utf8.h"
 
 #ifdef _WIN32
-#include "mongo/platform/windows_basic.h"
-#include "mongo/util/text.h"
+#include "merizo/platform/windows_basic.h"
+#include "merizo/util/text.h"
 #include <io.h>
 #else
 #include <unistd.h>
@@ -322,7 +322,7 @@ int write32(int fileHandle, const UChar32* string32, unsigned int sourceLengthIn
                                           sourceLengthInCharacters);
 #if defined(_WIN32)
     if (_isatty(fileHandle)) {
-        bool success = mongo::writeUtf8ToWindowsConsole(tempCharString.get(), count);
+        bool success = merizo::writeUtf8ToWindowsConsole(tempCharString.get(), count);
         if (!success) {
             return -1;
         }

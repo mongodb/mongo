@@ -1,4 +1,4 @@
-// Tests that the $changeStream stage returns an error when run against a standalone mongod.
+// Tests that the $changeStream stage returns an error when run against a standalone merizod.
 // @tags: [requires_sharding, uses_change_streams]
 
 (function() {
@@ -31,7 +31,7 @@
     }
 
     const conn = MongoRunner.runMongod({enableMajorityReadConcern: ""});
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
     // $changeStream cannot run on a non-existent database.
     assert.writeOK(conn.getDB("test").ensure_db_exists.insert({}));
     assertChangeStreamNotSupportedOnConnection(conn);
@@ -46,15 +46,15 @@
         shardAsReplicaSet: false
     });
     // Make sure the database exists before running any commands.
-    const mongosDB = clusterWithStandalones.getDB("test");
+    const merizosDB = clusterWithStandalones.getDB("test");
     // enableSharding will create the db at the cluster level but not on the shards. $changeStream
-    // through mongoS will be allowed to run on the shards despite the lack of a database.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: "test"}));
+    // through merizoS will be allowed to run on the shards despite the lack of a database.
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: "test"}));
     assertChangeStreamNotSupportedOnConnection(clusterWithStandalones.s);
     // Shard the 'ensure_db_exists' collection on a hashed key before running $changeStream on the
     // shards directly. This will ensure that the database is created on both shards.
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: "test.ensure_db_exists", key: {_id: "hashed"}}));
+        merizosDB.adminCommand({shardCollection: "test.ensure_db_exists", key: {_id: "hashed"}}));
     assertChangeStreamNotSupportedOnConnection(clusterWithStandalones.shard0);
     assertChangeStreamNotSupportedOnConnection(clusterWithStandalones.shard1);
     clusterWithStandalones.stop();

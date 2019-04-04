@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -39,9 +39,9 @@
  * Usage:  MONGO_MAKE_STRING_VECTOR("a", "b", "c") returns a vector containing
  * std::strings "a", "b", "c", in that order.
  */
-#define MONGO_MAKE_STRING_VECTOR(...) ::mongo::_makeStringVector(0, __VA_ARGS__, NULL)
+#define MONGO_MAKE_STRING_VECTOR(...) ::merizo::_makeStringVector(0, __VA_ARGS__, NULL)
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Create a vector of strings from varargs of C-style strings.
@@ -58,4 +58,4 @@ namespace mongo {
  */
 std::vector<std::string> _makeStringVector(int ignored, ...);
 
-}  // namespace mongo
+}  // namespace merizo

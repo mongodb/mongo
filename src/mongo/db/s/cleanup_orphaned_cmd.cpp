@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/field_parser.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/range_arithmetic.h"
-#include "mongo/db/s/chunk_move_write_concern_options.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/util/log.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/field_parser.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/range_arithmetic.h"
+#include "merizo/db/s/chunk_move_write_concern_options.h"
+#include "merizo/db/s/collection_sharding_runtime.h"
+#include "merizo/db/s/shard_filtering_metadata_refresh.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/service_context.h"
+#include "merizo/s/request_types/migration_secondary_throttle_options.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 enum CleanupResult { CleanupResult_Done, CleanupResult_Continue, CleanupResult_Error };
@@ -253,4 +253,4 @@ BSONField<BSONObj> CleanupOrphanedCommand::startingFromKeyField("startingFromKey
 BSONField<BSONObj> CleanupOrphanedCommand::stoppedAtKeyField("stoppedAtKey");
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

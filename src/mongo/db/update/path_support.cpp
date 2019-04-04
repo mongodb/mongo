@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/path_support.h"
+#include "merizo/db/update/path_support.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 namespace pathsupport {
 
 using std::string;
-using mongoutils::str::stream;
+using merizoutils::str::stream;
 
 namespace {
 
@@ -54,7 +54,7 @@ Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
 
         if (toPad > kMaxPaddingAllowed) {
             return Status(ErrorCodes::CannotBackfillArray,
-                          mongoutils::str::stream() << "can't backfill more than "
+                          merizoutils::str::stream() << "can't backfill more than "
                                                     << kMaxPaddingAllowed
                                                     << " elements");
         }
@@ -129,7 +129,7 @@ Status findLongestPrefix(const FieldRef& prefix,
         *idxFound = i - 1;
         *elemFound = prev;
         return Status(ErrorCodes::PathNotViable,
-                      mongoutils::str::stream() << "cannot use the part (" << prefix.getPart(i - 1)
+                      merizoutils::str::stream() << "cannot use the part (" << prefix.getPart(i - 1)
                                                 << " of "
                                                 << prefix.dottedField()
                                                 << ") to traverse the element ({"
@@ -173,7 +173,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
     // we need padding.
     size_t i = idxFound;
     bool inArray = false;
-    if (elemFound.getType() == mongo::Array) {
+    if (elemFound.getType() == merizo::Array) {
         boost::optional<size_t> newIdx = parseUnsignedBase10Integer(prefix.getPart(idxFound));
         if (!newIdx) {
             return Status(ErrorCodes::PathNotViable,
@@ -440,4 +440,4 @@ Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Docume
 }
 
 }  // namespace pathsupport
-}  // namespace mongo
+}  // namespace merizo

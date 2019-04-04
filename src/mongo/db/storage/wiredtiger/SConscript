@@ -16,11 +16,11 @@ env.Library(
         'wiredtiger_customization_hooks.cpp',
         'wiredtiger_extensions.cpp',
     ],
-    LIBDEPS= ['$BUILD_DIR/mongo/base',
-              '$BUILD_DIR/mongo/db/service_context'],
+    LIBDEPS= ['$BUILD_DIR/merizo/base',
+              '$BUILD_DIR/merizo/db/service_context'],
     PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
-        '$BUILD_DIR/mongo/mongos',
+        '$BUILD_DIR/merizo/merizod',
+        '$BUILD_DIR/merizo/merizos',
     ],
 )
 
@@ -51,40 +51,40 @@ if wiredtiger:
             env.Idlc('wiredtiger_parameters.idl')[0],
             ],
         LIBDEPS= [
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-            '$BUILD_DIR/mongo/db/catalog/collection',
-            '$BUILD_DIR/mongo/db/catalog/collection_options',
-            '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-            '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-            '$BUILD_DIR/mongo/db/curop',
-            '$BUILD_DIR/mongo/db/index/index_descriptor',
-            '$BUILD_DIR/mongo/db/global_settings',
-            '$BUILD_DIR/mongo/db/namespace_string',
-            '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-            '$BUILD_DIR/mongo/db/repl/repl_settings',
-            '$BUILD_DIR/mongo/db/server_options_core',
-            '$BUILD_DIR/mongo/db/service_context',
-            '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
-            '$BUILD_DIR/mongo/db/storage/journal_listener',
-            '$BUILD_DIR/mongo/db/storage/key_string',
-            '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
-            '$BUILD_DIR/mongo/db/storage/oplog_hack',
-            '$BUILD_DIR/mongo/db/storage/storage_file_util',
-            '$BUILD_DIR/mongo/db/storage/storage_options',
-            '$BUILD_DIR/mongo/util/concurrency/ticketholder',
-            '$BUILD_DIR/mongo/util/elapsed_tracker',
-            '$BUILD_DIR/mongo/util/processinfo',
+            '$BUILD_DIR/merizo/base',
+            '$BUILD_DIR/merizo/db/bson/dotted_path_support',
+            '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/merizo/db/catalog/collection',
+            '$BUILD_DIR/merizo/db/catalog/collection_options',
+            '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+            '$BUILD_DIR/merizo/db/concurrency/write_conflict_exception',
+            '$BUILD_DIR/merizo/db/curop',
+            '$BUILD_DIR/merizo/db/index/index_descriptor',
+            '$BUILD_DIR/merizo/db/global_settings',
+            '$BUILD_DIR/merizo/db/namespace_string',
+            '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+            '$BUILD_DIR/merizo/db/repl/repl_settings',
+            '$BUILD_DIR/merizo/db/server_options_core',
+            '$BUILD_DIR/merizo/db/service_context',
+            '$BUILD_DIR/merizo/db/storage/index_entry_comparison',
+            '$BUILD_DIR/merizo/db/storage/journal_listener',
+            '$BUILD_DIR/merizo/db/storage/key_string',
+            '$BUILD_DIR/merizo/db/storage/kv/kv_prefix',
+            '$BUILD_DIR/merizo/db/storage/oplog_hack',
+            '$BUILD_DIR/merizo/db/storage/storage_file_util',
+            '$BUILD_DIR/merizo/db/storage/storage_options',
+            '$BUILD_DIR/merizo/util/concurrency/ticketholder',
+            '$BUILD_DIR/merizo/util/elapsed_tracker',
+            '$BUILD_DIR/merizo/util/processinfo',
             '$BUILD_DIR/third_party/shim_snappy',
             '$BUILD_DIR/third_party/shim_wiredtiger',
             '$BUILD_DIR/third_party/shim_zlib',
             'storage_wiredtiger_customization_hooks',
             ],
         LIBDEPS_PRIVATE= [
-            '$BUILD_DIR/mongo/db/snapshot_window_options',
-            '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
-            '$BUILD_DIR/mongo/util/options_parser/options_parser',
+            '$BUILD_DIR/merizo/db/snapshot_window_options',
+            '$BUILD_DIR/merizo/db/storage/storage_repair_observer',
+            '$BUILD_DIR/merizo/util/options_parser/options_parser',
             ],
         )
 
@@ -93,23 +93,23 @@ if wiredtiger:
         source=[
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
-            'wiredtiger_record_store_mongod.cpp',
+            'wiredtiger_record_store_merizod.cpp',
             'wiredtiger_server_status.cpp',
             env.Idlc('wiredtiger_global_options.idl')[0],
         ],
         LIBDEPS=[
             'storage_wiredtiger_core',
             'storage_wiredtiger_customization_hooks',
-            '$BUILD_DIR/mongo/db/db_raii',
-            '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
-            '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
-            '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
+            '$BUILD_DIR/merizo/db/db_raii',
+            '$BUILD_DIR/merizo/db/storage/kv/kv_engine',
+            '$BUILD_DIR/merizo/db/storage/storage_engine_lock_file',
+            '$BUILD_DIR/merizo/db/storage/storage_engine_metadata',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/db/commands/server_status',
-            '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-            '$BUILD_DIR/mongo/db/storage/storage_engine_common',
-            '$BUILD_DIR/mongo/util/options_parser/options_parser',
+            '$BUILD_DIR/merizo/db/commands/server_status',
+            '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+            '$BUILD_DIR/merizo/db/storage/storage_engine_common',
+            '$BUILD_DIR/merizo/util/options_parser/options_parser',
         ],
     )
 
@@ -127,14 +127,14 @@ if wiredtiger:
         source=['wiredtiger_init_test.cpp',
                 ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/auth/authmocks',
-            '$BUILD_DIR/mongo/db/service_context',
-            '$BUILD_DIR/mongo/db/service_context_d',
-            '$BUILD_DIR/mongo/db/service_context_test_fixture',
-            '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
-            '$BUILD_DIR/mongo/db/storage/storage_options',
-            '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
-            '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_core',
+            '$BUILD_DIR/merizo/db/auth/authmocks',
+            '$BUILD_DIR/merizo/db/service_context',
+            '$BUILD_DIR/merizo/db/service_context_d',
+            '$BUILD_DIR/merizo/db/service_context_test_fixture',
+            '$BUILD_DIR/merizo/db/storage/storage_engine_metadata',
+            '$BUILD_DIR/merizo/db/storage/storage_options',
+            '$BUILD_DIR/merizo/db/storage/wiredtiger/storage_wiredtiger',
+            '$BUILD_DIR/merizo/db/storage/wiredtiger/storage_wiredtiger_core',
             ],
         )
 
@@ -145,14 +145,14 @@ if wiredtiger:
         ],
         LIBDEPS=[
             'storage_wiredtiger_mock',
-            '$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness',
-            '$BUILD_DIR/mongo/util/clock_source_mock',
+            '$BUILD_DIR/merizo/db/storage/recovery_unit_test_harness',
+            '$BUILD_DIR/merizo/util/clock_source_mock',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/db/auth/authmocks',
-            '$BUILD_DIR/mongo/db/index/index_access_methods',
-            '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-            '$BUILD_DIR/mongo/db/repl/replmocks',
+            '$BUILD_DIR/merizo/db/auth/authmocks',
+            '$BUILD_DIR/merizo/db/index/index_access_methods',
+            '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+            '$BUILD_DIR/merizo/db/repl/replmocks',
         ],
     )
 
@@ -162,9 +162,9 @@ if wiredtiger:
             'wiredtiger_record_store_test.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
-            '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
-            '$BUILD_DIR/mongo/util/clock_source_mock',
+            '$BUILD_DIR/merizo/db/storage/kv/kv_engine_core',
+            '$BUILD_DIR/merizo/db/storage/record_store_test_harness',
+            '$BUILD_DIR/merizo/util/clock_source_mock',
             'storage_wiredtiger_mock',
         ],
     )
@@ -175,8 +175,8 @@ if wiredtiger:
             'wiredtiger_index_test.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
-            '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
+            '$BUILD_DIR/merizo/db/storage/kv/kv_engine_core',
+            '$BUILD_DIR/merizo/db/storage/sorted_data_interface_test_harness',
             'storage_wiredtiger_mock',
         ],
     )
@@ -194,9 +194,9 @@ if wiredtiger:
                 'additional_wiredtiger_record_store_tests',
             ],
             LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/db/auth/authmocks',
-                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-                '$BUILD_DIR/mongo/db/repl/replmocks',
+                '$BUILD_DIR/merizo/db/auth/authmocks',
+                '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/merizo/db/repl/replmocks',
             ],
         )
 
@@ -209,9 +209,9 @@ if wiredtiger:
                 'additional_wiredtiger_record_store_tests',
             ],
             LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/db/auth/authmocks',
-                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-                '$BUILD_DIR/mongo/db/repl/replmocks',
+                '$BUILD_DIR/merizo/db/auth/authmocks',
+                '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/merizo/db/repl/replmocks',
             ],
         )
 
@@ -224,7 +224,7 @@ if wiredtiger:
                 'additional_wiredtiger_index_tests',
             ],
             LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/db/auth/authmocks',
+                '$BUILD_DIR/merizo/db/auth/authmocks',
             ]
         )
 
@@ -237,7 +237,7 @@ if wiredtiger:
                 'additional_wiredtiger_index_tests',
             ],
             LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/db/auth/authmocks',
+                '$BUILD_DIR/merizo/db/auth/authmocks',
             ]
         )
 
@@ -247,14 +247,14 @@ if wiredtiger:
                 'wiredtiger_kv_engine_test.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/auth/authmocks',
-                '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+                '$BUILD_DIR/merizo/db/auth/authmocks',
+                '$BUILD_DIR/merizo/db/storage/kv/kv_engine_test_harness',
                 'storage_wiredtiger_mock',
             ],
             LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-                '$BUILD_DIR/mongo/db/repl/replmocks',
-                '$BUILD_DIR/mongo/db/service_context_test_fixture',
+                '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/merizo/db/repl/replmocks',
+                '$BUILD_DIR/merizo/db/service_context_test_fixture',
             ],
         )
 
@@ -263,8 +263,8 @@ if wiredtiger:
             source=['wiredtiger_util_test.cpp',
                     ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/service_context',
-                '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+                '$BUILD_DIR/merizo/db/service_context',
+                '$BUILD_DIR/merizo/db/storage/kv/kv_engine_core',
                 'storage_wiredtiger_mock',
                 ],
             )

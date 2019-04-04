@@ -9,11 +9,11 @@ selector:
   - jstests/sharding/cleanup_orphaned_auth.js
   - jstests/sharding/localhostAuthBypass.js
   - jstests/sharding/kill_sessions.js
-  - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
+  - jstests/sharding/merizos_rs_auth_shard_failure_tolerance.js
   - jstests/sharding/mrShardedOutputAuth.js
   - jstests/sharding/aggregation_currentop.js
   - jstests/sharding/advance_cluster_time_action_type.js
-  - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+  - jstests/sharding/merizod_returns_no_cluster_time_without_keys.js
   # Count/write/aggregate commands against the config shard do not support retries yet
   - jstests/sharding/addshard1.js
   - jstests/sharding/addshard2.js
@@ -52,7 +52,7 @@ selector:
   - jstests/sharding/presplit.js
   - jstests/sharding/query_config.js
   - jstests/sharding/remove1.js
-  - jstests/sharding/rename_across_mongos.js
+  - jstests/sharding/rename_across_merizos.js
   - jstests/sharding/shard1.js
   - jstests/sharding/shard2.js
   - jstests/sharding/shard3.js
@@ -85,14 +85,14 @@ selector:
   - jstests/sharding/migrateBig.js
   - jstests/sharding/sharding_rs1.js
   - jstests/sharding/move_primary_fails_without_database_version.js
-  # Calls the config server primary directly (not through mongos)
+  # Calls the config server primary directly (not through merizos)
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js
   - jstests/sharding/read_after_optime.js
   - jstests/sharding/server_status.js
   - jstests/sharding/drop_configdb.js
   - jstests/sharding/shard_identity_config_update.js
-  - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
+  - jstests/sharding/merizos_does_not_gossip_logical_time_without_keys.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/keys_rotation_interval_sec.js
   - jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
@@ -109,24 +109,24 @@ selector:
   # Runs replSetGetStatus -- via awaitLastOpCommitted -- directly against the config server:
   # retries aren't supported.
   - jstests/sharding/coll_epoch_test1.js
-  - jstests/sharding/move_stale_mongos.js
+  - jstests/sharding/move_stale_merizos.js
   - jstests/sharding/shard4.js
   - jstests/sharding/shard5.js
-  - jstests/sharding/split_stale_mongos.js
-  - jstests/sharding/stale_mongos_updates_and_removes.js
+  - jstests/sharding/split_stale_merizos.js
+  - jstests/sharding/stale_merizos_updates_and_removes.js
   - jstests/sharding/zero_shard_version.js
   # Already stop or blackholes the primary of the CSRS config shard
   - jstests/sharding/all_shard_and_config_hosts_brought_down_one_by_one.js
-  - jstests/sharding/all_config_servers_blackholed_from_mongos.js
+  - jstests/sharding/all_config_servers_blackholed_from_merizos.js
   - jstests/sharding/batch_write_command_sharded.js
   - jstests/sharding/config_rs_no_primary.js
   - jstests/sharding/startup_with_all_configs_down.js
   - jstests/sharding/lagged_config_secondary.js
   - jstests/sharding/autodiscover_config_rs_from_secondary.js
   - jstests/sharding/rs_stepdown_and_pooling.js
-  - jstests/sharding/mongos_no_replica_set_refresh.js
+  - jstests/sharding/merizos_no_replica_set_refresh.js
   - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
-  - jstests/sharding/primary_config_server_blackholed_from_mongos.js
+  - jstests/sharding/primary_config_server_blackholed_from_merizos.js
   # Nothing is affected by config server step down
   - jstests/sharding/basic_sharding_params.js
   # ShardingTest is never used, so continuous step down thread never starts
@@ -156,7 +156,7 @@ selector:
   - jstests/sharding/shard_config_db_collections.js
   # creates collection, does movePrimary, then shards the collection and moves a chunk to the old
   # primary (SERVER-31909)
-  - jstests/sharding/mongos_validate_writes.js
+  - jstests/sharding/merizos_validate_writes.js
   # Test expects a specific chunk distribution after shardCollection and it can be broken when
   # a step down occurs.
   - jstests/sharding/regex_targeting.js
@@ -165,7 +165,7 @@ selector:
   # Calls movePrimary after data has been inserted into an unsharded collection, so will fail if
   # a stepdown causes the command to be sent again.
   - jstests/sharding/move_primary_clone_test.js
-  - jstests/sharding/mongos_validate_writes.js
+  - jstests/sharding/merizos_validate_writes.js
   - jstests/sharding/movePrimary1.js
   # Checks for an exact number of matching entries in the profiler, which will fail if a command
   # gets retried due to a stepdown.
@@ -192,7 +192,7 @@ selector:
   - jstests/sharding/out_stale_unique_key.js
   - jstests/sharding/out_unique_key_requires_index.js
   # In this suite the cluster may end up in a state where each shard believes the
-  # collection is sharded and the mongos believes it is unsharded. $out is not
+  # collection is sharded and the merizos believes it is unsharded. $out is not
   # prepared to work correctly in this situation. This should be fixed by a future
   # improvement in sharding infrastructure, and can be unblacklisted by SERVER-40172.
   - jstests/sharding/out_to_existing.js

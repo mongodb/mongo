@@ -39,7 +39,7 @@
             primaryAdmin.adminCommand({setParameter: 1, logComponentVerbosity: {command: 1}}));
         operation();
         // Wait for the operation to complete.
-        checkLog.contains(primary, logMsg + ' appName: "MongoDB Shell"');
+        checkLog.contains(primary, logMsg + ' appName: "MerizoDB Shell"');
         assert.commandWorked(
             primaryAdmin.adminCommand({setParameter: 1, logComponentVerbosity: {command: 0}}));
         assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));

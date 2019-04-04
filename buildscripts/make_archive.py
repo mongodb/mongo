@@ -5,8 +5,8 @@ The output format (tar, tgz, zip) is determined from the file name, unless the u
 --format on the command line.
 
 This script simplifies the specification of filename transformations, so that, e.g.,
-src/mongo/foo.cpp and build/linux2/normal/buildinfo.cpp can get put into the same
-directory in the archive, perhaps mongodb-2.0.2/src/mongo.
+src/merizo/foo.cpp and build/linux2/normal/buildinfo.cpp can get put into the same
+directory in the archive, perhaps merizodb-2.0.2/src/merizo.
 
 Usage:
 
@@ -22,7 +22,7 @@ Transformations are processed in command-line order and are short-circuiting.  S
 match1, it is never compared against match2 or later.  Matches are just python startswith()
 comparisons.
 
-For a detailed usage example, see src/SConscript.client or src/mongo/SConscript.
+For a detailed usage example, see src/SConscript.client or src/merizo/SConscript.
 """
 
 import optparse
@@ -71,8 +71,8 @@ def make_tar_archive(opts):
     tarball containing all the files in 'opt.input_filename' renamed
     according to the mappings in 'opts.transformations'.
 
-    e.g. for an input file named "a/mongo/build/DISTSRC", and an
-    existing transformation {"a/mongo/build": "release"}, the input
+    e.g. for an input file named "a/merizo/build/DISTSRC", and an
+    existing transformation {"a/merizo/build": "release"}, the input
     file will be written to the tarball as "release/DISTSRC"
 
     All files to be compressed are copied into new directories as

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,25 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/catalog_control.h"
+#include "merizo/db/catalog/catalog_control.h"
 
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/ftdc/ftdc_mongod.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repair_database.h"
-#include "mongo/util/log.h"
+#include "merizo/db/background.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/ftdc/ftdc_merizod.h"
+#include "merizo/db/index_builds_coordinator.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/repair_database.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace catalog {
 MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
@@ -216,4 +216,4 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     LOG(1) << "openCatalog: finished reloading UUID catalog";
 }
 }  // namespace catalog
-}  // namespace mongo
+}  // namespace merizo

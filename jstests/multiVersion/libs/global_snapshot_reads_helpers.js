@@ -51,7 +51,7 @@ function runCommandAndVerifyResponse(sessionDb, txnNumber, cmdObj, expectSuccess
 }
 
 /**
- * Runs reads with snapshot readConcern against mongos, expecting they either fail or succeed
+ * Runs reads with snapshot readConcern against merizos, expecting they either fail or succeed
  * depending on the expectSuccess parameter.
  */
 function verifyGlobalSnapshotReads(conn, expectSuccess, expectedCode) {

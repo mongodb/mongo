@@ -24,8 +24,8 @@
 #   go-tests = true
 #   unused-packages = true
 
-# mongo-lint is a custom linter that is not called in any of the go code.
-required = ["github.com/3rf/mongo-lint"]
+# merizo-lint is a custom linter that is not called in any of the go code.
+required = ["github.com/3rf/merizo-lint"]
 
 [[constraint]]
   name = "github.com/10gen/escaper"
@@ -89,7 +89,7 @@ required = ["github.com/3rf/mongo-lint"]
   revision = "287b4346dc4e71a038c346375a9d572453bc469b"
 
 [[override]]
-  name = "github.com/3rf/mongo-lint"
+  name = "github.com/3rf/merizo-lint"
   revision = "3550fdcf1f43b89aaeabaa4559eaae6dc4407e42"
 
 [[override]]

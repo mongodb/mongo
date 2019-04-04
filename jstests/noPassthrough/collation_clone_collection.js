@@ -6,10 +6,10 @@
     "use strict";
 
     var source = MongoRunner.runMongod({});
-    assert.neq(null, source, "mongod was unable to start up");
+    assert.neq(null, source, "merizod was unable to start up");
 
     var dest = MongoRunner.runMongod({});
-    assert.neq(null, dest, "mongod was unable to start up");
+    assert.neq(null, dest, "merizod was unable to start up");
 
     var sourceColl = source.getDB("test").collation;
     var destColl = dest.getDB("test").collation;

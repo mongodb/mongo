@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2015-present.
+// Copyright (C) MerizoDB, Inc. 2015-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -37,7 +37,7 @@ type MongoServer struct {
 	pingIndex     int
 	pingCount     uint32
 	pingWindow    [6]time.Duration
-	info          *mongoServerInfo
+	info          *merizoServerInfo
 }
 
 type dialer struct {
@@ -49,7 +49,7 @@ func (dial dialer) isSet() bool {
 	return dial.old != nil || dial.new != nil
 }
 
-type mongoServerInfo struct {
+type merizoServerInfo struct {
 	Master         bool
 	Mongos         bool
 	Tags           bson.D
@@ -57,7 +57,7 @@ type mongoServerInfo struct {
 	SetName        string
 }
 
-var defaultServerInfo mongoServerInfo
+var defaultServerInfo merizoServerInfo
 
 func newServer(addr string, tcpaddr *net.TCPAddr, sync chan bool, dial dialer) *MongoServer {
 	server := &MongoServer{
@@ -225,13 +225,13 @@ func (server *MongoServer) AbendSocket(socket *MongoSocket) {
 	}
 }
 
-func (server *MongoServer) SetInfo(info *mongoServerInfo) {
+func (server *MongoServer) SetInfo(info *merizoServerInfo) {
 	server.Lock()
 	server.info = info
 	server.Unlock()
 }
 
-func (server *MongoServer) Info() *mongoServerInfo {
+func (server *MongoServer) Info() *merizoServerInfo {
 	server.Lock()
 	info := server.info
 	server.Unlock()
@@ -313,25 +313,25 @@ func (server *MongoServer) pinger(loop bool) {
 	}
 }
 
-type mongoServerSlice []*MongoServer
+type merizoServerSlice []*MongoServer
 
-func (s mongoServerSlice) Len() int {
+func (s merizoServerSlice) Len() int {
 	return len(s)
 }
 
-func (s mongoServerSlice) Less(i, j int) bool {
+func (s merizoServerSlice) Less(i, j int) bool {
 	return s[i].ResolvedAddr < s[j].ResolvedAddr
 }
 
-func (s mongoServerSlice) Swap(i, j int) {
+func (s merizoServerSlice) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s mongoServerSlice) Sort() {
+func (s merizoServerSlice) Sort() {
 	sort.Sort(s)
 }
 
-func (s mongoServerSlice) Search(resolvedAddr string) (i int, ok bool) {
+func (s merizoServerSlice) Search(resolvedAddr string) (i int, ok bool) {
 	n := len(s)
 	i = sort.Search(n, func(i int) bool {
 		return s[i].ResolvedAddr >= resolvedAddr
@@ -339,23 +339,23 @@ func (s mongoServerSlice) Search(resolvedAddr string) (i int, ok bool) {
 	return i, i != n && s[i].ResolvedAddr == resolvedAddr
 }
 
-type mongoServers struct {
-	slice mongoServerSlice
+type merizoServers struct {
+	slice merizoServerSlice
 }
 
-func (servers *mongoServers) Search(resolvedAddr string) (server *MongoServer) {
+func (servers *merizoServers) Search(resolvedAddr string) (server *MongoServer) {
 	if i, ok := servers.slice.Search(resolvedAddr); ok {
 		return servers.slice[i]
 	}
 	return nil
 }
 
-func (servers *mongoServers) Add(server *MongoServer) {
+func (servers *merizoServers) Add(server *MongoServer) {
 	servers.slice = append(servers.slice, server)
 	servers.slice.Sort()
 }
 
-func (servers *mongoServers) Remove(other *MongoServer) (server *MongoServer) {
+func (servers *merizoServers) Remove(other *MongoServer) (server *MongoServer) {
 	if i, found := servers.slice.Search(other.ResolvedAddr); found {
 		server = servers.slice[i]
 		copy(servers.slice[i:], servers.slice[i+1:])
@@ -366,25 +366,25 @@ func (servers *mongoServers) Remove(other *MongoServer) (server *MongoServer) {
 	return
 }
 
-func (servers *mongoServers) Slice() []*MongoServer {
+func (servers *merizoServers) Slice() []*MongoServer {
 	return ([]*MongoServer)(servers.slice)
 }
 
-func (servers *mongoServers) Get(i int) *MongoServer {
+func (servers *merizoServers) Get(i int) *MongoServer {
 	return servers.slice[i]
 }
 
-func (servers *mongoServers) Len() int {
+func (servers *merizoServers) Len() int {
 	return len(servers.slice)
 }
 
-func (servers *mongoServers) Empty() bool {
+func (servers *merizoServers) Empty() bool {
 	return len(servers.slice) == 0
 }
 
 // BestFit returns the best guess of what would be the most interesting
 // server to perform operations on at this point in time.
-func (servers *mongoServers) BestFit(mode Mode, serverTags []bson.D) *MongoServer {
+func (servers *merizoServers) BestFit(mode Mode, serverTags []bson.D) *MongoServer {
 	var best *MongoServer
 	for _, next := range servers.slice {
 		if best == nil {

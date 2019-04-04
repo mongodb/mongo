@@ -10,10 +10,10 @@
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
 
-    const mongosDB = st.s0.getDB("out_hashed_shard_key");
+    const merizosDB = st.s0.getDB("out_hashed_shard_key");
     const foreignDB = st.s0.getDB("out_hashed_shard_key_foreign");
-    const source = mongosDB.source;
-    const target = mongosDB.target;
+    const source = merizosDB.source;
+    const target = merizosDB.target;
     source.drop();
     target.drop();
 

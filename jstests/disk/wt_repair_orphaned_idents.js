@@ -14,13 +14,13 @@
     resetDbpath(dbpath);
 
     // Create a collection and insert a doc.
-    let mongod = MongoRunner.runMongod({dbpath: dbpath});
+    let merizod = MongoRunner.runMongod({dbpath: dbpath});
     const importantCollName = "importantColl";
     const importantDocId = "importantDoc";
-    const importantColl = mongod.getDB("test")[importantCollName];
+    const importantColl = merizod.getDB("test")[importantCollName];
     assert.commandWorked(importantColl.insert({_id: importantDocId}));
     const importantCollIdent = getUriForColl(importantColl);
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 
     // Delete the _mdb_catalog.
     let mdbCatalogFile = dbpath + "_mdb_catalog.wt";
@@ -28,13 +28,13 @@
     removeFile(mdbCatalogFile);
 
     // Repair crates the _mdb_catalog and catalog entries for all the orphaned idents.
-    jsTestLog("running mongod with --repair");
-    assert.eq(0, runMongoProgram("mongod", "--repair", "--port", mongod.port, "--dbpath", dbpath));
+    jsTestLog("running merizod with --repair");
+    assert.eq(0, runMongoProgram("merizod", "--repair", "--port", merizod.port, "--dbpath", dbpath));
 
-    jsTestLog("restarting mongod");
-    mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
+    jsTestLog("restarting merizod");
+    merizod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
 
-    let localDb = mongod.getDB("local");
+    let localDb = merizod.getDB("local");
     let res = localDb.runCommand({listCollections: 1});
     assert.commandWorked(res, tojson(res));
 
@@ -63,7 +63,7 @@
     }
     assert.gt(recoveredCount, 0);
 
-    let testDb = mongod.getDB("test");
+    let testDb = merizod.getDB("test");
 
     // Assert the recovered collection still has the original document.
     assert.eq(testDb[importantCollName].find({_id: importantDocId}).count(), 1);
@@ -84,5 +84,5 @@
         assert(testDb[collName].drop());
     }
 
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 })();

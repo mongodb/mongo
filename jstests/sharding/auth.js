@@ -51,7 +51,7 @@
 
     var s = new ShardingTest({
         name: "auth",
-        mongos: 1,
+        merizos: 1,
         shards: 0,
         other: {keyFile: "jstests/libs/key1", chunkSize: 1, enableAutoSplit: false},
     });
@@ -77,7 +77,7 @@
 
     printjson(s.getDB("config").settings.find().toArray());
 
-    print("Restart mongos with different auth options");
+    print("Restart merizos with different auth options");
     s.restartMongos(0);
     login(adminUser);
 
@@ -281,7 +281,7 @@
     print("testing map reduce");
 
     // Sharded map reduce can be tricky since all components talk to each other. For example
-    // SERVER-4114 is triggered when 1 mongod connects to another for final reduce it's not
+    // SERVER-4114 is triggered when 1 merizod connects to another for final reduce it's not
     // properly tested here since addresses are localhost, which is more permissive.
     var res = s.getDB("test").runCommand({
         mapreduce: "foo",
@@ -297,14 +297,14 @@
     assert.commandWorked(res);
 
     // Check that dump doesn't get stuck with auth
-    var exitCode = MongoRunner.runMongoTool("mongodump", {
+    var exitCode = MongoRunner.runMongoTool("merizodump", {
         host: s.s.host,
         db: testUser.db,
         username: testUser.username,
         password: testUser.password,
         authenticationMechanism: "SCRAM-SHA-1",
     });
-    assert.eq(0, exitCode, "mongodump failed to run with authentication enabled");
+    assert.eq(0, exitCode, "merizodump failed to run with authentication enabled");
 
     // Test read only users
     print("starting read only tests");
@@ -333,7 +333,7 @@
     assert.commandFailed(readOnlyDB.currentOp());
     assert.commandFailed(readOnlyDB.killOp(123));
 
-    // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
+    // fsyncUnlock doesn't work in merizos anyway, so no need check authorization for it
     /*
     broken because of SERVER-4156
     print( "   testing write command (should fail)" );

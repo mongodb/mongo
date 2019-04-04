@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -36,7 +36,7 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/bson/util/builder.h"
+#include "merizo/bson/util/builder.h"
 
 /**
  * This is the public API for the Sorter (both in-memory and external)
@@ -83,7 +83,7 @@
  * };
  */
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Runtime options that control the Sorter's behavior
@@ -269,27 +269,27 @@ private:
 }
 
 /**
- * #include "mongo/db/sorter/sorter.cpp" and call this in a single translation
+ * #include "merizo/db/sorter/sorter.cpp" and call this in a single translation
  * unit once for each unique set of template parameters.
  */
 #define MONGO_CREATE_SORTER(Key, Value, Comparator)                                      \
     /* public classes */                                                                 \
-    template class ::mongo::Sorter<Key, Value>;                                          \
-    template class ::mongo::SortIteratorInterface<Key, Value>;                           \
-    template class ::mongo::SortedFileWriter<Key, Value>;                                \
+    template class ::merizo::Sorter<Key, Value>;                                          \
+    template class ::merizo::SortIteratorInterface<Key, Value>;                           \
+    template class ::merizo::SortedFileWriter<Key, Value>;                                \
     /* internal classes */                                                               \
-    template class ::mongo::sorter::NoLimitSorter<Key, Value, Comparator>;               \
-    template class ::mongo::sorter::LimitOneSorter<Key, Value, Comparator>;              \
-    template class ::mongo::sorter::TopKSorter<Key, Value, Comparator>;                  \
-    template class ::mongo::sorter::MergeIterator<Key, Value, Comparator>;               \
-    template class ::mongo::sorter::InMemIterator<Key, Value>;                           \
-    template class ::mongo::sorter::FileIterator<Key, Value>;                            \
+    template class ::merizo::sorter::NoLimitSorter<Key, Value, Comparator>;               \
+    template class ::merizo::sorter::LimitOneSorter<Key, Value, Comparator>;              \
+    template class ::merizo::sorter::TopKSorter<Key, Value, Comparator>;                  \
+    template class ::merizo::sorter::MergeIterator<Key, Value, Comparator>;               \
+    template class ::merizo::sorter::InMemIterator<Key, Value>;                           \
+    template class ::merizo::sorter::FileIterator<Key, Value>;                            \
     /* factory functions */                                                              \
-    template ::mongo::SortIteratorInterface<Key, Value>* ::mongo::                       \
+    template ::merizo::SortIteratorInterface<Key, Value>* ::merizo::                       \
         SortIteratorInterface<Key, Value>::merge<Comparator>(                            \
             const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,            \
             const std::string& fileName,                                                 \
             const SortOptions& opts,                                                     \
             const Comparator& comp);                                                     \
-    template ::mongo::Sorter<Key, Value>* ::mongo::Sorter<Key, Value>::make<Comparator>( \
+    template ::merizo::Sorter<Key, Value>* ::merizo::Sorter<Key, Value>::make<Comparator>( \
         const SortOptions& opts, const Comparator& comp, const Settings& settings);

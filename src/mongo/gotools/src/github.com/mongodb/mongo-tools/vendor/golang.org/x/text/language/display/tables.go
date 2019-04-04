@@ -530,7 +530,7 @@ var langHeaders = [261]header{
 			"vanésxeorxanukongokikuyukuanyamakazaquistanínkalaallisutḥemercanarés" +
 			"coreanukanuricachemiréscurdukomicórnicukirguistanínllatínluxemburgué" +
 			"sgandalimburguéslingalalaosianulituanuluba-katangaletónmalgaxemarsha" +
-			"llésmaorímacedoniumalayalammongolmarathimalayumaltésbirmanunaurundeb" +
+			"llésmaorímacedoniumalayalammerizolmarathimalayumaltésbirmanunaurundeb" +
 			"ele del nortenepalésndonganeerlandésnoruegu Nynorsknoruegu Bokmålnde" +
 			"bele del surnavajonyanjaoccitanuojibwaoromooriyaoséticupunyabípalipo" +
 			"lacupashtuportuguésquechuaromancherundirumanurusukinyarwandasánscrit" +
@@ -563,7 +563,7 @@ var langHeaders = [261]header{
 			"rmanjkikakokalenjinkimbundukomi-permyakkonkanikosraeanukpellekaracha" +
 			"y-balkarkriokinaray-akarelianukurukhshambalabafiacolonianukumykkuten" +
 			"ailadinolangilahndalambalezghianulingua franca novaligurianulivonian" +
-			"ulakotalombardumongoloziluri del nortelatgalianuluba-lulualuisenolun" +
+			"ulakotalombardumerizoloziluri del nortelatgalianuluba-lulualuisenolun" +
 			"daluomizoluyiachinu lliterariulazmadurésmafamagahimaithilimakasarman" +
 			"dingomasáimabamokshamandarmendemerumorisyenírlandés mediumakhuwa-mee" +
 			"ttometa’micmacminangkabaumanchúmanipurimohawkmossimari occidentalmun" +
@@ -1302,7 +1302,7 @@ var langHeaders = [261]header{
 			"tjapanegjavanegjorjianegkongokikuyukwanyamakazakkhmerkanaregkoreaneg" +
 			"kanourikashmirikurdegkerneveuregkirgizlatinluksembourgeggandalimbour" +
 			"geglingalalaoseglituanegluba-katangalatviegmalgachegmarshallmaorimak" +
-			"edonegmalayalammongolegmarathimalaysegmaltegbirmanegnauruegndebele a" +
+			"edonegmalayalammerizolegmarathimalaysegmaltegbirmanegnauruegndebele a" +
 			"n Norzhnepalegndonganederlandegnorvegeg nynorsknorvegeg bokmålndebel" +
 			"e ar Sunavacʼhonyanjaokitanegojibwaoriyaosetegpunjabipalipolonegpach" +
 			"toportugalegkechuaegromañchegrundiroumanegrusianegkinyarwandasanskri" +
@@ -1327,7 +1327,7 @@ var langHeaders = [261]header{
 			"eoleg Jamaikayuzev-persegyuzev-arabegkarakalpakkabilegkachinkambakab" +
 			"ardegkabuverdianukhasikhotanegkimbundukonkanikosraekpellekaratchay-b" +
 			"alkarkareliegkurukhkolunegkutenailadinolahndalambalezgilingua franca" +
-			" novaliguriegmongoloziluba-lulualuisenolundaluolushailuyiasinaeg len" +
+			" novaliguriegmerizoloziluba-lulualuisenolundaluolushailuyiasinaeg len" +
 			"negelmagahimaithilimasaimokshamandarmendemorisegkrenniwerzhonegmanch" +
 			"oumanipurimohawkmarieg ar Cʼhornôgyezhoù liesmuskogimirandegerzasina" +
 			"eg Min Nannapolitanegalamaneg izelnewariniasniueaoegnogayhennorsegno" +
@@ -1593,7 +1593,7 @@ var langHeaders = [261]header{
 			"gokikujukuanjamakazaškikalalisutskikmerskikanadakorejskikanurikašmir" +
 			"skikurdskikomikornskikirgiškilatinskiluksemburškigandalimburškilinga" +
 			"lalaoskilitvanskiluba-katangalatvijskimalgaškimaršalskimaorskimakedo" +
-			"nskimalajalammongolskimaratimalajskimalteškiburmanskinaurusjeverni n" +
+			"nskimalajalammerizolskimaratimalajskimalteškiburmanskinaurusjeverni n" +
 			"debelenepalskindongaholandskinorveški (Nynorsk)norveški (Bokmal)južn" +
 			"i ndebelenavahonjanjaoksitanskiojibvaoromoorijskiosetskipandžapskipa" +
 			"lipoljskipaštuportugalskikečuaretoromanskirundirumunskiruskikinjarua" +
@@ -1620,7 +1620,7 @@ var langHeaders = [261]header{
 			"a-kalpakkabilekačinkajukambakavikabardijskikanembutjapmakondezelenor" +
 			"tskikorokasikotanizijskikojra činikakokalenjinkimbundukomi-permskiko" +
 			"nkanikosrejskikpelekaračaj-balkarkriokarelijskikuruškišambalabafiake" +
-			"lnskikumikkutenailadinolangilandalambalezgijskilakotamongolozisjever" +
+			"lnskikumikkutenailadinolangilandalambalezgijskilakotamerizolozisjever" +
 			"ni luriluba-lulualuisenolundaluomizoluhijamadureškimafamagahimaitili" +
 			"makasarmandingomasaimabamokšamandarmendemerumauricijski kreolskisred" +
 			"njovjekovni irskimakuva-metometamikmakminangkabaumančumanipurimohavk" +
@@ -3285,7 +3285,7 @@ var langHeaders = [261]header{
 			"siagbeigbogbeicelanɖgbeItaliagbeJapangbedzavangbegɔgiagbekazakhstang" +
 			"bekhmergbekannadagbeKoreagbekashmirgbekurdiagbekirghistangbelatinlak" +
 			"sembɔggbelingalalaogbelithuaniagbelatviagbemalagasegbemaorgbemakedon" +
-			"iagbemalayagbemongoliagbemarathiagbemalaygbemaltagbeburmagbedziehe n" +
+			"iagbemalayagbemerizoliagbemarathiagbemalaygbemaltagbeburmagbedziehe n" +
 			"debelegbenepalgbeHollandgbenɔweigbe ninɔsknɔweigbe bokmålnyanjagbeor" +
 			"iyagbeossetiagbepundzabgbePolishgbepashtogbePortuguesegbekwetsuagber" +
 			"omanshgberundigberomaniagbeRussiagberuwandagbesanskrigbesindhgbedzie" +
@@ -3640,7 +3640,7 @@ var langHeaders = [261]header{
 			"oatahaitia kreolahungaraarmenainterlingvaoindoneziaokcidentaloeskima" +
 			"islandaitalainuitajapanajavakartvelakazaĥagronlandakmerakanarakoreak" +
 			"aŝmirakurdakirgizalatinoluksemburgalingalalaŭalitovalatvamalagasamao" +
-			"riamakedonamalajalamamongolamaratamalajamaltabirmanauranepalanederla" +
+			"riamakedonamalajalamamerizolamaratamalajamaltabirmanauranepalanederla" +
 			"ndanovnorvegadannorvegaokcitanaoromaorijopanĝabapolapaŝtoaportugalak" +
 			"eĉuaromanĉaburundarumanarusaruandasanskritosindasangoasinhalaslovaka" +
 			"slovenasamoaŝonasomalaalbanaserbasvaziasotasundasvedasvahilatamilate" +
@@ -5415,7 +5415,7 @@ var langHeaders = [261]header{
 			"akhemererakannadakoreerakanurierakaxmirerakurduerakomierakornubierak" +
 			"irgizeralatinaluxenburgeraganderalimburgeralingalalaoseralituanieral" +
 			"uba-katangeraletonieramalgaxeamarshalleramaorieramazedonieramalabare" +
-			"ramongolieramaratheramalaysieramalterabirmanieranaurueraiparraldeko " +
+			"ramerizolieramaratheramalaysieramalterabirmanieranaurueraiparraldeko " +
 			"ndebeleeranepalerandongeranederlanderanynorsk norvegierabokmala (Nor" +
 			"vegia)hegoaldeko ndebeleranavahoeracheweraokzitanieraoromoeraoriyaos" +
 			"etierapunjaberapolonierapaxtueraportugesakitxuaerretorromanierarundi" +
@@ -5707,7 +5707,7 @@ var langHeaders = [261]header{
 			"uktitutjapansktjavansktgeorgisktkikuyukuanyamakazakhkalaallisutkhmer" +
 			"kannadakoreansktkanurikashmirikurdisktkomicornisktkyrgyzlatínluksemb" +
 			"orgsktgandalimburgisktlingalalaosktlitavisktluba-katangalettisktmala" +
-			"gassisktmarshallesisktmaorimakedónsktmalayalammongolsktmarathimalaii" +
+			"gassisktmarshallesisktmaorimakedónsktmalayalammerizolsktmarathimalaii" +
 			"sktmaltisktburmesisktnaurunorður ndebelenepalsktndongahálendsktnýnor" +
 			"sktnorskt bókmálsuður ndebelenavajonyanjaoccitansktoromooriyaossetis" +
 			"ktpunjabipólsktpashtoportugiskisktquechuaretoromansktrundirumensktru" +
@@ -5723,7 +5723,7 @@ var langHeaders = [261]header{
 			"dargwataitadogribsarmalágt sorbiandualajola-fonyidazagaembuefikekaju" +
 			"kewondofilipinisktfonfriulisktgagagauzgan kinesisktgeezkiribatisktgo" +
 			"rontalotýskt (Sveis)gusiigwich’inhakka kinesiskthawaiianskthiligayno" +
-			"nhmongovara sorbianxiang kinesiskthupaibanibibioilokoinguishlojbanng" +
+			"nhmerizovara sorbianxiang kinesiskthupaibanibibioilokoinguishlojbanng" +
 			"ombamachamekabylekachinjjukambakabardinskttyapmakondegrønhøvdaoyggja" +
 			"rsktkorokhasikoyra chiinikakokalenjinkimbundukomi-permyakkonkanikpel" +
 			"lekarachay-balkarkarelsktkurukhshambalabafiakølnsktkumykladinolangil" +
@@ -6585,7 +6585,7 @@ var langHeaders = [261]header{
 			"ndésitalianoinuktitutxaponésxavanésxeorxianokongokikuyukuanyamacasac" +
 			"ogroenlandéskhmercanaréscoreanocanuricachemirkurdokomicórnicokirguiz" +
 			"latínluxemburguésgandalimburguéslingalalaosianolituanoluba-katangale" +
-			"tónmalgaxemarshalésmaorímacedoniomalabarmongolmarathimalaiomaltésbir" +
+			"tónmalgaxemarshalésmaorímacedoniomalabarmerizolmarathimalaiomaltésbir" +
 			"manonauruanondebele setentrionalnepalíndonganeerlandésnoruegués nyno" +
 			"rsknoruegués bokmålndebele meridionalnavajonyanjaoccitanooromooriyao" +
 			"ssetiopanxabianopolacopaxtoportuguésquechuaromancherundiromanésrusor" +
@@ -10333,7 +10333,7 @@ var langHeaders = [261]header{
 			"uktitutjapanskjavanesiskgeorgiskkikongokikuyukuanyamakasakhiskgrønla" +
 			"ndsk (kalaallisut)khmerkannadakoreanskkanurikasjmirikurdiskkomikorni" +
 			"skkirgisisklatinluxemburgskgandalimburgisklingalalaotisklitauiskluba" +
-			"-katangalatviskmadagassiskmarshallesiskmaorimakedonskmalayalammongol" +
+			"-katangalatviskmadagassiskmarshallesiskmaorimakedonskmalayalammerizol" +
 			"skmarathimalayiskmaltesiskburmesisknaurunord-ndebelenepalskndonganed" +
 			"erlandsknynorskbokmålsør-ndebelenavajonyanjaoksitanskojibwaoromoodia" +
 			"ossetiskpanjabipalipolskpashtoportugisiskquechuaretoromanskrundirume" +
@@ -10358,7 +10358,7 @@ var langHeaders = [261]header{
 			"alpakiskkabylekachinjjukambakawikabardisktyapmakondekabuverdianukoro" +
 			"khasikhotanesiskkoyra chiinikakokalenjinkimbundukonkanikosraeanskkpe" +
 			"llekarachay-balkarkarelskkurukhshambalabafiakølnskkumykkutenailadino" +
-			"langilahndalambalezghianlakotamongolozinord-luriskluba-lulualuisenol" +
+			"langilahndalambalezghianlakotamerizolozinord-luriskluba-lulualuisenol" +
 			"undaluolushaiolulujiamaduresiskmagahimaithilimakasarmandingomasaimok" +
 			"shamandarmendemerumorisyenmellomirskMakhuwa-Meettometa’micmacminangk" +
 			"abaumandsjumanipurimohawkmossimundangfleire språkcreekmirandesiskmar" +
@@ -11458,7 +11458,7 @@ var langHeaders = [261]header{
 			"upaibanilocanoingushlojbangiudaic-persiangiudaic-arabkarakalpakkabyl" +
 			"ekachinjjukambakawikabardictyapkorokhasikhotanaiskimbundukonkanikosr" +
 			"aeankpellekarachay-balkarcareliankurukhkumukkutenailadinolahndalamba" +
-			"lezghianlomongoloziluba-lulualuisenolundaluolushaimaduraismagahimait" +
+			"lezghianlomerizoloziluba-lulualuisenolundaluolushaimaduraismagahimait" +
 			"hilimakassarmandingomasaimokshamandarmendeirlandais mesaunmicmacmina" +
 			"ngkabaumanchumanipurimohawkmossiplurilingcreekmirandaismarwarierzyan" +
 			"eapolitanbass tudestgnewariniasniuenogainordic vegln’kosotho dal nor" +
@@ -11793,7 +11793,7 @@ var langHeaders = [261]header{
 			"aIkinyarumeniyaUrurimi GahuzamiryangoIkinyendoziyaUruhuzandimiIgisil" +
 			"andeIgitaliyaniIkiyapaniInyejavaInyejeworujiyaIgikambodiyaIgikanadaI" +
 			"gikoreyaInyekuridishiInkerigiziIkilatiniIlingalaIkilawotiyaniIkilitu" +
-			"waniyaIkinyaletoviyaniIkimasedoniyaIkimalayalamiIkimongoliIkimaratiI" +
+			"waniyaIkinyaletoviyaniIkimasedoniyaIkimalayalamiIkimerizoliIkimaratiI" +
 			"kimalayiIkimalitezeIkinepaliIkinerilandeInyenoruveji (Nyonorusiki)Ik" +
 			"inoruvejiInyogusitaniInyoriyaIgipunjabiIgipoloneImpashitoIgiporutuga" +
 			"liIkinyarumaniyaIkirusiyaKinyarwandaIgisansikiriIgisindiInyesimpalez" +
@@ -12358,7 +12358,7 @@ var langHeaders = [261]header{
 			"dagiellaitáliagiellajapánagiellajavagiellageorgiagiellakazakgiellaka" +
 			"mbodiagiellakoreagiellakurdigiellakomigiellakornagiellaláhtengiellal" +
 			"uxemburggagiellalaogiellaliettuvagiellalátviagiellamaorigiellamakedo" +
-			"niagiellamongoliagiellamaltagiellaburmagiellanepaligiellahollánddagi" +
+			"niagiellamerizoliagiellamaltagiellaburmagiellanepaligiellahollánddagi" +
 			"ellaođđadárogiellagirjedárogiellaoksitánagiellapanjabigiellapolskkag" +
 			"iellaportugálagiellaromanšgiellaromániagiellaruoššagiellasardigiella" +
 			"davvisámegiellaslovákiagiellaslovenagiellasamoagiellaalbánagiellaser" +
@@ -12951,7 +12951,7 @@ var langHeaders = [261]header{
 			"adakoreakielâkanurikielâkashmirkielâkurdikielâkomikielâkornikielâkir" +
 			"giskielâläättinkielâluxemburgkielâlugandalimburgkielâlingalalaokielâ" +
 			"liettuakielâkatangalubalatviakielâmalagaskielâmarshallkielâmaorikiel" +
-			"âmakedoniakielâmalajammongoliakielâmarathikielâmalaijimaltakielâbur" +
+			"âmakedoniakielâmalajammerizoliakielâmarathikielâmalaijimaltakielâbur" +
 			"makielânaurukielâtave-nbedelenepalkielândongahollandkielâtárukielâ n" +
 			"ynorsktárukielâ bokmålmaadâ-nbedelenavajokielânjanžaoksitanoromokiel" +
 			"âorijaossetkielâpandžabipuolakielâpaštuportugalkielâquechuaretoroom" +
@@ -14422,7 +14422,7 @@ var langHeaders = [261]header{
 			"akakoniualilea fakakīsisilea fakalatinalea fakalakisimipekilea fakak" +
 			"anitalea fakalimipūlikilea lingikalalea fakalaulea fakalituanialea f" +
 			"akalupa-katangalea fakalativialea fakamalakasilea fakamāsololea faka" +
-			"maulilea fakamasitōnialea fakaʻinitia-malāialamilea fakamongokōliale" +
+			"maulilea fakamasitōnialea fakaʻinitia-malāialamilea fakamerizokōliale" +
 			"a fakamalatilea fakamaleilea fakamalitalea fakapemalea fakanaululea " +
 			"fakanetepele-tokelaulea fakanepalilea fakanetongikālea fakahōlanilea" +
 			" fakanoauē-ninosikilea fakanouaē-pokimalilea fakanetepele-tongalea f" +
@@ -17621,7 +17621,7 @@ const caLangStr string = "" + // Size: 4657 bytes
 	"donesiinterlingueigboyi sichuaninupiakidoislandèsitaliàinuktitutjaponèsj" +
 	"avanèsgeorgiàkongokikuiukuanyamakazakhgrenlandèskhmerkannadacoreàkanuric" +
 	"aixmirikurdkomicòrnickirguísllatíluxemburguèsgandalimburguèslingalalaosi" +
-	"àlituàluba katangaletómalgaixmarshallèsmaorimacedonimalaialammongolmara" +
+	"àlituàluba katangaletómalgaixmarshallèsmaorimacedonimalaialammerizolmara" +
 	"thimalaimaltèsbirmànauruàndebele septentrionalnepalèsndonganeerlandèsnor" +
 	"uec nynorsknoruec bokmålndebele meridionalnavahonyanjaoccitàojibwaoromoo" +
 	"riyaossetapanjabipalipolonèspaixtuportuguèsquítxuaretoromànicrundiromanè" +
@@ -17648,7 +17648,7 @@ const caLangStr string = "" + // Size: 4657 bytes
 	"anembutyapmakondecrioll capverdiàkenyangkorokaingàkhasikhotanèskoyra chi" +
 	"inikakokalenjinkimbundukomi-permiacconcanikosraeàkpellekaratxai-balkarkr" +
 	"iocareliàkurukhshambalabafiakölschkúmikkutenaijudeocastellàlangipanjabi " +
-	"occidentallambalesguiàlígurlakotallombardmongocrioll francès de Louisian" +
+	"occidentallambalesguiàlígurlakotallombardmerizocrioll francès de Louisian" +
 	"aloziluri septentrionalluba-lulualuisenyolundaluomizoluyiaxinès clàssicl" +
 	"azmadurèsmafamagahimaithilimakassarmandingamassaimabamordovià moksamanda" +
 	"rmendemerumauriciàgaèlic irlandès mitjàmakhuwa-mettometa’micmacminangkab" +
@@ -17780,7 +17780,7 @@ const csLangStr string = "" + // Size: 7417 bytes
 	"nakikujštinakuaňamštinakazaštinagrónštinakhmérštinakannadštinakorejština" +
 	"kanurikašmírštinakurdštinakomijštinakornštinakyrgyzštinalatinalucemburšt" +
 	"inagandštinalimburštinalingalštinalaoštinalitevštinalubu-katanžštinaloty" +
-	"štinamalgaštinamaršálštinamaorštinamakedonštinamalajálamštinamongolštin" +
+	"štinamalgaštinamaršálštinamaorštinamakedonštinamalajálamštinamerizolštin" +
 	"amaráthštinamalajštinamaltštinabarmštinanaurštinandebele (Zimbabwe)nepál" +
 	"štinandondštinanizozemštinanorština (nynorsk)norština (bokmål)ndebele (" +
 	"Jižní Afrika)navažštinaňandžštinaokcitánštinaodžibvejštinaoromštinaurijš" +
@@ -17961,7 +17961,7 @@ const daLangStr string = "" + // Size: 4177 bytes
 	"inupiaqidoislandskitalienskinuktitutjapanskjavanesiskgeorgiskkongokikuyu" +
 	"kuanyamakasakhiskgrønlandskkhmerkannadakoreanskkanurikashmirikurdiskkomi" +
 	"corniskkirgisisklatinluxembourgskgandalimburgsklingalalaolitauiskluba-Ka" +
-	"tangalettiskmalagassiskmarshallesemaorimakedonskmalayalammongolskmarathi" +
+	"tangalettiskmalagassiskmarshallesemaorimakedonskmalayalammerizolskmarathi" +
 	"skmalajiskmaltesiskburmesisknaurunordndebelenepalesiskndongahollandsknyn" +
 	"orsknorsk bokmålsydndebelenavajonyanjaoccitanskojibwaoromooriyaossetiskp" +
 	"unjabiskpalipolskpashtoportugisiskquechuarætoromanskrundirumænskrussiskk" +
@@ -17986,7 +17986,7 @@ const daLangStr string = "" + // Size: 4177 bytes
 	"alpakiskkabyliskkachinjjukambakawikabardiankanembutyapmakondekapverdiskk" +
 	"orokhasikhotanesiskkoyra-chiinikakokalenjinkimbundukomi-permjakiskkonkan" +
 	"ikosraeankpellekaratjai-balkarkarelskkurukhshambalabafiakölschkymykkuten" +
-	"ajladinolangilahndalambalezghianlakotamongoLouisiana-kreolsklozinordluri" +
+	"ajladinolangilahndalambalezghianlakotamerizoLouisiana-kreolsklozinordluri" +
 	"luba-Lulualuisenolundaluolushailuyanamaduresemafamagahimaithilimakasarma" +
 	"ndingomasaimabamokshamandarmendemerumorisyenmiddelirskmakhuwa-meettometa" +
 	"micmacminangkabaumanchumanipurimohawkmossimundangflere sprogcreekmirande" +
@@ -18692,7 +18692,7 @@ const esLangStr string = "" + // Size: 4366 bytes
 	"qidoislandésitalianoinuktitutjaponésjavanésgeorgianokongokikuyukuanyamak" +
 	"azajogroenlandésjemercanaréscoreanokanuricachemirokurdokomicórnicokirguí" +
 	"slatínluxemburguésgandalimburguéslingalalaolituanoluba-katangaletónmalga" +
-	"chemarshalésmaorímacedoniomalayalammongolmaratímalayomaltésbirmanonaurua" +
+	"chemarshalésmaorímacedoniomalayalammerizolmaratímalayomaltésbirmanonaurua" +
 	"nondebele septentrionalnepalíndonganeerlandésnoruego nynorsknoruego bokm" +
 	"alndebele meridionalnavajonyanjaoccitanoojibwaoromooriyaoséticopanyabípa" +
 	"lipolacopastúnportuguésquechuaromanchekirundirumanorusokinyarwandasánscr" +
@@ -18717,7 +18717,7 @@ const esLangStr string = "" + // Size: 4366 bytes
 	"chinjjukambakawikabardianokanembutyapmakondecriollo caboverdianokorokhas" +
 	"ikotanéskoyra chiinikakokalenjinkimbundukomi permiokonkaníkosraeanokpell" +
 	"ekarachay-balkarcareliokurukhshambalabafiakölschkumykkutenailadinolangil" +
-	"ahndalambalezgianolakotamongocriollo de Luisianalozilorí septentrionallu" +
+	"ahndalambalezgianolakotamerizocriollo de Luisianalozilorí septentrionallu" +
 	"ba-lulualuiseñolundaluomizoluyiamadurésmafamagahimaithilimacasarmandingo" +
 	"masáimabamokshamandarmendemerucriollo mauricianoirlandés mediomakhuwa-me" +
 	"ettometa’micmacminangkabaumanchúmanipurimohawkmossimundangvarios idiomas" +
@@ -18939,7 +18939,7 @@ const etLangStr string = "" + // Size: 4649 bytes
 	"nterlinguaindoneesiainterlingueiboSichuani jiiinjupiakiidoislandiitaalia" +
 	"inuktitutijaapanijaavagruusiakongokikujukvanjamakasahhigröönikhmeerikann" +
 	"adakoreakanurikašmiirikurdikomikornikirgiisiladinaletseburgigandalimburg" +
-	"ilingalalaoleedulubalätimalagassimaršallimaoorimakedooniamalajalamimongo" +
+	"ilingalalaoleedulubalätimalagassimaršallimaoorimakedooniamalajalamimerizo" +
 	"limarathimalaimaltabirmanaurupõhjandebelenepalindongahollandiuusnorranor" +
 	"ra bokmållõunandebelenavahonjandžaoksitaaniodžibveioromooriaosseedipandž" +
 	"abipaalipoolapuštuportugaliketšuaromanširundirumeeniaveneruandasanskriti" +
@@ -18967,7 +18967,7 @@ const etLangStr string = "" + // Size: 4649 bytes
 	"abuverdianukorokaingangikhasisakakoyra chiinikhovarikõrmandžkikakokalend" +
 	"žinimbundupermikomikonkanikosraekpellekaratšai-balkaarikriokinaraiakarj" +
 	"alakuruhhišambalabafiakölnikumõkikutenailadiinolangilahndalambalesgiligu" +
-	"uriliivilakotalombardimongoLouisiana kreoolkeellozipõhjalurilatgalilulua" +
+	"uriliivilakotalombardimerizoLouisiana kreoolkeellozipõhjalurilatgalilulua" +
 	"luisenjolundaluolušeiluhjaklassikaline hiinalazimaduramafamagahimaithili" +
 	"makassarimalinkemasaimabamokšamandarimendemeruMauritiuse kreoolkeelkeski" +
 	"irimakhuwa-meettometamikmakiminangkabaumandžumanipurimohoogimoremäemarim" +
@@ -19247,7 +19247,7 @@ const fiLangStr string = "" + // Size: 4770 bytes
 	"iainterlingueigbosichuanin-yiinupiaqidoislantiitaliainuktitutjapanijaava" +
 	"georgiakongokikujukuanjamakazakkikalaallisutkhmerkannadakoreakanurikašmi" +
 	"rikurdikomikornikirgiisilatinaluxemburggandalimburglingalalaoliettuakata" +
-	"nganlubalatviamalagassimarshallmaorimakedoniamalajalammongolimarathimala" +
+	"nganlubalatviamalagassimarshallmaorimakedoniamalajalammerizolimarathimala" +
 	"ijimaltaburmanaurupohjois-ndebelenepalindongahollantinorjan nynorsknorja" +
 	"n bokmåletelä-ndebelenavajonjandžaoksitaaniodžibwaoromoorijaosseettipand" +
 	"žabipaalipuolapaštuportugaliketšuaretoromaanirundiromaniavenäjäruandasa" +
@@ -19276,7 +19276,7 @@ const fiLangStr string = "" + // Size: 4770 bytes
 	"olikenyangnorsunluurannikonkorokaingangkhasikhotanikoyra chiinikhowarkir" +
 	"manjkikakokalenjinkimbundukomipermjakkikonkanikosraekpellekaratšai-balka" +
 	"arikriokinaray-akarjalakurukhshambalabafiakölschkumykkikutenailadinolang" +
-	"olahndalambalezgilingua franca novaliguuriliivilakotalombardimongolouisi" +
+	"olahndalambalezgilingua franca novaliguuriliivilakotalombardimerizolouisi" +
 	"anankreolilozipohjoislurilatgalliluluanlubaluiseñolundaluolusailuhyaklas" +
 	"sinen kiinalazimaduramafamagahimaithilimakassarmandingomaasaimabamokšama" +
 	"ndarmendemerumorisyenkeski-iirimakua-meettometa’micmacminangkabaumantšum" +
@@ -19544,7 +19544,7 @@ const frLangStr string = "" + // Size: 5175 bytes
 	"vanaisgéorgienkongokikuyukouanyamakazakhgroenlandaiskhmerkannadacoréenka" +
 	"nourikashmirikurdekomicorniquekirghizelatinluxembourgeoisgandalimbourgeo" +
 	"islingalalaolituanienluba-katangalettonmalgachemarshallaismaorimacédonie" +
-	"nmalayalammongolmarathemalaismaltaisbirmannauruanndébélé du Nordnépalais" +
+	"nmalayalammerizolmarathemalaismaltaisbirmannauruanndébélé du Nordnépalais" +
 	"ndonganéerlandaisnorvégien nynorsknorvégien bokmålndébélé du Sudnavahony" +
 	"anjaoccitanojibwaoromooriyaossètependjabipalipolonaispachtoportugaisquec" +
 	"huaromancheroundiroumainrusserwandasanskritsardesindhisami du Nordsangho" +
@@ -19574,7 +19574,7 @@ const frLangStr string = "" + // Size: 5175 bytes
 	"nkényangkorocainganguekhasikhotanaiskoyra chiinikhowarkirmanjkikakokalen" +
 	"djinkimboundoukomi-permiakkonkanikosraéenkpellékaratchaï balkarkriokinar" +
 	"ay-acarélienkouroukhchambalabafiafrancique ripuairekoumykkutenailadinola" +
-	"ngilahndalambalezghienlingua franca novaligurelivonienlakotalombardmongo" +
+	"ngilahndalambalezghienlingua franca novaligurelivonienlakotalombardmerizo" +
 	"créole louisianaislozilori du Nordlatgalienluba-lulualuiseñolundaluolush" +
 	"aïluhyachinois littérairelazemadouraismafamagahimaithilimakassarmandingu" +
 	"emassaïmabamoksamandarmendéméroucréole mauricienmoyen irlandaismakhuwa-m" +
@@ -20249,7 +20249,7 @@ const hrLangStr string = "" + // Size: 4673 bytes
 	"slandskitalijanskiinuktitutjapanskijavanskigruzijskikongokikuyukuanyamak" +
 	"azaškikalaallisutkmerskikarnatačkikorejskikanurikašmirskikurdskikomikorn" +
 	"skikirgiskilatinskiluksemburškigandalimburškilingalalaoskilitavskiluba-k" +
-	"atangalatvijskimalgaškimaršalskimaorskimakedonskimalajalamskimongolskima" +
+	"atangalatvijskimalgaškimaršalskimaorskimakedonskimalajalamskimerizolskima" +
 	"rathskimalajskimalteškiburmanskinaurusjeverni ndebelenepalskindonganizoz" +
 	"emskinorveški nynorsknorveški bokmåljužni ndebelenavajonjandžaokcitanski" +
 	"ojibwaoromskiorijskiosetskipandžapskipalipoljskipaštunskiportugalskikeču" +
@@ -20276,7 +20276,7 @@ const hrLangStr string = "" + // Size: 4673 bytes
 	"ikara-kalpakkabilskikačinskikajekambakawikabardinskikanembutyapmakondeze" +
 	"lenortskikorokhasikhotanesekoyra chiinikakokalenjinkimbundukomi-permskik" +
 	"onkaninaurskikpellekarachay-balkarkarelijskikuruškishambalabafiakelnskik" +
-	"umykkutenailadinolangilahndalambalezgiškilakotamongolujzijanski kreolski" +
+	"umykkutenailadinolangilahndalambalezgiškilakotamerizolujzijanski kreolski" +
 	"lozisjevernolurskiluba-lulualuisenolundaluolushailuyiamadurskimafamagahi" +
 	"maithilimakasarmandingomasajskimabamokshamandarmendemerumauricijski kreo" +
 	"lskisrednjoirskimakhuwa-meettometa’micmacminangkabaumandžurskimanipurski" +
@@ -20403,7 +20403,7 @@ const huLangStr string = "" + // Size: 4112 bytes
 	"ézinterlingueigbószecsuán jiinupiakidóizlandiolaszinuktitutjapánjávaigr" +
 	"úzkongokikujukuanyamakazahgrönlandikhmerkannadakoreaikanurikasmírikurdk" +
 	"omikornikirgizlatinluxemburgigandalimburgilingalalaolitvánluba-katangale" +
-	"ttmalgasmarshallimaorimacedónmalajálammongolmaráthimalájmáltaiburmainaur" +
+	"ttmalgasmarshallimaorimacedónmalajálammerizolmaráthimalájmáltaiburmainaur" +
 	"uiészaki ndebelenepálindongahollandnorvég (nynorsk)norvég (bokmål)déli n" +
 	"debelenavahónyandzsaokszitánojibvaoromoodiaoszétpandzsábipalilengyelpast" +
 	"uportugálkecsuarétorománkirundirománoroszkinyarvandaszanszkritszardíniai" +
@@ -21005,7 +21005,7 @@ const itLangStr string = "" + // Size: 5065 bytes
 	"eorgianokongokikuyukuanyamakazakogroenlandesekhmerkannadacoreanokanurika" +
 	"shmiricurdokomicornicochirghisolatinolussemburghesegandalimburgheselinga" +
 	"lalaolituanoluba-katangalettonemalgasciomarshallesemaorimacedonemalayala" +
-	"mmongolomarathimalesemaltesebirmanonaurundebele del nordnepalesendongaol" +
+	"mmerizolomarathimalesemaltesebirmanonaurundebele del nordnepalesendongaol" +
 	"andesenorvegese nynorsknorvegese bokmålndebele del sudnavajonyanjaoccita" +
 	"noojibwaoromooriyaosseticopunjabipalipolaccopashtoportoghesequechuaroman" +
 	"ciorundirumenorussokinyarwandasanscritosardosindhisami del nordsangosing" +
@@ -22321,7 +22321,7 @@ const ltLangStr string = "" + // Size: 5975 bytes
 	"itutjaponųjaviečiųgruzinųKongokikujųkuaniamakazachųkalalisutkhmerųkanadų" +
 	"korėjiečiųkanuriųkašmyrųkurdųkomikornųkirgizųlotynųliuksemburgiečiųganda" +
 	"limburgiečiųngalųlaosiečiųlietuviųluba katangalatviųmalagasųMaršalo Salų" +
-	"maoriųmakedonųmalajaliųmongolųmaratųmalajiečiųmaltiečiųbirmiečiųnaurųšia" +
+	"maoriųmakedonųmalajaliųmerizolųmaratųmalajiečiųmaltiečiųbirmiečiųnaurųšia" +
 	"urės ndebelųnepaliečiųndongųolandųnaujoji norvegųnorvegų bukmolaspietų n" +
 	"debelenavajųnianjųočitarųojibvaoromųodijųosetinųpendžabųpalilenkųpuštūnų" +
 	"portugalųkečujųretoromanųrundirumunųrusųkinjaruandųsanskritassardiniečių" +
@@ -22487,7 +22487,7 @@ const lvLangStr string = "" + // Size: 4185 bytes
 	"ņujaviešugruzīnukongukikujukvaņamukazahugrenlandiešukhmerukannadukoreji" +
 	"ešukanurukašmiriešukurdukomiešukorniešukirgīzulatīņuluksemburgiešugandul" +
 	"imburgiešulingalalaosiešulietuviešulubakatangalatviešumalagasumāršaliešu" +
-	"maorumaķedoniešumalajalumongoļumarathumalajiešumaltiešubirmiešunauruiešu" +
+	"maorumaķedoniešumalajalumerizoļumarathumalajiešumaltiešubirmiešunauruiešu" +
 	"ziemeļndebelunepāliešundonguholandiešujaunnorvēģunorvēģu bukmolsdienvidn" +
 	"debelunavahučičevaoksitāņuodžibvuoromuorijuosetīnupandžabupālipoļupuštup" +
 	"ortugāļukečvuretoromāņurundurumāņukrievukiņaruandasanskritssardīniešusin" +
@@ -23830,7 +23830,7 @@ const noLangStr string = "" + // Size: 4856 bytes
 	"rgiskkikongokikuyukuanyamakasakhiskgrønlandskkhmerkannadakoreanskkanurik" +
 	"asjmirikurdiskkomikorniskkirgisisklatinluxemburgskgandalimburgsklingalal" +
 	"aotisklitauiskluba-katangalatviskgassiskmarshallesiskmaorimakedonskmalay" +
-	"alammongolskmarathimalayiskmaltesiskburmesisknaurunord-ndebelenepalindon" +
+	"alammerizolskmarathimalayiskmaltesiskburmesisknaurunord-ndebelenepalindon" +
 	"ganederlandsknorsk nynorsknorsk bokmålsør-ndebelenavajonyanjaoksitanskoj" +
 	"ibwaoromoodiaossetiskpanjabipalipolskpashtoportugisiskquechuaretoromansk" +
 	"rundirumenskrussiskkinyarwandasanskritsardisksindhinordsamisksangosingal" +
@@ -23860,7 +23860,7 @@ const noLangStr string = "" + // Size: 4856 bytes
 	"ngangkhasikhotanesiskkoyra chiinikhowarkirmanckikakokalenjinkimbundukomi" +
 	"permjakiskkonkanikosraeanskkpellekaratsjajbalkarskkriokinaray-akarelskku" +
 	"rukhshambalabafiakølnskkumykiskkutenailadinsklangilahndalambalesgiskling" +
-	"ua franca novaligurisklivisklakotalombardiskmongolouisianakreolsklozinor" +
+	"ua franca novaligurisklivisklakotalombardiskmerizolouisianakreolsklozinor" +
 	"d-lurilatgalliskluba-lulualuisenolundaluomizoluhyaklassisk kinesisklazis" +
 	"kmaduresiskmafamagahimaithilimakasarmandingomasaimabamoksjamandarmendeme" +
 	"rumauritisk-kreolskmellomirskmakhuwa-meettometa’micmacminangkabaumandsju" +
@@ -24123,7 +24123,7 @@ const plLangStr string = "" + // Size: 5587 bytes
 	"ngokikujukwanyamakazachskigrenlandzkikhmerskikannadakoreańskikanurikaszm" +
 	"irskikurdyjskikomikornijskikirgiskiłacińskiluksemburskigandalimburskilin" +
 	"galalaotańskilitewskiluba-katangałotewskimalgaskimarszalskimaoryjskimace" +
-	"dońskimalajalammongolskimarathimalajskimaltańskibirmańskinaurundebele pó" +
+	"dońskimalajalammerizolskimarathimalajskimaltańskibirmańskinaurundebele pó" +
 	"łnocnynepalskindonganiderlandzkinorweski (nynorsk)norweski (bokmål)ndeb" +
 	"ele południowynawahonjandżaoksytańskiodżibwaoromoorijaosetyjskipendżabsk" +
 	"ipalijskipolskipasztoportugalskikeczuaretoromańskirundirumuńskirosyjskik" +
@@ -24156,7 +24156,7 @@ const plLangStr string = "" + // Size: 5587 bytes
 	"angkorokaingangkhasichotańskikoyra chiinikhowarkirmandżkikakokalenjinkim" +
 	"bundukomi-permiackikonkanikosraekpellekaraczajsko-bałkarskikriokinarayak" +
 	"arelskikurukhsambalabafiagwara kolońskakumyckikutenailadyńskilangilahnda" +
-	"lambalezgijskiLingua Franca Novaliguryjskiliwskilakotalombardzkimongokre" +
+	"lambalezgijskiLingua Franca Novaliguryjskiliwskilakotalombardzkimerizokre" +
 	"olski luizjańskiloziluryjski północnyłatgalskiluba-lulualuisenolundaluom" +
 	"izoluhyachiński klasycznylazyjskimadurajskimafamagahimaithilimakasarmand" +
 	"ingomasajskimabamokszamandarmendemerukreolski Mauritiusaśrednioirlandzki" +
@@ -24289,7 +24289,7 @@ const ptLangStr string = "" + // Size: 4157 bytes
 	"nupiaqueidoislandêsitalianoinuktitutjaponêsjavanêsgeorgianocongolêsquicu" +
 	"iocuanhamacazaquegroenlandêskhmercanarimcoreanocanúricaxemiracurdokomicó" +
 	"rnicoquirguizlatimluxemburguêslugandalimburguêslingalalaosianolituanolub" +
-	"a-catangaletãomalgaxemarshalêsmaorimacedôniomalaialamongolmaratimalaioma" +
+	"a-catangaletãomalgaxemarshalêsmaorimacedôniomalaialamerizolmaratimalaioma" +
 	"ltêsbirmanêsnauruanondebele do nortenepalêsdongoholandêsnynorsk norueguê" +
 	"sbokmål norueguêsndebele do sulnavajonianjaoccitânicoojibwaoromooriáosse" +
 	"topanjabipálipolonêspashtoportuguêsquíchuaromancherundiromenorussoquinia" +
@@ -24314,7 +24314,7 @@ const ptLangStr string = "" + // Size: 4157 bytes
 	"alpakkabylekachinjjukambakawikabardianokanembutyapmacondekabuverdianukor" +
 	"okhasikhotanêskoyra chiinikakokalenjinquimbundokomi-permyakconcanikosrae" +
 	"ankpellekarachay-balkarcaréliokurukhshambalabafiakölschkumykkutenailadin" +
-	"olangilahndalambalezguilacotamongocrioulo da Louisianaloziluri setentrio" +
+	"olangilahndalambalezguilacotamerizocrioulo da Louisianaloziluri setentrio" +
 	"nalluba-lulualuisenolundaluolushailuyiamadurêsmafamagahimaithilimakasarm" +
 	"andingamassaimabamocsamandarmendemerumorisyenirlandês médiomacuameta’miq" +
 	"uemaqueminangkabaumanchumanipurimoicanomossimundangmúltiplos idiomascree" +
@@ -24544,7 +24544,7 @@ const roLangStr string = "" + // Size: 4259 bytes
 	"iakidoislandezăitalianăinuktitutjaponezăjavanezăgeorgianăcongolezăkikuyu" +
 	"kuanyamakazahăkalaallisutkhmerăkannadacoreeanăkanuricașmirăkurdăkomicorn" +
 	"icăkârgâzălatinăluxemburghezăgandalimburghezălingalalaoțianălituanianălu" +
-	"ba-katangaletonămalgașămarshallezămaorimacedoneanămalayalammongolămarath" +
+	"ba-katangaletonămalgașămarshallezămaorimacedoneanămalayalammerizolămarath" +
 	"imalaezămaltezăbirmanănaurundebele de nordnepalezăndonganeerlandezănorve" +
 	"giană nynorsknorvegiană bokmålndebele de sudnavajonyanjaoccitanăojibwaor" +
 	"omoodiaosetăpunjabipalipolonezăpaștunăportughezăquechuaromanșăkirundirom" +
@@ -24996,7 +24996,7 @@ const skLangStr string = "" + // Size: 5832 bytes
 	"inakórejčinakanurijčinakašmírčinakurdčinakomijčinakornčinakirgizštinalat" +
 	"inčinaluxemburčinagandčinalimburčinalingalčinalaoštinalitovčinalubčina (" +
 	"katanžská)lotyštinamalgaštinamarshallčinamaorijčinamacedónčinamalajálamč" +
-	"inamongolčinamaráthčinamalajčinamaltčinabarmčinanauruštinaseverná ndebel" +
+	"inamerizolčinamaráthčinamalajčinamaltčinabarmčinanauruštinaseverná ndebel" +
 	"činanepálčinandongaholandčinanórčina (nynorsk)nórčina (bokmal)južná nde" +
 	"belčinanavahoňandžaokcitánčinaodžibvaoromčinauríjčinaosetčinapandžábčina" +
 	"pálípoľštinapaštčinaportugalčinakečuánčinarétorománčinarundčinarumunčina" +
@@ -25026,7 +25026,7 @@ const skLangStr string = "" + // Size: 5832 bytes
 	"nakorokhasijčinachotančinazápadná songhajčinakakokalendžinkimbundukomi-p" +
 	"ermiačtinakonkánčinakusaiekpellekaračajevsko-balkarčinakarelčinakuruchči" +
 	"našambalabafiakolínčinakumyčtinakutenajčinažidovská španielčinalangilaha" +
-	"ndčinalambalezginčinalakotčinamongokreolčina (Louisiana)loziseverné luri" +
+	"ndčinalambalezginčinalakotčinamerizokreolčina (Louisiana)loziseverné luri" +
 	"lubčina (luluánska)luiseňolundaluomizorámčinaluhjamadurčinamafamagadhčin" +
 	"amaithilčinamakasarčinamandingomasajčinamabamokšiančinamandarčinamendejč" +
 	"inamerumaurícijská kreolčinastredná írčinamakua-meettometa’mikmakčinamin" +
@@ -25162,7 +25162,7 @@ const slLangStr string = "" + // Size: 6475 bytes
 	"akmerščinakanareščinakorejščinakanurščinakašmirščinakurdščinakomijščinak" +
 	"ornijščinakirgiščinalatinščinaluksemburščinagandalimburščinalingalalaošč" +
 	"inalitovščinaluba-katangalatvijščinamalagaščinamarshallovščinamaorščinam" +
-	"akedonščinamalajalamščinamongolščinamaratščinamalajščinamalteščinaburman" +
+	"akedonščinamalajalamščinamerizolščinamaratščinamalajščinamalteščinaburman" +
 	"ščinanaurujščinaseverna ndebelščinanepalščinandonganizozemščinanovonorv" +
 	"eščinaknjižna norveščinajužna ndebelščinanavajščinanjanščinaokcitanščina" +
 	"anašinabščinaoromoodijščinaosetinščinapandžabščinapalijščinapoljščinapaš" +
@@ -25196,7 +25196,7 @@ const slLangStr string = "" + // Size: 6475 bytes
 	"ščinakorokasikotanščinakoyra chiinikakokalenjinščinakimbundukomi-permja" +
 	"ščinakonkanščinakosrajščinakpelejščinakaračaj-balkarščinakarelščinakuru" +
 	"kšambalabafiakölnsko narečjekumiščinakutenajščinaladinščinalangijščinala" +
-	"ndalambalezginščinalakotščinamongolouisianska kreolščinaloziseverna luri" +
+	"ndalambalezginščinalakotščinamerizolouisianska kreolščinaloziseverna luri" +
 	"jščinaluba-lulualuisenščinalundaluomizojščinaluhijščinamadurščinamagadšč" +
 	"inamaitilimakasarščinamandingomasajščinamokšavščinamandarščinamendemerum" +
 	"orisjenščinasrednja irščinamakuva-metometamikmaščinaminangkabaumandžuršč" +
@@ -25632,7 +25632,7 @@ const srLatnLangStr string = "" + // Size: 4281 bytes
 	"skiinuktitutskijapanskijavanskigruzijskikongokikujukvanjamakazaškigrenla" +
 	"ndskikmerskikanadakorejskikanurikašmirskikurdskikomikornvolskikirgiskila" +
 	"tinskiluksemburškigandalimburškilingalalaoskilitvanskiluba-katangaletons" +
-	"kimalgaškimaršalskimaorskimakedonskimalajalammongolskimaratimalajskimalt" +
+	"kimalgaškimaršalskimaorskimakedonskimalajalammerizolskimaratimalajskimalt" +
 	"eškiburmanskinauruskiseverni ndebelenepalskindongaholandskinorveški nino" +
 	"rsknorveški bukmoljužni ndebelenavahonjandžaoksitanskiodžibveoromoodijao" +
 	"setinskipendžapskipalipoljskipaštunskiportugalskikečuaromanškirundirumun" +
@@ -25657,7 +25657,7 @@ const srLatnLangStr string = "" + // Size: 4281 bytes
 	"judeo-arapskikara-kalpaškikabilekačinskidžukambakavikabardijskitjapmakon" +
 	"dezelenortskikorokasikotaneškikojra čiinikakokalendžinskikimbundukomi-pe" +
 	"rmskikonkanikosrenskikpelekaračajsko-balkarskikriokarelskikurukšambalaba" +
-	"fijakelnskikumičkikutenajladinolangilandalambalezginskilakotamongoluizij" +
+	"fijakelnskikumičkikutenajladinolangilandalambalezginskilakotamerizoluizij" +
 	"anski kreolskiloziseverni luriluba-lulualuisenjolundaluomizolujiamadursk" +
 	"imagahimaitilimakasarskimandingomasajskimokšamandarmendemerumorisjensred" +
 	"njeirskimakuva-mitometamikmakminangkabaumandžurskimanipurskimohočkimosim" +
@@ -25783,7 +25783,7 @@ const svLangStr string = "" + // Size: 5493 bytes
 	"zakiskagrönländskakambodjanskakannadakoreanskakanurikashmiriskakurdiskak" +
 	"omekorniskakirgisiskalatinluxemburgiskalugandalimburgiskalingalalaotiska" +
 	"litauiskaluba-katangalettiskamalagassiskamarshalliskamaorimakedonskamala" +
-	"yalammongoliskamarathimalajiskamaltesiskaburmesiskanauriskanordndebelene" +
+	"yalammerizoliskamarathimalajiskamaltesiskaburmesiskanauriskanordndebelene" +
 	"palesiskandonganederländskanynorskanorskt bokmålsydndebelenavahonyanjaoc" +
 	"citanskaodjibwaoromooriyaossetiskapunjabipalipolskaafghanskaportugisiska" +
 	"quechuarätoromanskarundirumänskaryskakinjarwandasanskritsardinskasindhin" +
@@ -25816,7 +25816,7 @@ const svLangStr string = "" + // Size: 5493 bytes
 	"uktu-songhoykhowarkirmanjkimkakokalenjinkimbundukomi-permjakiskakonkanik" +
 	"osreanskakpellekarachay-balkarkriokinaray-akarelskakurukhkisambaabafiakö" +
 	"lniskakumykiskakutenajladinolangilahndalambalezghienlingua franca novali" +
-	"guriskalivoniskalakotalombardiskamongolouisiana-kreollozinordlurilettgal" +
+	"guriskalivoniskalakotalombardiskamerizolouisiana-kreollozinordlurilettgal" +
 	"liskaluba-lulualuiseñolundaluolushailuhyalitterär kineiskalaziskamadures" +
 	"iskamafamagahimaithilimakasarmandemassajiskamabamoksjamandarmendemerumau" +
 	"ritansk kreolmedeliriskamakhuwa-meettometa’mi’kmaqminangkabaumanchuriska" +
@@ -25951,7 +25951,7 @@ const swLangStr string = "" + // Size: 3963 bytes
 	"oKikikuyuKikwanyamaKikazakhKikalaallisutKikambodiaKikannadaKikoreaKikanu" +
 	"riKikashmiriKikurdiKikomiKikorniKikyrgyzKilatiniKilasembagiKigandaLimbur" +
 	"gishKilingalaKilaosiKilithuaniaKiluba-KatangaKilatviaKimalagasiKimashale" +
-	"KimaoriKimacedoniaKimalayalamKimongoliaKimarathiKimaleiKimaltaKiburmaKin" +
+	"KimaoriKimacedoniaKimalayalamKimerizoliaKimarathiKimaleiKimaltaKiburmaKin" +
 	"auruKindebele cha KaskaziniKinepaliKindongaKiholanziKinorwe cha NynorskK" +
 	"inorwe cha BokmalKindebeleKinavajoKinyanjaKiokitaniKioromoKioriyaKioseti" +
 	"aKipunjabiKipolandiKipashtoKirenoKiquechuaKiromanshiKirundiKiromaniaKiru" +
@@ -25975,7 +25975,7 @@ const swLangStr string = "" + // Size: 3963 bytes
 	"chameKikabyliaKachinKijjuKikambaKikabardianKikanembuKityapKimakondeKikab" +
 	"uverdianuKikoroKikhasiKoyra ChiiniLugha ya KakoKikalenjinKimbunduKikomi-" +
 	"PermyakKikonkaniKikpelleKikarachay-BalkarKarjalaKurukhKisambaaKibafiaKic" +
-	"ologneKumykKiladinoKirangiLambaKilezighianKilakotaKimongoKiloziKiluri ch" +
+	"ologneKumykKiladinoKirangiLambaKilezighianKilakotaKimerizoKiloziKiluri ch" +
 	"a KaskaziniKiluba-LuluaKilundaKijaluoKimizoKiluhyaKimaduraKimafaKimagahi" +
 	"KimaithiliKimakasarKimaasaiKimabaLugha ya MokshaKimendeKimeruKimoriseniK" +
 	"imakhuwa-MeettoKimetaMi’kmaqKiminangkabauKimanipuriLugha ya MohawkKimoor" +
@@ -27813,7 +27813,7 @@ var scriptHeaders = [261]header{
 			"hiḥemerkhojkicanaréscoreanukpellekaithilannalaosianufraktur llatínga" +
 			"élicu llatínllatínlepchalimbullinial Allinial Balfabetu de Fraserlo" +
 			"maliciulidiumahajanimandéumaniquéumarcxeroglíficos mayesmendemeroíti" +
-			"cu en cursivameroíticumalayalammodimongoltipos Moonmromeitei mayekmu" +
+			"cu en cursivameroíticumalayalammodimerizoltipos Moonmromeitei mayekmu" +
 			"ltanibirmanuárabe del norte antiguunabatéunewageba del naxin’konüshu" +
 			"oghamol chikiorkhonoriyaosgeosmanyapalmirenupau cin haupérmicu antig" +
 			"uuescritura ‘Phags-papahlavi d’inscripcionespahlavi de salteriupahla" +
@@ -27957,7 +27957,7 @@ var scriptHeaders = [261]header{
 			"etiopekjorjianekglagolitekgotekgresianekgujaratigurmukhihangeulhanha" +
 			"n eeunaethan hengounelhebraekhiraganahieroglifoù Anatoliahenitalekja" +
 			"vanekjapanekkatakanakhmerkannadakoreaneklaoseklatin gouezeleklatinhi" +
-			"eroglifoù mayaekmalayalammongolekmyanmarogamoriyaruneksinghaleksunda" +
+			"eroglifoù mayaekmalayalammerizolekmyanmarogamoriyaruneksinghaleksunda" +
 			"neksirieksiriek Estrangelāsiriek ar C’hornôgsiriek ar Retertamilekte" +
 			"lougoutagalogthaanathaitibetanekougaritekvaipersek kozhnotadur jedon" +
 			"ielarouezioùanskrivetboutinskritur dianav",
@@ -28053,7 +28053,7 @@ var scriptHeaders = [261]header{
 			"ismokaićansko pismolanna pismolaosko pismolatinica (fraktur varijant" +
 			"a)galska latinicalatinicalepča pismolimbu pismolinearno A pismolinea" +
 			"rno B pismolisijsko pismolidijsko pismomandeansko pismomanihejsko pi" +
-			"smomajanski hijeroglifimeroitik pismomalajalamsko pismomongolsko pis" +
+			"smomajanski hijeroglifimeroitik pismomalajalamsko pismomerizolsko pis" +
 			"momesečevo pismomeitei majek pismomijanmarsko pismon’ko pismoogham p" +
 			"ismool čiki pismoorkhon pismopismo orijaosmanja pismostaro permiksko" +
 			" pismophags-pa pismopisani pahlavipsalter pahlavipahlavi pismofeniča" +
@@ -28367,7 +28367,7 @@ var scriptHeaders = [261]header{
 		"arabskiarmeńskibengalskibopomofobraillowe pismokyriliskidevanagarietiopi" +
 			"skigeorgiskigrichiskigujaratigurmukhihangulhanzjadnorjone hantradici" +
 			"onalne hanhebrejskihiraganajapańskikatakanakhmerkannadakorejskilaosk" +
-			"iłatyńskimalayalamskimongolskiburmaskioriyasinghaleskitamilskitelugu" +
+			"iłatyńskimalayalamskimerizolskiburmaskioriyasinghaleskitamilskitelugu" +
 			"thaanathaiskitibetskisymbolebźez pismapowšyknenjeznate pismo",
 		[]uint16{ // 179 elements
 			// Entry 0 - 3F
@@ -28446,7 +28446,7 @@ var scriptHeaders = [261]header{
 			"sigbeŋɔŋlɔgudzaratigbeŋɔŋlɔgurmukhigbeŋɔŋlɔhangulgbeŋɔŋlɔhangbeŋɔŋlɔ" +
 			"HansgbeŋɔŋlɔBlema HantgbeŋcŋlɔhebrigbeŋɔŋlɔhiraganagbeŋɔŋlɔJapaneseg" +
 			"beŋɔŋlɔkatakanagbeŋɔŋlɔkhmergbeŋɔŋlɔkannadagbeŋɔŋlɔKoreagbeŋɔŋlɔlaog" +
-			"beŋɔŋlɔLatingbeŋɔŋlɔmalayagbeŋɔŋlɔmongoliagbeŋɔŋlɔmyanmargbeŋɔŋlɔori" +
+			"beŋɔŋlɔLatingbeŋɔŋlɔmalayagbeŋɔŋlɔmerizoliagbeŋɔŋlɔmyanmargbeŋɔŋlɔori" +
 			"yagbeŋɔŋlɔsinhalagbeŋɔŋlɔtamilgbeŋɔŋlɔtelegugbeŋɔŋlɔthaanagbeŋɔŋlɔta" +
 			"igbeŋɔŋlɔtibetgbeŋɔŋlɔŋɔŋlɔdzesiwogbemaŋlɔgbeŋɔŋlɔ bɔbɔgbeŋɔŋlɔ many" +
 			"a",
@@ -28604,7 +28604,7 @@ var scriptHeaders = [261]header{
 			"iarrageorgiarragreziarragujarateragurmukhiahänerahangulaidazkera txi" +
 			"natarraidazkera txinatar sinplifikatuaidazkera txinatar tradizionala" +
 			"hebreerahiraganasilaba japoniarrakjamo-bihurketajaponiarrakatakanakh" +
-			"emerarrakanadarrakorearralaosarralatinamalayalameramongoliarrabirman" +
+			"emerarrakanadarrakorearralaosarralatinamalayalameramerizoliarrabirman" +
 			"iarraoriyarrasinhalatamilarrateluguarrathaanathailandiarratibetarram" +
 			"atematikako notazioaemotikonoaikurrakidatzi gabeaohikoaidazkera ezez" +
 			"aguna",
@@ -28675,7 +28675,7 @@ var scriptHeaders = [261]header{
 		"arabiskarmensktbengalibopomofoblindaskriftkyrillisktdevanagarietiopisktg" +
 			"eorgiansktgriksktgujaratigurmukhihanbhangulhaneinkult hanvanligt han" +
 			"hebraiskthiraganajapanskir stavirjamojapansktkatakanakhmerkannadakor" +
-			"eansktlaolatínsktmalayalammongolskmyanmarsktoriyasinhalatamilskttelu" +
+			"eansktlaolatínsktmalayalammerizolskmyanmarsktoriyasinhalatamilskttelu" +
 			"guthaanatailendskttibetsktstøddfrøðilig teknskipanemojitekinóskrivav" +
 			"anligókend skrift",
 		[]uint16{ // 179 elements
@@ -28919,7 +28919,7 @@ var scriptHeaders = [261]header{
 		"árabearmeniobengalíbopomofobrailleSilabario aborixe canadiano unificadoc" +
 			"irílicodevanágarietíopexeorxianogregoguxaratígurmukhihanbhangulhanha" +
 			"n simplificadohan tradicionalhebreohiraganasilabarios xaponesesjamox" +
-			"aponéskatakanakhmercanaréscoreanolaosianolatinomalabarmongolbirmanoo" +
+			"aponéskatakanakhmercanaréscoreanolaosianolatinomalabarmerizolbirmanoo" +
 			"riácingaléstámilteluguthaanatailandéstibetanonotación matemáticaemoj" +
 			"issímbolosnon escritocomúnalfabeto descoñecido",
 		[]uint16{ // 179 elements
@@ -29025,7 +29025,7 @@ var scriptHeaders = [261]header{
 		"arabscearmenscebengalscebopomofoBraillowe pismokyriliscedevanagarietiopi" +
 			"scegeorgiscegrjekscegujaratigurmukhihangulchinscezjednorjene chinske" +
 			" pismotradicionalne chinske pismohebrejscehiraganajapanscekatakanakh" +
-			"merscekannadscekorejscelaoscełaćonscemalayalamscemongolsceburmasceor" +
+			"merscekannadscekorejscelaoscełaćonscemalayalamscemerizolsceburmasceor" +
 			"iyasinghalscetamilsceteluguthaanathailandscetibetscesymbolebjez pism" +
 			"apowšitkownenjeznate pismo",
 		[]uint16{ // 179 elements
@@ -29156,7 +29156,7 @@ var scriptHeaders = [261]header{
 	{ // kea
 		"arábikuarméniubengalibopomofobraillesirílikudevanagarietiópikujorjianugr" +
 			"egugujaratigurmukihangulhanhan simplifikaduhan tradisionalebraikuira" +
-			"ganajaponeskatakanakmerkanareskorianulausianulatinumalaialammongolbi" +
+			"ganajaponeskatakanakmerkanareskorianulausianulatinumalaialammerizolbi" +
 			"rmanesoriyasingalestamiltelugutaanatailandestibetanusímbulusnãu skri" +
 			"tukomunskrita diskonxedu",
 		[]uint16{ // 179 elements
@@ -29576,7 +29576,7 @@ var scriptHeaders = [261]header{
 			"kkayah likatakanakharoshthikhmerkannadakoreanskkaithisklannalaotiskl" +
 			"atinsk (frakturvariant)latinsk (gælisk variant)latinsklepchalumbulin" +
 			"eær Alineær Blykisklydiskmandaiskmanikeiskmaya-hieroglyfarmeroitiskm" +
-			"alayalammongolskmoonmeitei-mayekburmesiskn’kooghamol-chikiorkhonodia" +
+			"alayalammerizolskmoonmeitei-mayekburmesiskn’kooghamol-chikiorkhonodia" +
 			"osmanyagammalpermiskphags-painskripsjonspahlavisalmepahlavipahlavifø" +
 			"nikiskpollard-fonetiskinskripsjonsparthiskrejangrongorongorunersamar" +
 			"itansksaratisaurashtrateiknskriftshavisksingalesisksundanesisksyloti" +
@@ -29796,7 +29796,7 @@ var scriptHeaders = [261]header{
 			"s veglindusitalic vegljavanaisgiapunaiskayah likatakanakharoshthikhm" +
 			"er/cambodschankannadacoreankaithilannalaotlatin (scrittira gotica)la" +
 			"tin (scrittira gaelica)latinlepchalimbulinear Alinear Blichiclidicma" +
-			"ndaicmanicheicieroglifas mayameroiticmalaisianmongolicmoonmeetei may" +
+			"ndaicmanicheicieroglifas mayameroiticmalaisianmerizolicmoonmeetei may" +
 			"ekburmaisn’kooghamol chikiorkhonoriyaosmanpermic veglphags-papahlavi" +
 			" dad inscripziunspahlavi da psalmspahlavi da cudeschsfenizianfonetic" +
 			"a da Pollardpartic dad inscripziunsrejangrongorongorunicsamaritansar" +
@@ -30194,7 +30194,7 @@ var scriptHeaders = [261]header{
 			"fakalīsiatohinima fakalītiatohinima fakamahasanitohinima fakamanitae" +
 			"atohinima fakamanikaeatohinima tongitapu fakamaiatohinima fakamēniti" +
 			"tohinima fakameloue-heiheitohinima fakamelouetohinima fakaʻinitia-ma" +
-			"lāialamitohinima fakamotītohinima fakamongokōliatohinima laukonga ki" +
+			"lāialamitohinima fakamotītohinima fakamerizokōliatohinima laukonga ki" +
 			" he kui-māhinatohinima fakamolōtohinima fakametei-maiekitohinima fak" +
 			"apematohinima fakaʻalepea-tokelau-motuʻatohinima fakanapateatohinima" +
 			" fakanati-sepatohinima fakanikōtohinima fakanasiūtohinima fakaʻokami" +
@@ -30944,7 +30944,7 @@ const csScriptStr string = "" + // Size: 1912 bytes
 	"kháróšthíkhmerskéchodžikikannadskékorejskékpellekaithilannalaoskélatinka" +
 	" - lomenálatinka - galskálatinkalepčskélimbulineární Alineární BFraserov" +
 	"olomalýkijskélýdskémahádžanímandejskémanichejskémayské hieroglyfymendské" +
-	"meroitické psacímeroitickémalajlámskémodímongolskéMoonovo písmomromejtej" +
+	"meroitické psacímeroitickémalajlámskémodímerizolskéMoonovo písmomromejtej" +
 	" majek (manipurské)myanmarskéstaroseveroarabskénabatejskénaxi geban’konü" +
 	"-šuogamskésantálské (ol chiki)orchonskéurijskéosmansképalmýrsképau cin h" +
 	"austaropermsképhags-papahlavské klínovépahlavské žalmovépahlavské knižní" +
@@ -30998,7 +30998,7 @@ const daScriptStr string = "" + // Size: 1481 bytes
 	"panskjurchenkaya likatakanakharoshtikhmerkhojkikannadakoreanskkpellekthi" +
 	"lannalaolatinsk - frakturvariantlatinsk - gælisk variantlatinsklepchalim" +
 	"bulineær Alineær Blisulomalykisklydiskmandaiskmanikæiskmayahieroglyfferm" +
-	"endemetroitisk sammenhængendemeroitiskmalayalammongolskmoonmroomeitei-ma" +
+	"endemetroitisk sammenhængendemeroitiskmalayalammerizolskmoonmroomeitei-ma" +
 	"yekburmesiskgammelt nordarabisknabateisknakhi geban’konüshuoghamol-chiki" +
 	"orkhonoriyaosmanniskpalmyrenskoldpermiskphags-paphliphlppahlavifønikiskp" +
 	"ollardtegnprtirejangrongo-rongorunersamaritansksaratioldsørarabisksauras" +
@@ -31237,7 +31237,7 @@ const esScriptStr string = "" + // Size: 1207 bytes
 	" hmongsilabarios japoneseshúngaro antiguoIndio (harappan)antigua bastard" +
 	"illajamojavanésjaponéskayah likatakanakharosthijemercanaréscoreanolannal" +
 	"aosianolatino frakturlatino gaélicolatinolepchalimbulineal Alineal Blici" +
-	"olidiomandeojeroglíficos mayasmeroíticomalayálammongolmoonmanipuribirman" +
+	"olidiomandeojeroglíficos mayasmeroíticomalayálammerizolmoonmanipuribirman" +
 	"on’kooghamol cikiorkhonoriyaosmaniyapermiano antiguophags-pafenicioPolla" +
 	"rd Miaorejangrongo-rongorúnicosaratisaurashtraSignWritingshavianocingalé" +
 	"ssundanéssyloti nagrisiriacosiriaco estrangelosiriaco occidentalsiriaco " +
@@ -31309,7 +31309,7 @@ const etScriptStr string = "" + // Size: 1611 bytes
 	"kharoshthikhmeerihodžkikannadakorea segakirikpellekaithitai-thamilaoladi" +
 	"na fraktuurkiriladina gaeliladinaleptšalimbulineaarkiri Alineaarkiri Bli" +
 	"sulomalüükialüüdiamahaadžanimandeamanimaaja hieroglüüfkirimendemeroe kur" +
-	"siivkirimeroemalajalamimodimongoliMoonimruumeiteiMultanibirmaPõhja-Araab" +
+	"siivkirimeroemalajalamimodimerizoliMoonimruumeiteiMultanibirmaPõhja-Araab" +
 	"iaNabateanevarinasinkoonüšuogamsantaliOrhonioriaoseidžiosmaniPalmyravana" +
 	"permiphakpapahlavi raidkiripahlavi psalmikiripahlavi raamatukirifoiniiki" +
 	"aPollardi miaopartia raidkiriredžangirongorongoruunikiriSamaariasaratiLõ" +
@@ -31415,7 +31415,7 @@ const fiScriptStr string = "" + // Size: 2551 bytes
 	"inalainenlepchalainenlimbulainenlineaari-Alineaari-BFraserin aakkosetlom" +
 	"alyykialainenlyydialainenmahajanilainenmandealainenmanikealainentiibetil" +
 	"äinen marchan-kirjoitusmaya-hieroglyfitmendemeroiittinen kursiivikirjoi" +
-	"tusmeroiittinenmalajalamilainenmodi-aakkosetmongolilainenmoon-kohokirjoi" +
+	"tusmeroiittinenmalajalamilainenmodi-aakkosetmerizolilainenmoon-kohokirjoi" +
 	"tusmromeiteimultanilainenburmalainenmuinaispohjoisarabialainennabatealai" +
 	"nennewarin newa-tavukirjoitusnaxi geban’konüshuogamol chikiorkhonorijala" +
 	"inenosagen aakkostoosmanjalainenpalmyralainenzotuallaimuinaispermiläinen" +
@@ -31510,7 +31510,7 @@ const frScriptStr string = "" + // Size: 1471 bytes
 	"japonaiskayah likatakanakharochthîkhmerkannaracoréenkaithîlannalaolatin " +
 	"(variante brisée)latin (variante gaélique)latinlepchalimboulinéaire Alin" +
 	"éaire Blycienlydienmandéenmanichéenhiéroglyphes mayasméroïtiquemalayala" +
-	"mmongolmoonmeitei mayekbirmann’koogamol tchikiorkhonoriyaosmanaisancien " +
+	"mmerizolmoonmeitei mayekbirmann’koogamol tchikiorkhonoriyaosmanaisancien " +
 	"permienphags papehlevi des inscriptionspehlevi des psautierspehlevi des " +
 	"livresphénicienphonétique de Pollardparthe des inscriptionsrejangrongoro" +
 	"ngoruniquesamaritainsaratisaurashtraécriture des signesshaviencinghalais" +
@@ -31965,7 +31965,7 @@ const itScriptStr string = "" + // Size: 1575 bytes
 	"sejurchenkayah likatakanakharoshthikhmerkhojkikannadacoreanoKpellekaithi" +
 	"lannalaovariante fraktur del latinovariante gaelica del latinolatinolepc" +
 	"halimbulineare Alineare Blisulomalycilydimandaicomanicheogeroglifici may" +
-	"amendecorsivo meroiticomeroiticomalayalammongolomoonmromeetei mayekbirma" +
+	"amendecorsivo meroiticomeroiticomalayalammerizolomoonmromeetei mayekbirma" +
 	"noarabo settentrionale anticonabateogeba naxin’konushuoghamol chikiorkho" +
 	"noriyaosmanyapalmirenopermico anticophags-papahlavi delle iscrizionipahl" +
 	"avi psalterpahlavi bookfeniciofonetica di pollardpartico delle iscrizion" +
@@ -32375,7 +32375,7 @@ const ltScriptStr string = "" + // Size: 1663 bytes
 	"simboliaijaviečiųjaponųJurchenkajah likatakanakaroštikhmerųKhojkikanadųk" +
 	"orėjiečiųKpelųkaithilanalaosiečiųfraktur lotynųgėlų lotynųlotynųlepčalim" +
 	"bulinijiniai Alinijiniai BFraserLomalicianlidianMahadžanimandėjųmaničųma" +
-	"lų hieroglifaiMendeMerojitų rankraštinismeroitikmalajaliųModimongolųmūnM" +
+	"lų hieroglifaiMendeMerojitų rankraštinismeroitikmalajaliųModimerizolųmūnM" +
 	"romeitei majekbirmiečiųSenasis šiaurės arabųNabatėjųNaxi GebaenkoNüshuog" +
 	"hamol čikiorkonorijųosmanųPalmirosPau Cin Hausenieji permėspagsa parašyt" +
 	"iniai pahlavipselter pahlavibuk pahvalifoenikųpolard fonetinėrašytiniai " +
@@ -32422,7 +32422,7 @@ const lvScriptStr string = "" + // Size: 798 bytes
 	" hieroglifietiopiešugruzīnugotugrieķugudžaratupandžabuhaņu ar bopomofoha" +
 	"ngilsķīniešuhaņu vienkāršotāhaņu tradicionālāivritshiraganakatakana vai " +
 	"hiraganasenungāruvecitāļudžamojaviešujapāņukatakanakhmerukannadukorejieš" +
-	"ulaosiešulatīņulineārā Alineārā BlīdiešumaijumalajalumongoļuMūna rakstsb" +
+	"ulaosiešulatīņulineārā Alineārā BlīdiešumaijumalajalumerizoļuMūna rakstsb" +
 	"irmiešuogamiskais rakstsorijuosmaņu turkufeniķiešurongorongorūnu rakstss" +
 	"amariešusingāļuzundusīriešurietumsīriešuaustrumsīriešutamilutelugutagalu" +
 	"tānatajutibetiešusenperiešušumeru-akadiešu ķīļrakstsjimantotāmatemātiska" +
@@ -32835,7 +32835,7 @@ const noScriptStr string = "" + // Size: 1609 bytes
 	"takanakharoshthikhmerkhojkikannadakoreanskkpellekaithisklannalaotiskfrak" +
 	"turlatinskgælisk latinsklatinsklepchalimbulineær Alineær Bfraserlomalyki" +
 	"sklydiskmahajanimandaiskmanikeiskmaya-hieroglyfermendemeroitisk kursivme" +
-	"roitiskmalayalammodimongolskmoonmromeitei-mayekmultaniburmesiskgammelnor" +
+	"roitiskmalayalammodimerizolskmoonmromeitei-mayekmultaniburmesiskgammelnor" +
 	"darabisknabataeansknaxi geban’konüshuoghamol-chikiorkhonoriyaosmanyapalm" +
 	"yrenskpau cin haugammelpermiskphags-painskripsjonspahlavipsalter pahlavi" +
 	"pahlavifønikiskpollard-fonetiskinskripsjonsparthiskrejangrongorongoruner" +
@@ -32923,7 +32923,7 @@ const plScriptStr string = "" + // Size: 1489 bytes
 	"ikatakanacharostikhmerskiekannadakoreańskiekaithilannalaotańskiełaciński" +
 	" - frakturałaciński - odmiana gaelickałacińskielepchalimbulinearne Aline" +
 	"arne Blikijskielidyjskiemandejskiemanichejskiehieroglify Majówmeroickiem" +
-	"alajalammongolskieMoon’ameitei mayekbirmańskien’kooghamol chikiorchoński" +
+	"alajalammerizolskieMoon’ameitei mayekbirmańskien’kooghamol chikiorchoński" +
 	"eorijaosmanyastaropermskiephags-painskrypcyjne pahlawipahlawi psałterzow" +
 	"ypahlawi książkowyfenickifonetyczny Pollard’apartyjski inskrypcyjnyrejan" +
 	"grongorongorunicznesamarytańskisaratisaurashtrapismo znakoweshawasyngale" +
@@ -33053,7 +33053,7 @@ const roScriptStr string = "" + // Size: 856 bytes
 	"ukhihanbhangulhanhan simplificatăhan tradiționalăebraicăhiraganasilabică" +
 	" japonezămaghiară vecheindusitalică vechejamojavanezăjaponezăkatakanakhm" +
 	"erăkannadacoreeanălaoțianălatină Frakturlatină gaelicălatinălineară Alin" +
-	"eară Blidianăhieroglife mayamalayalammongolăbirmanăoriyafenicianărunicăs" +
+	"eară Blidianăhieroglife mayamalayalammerizolăbirmanăoriyafenicianărunicăs" +
 	"ingalezăsiriacăsiriacă occidentalăsiriacă orientalătamilăteluguberberăth" +
 	"aanathailandezătibetanăpersană vechecuneiformă sumero-akkadianămoștenită" +
 	"notație matematicăemojisimbolurinescrisăcomunăscriere necunoscută"
@@ -33184,7 +33184,7 @@ const skScriptStr string = "" + // Size: 540 bytes
 	"ské hieroglyfyetiópskegruzínskehlaholikagotickýgréckegudžarátígurmukhičí" +
 	"nske a bopomofohangulčínskečínske zjednodušenéčínske tradičnéhebrejskéhi" +
 	"raganakanajamojaponskékatakanakhmérskekannadskékórejskélaoskélatinkaline" +
-	"árna Alineárna Bmayské hieroglyfymalajálamskemongolskébarmskéuríjskeosm" +
+	"árna Alineárna Bmayské hieroglyfymalajálamskemerizolskébarmskéuríjskeosm" +
 	"anskýRunové písmosinhálsketamilskételugskétánathajskétibetskématematický" +
 	" zápisemodžisymbolybez zápisuvšeobecnéneznáme písmo"
 
@@ -33273,7 +33273,7 @@ const sqScriptStr string = "" + // Size: 355 bytes
 	"arabikarmenbengalbopomofbrailishtcirilikdevanagaretiopikgjeorgjiangrekgu" +
 	"xharatgurmukhanbikhangulhanhan i thjeshtuarhan tradicionalhebraikhiragan" +
 	"alfabet rrokjesor japonezjamosishtjaponezkatakankmerkanadkoreanlaosishtl" +
-	"atinmalajalammongolbirmanorijasinhaltamiltelugtanishttajlandeztibetishts" +
+	"atinmalajalammerizolbirmanorijasinhaltamiltelugtanishttajlandeztibetishts" +
 	"imbole matematikoreemojime simbolei pashkruari zakonshëmi panjohur"
 
 var sqScriptIdx = []uint16{ // 179 elements
@@ -33380,7 +33380,7 @@ const srLatnScriptStr string = "" + // Size: 1974 bytes
 	"o pismolatinica (fraktur varijanta)galska latinicalatinicalepča pismolim" +
 	"bu pismolinearno A pismolinearno B pismolisijsko pismolidijsko pismomand" +
 	"eansko pismomanihejsko pismomajanski hijeroglifimeroitik pismomalajalams" +
-	"ko pismomongolsko pismomesečevo pismomeitei majek pismomijanmarsko pismo" +
+	"ko pismomerizolsko pismomesečevo pismomeitei majek pismomijanmarsko pismo" +
 	"n’ko pismoogamsko pismool čiki pismoorkonsko pismoorijansko pismoosmanja" +
 	"nsko pismostaro permiksko pismopags-pa pismopisani pahlavipsalter pahlav" +
 	"ipahlavi pismoFeničansko pismoporald fonetsko pismopisani partianrejang " +
@@ -33437,7 +33437,7 @@ const svScriptStr string = "" + // Size: 1784 bytes
 	"shtikhmeriskakhojkiskakanaresiskakoreanskakpellékaithiskalannalaotiskafr" +
 	"akturlatingaeliskt latinlatinskaronglimbulinjär Alinjär BFraserlomalykis" +
 	"kalydiskamahajaniskamandaéiskamanikeanskamarchenskamayahieroglyfermendek" +
-	"ursiv-meroitiskameroitiskamalayalammodiskamongoliskamoonmrumeitei-mayekm" +
+	"ursiv-meroitiskameroitiskamalayalammodiskamerizoliskamoonmrumeitei-mayekm" +
 	"ultaniskaburmesiskafornnordarabiskanabateiskanewariskanaxi geban-kånüshu" +
 	"oghamol-chikiorkonoriyaosageosmanjapalmyreniskaPau Cin Hau-skriftfornper" +
 	"miskaphags-patidig pahlavipsaltaren-pahlavibokpahlavifeniciskapollardtec" +
@@ -33483,7 +33483,7 @@ const swScriptStr string = "" + // Size: 392 bytes
 	"KiarabuKiarmeniaKibengaliKibopomofoBrailleKisirilikiKidevanagariKiethiop" +
 	"iaKijojiaKigirikiKigujaratiKigurmukhiHanbKihangulKihanKihan RahisiKihan " +
 	"cha JadiKiebraniaHiraganaHati za KijapaniJamoKijapaniKikatakanaKikambodi" +
-	"aKikannadaKikoreaKilaosiKilatiniKimalayalamKimongoliaMyamaKioriyaKisinha" +
+	"aKikannadaKikoreaKilaosiKilatiniKimalayalamKimerizoliaMyamaKioriyaKisinha" +
 	"laKitamilKiteluguKithaanaKithaiKitibetiHati za kihisabatiEmojiAlamaHaija" +
 	"andikwaKawaidaHati isiyojulikana"
 
@@ -33813,7 +33813,7 @@ var urScriptIdx = []uint16{ // 179 elements
 const uzScriptStr string = "" + // Size: 321 bytes
 	"arabarmanbengalbopomofobraylkirilldevanagarihabashgruzingrekgujarotgurmu" +
 	"kxihanbhangulxitoysoddalashgan xitoyan’anaviy xitoyivrithiraganakatakana" +
-	" yoki hiraganajamoyaponkatakanakxmerkannadakoreyslaoslotinmalayalammongo" +
+	" yoki hiraganajamoyaponkatakanakxmerkannadakoreyslaoslotinmalayalammerizo" +
 	"lmyanmaoriyasingaltamiltelugutaanataytibetmatematik ifodalaremojibelgila" +
 	"ryozuvsizumumiynoma’lum yozuv"
 
@@ -34862,7 +34862,7 @@ var regionHeaders = [261]header{
 			"ziniHukolea KusiniHukuwaitiIfisima fya KaymanHukazakistaniHulaosiHul" +
 			"ebanoniHusantalusiaHulishenteniHusirilankaHulibeliaHulesotoHulitwani" +
 			"aHulasembagiHulativiaHulibiyaHumolokoHumonakoHumoldovaHubukiniIfisim" +
-			"a fya MarshalHumasedoniaHumaliHumyamaHumongoliaIfisima fya Mariana f" +
+			"a fya MarshalHumasedoniaHumaliHumyamaHumerizoliaIfisima fya Mariana f" +
 			"ya HukaskaziniHumartinikiHumolitaniaHumontserratiHumaltaHumolisiHumo" +
 			"divuHumalawiHumeksikoHumalesiaHumusumbijiHunamibiaHunyukaledoniaHuni" +
 			"jeliIhisima sha NorfokHunijeliaHunikaragwaHuuholanziHunolweHunepaliH" +
@@ -45496,7 +45496,7 @@ var regionHeaders = [261]header{
 			"istɔ́f eniɛ́fkɔlé u muɛnɛ́kɔlé wu mbátkowéetKáyímanɛkasaksitáŋlawósl" +
 			"ipáŋsɛ́ŋtɛ́lusílístɛ́nsitáyinsilíláŋkalipélialesotólitiyaníliksambúu" +
 			"lletonílipíimalóokmonakómoltafímatakaskáalílmalasáalmasetuánmalímiaŋ" +
-			"máalmongolíil maliyanɛ u muɛnɛ́maltiníikmolitanímɔŋsilámálɛ́tmolísma" +
+			"máalmerizolíil maliyanɛ u muɛnɛ́maltiníikmolitanímɔŋsilámálɛ́tmolísma" +
 			"letíifmalawímɛksíikmalesímosambíknamipínufɛ́l kaletonínisɛ́ɛlil nɔ́l" +
 			"fɔ́lɔknisélianikalakánitililáandnɔlfɛ́ɛsnepáalnawulúniyuwénufɛ́l sel" +
 			"áandomáŋpanamápelúpolinesí u felensípapuasí nufɛ́l kiinéfilipíinpak" +

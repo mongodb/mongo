@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <algorithm>
 #include <boost/filesystem.hpp>
 #include <iostream>
 #include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/ftdc/collector.h"
-#include "mongo/db/ftdc/config.h"
-#include "mongo/db/ftdc/file_manager.h"
-#include "mongo/db/ftdc/file_writer.h"
-#include "mongo/db/ftdc/ftdc_test.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/bson_validate.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/client.h"
+#include "merizo/db/ftdc/collector.h"
+#include "merizo/db/ftdc/config.h"
+#include "merizo/db/ftdc/file_manager.h"
+#include "merizo/db/ftdc/file_writer.h"
+#include "merizo/db/ftdc/ftdc_test.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/temp_dir.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 
 class FTDCFileManagerTest : public ServiceContextTest {};
 
@@ -388,4 +388,4 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     ValidateDocumentList(files[1], docs2, FTDCValidationMode::kStrict);
 }
 
-}  // namespace mongo
+}  // namespace merizo

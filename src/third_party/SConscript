@@ -96,7 +96,7 @@ if True:
     thirdPartyEnvironmentModifications['mozjs'] = {
         'CPPPATH' : [
             '#/src/third_party/mozjs' + mozjsSuffix + '/include',
-            '#/src/third_party/mozjs' + mozjsSuffix + '/mongo_sources',
+            '#/src/third_party/mozjs' + mozjsSuffix + '/merizo_sources',
             '#/src/third_party/mozjs' + mozjsSuffix + '/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + "/include",
         ],
     }

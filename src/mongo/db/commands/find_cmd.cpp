@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/run_aggregate.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/server_read_concern_metrics.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/log.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/client.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/run_aggregate.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/cursor_manager.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/find.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/stats/server_read_concern_metrics.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const auto kTermField = "term"_sd;
@@ -508,4 +508,4 @@ public:
 } findCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

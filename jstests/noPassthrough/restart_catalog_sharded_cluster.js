@@ -23,7 +23,7 @@
 
     const st = new ShardingTest({
         name: "restart_catalog_sharded_cluster",
-        mongos: 1,
+        merizos: 1,
         config: 1,
         shards: {
             rs: true,
@@ -36,7 +36,7 @@
             shardOptions: {setParameter: "enableTestCommands=1"},
         }
     });
-    const mongos = st.s0;
+    const merizos = st.s0;
     const shard0 = st.shard0;
     const shard1 = st.shard1;
 
@@ -48,24 +48,24 @@
         {_id: "espresso", price: 2.0},
         {_id: "starbucks", price: 1000.0}
     ];
-    const coffeeColl = mongos.getDB(dbName).getCollection("coffee");
-    assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
+    const coffeeColl = merizos.getDB(dbName).getCollection("coffee");
+    assert.commandWorked(merizos.adminCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, shard0.shardName);
     assert.commandWorked(
-        mongos.adminCommand({shardCollection: coffeeColl.getFullName(), key: {price: 1}}));
+        merizos.adminCommand({shardCollection: coffeeColl.getFullName(), key: {price: 1}}));
     const splitPoint = 50.0;
     assert.commandWorked(
-        mongos.adminCommand({split: coffeeColl.getFullName(), middle: {price: splitPoint}}));
+        merizos.adminCommand({split: coffeeColl.getFullName(), middle: {price: splitPoint}}));
     for (let coffee of coffees) {
         assert.commandWorked(coffeeColl.insert(coffee, {writeConcern: {w: "majority"}}));
     }
-    assert.commandWorked(mongos.adminCommand({
+    assert.commandWorked(merizos.adminCommand({
         moveChunk: coffeeColl.getFullName(),
         find: {price: 1000.0},
         to: shard1.shardName,
         _waitForDelete: true
     }));
-    assert.commandWorked(mongos.adminCommand({
+    assert.commandWorked(merizos.adminCommand({
         moveChunk: coffeeColl.getFullName(),
         find: {price: 0.0},
         to: shard0.shardName,
@@ -73,7 +73,7 @@
     }));
 
     // Create an unsharded collection and throw some data in.
-    const teaColl = mongos.getDB(dbName).getCollection("tea");
+    const teaColl = merizos.getDB(dbName).getCollection("tea");
     const teas = [
         {_id: "darjeeling", price: 2.0},
         {_id: "earl gray", price: 1.5},
@@ -89,10 +89,10 @@
         const dbShard1 = shard1.getDB(dbName);
 
         // Assert that we can find all documents in the unsharded collection by either asking
-        // mongos, or consulting the primary shard directly.
+        // merizos, or consulting the primary shard directly.
         assert.eq(teaColl.find().sort({_id: 1}).readConcern("majority").toArray(),
                   teas.sort(sortOn("_id")),
-                  "couldn't find all unsharded data via mongos");
+                  "couldn't find all unsharded data via merizos");
         assert.eq(dbShard0.tea.find().sort({_id: 1}).toArray(),
                   teas.sort(sortOn("_id")),
                   "couldn't find all unsharded data directly via primary shard");
@@ -101,30 +101,30 @@
         // Assert that we can find all documents in the sharded collection via scatter-gather.
         assert.eq(coffeeColl.find().sort({_id: 1}).readConcern("majority").toArray(),
                   coffees.sort(sortOn("_id")),
-                  "couldn't find all sharded data via mongos scatter-gather");
+                  "couldn't find all sharded data via merizos scatter-gather");
 
         // Assert that we can find all documents via a query that targets multiple shards.
         assert.eq(coffeeColl.find({price: {$gt: 0}}).sort({price: 1}).toArray(),
                   coffees.sort(sortOn("price")),
-                  "couldn't find all sharded data via mongos multi-shard targeted query");
+                  "couldn't find all sharded data via merizos multi-shard targeted query");
 
-        // Assert that we can find all sharded documents on shard0 by shard targeting via mongos,
+        // Assert that we can find all sharded documents on shard0 by shard targeting via merizos,
         // and by consulting shard0 directly.
         const dataShard0 = coffees.filter(drink => drink.price < splitPoint).sort(sortOn("_id"));
         assert.eq(coffeeColl.find({price: {$lt: splitPoint}}).sort({_id: 1}).toArray(),
                   dataShard0,
-                  "couldn't find shard0 data via targeting through mongos");
+                  "couldn't find shard0 data via targeting through merizos");
         jsTest.log(tojson(dbShard0.getCollectionInfos()));
         assert.eq(dbShard0.coffee.find().toArray(),
                   dataShard0,
                   "couldn't find shard0 data by directly asking shard0");
 
-        // Assert that we can find all sharded documents on shard1 by shard targeting via mongos,
+        // Assert that we can find all sharded documents on shard1 by shard targeting via merizos,
         // and by consulting shard1 directly.
         const dataShard1 = coffees.filter(drink => drink.price >= splitPoint).sort(sortOn("_id"));
         assert.eq(coffeeColl.find({price: {$gte: splitPoint}}).sort({_id: 1}).toArray(),
                   dataShard1,
-                  "couldn't find shard1 data via targeting through mongos");
+                  "couldn't find shard1 data via targeting through merizos");
         assert.eq(dbShard1.coffee.find().toArray(),
                   dataShard1,
                   "couldn't find shard1 data by directly asking shard1");
@@ -133,11 +133,11 @@
 
     // Run queries on the metadata stored in the config servers.
     function assertConfigServersHaveExpectedData() {
-        const configDBViaMongos = mongos.getDB("config");
+        const configDBViaMongos = merizos.getDB("config");
         const configDBViaConfigSvr = st.config0.getDB("config");
         const projectOnlyShard = {_id: 0, shard: 1};
 
-        // Assert that we can find documents for chunk metadata, both via mongos and by asking the
+        // Assert that we can find documents for chunk metadata, both via merizos and by asking the
         // config server primary directly.
         const smallestChunk = {"max.price": splitPoint};
         const smallestChunkShard = {shard: "restart_catalog_sharded_cluster-rs0"};
@@ -161,10 +161,10 @@
     assertConfigServersHaveExpectedData();
     assertShardsHaveExpectedData();
 
-    // Remember what indexes are present, then restart the catalog on all shards via mongos.
+    // Remember what indexes are present, then restart the catalog on all shards via merizos.
     const teaIndexesBeforeRestart = teaColl.getIndexes().sort(sortOn("_id"));
     const coffeeIndexesBeforeRestart = coffeeColl.getIndexes().sort(sortOn("_id"));
-    assert.commandWorked(mongos.adminCommand({restartCatalog: 1}));
+    assert.commandWorked(merizos.adminCommand({restartCatalog: 1}));
 
     // Verify that the data in the collections and the metadata have not changed.
     assertConfigServersHaveExpectedData();
@@ -192,7 +192,7 @@
     });
 
     // Perform another write, implicitly creating a new collection and database.
-    const secondTestDB = mongos.getDB("restart_catalog_sharded_cluster_2");
+    const secondTestDB = merizos.getDB("restart_catalog_sharded_cluster_2");
     const foodColl = secondTestDB.getCollection("food");
     const doc = {_id: "apple", category: "fruit"};
     assert.commandWorked(foodColl.insert(doc));
@@ -200,9 +200,9 @@
     assert.eq(foodColl.find().toArray(), [doc]);
 
     // Shard the new collection and verify we can find its data again.
-    assert.commandWorked(mongos.adminCommand({enableSharding: secondTestDB.getName()}));
+    assert.commandWorked(merizos.adminCommand({enableSharding: secondTestDB.getName()}));
     assert.commandWorked(
-        mongos.adminCommand({shardCollection: foodColl.getFullName(), key: {category: 1}}));
+        merizos.adminCommand({shardCollection: foodColl.getFullName(), key: {category: 1}}));
     assert.eq(foodColl.find().toArray(), [doc]);
 
     // Build a new index on the new collection.

@@ -11,10 +11,10 @@
     // implicit sessions.
     TestData.disableImplicitSessions = true;
 
-    function runListSessionsTest(mongod) {
-        assert(mongod);
-        const admin = mongod.getDB('admin');
-        const config = mongod.getDB('config');
+    function runListSessionsTest(merizod) {
+        assert(merizod);
+        const admin = merizod.getDB('admin');
+        const config = merizod.getDB('config');
 
         const pipeline = [{'$listSessions': {}}];
         function listSessions() {
@@ -63,7 +63,7 @@
         assertErrorCode(config.system.sessions, user1Pipeline, ErrorCodes.Unauthorized);
 
         if (true) {
-            // TODO SERVER-29141: Support forcing pipelines to run on mongos
+            // TODO SERVER-29141: Support forcing pipelines to run on merizos
             return;
         }
         function listLocalSessions() {
@@ -72,14 +72,14 @@
         assert.eq(listLocalSessions().toArray().length, 0);
     }
 
-    const mongod = MongoRunner.runMongod({auth: ""});
-    runListSessionsTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    const merizod = MongoRunner.runMongod({auth: ""});
+    runListSessionsTest(merizod);
+    MongoRunner.stopMongod(merizod);
 
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     const st = new ShardingTest({
         shards: 1,
-        mongos: 1,
+        merizos: 1,
         config: 1,
         other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
     });

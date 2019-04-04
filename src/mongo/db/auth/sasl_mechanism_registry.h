@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,14 +33,14 @@
 #include <memory>
 #include <unordered_map>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/service_context.h"
 
-namespace mongo {
+namespace merizo {
 
 class User;
 
@@ -145,9 +145,9 @@ public:
     }
 
     /**
-     * Standard method in mongodb for determining if "authenticatedUser" may act as "requestedUser."
+     * Standard method in merizodb for determining if "authenticatedUser" may act as "requestedUser."
      *
-     * The standard rule in MongoDB is simple.  The authenticated user name must be the same as the
+     * The standard rule in MerizoDB is simple.  The authenticated user name must be the same as the
      * requested user name.
      */
     virtual bool isAuthorizedToActAs(StringData requestedUser, StringData authenticatedUser) {
@@ -183,8 +183,8 @@ public:
         if (getTestCommandsEnabled() && _authenticationDatabase == "admin" &&
             getPrincipalName() == internalSecurity.user->getName().getUser()) {
             // Allows authenticating as the internal user against the admin database.  This is to
-            // support the auth passthrough test framework on mongos (since you can't use the local
-            // database on a mongos, so you can't auth as the internal user without this).
+            // support the auth passthrough test framework on merizos (since you can't use the local
+            // database on a merizos, so you can't auth as the internal user without this).
             return internalSecurity.user->getName().getDB();
         } else {
             return _authenticationDatabase;
@@ -395,4 +395,4 @@ public:
                            });
     }
 };
-}  // namespace mongo
+}  // namespace merizo

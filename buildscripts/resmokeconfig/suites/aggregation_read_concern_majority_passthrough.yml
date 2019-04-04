@@ -13,12 +13,12 @@ selector:
   - jstests/aggregation/sources/out/required_last_position.js
   # These tests fail due to the inability to specify a writeConcern when secondaryThrottle is not
   # set as part of the moveChunk command.
-  - jstests/aggregation/mongos_merge.js
+  - jstests/aggregation/merizos_merge.js
   - jstests/aggregation/shard_targeting.js
   - jstests/aggregation/sources/facet/use_cases.js
   # These test fail because afterOpTime is required to guarantee a secondary has advanced its
   # majority-committed snapshot.
-  - jstests/aggregation/mongos_slaveok.js
+  - jstests/aggregation/merizos_slaveok.js
   - jstests/aggregation/testSlave.js
   exclude_with_any_tags:
   ##
@@ -57,7 +57,7 @@ executor:
   - class: ValidateCollections
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       enableMajorityReadConcern: ''
       set_parameters:
         enableTestCommands: 1

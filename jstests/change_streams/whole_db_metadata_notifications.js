@@ -79,7 +79,7 @@
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 1);
 
-    // Test that renaming a collection generates a 'rename' entry for the 'from' collection. MongoDB
+    // Test that renaming a collection generates a 'rename' entry for the 'from' collection. MerizoDB
     // does not allow renaming of sharded collections, so only perform this test if the collection
     // is not sharded.
     if (!FixtureHelpers.isSharded(coll)) {
@@ -121,7 +121,7 @@
 
         coll = testDB[collName];
         // Test renaming a collection from the database being watched to a different database. Do
-        // not run this in the mongos passthrough suites since we cannot guarantee the primary shard
+        // not run this in the merizos passthrough suites since we cannot guarantee the primary shard
         // of the target database, and renameCollection requires the source and destination to be on
         // the same shard.
         if (!FixtureHelpers.isMongos(testDB)) {

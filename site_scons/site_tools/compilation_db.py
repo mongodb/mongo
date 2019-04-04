@@ -1,4 +1,4 @@
-# Copyright 2015 MongoDB Inc.
+# Copyright 2015 MerizoDB Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import json
 import SCons
 import itertools
 
-# Implements the ability for SCons to emit a compilation database for the MongoDB project. See
+# Implements the ability for SCons to emit a compilation database for the MerizoDB project. See
 # http://clang.llvm.org/docs/JSONCompilationDatabase.html for details on what a compilation
 # database is, and why you might want one. The only user visible entry point here is
 # 'env.CompilationDatabase'. This method takes an optional 'target' to name the file that

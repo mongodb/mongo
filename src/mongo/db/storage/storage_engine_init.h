@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,12 +31,12 @@
 
 #include <memory>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/bitwise_enum_operators.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/platform/bitwise_enum_operators.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Valid flags to pass to initializeStorageEngine. Used as a bitfield.
@@ -52,7 +52,7 @@ enum StorageEngineInitFlags {
 void initializeStorageEngine(ServiceContext* service, StorageEngineInitFlags initFlags);
 
 /**
- * Shuts down storage engine cleanly and releases any locks on mongod.lock.
+ * Shuts down storage engine cleanly and releases any locks on merizod.lock.
  */
 void shutdownGlobalStorageEngineCleanly(ServiceContext* service);
 
@@ -96,4 +96,4 @@ void appendStorageEngineList(ServiceContext* service, BSONObjBuilder* result);
 
 ENABLE_BITMASK_OPERATORS(StorageEngineInitFlags)
 
-}  // namespace mongo
+}  // namespace merizo

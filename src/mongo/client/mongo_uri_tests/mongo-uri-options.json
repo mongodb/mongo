@@ -2,7 +2,7 @@
   "tests": [
     {
       "description": "Option names are normalized to lowercase",
-      "uri": "mongodb://alice:secret@example.com/admin?AUTHMechanism=MONGODB-CR",
+      "uri": "merizodb://alice:secret@example.com/admin?AUTHMechanism=MONGODB-CR",
       "valid": true,
       "warning": false,
       "hosts": [

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,56 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <algorithm>
 #include <memory>
 #include <utility>
 #include <vector>
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/idempotency_test_fixture.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
-#include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/sync_tail.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/transaction_participant_gen.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/md5.hpp"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/string_map.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/feature_compatibility_version_parser.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/logical_session_id_helpers.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/bgsync.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/idempotency_test_fixture.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_buffer_blocking_queue.h"
+#include "merizo/db/repl/oplog_interface_local.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/repl/sync_tail.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/session_txn_record_gen.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/db/transaction_participant_gen.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/clock_source_mock.h"
+#include "merizo/util/md5.hpp"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/string_map.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 namespace {
 
@@ -186,7 +186,7 @@ void createCollection(OperationContext* opCtx,
         OldClientContext ctx(opCtx, nss.ns());
         auto db = ctx.db();
         ASSERT_TRUE(db);
-        mongo::WriteUnitOfWork wuow(opCtx);
+        merizo::WriteUnitOfWork wuow(opCtx);
         auto coll = db->createCollection(opCtx, nss.ns(), options);
         ASSERT_TRUE(coll);
         wuow.commit();
@@ -2028,7 +2028,7 @@ TEST_F(SyncTailTest, FailOnDropFCVCollection) {
 
 TEST_F(SyncTailTest, FailOnInsertFCVDocument) {
     auto fcvNS(NamespaceString::kServerConfigurationNamespace);
-    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ::merizo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
@@ -2039,7 +2039,7 @@ TEST_F(SyncTailTest, FailOnInsertFCVDocument) {
 
 TEST_F(IdempotencyTest, InsertToFCVCollectionBesidesFCVDocumentSucceeds) {
     auto fcvNS(NamespaceString::kServerConfigurationNamespace);
-    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ::merizo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
@@ -2053,7 +2053,7 @@ TEST_F(IdempotencyTest, InsertToFCVCollectionBesidesFCVDocumentSucceeds) {
 TEST_F(IdempotencyTest, DropDatabaseSucceeds) {
     // Choose `system.profile` so the storage engine doesn't expect the drop to be timestamped.
     auto ns = NamespaceString("foo.system.profile");
-    ::mongo::repl::createCollection(_opCtx.get(), ns, CollectionOptions());
+    ::merizo::repl::createCollection(_opCtx.get(), ns, CollectionOptions());
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
@@ -2064,7 +2064,7 @@ TEST_F(IdempotencyTest, DropDatabaseSucceeds) {
 TEST_F(SyncTailTest, DropDatabaseSucceedsInRecovering) {
     // Choose `system.profile` so the storage engine doesn't expect the drop to be timestamped.
     auto ns = NamespaceString("foo.system.profile");
-    ::mongo::repl::createCollection(_opCtx.get(), ns, CollectionOptions());
+    ::merizo::repl::createCollection(_opCtx.get(), ns, CollectionOptions());
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
@@ -2592,4 +2592,4 @@ TEST_F(IdempotencyTest, ConvertToCappedNamespaceNotFound) {
 
 }  // namespace
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

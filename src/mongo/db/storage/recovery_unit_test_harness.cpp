@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/recovery_unit_test_harness.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/db/storage/recovery_unit_test_harness.h"
+#include "merizo/db/repl/read_concern_level.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/storage/record_store.h"
+#include "merizo/db/storage/recovery_unit.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class RecoveryUnitTestHarness : public unittest::Test {
@@ -142,4 +142,4 @@ DEATH_TEST_F(RecoveryUnitTestHarness, AbandonSnapshotMustBeOutOfUnitOfWork, "inv
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

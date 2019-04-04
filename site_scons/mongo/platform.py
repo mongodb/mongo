@@ -2,7 +2,7 @@
 
 """
 Support code related to OS detection in general. System specific facilities or customization
-hooks live in mongo_platform_<PLATFORM>.py files.
+hooks live in merizo_platform_<PLATFORM>.py files.
 """
 
 import os

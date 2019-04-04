@@ -1,7 +1,7 @@
 // Tests of sharded GLE enforcing write concern against operations in a cluster
 // Basic sharded GLE operation is tested elsewhere.
 //
-// This test asserts that a journaled write to a mongod running with --nojournal should be rejected,
+// This test asserts that a journaled write to a merizod running with --nojournal should be rejected,
 // so cannot be run on the ephemeralForTest storage engine, as it accepts all journaled writes.
 // @tags: [SERVER-21420]
 
@@ -34,10 +34,10 @@ TestData.skipCheckDBHashes = true;
 
     var st = new ShardingTest({shards: 2, other: options});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var config = mongos.getDB("config");
-    var coll = mongos.getCollection(jsTestName() + ".coll");
+    var merizos = st.s0;
+    var admin = merizos.getDB("admin");
+    var config = merizos.getDB("config");
+    var coll = merizos.getCollection(jsTestName() + ".coll");
     var shards = config.shards.find().toArray();
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));

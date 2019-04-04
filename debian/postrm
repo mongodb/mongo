@@ -1,5 +1,5 @@
 #!/bin/sh
-# postrm script for mongodb
+# postrm script for merizodb
 #
 # see: dh_installdeb(1)
 

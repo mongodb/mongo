@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,41 +27,41 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/stage_builder.h"
+#include "merizo/db/query/stage_builder.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/exec/and_hash.h"
-#include "mongo/db/exec/and_sorted.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/count_scan.h"
-#include "mongo/db/exec/distinct_scan.h"
-#include "mongo/db/exec/ensure_sorted.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/geo_near.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/limit.h"
-#include "mongo/db/exec/merge_sort.h"
-#include "mongo/db/exec/or.h"
-#include "mongo/db/exec/projection.h"
-#include "mongo/db/exec/shard_filter.h"
-#include "mongo/db/exec/skip.h"
-#include "mongo/db/exec/sort.h"
-#include "mongo/db/exec/sort_key_generator.h"
-#include "mongo/db/exec/text.h"
-#include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/exec/and_hash.h"
+#include "merizo/db/exec/and_sorted.h"
+#include "merizo/db/exec/collection_scan.h"
+#include "merizo/db/exec/count_scan.h"
+#include "merizo/db/exec/distinct_scan.h"
+#include "merizo/db/exec/ensure_sorted.h"
+#include "merizo/db/exec/fetch.h"
+#include "merizo/db/exec/geo_near.h"
+#include "merizo/db/exec/index_scan.h"
+#include "merizo/db/exec/limit.h"
+#include "merizo/db/exec/merge_sort.h"
+#include "merizo/db/exec/or.h"
+#include "merizo/db/exec/projection.h"
+#include "merizo/db/exec/shard_filter.h"
+#include "merizo/db/exec/skip.h"
+#include "merizo/db/exec/sort.h"
+#include "merizo/db/exec/sort_key_generator.h"
+#include "merizo/db/exec/text.h"
+#include "merizo/db/index/fts_access_method.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using stdx::make_unique;
@@ -389,7 +389,7 @@ PlanStage* buildStages(OperationContext* opCtx,
         case STAGE_TRIAL:
         case STAGE_UNKNOWN:
         case STAGE_UPDATE: {
-            mongoutils::str::stream ss;
+            merizoutils::str::stream ss;
             root->appendToString(&ss, 0);
             string nodeStr(ss);
             warning() << "Can't build exec tree for node " << nodeStr << endl;
@@ -421,4 +421,4 @@ bool StageBuilder::build(OperationContext* opCtx,
     return nullptr != (*rootOut = buildStages(opCtx, collection, cq, solution, solutionNode, wsIn));
 }
 
-}  // namespace mongo
+}  // namespace merizo

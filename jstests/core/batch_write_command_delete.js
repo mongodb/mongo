@@ -10,7 +10,7 @@
 // ]
 
 //
-// Ensures that mongod respects the batch write protocols for delete
+// Ensures that merizod respects the batch write protocols for delete
 //
 
 var coll = db.getCollection("batch_write_delete");

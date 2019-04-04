@@ -1,18 +1,18 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongorestore
+package merizorestore
 
 import (
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testutil"
+	"github.com/merizodb/merizo-tools/common/util"
 
 	"os"
 	"testing"
@@ -143,7 +143,7 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 		t.Skip("Requires server with FCV 3.6 or later")
 	}
 
-	// From mongorestore/testdata/oplogdump/db1/c1.metadata.json
+	// From merizorestore/testdata/oplogdump/db1/c1.metadata.json
 	originalUUID := "699f503df64b4aa8a484a8052046fa3a"
 
 	Convey("With a test MongoRestore", t, func() {

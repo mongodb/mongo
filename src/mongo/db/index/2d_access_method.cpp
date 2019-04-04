@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/2d_access_method.h"
+#include "merizo/db/index/2d_access_method.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/expression_keys_private.h"
-#include "mongo/db/index/expression_params.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
+#include "merizo/db/catalog/index_catalog_entry.h"
+#include "merizo/db/index/2d_common.h"
+#include "merizo/db/index/expression_keys_private.h"
+#include "merizo/db/index/expression_params.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/jsobj.h"
 
-namespace mongo {
+namespace merizo {
 
 TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
     : AbstractIndexAccessMethod(btreeState, btree) {
@@ -56,4 +56,4 @@ void TwoDAccessMethod::doGetKeys(const BSONObj& obj,
     ExpressionKeysPrivate::get2DKeys(obj, _params, keys);
 }
 
-}  // namespace mongo
+}  // namespace merizo

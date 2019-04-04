@@ -81,7 +81,7 @@ def find_program(prog, paths):
 def get_process_logger(debugger_output, pid, process_name):
     """Return the process logger from options specified."""
     process_logger = logging.Logger("process", level=logging.DEBUG)
-    process_logger.mongo_process_filename = None
+    process_logger.merizo_process_filename = None
 
     if 'stdout' in debugger_output:
         s_handler = logging.StreamHandler(sys.stdout)
@@ -90,7 +90,7 @@ def get_process_logger(debugger_output, pid, process_name):
 
     if 'file' in debugger_output:
         filename = "debugger_%s_%d.log" % (os.path.splitext(process_name)[0], pid)
-        process_logger.mongo_process_filename = filename
+        process_logger.merizo_process_filename = filename
         f_handler = logging.FileHandler(filename=filename, mode="w")
         f_handler.setFormatter(logging.Formatter(fmt="%(message)s"))
         process_logger.addHandler(f_handler)
@@ -296,7 +296,7 @@ class GDBDumper(object):
     @staticmethod
     def __find_debugger(debugger):
         """Find the installed debugger."""
-        return find_program(debugger, ['/opt/mongodbtoolchain/gdb/bin', '/usr/bin'])
+        return find_program(debugger, ['/opt/merizodbtoolchain/gdb/bin', '/usr/bin'])
 
     def dump_info(  # pylint: disable=too-many-arguments,too-many-locals
             self, root_logger, logger, pid, process_name, take_dump):
@@ -322,38 +322,38 @@ class GDBDumper(object):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         root_logger.info("dir %s", script_dir)
         gdb_dir = os.path.join(script_dir, "gdb")
-        mongo_script = os.path.join(gdb_dir, "mongo.py")
-        mongo_printers_script = os.path.join(gdb_dir, "mongo_printers.py")
-        mongo_lock_script = os.path.join(gdb_dir, "mongo_lock.py")
+        merizo_script = os.path.join(gdb_dir, "merizo.py")
+        merizo_printers_script = os.path.join(gdb_dir, "merizo_printers.py")
+        merizo_lock_script = os.path.join(gdb_dir, "merizo_lock.py")
 
-        source_mongo = "source %s" % mongo_script
-        source_mongo_printers = "source %s" % mongo_printers_script
-        source_mongo_lock = "source %s" % mongo_lock_script
-        mongodb_dump_locks = "mongodb-dump-locks"
-        mongodb_show_locks = "mongodb-show-locks"
-        mongodb_uniqstack = "mongodb-uniqstack mongodb-bt-if-active"
-        mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
+        source_merizo = "source %s" % merizo_script
+        source_merizo_printers = "source %s" % merizo_printers_script
+        source_merizo_lock = "source %s" % merizo_lock_script
+        merizodb_dump_locks = "merizodb-dump-locks"
+        merizodb_show_locks = "merizodb-show-locks"
+        merizodb_uniqstack = "merizodb-uniqstack merizodb-bt-if-active"
+        merizodb_waitsfor_graph = "merizodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
             (process_name, pid)
-        mongodb_javascript_stack = "mongodb-javascript-stack"
-        mongod_dump_sessions = "mongod-dump-sessions"
+        merizodb_javascript_stack = "merizodb-javascript-stack"
+        merizod_dump_sessions = "merizod-dump-sessions"
 
-        # The following MongoDB python extensions do not run on Solaris.
+        # The following MerizoDB python extensions do not run on Solaris.
         if sys.platform.startswith("sunos"):
-            source_mongo_lock = ""
+            source_merizo_lock = ""
             # SERVER-28234 - GDB frame information not available on Solaris for a templatized
             # function
-            mongodb_dump_locks = ""
+            merizodb_dump_locks = ""
 
             # SERVER-28373 - GDB thread-local variables not available on Solaris
-            mongodb_show_locks = ""
-            mongodb_waitsfor_graph = ""
-            mongodb_javascript_stack = ""
-            mongod_dump_sessions = ""
+            merizodb_show_locks = ""
+            merizodb_waitsfor_graph = ""
+            merizodb_javascript_stack = ""
+            merizod_dump_sessions = ""
 
-        if not logger.mongo_process_filename:
+        if not logger.merizo_process_filename:
             raw_stacks_commands = []
         else:
-            base, ext = os.path.splitext(logger.mongo_process_filename)
+            base, ext = os.path.splitext(logger.merizo_process_filename)
             raw_stacks_filename = base + '_raw_stacks' + ext
             raw_stacks_commands = [
                 'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
@@ -374,18 +374,18 @@ class GDBDumper(object):
             "info threads",  # Dump a simple list of commands to get the thread name
             "set python print-stack full",
         ] + raw_stacks_commands + [
-            source_mongo,
-            source_mongo_printers,
-            source_mongo_lock,
-            mongodb_uniqstack,
+            source_merizo,
+            source_merizo_printers,
+            source_merizo_lock,
+            merizodb_uniqstack,
             # Lock the scheduler, before running commands, which execute code in the attached process.
             "set scheduler-locking on",
             dump_command,
-            mongodb_dump_locks,
-            mongodb_show_locks,
-            mongodb_waitsfor_graph,
-            mongodb_javascript_stack,
-            mongod_dump_sessions,
+            merizodb_dump_locks,
+            merizodb_show_locks,
+            merizodb_waitsfor_graph,
+            merizodb_javascript_stack,
+            merizod_dump_sessions,
             "set confirm off",
             "quit",
         ]
@@ -614,7 +614,7 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
     except AttributeError:
         root_logger.warning("Cannot determine Unix Current Login, not supported on Windows")
 
-    interesting_processes = ["mongo", "mongod", "mongos", "_test", "dbtest", "python", "java"]
+    interesting_processes = ["merizo", "merizod", "merizos", "_test", "dbtest", "python", "java"]
     go_processes = []
     process_ids = []
 

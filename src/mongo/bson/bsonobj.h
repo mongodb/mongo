@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -36,20 +36,20 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/data_type.h"
-#include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
-#include "mongo/bson/bson_comparator_interface_base.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/bufreader.h"
-#include "mongo/util/shared_buffer.h"
+#include "merizo/base/data_type.h"
+#include "merizo/base/string_data.h"
+#include "merizo/base/string_data_comparator_interface.h"
+#include "merizo/bson/bson_comparator_interface_base.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsontypes.h"
+#include "merizo/bson/oid.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/util/bufreader.h"
+#include "merizo/util/shared_buffer.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObjStlIterator;
 
@@ -870,4 +870,4 @@ Container BSONObj::getFieldNames() const {
     return fields;
 }
 
-}  // namespace mongo
+}  // namespace merizo

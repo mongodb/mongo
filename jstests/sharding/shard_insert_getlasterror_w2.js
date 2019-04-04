@@ -23,7 +23,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // Spin up a sharded cluster, but do not add the shards
     var shardingTestConfig = {
         name: baseName,
-        mongos: 1,
+        merizos: 1,
         shards: 1,
         rs: {nodes: replNodes},
         other: {manualAddShard: true}
@@ -41,17 +41,17 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     }
     assert.writeOK(bulk.execute());
 
-    // Get connection to mongos for the cluster
-    var mongosConn = shardingTest.s;
-    var testDB = mongosConn.getDB(testDBName);
+    // Get connection to merizos for the cluster
+    var merizosConn = shardingTest.s;
+    var testDB = merizosConn.getDB(testDBName);
 
     // Add replSet1 as only shard
-    assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
+    assert.commandWorked(merizosConn.adminCommand({addshard: replSet1.getURL()}));
 
     // Enable sharding on test db and its collection foo
-    assert.commandWorked(mongosConn.getDB('admin').runCommand({enablesharding: testDBName}));
+    assert.commandWorked(merizosConn.getDB('admin').runCommand({enablesharding: testDBName}));
     testDB[testCollName].ensureIndex({x: 1});
-    assert.commandWorked(mongosConn.getDB('admin').runCommand(
+    assert.commandWorked(merizosConn.getDB('admin').runCommand(
         {shardcollection: testDBName + '.' + testCollName, key: {x: 1}}));
 
     // Test case where GLE should return an error

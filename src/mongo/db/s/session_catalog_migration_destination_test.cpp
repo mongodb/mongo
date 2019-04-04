@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/connection_string.h"
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/initialize_operation_session_info.h"
-#include "mongo/db/logical_session_cache_noop.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/s/migration_session_id.h"
-#include "mongo/db/s/session_catalog_migration_destination.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/initialize_operation_session_info.h"
+#include "merizo/db/logical_session_cache_noop.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/ops/write_ops_exec.h"
+#include "merizo/db/ops/write_ops_gen.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/s/migration_session_id.h"
+#include "merizo/db/s/session_catalog_migration_destination.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/session_txn_record_gen.h"
+#include "merizo/db/transaction_history_iterator.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/executor/remote_command_request.h"
+#include "merizo/s/catalog/sharding_catalog_client_mock.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/shard_server_test_fixture.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using executor::RemoteCommandRequest;
@@ -1753,4 +1753,4 @@ TEST_F(SessionCatalogMigrationDestinationTest, MigratingKnownStmtWhileOplogTrunc
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,51 +27,51 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/index_catalog_impl.h"
+#include "merizo/db/catalog/index_catalog_impl.h"
 
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/index_catalog_entry_impl.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_legacy.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/represent_as.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/background.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/index_catalog_entry_impl.h"
+#include "merizo/db/catalog/index_key_validate.h"
+#include "merizo/db/client.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/index/index_access_method.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index_legacy.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/ops/delete.h"
+#include "merizo/db/query/collation/collation_spec.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/storage_engine_init.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/represent_as.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 using std::string;
@@ -401,7 +401,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 
     if (!IndexDescriptor::isIndexVersionSupported(indexVersion)) {
         return Status(ErrorCodes::CannotCreateIndex,
-                      str::stream() << "this version of mongod cannot build new indexes "
+                      str::stream() << "this version of merizod cannot build new indexes "
                                     << "of version number "
                                     << static_cast<int>(indexVersion));
     }
@@ -598,7 +598,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     if (storageEngineElement.eoo()) {
         return Status::OK();
     }
-    if (storageEngineElement.type() != mongo::Object) {
+    if (storageEngineElement.type() != merizo::Object) {
         return Status(ErrorCodes::CannotCreateIndex,
                       "\"storageEngine\" options must be a document if present");
     }
@@ -742,7 +742,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
-            mongoutils::str::stream()
+            merizoutils::str::stream()
                 << "cannot perform operation: an index build is currently running",
             !haveAnyIndexesInProgress());
 
@@ -1526,4 +1526,4 @@ void IndexCatalogImpl::setNs(NamespaceString ns) {
     }
     _unfinishedIndexes.swap(newUnfinishedIndexes);
 }
-}  // namespace mongo
+}  // namespace merizo

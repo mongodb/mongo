@@ -1,6 +1,6 @@
 // Hash sharding on a non empty collection should not pre-split.
 
-var s = new ShardingTest({name: jsTestName(), shards: 3, mongos: 1, verbose: 1});
+var s = new ShardingTest({name: jsTestName(), shards: 3, merizos: 1, verbose: 1});
 var dbname = "test";
 var coll = "foo";
 var db = s.getDB(dbname);

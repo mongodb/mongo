@@ -219,8 +219,8 @@
     /**
      * Helper to make this test work in the sharding passthrough suite.
      *
-     * Transforms the explain output so that if it came from a mongos, it will be modified
-     * to have the same format as though it had come from a mongod.
+     * Transforms the explain output so that if it came from a merizos, it will be modified
+     * to have the same format as though it had come from a merizod.
      */
     function transformIfSharded(explainOut) {
         if (!isMongos) {

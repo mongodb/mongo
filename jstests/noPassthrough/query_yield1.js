@@ -2,7 +2,7 @@
     "use strict";
     if (0) {  // Test disabled until SERVER-8579 is finished. Reminder ticket: SERVER-8342
         const conn = MongoRunner.runMongod({nojournal: ""});
-        assert.neq(null, conn, "mongod failed to start.");
+        assert.neq(null, conn, "merizod failed to start.");
         db = conn.getDB("test");
 
         t = db.query_yield1;

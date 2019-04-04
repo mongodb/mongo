@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,20 +29,20 @@
 
 #pragma once
 
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/ops/delete_request.h"
-#include "mongo/db/ops/parsed_delete.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/parsed_distinct.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_settings.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/update/update_driver.h"
+#include "merizo/db/catalog/index_catalog_entry.h"
+#include "merizo/db/ops/delete_request.h"
+#include "merizo/db/ops/parsed_delete.h"
+#include "merizo/db/ops/parsed_update.h"
+#include "merizo/db/ops/update_request.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/parsed_distinct.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/db/query/query_planner_params.h"
+#include "merizo/db/query/query_settings.h"
+#include "merizo/db/query/query_solution.h"
+#include "merizo/db/update/update_driver.h"
 
-namespace mongo {
+namespace merizo {
 
 class Collection;
 class CountRequest;
@@ -229,4 +229,4 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedUpdate* parsedUpdate);
-}  // namespace mongo
+}  // namespace merizo

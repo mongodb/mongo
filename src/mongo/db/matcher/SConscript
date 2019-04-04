@@ -11,8 +11,8 @@ env.Library(
         'path_internal.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/common',
     ],
 )
 
@@ -69,17 +69,17 @@ env.Library(
         env.Idlc('schema/encrypt_schema.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/fts/fts_query_noop',
-        '$BUILD_DIR/mongo/db/geo/geometry',
-        '$BUILD_DIR/mongo/db/geo/geoparser',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
-        '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/pipeline/expression',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/util/regex_util',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/fts/fts_query_noop',
+        '$BUILD_DIR/merizo/db/geo/geometry',
+        '$BUILD_DIR/merizo/db/geo/geoparser',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface',
+        '$BUILD_DIR/merizo/db/query/query_knobs',
+        '$BUILD_DIR/merizo/db/pipeline/expression',
+        '$BUILD_DIR/merizo/idl/idl_parser',
+        '$BUILD_DIR/merizo/util/regex_util',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         'path',
     ],
@@ -137,9 +137,9 @@ env.CppUnitTest(
         'schema/expression_internal_schema_xor_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/query/query_planner',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'expressions',
     ],
 )
@@ -156,8 +156,8 @@ env.CppUnitTest(
         'schema/json_schema_parser_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'expressions',
     ],
 )
@@ -169,27 +169,27 @@ env.CppUnitTest(
         'rewrite_expr_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'expressions',
     ],
 )
 
 env.Library(
-    target='expressions_mongod_only',
+    target='expressions_merizod_only',
     source=[
         'extensions_callback_real.cpp',
         'expression_text.cpp',
         'expression_where.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/fts/base_fts',
-        '$BUILD_DIR/mongo/scripting/scripting_server',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/fts/base_fts',
+        '$BUILD_DIR/merizo/scripting/scripting_server',
         'expressions',
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/merizo/db/catalog/collection',
+        '$BUILD_DIR/merizo/db/catalog/index_catalog',
+        '$BUILD_DIR/merizo/db/catalog_raii',
     ],
 )
 
@@ -199,7 +199,7 @@ env.CppUnitTest(
         'expression_serialization_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
         'expressions',
     ],
 )

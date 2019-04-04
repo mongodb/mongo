@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/bindata.h"
+#include "merizo/scripting/mozjs/bindata.h"
 
 #include <cctype>
 #include <iomanip>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/internedstring.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/uuid.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/scripting/mozjs/implscope.h"
+#include "merizo/scripting/mozjs/internedstring.h"
+#include "merizo/scripting/mozjs/objectwrapper.h"
+#include "merizo/scripting/mozjs/valuereader.h"
+#include "merizo/scripting/mozjs/valuewriter.h"
+#include "merizo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec BinDataInfo::methods[5] = {
@@ -117,10 +117,10 @@ void BinDataInfo::finalize(js::FreeOp* fop, JSObject* obj) {
 }
 
 void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
-    boost::optional<mongo::UUID> uuid;
+    boost::optional<merizo::UUID> uuid;
 
     if (args.length() == 0) {
-        uuid = mongo::UUID::gen();
+        uuid = merizo::UUID::gen();
     } else {
         uassert(ErrorCodes::BadValue, "UUID needs 0 or 1 arguments", args.length() == 1);
         auto arg = args.get(0);
@@ -132,10 +132,10 @@ void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
             hexToBinData(cx, bdtUUID, arg, args.rval());
             return;
         }
-        uuid = uassertStatusOK(mongo::UUID::parse(str));
+        uuid = uassertStatusOK(merizo::UUID::parse(str));
     };
     ConstDataRange cdr = uuid->toCDR();
-    std::string encoded = mongo::base64::encode(cdr.data(), cdr.length());
+    std::string encoded = merizo::base64::encode(cdr.data(), cdr.length());
 
     JS::AutoValueArray<2> newArgs(cx);
     newArgs[0].setInt32(newUUID);
@@ -178,11 +178,11 @@ void BinDataInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     auto binType = o.getNumber(InternedString::type);
 
     if (binType == newUUID) {
-        auto decoded = mongo::base64::decode(*str);
+        auto decoded = merizo::base64::decode(*str);
 
         // If this is in fact a UUID, use a more friendly string representation.
-        if (decoded.length() == mongo::UUID::kNumBytes) {
-            mongo::UUID uuid = mongo::UUID::fromCDR({decoded.data(), decoded.length()});
+        if (decoded.length() == merizo::UUID::kNumBytes) {
+            merizo::UUID uuid = merizo::UUID::fromCDR({decoded.data(), decoded.length()});
             ss << "UUID(\"" << uuid.toString() << "\")";
             ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
             return;
@@ -217,7 +217,7 @@ void BinDataInfo::Functions::base64::call(JSContext* cx, JS::CallArgs args) {
 void BinDataInfo::Functions::hex::call(JSContext* cx, JS::CallArgs args) {
     auto str = getEncoded(args.thisv());
 
-    std::string data = mongo::base64::decode(*str);
+    std::string data = merizo::base64::decode(*str);
     std::stringstream ss;
     ss.setf(std::ios_base::hex, std::ios_base::basefield);
     ss.fill('0');
@@ -270,4 +270,4 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
 }
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

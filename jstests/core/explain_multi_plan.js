@@ -59,7 +59,7 @@
     function assertHasRejectedPlans(explainOutput) {
         var queryPlannerOutput = explainOutput.queryPlanner;
 
-        // The 'rejectedPlans' section will be in a different place if passed through a mongos.
+        // The 'rejectedPlans' section will be in a different place if passed through a merizos.
         if ("SINGLE_SHARD" == queryPlannerOutput.winningPlan.stage) {
             var shards = queryPlannerOutput.winningPlan.shards;
             shards.forEach(function assertShardHasRejectedPlans(shard) {

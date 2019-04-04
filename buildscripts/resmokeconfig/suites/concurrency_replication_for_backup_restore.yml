@@ -1,6 +1,6 @@
 test_kind: fsm_workload_test
 
-# This suite connects to a running mongod replica set to test backup_restore.
+# This suite connects to a running merizod replica set to test backup_restore.
 # It must specify resmoke.py options '--shellConnPort' or '--shellConnString'.
 
 selector:
@@ -18,7 +18,7 @@ selector:
   # The ability to shut down a node while its in the middle of applying ops is required for
   # backup_restore. The workloads which perform certain operations which can cause the test to fail
   # have been excluded.
-  # Background indexes can still be running when the mongod is shut down (SERVER-24639).
+  # Background indexes can still be running when the merizod is shut down (SERVER-24639).
   - creates_background_indexes
   # Workloads that use a write concern will fail since the workload only connects to the primary.
   - uses_write_concern

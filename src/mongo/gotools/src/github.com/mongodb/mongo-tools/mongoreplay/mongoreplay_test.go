@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/llmgo/bson"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testtype"
 )
 
 type testDoc struct {
@@ -29,7 +29,7 @@ func TestOpGetMore(t *testing.T) {
 	generator := newRecordedOpGenerator()
 
 	op := GetMoreOp{}
-	op.Collection = "mongoreplay_test.test"
+	op.Collection = "merizoreplay_test.test"
 	op.CursorId = 12345
 	op.Limit = -1
 
@@ -47,8 +47,8 @@ func TestOpGetMore(t *testing.T) {
 
 	t.Log("Comparing parsed Getmore to original Getmore")
 	switch {
-	case getMoreOp.Collection != "mongoreplay_test.test":
-		t.Errorf("Collection not matched. Saw %v -- Expected %v\n", getMoreOp.Collection, "mongoreplay_test.test")
+	case getMoreOp.Collection != "merizoreplay_test.test":
+		t.Errorf("Collection not matched. Saw %v -- Expected %v\n", getMoreOp.Collection, "merizoreplay_test.test")
 	case getMoreOp.CursorId != 12345:
 		t.Errorf("CursorId not matched. Saw %v -- Expected %v\n", getMoreOp.CursorId, 12345)
 	case getMoreOp.Limit != -1:
@@ -61,7 +61,7 @@ func TestOpDelete(t *testing.T) {
 	generator := newRecordedOpGenerator()
 
 	op := DeleteOp{}
-	op.Collection = "mongoreplay_test.test"
+	op.Collection = "merizoreplay_test.test"
 	op.Flags = 7
 	selector := bson.D{{"test", 1}}
 	op.Selector = selector
@@ -80,8 +80,8 @@ func TestOpDelete(t *testing.T) {
 
 	t.Log("Comparing parsed Delete to original Delete")
 	switch {
-	case deleteOp.Collection != "mongoreplay_test.test":
-		t.Errorf("Collection not matched. Saw %v -- Expected %v\n", deleteOp.Collection, "mongoreplay_test.test")
+	case deleteOp.Collection != "merizoreplay_test.test":
+		t.Errorf("Collection not matched. Saw %v -- Expected %v\n", deleteOp.Collection, "merizoreplay_test.test")
 	case deleteOp.Flags != 7:
 		t.Errorf("Flags not matched. Saw %v -- Expected %v\n", deleteOp.Flags, 7)
 	case !reflect.DeepEqual(deleteOp.Selector, &selector):
@@ -94,7 +94,7 @@ func TestInsertOp(t *testing.T) {
 	generator := newRecordedOpGenerator()
 
 	op := InsertOp{}
-	op.Collection = "mongoreplay_test.test"
+	op.Collection = "merizoreplay_test.test"
 	op.Flags = 7
 
 	documents := []interface{}(nil)
@@ -120,8 +120,8 @@ func TestInsertOp(t *testing.T) {
 
 	t.Log("Comparing parsed Insert to original Insert")
 	switch {
-	case insertOp.Collection != "mongoreplay_test.test":
-		t.Errorf("Collection not matched. Saw %v -- Expected %v\n", insertOp.Collection, "mongoreplay_test.test")
+	case insertOp.Collection != "merizoreplay_test.test":
+		t.Errorf("Collection not matched. Saw %v -- Expected %v\n", insertOp.Collection, "merizoreplay_test.test")
 	case insertOp.Flags != 7:
 		t.Errorf("Flags not matched. Saw %v -- Expected %v\n", insertOp.Flags, 7)
 	}
@@ -166,7 +166,7 @@ func TestQueryOp(t *testing.T) {
 	generator := newRecordedOpGenerator()
 
 	op := QueryOp{}
-	op.Collection = "mongoreplay_test.test"
+	op.Collection = "merizoreplay_test.test"
 	op.Flags = 0
 	op.HasOptions = true
 	op.Limit = -1
@@ -216,7 +216,7 @@ func TestOpUpdate(t *testing.T) {
 	change := bson.D{{"updated", true}}
 	update := bson.D{{"$set", change}}
 	op.Update = update
-	op.Collection = "mongoreplay_test.test"
+	op.Collection = "merizoreplay_test.test"
 	op.Flags = 12345
 
 	t.Logf("Generated Update: %#v\n", op.UpdateOp)

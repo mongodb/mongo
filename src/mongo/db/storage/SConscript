@@ -32,8 +32,8 @@ env.Library(
         'index_entry_comparison.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/namespace_string',
         'duplicate_key_error_info',
         ],
     )
@@ -44,7 +44,7 @@ env.Library(
         'duplicate_key_error_info.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         ],
     )
 
@@ -54,7 +54,7 @@ env.Library(
         'key_string.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         ],
     )
 
@@ -64,10 +64,10 @@ env.Library(
         'bson_collection_catalog_entry.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
+        '$BUILD_DIR/merizo/db/catalog/collection_options',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/storage/kv/kv_prefix',
         ],
     )
 
@@ -77,7 +77,7 @@ env.Library(
         'oplog_hack.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         ]
     )
 
@@ -88,10 +88,10 @@ env.Library(
         env.Idlc('storage_parameters.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
@@ -100,11 +100,11 @@ env.Library(
     source= [
         'encryption_hooks.cpp',
         ],
-    LIBDEPS= ['$BUILD_DIR/mongo/base',
-              '$BUILD_DIR/mongo/db/service_context'],
+    LIBDEPS= ['$BUILD_DIR/merizo/base',
+              '$BUILD_DIR/merizo/db/service_context'],
     PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
-        '$BUILD_DIR/mongo/mongos',
+        '$BUILD_DIR/merizo/merizod',
+        '$BUILD_DIR/merizo/merizos',
         ],
     )
 
@@ -114,11 +114,11 @@ env.Library(
         'backup_cursor_hooks.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
     PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
+        '$BUILD_DIR/merizo/merizod',
     ],
 )
 
@@ -128,9 +128,9 @@ env.Library(
         'test_harness_helper.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )
 
@@ -155,9 +155,9 @@ env.Library(
         'sorted_data_interface_test_unindex.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/unittest/unittest',
         'index_entry_comparison',
         'test_harness_helper',
     ],
@@ -186,9 +186,9 @@ env.Library(
         'record_store_test_updatewithdamages.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/unittest/unittest',
         'test_harness_helper',
         ],
     )
@@ -200,7 +200,7 @@ env.Library(
         'recovery_unit_test_harness.cpp'
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/unittest/unittest',
         'test_harness_helper',
         ],
     )
@@ -212,8 +212,8 @@ env.Library(
         'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/service_context',
         ],
     )
 
@@ -225,8 +225,8 @@ env.Library(
     LIBDEPS=[
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
         'storage_engine_lock_file',
         'storage_repair_observer',
         'storage_engine_metadata',
@@ -242,7 +242,7 @@ env.Library(
         "storage_options",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/merizo/db/commands/server_status',
         'backup_cursor_hooks'
     ]
 )
@@ -253,9 +253,9 @@ env.Library(
         "write_unit_of_work.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        '$BUILD_DIR/mongo/util/fail_point',
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/db/storage/storage_options",
+        '$BUILD_DIR/merizo/util/fail_point',
     ],
 )
 
@@ -273,9 +273,9 @@ env.Library(
         'storage_engine_metadata.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/bson/dotted_path_support',
     ],
 )
 
@@ -285,7 +285,7 @@ env.Library(
         'storage_file_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -295,10 +295,10 @@ env.Library(
         'storage_repair_observer.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/dbhelpers',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/repl/replica_set_messages',
         'storage_file_util',
     ],
 )
@@ -309,14 +309,14 @@ env.CppUnitTest(
         'storage_repair_observer_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/executor/network_interface_mock',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/dbhelpers',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
+        '$BUILD_DIR/merizo/executor/network_interface_factory',
+        '$BUILD_DIR/merizo/executor/network_interface_mock',
         'storage_repair_observer',
     ],
 )
@@ -334,7 +334,7 @@ env.CppUnitTest(
     source='key_string_test.cpp',
     LIBDEPS=[
         'key_string',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -343,7 +343,7 @@ env.Benchmark(
     source='key_string_bm.cpp',
     LIBDEPS=[
         'key_string',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -355,7 +355,7 @@ env.Library(
     LIBDEPS=[
         'encryption_hooks',
         'storage_options',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
@@ -366,15 +366,15 @@ env.Library(
         env.Idlc('flow_control_parameters.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/merizo/db/commands/server_status',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/concurrency/flow_control_ticketholder',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/idl/server_parameter',
+        '$BUILD_DIR/merizo/util/background_job',
     ],
 )

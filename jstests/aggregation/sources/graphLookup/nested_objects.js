@@ -1,4 +1,4 @@
-// In MongoDB 3.4, $graphLookup was introduced. In this file, we test the behavior of graphLookup
+// In MerizoDB 3.4, $graphLookup was introduced. In this file, we test the behavior of graphLookup
 // when the 'connectToField' is a nested array, or when the 'connectFromField' is a nested array.
 
 (function() {

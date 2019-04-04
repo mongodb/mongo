@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/db"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -31,7 +31,7 @@ func GetAuthVersion(commander db.CommandRunner) (int, error) {
 	if err != nil {
 		errMessage := err.Error()
 		// as a necessary hack, if the error message takes a certain form,
-		// we can infer version 1. This is because early versions of mongodb
+		// we can infer version 1. This is because early versions of merizodb
 		// had no concept of an "auth schema version", so asking for the
 		// authSchemaVersion value will return a "no option found" or "no such cmd"
 		if errMessage == "no option found to get" ||

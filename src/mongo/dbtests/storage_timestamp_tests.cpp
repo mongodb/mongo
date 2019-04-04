@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,63 +27,63 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <cstdint>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/drop_database.h"
-#include "mongo/db/catalog/drop_indexes.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/index/index_build_interceptor.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/multi_key_path_tracker.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_applier.h"
-#include "mongo/db/repl/oplog_applier_impl.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
-#include "mongo/db/repl/replication_consistency_markers_mock.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery_mock.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/sync_tail.h"
-#include "mongo/db/repl/timestamp_block.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/session.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/transaction_participant_gen.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/future.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/stacktrace.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/create_collection.h"
+#include "merizo/db/catalog/drop_database.h"
+#include "merizo/db/catalog/drop_indexes.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/multi_index_block.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/global_settings.h"
+#include "merizo/db/index/index_build_interceptor.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index_builds_coordinator.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/multi_key_path_tracker.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/repl/apply_ops.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/multiapplier.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_applier.h"
+#include "merizo/db/repl/oplog_applier_impl.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_consistency_markers_impl.h"
+#include "merizo/db/repl/replication_consistency_markers_mock.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/replication_recovery_mock.h"
+#include "merizo/db/repl/storage_interface_impl.h"
+#include "merizo/db/repl/sync_tail.h"
+#include "merizo/db/repl/timestamp_block.h"
+#include "merizo/db/s/op_observer_sharding_impl.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/session.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/storage/kv/kv_storage_engine.h"
+#include "merizo/db/storage/snapshot_manager.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/db/transaction_participant_gen.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/stdx/future.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/stacktrace.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 /**
  * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
@@ -224,7 +224,7 @@ public:
      * without actually dropping it.
      */
     void reset(NamespaceString nss) const {
-        ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss.ns(), [&] {
+        ::merizo::writeConflictRetry(_opCtx, "deleteAll", nss.ns(), [&] {
             _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
             AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);
 
@@ -2638,8 +2638,8 @@ class CreateCollectionWithSystemIndex : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
-              mongo::serverGlobalParams.enableMajorityReadConcern)) {
+        if (!(merizo::storageGlobalParams.engine == "wiredTiger" &&
+              merizo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -3403,7 +3403,7 @@ public:
         // Only run on storage engines that support snapshot reads.
         auto storageEngine = cc().getServiceContext()->getStorageEngine();
         if (!storageEngine->supportsReadConcernSnapshot() ||
-            !mongo::serverGlobalParams.enableMajorityReadConcern) {
+            !merizo::serverGlobalParams.enableMajorityReadConcern) {
             unittest::log() << "Skipping this test suite because storage engine "
                             << storageGlobalParams.engine << " does not support timestamp writes.";
             return;
@@ -3453,4 +3453,4 @@ public:
 };
 
 unittest::SuiteInstance<AllStorageTimestampTests> allStorageTimestampTests;
-}  // namespace mongo
+}  // namespace merizo

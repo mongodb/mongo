@@ -1,5 +1,5 @@
 /**
- * When a network connection to the mongo shell is closed, attempting to call
+ * When a network connection to the merizo shell is closed, attempting to call
  * Mongo.prototype.runCommand() and Mongo.prototype.runCommandWithMetadata() throws a JavaScript
  * exception. This override catches these exceptions (i.e. ones where isNetworkError() returns true)
  * and automatically re-sends the command request to the server, or propagates the error if the
@@ -19,15 +19,15 @@
     // Store a session to access ServerSession#canRetryWrites.
     let _serverSession;
 
-    const mongoRunCommandOriginal = Mongo.prototype.runCommand;
-    const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
+    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
+    const merizoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
     Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
         if (typeof _serverSession === "undefined") {
             _serverSession = this.startSession()._serverSession;
         }
 
-        return runWithRetriesOnNetworkErrors(this, cmdObj, mongoRunCommandOriginal, arguments);
+        return runWithRetriesOnNetworkErrors(this, cmdObj, merizoRunCommandOriginal, arguments);
     };
 
     Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
@@ -37,7 +37,7 @@
         }
 
         return runWithRetriesOnNetworkErrors(
-            this, cmdObj, mongoRunCommandWithMetadataOriginal, arguments);
+            this, cmdObj, merizoRunCommandWithMetadataOriginal, arguments);
     };
 
     // Commands assumed to not be blindly retryable.
@@ -147,7 +147,7 @@
             msg.indexOf("InterruptedDueToStepDown") >= 0;
     }
 
-    function runWithRetriesOnNetworkErrors(mongo, cmdObj, clientFunction, clientFunctionArguments) {
+    function runWithRetriesOnNetworkErrors(merizo, cmdObj, clientFunction, clientFunctionArguments) {
         let cmdName = Object.keys(cmdObj)[0];
 
         // If the command is in a wrapped form, then we look for the actual command object
@@ -225,7 +225,7 @@
             try {
                 TestData.retryingOnNetworkError = retry;
                 retry = true;
-                let res = clientFunction.apply(mongo, clientFunctionArguments);
+                let res = clientFunction.apply(merizo, clientFunctionArguments);
 
                 if (isRetryableWriteCmd) {
                     // findAndModify can fail during the find stage and return an executor error.
@@ -285,7 +285,7 @@
                             continue;
                         }
 
-                        // listCollections and listIndexes called through mongos may return
+                        // listCollections and listIndexes called through merizos may return
                         // OperationFailed if the request to establish a cursor on the targeted
                         // shard fails with a network error.
                         //
@@ -295,7 +295,7 @@
                             res.code === ErrorCodes.OperationFailed &&
                             res.hasOwnProperty("errmsg") &&
                             res.errmsg.indexOf("failed to read command response from shard") >= 0) {
-                            print("=-=-=-= Retrying failed mongos cursor command: " + cmdName +
+                            print("=-=-=-= Retrying failed merizos cursor command: " + cmdName +
                                   ", retries remaining: " + numRetries);
                             continue;
                         }

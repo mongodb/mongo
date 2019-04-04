@@ -6,7 +6,7 @@
  * commit point. We can only provide reads within a window behind the primary's 'lastApplied'. The
  * size of that window is controlled by 'maxTargetSnapshotHistoryWindowInSeconds', which is 5
  * seconds by default. If the commit point lag is greater than that amount, reading at that time
- * fails with a SnapshotTooOld error. Therefore, in order for the transaction to succeed, mongos
+ * fails with a SnapshotTooOld error. Therefore, in order for the transaction to succeed, merizos
  * needs to pick a read timestamp that is not derived from the commit point, but rather from the
  * 'lastApplied' optime on the primary.
  *
@@ -34,17 +34,17 @@
     });
 
     const rst = shardingTest.rs0;
-    const mongos = shardingTest.s;
-    const mongosDB = mongos.getDB(dbName);
-    const mongosColl = mongosDB[collName];
+    const merizos = shardingTest.s;
+    const merizosDB = merizos.getDB(dbName);
+    const merizosColl = merizosDB[collName];
 
     // Create and shard collection beforehand.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {_id: 1}}));
 
     // This is the last write the secondary will have before the start of the transaction.
-    assert.commandWorked(mongosColl.insert({_id: 1, x: 10}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(merizosColl.insert({_id: 1, x: 10}, {writeConcern: {w: "majority"}}));
 
     // We want the secondary to lag for an amount generously greater than the history window.
     const secondary = rst.getSecondary();
@@ -60,17 +60,17 @@
     // Insert a stream of writes to the primary with _ids all numbers greater or equal than
     // 1000 (this is done to easily distinguish them from the write above done with _id: 1).
     // The secondary cannot replicate them, so this has the effect of making that node lagged.
-    // It would also update mongos' notion of the latest clusterTime in the system.
+    // It would also update merizos' notion of the latest clusterTime in the system.
     while (Date.now() - startTime < maxWindowInMS) {
-        assert.commandWorked(mongosColl.insert({id: nextId}));
+        assert.commandWorked(merizosColl.insert({id: nextId}));
         nextId++;
         sleep(50);
     }
 
     // This is an update only the primary has. The test will explicitly check for it in a few lines.
-    assert.commandWorked(mongosColl.update({_id: 1, x: 10}, {_id: 1, x: 20}));
+    assert.commandWorked(merizosColl.update({_id: 1, x: 10}, {_id: 1, x: 20}));
 
-    const session = mongos.startSession();
+    const session = merizos.startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
 

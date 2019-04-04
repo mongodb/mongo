@@ -35,13 +35,13 @@
     var collectionWideConfigString = 'split_pct=75,';
     var indexSpecificConfigString = 'split_pct=80,';
 
-    // Start up a mongod with system-wide defaults for index options and create a collection without
+    // Start up a merizod with system-wide defaults for index options and create a collection without
     // any additional options. Tests than an index without any additional options should take on the
     // system-wide defaults, whereas an index with additional options should override the
     // system-wide defaults.
     runTest({});
 
-    // Start up a mongod with system-wide defaults for index options and create a collection with
+    // Start up a merizod with system-wide defaults for index options and create a collection with
     // additional options. Tests than an index without any additional options should take on the
     // collection-wide defaults, whereas an index with additional options should override the
     // collection-wide defaults.
@@ -53,13 +53,13 @@
         var dbpath = MongoRunner.dataPath + 'wt_index_option_defaults';
         resetDbpath(dbpath);
 
-        // Start a mongod with system-wide defaults for engine-specific index options.
+        // Start a merizod with system-wide defaults for engine-specific index options.
         var conn = MongoRunner.runMongod({
             dbpath: dbpath,
             noCleanData: true,
             [engine + 'IndexConfigString']: systemWideConfigString,
         });
-        assert.neq(null, conn, 'mongod was unable to start up');
+        assert.neq(null, conn, 'merizod was unable to start up');
 
         var testDB = conn.getDB('test');
         var cmdObj = {create: 'coll'};

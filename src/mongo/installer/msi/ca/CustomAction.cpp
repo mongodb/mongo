@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -30,7 +30,7 @@
 /**
  * Note: This file is included in the install package and used during installation.
  *
- * It supposed to be linked to a static C-runtime, and should not depend on other MongoDB
+ * It supposed to be linked to a static C-runtime, and should not depend on other MerizoDB
  * components.
  */
 
@@ -47,7 +47,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/util/scopeguard.h"
+#include "merizo/util/scopeguard.h"
 
 // UpdateMongoYAML CustomAction Constants
 constexpr wchar_t kBIN[] = L"BIN";
@@ -262,7 +262,7 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
         }
 
         std::wstring YamlFile(binPath);
-        YamlFile += L"\\mongod.cfg";
+        YamlFile += L"\\merizod.cfg";
 
         LOG_INFO("CA - BIN = %ls", binPath.c_str());
         LOG_INFO("CA - MONGO_DATA_PATH = %ls", dataDir.c_str());
@@ -285,7 +285,7 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
             CHECKGLE_AND_LOG("Failed to open yaml file");
         }
 
-        const auto handleGuard = mongo::makeGuard([&] { CloseHandle(hFile); });
+        const auto handleGuard = merizo::makeGuard([&] { CloseHandle(hFile); });
 
         LARGE_INTEGER fileSize;
         if (GetFileSizeEx(hFile, &fileSize) == 0) {

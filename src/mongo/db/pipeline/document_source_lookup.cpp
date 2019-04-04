@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_lookup.h"
+#include "merizo/db/pipeline/document_source_lookup.h"
 
-#include "mongo/base/init.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/base/init.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/expression_algo.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_path_support.h"
+#include "merizo/db/pipeline/expression.h"
+#include "merizo/db/pipeline/expression_context.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 using std::vector;
@@ -177,10 +177,10 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
         txnRequirement = resolvedRequirements.second;
     }
 
-    // If executing on mongos and the foreign collection is sharded, then this stage can run on
-    // mongos or any shard.
+    // If executing on merizos and the foreign collection is sharded, then this stage can run on
+    // merizos or any shard.
     HostTypeRequirement hostRequirement =
-        (pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs))
+        (pExpCtx->inMongos && pExpCtx->merizoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs))
         ? HostTypeRequirement::kNone
         : HostTypeRequirement::kPrimaryShard;
 
@@ -286,7 +286,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     // If we don't have a cache, build and return the pipeline immediately.
     if (!_cache || _cache->isAbandoned()) {
-        return pExpCtx->mongoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx);
+        return pExpCtx->merizoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx);
     }
 
     // Tailor the pipeline construction for our needs. We want a non-optimized pipeline without a
@@ -297,7 +297,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     // Construct the basic pipeline without a cache stage.
     auto pipeline =
-        pExpCtx->mongoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
+        pExpCtx->merizoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
 
     // Add the cache stage at the end and optimize. During the optimization process, the cache will
     // either move itself to the correct position in the pipeline, or will abandon itself if no
@@ -309,7 +309,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
-        pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_fromExpCtx,
+        pipeline = pExpCtx->merizoProcessInterface->attachCursorSourceToPipeline(_fromExpCtx,
                                                                                 pipeline.release());
     }
 
@@ -873,4 +873,4 @@ void DocumentSourceLookUp::addInvolvedCollections(
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

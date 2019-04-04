@@ -1,11 +1,11 @@
 (function() {
-    // Tests that errors encountered on shards are correctly returned to the client when mongos uses
+    // Tests that errors encountered on shards are correctly returned to the client when merizos uses
     // the legacy DBClientCursor method of executing commands on shards. We use aggregation here
     // specifically because it is one of the few query paths that still uses the legacy DBClient
-    // classes in mongos.
+    // classes in merizos.
     "use strict";
 
-    var st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 3}});
+    var st = new ShardingTest({merizos: 1, shards: 1, rs: {nodes: 3}});
 
     var db = st.getDB('test');
     db.setSlaveOk(true);

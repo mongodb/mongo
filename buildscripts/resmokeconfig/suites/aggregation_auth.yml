@@ -35,7 +35,7 @@ executor:
     n: 20
   fixture:
     class: MongoDFixture
-    mongod_options:
+    merizod_options:
       auth: ''
       keyFile: *keyFile
       set_parameters:

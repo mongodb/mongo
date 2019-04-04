@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/server_options.h"
-#include "mongo/s/sharding_mongod_test_fixture.h"
+#include "merizo/db/server_options.h"
+#include "merizo/s/sharding_merizod_test_fixture.h"
 
-namespace mongo {
+namespace merizo {
 
 class RemoteCommandTargeterMock;
 
 /**
- * Test fixture for shard components, as opposed to config or mongos components. Provides a mock
+ * Test fixture for shard components, as opposed to config or merizos components. Provides a mock
  * network and ephemeral storage engine via ShardingMongodTestFixture. Additionally sets up mock
  * dist lock catalog and manager with a real catalog client.
  */
@@ -83,4 +83,4 @@ protected:
     OID _clusterId;
 };
 
-}  // namespace mongo
+}  // namespace merizo

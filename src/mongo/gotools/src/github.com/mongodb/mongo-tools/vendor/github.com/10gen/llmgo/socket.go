@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2015-present.
+// Copyright (C) MerizoDB, Inc. 2015-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -64,7 +64,7 @@ type MongoSocket struct {
 	cachedNonce   string
 	gotNonce      sync.Cond
 	dead          error
-	serverInfo    *mongoServerInfo
+	serverInfo    *merizoServerInfo
 }
 
 type QueryOpFlags uint32
@@ -347,7 +347,7 @@ func (socket *MongoSocket) Server() *MongoServer {
 
 // ServerInfo returns details for the server at the time the socket
 // was initially acquired.
-func (socket *MongoSocket) ServerInfo() *mongoServerInfo {
+func (socket *MongoSocket) ServerInfo() *merizoServerInfo {
 	socket.Lock()
 	serverInfo := socket.serverInfo
 	socket.Unlock()
@@ -357,7 +357,7 @@ func (socket *MongoSocket) ServerInfo() *mongoServerInfo {
 // InitialAcquire obtains the first reference to the socket, either
 // right after the connection is made or once a recycled socket is
 // being put back in use.
-func (socket *MongoSocket) InitialAcquire(serverInfo *mongoServerInfo, timeout time.Duration) error {
+func (socket *MongoSocket) InitialAcquire(serverInfo *merizoServerInfo, timeout time.Duration) error {
 	socket.Lock()
 	if socket.references > 0 {
 		panic("Socket acquired out of cache with references")
@@ -379,7 +379,7 @@ func (socket *MongoSocket) InitialAcquire(serverInfo *mongoServerInfo, timeout t
 // Acquire obtains an additional reference to the socket.
 // The socket will only be recycled when it's released as many
 // times as it's been acquired.
-func (socket *MongoSocket) Acquire() (info *mongoServerInfo) {
+func (socket *MongoSocket) Acquire() (info *merizoServerInfo) {
 	socket.Lock()
 	if socket.references == 0 {
 		panic("Socket got non-initial acquire with references == 0")

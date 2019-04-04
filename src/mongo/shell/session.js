@@ -2,7 +2,7 @@
  * Implements the sessions api for the shell.
  *
  * Roughly follows the driver sessions spec:
- * https://github.com/mongodb/specifications/blob/master/source/sessions/driver-sessions.rst#abstract
+ * https://github.com/merizodb/specifications/blob/master/source/sessions/driver-sessions.rst#abstract
  */
 var {
     DriverSession, SessionOptions, _DummyDriverSession, _DelegatingDriverSession,
@@ -41,7 +41,7 @@ var {
         const _causalConsistency =
             rawOptions.hasOwnProperty("causalConsistency") ? rawOptions.causalConsistency : true;
 
-        // If the user specified --retryWrites to the mongo shell, then we enable retryable
+        // If the user specified --retryWrites to the merizo shell, then we enable retryable
         // writes automatically.
         const _retryWrites = rawOptions.hasOwnProperty("retryWrites")
             ? rawOptions.retryWrites
@@ -250,7 +250,7 @@ var {
                 (client.isReplicaSetMember() || client.isMongos()) &&
                 !jsTest.options().skipGossipingClusterTime) {
                 // The `clientClusterTime` is the highest clusterTime observed by any connection
-                // within this mongo shell.
+                // within this merizo shell.
                 const clientClusterTime = client.getClusterTime();
                 // The `sessionClusterTime` is the highest clusterTime tracked by the
                 // `driverSession` session and may lag behind `clientClusterTime` if operations on
@@ -283,7 +283,7 @@ var {
             }
 
             // TODO SERVER-31868: A user should get back an error if they attempt to advance the
-            // DriverSession's operationTime manually when talking to a stand-alone mongod. Removing
+            // DriverSession's operationTime manually when talking to a stand-alone merizod. Removing
             // the `(client.isReplicaSetMember() || client.isMongos())` condition will also involve
             // calling resetOperationTime_forTesting() in JavaScript tests that start different
             // cluster types.
@@ -324,7 +324,7 @@ var {
          * the following error codes, or an error response with a different code containing the
          * phrase "not master" or "node is recovering".
          *
-         * https://github.com/mongodb/specifications/blob/5b53e0baca18ba111364d479a37fa9195ef801a6/
+         * https://github.com/merizodb/specifications/blob/5b53e0baca18ba111364d479a37fa9195ef801a6/
          * source/retryable-writes/retryable-writes.rst#terms
          */
         function isRetryableCode(code) {
@@ -343,7 +343,7 @@ var {
                 cmdName = Object.keys(cmdObj)[0];
             }
 
-            // TODO SERVER-33921: Revisit how the mongo shell decides whether it should retry a
+            // TODO SERVER-33921: Revisit how the merizo shell decides whether it should retry a
             // command or not.
             const sessionOptions = driverSession.getOptions();
             let numRetries =
@@ -405,7 +405,7 @@ var {
                                        res.code + "), subsequent retries remaining: " + numRetries);
                         }
                         if (client.isReplicaSetConnection()) {
-                            client._markNodeAsFailed(res._mongo.host, res.code, res.errmsg);
+                            client._markNodeAsFailed(res._merizo.host, res.code, res.errmsg);
                         }
                         continue;
                     }
@@ -425,7 +425,7 @@ var {
                             }
                             if (client.isReplicaSetConnection()) {
                                 client._markNodeAsFailed(
-                                    res._mongo.host, writeError.code, writeError.errmsg);
+                                    res._merizo.host, writeError.code, writeError.errmsg);
                             }
                             continue;
                         }
@@ -440,7 +440,7 @@ var {
                                        "), subsequent retries remaining: " + numRetries);
                         }
                         if (client.isReplicaSetConnection()) {
-                            client._markNodeAsFailed(res._mongo.host,
+                            client._markNodeAsFailed(res._merizo.host,
                                                      res.writeConcernError.code,
                                                      res.writeConcernError.errmsg);
                         }

@@ -1,15 +1,15 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongodump
+package merizodump
 
 import (
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -17,7 +17,7 @@ func TestSkipCollection(t *testing.T) {
 
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("With a mongodump that excludes collections 'test' and 'fake'"+
+	Convey("With a merizodump that excludes collections 'test' and 'fake'"+
 		" and excludes prefixes 'pre-' and 'no'", t, func() {
 		md := &MongoDump{
 			OutputOptions: &OutputOptions{

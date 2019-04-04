@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/util/bson_extract.h"
+#include "merizo/bson/util/bson_extract.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -52,7 +52,7 @@ Status bsonExtractFieldImpl(const BSONObj& object,
         return kDefaultCase;
     }
     return Status(ErrorCodes::NoSuchKey,
-                  mongoutils::str::stream() << "Missing expected field \"" << fieldName.toString()
+                  merizoutils::str::stream() << "Missing expected field \"" << fieldName.toString()
                                             << "\"");
 }
 
@@ -66,7 +66,7 @@ Status bsonExtractTypedFieldImpl(const BSONObj& object,
         return status;
     if (type != outElement->type()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "\"" << fieldName
+                      merizoutils::str::stream() << "\"" << fieldName
                                                 << "\" had the wrong type. Expected "
                                                 << typeName(type)
                                                 << ", found "
@@ -85,7 +85,7 @@ Status bsonExtractIntegerFieldImpl(const BSONObj& object,
         return status;
     if (!element.isNumber()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "Expected field \"" << fieldName
+                      merizoutils::str::stream() << "Expected field \"" << fieldName
                                                 << "\" to have numeric type, but found "
                                                 << typeName(element.type()));
     }
@@ -93,7 +93,7 @@ Status bsonExtractIntegerFieldImpl(const BSONObj& object,
     if (result != element.numberDouble()) {
         return Status(
             ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Expected field \"" << fieldName
+            merizoutils::str::stream() << "Expected field \"" << fieldName
                                       << "\" to have a value "
                                          "exactly representable as a 64-bit integer, but found "
                                       << element);
@@ -112,7 +112,7 @@ Status bsonExtractDoubleFieldImpl(const BSONObj& object,
         return status;
     if (!element.isNumber()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "Expected field \"" << fieldName
+                      merizoutils::str::stream() << "Expected field \"" << fieldName
                                                 << "\" to have numeric type, but found "
                                                 << typeName(element.type()));
     }
@@ -157,7 +157,7 @@ Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
 
     if (!element.isNumber() && !element.isBoolean()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "Expected boolean or number type for field \""
+                      merizoutils::str::stream() << "Expected boolean or number type for field \""
                                                 << fieldName
                                                 << "\", found "
                                                 << typeName(element.type()));
@@ -265,7 +265,7 @@ Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
     if (!pred(*out)) {
         return Status(
             ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Invalid value in field \"" << fieldName << "\": " << *out
+            merizoutils::str::stream() << "Invalid value in field \"" << fieldName << "\": " << *out
                                       << ": "
                                       << predDescription);
     }
@@ -281,4 +281,4 @@ Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
         object, fieldName, defaultValue, pred, "constraint failed", out);
 }
 
-}  // namespace mongo
+}  // namespace merizo

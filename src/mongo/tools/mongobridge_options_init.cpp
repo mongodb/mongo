@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/tools/mongobridge_options.h"
+#include "merizo/tools/merizobridge_options.h"
 
 #include <iostream>
 
-#include "mongo/transport/message_compressor_registry.h"
-#include "mongo/util/exit_code.h"
-#include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/quick_exit.h"
+#include "merizo/transport/message_compressor_registry.h"
+#include "merizo/util/exit_code.h"
+#include "merizo/util/options_parser/startup_option_init.h"
+#include "merizo/util/options_parser/startup_options.h"
+#include "merizo/util/quick_exit.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) {
     if (!handlePreValidationMongoBridgeOptions(moe::startupOptionsParsed)) {

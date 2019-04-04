@@ -1,24 +1,24 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package mongotop provides a method to track the amount of time a MongoDB instance spends reading and writing data.
-package mongotop
+// Package merizotop provides a method to track the amount of time a MerizoDB instance spends reading and writing data.
+package merizotop
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
 	"time"
 )
 
 // MongoTop is a container for the user-specified options and
-// internal state used for running mongotop.
+// internal state used for running merizotop.
 type MongoTop struct {
-	// Generic mongo tool options
+	// Generic merizo tool options
 	Options *options.ToolOptions
 
 	// Mongotop-specific output options
@@ -80,7 +80,7 @@ func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
 	return outDiff, nil
 }
 
-// Run executes the mongotop program.
+// Run executes the merizotop program.
 func (mt *MongoTop) Run() error {
 
 	connURL := mt.Options.Host

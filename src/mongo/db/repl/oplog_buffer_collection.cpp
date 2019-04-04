@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,25 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/oplog_buffer_collection.h"
+#include "merizo/db/repl/oplog_buffer_collection.h"
 
 #include <algorithm>
 #include <iterator>
 #include <numeric>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 namespace {
@@ -387,4 +387,4 @@ std::queue<BSONObj> OplogBufferCollection::getPeekCache_forTest() const {
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

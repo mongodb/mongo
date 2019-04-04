@@ -7,8 +7,8 @@ load("jstests/replsets/rslib.js");
 
 var NODE_COUNT = 2;
 
-// Checking UUID consistency involves reading from the config server through mongos, but this test
-// sets an invalid readPreference on the connection to the mongos.
+// Checking UUID consistency involves reading from the config server through merizos, but this test
+// sets an invalid readPreference on the connection to the merizos.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 /**
@@ -42,7 +42,7 @@ var tearDown = function() {
  * @param conn {Mongo} the connection object of which to test the read
  *     preference functionality.
  * @param hostList {Array.<Mongo>} list of the replica set host members.
- * @param isMongos {boolean} true if conn is a mongos connection.
+ * @param isMongos {boolean} true if conn is a merizos connection.
  * @param mode {string} a read preference mode like 'secondary'
  * @param tagSets {Array.<Object>} list of tag sets to use
  * @param secExpected {boolean} true if we expect to run any commands on secondary
@@ -218,7 +218,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
  * @param conn {Mongo} the connection object of which to test the read
  *     preference functionality.
  * @param hostList {Array.<Mongo>} list of the replica set host members.
- * @param isMongos {boolean} true if conn is a mongos connection.
+ * @param isMongos {boolean} true if conn is a merizos connection.
  * @param mode {string} a read preference mode like 'secondary'
  * @param tagSets {Array.<Object>} list of tag sets to use
  */
@@ -342,13 +342,13 @@ try {
 
 st.rs0.awaitSecondaryNodes();
 
-// Force mongos to reconnect after our reconfig
+// Force merizos to reconnect after our reconfig
 assert.soon(function() {
     try {
         st.s.getDB('foo').runCommand({create: 'foo'});
         return true;
     } catch (x) {
-        // Intentionally caused an error that forces mongos's monitor to refresh.
+        // Intentionally caused an error that forces merizos's monitor to refresh.
         jsTest.log('Caught exception while doing dummy command: ' + tojson(x));
         return false;
     }
@@ -376,7 +376,7 @@ assert.commandWorked(
 
 testAllModes(replConn, st.rs0.nodes, false);
 
-jsTest.log('Starting test for mongos connection');
+jsTest.log('Starting test for merizos connection');
 
 testAllModes(st.s, st.rs0.nodes, true);
 

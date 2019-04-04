@@ -1,5 +1,5 @@
 /**
- * Tests for the command assertion functions in mongo/shell/assert.js.
+ * Tests for the command assertion functions in merizo/shell/assert.js.
  */
 
 (function() {

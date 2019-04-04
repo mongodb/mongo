@@ -2,7 +2,7 @@
  * Ensures that if the config servers are blackholed from the point of view of MongoS, metadata
  * operations do not get stuck forever.
  *
- * Checking UUID consistency involves talking to config servers through mongos, but mongos is
+ * Checking UUID consistency involves talking to config servers through merizos, but merizos is
  * blackholed from the config servers in this test.
  */
 
@@ -13,7 +13,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     var st = new ShardingTest({
         shards: 2,
-        mongos: 1,
+        merizos: 1,
         useBridge: true,
     });
 
@@ -25,7 +25,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     assert.writeOK(testDB.ShardedColl.insert({a: 1}));
 
-    jsTest.log('Making all the config servers appear as a blackhole to mongos');
+    jsTest.log('Making all the config servers appear as a blackhole to merizos');
     st._configServers.forEach(function(configSvr) {
         configSvr.discardMessagesFrom(st.s, 1.0);
     });

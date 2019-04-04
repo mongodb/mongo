@@ -2,7 +2,7 @@
     'use strict';
     load('jstests/sharding/autosplit_include.js');
 
-    var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
+    var s = new ShardingTest({shards: 2, merizos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 
     var db = s.getDB("test");

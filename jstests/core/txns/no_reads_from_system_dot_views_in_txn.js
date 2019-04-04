@@ -20,7 +20,7 @@
 
     if (FixtureHelpers.isMongos(testDB)) {
         // The rest of the test is concerned with a find by UUID which is not supported against
-        // mongos.
+        // merizos.
         return;
     }
 

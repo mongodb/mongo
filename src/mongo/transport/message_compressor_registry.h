@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/transport/message_compressor_base.h"
-#include "mongo/util/string_map.h"
+#include "merizo/base/status.h"
+#include "merizo/transport/message_compressor_base.h"
+#include "merizo/util/string_map.h"
 
 #include <array>
 #include <limits>
@@ -40,14 +40,14 @@
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace merizo {
 
 namespace optionenvironment {
 class OptionSection;
 class Environment;
 }  // namespace option environment
 
-namespace moe = mongo::optionenvironment;
+namespace moe = merizo::optionenvironment;
 
 /*
  * The MessageCompressorRegistry holds the global registrations of compressors for a process.
@@ -120,4 +120,4 @@ private:
 
 Status storeMessageCompressionOptions(const std::string& compressors);
 void appendMessageCompressionStats(BSONObjBuilder* b);
-}  // namespace mongo
+}  // namespace merizo

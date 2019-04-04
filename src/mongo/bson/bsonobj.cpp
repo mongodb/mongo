@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/db/jsobj.h"
+#include "merizo/db/jsobj.h"
 
-#include "mongo/base/data_range.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/bson/bsonelement_comparator_interface.h"
-#include "mongo/db/json.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/data_range.h"
+#include "merizo/bson/bson_validate.h"
+#include "merizo/bson/bsonelement_comparator_interface.h"
+#include "merizo/db/json.h"
+#include "merizo/util/allocator.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -622,7 +622,7 @@ void BSONObj::toString(
 Status DataType::Handler<BSONObj>::store(
     const BSONObj& bson, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
     if (bson.objsize() > static_cast<int>(length)) {
-        mongoutils::str::stream ss;
+        merizoutils::str::stream ss;
         ss << "buffer too small to write bson of size (" << bson.objsize()
            << ") at offset: " << debug_offset;
         return Status(ErrorCodes::Overflow, ss);
@@ -684,4 +684,4 @@ BSONObjIteratorSorted::BSONObjIteratorSorted(const BSONObj& object)
 BSONArrayIteratorSorted::BSONArrayIteratorSorted(const BSONArray& array)
     : BSONIteratorSorted(array, ElementFieldCmp(true)) {}
 
-}  // namespace mongo
+}  // namespace merizo

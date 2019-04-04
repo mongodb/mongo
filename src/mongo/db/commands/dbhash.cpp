@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/optional.hpp>
 #include <map>
 #include <string>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/md5.hpp"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/timer.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/md5.hpp"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -349,4 +349,4 @@ private:
 } dbhashCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

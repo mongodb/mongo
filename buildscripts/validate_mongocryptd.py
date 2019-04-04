@@ -1,8 +1,8 @@
-# Copyright (C) 2019-present MongoDB, Inc.
+# Copyright (C) 2019-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -25,7 +25,7 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-"""Validate that mongocryptd push tasks are correct in etc/evergreen.yml."""
+"""Validate that merizocryptd push tasks are correct in etc/evergreen.yml."""
 from __future__ import absolute_import, print_function, unicode_literals
 
 import argparse
@@ -33,14 +33,14 @@ import sys
 import yaml
 
 # Name of map to search for in the variables map in evergreen.yml
-MONGOCRYPTD_VARIANTS = "mongocryptd_variants"
+MONGOCRYPTD_VARIANTS = "merizocryptd_variants"
 
 
 def main():
     # type: () -> None
     """Execute Main Entry point."""
 
-    parser = argparse.ArgumentParser(description='MongoDB CryptD Check Tool.')
+    parser = argparse.ArgumentParser(description='MerizoDB CryptD Check Tool.')
 
     parser.add_argument('file', type=str, help="etc/evergreen.yml file")
 

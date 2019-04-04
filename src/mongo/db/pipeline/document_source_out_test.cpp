@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
 
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
+#include "merizo/db/pipeline/aggregation_context_fixture.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_source_out.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using boost::intrusive_ptr;
@@ -77,7 +77,7 @@ public:
 class DocumentSourceOutTest : public AggregationContextFixture {
 public:
     DocumentSourceOutTest() : AggregationContextFixture() {
-        getExpCtx()->mongoProcessInterface = std::make_shared<MongoProcessInterfaceForTest>();
+        getExpCtx()->merizoProcessInterface = std::make_shared<MongoProcessInterfaceForTest>();
     }
 
     intrusive_ptr<DocumentSourceOut> createOutStage(BSONObj spec) {
@@ -376,12 +376,12 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfTargetCollectionVersionIsSpecifiedOn
     getExpCtx()->inMongos = true;
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 50984);
 
-    // Test that 'targetCollectionVersion' is accepted if _from_ mongos.
+    // Test that 'targetCollectionVersion' is accepted if _from_ merizos.
     getExpCtx()->inMongos = false;
     getExpCtx()->fromMongos = true;
     ASSERT(createOutStage(spec) != nullptr);
 
-    // Test that 'targetCollectionVersion' is not accepted if on mongod but not from mongos.
+    // Test that 'targetCollectionVersion' is not accepted if on merizod but not from merizos.
     getExpCtx()->inMongos = false;
     getExpCtx()->fromMongos = false;
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 51018);
@@ -419,4 +419,4 @@ TEST_F(DocumentSourceOutTest, CorrectlyUsesForeignTargetDb) {
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 50939);
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

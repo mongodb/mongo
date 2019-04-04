@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/native_sasl_client_session.h"
+#include "merizo/client/native_sasl_client_session.h"
 
-#include "mongo/base/init.h"
-#include "mongo/client/sasl_client_conversation.h"
-#include "mongo/client/sasl_plain_client_conversation.h"
-#include "mongo/client/sasl_scram_client_conversation.h"
-#include "mongo/client/scram_client_cache.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/init.h"
+#include "merizo/client/sasl_client_conversation.h"
+#include "merizo/client/sasl_plain_client_conversation.h"
+#include "merizo/client/sasl_scram_client_conversation.h"
+#include "merizo/client/scram_client_cache.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/crypto/sha256_block.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 SaslClientSession* createNativeSaslClientSession(const std::string mech) {
@@ -79,7 +79,7 @@ Status NativeSaslClientSession::initialize() {
             new SaslSCRAMClientConversationImpl<SHA256Block>(this, scramsha256ClientCache));
     } else {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "SASL mechanism " << mechanism
+                      merizoutils::str::stream() << "SASL mechanism " << mechanism
                                                 << " is not supported");
     }
 
@@ -89,7 +89,7 @@ Status NativeSaslClientSession::initialize() {
 Status NativeSaslClientSession::step(StringData inputData, std::string* outputData) {
     if (!_saslConversation) {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream()
+                      merizoutils::str::stream()
                           << "The client authentication session has not been properly initialized");
     }
 

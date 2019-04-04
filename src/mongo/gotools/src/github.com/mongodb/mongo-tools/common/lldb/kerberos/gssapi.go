@@ -1,17 +1,17 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package kerberos implements authentication to MongoDB using kerberos
+// Package kerberos implements authentication to MerizoDB using kerberos
 package kerberos
 
 // #cgo windows CFLAGS: -Ic:/sasl/include
 // #cgo windows LDFLAGS: -Lc:/sasl/lib
 
 import (
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/options"
 	mgo "github.com/10gen/llmgo"
 )
 

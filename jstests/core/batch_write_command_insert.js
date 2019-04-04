@@ -11,7 +11,7 @@
 // ]
 //
 //
-// Ensures that mongod respects the batch write protocol for inserts
+// Ensures that merizod respects the batch write protocol for inserts
 //
 
 load("jstests/libs/get_index_helpers.js");

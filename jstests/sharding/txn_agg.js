@@ -41,7 +41,7 @@
 
     session.abortTransaction_forTesting();
 
-    // merge on mongos
+    // merge on merizos
 
     session.startTransaction();
 

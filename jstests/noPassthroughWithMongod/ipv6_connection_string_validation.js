@@ -2,31 +2,31 @@
 // Related to SERVER-8030.
 
 // This file runs in two modes: outer and inner.  This is to enable testing with --ipv6.
-// The outer mode test starts a mongod with --ipv6 and then starts a mongo shell with --ipv6
+// The outer mode test starts a merizod with --ipv6 and then starts a merizo shell with --ipv6
 // and a command line to run the test in inner_mode.  The inner mode test is the actual test.
 (function() {
     if ("undefined" == typeof inner_mode) {
-        // Start a mongod with --ipv6
-        jsTest.log("Outer mode test starting mongod with --ipv6");
+        // Start a merizod with --ipv6
+        jsTest.log("Outer mode test starting merizod with --ipv6");
         // NOTE: bind_ip arg is present to test if it can parse ipv6 addresses (::1 in this case).
         // Unfortunately, having bind_ip = ::1 won't work in the test framework (But does work when
-        // tested manually), so 127.0.0.1 is also present so the test mongo shell can connect
+        // tested manually), so 127.0.0.1 is also present so the test merizo shell can connect
         // with that address.
-        var mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
-        if (mongod == null) {
+        var merizod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
+        if (merizod == null) {
             jsTest.log("Unable to run test because ipv6 is not on machine, see BF-10990");
             return;
         }
         var args = [
-            "mongo",
+            "merizo",
             "--nodb",
             "--ipv6",
             "--host",
             "::1",
             "--port",
-            mongod.port,
+            merizod.port,
             "--eval",
-            "inner_mode=true;port=" + mongod.port + ";",
+            "inner_mode=true;port=" + merizod.port + ";",
             "jstests/noPassthroughWithMongod/ipv6_connection_string_validation.js"
         ];
         var exitCode = _runMongoProgram.apply(null, args);
@@ -36,7 +36,7 @@
         if (exitCode != 0) {
             doassert("inner test failed with exit code " + exitCode);
         }
-        MongoRunner.stopMongod(mongod);
+        MongoRunner.stopMongod(merizod);
         return;
     }
 
@@ -54,7 +54,7 @@
     var missingConnString = /^Missing connection string$/;
     var incorrectType = /^Incorrect type/;
     var emptyConnString = /^Empty connection string$/;
-    var badHost = /^Failed to parse mongodb/;
+    var badHost = /^Failed to parse merizodb/;
     var emptyHost = /^Empty host component/;
     var noPort = /^No digits/;
     var badPort = /^Bad digit/;

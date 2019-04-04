@@ -1,6 +1,6 @@
 /**
  * Confirms that log output for each operation adheres to the expected, consistent format, including
- * query/write metrics where applicable, on both mongoD and mongoS and under both legacy and command
+ * query/write metrics where applicable, on both merizoD and merizoS and under both legacy and command
  * protocols.
  * @tags: [requires_replication, requires_sharding]
  */
@@ -14,7 +14,7 @@
     load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
     load("jstests/libs/check_log.js");        // For formatAsLogLine.
 
-    // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
+    // Prevent the merizo shell from gossiping its cluster time, since this will increase the amount
     // of data logged for each op. For some of the testcases below, including the cluster time would
     // cause them to be truncated at the 512-byte RamLog limit, and some of the fields we need to
     // check would be lost.
@@ -24,24 +24,24 @@
     const stParams = {name: jsTestName(), shards: 2, rs: {nodes: 1}};
     const st = new ShardingTest(stParams);
 
-    // Obtain one mongoS connection and a second direct to the shard.
+    // Obtain one merizoS connection and a second direct to the shard.
     const shardConn = st.rs0.getPrimary();
-    const mongosConn = st.s;
+    const merizosConn = st.s;
 
     const dbName = "logtest";
 
-    const mongosDB = mongosConn.getDB(dbName);
+    const merizosDB = merizosConn.getDB(dbName);
     const shardDB = shardConn.getDB(dbName);
 
     // Enable sharding on the the test database and ensure that the primary is on shard0.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), shardConn.name);
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), shardConn.name);
 
     // Drops and re-shards the test collection, then splits at {_id: 0} and moves the upper chunk to
     // the second shard.
     function dropAndRecreateTestCollection() {
-        assert(mongosDB.test.drop());
-        st.shardColl(mongosDB.test, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName(), true);
+        assert(merizosDB.test.drop());
+        st.shardColl(merizosDB.test, {_id: 1}, {_id: 0}, {_id: 1}, merizosDB.getName(), true);
     }
 
     // Configures logging parameters on the target environment, constructs a list of test operations
@@ -79,7 +79,7 @@
 
         // Build a string that identifies the parameters of this test run. Individual ops will
         // use this string as their comment where applicable, and we also print it to the logs.
-        const logFormatTestComment = (isMongos ? 'mongos' : 'mongod') + "_" + readWriteMode +
+        const logFormatTestComment = (isMongos ? 'merizos' : 'merizod') + "_" + readWriteMode +
             "_slowms:" + slowMs + "_logLevel:" + logLevel + "_sampleRate:" + sampleRate;
         jsTestLog(logFormatTestComment);
 
@@ -90,8 +90,8 @@
         assert.commandWorked(db.setLogLevel(logLevel, "command"));
         assert.commandWorked(db.setLogLevel(logLevel, "write"));
 
-        // Certain fields in the log lines on mongoD are not applicable in their counterparts on
-        // mongoS, and vice-versa. Ignore these fields when examining the logs of an instance on
+        // Certain fields in the log lines on merizoD are not applicable in their counterparts on
+        // merizoS, and vice-versa. Ignore these fields when examining the logs of an instance on
         // which we do not expect them to appear.
         const ignoreFields =
             (isMongos
@@ -207,7 +207,7 @@
                   }),
                             {_id: 1, a: 1, loc: {type: "Point", coordinates: [1, 1]}});
               },
-              // TODO SERVER-34208: display FAM update metrics in mongoS logs.
+              // TODO SERVER-34208: display FAM update metrics in merizoS logs.
               logFields: Object.assign((isMongos ? {} : {nMatched: 1, nModified: 1}), {
                   command: "findAndModify",
                   findandmodify: coll.getName(),
@@ -446,7 +446,7 @@
     // Test cases for varying values of logLevel, slowms, and sampleRate.
     //
 
-    for (let testDB of[shardDB, mongosDB]) {
+    for (let testDB of[shardDB, merizosDB]) {
         for (let readWriteMode of["commands", "legacy"]) {
             // Test that all operations are logged when slowMs is < 0 and sampleRate is 1 at the
             // default logLevel.

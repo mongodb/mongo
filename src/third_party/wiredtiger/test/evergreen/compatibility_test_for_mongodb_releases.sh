@@ -8,7 +8,7 @@
 ###########################################################################
 get_release()
 {
-	echo "$(git tag | grep "^mongodb-$1.[0-9]" | sort -V | sed -e '$p' -e d)"
+	echo "$(git tag | grep "^merizodb-$1.[0-9]" | sort -V | sed -e '$p' -e d)"
 }
 
 #############################################################
@@ -16,7 +16,7 @@ get_release()
 #	- checkout git tree of the desired release and build it,
 #	- generate test objects.
 #
-# arg1: MongoDB tagged release number or develop branch identifier.
+# arg1: MerizoDB tagged release number or develop branch identifier.
 #############################################################
 build_rel()
 {
@@ -31,7 +31,7 @@ build_rel()
 	config+="--enable-snappy "
 
 	case "$1" in
-        # Please note 'develop' here is planned as the future MongoDB release 4.2 - the only release that supports
+        # Please note 'develop' here is planned as the future MerizoDB release 4.2 - the only release that supports
         # both enabling and disabling of timestamps in data format. Once 4.2 is released, we need to update this script.
 	"develop")
 		branch="develop";;

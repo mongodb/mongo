@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/3rf/mongo-lint"
+	"github.com/3rf/merizo-lint"
 )
 
 var minConfidence = flag.Float64("min_confidence", 0.8, "minimum confidence of a problem to print it")

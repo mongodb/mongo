@@ -208,7 +208,7 @@
 
     if (typeof db === 'undefined') {
         throw new Error(
-            'resmoke_runner.js must be run with the mongo shell already connected to the database');
+            'resmoke_runner.js must be run with the merizo shell already connected to the database');
     }
 
     const clusterOptions = {
@@ -233,7 +233,7 @@
             clusterOptions.sharded.enableBalancer = TestData.hasOwnProperty('runningWithBalancer')
                 ? TestData.runningWithBalancer
                 : true;
-            clusterOptions.sharded.numMongos = topology.mongos.nodes.length;
+            clusterOptions.sharded.numMongos = topology.merizos.nodes.length;
             clusterOptions.sharded.numShards = Object.keys(topology.shards).length;
             clusterOptions.sharded.stepdownOptions = {};
             clusterOptions.sharded.stepdownOptions.configStepdown =

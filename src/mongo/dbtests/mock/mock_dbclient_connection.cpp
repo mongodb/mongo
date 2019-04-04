@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
 
-#include "mongo/client/dbclient_mockcursor.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/time_support.h"
+#include "merizo/client/dbclient_mockcursor.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/time_support.h"
 
-using mongo::BSONObj;
+using merizo::BSONObj;
 
 using std::string;
 using std::vector;
 
-namespace mongo {
+namespace merizo {
 MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect)
     : _remoteServerInstanceID(remoteServer->getInstanceID()),
       _remoteServer(remoteServer),
       _isFailed(false),
-      _sockCreationTime(mongo::curTimeMicros64()),
+      _sockCreationTime(merizo::curTimeMicros64()),
       _autoReconnect(autoReconnect) {}
 
 MockDBClientConnection::~MockDBClientConnection() {}
@@ -69,16 +69,16 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
 
     try {
         return {_remoteServer->runCommand(_remoteServerInstanceID, request), this};
-    } catch (const mongo::DBException&) {
+    } catch (const merizo::DBException&) {
         _isFailed = true;
         throw;
     }
 }
 
 
-std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
+std::unique_ptr<merizo::DBClientCursor> MockDBClientConnection::query(
     const NamespaceStringOrUUID& nsOrUuid,
-    mongo::Query query,
+    merizo::Query query,
     int nToReturn,
     int nToSkip,
     const BSONObj* fieldsToReturn,
@@ -87,7 +87,7 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
     checkConnection();
 
     try {
-        mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID,
+        merizo::BSONArray result(_remoteServer->query(_remoteServerInstanceID,
                                                      nsOrUuid,
                                                      query,
                                                      nToReturn,
@@ -96,20 +96,20 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
                                                      queryOptions,
                                                      batchSize));
 
-        std::unique_ptr<mongo::DBClientCursor> cursor;
+        std::unique_ptr<merizo::DBClientCursor> cursor;
         cursor.reset(new DBClientMockCursor(this, BSONArray(result.copy()), batchSize));
         return cursor;
-    } catch (const mongo::DBException&) {
+    } catch (const merizo::DBException&) {
         _isFailed = true;
         throw;
     }
 
-    std::unique_ptr<mongo::DBClientCursor> nullPtr;
+    std::unique_ptr<merizo::DBClientCursor> nullPtr;
     return nullPtr;
 }
 
-mongo::ConnectionString::ConnectionType MockDBClientConnection::type() const {
-    return mongo::ConnectionString::CUSTOM;
+merizo::ConnectionString::ConnectionType MockDBClientConnection::type() const {
+    return merizo::ConnectionString::CUSTOM;
 }
 
 bool MockDBClientConnection::isFailed() const {
@@ -125,10 +125,10 @@ string MockDBClientConnection::toString() const {
 }
 
 unsigned long long MockDBClientConnection::query(
-    stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
+    stdx::function<void(merizo::DBClientCursorBatchIterator&)> f,
     const NamespaceStringOrUUID& nsOrUuid,
-    mongo::Query query,
-    const mongo::BSONObj* fieldsToReturn,
+    merizo::Query query,
+    const merizo::BSONObj* fieldsToReturn,
     int queryOptions,
     int batchSize) {
     return DBClientBase::query(f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize);
@@ -156,15 +156,15 @@ void MockDBClientConnection::killCursor(const NamespaceString& ns, long long cur
     verify(false);  // unimplemented
 }
 
-bool MockDBClientConnection::call(mongo::Message& toSend,
-                                  mongo::Message& response,
+bool MockDBClientConnection::call(merizo::Message& toSend,
+                                  merizo::Message& response,
                                   bool assertOk,
                                   string* actualServer) {
     verify(false);  // unimplemented
     return false;
 }
 
-void MockDBClientConnection::say(mongo::Message& toSend, bool isRetry, string* actualServer) {
+void MockDBClientConnection::say(merizo::Message& toSend, bool isRetry, string* actualServer) {
     verify(false);  // unimplemented
 }
 

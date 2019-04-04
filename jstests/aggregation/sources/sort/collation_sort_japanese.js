@@ -1,5 +1,5 @@
 /**
- * Tests that the $sort stage performs sorts correctly, whether in-memory, merging on mongos, or
+ * Tests that the $sort stage performs sorts correctly, whether in-memory, merging on merizos, or
  * merging on a shard. (The sharding scenarios are tested when this test is run in the
  * aggregation_sharded_collections_passthrough.)
  */
@@ -55,7 +55,7 @@
                           " and collation " + tojson(collation));
 
             // Run the same aggregation, but in a sharded cluster, force the merging to be performed
-            // on a shard instead of on mongos.
+            // on a shard instead of on merizos.
             result = coll.aggregate(
                              [
                                {$_internalSplitPipeline: {mergeType: "anyShard"}},

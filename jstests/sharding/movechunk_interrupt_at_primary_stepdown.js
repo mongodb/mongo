@@ -14,13 +14,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Intentionally use a config server with 1 node so that the step down and promotion to primary
     // are guaranteed to happen on the same host
     var st = new ShardingTest({config: 1, shards: 2});
-    var mongos = st.s0;
+    var merizos = st.s0;
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: 'TestDB'}));
+    assert.commandWorked(merizos.adminCommand({enableSharding: 'TestDB'}));
     st.ensurePrimaryShard('TestDB', st.shard0.shardName);
-    assert.commandWorked(mongos.adminCommand({shardCollection: 'TestDB.TestColl', key: {Key: 1}}));
+    assert.commandWorked(merizos.adminCommand({shardCollection: 'TestDB.TestColl', key: {Key: 1}}));
 
-    var coll = mongos.getDB('TestDB').TestColl;
+    var coll = merizos.getDB('TestDB').TestColl;
 
     // We have one chunk initially
     assert.writeOK(coll.insert({Key: 0, Value: 'Test value'}));
@@ -31,11 +31,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
     var staticMongod = MongoRunner.runMongod({});
 
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, mongos.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
+        staticMongod, merizos.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
     waitForMigrateStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 
     // Stepdown the primary in order to force the balancer to stop. Use a timeout of 5 seconds for
-    // both step down operations, because mongos will retry to find the CSRS primary for up to 20
+    // both step down operations, because merizos will retry to find the CSRS primary for up to 20
     // seconds and we have two successive ones.
     assert.commandWorked(st.configRS.getPrimary().adminCommand({replSetStepDown: 5, force: true}));
 
@@ -43,11 +43,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
     st.configRS.getPrimary(30000);
 
     assert.eq(1,
-              mongos.getDB('config')
+              merizos.getDB('config')
                   .chunks.find({ns: 'TestDB.TestColl', shard: st.shard0.shardName})
                   .itcount());
     assert.eq(0,
-              mongos.getDB('config')
+              merizos.getDB('config')
                   .chunks.find({ns: 'TestDB.TestColl', shard: st.shard1.shardName})
                   .itcount());
 
@@ -64,11 +64,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
     joinMoveChunk();
 
     assert.eq(0,
-              mongos.getDB('config')
+              merizos.getDB('config')
                   .chunks.find({ns: 'TestDB.TestColl', shard: st.shard0.shardName})
                   .itcount());
     assert.eq(1,
-              mongos.getDB('config')
+              merizos.getDB('config')
                   .chunks.find({ns: 'TestDB.TestColl', shard: st.shard1.shardName})
                   .itcount());
 

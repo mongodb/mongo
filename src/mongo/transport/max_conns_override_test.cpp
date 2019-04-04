@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/transport/mock_session.h"
-#include "mongo/transport/service_entry_point_impl.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/transport/mock_session.h"
+#include "merizo/transport/service_entry_point_impl.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using ExemptionVector = std::vector<stdx::variant<CIDR, std::string>>;
@@ -73,13 +73,13 @@ TEST(MaxConnsOverride, NormalCIDR) {
 TEST(MaxConnsOverride, UNIXPaths) {
     ExemptionVector mixed{makeExemption("127.0.0.1"),
                           makeExemption("10.0.0.0/24"),
-                          makeExemption("/tmp/mongod.sock")};
+                          makeExemption("/tmp/merizod.sock")};
 
     ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("127.0.0.1"), mixed));
     ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("10.0.0.35"), mixed));
     ASSERT_FALSE(shouldOverrideMaxConns(makeIPSession("192.168.0.53"), mixed));
-    ASSERT_TRUE(shouldOverrideMaxConns(makeUNIXSession("/tmp/mongod.sock"), mixed));
-    ASSERT_FALSE(shouldOverrideMaxConns(makeUNIXSession("/tmp/other-mongod.sock"), mixed));
+    ASSERT_TRUE(shouldOverrideMaxConns(makeUNIXSession("/tmp/merizod.sock"), mixed));
+    ASSERT_FALSE(shouldOverrideMaxConns(makeUNIXSession("/tmp/other-merizod.sock"), mixed));
 }
 #endif
 

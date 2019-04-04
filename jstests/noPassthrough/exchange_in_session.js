@@ -9,7 +9,7 @@
     TestData.disableImplicitSessions = true;
 
     // Start a sharded cluster. For this test, we'll just need to talk to the shard directly.
-    const st = new ShardingTest({shards: 1, mongos: 1});
+    const st = new ShardingTest({shards: 1, merizos: 1});
 
     const adminDB = st.shard0.getDB("admin");
     const session = st.shard0.getDB("test").getMongo().startSession();

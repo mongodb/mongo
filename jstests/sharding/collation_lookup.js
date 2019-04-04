@@ -387,12 +387,12 @@
     const testName = "collation_lookup";
     const caseInsensitive = {collation: {locale: "en_US", strength: 2}};
 
-    const mongosDB = st.s0.getDB(testName);
-    const withDefaultCollationColl = mongosDB[testName + "_with_default"];
-    const withoutDefaultCollationColl = mongosDB[testName + "_without_default"];
+    const merizosDB = st.s0.getDB(testName);
+    const withDefaultCollationColl = merizosDB[testName + "_with_default"];
+    const withoutDefaultCollationColl = merizosDB[testName + "_without_default"];
 
     assert.commandWorked(
-        mongosDB.createCollection(withDefaultCollationColl.getName(), caseInsensitive));
+        merizosDB.createCollection(withDefaultCollationColl.getName(), caseInsensitive));
     assert.writeOK(withDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
 
     assert.writeOK(withoutDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
@@ -407,22 +407,22 @@
         withDefaultCollationColl.createIndex({str: 1}, {collation: {locale: "simple"}}));
 
     // Enable sharding on the test DB and ensure its primary is shard0000.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.shard0.shardName);
 
     // Shard the collection with a default collation.
-    assert.commandWorked(mongosDB.adminCommand({
+    assert.commandWorked(merizosDB.adminCommand({
         shardCollection: withDefaultCollationColl.getFullName(),
         key: {str: 1},
         collation: {locale: "simple"}
     }));
 
     // Split the collection into 2 chunks.
-    assert.commandWorked(mongosDB.adminCommand(
+    assert.commandWorked(merizosDB.adminCommand(
         {split: withDefaultCollationColl.getFullName(), middle: {str: "abc"}}));
 
     // Move the chunk containing {str: "abc"} to shard0001.
-    assert.commandWorked(mongosDB.adminCommand({
+    assert.commandWorked(merizosDB.adminCommand({
         moveChunk: withDefaultCollationColl.getFullName(),
         find: {str: "abc"},
         to: st.shard1.shardName
@@ -437,17 +437,17 @@
     //
 
     // Shard the collection without a default collation.
-    // assert.commandWorked(mongosDB.adminCommand({
+    // assert.commandWorked(merizosDB.adminCommand({
     //     shardCollection: withoutDefaultCollationColl.getFullName(),
     //     key: {_id: 1},
     // }));
 
     // // Split the collection into 2 chunks.
-    // assert.commandWorked(mongosDB.adminCommand(
+    // assert.commandWorked(merizosDB.adminCommand(
     //     {split: withoutDefaultCollationColl.getFullName(), middle: {_id: "unmatched"}}));
 
     // // Move the chunk containing {_id: "lowercase"} to shard0001.
-    // assert.commandWorked(mongosDB.adminCommand({
+    // assert.commandWorked(merizosDB.adminCommand({
     //     moveChunk: withoutDefaultCollationColl.getFullName(),
     //     find: {_id: "lowercase"},
     //     to: st.shard1.shardName

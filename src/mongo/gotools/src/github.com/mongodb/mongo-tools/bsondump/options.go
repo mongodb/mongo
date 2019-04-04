@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -10,7 +10,7 @@ var Usage = `<options> <file>
 
 View and debug .bson files.
 
-See http://docs.mongodb.org/manual/reference/program/bsondump/ for more information.`
+See http://docs.merizodb.org/manual/reference/program/bsondump/ for more information.`
 
 type BSONDumpOptions struct {
 	// Format to display the BSON data file

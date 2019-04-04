@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,34 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/db/commands/fsync.h"
+#include "merizo/db/commands/fsync.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/backup_cursor_hooks.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/background.h"
-#include "mongo/util/log.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/fsync_locked.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/backup_cursor_hooks.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/background.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::stringstream;
@@ -66,7 +66,7 @@ Lock::ResourceMutex commandMutex("fsyncCommandMutex");
 }
 
 /**
- * Maintains a global read lock while mongod is fsyncLocked.
+ * Maintains a global read lock while merizod is fsyncLocked.
  */
 class FSyncLockThread : public BackgroundJob {
 public:
@@ -85,7 +85,7 @@ private:
 class FSyncCommand : public ErrmsgCommandDeprecated {
 public:
     static const char* url() {
-        return "http://dochub.mongodb.org/core/fsynccommand";
+        return "http://dochub.merizodb.org/core/fsynccommand";
     }
 
     FSyncCommand() : ErrmsgCommandDeprecated("fsync") {}
@@ -185,7 +185,7 @@ public:
             }
         }
 
-        log() << "mongod is locked and no writes are allowed. db.fsyncUnlock() to unlock";
+        log() << "merizod is locked and no writes are allowed. db.fsyncUnlock() to unlock";
         log() << "Lock count is " << getLockCount();
         log() << "    For more info see " << FSyncCommand::url();
         result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
@@ -301,7 +301,7 @@ public:
             result.append("info", str::stream() << "fsyncUnlock completed");
             result.append("lockCount", lockCount);
             if (lockCount == 0) {
-                log() << "fsyncUnlock completed. mongod is now unlocked and free to accept writes";
+                log() << "fsyncUnlock completed. merizod is now unlocked and free to accept writes";
             } else {
                 log() << "fsyncUnlock completed. Lock count is now " << lockCount;
             }

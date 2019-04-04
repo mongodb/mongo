@@ -3,16 +3,16 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({mongos: 1, shards: 3});
+    var st = new ShardingTest({merizos: 1, shards: 3});
     var kDbName = 'test';
     var kCollName = 'foo';
     var ns = kDbName + '.' + kCollName;
     var zoneName = 'zoneName';
-    var mongos = st.s0;
-    var testDB = mongos.getDB(kDbName);
-    var configDB = mongos.getDB('config');
+    var merizos = st.s0;
+    var testDB = merizos.getDB(kDbName);
+    var configDB = merizos.getDB('config');
     var shardName = st.shard0.shardName;
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(merizos.adminCommand({enableSharding: kDbName}));
 
     /**
      * Test that shardCollection correctly validates that a zone is associated with a shard.
@@ -29,10 +29,10 @@
         assert.eq(zoneMax, tagDoc.max);
         assert.eq(zoneName, tagDoc.tag);
 
-        assert.commandFailed(mongos.adminCommand({shardCollection: ns, key: proposedShardKey}));
+        assert.commandFailed(merizos.adminCommand({shardCollection: ns, key: proposedShardKey}));
 
         assert.commandWorked(st.s.adminCommand({addShardToZone: shardName, zone: zoneName}));
-        assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: proposedShardKey}));
+        assert.commandWorked(merizos.adminCommand({shardCollection: ns, key: proposedShardKey}));
 
         assert.commandWorked(testDB.runCommand({drop: kCollName}));
     }
@@ -57,9 +57,9 @@
         assert.eq(zoneName, tagDoc.tag);
 
         if (success) {
-            assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: proposedShardKey}));
+            assert.commandWorked(merizos.adminCommand({shardCollection: ns, key: proposedShardKey}));
         } else {
-            assert.commandFailed(mongos.adminCommand({shardCollection: ns, key: proposedShardKey}));
+            assert.commandFailed(merizos.adminCommand({shardCollection: ns, key: proposedShardKey}));
         }
 
         assert.commandWorked(testDB.runCommand({drop: kCollName}));
@@ -104,7 +104,7 @@
             "expect to see no chunk documents for the collection before shardCollection is run");
 
         // shard the collection and validate the resulting chunks
-        assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: shardKey}));
+        assert.commandWorked(merizos.adminCommand({shardCollection: ns, key: shardKey}));
         var expectedChunks = [
             {range: [{x: {"$minKey": 1}}, {x: 0}], shardId: st.shard0.shardName},
             {range: [{x: 0}, {x: 10}], shardId: st.shard0.shardName},  // pre-defined
@@ -149,8 +149,8 @@
 
         for (let i = 0; i < shards.length; i++) {
             assert.commandWorked(
-                mongos.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}));
-            assert.commandWorked(mongos.adminCommand({
+                merizos.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}));
+            assert.commandWorked(merizos.adminCommand({
                 updateZoneKeyRange: ns,
                 min: ranges[i].min,
                 max: ranges[i].max,
@@ -158,7 +158,7 @@
             }));
         }
 
-        assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: shardKey}));
+        assert.commandWorked(merizos.adminCommand({shardCollection: ns, key: shardKey}));
 
         // Check that there is initially 1 chunk.
         assert.eq(1, configDB.chunks.count({ns: ns}));

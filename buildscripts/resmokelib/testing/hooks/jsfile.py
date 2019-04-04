@@ -43,7 +43,7 @@ class DataConsistencyHook(JSHook):
     """
     A hook for running a static JavaScript file that checks data consistency of the server.
 
-    If the mongo shell process running the JavaScript file exits with a non-zero return code, then
+    If the merizo shell process running the JavaScript file exits with a non-zero return code, then
     an errors.ServerFailure exception is raised to cause resmoke.py's test execution to stop.
     """
 

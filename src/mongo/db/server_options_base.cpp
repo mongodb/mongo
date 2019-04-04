@@ -1,10 +1,10 @@
 
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,7 +13,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,21 +28,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/server_options_base.h"
+#include "merizo/db/server_options_base.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/server_options_base_gen.h"
-#include "mongo/db/server_options_general_gen.h"
-#include "mongo/logger/log_component.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "merizo/base/string_data.h"
+#include "merizo/db/server_options_base_gen.h"
+#include "merizo/db/server_options_general_gen.h"
+#include "merizo/logger/log_component.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_description.h"
+#include "merizo/util/options_parser/option_section.h"
+#include "merizo/util/options_parser/startup_option_init.h"
+#include "merizo/util/options_parser/startup_options.h"
 
-namespace moe = mongo::optionenvironment;
+namespace moe = merizo::optionenvironment;
 
-namespace mongo {
+namespace merizo {
 
 // Primarily dispatches to IDL defined addBaseServerOptionDefinitions,
 // then adds some complex options inexpressible in IDL.
@@ -141,4 +141,4 @@ std::string getUnixDomainSocketFilePermissionsHelpText() {
     return ss.str();
 }
 
-}  // namespace mongo
+}  // namespace merizo

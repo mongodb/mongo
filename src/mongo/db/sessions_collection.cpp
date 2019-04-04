@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/sessions_collection.h"
+#include "merizo/db/sessions_collection.h"
 
 #include <memory>
 #include <vector>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/dbclient_base.h"
-#include "mongo/db/create_indexes_gen.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/refresh_sessions_gen.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/client/dbclient_base.h"
+#include "merizo/db/create_indexes_gen.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/refresh_sessions_gen.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 
 constexpr StringData SessionsCollection::kSessionsTTLIndex;
 
@@ -330,4 +330,4 @@ BSONObj SessionsCollection::generateCollModCmd() {
     return collModCmdBuilder.obj();
 }
 
-}  // namespace mongo
+}  // namespace merizo

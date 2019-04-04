@@ -34,7 +34,7 @@ Date.prototype.tojson = function() {
         // If this === Date.prototype or this is a Date instance created from
         // Object.create(Date.prototype), then the [[DateValue]] internal slot won't be set and will
         // lead to a TypeError. We instead treat it as though the [[DateValue]] internal slot is NaN
-        // in order to be consistent with the ES5 behavior in MongoDB 3.2 and earlier.
+        // in order to be consistent with the ES5 behavior in MerizoDB 3.2 and earlier.
         this.getTime();
     } catch (e) {
         if (e instanceof TypeError &&
@@ -419,7 +419,7 @@ ObjectId.prototype.equals = function(other) {
 
 // Creates an ObjectId from a Date.
 // Based on solution discussed here:
-//     http://stackoverflow.com/questions/8749971/can-i-query-mongodb-objectid-by-date
+//     http://stackoverflow.com/questions/8749971/can-i-query-merizodb-objectid-by-date
 ObjectId.fromDate = function(source) {
     if (!source) {
         throw Error("date missing or undefined");

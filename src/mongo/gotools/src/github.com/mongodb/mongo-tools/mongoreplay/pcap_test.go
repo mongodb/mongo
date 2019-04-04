@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/llmgo/bson"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testtype"
 )
 
 type verifyFunc func(*testing.T, *mgo.Session, *BufferedStatRecorder, *preprocessCursorManager)
@@ -25,7 +25,7 @@ func TestOpCommandFromPcapFileLiveDB(t *testing.T) {
 		t.Error(err)
 	}
 	if isMongosTestServer {
-		t.Skipf("Skipping OpCommand test when running against mongos")
+		t.Skipf("Skipping OpCommand test when running against merizos")
 	}
 
 	pcapFname := "op_command_2inserts.pcap"
@@ -202,7 +202,7 @@ func playbackFileFromPcap(pcapFname, playbackFname string) error {
 
 func pcapTestHelper(t *testing.T, pcapFname string, preprocess bool, verifier verifyFunc) {
 	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
-	pcapFile := "mongoreplay/testPcap/" + pcapFname
+	pcapFile := "merizoreplay/testPcap/" + pcapFname
 	if _, err := os.Stat(pcapFile); err != nil {
 		t.Skipf("pcap file %v not present, skipping test", pcapFile)
 	}

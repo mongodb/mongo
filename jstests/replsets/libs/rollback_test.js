@@ -30,7 +30,7 @@ load("jstests/hooks/validate_collections.js");
  *      1. It must have exactly three nodes: A primary and two secondaries. One of the secondaries
  *         must be configured with priority: 0 so that it won't be elected primary. Throughout
  *         this file, this secondary will be referred to as the tiebreaker node.
- *      2. It must be running with mongobridge.
+ *      2. It must be running with merizobridge.
  *
  * If the caller does not provide their own replica set, a standard three-node
  * replset will be initialized instead, with all nodes running the latest version.
@@ -92,7 +92,7 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
                   replSet instanceof ReplSetTest,
                   `Must provide an instance of ReplSetTest. Have: ${tojson(replSet)}`);
 
-        assert.eq(true, replSet.usesBridge(), "Must set up ReplSetTest with mongobridge enabled.");
+        assert.eq(true, replSet.usesBridge(), "Must set up ReplSetTest with merizobridge enabled.");
         assert.eq(3, replSet.nodes.length, "Replica set must contain exactly three nodes.");
 
         // Make sure we have a primary.

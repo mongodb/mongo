@@ -16,10 +16,10 @@
 
 #include <iosfwd>
 
-#include "mongo/logger/log_severity.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/logstream_builder.h"
-#include "mongo/util/concurrency/thread_name.h"
+#include "merizo/logger/log_severity.h"
+#include "merizo/logger/logger.h"
+#include "merizo/logger/logstream_builder.h"
+#include "merizo/util/concurrency/thread_name.h"
 
 #include "macros.h"
 
@@ -60,20 +60,20 @@
 
 // VLOG messages will be logged at debug level 5 with the S2 log component.
 #define S2LOG(x) x
-// Expansion of MONGO_LOG_COMPONENT defined in mongo/util/log.h
+// Expansion of MONGO_LOG_COMPONENT defined in merizo/util/log.h
 #define VLOG(x) \
-    if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::logger::LogComponent::kGeo, ::mongo::logger::LogSeverity::Debug(5))) {} \
-    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::logger::LogSeverity::Debug(5), ::mongo::logger::LogComponent::kGeo)
+    if (!(::merizo::logger::globalLogDomain())->shouldLog(::merizo::logger::LogComponent::kGeo, ::merizo::logger::LogSeverity::Debug(5))) {} \
+    else ::merizo::logger::LogstreamBuilder(::merizo::logger::globalLogDomain(), ::merizo::getThreadName(), ::merizo::logger::LogSeverity::Debug(5), ::merizo::logger::LogComponent::kGeo)
 
 class LogMessageBase {
 public:
-    LogMessageBase(::mongo::logger::LogstreamBuilder builder);
-    LogMessageBase(::mongo::logger::LogstreamBuilder builder, const char* file, int line);
+    LogMessageBase(::merizo::logger::LogstreamBuilder builder);
+    LogMessageBase(::merizo::logger::LogstreamBuilder builder, const char* file, int line);
     virtual ~LogMessageBase() { };
     std::ostream& stream() { return _lsb.stream(); }
 protected:
     // Fatal message will deconstruct it before abort to flush final message.
-    mongo::logger::LogstreamBuilder _lsb;
+    merizo::logger::LogstreamBuilder _lsb;
 private:
     DISALLOW_COPY_AND_ASSIGN(LogMessageBase);
 };

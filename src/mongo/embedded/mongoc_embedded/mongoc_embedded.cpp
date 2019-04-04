@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongoc_embedded/mongoc_embedded.h"
+#include "merizoc_embedded/merizoc_embedded.h"
 
 #include <algorithm>
 #include <cassert>
@@ -38,10 +38,10 @@
 #include <memory>
 #include <stdexcept>
 
-#include "mongo_embedded/mongo_embedded.h"
+#include "merizo_embedded/merizo_embedded.h"
 
 // Only header-only includes allowed here (except for capi.h)
-#include "mongo/platform/endian.h"
+#include "merizo/platform/endian.h"
 
 #if defined(_WIN32)
 #define MONGO_API_CALL __cdecl
@@ -50,7 +50,7 @@
 #endif
 
 // Macro to trick the linter into accepting assert.
-#define mongoc_client_assert assert
+#define merizoc_client_assert assert
 
 namespace {
 enum RPCState { kWaitingForMessageLength, kWaitingForMessageContent, kHaveOutput };
@@ -77,7 +77,7 @@ struct MemoryView {
     // Write memory to current position and advance internal pointer
     void write(const void* source, size_t size) {
         if (remaining() < size) {
-            mongoc_client_assert(false);
+            merizoc_client_assert(false);
             return;
         }
 
@@ -120,8 +120,8 @@ struct FreeDeleter {
 };
 }  // namespace
 
-struct mongoc_stream_embedded_t : mongoc_stream_t {
-    mongo_embedded_v1_client* clientHandle;
+struct merizoc_stream_embedded_t : merizoc_stream_t {
+    merizo_embedded_v1_client* clientHandle;
     MemoryView inputBuf;
     std::unique_ptr<char, FreeDeleter> hiddenBuf;
     MemoryView outputBuf;
@@ -131,26 +131,26 @@ struct mongoc_stream_embedded_t : mongoc_stream_t {
 namespace {
 
 struct FreeAndDestroy {
-    void operator()(mongoc_stream_t* x) {
-        auto stream = static_cast<mongoc_stream_embedded_t*>(x);
-        mongo_embedded_v1_client_destroy(stream->clientHandle, nullptr);
-        stream->~mongoc_stream_embedded_t();
+    void operator()(merizoc_stream_t* x) {
+        auto stream = static_cast<merizoc_stream_embedded_t*>(x);
+        merizo_embedded_v1_client_destroy(stream->clientHandle, nullptr);
+        stream->~merizoc_stream_embedded_t();
         free(stream);
     }
 };
-extern "C" void mongoc_stream_embedded_destroy(mongoc_stream_t* s) try {
-    std::unique_ptr<mongoc_stream_t, FreeAndDestroy> stream(s);
+extern "C" void merizoc_stream_embedded_destroy(merizoc_stream_t* s) try {
+    std::unique_ptr<merizoc_stream_t, FreeAndDestroy> stream(s);
 } catch (...) {
     errno = EBADMSG;
 }
 
 
-extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
-                                                 mongoc_iovec_t* iov,
+extern "C" ssize_t merizoc_stream_embedded_writev(merizoc_stream_t* s,
+                                                 merizoc_iovec_t* iov,
                                                  size_t iovcnt,
                                                  int32_t timeout_msec) try {
-    auto stream = static_cast<mongoc_stream_embedded_t*>(s);
-    mongoc_client_assert(stream->state == RPCState::kWaitingForMessageContent ||
+    auto stream = static_cast<merizoc_stream_embedded_t*>(s);
+    merizoc_client_assert(stream->state == RPCState::kWaitingForMessageContent ||
                          stream->state == RPCState::kWaitingForMessageLength);
 
     u_long already_read = 0;
@@ -171,7 +171,7 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
             memcpy(&message_length, current_loc, sizeof(message_length));
 
             // make sure we convert from network byte order to host byte order before using it.
-            message_length = mongo::endian::littleToNative(message_length);
+            message_length = merizo::endian::littleToNative(message_length);
 
             stream->hiddenBuf = std::unique_ptr<char, FreeDeleter>((char*)malloc(message_length));
             stream->inputBuf = MemoryView(stream->hiddenBuf.get(), message_length);
@@ -189,7 +189,7 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
 
         // copy message length into buffer
         // pipelining is not allowed, so remaining_iov must be less than input_length_to_go
-        mongoc_client_assert(stream->inputBuf.remaining() >= remaining_iov);
+        merizoc_client_assert(stream->inputBuf.remaining() >= remaining_iov);
         stream->inputBuf.write(current_loc, remaining_iov);
 
         // cleanup number values to reflect the copy
@@ -200,7 +200,7 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
         if (stream->inputBuf.remaining() == 0) {
             void* output_buffer;
             size_t output_buffer_size;
-            int retVal = mongo_embedded_v1_client_invoke(stream->clientHandle,
+            int retVal = merizo_embedded_v1_client_invoke(stream->clientHandle,
                                                          stream->inputBuf.begin(),
                                                          stream->inputBuf.size(),
                                                          &output_buffer,
@@ -223,14 +223,14 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
     errno = EBADMSG;
     return 0;  // not guarenteeing anything was written
 }
-extern "C" ssize_t mongoc_stream_embedded_readv(mongoc_stream_t* s,
-                                                mongoc_iovec_t* iov,
+extern "C" ssize_t merizoc_stream_embedded_readv(merizoc_stream_t* s,
+                                                merizoc_iovec_t* iov,
                                                 size_t iovcnt,
                                                 size_t min_bytes,
                                                 int32_t timeout_msec) try {
     size_t bytes_read = 0;
-    auto stream = static_cast<mongoc_stream_embedded_t*>(s);
-    mongoc_client_assert(stream->state == RPCState::kHaveOutput);
+    auto stream = static_cast<merizoc_stream_embedded_t*>(s);
+    merizoc_client_assert(stream->state == RPCState::kHaveOutput);
     for (size_t i = 0; i < iovcnt && stream->outputBuf.remaining() > 0; ++i) {
 
         // for each vector, fill the vector if we are able
@@ -245,11 +245,11 @@ extern "C" ssize_t mongoc_stream_embedded_readv(mongoc_stream_t* s,
 }
 
 
-extern "C" int mongoc_stream_embedded_close(mongoc_stream_t* s) {
+extern "C" int merizoc_stream_embedded_close(merizoc_stream_t* s) {
     return 0;
 }
 
-extern "C" ssize_t mongoc_stream_embedded_poll(mongoc_stream_poll_t* s,
+extern "C" ssize_t merizoc_stream_embedded_poll(merizoc_stream_poll_t* s,
                                                size_t array_length,
                                                int32_t timeout_msec) try {
     for (size_t i = 0; i < array_length; i++) {
@@ -261,39 +261,39 @@ extern "C" ssize_t mongoc_stream_embedded_poll(mongoc_stream_poll_t* s,
     return -1;
 }
 
-extern "C" bool mongoc_stream_embedded_check_closed(mongoc_stream_t* s) noexcept {
+extern "C" bool merizoc_stream_embedded_check_closed(merizoc_stream_t* s) noexcept {
     return false;
 }
 
-extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
-                                                      const mongoc_host_list_t* host,
+extern "C" merizoc_stream_t* embedded_stream_initiator(const merizoc_uri_t* uri,
+                                                      const merizoc_host_list_t* host,
                                                       void* user_data,
                                                       bson_error_t* error) try {
     std::unique_ptr<unsigned char, FreeDeleter> stream_buf(
-        static_cast<unsigned char*>(bson_malloc0(sizeof(mongoc_stream_embedded_t))));
+        static_cast<unsigned char*>(bson_malloc0(sizeof(merizoc_stream_embedded_t))));
     if (!stream_buf) {
         errno = ENOMEM;
         return nullptr;
     }
     // Create the stream
-    std::unique_ptr<mongoc_stream_embedded_t, FreeAndDestroy> stream(
-        new (stream_buf.get()) mongoc_stream_embedded_t());
+    std::unique_ptr<merizoc_stream_embedded_t, FreeAndDestroy> stream(
+        new (stream_buf.get()) merizoc_stream_embedded_t());
     stream_buf.release();  // This must be here so we don't have double ownership
     stream->state = RPCState::kWaitingForMessageLength;
     // Set up connections to database
-    stream->clientHandle = mongo_embedded_v1_client_create(
-        static_cast<mongo_embedded_v1_instance*>(user_data), nullptr);
+    stream->clientHandle = merizo_embedded_v1_client_create(
+        static_cast<merizo_embedded_v1_instance*>(user_data), nullptr);
 
     // Connect the functions to the stream
     // type is not relevant for us. Has to be set for the C Driver, but it has to do with picking
     // how to communicate over the networ
     stream->type = 1000;
-    stream->poll = mongoc_stream_embedded_poll;
-    stream->close = mongoc_stream_embedded_close;
-    stream->readv = mongoc_stream_embedded_readv;
-    stream->writev = mongoc_stream_embedded_writev;
-    stream->destroy = mongoc_stream_embedded_destroy;
-    stream->check_closed = mongoc_stream_embedded_check_closed;
+    stream->poll = merizoc_stream_embedded_poll;
+    stream->close = merizoc_stream_embedded_close;
+    stream->readv = merizoc_stream_embedded_readv;
+    stream->writev = merizoc_stream_embedded_writev;
+    stream->destroy = merizoc_stream_embedded_destroy;
+    stream->check_closed = merizoc_stream_embedded_check_closed;
     return stream.release();
 } catch (...) {
     errno = EBADMSG;
@@ -301,21 +301,21 @@ extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
 }
 
 struct ClientDeleter {
-    void operator()(mongoc_client_t* x) {
-        mongoc_client_destroy(x);
+    void operator()(merizoc_client_t* x) {
+        merizoc_client_destroy(x);
     }
 };
 
 }  // namespace
 
-extern "C" mongoc_client_t* MONGO_API_CALL
-mongoc_embedded_v1_client_create(mongo_embedded_v1_instance* db) try {
+extern "C" merizoc_client_t* MONGO_API_CALL
+merizoc_embedded_v1_client_create(merizo_embedded_v1_instance* db) try {
     if (!db) {
         errno = EINVAL;
         return nullptr;
     }
-    std::unique_ptr<mongoc_client_t, ClientDeleter> client(mongoc_client_new(NULL));
-    mongoc_client_set_stream_initiator(client.get(), embedded_stream_initiator, db);
+    std::unique_ptr<merizoc_client_t, ClientDeleter> client(merizoc_client_new(NULL));
+    merizoc_client_set_stream_initiator(client.get(), embedded_stream_initiator, db);
     return client.release();
 } catch (const std::out_of_range&) {
     errno = EACCES;

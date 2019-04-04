@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,40 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <pcrecpp.h>
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/op_observer_registry.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/storage_interface_mock.h"
+#include "merizo/db/s/op_observer_sharding_impl.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/scopeguard.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
@@ -77,7 +77,7 @@ protected:
 };
 
 void DatabaseTest::setUp() {
-    // Set up mongod.
+    // Set up merizod.
     ServiceContextMongoDTest::setUp();
 
     auto service = getServiceContext();
@@ -271,7 +271,7 @@ TEST_F(
     // Replicated collection is renamed with a special drop-pending names in the <db>.system.drop.*
     // namespace.
     auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
-    ASSERT_TRUE(mongo::AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
+    ASSERT_TRUE(merizo::AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
 
     // Reaper should have the drop optime of the collection.
     auto reaperEarliestDropOpTime =

@@ -52,17 +52,17 @@
     }
     assert.eq(foo.bar.count(), 40, "should have inserted 40 total documents");
 
-    step("try mongodump with $timestamp");
+    step("try merizodump with $timestamp");
 
     var data = MongoRunner.dataDir + "/dumprestore7-dump1/";
     var query = {ts: {$gt: time}};
-    print("mongodump query: " + tojson(query));
+    print("merizodump query: " + tojson(query));
 
     var testQueryCount =
         replTest.getPrimary().getDB("local").getCollection("oplog.rs").find(query).itcount();
     assert.eq(testQueryCount, 20, "the query should match 20 documents");
 
-    var exitCode = MongoRunner.runMongoTool("mongodump", {
+    var exitCode = MongoRunner.runMongoTool("merizodump", {
         host: "127.0.0.1:" + replTest.ports[0],
         db: "local",
         collection: "oplog.rs",
@@ -71,21 +71,21 @@
     });
     assert.eq(0, exitCode, "monogdump failed to dump the oplog");
 
-    step("try mongorestore from $timestamp");
+    step("try merizorestore from $timestamp");
 
     var restoreMongod = MongoRunner.runMongod({});
-    exitCode = MongoRunner.runMongoTool("mongorestore", {
+    exitCode = MongoRunner.runMongoTool("merizorestore", {
         host: "127.0.0.1:" + restoreMongod.port,
         dir: data,
         writeConcern: 1,
     });
-    assert.eq(0, exitCode, "mongorestore failed to restore the oplog");
+    assert.eq(0, exitCode, "merizorestore failed to restore the oplog");
 
     var count = restoreMongod.getDB("local").getCollection("oplog.rs").count();
     if (count != 20) {
-        print("mongorestore restored too many documents");
+        print("merizorestore restored too many documents");
         restoreMongod.getDB("local").getCollection("oplog.rs").find().pretty().shellPrint();
-        assert.eq(count, 20, "mongorestore should only have inserted the latter 20 entries");
+        assert.eq(count, 20, "merizorestore should only have inserted the latter 20 entries");
     }
 
     MongoRunner.stopMongod(restoreMongod);

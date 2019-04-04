@@ -8,48 +8,48 @@ env = env.Clone()
 yamlEnv = env.Clone()
 yamlEnv.InjectThirdParty(libraries=['yaml'])
 
-mongobridge = env.Program(
-    target="mongobridge",
+merizobridge = env.Program(
+    target="merizobridge",
     source=[
         "bridge.cpp",
         "bridge_commands.cpp",
-        "mongobridge_options.cpp",
-        env.Idlc("mongobridge_options.idl")[0],
-        "mongobridge_options_init.cpp"
+        "merizobridge_options.cpp",
+        env.Idlc("merizobridge_options.idl")[0],
+        "merizobridge_options_init.cpp"
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/transport/message_compressor',
-        '$BUILD_DIR/mongo/transport/message_compressor_options_server',
-        '$BUILD_DIR/mongo/transport/service_entry_point',
-        '$BUILD_DIR/mongo/transport/service_executor',
-        '$BUILD_DIR/mongo/transport/transport_layer',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
-        '$BUILD_DIR/mongo/util/signal_handlers',
+        '$BUILD_DIR/merizo/db/dbmessage',
+        '$BUILD_DIR/merizo/rpc/rpc',
+        '$BUILD_DIR/merizo/transport/message_compressor',
+        '$BUILD_DIR/merizo/transport/message_compressor_options_server',
+        '$BUILD_DIR/merizo/transport/service_entry_point',
+        '$BUILD_DIR/merizo/transport/service_executor',
+        '$BUILD_DIR/merizo/transport/transport_layer',
+        '$BUILD_DIR/merizo/util/net/network',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser_init',
+        '$BUILD_DIR/merizo/util/signal_handlers',
     ],
     INSTALL_ALIAS=[
         'tools'
     ],
 )
 
-mongoebench = yamlEnv.Program(
-    target='mongoebench',
+merizoebench = yamlEnv.Program(
+    target='merizoebench',
     source=[
-        'mongoebench_main.cpp',
-        'mongoebench_options.cpp',
-        'mongoebench_options_init.cpp',
-        env.Idlc('mongoebench_options.idl')[0],
+        'merizoebench_main.cpp',
+        'merizoebench_options.cpp',
+        'merizoebench_options_init.cpp',
+        env.Idlc('merizoebench_options.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
-        '$BUILD_DIR/mongo/embedded/embedded',
-        '$BUILD_DIR/mongo/embedded/embedded_integration_helpers',
-        '$BUILD_DIR/mongo/shell/benchrun',
-        '$BUILD_DIR/mongo/util/signal_handlers',
+        '$BUILD_DIR/merizo/db/dbdirectclient',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/storage/wiredtiger/storage_wiredtiger',
+        '$BUILD_DIR/merizo/embedded/embedded',
+        '$BUILD_DIR/merizo/embedded/embedded_integration_helpers',
+        '$BUILD_DIR/merizo/shell/benchrun',
+        '$BUILD_DIR/merizo/util/signal_handlers',
     ],
     INSTALL_ALIAS=[
         'embedded-test',
@@ -59,7 +59,7 @@ mongoebench = yamlEnv.Program(
 
 hygienic = get_option('install-mode') == 'hygienic'
 if not hygienic:
-    env.Install("#/", mongobridge)
-    env.Install("#/", mongoebench)
+    env.Install("#/", merizobridge)
+    env.Install("#/", merizoebench)
 
-env.Alias('all', mongoebench)  # This ensures it compiles and links, but doesn't copy it anywhere.
+env.Alias('all', merizoebench)  # This ensures it compiles and links, but doesn't copy it anywhere.

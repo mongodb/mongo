@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/db/fts/fts_language.h"
+#include "merizo/db/fts/fts_language.h"
 
 #include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/db/fts/fts_basic_phrase_matcher.h"
-#include "mongo/db/fts/fts_basic_tokenizer.h"
-#include "mongo/db/fts/fts_unicode_phrase_matcher.h"
-#include "mongo/db/fts/fts_unicode_tokenizer.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/base/init.h"
+#include "merizo/db/fts/fts_basic_phrase_matcher.h"
+#include "merizo/db/fts/fts_basic_tokenizer.h"
+#include "merizo/db/fts/fts_unicode_phrase_matcher.h"
+#include "merizo/db/fts/fts_unicode_tokenizer.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/string_map.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace fts {
 
@@ -140,7 +140,7 @@ MONGO_FTS_LANGUAGE_LIST(LANGUAGE_DECLV3);
 MONGO_INITIALIZER_GENERAL(FTSRegisterV2LanguagesAndLater,
                           MONGO_NO_PREREQUISITES,
                           ("FTSAllLanguagesRegistered"))
-(::mongo::InitializerContext* context) {
+(::merizo::InitializerContext* context) {
     FTSLanguage::registerLanguage("none", TEXT_INDEX_VERSION_2, &languageNoneV2);
     MONGO_FTS_LANGUAGE_LIST(LANGUAGE_INITV2);
 
@@ -280,7 +280,7 @@ StatusWithFTSLanguage FTSLanguage::make(StringData langName, TextIndexVersion te
             // TEXT_INDEX_VERSION_2 and above reject unrecognized language strings.
             Status status =
                 Status(ErrorCodes::BadValue,
-                       mongoutils::str::stream() << "unsupported language: \"" << langName
+                       merizoutils::str::stream() << "unsupported language: \"" << langName
                                                  << "\" for text index version "
                                                  << textIndexVersion);
             return StatusWithFTSLanguage(status);

@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    const st = new ShardingTest({shards: 2, mongos: 2});
+    const st = new ShardingTest({shards: 2, merizos: 2});
 
     const dbName = "out_stale_unique_key";
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -11,7 +11,7 @@
     const source = st.s0.getDB(dbName).source;
     const target = st.s0.getDB(dbName).target;
 
-    // Test that an $out through a stale mongos can still use the correct uniqueKey and succeed.
+    // Test that an $out through a stale merizos can still use the correct uniqueKey and succeed.
     (function testDefaultUniqueKeyIsRecent() {
         const freshMongos = st.s0;
         const staleMongos = st.s1;
@@ -26,17 +26,17 @@
             // collection is sharded by {sk: 1, _id: 1}.
             assert.commandWorked(staleMongosDB.adminCommand(
                 {shardCollection: target.getFullName(), key: {sk: 1, _id: 1}}));
-            // Perform a query through that mongos to ensure the cache is populated.
+            // Perform a query through that merizos to ensure the cache is populated.
             assert.eq(0, staleMongosDB[target.getName()].find().itcount());
 
-            // Drop the collection from the other mongos - it is no longer sharded but the stale
-            // mongos doesn't know that yet.
+            // Drop the collection from the other merizos - it is no longer sharded but the stale
+            // merizos doesn't know that yet.
             target.drop();
         }());
 
         // At this point 'staleMongos' will believe that the target collection is sharded. This
         // should not prevent it from running an $out without a uniqueKey specified. Specifically,
-        // the mongos should force a refresh of its cache before defaulting the uniqueKey.
+        // the merizos should force a refresh of its cache before defaulting the uniqueKey.
         assert.commandWorked(source.insert({_id: 'seed'}));
 
         // If we had used the stale uniqueKey, this aggregation would fail since the documents do
@@ -62,8 +62,8 @@
 
         // Use a failpoint to make the query feeding into the aggregate hang while we drop the
         // collection.
-        [st.rs0.getPrimary(), st.rs1.getPrimary()].forEach((mongod) => {
-            assert.commandWorked(mongod.adminCommand(
+        [st.rs0.getPrimary(), st.rs1.getPrimary()].forEach((merizod) => {
+            assert.commandWorked(merizod.adminCommand(
                 {configureFailPoint: failpoint, mode: "alwaysOn", data: failpointData || {}}));
         });
         let parallelShellJoiner;
@@ -81,8 +81,8 @@
                 // If a user specifies their own uniqueKey, we don't need to fail an aggregation if
                 // the collection is dropped and recreated or the epoch otherwise changes. We are
                 // allowed to fail such an operation should we choose to in the future, but for now
-                // we don't expect to because we do not do anything special on mongos to ensure the
-                // catalog cache is up to date, so do not want to attach mongos's believed epoch to
+                // we don't expect to because we do not do anything special on merizos to ensure the
+                // catalog cache is up to date, so do not want to attach merizos's believed epoch to
                 // the command for the shards.
                 parallelCode = `
                     const source = db.getSiblingDB("${dbName}").${source.getName()};
@@ -96,7 +96,7 @@
             parallelShellJoiner = startParallelShell(parallelCode, st.s.port);
 
             // Wait for the merging $out to appear in the currentOp output from the shards. We
-            // should see that the $out stage has an 'epoch' field serialized from the mongos.
+            // should see that the $out stage has an 'epoch' field serialized from the merizos.
             const getAggOps = function() {
                 return st.s.getDB("admin")
                     .aggregate([
@@ -119,9 +119,9 @@
             // Drop the collection so that the epoch changes.
             target.drop();
         } finally {
-            [st.rs0.getPrimary(), st.rs1.getPrimary()].forEach((mongod) => {
+            [st.rs0.getPrimary(), st.rs1.getPrimary()].forEach((merizod) => {
                 assert.commandWorked(
-                    mongod.adminCommand({configureFailPoint: failpoint, mode: "off"}));
+                    merizod.adminCommand({configureFailPoint: failpoint, mode: "off"}));
             });
         }
         parallelShellJoiner();

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/shard_key_pattern.h"
+#include "merizo/s/shard_key_pattern.h"
 
 #include <vector>
 
-#include "mongo/db/field_ref.h"
-#include "mongo/db/field_ref_set.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/update/path_support.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/field_ref_set.h"
+#include "merizo/db/hasher.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/update/path_support.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
-namespace mongo {
+namespace merizo {
 
 using pathsupport::EqualityMatches;
 
@@ -453,4 +453,4 @@ BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
     return ret;
 }
 
-}  // namespace mongo
+}  // namespace merizo

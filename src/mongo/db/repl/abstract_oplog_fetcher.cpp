@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/abstract_oplog_fetcher.h"
+#include "merizo/db/repl/abstract_oplog_fetcher.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
+#include "merizo/base/counter.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/repl/repl_server_parameters_gen.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 namespace {
@@ -322,4 +322,4 @@ std::unique_ptr<Fetcher> AbstractOplogFetcher::_makeFetcher(const BSONObj& findC
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

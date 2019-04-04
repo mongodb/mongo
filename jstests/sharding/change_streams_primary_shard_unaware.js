@@ -14,9 +14,9 @@
 
     // TODO (SERVER-38673): Remove this once BACKPORT-3428, BACKPORT-3429 are completed.
     if (!jsTestOptions().enableMajorityReadConcern &&
-        jsTestOptions().mongosBinVersion === 'last-stable') {
+        jsTestOptions().merizosBinVersion === 'last-stable') {
         jsTestLog(
-            "Skipping test since 'last-stable' mongos doesn't support speculative majority update lookup queries.");
+            "Skipping test since 'last-stable' merizos doesn't support speculative majority update lookup queries.");
         return;
     }
 
@@ -35,7 +35,7 @@
     const testName = "change_streams_primary_shard_unaware";
     const st = new ShardingTest({
         shards: 2,
-        mongos: 3,
+        merizos: 3,
         rs: {
             nodes: 1,
             // Use a higher frequency for periodic noops to speed up the test.
@@ -43,57 +43,57 @@
         },
     });
 
-    const mongosDB = st.s0.getDB(testName);
+    const merizosDB = st.s0.getDB(testName);
 
     // Ensure that shard0 is the primary shard.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.rs0.getURL());
 
     // Create unsharded collection on primary shard.
-    const mongosColl = mongosDB[testName];
-    assert.commandWorked(mongosDB.createCollection(testName));
+    const merizosColl = merizosDB[testName];
+    assert.commandWorked(merizosDB.createCollection(testName));
 
-    // Before sharding the collection, issue a write through mongos2 to ensure that it knows the
+    // Before sharding the collection, issue a write through merizos2 to ensure that it knows the
     // collection exists and believes it is unsharded. This is needed later in the test to avoid
-    // triggering a refresh when a change stream is established through mongos2.
-    const mongos2DB = st.s2.getDB(testName);
-    const mongos2Coll = mongos2DB[testName];
-    assert.writeOK(mongos2Coll.insert({_id: 0, a: 0}));
+    // triggering a refresh when a change stream is established through merizos2.
+    const merizos2DB = st.s2.getDB(testName);
+    const merizos2Coll = merizos2DB[testName];
+    assert.writeOK(merizos2Coll.insert({_id: 0, a: 0}));
 
     // Create index on the shard key.
-    assert.commandWorked(mongos2Coll.createIndex({a: 1}));
+    assert.commandWorked(merizos2Coll.createIndex({a: 1}));
 
     // Shard the collection.
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {a: 1}}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {a: 1}}));
 
     // Restart the primary shard and ensure that it is no longer aware that the collection is
     // sharded.
     st.restartShardRS(0);
-    assert.eq(false, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
+    assert.eq(false, isShardAware(st.rs0.getPrimary(), merizosColl.getFullName()));
 
-    const mongos1DB = st.s1.getDB(testName);
-    const mongos1Coll = mongos1DB[testName];
+    const merizos1DB = st.s1.getDB(testName);
+    const merizos1Coll = merizos1DB[testName];
 
-    // Establish change stream cursor on the second mongos, which is not aware that the
+    // Establish change stream cursor on the second merizos, which is not aware that the
     // collection is sharded.
-    let cstMongos1 = new ChangeStreamTest(mongos1DB);
+    let cstMongos1 = new ChangeStreamTest(merizos1DB);
     let cursorMongos1 = cstMongos1.startWatchingChanges(
-        {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: mongos1Coll});
+        {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: merizos1Coll});
     assert.eq(0, cursorMongos1.firstBatch.length, "Cursor had changes: " + tojson(cursorMongos1));
 
-    // Establish a change stream cursor on the now sharded collection through the first mongos.
-    let cst = new ChangeStreamTest(mongosDB);
+    // Establish a change stream cursor on the now sharded collection through the first merizos.
+    let cst = new ChangeStreamTest(merizosDB);
     let cursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: mongosColl});
+        {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: merizosColl});
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
     // Ensure that the primary shard is still unaware that the collection is sharded.
-    assert.eq(false, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
+    assert.eq(false, isShardAware(st.rs0.getPrimary(), merizosColl.getFullName()));
 
     // Insert a doc and verify that the primary shard is now aware that the collection is sharded.
-    assert.writeOK(mongosColl.insert({_id: 1, a: 1}));
-    assert.eq(true, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
+    assert.writeOK(merizosColl.insert({_id: 1, a: 1}));
+    assert.eq(true, isShardAware(st.rs0.getPrimary(), merizosColl.getFullName()));
 
     // Verify that both cursors are able to pick up an inserted document.
     cst.assertNextChangesEqual({
@@ -101,32 +101,32 @@
         expectedChanges: [{
             documentKey: {_id: 1, a: 1},
             fullDocument: {_id: 1, a: 1},
-            ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+            ns: {db: merizosDB.getName(), coll: merizosColl.getName()},
             operationType: "insert",
         }]
     });
-    let mongos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);
-    assert.docEq({_id: 1, a: 1}, mongos1ChangeDoc.documentKey);
-    assert.docEq({_id: 1, a: 1}, mongos1ChangeDoc.fullDocument);
-    assert.eq({db: mongos1DB.getName(), coll: mongos1Coll.getName()}, mongos1ChangeDoc.ns);
-    assert.eq("insert", mongos1ChangeDoc.operationType);
+    let merizos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);
+    assert.docEq({_id: 1, a: 1}, merizos1ChangeDoc.documentKey);
+    assert.docEq({_id: 1, a: 1}, merizos1ChangeDoc.fullDocument);
+    assert.eq({db: merizos1DB.getName(), coll: merizos1Coll.getName()}, merizos1ChangeDoc.ns);
+    assert.eq("insert", merizos1ChangeDoc.operationType);
 
     // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey).
-    assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {a: 0}}));
+    assert.commandWorked(merizosDB.adminCommand({split: merizosColl.getFullName(), middle: {a: 0}}));
 
     // Move a chunk to the non-primary shard.
-    assert.commandWorked(mongosDB.adminCommand({
-        moveChunk: mongosColl.getFullName(),
+    assert.commandWorked(merizosDB.adminCommand({
+        moveChunk: merizosColl.getFullName(),
         find: {a: -1},
         to: st.rs1.getURL(),
         _waitForDelete: true
     }));
 
     // Update the document on the primary shard.
-    assert.writeOK(mongosColl.update({_id: 1, a: 1}, {$set: {b: 1}}));
+    assert.writeOK(merizosColl.update({_id: 1, a: 1}, {$set: {b: 1}}));
     // Insert another document to each shard.
-    assert.writeOK(mongosColl.insert({_id: -2, a: -2}));
-    assert.writeOK(mongosColl.insert({_id: 2, a: 2}));
+    assert.writeOK(merizosColl.insert({_id: -2, a: -2}));
+    assert.writeOK(merizosColl.insert({_id: 2, a: 2}));
 
     // Verify that both cursors pick up the first inserted doc regardless of the moveChunk
     // operation.
@@ -135,31 +135,31 @@
         expectedChanges: [{
             documentKey: {_id: 1, a: 1},
             fullDocument: {_id: 1, a: 1, b: 1},
-            ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+            ns: {db: merizosDB.getName(), coll: merizosColl.getName()},
             operationType: "update",
             updateDescription: {removedFields: [], updatedFields: {b: 1}}
         }]
     });
-    mongos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);
-    assert.docEq({_id: 1, a: 1}, mongos1ChangeDoc.documentKey);
-    assert.docEq({_id: 1, a: 1, b: 1}, mongos1ChangeDoc.fullDocument);
-    assert.eq({db: mongos1DB.getName(), coll: mongos1Coll.getName()}, mongos1ChangeDoc.ns);
-    assert.eq("update", mongos1ChangeDoc.operationType);
+    merizos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);
+    assert.docEq({_id: 1, a: 1}, merizos1ChangeDoc.documentKey);
+    assert.docEq({_id: 1, a: 1, b: 1}, merizos1ChangeDoc.fullDocument);
+    assert.eq({db: merizos1DB.getName(), coll: merizos1Coll.getName()}, merizos1ChangeDoc.ns);
+    assert.eq("update", merizos1ChangeDoc.operationType);
 
     // Restart the primary shard and ensure that it is no longer aware that the collection is
     // sharded.
     st.restartShardRS(0);
-    assert.eq(false, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
+    assert.eq(false, isShardAware(st.rs0.getPrimary(), merizosColl.getFullName()));
 
-    // Establish change stream cursor on mongos2 using the resume token from the change steam on
-    // mongos1. Mongos2 is aware that the collection exists and thinks that it's unsharded, so it
+    // Establish change stream cursor on merizos2 using the resume token from the change steam on
+    // merizos1. Mongos2 is aware that the collection exists and thinks that it's unsharded, so it
     // won't trigger a routing table refresh. This must be done using a resume token from an update
     // otherwise the shard will generate the documentKey based on the assumption that the shard key
     // is _id which will cause the cursor establishment to fail due to SERVER-32085.
-    let cstMongos2 = new ChangeStreamTest(mongos2DB);
+    let cstMongos2 = new ChangeStreamTest(merizos2DB);
     let cursorMongos2 = cstMongos2.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: mongos1ChangeDoc._id}}],
-        collection: mongos2Coll
+        pipeline: [{$changeStream: {resumeAfter: merizos1ChangeDoc._id}}],
+        collection: merizos2Coll
     });
 
     cstMongos2.assertNextChangesEqual({
@@ -167,7 +167,7 @@
         expectedChanges: [{
             documentKey: {_id: -2, a: -2},
             fullDocument: {_id: -2, a: -2},
-            ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
+            ns: {db: merizos2DB.getName(), coll: merizos2Coll.getName()},
             operationType: "insert",
         }]
     });
@@ -177,7 +177,7 @@
         expectedChanges: [{
             documentKey: {_id: 2, a: 2},
             fullDocument: {_id: 2, a: 2},
-            ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
+            ns: {db: merizos2DB.getName(), coll: merizos2Coll.getName()},
             operationType: "insert",
         }]
     });

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,54 +31,54 @@
  * Connect to a Mongo database as a database, from C++.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/dbclient_connection.h"
+#include "merizo/client/dbclient_connection.h"
 
 #include <algorithm>
 #include <utility>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/client/authenticate.h"
-#include "mongo/client/constants.h"
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/killcursors_request.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/password_digest.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/version.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/client/constants.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/config.h"
+#include "merizo/db/auth/user_name.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/json.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/killcursors_request.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/executor/remote_command_request.h"
+#include "merizo/executor/remote_command_response.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/metadata/client_metadata.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/net/socket_utils.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/password_digest.h"
+#include "merizo/util/time_support.h"
+#include "merizo/util/version.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::endl;
@@ -116,7 +116,7 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
     try {
         // We need to force the usage of OP_QUERY on this command, even if we have previously
         // detected support for OP_MSG on a connection. This is necessary to handle the case
-        // where we reconnect to an older version of MongoDB running at the same host/port.
+        // where we reconnect to an older version of MerizoDB running at the same host/port.
         ScopedForceOpQuery forceOpQuery{conn};
 
         BSONObjBuilder bob;
@@ -130,7 +130,7 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
 
         if (getTestCommandsEnabled()) {
             // Only include the host:port of this process in the isMaster command request if test
-            // commands are enabled. mongobridge uses this field to identify the process opening a
+            // commands are enabled. merizobridge uses this field to identify the process opening a
             // connection to it.
             StringBuilder sb;
             sb << getHostName() << ':' << serverGlobalParams.port;
@@ -140,7 +140,7 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
         auto versionString = VersionInfoInterface::instance().version();
 
         Status serializeStatus = ClientMetadata::serialize(
-            "MongoDB Internal Client", versionString, applicationName, &bob);
+            "MerizoDB Internal Client", versionString, applicationName, &bob);
         if (!serializeStatus.isOK()) {
             return serializeStatus;
         }
@@ -248,7 +248,7 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
         // as either (a) having a "setName" field in the isMaster response, or (b) having
         // "isreplicaset: true" in the isMaster response.
         //
-        // https://github.com/mongodb/specifications/blob/c386e23724318e2fa82f4f7663d77581b755b2c3/
+        // https://github.com/merizodb/specifications/blob/c386e23724318e2fa82f4f7663d77581b755b2c3/
         // source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#type
         const bool hasSetNameField = swIsMasterReply.data.hasField("setName");
         const bool isReplicaSetField = swIsMasterReply.data.getBoolField("isreplicaset");
@@ -686,4 +686,4 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
 
 AtomicWord<int> DBClientConnection::_numConnections;
 
-}  // namespace mongo
+}  // namespace merizo

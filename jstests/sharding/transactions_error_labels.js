@@ -1,4 +1,4 @@
-// Test TransientTransactionErrors error label in mongos write commands.
+// Test TransientTransactionErrors error label in merizos write commands.
 // @tags: [uses_transactions, uses_multi_shard_transaction]
 (function() {
     "use strict";
@@ -17,7 +17,7 @@
                 data: {
                     errorCode: errorCode,
                     failCommands: [commandToFail],
-                    failInternalCommands: true  // mongod sees mongos as an internal client
+                    failInternalCommands: true  // merizod sees merizos as an internal client
                 }
             }));
         });
@@ -31,7 +31,7 @@
                 data: {
                     writeConcernError: {code: NumberInt(12345), errmsg: "dummy"},
                     failCommands: [commandToFail],
-                    failInternalCommands: true  // mongod sees mongos as an internal client
+                    failInternalCommands: true  // merizod sees merizos as an internal client
                 }
             }));
         });
@@ -45,10 +45,10 @@
     };
 
     let numCalls = 0;
-    const startTransaction = function(mongosSession, dbName, collName) {
+    const startTransaction = function(merizosSession, dbName, collName) {
         numCalls++;
-        mongosSession.startTransaction();
-        return mongosSession.getDatabase(dbName).runCommand({
+        merizosSession.startTransaction();
+        return merizosSession.getDatabase(dbName).runCommand({
             insert: collName,
             // Target both chunks, wherever they may be
             documents: [{_id: -1 * numCalls}, {_id: numCalls}],
@@ -65,9 +65,9 @@
         }));
     };
 
-    const commitTransaction = function(mongosSession) {
-        let res = mongosSession.commitTransaction_forTesting();
-        print("commitTransaction response from mongos: " + tojson(res));
+    const commitTransaction = function(merizosSession) {
+        let res = merizosSession.commitTransaction_forTesting();
+        print("commitTransaction response from merizos: " + tojson(res));
         return res;
     };
 
@@ -97,39 +97,39 @@
     const runCommitTests = function(commandSentToShard) {
         jsTest.log("Mongos does not attach any error label if " + commandSentToShard +
                    " returns success.");
-        assert.commandWorked(startTransaction(mongosSession, dbName, collName));
-        res = mongosSession.commitTransaction_forTesting();
+        assert.commandWorked(startTransaction(merizosSession, dbName, collName));
+        res = merizosSession.commitTransaction_forTesting();
         checkMongosResponse(res, null, null, null);
 
         jsTest.log("Mongos does not attach any error label if " + commandSentToShard +
                    " returns success with writeConcern error.");
         failCommandWithWriteConcernError(st.rs0, commandSentToShard);
-        assert.commandWorked(startTransaction(mongosSession, dbName, collName));
-        res = mongosSession.commitTransaction_forTesting();
+        assert.commandWorked(startTransaction(merizosSession, dbName, collName));
+        res = merizosSession.commitTransaction_forTesting();
         checkMongosResponse(res, null, null, true);
         turnOffFailCommand(st.rs0);
 
         jsTest.log("Mongos attaches 'TransientTransactionError' label if " + commandSentToShard +
                    " returns NoSuchTransaction.");
-        assert.commandWorked(startTransaction(mongosSession, dbName, collName));
+        assert.commandWorked(startTransaction(merizosSession, dbName, collName));
         abortTransactionDirectlyOnParticipant(
-            st.rs0, mongosSession.getSessionId(), mongosSession.getTxnNumber_forTesting());
-        res = mongosSession.commitTransaction_forTesting();
+            st.rs0, merizosSession.getSessionId(), merizosSession.getTxnNumber_forTesting());
+        res = merizosSession.commitTransaction_forTesting();
         checkMongosResponse(res, ErrorCodes.NoSuchTransaction, "TransientTransactionError", null);
         turnOffFailCommand(st.rs0);
 
         jsTest.log("Mongos does not attach any error label if " + commandSentToShard +
                    " returns NoSuchTransaction with writeConcern error.");
         failCommandWithWriteConcernError(st.rs0, commandSentToShard);
-        assert.commandWorked(startTransaction(mongosSession, dbName, collName));
+        assert.commandWorked(startTransaction(merizosSession, dbName, collName));
         abortTransactionDirectlyOnParticipant(
-            st.rs0, mongosSession.getSessionId(), mongosSession.getTxnNumber_forTesting());
-        res = mongosSession.commitTransaction_forTesting();
+            st.rs0, merizosSession.getSessionId(), merizosSession.getTxnNumber_forTesting());
+        res = merizosSession.commitTransaction_forTesting();
         checkMongosResponse(res, ErrorCodes.NoSuchTransaction, null, true);
         turnOffFailCommand(st.rs0);
     };
 
-    let st = new ShardingTest({shards: 2, config: 1, mongosOptions: {verbose: 3}});
+    let st = new ShardingTest({shards: 2, config: 1, merizosOptions: {verbose: 3}});
 
     // Create a sharded collection with a chunk on each shard:
     // shard0: [-inf, 0)
@@ -145,8 +145,8 @@
     assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
     assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 
-    let mongosSession = st.s.startSession();
-    let mongosSessionDB = mongosSession.getDatabase(dbName);
+    let merizosSession = st.s.startSession();
+    let merizosSessionDB = merizosSession.getDatabase(dbName);
 
     let res;
 
@@ -154,15 +154,15 @@
     jsTest.log(
         "'TransientTransactionError' label is attached if write statement returns WriteConflict");
     failCommandWithError(st.rs0, "insert", ErrorCodes.WriteConflict);
-    res = startTransaction(mongosSession, dbName, collName);
+    res = startTransaction(merizosSession, dbName, collName);
     checkMongosResponse(res, ErrorCodes.WriteConflict, "TransientTransactionError", null);
     turnOffFailCommand(st.rs0);
-    mongosSession.abortTransaction();
+    merizosSession.abortTransaction();
 
-    // commitTransaction for single-shard transaction (mongos sends commitTransaction)
+    // commitTransaction for single-shard transaction (merizos sends commitTransaction)
     runCommitTests("commitTransaction");
 
-    // commitTransaction for multi-shard transaction (mongos sends coordinateCommitTransaction)
+    // commitTransaction for multi-shard transaction (merizos sends coordinateCommitTransaction)
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
     flushRoutersAndRefreshShardMetadata(st, {ns});

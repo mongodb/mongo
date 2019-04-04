@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/canonical_query.h"
+#include "merizo/db/query/canonical_query.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/indexability.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/util/log.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/expression_array.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/query/canonical_query_encoder.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/indexability.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 /**
@@ -487,4 +487,4 @@ CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
     return canonical_query_encoder::encode(*this);
 }
 
-}  // namespace mongo
+}  // namespace merizo

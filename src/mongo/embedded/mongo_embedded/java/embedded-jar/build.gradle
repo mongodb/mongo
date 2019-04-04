@@ -16,10 +16,10 @@ jar {
     }
 
     manifest {
-        instruction 'Automatic-Module-Name', 'org.mongodb.driver.embedded.client.capi'
+        instruction 'Automatic-Module-Name', 'org.merizodb.driver.embedded.client.capi'
         instruction 'Build-Version', getGitVersion()
         instruction 'Import-Package',
-                     'com.mongodb.*'
+                     'com.merizodb.*'
     }
 }
 
@@ -76,10 +76,10 @@ publishing {
 
 
 artifactory {
-    contextUrl = "http://artifactory.corp.mongodb.com/artifactory"
+    contextUrl = "http://artifactory.corp.merizodb.com/artifactory"
     publish {
         repository {
-            repoKey = 'mongodb-mobile-local'
+            repoKey = 'merizodb-mobile-local'
             username = System.getenv('artifactory_mobile_user')
             password = System.getenv('artifactory_mobile_pass')
             maven = true

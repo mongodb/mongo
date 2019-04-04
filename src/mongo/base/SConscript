@@ -60,7 +60,7 @@ env.Library(
         'system_error.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -93,10 +93,10 @@ env.Library(
         'secure_allocator.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/util/processinfo',
-        '$BUILD_DIR/mongo/util/secure_zero_memory',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/util/processinfo',
+        '$BUILD_DIR/merizo/util/secure_zero_memory',
     ],
 )
 

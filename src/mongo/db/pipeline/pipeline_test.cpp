@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <string>
 #include <vector>
 
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_facet.h"
-#include "mongo/db/pipeline/document_source_graph_lookup.h"
-#include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_source_test_optimizations.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/s/query/cluster_aggregation_planner.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/temp_dir.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/pipeline/aggregation_context_fixture.h"
+#include "merizo/db/pipeline/dependencies.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_change_stream.h"
+#include "merizo/db/pipeline/document_source_facet.h"
+#include "merizo/db/pipeline/document_source_graph_lookup.h"
+#include "merizo/db/pipeline/document_source_internal_split_pipeline.h"
+#include "merizo/db/pipeline/document_source_lookup.h"
+#include "merizo/db/pipeline/document_source_lookup_change_post_image.h"
+#include "merizo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/document_source_mock.h"
+#include "merizo/db/pipeline/document_source_out.h"
+#include "merizo/db/pipeline/document_source_project.h"
+#include "merizo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/document_source_test_optimizations.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/pipeline/pipeline.h"
+#include "merizo/db/pipeline/stub_merizo_process_interface.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/db/query/query_test_service_context.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/s/query/cluster_aggregation_planner.h"
+#include "merizo/unittest/death_test.h"
+#include "merizo/unittest/temp_dir.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using boost::intrusive_ptr;
@@ -2334,7 +2334,7 @@ class LookUp : public needsPrimaryShardMergerBase {
 
 namespace mustRunOnMongoS {
 
-// Like a DocumentSourceMock, but must run on mongoS and can be used anywhere in the pipeline.
+// Like a DocumentSourceMock, but must run on merizoS and can be used anywhere in the pipeline.
 class DocumentSourceMustRunOnMongoS : public DocumentSourceMock {
 public:
     DocumentSourceMustRunOnMongoS() : DocumentSourceMock({}) {}
@@ -2384,7 +2384,7 @@ TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowe
     auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS, sort}, expCtx));
     pipeline->optimizePipeline();
 
-    // The entire pipeline must run on mongoS, but $sort cannot do so when 'allowDiskUse' is true.
+    // The entire pipeline must run on merizoS, but $sort cannot do so when 'allowDiskUse' is true.
     ASSERT_THROWS_CODE(
         pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
 }
@@ -2401,7 +2401,7 @@ DEATH_TEST_F(PipelineMustRunOnMongoSTest,
 
     auto pipeline = uassertStatusOK(Pipeline::create({match, split, runOnMongoS}, expCtx));
 
-    // We don't need to run the entire pipeline on mongoS because we can split at
+    // We don't need to run the entire pipeline on merizoS because we can split at
     // $_internalSplitPipeline.
     ASSERT_FALSE(pipeline->requiredToRunOnMongos());
 
@@ -2432,7 +2432,7 @@ TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStageP
 
     expCtx->allowDiskUse = true;
     expCtx->inMongos = true;
-    expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
+    expCtx->merizoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
 
     auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
     auto split = DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kNone);
@@ -2442,13 +2442,13 @@ TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStageP
 
     auto pipeline = uassertStatusOK(Pipeline::create({match, split, runOnMongoS, out}, expCtx));
 
-    // We don't need to run the entire pipeline on mongoS because we can split at
+    // We don't need to run the entire pipeline on merizoS because we can split at
     // $_internalSplitPipeline.
     ASSERT_FALSE(pipeline->requiredToRunOnMongos());
 
     auto splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(pipeline));
 
-    // The merge pipeline must run on mongoS, but $out needs to run on  the primary shard.
+    // The merge pipeline must run on merizoS, but $out needs to run on  the primary shard.
     ASSERT_THROWS_CODE(splitPipeline.mergePipeline->requiredToRunOnMongos(),
                        AssertionException,
                        ErrorCodes::IllegalOperation);
@@ -2467,8 +2467,8 @@ TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShar
     pipeline->optimizePipeline();
 
     // The 'runOnMongoS' stage comes before any splitpoint, so this entire pipeline must run on
-    // mongoS. However, the pipeline *cannot* run on mongoS and *must* split at
-    // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The mongoS stage would
+    // merizoS. However, the pipeline *cannot* run on merizoS and *must* split at
+    // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The merizoS stage would
     // end up on the shard side of this split, and so it asserts.
     ASSERT_THROWS_CODE(
         pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
@@ -2485,8 +2485,8 @@ TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplit
     auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS, split}, expCtx));
     pipeline->optimizePipeline();
 
-    // The 'runOnMongoS' stage is before the splitpoint, so this entire pipeline must run on mongoS.
-    // In this case, the splitpoint is itself eligible to run on mongoS, and so we are able to
+    // The 'runOnMongoS' stage is before the splitpoint, so this entire pipeline must run on merizoS.
+    // In this case, the splitpoint is itself eligible to run on merizoS, and so we are able to
     // return true.
     ASSERT_TRUE(pipeline->requiredToRunOnMongos());
 }
@@ -3253,4 +3253,4 @@ public:
 SuiteInstance<All> myall;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

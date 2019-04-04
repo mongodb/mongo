@@ -7,8 +7,8 @@
 
     load("jstests/libs/fixture_helpers.js");  // For isMongos.
 
-    assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
-    assert(FixtureHelpers.isMongos(db), "not connected to mongos");
+    assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a merizod?');
+    assert(FixtureHelpers.isMongos(db), "not connected to merizos");
 
     let balSettingResult = assert.commandWorked(db.adminCommand({balancerStatus: 1}));
     if (balSettingResult.mode !== 'off') {

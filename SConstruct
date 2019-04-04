@@ -20,12 +20,12 @@ import SCons
 # we are to avoid bulk loading all tools in the DefaultEnvironment.
 DefaultEnvironment(tools=[])
 
-# These come from site_scons/mongo. Import these things
+# These come from site_scons/merizo. Import these things
 # after calling DefaultEnvironment, for the sake of paranoia.
-import mongo
-import mongo.platform as mongo_platform
-import mongo.toolchain as mongo_toolchain
-import mongo.generators as mongo_generators
+import merizo
+import merizo.platform as merizo_platform
+import merizo.toolchain as merizo_toolchain
+import merizo.generators as merizo_generators
 
 EnsurePythonVersion(2, 7)
 EnsureSConsVersion(3, 0, 4)
@@ -36,7 +36,7 @@ from buildscripts import moduleconfig
 import libdeps
 import psutil
 
-atexit.register(mongo.print_build_failures)
+atexit.register(merizo.print_build_failures)
 
 def add_option(name, **kwargs):
 
@@ -198,7 +198,7 @@ add_option('js-engine',
 add_option('server-js',
     choices=['on', 'off'],
     default='on',
-    help='Build mongod without JavaScript support',
+    help='Build merizod without JavaScript support',
     type='choice',
 )
 
@@ -391,11 +391,11 @@ add_option('use-system-intel_decimal128',
     nargs=0,
 )
 
-add_option('use-system-mongo-c',
+add_option('use-system-merizo-c',
     choices=['on', 'off', 'auto'],
     const='on',
     default="auto",
-    help="use system version of the mongo-c-driver (auto will use it if it's found)",
+    help="use system version of the merizo-c-driver (auto will use it if it's found)",
     nargs='?',
     type='choice',
 )
@@ -415,8 +415,8 @@ add_option('use-new-tools',
     nargs=0,
 )
 
-add_option('build-mongoreplay',
-    help='when building with --use-new-tools, build mongoreplay ( requires pcap dev )',
+add_option('build-merizoreplay',
+    help='when building with --use-new-tools, build merizoreplay ( requires pcap dev )',
     nargs=1,
 )
 
@@ -485,16 +485,16 @@ add_option("cxx-std",
     help="Select the C++ langauge standard to build with",
 )
 
-def find_mongo_custom_variables():
+def find_merizo_custom_variables():
     files = []
     for path in sys.path:
-        probe = os.path.join(path, 'mongo_custom_variables.py')
+        probe = os.path.join(path, 'merizo_custom_variables.py')
         if os.path.isfile(probe):
             files.append(probe)
     return files
 
 add_option('variables-files',
-    default=find_mongo_custom_variables(),
+    default=find_merizo_custom_variables(),
     help="Specify variables files to load",
 )
 
@@ -596,7 +596,7 @@ def variable_shlex_converter(val):
         return val
     parse_mode = get_option('variable-parse-mode')
     if parse_mode == 'auto':
-        parse_mode = 'other' if mongo_platform.is_running_os('windows') else 'posix'
+        parse_mode = 'other' if merizo_platform.is_running_os('windows') else 'posix'
     return shlex.split(val, posix=(parse_mode == 'posix'))
 
 def variable_arch_converter(val):
@@ -626,12 +626,12 @@ def variable_arch_converter(val):
 # If we aren't on a platform where we know the minimal set of tools, we fall back to loading
 # the 'default' tool.
 def decide_platform_tools():
-    if mongo_platform.is_running_os('windows'):
+    if merizo_platform.is_running_os('windows'):
         # we only support MS toolchain on windows
         return ['msvc', 'mslink', 'mslib', 'masm']
-    elif mongo_platform.is_running_os('linux', 'solaris'):
+    elif merizo_platform.is_running_os('linux', 'solaris'):
         return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
-    elif mongo_platform.is_running_os('darwin'):
+    elif merizo_platform.is_running_os('darwin'):
         return ['gcc', 'g++', 'applelink', 'ar', 'libtool', 'as', 'xcode']
     else:
         return ["default"]
@@ -643,9 +643,9 @@ def variable_tools_converter(val):
         "gziptool",
         'idl_tool',
         "jsheader",
-        "mongo_benchmark",
-        "mongo_integrationtest",
-        "mongo_unittest",
+        "merizo_benchmark",
+        "merizo_integrationtest",
+        "merizo_unittest",
         "textfile",
     ]
 
@@ -773,12 +773,12 @@ env_vars.Add('MAXLINELENGTH',
 # default_buildinfo_environment_data() function for examples of how to use this.
 env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
     help='Sets the info returned from the buildInfo command and --version command-line flag',
-    default=mongo_generators.default_buildinfo_environment_data())
+    default=merizo_generators.default_buildinfo_environment_data())
 
 env_vars.Add('MONGO_DIST_SRC_PREFIX',
     help='Sets the prefix for files in the source distribution archive',
     converter=variable_distsrc_converter,
-    default="mongodb-src-r${MONGO_VERSION}")
+    default="merizodb-src-r${MONGO_VERSION}")
 
 env_vars.Add('MONGO_DISTARCH',
     help='Adds a string representing the target processor architecture to the dist archive',
@@ -792,19 +792,19 @@ env_vars.Add('MONGO_DISTNAME',
     help='Sets the version string to be used in dist archive naming',
     default='$MONGO_VERSION')
 
-def validate_mongo_version(key, val, env):
+def validate_merizo_version(key, val, env):
     regex = r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?'
     if not re.match(regex, val):
         print("Invalid MONGO_VERSION '{}', or could not derive from version.json or git metadata. Please add a conforming MONGO_VERSION=x.y.z[-extra] as an argument to SCons".format(val))
         Exit(1)
 
 env_vars.Add('MONGO_VERSION',
-    help='Sets the version string for MongoDB',
+    help='Sets the version string for MerizoDB',
     default=version_data['version'],
-    validator=validate_mongo_version)
+    validator=validate_merizo_version)
 
 env_vars.Add('MONGO_GIT_HASH',
-    help='Sets the githash to store in the MongoDB version information',
+    help='Sets the githash to store in the MerizoDB version information',
     default=version_data['githash'])
 
 env_vars.Add('MSVC_USE_SCRIPT',
@@ -851,7 +851,7 @@ env_vars.Add('TARGET_ARCH',
 
 env_vars.Add('TARGET_OS',
     help='Sets the target OS to build for',
-    default=mongo_platform.get_running_os_name())
+    default=merizo_platform.get_running_os_name())
 
 env_vars.Add('TOOLS',
     help='Sets the list of SCons tools to add to the environment',
@@ -860,7 +860,7 @@ env_vars.Add('TOOLS',
 
 env_vars.Add('VARIANT_DIR',
     help='Sets the name (or generator function) for the variant directory',
-    default=mongo_generators.default_variant_dir_generator,
+    default=merizo_generators.default_variant_dir_generator,
 )
 
 env_vars.Add('VERBOSE',
@@ -941,7 +941,7 @@ printLocalInfo()
 
 boostLibs = [ "filesystem", "program_options", "system", "iostreams" ]
 
-onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
+onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "merizod" , "merizos" , "test" ] )
 
 releaseBuild = has_option("release")
 
@@ -1011,8 +1011,8 @@ envDict = dict(BUILD_ROOT=buildDir,
 env = Environment(variables=env_vars, **envDict)
 del envDict
 
-env.AddMethod(mongo_platform.env_os_is_wrapper, 'TargetOSIs')
-env.AddMethod(mongo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
+env.AddMethod(merizo_platform.env_os_is_wrapper, 'TargetOSIs')
+env.AddMethod(merizo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
 
 def fatal_error(env, msg, *args):
     print(msg.format(*args))
@@ -1215,7 +1215,7 @@ if not detectConf.CheckForCXXLink():
         detectEnv['CXX'])
 
 toolchain_search_sequence = [ "GCC", "clang" ]
-if mongo_platform.is_running_os('windows'):
+if merizo_platform.is_running_os('windows'):
     toolchain_search_sequence = [ 'MSVC', 'clang', 'GCC' ]
 for candidate_toolchain in toolchain_search_sequence:
     if detectConf.CheckForToolchain(candidate_toolchain, "C++", "CXX", ".cpp"):
@@ -1259,8 +1259,8 @@ elif not detectConf.CheckForOS(env['TARGET_OS']):
 
 detectConf.Finish()
 
-env['CC_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CC')
-env['CXX_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CXX')
+env['CC_VERSION'] = merizo_toolchain.get_toolchain_ver(env, 'CC')
+env['CXX_VERSION'] = merizo_toolchain.get_toolchain_ver(env, 'CXX')
 
 if not env['HOST_ARCH']:
     env['HOST_ARCH'] = env['TARGET_ARCH']
@@ -1369,7 +1369,7 @@ if link_model.startswith("dynamic"):
     #   links all of them.
     #
     # - The symbol is provided by an executable into which the library
-    #   will be linked. The mongo::inShutdown symbol is a good
+    #   will be linked. The merizo::inShutdown symbol is a good
     #   example.
     #
     # - The symbol is provided by a third-party library, outside of our
@@ -1388,7 +1388,7 @@ if link_model.startswith("dynamic"):
 
     if env.TargetOSIs('darwin'):
         if link_model.startswith('dynamic'):
-            print("WARNING: Building MongoDB server with dynamic linking " +
+            print("WARNING: Building MerizoDB server with dynamic linking " +
                   "on macOS is not supported. Static linking is recommended.")
 
         if link_model == "dynamic-strict":
@@ -1955,7 +1955,7 @@ if get_option("system-boost-lib-search-suffixes") is not None:
         boostSuffixList = boostSuffixList.split(',')
 
 # discover modules, and load the (python) module for each module's build.py
-mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules', get_option('modules'))
+merizo_modules = moduleconfig.discover_modules('src/merizo/db/modules', get_option('modules'))
 
 # --- check system ---
 ssl_provider = None
@@ -1982,7 +1982,7 @@ def doConfigure(myenv):
         #endif
 
         #if _MSC_VER < 1916
-        #error %s or newer is required to build MongoDB
+        #error %s or newer is required to build MerizoDB
         #endif
 
         int main(int argc, char* argv[]) {
@@ -1998,7 +1998,7 @@ def doConfigure(myenv):
         #endif
 
         #if (__GNUC__ < 8) || (__GNUC__ == 8 && __GNUC_MINOR__ < 2)
-        #error %s or newer is required to build MongoDB
+        #error %s or newer is required to build MerizoDB
         #endif
 
         int main(int argc, char* argv[]) {
@@ -2015,10 +2015,10 @@ def doConfigure(myenv):
 
         #if defined(__apple_build_version__)
         #if __apple_build_version__ < 10001044
-        #error %s or newer is required to build MongoDB
+        #error %s or newer is required to build MerizoDB
         #endif
         #elif (__clang_major__ < 7) || (__clang_major__ == 7 && __clang_minor__ < 0)
-        #error %s or newer is required to build MongoDB
+        #error %s or newer is required to build MerizoDB
         #endif
 
         int main(int argc, char* argv[]) {
@@ -2216,7 +2216,7 @@ def doConfigure(myenv):
         AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-unsigned-enum-zero-compare")
 
         # New in clang-3.4, trips up things mostly in third_party, but in a few places in the
-        # primary mongo sources as well.
+        # primary merizo sources as well.
         AddToCCFLAGSIfSupported(myenv, "-Wno-unused-const-variable")
 
         # Prevents warning about unused but set variables found in boost version 1.49
@@ -2362,7 +2362,7 @@ def doConfigure(myenv):
         iOS  : scons CCFLAGS="-miphoneos-version-min=10.3" LINKFLAGS="-miphoneos-version-min=10.3" ...
         tvOS : scons CCFLAGS="-mtvos-version-min=10.3" LINKFLAGS="-tvos-version-min=10.3" ...
 
-        Note that MongoDB requires macOS 10.10, iOS 10.2, or tvOS 10.2 or later.
+        Note that MerizoDB requires macOS 10.10, iOS 10.2, or tvOS 10.2 or later.
         """
         myenv.ConfError(textwrap.dedent(message))
 
@@ -2427,7 +2427,7 @@ def doConfigure(myenv):
     })
 
     if get_option('cxx-std') == "17" and not conf.CheckCxx17():
-        myenv.ConfError('C++17 support is required to build MongoDB')
+        myenv.ConfError('C++17 support is required to build MerizoDB')
 
     conf.Finish()
 
@@ -2485,7 +2485,7 @@ def doConfigure(myenv):
 
         suppress_invalid = has_option("disable-minimum-compiler-version-enforcement")
         if not conf.CheckModernLibStdCxx() and not suppress_invalid:
-            myenv.ConfError("When using libstdc++, MongoDB requires libstdc++ from GCC 5.3.0 or newer")
+            myenv.ConfError("When using libstdc++, MerizoDB requires libstdc++ from GCC 5.3.0 or newer")
 
         conf.Finish()
 
@@ -2524,7 +2524,7 @@ def doConfigure(myenv):
         })
 
         if not conf.CheckWindowsSDKVersion():
-            myenv.ConfError('Windows SDK Version 8.1 or higher is required to build MongoDB')
+            myenv.ConfError('Windows SDK Version 8.1 or higher is required to build MerizoDB')
 
         conf.Finish()
 
@@ -3415,14 +3415,14 @@ def doConfigure(myenv):
 
     def CheckMongoCMinVersion(context):
         compile_test_body = textwrap.dedent("""
-        #include <mongoc/mongoc.h>
+        #include <merizoc/merizoc.h>
 
         #if !MONGOC_CHECK_VERSION(1,13,0)
         #error
         #endif
         """)
 
-        context.Message("Checking if mongoc version is 1.13.0 or newer...")
+        context.Message("Checking if merizoc version is 1.13.0 or newer...")
         result = context.TryCompile(compile_test_body, ".cpp")
         context.Result(result)
         return result
@@ -3431,19 +3431,19 @@ def doConfigure(myenv):
 
     if env.TargetOSIs('darwin'):
         def CheckMongoCFramework(context):
-            context.Message("Checking for mongoc_get_major_version() in darwin framework mongoc...")
+            context.Message("Checking for merizoc_get_major_version() in darwin framework merizoc...")
             test_body = """
-            #include <mongoc/mongoc.h>
+            #include <merizoc/merizoc.h>
 
             int main() {
-                mongoc_get_major_version();
+                merizoc_get_major_version();
 
                 return EXIT_SUCCESS;
             }
             """
 
             lastFRAMEWORKS = context.env['FRAMEWORKS']
-            context.env.Append(FRAMEWORKS=['mongoc'])
+            context.env.Append(FRAMEWORKS=['merizoc'])
             result = context.TryLink(textwrap.dedent(test_body), ".c")
             context.Result(result)
             context.env['FRAMEWORKS'] = lastFRAMEWORKS
@@ -3451,25 +3451,25 @@ def doConfigure(myenv):
 
         conf.AddTest('CheckMongoCFramework', CheckMongoCFramework)
 
-    mongoc_mode = get_option('use-system-mongo-c')
+    merizoc_mode = get_option('use-system-merizo-c')
     conf.env['MONGO_HAVE_LIBMONGOC'] = False
-    if mongoc_mode != 'off':
+    if merizoc_mode != 'off':
         if conf.CheckLibWithHeader(
-                ["mongoc-1.0"],
-                ["mongoc/mongoc.h"],
+                ["merizoc-1.0"],
+                ["merizoc/merizoc.h"],
                 "C",
-                "mongoc_get_major_version();",
+                "merizoc_get_major_version();",
                 autoadd=False ):
             conf.env['MONGO_HAVE_LIBMONGOC'] = "library"
         if not conf.env['MONGO_HAVE_LIBMONGOC'] and env.TargetOSIs('darwin') and conf.CheckMongoCFramework():
             conf.env['MONGO_HAVE_LIBMONGOC'] = "framework"
-        if not conf.env['MONGO_HAVE_LIBMONGOC'] and mongoc_mode == 'on':
+        if not conf.env['MONGO_HAVE_LIBMONGOC'] and merizoc_mode == 'on':
             myenv.ConfError("Failed to find the required C driver headers")
         if conf.env['MONGO_HAVE_LIBMONGOC'] and not conf.CheckMongoCMinVersion():
-            myenv.ConfError("Version of mongoc is too old. Version 1.13+ required")
+            myenv.ConfError("Version of merizoc is too old. Version 1.13+ required")
 
     # ask each module to configure itself and the build environment.
-    moduleconfig.configure_modules(mongo_modules, conf)
+    moduleconfig.configure_modules(merizo_modules, conf)
 
     # Resolve --enable-free-mon
     if free_monitoring == "auto":
@@ -3611,7 +3611,7 @@ env.Tool("compilation_db")
 
 # If we can, load the dagger tool for build dependency graph introspection.
 # Dagger is only supported on Linux and OSX (not Windows or Solaris).
-should_dagger = ( mongo_platform.is_running_os('osx') or mongo_platform.is_running_os('linux')  ) and "dagger" in COMMAND_LINE_TARGETS
+should_dagger = ( merizo_platform.is_running_os('osx') or merizo_platform.is_running_os('linux')  ) and "dagger" in COMMAND_LINE_TARGETS
 
 if should_dagger:
     env.Tool("dagger")
@@ -3640,7 +3640,7 @@ env.AddMethod(env_windows_resource_file, 'WindowsResourceFile')
 
 def doLint( env , target , source ):
     import buildscripts.eslint
-    if not buildscripts.eslint.lint(None, dirmode=True, glob=["jstests/", "src/mongo/"]):
+    if not buildscripts.eslint.lint(None, dirmode=True, glob=["jstests/", "src/merizo/"]):
         raise Exception("ESLint errors")
 
     import buildscripts.clang_format
@@ -3651,7 +3651,7 @@ def doLint( env , target , source ):
     buildscripts.pylinters.lint_all(None, {}, [])
 
     import buildscripts.lint
-    if not buildscripts.lint.run_lint( [ "src/mongo/" ] ):
+    if not buildscripts.lint.run_lint( [ "src/merizo/" ] ):
         raise Exception( "lint errors" )
 
 env.Alias( "lint" , [] , [ doLint ] )
@@ -3675,8 +3675,8 @@ def getSystemInstallName():
     os_name = os_name_translations.get(os_name, os_name)
     n = os_name + "-" + arch_name
 
-    if len(mongo_modules):
-            n += "-" + "-".join(m.name for m in mongo_modules)
+    if len(merizo_modules):
+            n += "-" + "-".join(m.name for m in merizo_modules)
 
     dn = env.subst('$MONGO_DISTMOD')
     if len(dn) > 0:
@@ -3705,9 +3705,9 @@ def add_version_to_distsrc(env, archive):
 
 env.AddDistSrcCallback(add_version_to_distsrc)
 
-env['SERVER_DIST_BASENAME'] = env.subst('mongodb-%s-$MONGO_DISTNAME' % (getSystemInstallName()))
+env['SERVER_DIST_BASENAME'] = env.subst('merizodb-%s-$MONGO_DISTNAME' % (getSystemInstallName()))
 
-module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
+module_sconscripts = moduleconfig.get_module_sconscripts(merizo_modules)
 
 # The following symbols are exported for use in subordinate SConscript files.
 # Ideally, the SConscript files would be purely declarative.  They would only
@@ -3748,22 +3748,22 @@ compileDb = env.Alias("compiledb", compileCommands)
 
 # Microsoft Visual Studio Project generation for code browsing
 vcxprojFile = env.Command(
-    "mongodb.vcxproj",
+    "merizodb.vcxproj",
     compileCommands,
-    r"$PYTHON buildscripts\make_vcxproj.py mongodb")
+    r"$PYTHON buildscripts\make_vcxproj.py merizodb")
 vcxproj = env.Alias("vcxproj", vcxprojFile)
 
-distSrc = env.DistSrc("mongodb-src-${MONGO_VERSION}.tar")
+distSrc = env.DistSrc("merizodb-src-${MONGO_VERSION}.tar")
 env.NoCache(distSrc)
 env.Alias("distsrc-tar", distSrc)
 
 distSrcGzip = env.GZip(
-    target="mongodb-src-${MONGO_VERSION}.tgz",
+    target="merizodb-src-${MONGO_VERSION}.tgz",
     source=[distSrc])
 env.NoCache(distSrcGzip)
 env.Alias("distsrc-tgz", distSrcGzip)
 
-distSrcZip = env.DistSrc("mongodb-src-${MONGO_VERSION}.zip")
+distSrcZip = env.DistSrc("merizodb-src-${MONGO_VERSION}.zip")
 env.NoCache(distSrcZip)
 env.Alias("distsrc-zip", distSrcZip)
 
@@ -3900,7 +3900,7 @@ env.Alias('cache-prune', cachePrune)
 #
 # > scons --prefix=/foo/bar '$INSTALL_DIR'
 # or
-# > scons \$BUILD_DIR/mongo/base
+# > scons \$BUILD_DIR/merizo/base
 #
 # That way, you can reference targets under the variant dir or install
 # path via an invariant name.

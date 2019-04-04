@@ -21,7 +21,7 @@
     }
 
     const startTime = Date.now();
-    assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
+    assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a merizod?');
 
     let skipped = false;
     try {
@@ -30,7 +30,7 @@
 
         if (topology.type === Topology.kStandalone) {
             print('Skipping data consistency checks for cluster because we are connected to a' +
-                  ' stand-alone mongod: ' + tojsononeline(topology));
+                  ' stand-alone merizod: ' + tojsononeline(topology));
             skipped = true;
             return;
         }

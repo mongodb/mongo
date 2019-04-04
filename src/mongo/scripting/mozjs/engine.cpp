@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/engine.h"
+#include "merizo/scripting/mozjs/engine.h"
 
 #include <js/Initialization.h>
 
-#include "mongo/db/operation_context.h"
-#include "mongo/scripting/mozjs/engine_gen.h"
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/proxyscope.h"
-#include "mongo/util/log.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/scripting/mozjs/engine_gen.h"
+#include "merizo/scripting/mozjs/implscope.h"
+#include "merizo/scripting/mozjs/proxyscope.h"
+#include "merizo/util/log.h"
 
 namespace js {
 void DisableExtraThreads();
 }
 
-namespace mongo {
+namespace merizo {
 
 void ScriptEngine::setup() {
     if (getGlobalScriptEngine())
@@ -73,11 +73,11 @@ MozJSScriptEngine::~MozJSScriptEngine() {
     JS_ShutDown();
 }
 
-mongo::Scope* MozJSScriptEngine::createScope() {
+merizo::Scope* MozJSScriptEngine::createScope() {
     return new MozJSProxyScope(this);
 }
 
-mongo::Scope* MozJSScriptEngine::createScopeForCurrentThread() {
+merizo::Scope* MozJSScriptEngine::createScopeForCurrentThread() {
     return new MozJSImplScope(this);
 }
 
@@ -168,4 +168,4 @@ void MozJSScriptEngine::unregisterOperation(unsigned int opId) {
 }
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

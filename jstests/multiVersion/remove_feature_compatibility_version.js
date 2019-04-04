@@ -6,7 +6,7 @@
     'use strict';
 
     let standalone = MongoRunner.runMongod();
-    assert.neq(null, standalone, 'mongod was unable to start up');
+    assert.neq(null, standalone, 'merizod was unable to start up');
     let adminDB = standalone.getDB('admin');
 
     // Renaming the collection or deleting the document should fail.

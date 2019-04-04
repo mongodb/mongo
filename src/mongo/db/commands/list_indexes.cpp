@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/cursor_request.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/uuid.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/cursor_manager.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/exec/queued_data_stage.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/query/cursor_request.h"
+#include "merizo/db/query/cursor_response.h"
+#include "merizo/db/query/find_common.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/storage_engine.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::stringstream;
@@ -243,4 +243,4 @@ public:
 } cmdListIndexes;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

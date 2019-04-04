@@ -7,7 +7,7 @@ selector:
   # This test starts a parallel shell which we want to read from the same node as the change stream,
   # but the parallel shell performs an insert which will not work against the secondary.
   - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
-  # This test is not expected to work when run against a mongos.
+  # This test is not expected to work when run against a merizos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
   exclude_with_any_tags:
   ##
@@ -51,7 +51,7 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
-    mongos_options:
+    merizos_options:
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:
@@ -61,7 +61,7 @@ executor:
             verbosity: 1
             asio: 2
           tracking: 0
-    mongod_options:
+    merizod_options:
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:

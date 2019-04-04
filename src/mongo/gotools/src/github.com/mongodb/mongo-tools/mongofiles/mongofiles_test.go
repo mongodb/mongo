@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongofiles
+package merizofiles
 
 import (
 	"bytes"
@@ -14,19 +14,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/common/testutil"
+	"github.com/merizodb/merizo-tools/common/util"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2"
 )
 
 var (
-	testDB     = "mongofiles_test_db"
+	testDB     = "merizofiles_test_db"
 	testServer = "localhost"
 	testPort   = db.DefaultTestPort
 
@@ -114,7 +114,7 @@ func simpleMongoFilesInstanceWithFilenameAndID(command, fname, Id string) (*Mong
 		return nil, err
 	}
 
-	mongofiles := MongoFiles{
+	merizofiles := MongoFiles{
 		ToolOptions:     toolOptions,
 		InputOptions:    &InputOptions{},
 		StorageOptions:  &StorageOptions{GridFSPrefix: "fs", DB: testDB},
@@ -124,7 +124,7 @@ func simpleMongoFilesInstanceWithFilenameAndID(command, fname, Id string) (*Mong
 		Id:              Id,
 	}
 
-	return &mongofiles, nil
+	return &merizofiles, nil
 }
 
 func fileContentsCompare(file1, file2 *os.File, t *testing.T) (bool, error) {
@@ -294,7 +294,7 @@ func TestValidArguments(t *testing.T) {
 	})
 }
 
-// Test that the output from mongofiles is actually correct
+// Test that the output from merizofiles is actually correct
 func TestMongoFilesCommands(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 
@@ -590,17 +590,17 @@ func TestMongoFilesCommands(t *testing.T) {
 
 func runPutIdTestCase(idToTest string, t *testing.T) {
 	remoteName := "remoteName"
-	mongoFilesInstance, err := simpleMongoFilesInstanceWithFilenameAndID("put_id", remoteName, idToTest)
+	merizoFilesInstance, err := simpleMongoFilesInstanceWithFilenameAndID("put_id", remoteName, idToTest)
 
 	var buff bytes.Buffer
 	log.SetWriter(&buff)
 
 	So(err, ShouldBeNil)
-	So(mongoFilesInstance, ShouldNotBeNil)
-	mongoFilesInstance.StorageOptions.LocalFileName = util.ToUniversalPath("testdata/lorem_ipsum_287613_bytes.txt")
+	So(merizoFilesInstance, ShouldNotBeNil)
+	merizoFilesInstance.StorageOptions.LocalFileName = util.ToUniversalPath("testdata/lorem_ipsum_287613_bytes.txt")
 
 	t.Log("Should correctly insert the file into GridFS")
-	str, err := mongoFilesInstance.Run(false)
+	str, err := merizoFilesInstance.Run(false)
 	So(err, ShouldBeNil)
 	So(str, ShouldEqual, "")
 	So(buff.Len(), ShouldNotEqual, 0)

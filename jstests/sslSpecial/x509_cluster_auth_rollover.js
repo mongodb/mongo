@@ -35,9 +35,9 @@
     // All the certificates' DNs share this base
     const dnBase = "C=US, ST=New York, L=New York,";
     // This is the DN of the rollover certificate.
-    const rolloverDN = dnBase + " O=MongoDB\\, Inc. (Rollover), OU=Kernel (Rollover), CN=server";
+    const rolloverDN = dnBase + " O=MerizoDB\\, Inc. (Rollover), OU=Kernel (Rollover), CN=server";
     // This is the DN of the original certificate
-    const originalDN = dnBase + " O=MongoDB, OU=Kernel, CN=server";
+    const originalDN = dnBase + " O=MerizoDB, OU=Kernel, CN=server";
 
     // This will rollover the cluster to a new config in a rolling fashion. It will return when
     // there is a primary and we are able to write to it.
@@ -65,7 +65,7 @@
             // Start a shell that connects to the server with the current CA/cert configuration
             // and ensure that it's able to connect and authenticate with x509.
             const shellArgs = [
-                'mongo',
+                'merizo',
                 primary.name,
                 '--eval',
                 ';',

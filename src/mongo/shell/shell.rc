@@ -2,7 +2,7 @@
 //
 #include <winres.h>
 
-#include "mongo/util/resource_constants.h"
+#include "merizo/util/resource_constants.h"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -12,7 +12,7 @@
 // remains consistent on all systems.
 #define IDI_ICON2 102
 
-IDI_ICON2               ICON                    "mongo/db/mongo.ico"
+IDI_ICON2               ICON                    "merizo/db/merizo.ico"
 /////////////////////////////////////////////////////////////////////////////
 
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
@@ -37,11 +37,11 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "MongoDB, Inc"
-            VALUE "FileDescription", "MongoDB Shell"
+            VALUE "CompanyName", "MerizoDB, Inc"
+            VALUE "FileDescription", "MerizoDB Shell"
             VALUE "FileVersion", MONGO_FILE_VERSION_STR
-            VALUE "InternalName", "mongo.exe"
-            VALUE "OriginalFilename", "mongo.exe"
+            VALUE "InternalName", "merizo.exe"
+            VALUE "OriginalFilename", "merizo.exe"
             VALUE "ProductName", MONGO_PRODUCT_NAME_STR
             VALUE "ProductVersion", MONGO_PRODUCT_VERSION_STR
             VALUE "Comment", MONGO_VERSION_COMMENT_STR
@@ -53,4 +53,4 @@ BEGIN
     END
 END
 
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "mongo/shell/shell.manifest"
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "merizo/shell/shell.manifest"

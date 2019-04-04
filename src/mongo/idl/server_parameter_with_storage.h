@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,24 +31,24 @@
 /* The contents of this file are meant to be used by
  * code generated from idlc.py.
  *
- * It should not be instantiated directly from mongo code,
+ * It should not be instantiated directly from merizo code,
  * rather parameters should be defined in .idl files.
  */
 
 #include <functional>
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/idl/server_parameter.h"
-#include "mongo/platform/atomic_proxy.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/stringutils.h"
-#include "mongo/util/synchronized_value.h"
+#include "merizo/base/status.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/idl/server_parameter.h"
+#include "merizo/platform/atomic_proxy.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/util/stringutils.h"
+#include "merizo/util/synchronized_value.h"
 
-namespace mongo {
+namespace merizo {
 namespace idl_server_parameter_detail {
 
 template <typename T>
@@ -327,4 +327,4 @@ IDLServerParameterWithStorage<paramType, T>* makeIDLServerParameterWithStorage(S
     return new IDLServerParameterWithStorage<paramType, T>(name, storage);
 }
 
-}  // namespace mongo
+}  // namespace merizo

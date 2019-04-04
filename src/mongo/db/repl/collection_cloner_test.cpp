@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,31 +26,31 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <memory>
 #include <vector>
 
-#include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/base_cloner_test_fixture.h"
-#include "mongo/db/repl/collection_cloner.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/task_executor_proxy.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/base_cloner_test_fixture.h"
+#include "merizo/db/repl/collection_cloner.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/repl/storage_interface_mock.h"
+#include "merizo/dbtests/mock/mock_dbclient_connection.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/task_executor_proxy.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/merizoutils/str.h"
 
 namespace {
 
-using namespace mongo;
-using namespace mongo::repl;
+using namespace merizo;
+using namespace merizo::repl;
 using namespace unittest;
 
-class MockCallbackState final : public mongo::executor::TaskExecutor::CallbackState {
+class MockCallbackState final : public merizo::executor::TaskExecutor::CallbackState {
 public:
     MockCallbackState() = default;
     void cancel() override {}
@@ -79,10 +79,10 @@ public:
     }
 
     using MockDBClientConnection::query;  // This avoids warnings from -Woverloaded-virtual
-    unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
+    unsigned long long query(stdx::function<void(merizo::DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
-                             mongo::Query query,
-                             const mongo::BSONObj* fieldsToReturn,
+                             merizo::Query query,
+                             const merizo::BSONObj* fieldsToReturn,
                              int queryOptions,
                              int batchSize) override {
         ON_BLOCK_EXIT([this]() {
@@ -170,7 +170,7 @@ private:
         while (_waiting) {
             lk->unlock();
             _net->signalWorkAvailable();
-            mongo::sleepmillis(10);
+            merizo::sleepmillis(10);
             lk->lock();
         }
     }
@@ -746,7 +746,7 @@ TEST_F(CollectionClonerTest, BeginCollectionCallbackCanceled) {
     collectionCloner->setScheduleDbWorkFn_forTest(
         [&](const executor::TaskExecutor::CallbackFn& workFn) {
             executor::TaskExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
-            mongo::executor::TaskExecutor::CallbackArgs args{
+            merizo::executor::TaskExecutor::CallbackArgs args{
                 &executor,
                 handle,
                 {ErrorCodes::CallbackCanceled, "Never run, but treat like cancelled."}};
@@ -976,7 +976,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsCallbackCanceled) {
     collectionCloner->setScheduleDbWorkFn_forTest(
         [&](const executor::TaskExecutor::CallbackFn& workFn) {
             executor::TaskExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
-            mongo::executor::TaskExecutor::CallbackArgs args{
+            merizo::executor::TaskExecutor::CallbackArgs args{
                 &executor,
                 handle,
                 {ErrorCodes::CallbackCanceled, "Never run, but treat like cancelled."}};

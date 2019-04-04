@@ -9,7 +9,7 @@
 
     const options = {setParameter: "internalQueryIgnoreUnknownJSONSchemaKeywords=1"};
     const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
+    assert.neq(null, conn, "merizod was unable to start up with options: " + tojson(options));
 
     const testDB = conn.getDB("test");
     const coll = testDB.getCollection("jstests_json_schema_ignore_unsupported");

@@ -4,7 +4,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PORT=28080
 INTERFACE=lo
 KEEP=false
-DBPATH=/data/mongoreplay
+DBPATH=/data/merizoreplay
 SILENT="--silent"
 EXPLICIT=
 VERBOSE=
@@ -23,14 +23,14 @@ while test $# -gt 0; do
 
 -a, --assert JS-BOOL     condition for assertion after workload (used with -w);
                          can be specified in multiplicity
-    --dbpath             path for mongod, can be cleared by program
+    --dbpath             path for merizod, can be cleared by program
                          (defaults to $DBPATH)
 -e, --explicit           show comparison scores for all individual metrics
 -i, --interface NI       network interface (defaults to $INTERFACE)
 -k, --keep               keep temp files
 -p, --port PORT          use port PORT (defaults to $PORT)
--v, --verbose            unsilence mongoreplay and make it slightly loud
--w, --workload JS-FILE   mongo shell workload script (used with -a);
+-v, --verbose            unsilence merizoreplay and make it slightly loud
+-w, --workload JS-FILE   merizo shell workload script (used with -a);
                          runs concurrent workloads when specified in
                          multiplicity
 "
@@ -91,9 +91,9 @@ elif [ ${#ASSERTIONS[@]} -eq 0 ]; then
   exit 1
 fi
 
-command -v mongoreplay >/dev/null
+command -v merizoreplay >/dev/null
 if [ $? != 0 ]; then
-  log "mongoreplay must be in PATH"
+  log "merizoreplay must be in PATH"
   exit 1
 fi
 command -v ftdc >/dev/null
@@ -107,7 +107,7 @@ set -e
 rm -rf $DBPATH
 mkdir $DBPATH
 log "starting MONGOD"
-mongod --port=$PORT --dbpath=$DBPATH >/dev/null &
+merizod --port=$PORT --dbpath=$DBPATH >/dev/null &
 MONGOPID=$!
 
 check_integrity() {
@@ -115,7 +115,7 @@ check_integrity() {
   for ((i = 0; i < ${#ASSERTIONS[@]}; i++))
   do
     assertion="${ASSERTIONS[$i]}"
-    mongo --port=$PORT --quiet mongoreplay_test --eval "assert($assertion)" >/dev/null
+    merizo --port=$PORT --quiet merizoreplay_test --eval "assert($assertion)" >/dev/null
     STATUS=$?
     if [ $STATUS != 0 ]; then
       log "integrity check FAILED: $assertion"
@@ -127,7 +127,7 @@ check_integrity() {
 }
 
 sleep 1
-mongo --port=$PORT mongoreplay_test --eval "db.dropDatabase()" >/dev/null 2>&1
+merizo --port=$PORT merizoreplay_test --eval "db.dropDatabase()" >/dev/null 2>&1
 
 log "starting TCPDUMP"
 sudo tcpdump -i "$INTERFACE" port "$PORT" -w tmp.pcap &
@@ -142,7 +142,7 @@ WorkerPIDs=()
 for ((i = 0; i < ${#WORKLOADS[@]}; i++))
 do
   script="${WORKLOADS[$i]}"
-  mongo --port=$PORT --quiet mongoreplay_test "$script" >/dev/null &
+  merizo --port=$PORT --quiet merizoreplay_test "$script" >/dev/null &
   WorkerPIDs+=("$!")
 done
 # join
@@ -160,26 +160,26 @@ wait $TCPDUMPPID
 check_integrity
 
 # clean up database
-mongo --port=$PORT mongoreplay_test --eval "db.dropDatabase()" >/dev/null 2>&1
-sleep 1 # mongoreplay play should certainly happen after the drop
+merizo --port=$PORT merizoreplay_test --eval "db.dropDatabase()" >/dev/null 2>&1
+sleep 1 # merizoreplay play should certainly happen after the drop
 
-log "running mongoreplay RECORD"
-mongoreplay record $SILENT $VERBOSE $DEBUG -f=tmp.pcap -p=tmp.playback >/dev/null
+log "running merizoreplay RECORD"
+merizoreplay record $SILENT $VERBOSE $DEBUG -f=tmp.pcap -p=tmp.playback >/dev/null
 TAPECODE=$?
 if [ "$TAPECODE" != 0 ]; then
-  log "mongoreplay failed with code $TAPECODE"
+  log "merizoreplay failed with code $TAPECODE"
   exit 1
 fi
 
 log # newline to separate replay
 
-log "starting mongoreplay PLAY"
+log "starting merizoreplay PLAY"
 REPLAY_START=`date`
 sleep 1
-mongoreplay play $SILENT $VERBOSE $DEBUG --host "localhost:$PORT" -p=tmp.playback --report tmp.report >/dev/null
+merizoreplay play $SILENT $VERBOSE $DEBUG --host "localhost:$PORT" -p=tmp.playback --report tmp.report >/dev/null
 sleep 1
 REPLAY_END=`date`
-log "finished mongoreplay PLAY"
+log "finished merizoreplay PLAY"
 
 check_integrity
 
@@ -187,7 +187,7 @@ log "flushing FTDC diagnostic files (15 sec)"
 sleep 15
 
 log "killing MONGOD"
-mongo --port=$PORT mongoreplay_test --eval "db.dropDatabase()" >/dev/null 2>&1
+merizo --port=$PORT merizoreplay_test --eval "db.dropDatabase()" >/dev/null 2>&1
 sleep 1
 kill $MONGOPID
 sleep 2 # give it a chance to dump FTDC

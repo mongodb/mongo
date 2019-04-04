@@ -6,9 +6,9 @@
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
-    const mongosDB = st.s0.getDB("test");
-    const source = mongosDB.getCollection("source");
-    const target = mongosDB.getCollection("target");
+    const merizosDB = st.s0.getDB("test");
+    const source = merizosDB.getCollection("source");
+    const target = merizosDB.getCollection("target");
     const primaryDB = st.rs0.getPrimary().getDB("test");
     const nonPrimaryDB = st.rs1.getPrimary().getDB("test");
     const maxTimeMS = 5 * 60 * 1000;
@@ -18,16 +18,16 @@
     assert.commandWorked(nonPrimaryDB.setProfilingLevel(2));
 
     // Enable sharding on the test DB and ensure that shard0 is the primary.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.rs0.getURL());
 
     // Shard the target collection, and set the unique flag to ensure that there's a unique
     // index on the shard key.
     const shardKey = {sk: 1};
-    assert.commandWorked(mongosDB.adminCommand(
+    assert.commandWorked(merizosDB.adminCommand(
         {shardCollection: target.getFullName(), key: shardKey, unique: true}));
-    assert.commandWorked(mongosDB.adminCommand({split: target.getFullName(), middle: {sk: 1}}));
-    assert.commandWorked(mongosDB.adminCommand(
+    assert.commandWorked(merizosDB.adminCommand({split: target.getFullName(), middle: {sk: 1}}));
+    assert.commandWorked(merizosDB.adminCommand(
         {moveChunk: target.getFullName(), find: {sk: 1}, to: st.rs1.getURL()}));
 
     assert.commandWorked(source.insert({sk: "dummy"}));
@@ -72,7 +72,7 @@
 
     (function testTimeout() {
         // Configure the "maxTimeAlwaysTimeOut" fail point on the primary shard, which forces
-        // mongod to throw if it receives an operation with a max time.
+        // merizod to throw if it receives an operation with a max time.
         assert.commandWorked(primaryDB.getSiblingDB("admin").runCommand(
             {configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
 

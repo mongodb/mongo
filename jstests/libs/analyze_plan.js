@@ -248,7 +248,7 @@ function aggPlanHasStage(root, stage) {
 function planHasStage(db, root, stage) {
     const matchingStages = getPlanStages(root, stage);
 
-    // If we are executing against a mongos, we may get more than one occurrence of the stage.
+    // If we are executing against a merizos, we may get more than one occurrence of the stage.
     if (FixtureHelpers.isMongos(db)) {
         return matchingStages.length >= 1;
     } else {
@@ -347,7 +347,7 @@ function getChunkSkips(root) {
 function assertExplainCount({explainResults, expectedCount}) {
     const execStages = explainResults.executionStats.executionStages;
 
-    // If passed through mongos, then the root stage should be the mongos SINGLE_SHARD stage or
+    // If passed through merizos, then the root stage should be the merizos SINGLE_SHARD stage or
     // SHARD_MERGE stages, with COUNT as the root stage on each shard. If explaining directly on the
     // shard, then COUNT is the root stage.
     if ("SINGLE_SHARD" == execStages.stage || "SHARD_MERGE" == execStages.stage) {

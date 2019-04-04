@@ -1,4 +1,4 @@
-LIBRARY "mongoca"
+LIBRARY "merizoca"
 
 EXPORTS
 

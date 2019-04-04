@@ -1,4 +1,4 @@
-// In MongoDB 3.4, $graphLookup was introduced. In this file, we test basic behavior and correctness
+// In MerizoDB 3.4, $graphLookup was introduced. In this file, we test basic behavior and correctness
 // of the stage.
 
 (function() {

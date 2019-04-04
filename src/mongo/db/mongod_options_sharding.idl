@@ -1,8 +1,8 @@
-# Copyright (C) 2019-present MongoDB, Inc.
+# Copyright (C) 2019-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
 #
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "merizo"
     cpp_includes:
-        - "mongo/db/mongod_options_sharding.h"
+        - "merizo/db/merizod_options_sharding.h"
     configs:
         section: 'Sharding options'
         initializer:
@@ -48,7 +48,7 @@ configs:
         conflicts: configsvr
     'sharding.clusterRole':
         description: >-
-            Choose what role this mongod has in a sharded cluster.  Possible values are:
+            Choose what role this merizod has in a sharded cluster.  Possible values are:
             "configsvr": Start this node as a config server.  Starts on port 27019 by default.
             "shardsvr": Start this node as a shard server.  Starts on port 27018 by default.
         arg_vartype: String
@@ -58,7 +58,7 @@ configs:
     'sharding._overrideShardIdentity':
         description: >-
             Overrides the shardIdentity document settings stored in the local storage with
-            a MongoDB Extended JSON document in string format.
+            a MerizoDB Extended JSON document in string format.
         arg_vartype: String
         source: yaml
         conflicts: configsvr

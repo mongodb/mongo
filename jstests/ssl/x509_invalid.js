@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    const CLIENT_NAME = 'C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client';
+    const CLIENT_NAME = 'C=US,ST=New York,L=New York City,O=MerizoDB,OU=KernelUser,CN=client';
     const CLIENT_CERT = 'jstests/libs/client.pem';
     const SERVER_CERT = 'jstests/libs/server.pem';
     const CA_CERT = 'jstests/libs/ca.pem';
@@ -16,7 +16,7 @@
         }
         const script = 'assert(db.getSiblingDB(\'$external\').auth(' + tojson(auth) + '));';
         clearRawMongoProgramOutput();
-        const exitCode = runMongoProgram('mongo',
+        const exitCode = runMongoProgram('merizo',
                                          '--ssl',
                                          '--sslAllowInvalidHostnames',
                                          '--sslPEMKeyFile',
@@ -49,13 +49,13 @@
     }
 
     // Standalone.
-    const mongod = MongoRunner.runMongod({
+    const merizod = MongoRunner.runMongod({
         auth: '',
         sslMode: 'requireSSL',
         sslPEMKeyFile: SERVER_CERT,
         sslCAFile: CA_CERT,
         sslAllowInvalidCertificates: '',
     });
-    runTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    runTest(merizod);
+    MongoRunner.stopMongod(merizod);
 })();

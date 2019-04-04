@@ -28,9 +28,9 @@
 
     // calling this function with and without a primary, should provide sufficient code coverage
     // to catch any JS errors
-    var mongo =
+    var merizo =
         startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
-    mongo();
+    merizo();
     assert(rawMongoProgramOutput().match("behind the primary"));
 
     // get to a primaryless state
@@ -40,9 +40,9 @@
     }
     assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 120, force: true}));
 
-    mongo =
+    merizo =
         startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
-    mongo();
+    merizo();
     assert(rawMongoProgramOutput().match("behind the freshest"));
 
     replSet.stopSet();

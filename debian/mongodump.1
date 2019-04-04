@@ -1,8 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGODUMP" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
+.TH "MONGODUMP" "1" "Jun 21, 2018" "4.0" "merizodb-manual"
 .SH NAME
-mongodump \- MongoDB Data Dump Utility
+merizodump \- MerizoDB Data Dump Utility
 .
 .nr rst2man-indent-level 0
 .
@@ -48,32 +48,32 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP "Mac OSX Sierra and Go 1.6 Incompatibility"
 .sp
 Users running on Mac OSX Sierra require the 3.2.10 or newer version
-of  mongodump\&.
+of  merizodump\&.
 .UNINDENT
 .UNINDENT
 .SH SYNOPSIS
 .sp
-\fI\%mongodump\fP is a utility for creating a binary export of the
-contents of a database. \fI\%mongodump\fP can export data from
-either \fBmongod\fP or \fBmongos\fP instances.
+\fI\%merizodump\fP is a utility for creating a binary export of the
+contents of a database. \fI\%merizodump\fP can export data from
+either \fBmerizod\fP or \fBmerizos\fP instances.
 .sp
-\fI\%mongodump\fP can be a part of a backup strategy with \fBmongorestore\fP for partial
+\fI\%merizodump\fP can be a part of a backup strategy with \fBmerizorestore\fP for partial
 backups based on a query, syncing from production to staging or
 development environments, or changing the storage engine of a
-standalone. However, the use of \fI\%mongodump\fP and
-\fBmongorestore\fP as a backup strategy can be problematic for
+standalone. However, the use of \fI\%merizodump\fP and
+\fBmerizorestore\fP as a backup strategy can be problematic for
 sharded clusters and replica sets.
 .sp
-Run \fI\%mongodump\fP from the system command line, not the \fBmongo\fP shell.
+Run \fI\%merizodump\fP from the system command line, not the \fBmerizo\fP shell.
 .sp
-For an overview of \fI\%mongodump\fP in conjunction with
-\fBmongorestore\fP part of a backup and recovery strategy, see
+For an overview of \fI\%merizodump\fP in conjunction with
+\fBmerizorestore\fP part of a backup and recovery strategy, see
 /tutorial/backup\-and\-restore\-tools\&.
 .sp
 \fBSEE ALSO:\fP
 .INDENT 0.0
 .INDENT 3.5
-\fBmongorestore\fP,
+\fBmerizorestore\fP,
 /tutorial/backup\-sharded\-cluster\-with\-database\-dumps
 and /core/backups\&.
 .UNINDENT
@@ -81,15 +81,15 @@ and /core/backups\&.
 .SH BEHAVIOR
 .SS Data Exclusion
 .sp
-\fI\%mongodump\fP excludes the content of the \fBlocal\fP database in its output.
+\fI\%merizodump\fP excludes the content of the \fBlocal\fP database in its output.
 .sp
-\fI\%mongodump\fP only captures the documents in the database in its
-backup data and does not include index data. \fBmongorestore\fP or
-\fBmongod\fP must then rebuild the indexes after restoring data.
+\fI\%merizodump\fP only captures the documents in the database in its
+backup data and does not include index data. \fBmerizorestore\fP or
+\fBmerizod\fP must then rebuild the indexes after restoring data.
 .sp
-Changed in version 3.4: MongoDB 3.4 added support for
+Changed in version 3.4: MerizoDB 3.4 added support for
 read\-only views\&. By default,
-\fI\%mongodump\fP only captures a view’s metadata: it does not
+\fI\%merizodump\fP only captures a view’s metadata: it does not
 create a binary export of the documents included in the view. To
 capture the documents in a view use \fI\%\-\-viewsAsCollections\fP\&.
 
@@ -97,12 +97,12 @@ capture the documents in a view use \fI\%\-\-viewsAsCollections\fP\&.
 .SS Replica Sets
 .sp
 Changed in version 3.2.0: The choice of target or targets for the \fI\%\-\-host\fP
-parameter affects the read preference of \fI\%mongodump\fP
+parameter affects the read preference of \fI\%merizodump\fP
 when connecting to a replica set.
 .INDENT 0.0
 .IP \(bu 2
 If the string passed to \fB\-\-host\fP is prefixed by the replica set name,
-\fI\%mongodump\fP reads from the \fBprimary\fP replica set
+\fI\%merizodump\fP reads from the \fBprimary\fP replica set
 member by default. For example:
 .INDENT 2.0
 .INDENT 3.5
@@ -116,8 +116,8 @@ member by default. For example:
 .UNINDENT
 .IP \(bu 2
 If the string passed to \fB\-\-host\fP contains a list of
-\fBmongod\fP instances, but does not include the replica set
-name as a prefix to the host string, \fI\%mongodump\fP
+\fBmerizod\fP instances, but does not include the replica set
+name as a prefix to the host string, \fI\%merizodump\fP
 reads from the \fBnearest\fP node by default. For example:
 .INDENT 2.0
 .INDENT 3.5
@@ -134,40 +134,40 @@ reads from the \fBnearest\fP node by default. For example:
 .SS Sharded Clusters
 .sp
 Changed in version 3.0.5: For a sharded cluster where the shards are replica sets,
-\fI\%mongodump\fP no longer prefers reads from secondary
-members when run against the \fBmongos\fP instance.
+\fI\%merizodump\fP no longer prefers reads from secondary
+members when run against the \fBmerizos\fP instance.
 
 .sp
-For sharded clusters, specify the hostname of a \fBmongos\fP
+For sharded clusters, specify the hostname of a \fBmerizos\fP
 for the \fB\-\-host\fP option.
-\fI\%mongodump\fP reads from the \fBprimary\fP replica set
+\fI\%merizodump\fP reads from the \fBprimary\fP replica set
 member on each shard replica set in the cluster.
 .sp
 Unsharded collections in a sharded cluster are stored on a
 primary shard\&.
-\fI\%mongodump\fP reads from the primary replica set member on
+\fI\%merizodump\fP reads from the primary replica set member on
 the primary shard for any unsharded collections. Note: each
 database has its own primary shard.
 .SS Overwrite Files
 .sp
-\fI\%mongodump\fP overwrites output files if they exist in the
-backup data folder. Before running the \fI\%mongodump\fP command
+\fI\%merizodump\fP overwrites output files if they exist in the
+backup data folder. Before running the \fI\%merizodump\fP command
 multiple times, either ensure that you no longer need the files in the
 output folder (the default is the \fBdump/\fP folder) or rename the
 folders or files.
 .SS Data Compression Handling
 .sp
-When run against a \fBmongod\fP instance that uses the
+When run against a \fBmerizod\fP instance that uses the
 WiredTiger storage engine,
-\fI\%mongodump\fP outputs uncompressed data.
+\fI\%merizodump\fP outputs uncompressed data.
 .SS Working Set
 .sp
-\fI\%mongodump\fP can adversely affect performance of the
-\fBmongod\fP\&. If your data is larger than system memory, the
-\fI\%mongodump\fP will push the working set out of memory.
+\fI\%merizodump\fP can adversely affect performance of the
+\fBmerizod\fP\&. If your data is larger than system memory, the
+\fI\%merizodump\fP will push the working set out of memory.
 .SH REQUIRED ACCESS
 .sp
-To run \fI\%mongodump\fP against a MongoDB deployment that has
+To run \fI\%merizodump\fP against a MerizoDB deployment that has
 access control enabled, you must have
 privileges that grant \fBfind\fP action for each database to
 back up. The built\-in \fBbackup\fP role provides the required
@@ -180,19 +180,19 @@ collection that exists when running with database profiling\&. Previously, users
 
 .SH OPTIONS
 .sp
-Changed in version 3.0.0: \fI\%mongodump\fP removed the \fB\-\-dbpath\fP as well as related
+Changed in version 3.0.0: \fI\%merizodump\fP removed the \fB\-\-dbpath\fP as well as related
 \fB\-\-directoryperdb\fP and \fB\-\-journal\fP options. To use
-\fI\%mongodump\fP, you must run \fI\%mongodump\fP against a running
-\fBmongod\fP or \fBmongos\fP instance as appropriate.
+\fI\%merizodump\fP, you must run \fI\%merizodump\fP against a running
+\fBmerizod\fP or \fBmerizos\fP instance as appropriate.
 
 .INDENT 0.0
 .TP
-.B mongodump
+.B merizodump
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-help
-Returns information on the options and use of \fBmongodump\fP\&.
+Returns information on the options and use of \fBmerizodump\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -204,7 +204,7 @@ including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .INDENT 0.0
 .TP
 .B \-\-quiet
-Runs \fBmongodump\fP in a quiet mode that attempts to limit the amount
+Runs \fBmerizodump\fP in a quiet mode that attempts to limit the amount
 of output.
 .sp
 This option suppresses:
@@ -222,7 +222,7 @@ connection closed events
 .INDENT 0.0
 .TP
 .B \-\-version
-Returns the \fBmongodump\fP release number.
+Returns the \fBmerizodump\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -231,7 +231,7 @@ New in version 3.4.6.
 
 .sp
 Specify a resolvable URI
-connection string for the \fBmongod\fP to which to
+connection string for the \fBmerizod\fP to which to
 connect.
 .sp
 The following is the standard
@@ -241,7 +241,7 @@ URI connection scheme:
 .sp
 .nf
 .ft C
-mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
+merizodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
 .ft P
 .fi
 .UNINDENT
@@ -255,7 +255,7 @@ documentation.
 \fBIMPORTANT:\fP
 .INDENT 7.0
 .INDENT 3.5
-The following \fI\%mongodump\fP options are incompatible with the
+The following \fI\%merizodump\fP options are incompatible with the
 \fB\-\-uri\fP option. Instead, specify these options as part of your
 \fB\-\-uri\fP connection string when applicable:
 .INDENT 0.0
@@ -283,8 +283,8 @@ URI connection string)
 .B \-\-host <hostname><:port>, \-h <hostname><:port>
 \fIDefault\fP: localhost:27017
 .sp
-Specifies a resolvable hostname for the \fBmongod\fP to which to
-connect. By default, the \fBmongodump\fP attempts to connect to a MongoDB
+Specifies a resolvable hostname for the \fBmerizod\fP to which to
+connect. By default, the \fBmerizodump\fP attempts to connect to a MerizoDB
 instance running on the localhost on port number \fB27017\fP\&.
 .sp
 To connect to a replica set, specify the
@@ -301,7 +301,7 @@ the following:
 .UNINDENT
 .UNINDENT
 .sp
-You can always connect directly to a single MongoDB instance by
+You can always connect directly to a single MerizoDB instance by
 specifying the host and port number directly.
 .sp
 Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
@@ -314,7 +314,7 @@ brackets (e.g. \fB[<address>]\fP).
 .B \-\-port <port>
 \fIDefault\fP: 27017
 .sp
-Specifies the TCP port on which the MongoDB instance listens for
+Specifies the TCP port on which the MerizoDB instance listens for
 client connections.
 .UNINDENT
 .INDENT 0.0
@@ -322,9 +322,9 @@ client connections.
 .B \-\-ipv6
 \fIRemoved in version 3.0.\fP
 .sp
-Enables IPv6 support and allows \fBmongodump\fP to connect to the
-MongoDB instance using an IPv6 network. Prior to MongoDB 3.0, you
-had to specify \fI\%\-\-ipv6\fP to use IPv6. In MongoDB 3.0 and later, IPv6
+Enables IPv6 support and allows \fBmerizodump\fP to connect to the
+MerizoDB instance using an IPv6 network. Prior to MerizoDB 3.0, you
+had to specify \fI\%\-\-ipv6\fP to use IPv6. In MerizoDB 3.0 and later, IPv6
 is always enabled.
 .UNINDENT
 .INDENT 0.0
@@ -333,10 +333,10 @@ is always enabled.
 New in version 2.6.
 
 .sp
-Enables connection to a \fBmongod\fP or \fBmongos\fP that has
+Enables connection to a \fBmerizod\fP or \fBmerizos\fP that has
 TLS/SSL support enabled.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -362,18 +362,18 @@ must be specified.
 .INDENT 7.0
 .INDENT 3.5
 \fBVersion 3.2 and earlier:\fP For TLS/SSL connections (\fB\-\-ssl\fP) to
-\fBmongod\fP and \fBmongos\fP, if the \fBmongodump\fP runs without the
-\fI\%\-\-sslCAFile\fP, \fBmongodump\fP will not attempt
+\fBmerizod\fP and \fBmerizos\fP, if the \fBmerizodump\fP runs without the
+\fI\%\-\-sslCAFile\fP, \fBmerizodump\fP will not attempt
 to validate the server certificates. This creates a vulnerability
-to expired \fBmongod\fP and \fBmongos\fP certificates as
-well as to foreign processes posing as valid \fBmongod\fP or
-\fBmongos\fP instances. Ensure that you \fIalways\fP specify the
+to expired \fBmerizod\fP and \fBmerizos\fP certificates as
+well as to foreign processes posing as valid \fBmerizod\fP or
+\fBmerizos\fP instances. Ensure that you \fIalways\fP specify the
 CA file to validate the server certificates in cases where
 intrusion is a possibility.
 .UNINDENT
 .UNINDENT
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -388,11 +388,11 @@ and key. Specify the file name of the \fB\&.pem\fP file using relative
 or absolute paths.
 .sp
 This option is required when using the \fI\%\-\-ssl\fP option to connect
-to a \fBmongod\fP or \fBmongos\fP that has
+to a \fBmerizod\fP or \fBmerizos\fP that has
 \fBCAFile\fP enabled \fIwithout\fP
 \fBallowConnectionsWithoutCertificates\fP\&.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -404,14 +404,14 @@ New in version 2.6.
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
 \fI\%\-\-sslPEMKeyFile\fP). Use the \fI\%\-\-sslPEMKeyPassword\fP option only if the
-certificate\-key file is encrypted. In all cases, the \fBmongodump\fP will
+certificate\-key file is encrypted. In all cases, the \fBmerizodump\fP will
 redact the password from all logging and reporting output.
 .sp
 If the private key in the PEM file is encrypted and you do not specify
-the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongodump\fP will prompt for a passphrase. See
+the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmerizodump\fP will prompt for a passphrase. See
 ssl\-certificate\-password\&.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -425,7 +425,7 @@ Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -437,10 +437,10 @@ New in version 2.6.
 .sp
 Bypasses the validation checks for server certificates and allows
 the use of invalid certificates. When using the
-\fBallowInvalidCertificates\fP setting, MongoDB logs as a
+\fBallowInvalidCertificates\fP setting, MerizoDB logs as a
 warning the use of the invalid certificate.
 .sp
-Starting in MongoDB 4.0, if you specify
+Starting in MerizoDB 4.0, if you specify
 \fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
 true\fP when using x.509 authentication, an invalid certificate is
 only sufficient to establish a TLS/SSL connection but is
@@ -449,25 +449,25 @@ only sufficient to establish a TLS/SSL connection but is
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
-For TLS/SSL connections to \fBmongod\fP and
-\fBmongos\fP, avoid using
+For TLS/SSL connections to \fBmerizod\fP and
+\fBmerizos\fP, avoid using
 \fB\-\-sslAllowInvalidCertificates\fP if possible and only use
 \fB\-\-sslAllowInvalidCertificates\fP on systems where intrusion is
 not possible.
 .sp
-If the \fBmongo\fP shell (and other
-mongodb\-tools\-support\-ssl) runs with the
+If the \fBmerizo\fP shell (and other
+merizodb\-tools\-support\-ssl) runs with the
 \fB\-\-sslAllowInvalidCertificates\fP option, the
-\fBmongo\fP shell (and other
-mongodb\-tools\-support\-ssl) will not attempt to validate
+\fBmerizo\fP shell (and other
+merizodb\-tools\-support\-ssl) will not attempt to validate
 the server certificates. This creates a vulnerability to expired
-\fBmongod\fP and \fBmongos\fP certificates as
+\fBmerizod\fP and \fBmerizos\fP certificates as
 well as to foreign processes posing as valid
-\fBmongod\fP or \fBmongos\fP instances.
+\fBmerizod\fP or \fBmerizos\fP instances.
 .UNINDENT
 .UNINDENT
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -478,10 +478,10 @@ New in version 3.0.
 
 .sp
 Disables the validation of the hostnames in TLS/SSL certificates. Allows
-\fBmongodump\fP to connect to MongoDB instances even if the hostname in their
+\fBmerizodump\fP to connect to MerizoDB instances even if the hostname in their
 certificates do not match the specified hostname.
 .sp
-For more information about TLS/SSL and MongoDB, see
+For more information about TLS/SSL and MerizoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
 .UNINDENT
@@ -491,7 +491,7 @@ For more information about TLS/SSL and MongoDB, see
 New in version 2.6.
 
 .sp
-Directs the \fBmongodump\fP to use the FIPS mode of the installed OpenSSL
+Directs the \fBmerizodump\fP to use the FIPS mode of the installed OpenSSL
 library. Your system must have a FIPS compliant OpenSSL library to use
 the \fI\%\-\-sslFIPSMode\fP option.
 .sp
@@ -499,7 +499,7 @@ the \fI\%\-\-sslFIPSMode\fP option.
 .INDENT 7.0
 .INDENT 3.5
 FIPS\-compatible TLS/SSL is
-available only in \fI\%MongoDB Enterprise\fP\&. See
+available only in \fI\%MerizoDB Enterprise\fP\&. See
 /tutorial/configure\-fips for more information.
 .UNINDENT
 .UNINDENT
@@ -507,22 +507,22 @@ available only in \fI\%MongoDB Enterprise\fP\&. See
 .INDENT 0.0
 .TP
 .B \-\-username <username>, \-u <username>
-Specifies a username with which to authenticate to a MongoDB database
+Specifies a username with which to authenticate to a MerizoDB database
 that uses authentication. Use in conjunction with the \fB\-\-password\fP and
 \fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-password <password>, \-p <password>
-Specifies a password with which to authenticate to a MongoDB database
+Specifies a password with which to authenticate to a MerizoDB database
 that uses authentication. Use in conjunction with the \fB\-\-username\fP and
 \fB\-\-authenticationDatabase\fP options.
 .sp
-Changed in version 3.0.0: If you do not specify an argument for \fI\%\-\-password\fP, \fBmongodump\fP returns
+Changed in version 3.0.0: If you do not specify an argument for \fI\%\-\-password\fP, \fBmerizodump\fP returns
 an error.
 
 .sp
-Changed in version 3.0.2: If you wish \fBmongodump\fP to prompt the user
+Changed in version 3.0.2: If you wish \fBmerizodump\fP to prompt the user
 for the password, pass the \fI\%\-\-username\fP option without
 \fI\%\-\-password\fP or specify an empty string as the \fI\%\-\-password\fP value,
 as in \fB\-\-password ""\fP .
@@ -534,11 +534,11 @@ as in \fB\-\-password ""\fP .
 Specifies the database in which the user is created.
 See user\-authentication\-database\&.
 .sp
-If you do not specify an authentication database, \fBmongodump\fP
+If you do not specify an authentication database, \fBmerizodump\fP
 assumes that the database specified to export holds the user’s credentials.
 .sp
 If you do not specify an authentication database or a database to
-export, \fBmongodump\fP assumes the \fBadmin\fP database holds the user’s
+export, \fBmerizodump\fP assumes the \fBadmin\fP database holds the user’s
 credentials.
 .UNINDENT
 .INDENT 0.0
@@ -546,13 +546,13 @@ credentials.
 .B \-\-authenticationMechanism <name>
 \fIDefault\fP: SCRAM\-SHA\-1
 .sp
-Specifies the authentication mechanism the \fBmongodump\fP instance uses to
-authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+Specifies the authentication mechanism the \fBmerizodump\fP instance uses to
+authenticate to the \fBmerizod\fP or \fBmerizos\fP\&.
 .sp
-Changed in version 4.0: MongoDB removes support for the deprecated MongoDB
+Changed in version 4.0: MerizoDB removes support for the deprecated MerizoDB
 Challenge\-Response (\fBMONGODB\-CR\fP) authentication mechanism.
 .sp
-MongoDB adds support for SCRAM mechanism using the SHA\-256 hash
+MerizoDB adds support for SCRAM mechanism using the SHA\-256 hash
 function (\fBSCRAM\-SHA\-256\fP).
 
 .TS
@@ -588,14 +588,14 @@ _
 T{
 MONGODB\-X509
 T}	T{
-MongoDB TLS/SSL certificate authentication.
+MerizoDB TLS/SSL certificate authentication.
 T}
 _
 T{
 GSSAPI (Kerberos)
 T}	T{
 External authentication using Kerberos. This mechanism is
-available only in \fI\%MongoDB Enterprise\fP\&.
+available only in \fI\%MerizoDB Enterprise\fP\&.
 T}
 _
 T{
@@ -604,7 +604,7 @@ T}	T{
 External authentication using LDAP. You can also use \fBPLAIN\fP
 for authenticating in\-database users. \fBPLAIN\fP transmits
 passwords in plain text. This mechanism is available only in
-\fI\%MongoDB Enterprise\fP\&.
+\fI\%MerizoDB Enterprise\fP\&.
 T}
 _
 .TE
@@ -616,9 +616,9 @@ New in version 2.6.
 
 .sp
 Specify the name of the service using GSSAPI/Kerberos\&. Only required if the service does not use the
-default name of \fBmongodb\fP\&.
+default name of \fBmerizodb\fP\&.
 .sp
-This option is available only in MongoDB Enterprise.
+This option is available only in MerizoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -629,13 +629,13 @@ New in version 2.6.
 Specify the hostname of a service using GSSAPI/Kerberos\&. \fIOnly\fP required if the hostname of a machine does
 not match the hostname resolved by DNS.
 .sp
-This option is available only in MongoDB Enterprise.
+This option is available only in MerizoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-db <database>, \-d <database>
 Specifies a database to backup. If you do not specify a database,
-\fI\%mongodump\fP copies all databases in this instance into the dump
+\fI\%merizodump\fP copies all databases in this instance into the dump
 files.
 .UNINDENT
 .INDENT 0.0
@@ -649,7 +649,7 @@ to the dump files.
 .TP
 .B \-\-query <json>, \-q <json>
 Provides a JSON document as a query that optionally limits the
-documents included in the output of \fI\%mongodump\fP\&.
+documents included in the output of \fI\%merizodump\fP\&.
 .sp
 You must enclose the query in single quotes (e.g. \fB\(aq\fP) to ensure that it does
 not interact with your shell environment.
@@ -662,28 +662,28 @@ New in version 3.2.
 .sp
 Specifies the path to a file containing a JSON document as a query
 filter that limits the documents included in the output of
-\fI\%mongodump\fP\&. \fI\%\-\-queryFile\fP enables you to create query filters that
+\fI\%merizodump\fP\&. \fI\%\-\-queryFile\fP enables you to create query filters that
 are too large to fit in your terminal’s buffer.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-readPreference <string>
 Specify the read preference for
-\fBmongodump\fP\&.
+\fBmerizodump\fP\&.
 .sp
 See replica\-set\-read\-preference\-modes\&.
 .sp
-\fBmongodump\fP defaults to \fBprimary\fP
+\fBmerizodump\fP defaults to \fBprimary\fP
 read preference when connected to a
-\fBmongos\fP or a replica set\&.
+\fBmerizos\fP or a replica set\&.
 .sp
-Otherwise, \fBmongodump\fP defaults to \fBnearest\fP\&.
+Otherwise, \fBmerizodump\fP defaults to \fBnearest\fP\&.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
 Using a read preference other than
-\fBprimary\fP with a connection to a \fBmongos\fP may produce
+\fBprimary\fP with a connection to a \fBmerizos\fP may produce
 inconsistencies, duplicates, or result in missed documents.
 .UNINDENT
 .UNINDENT
@@ -693,10 +693,10 @@ See \fI\%Read Preference\fP\&.
 .INDENT 0.0
 .TP
 .B \-\-forceTableScan
-Forces \fI\%mongodump\fP to scan the data store directly: typically,
-\fI\%mongodump\fP saves entries as they appear in the index of
+Forces \fI\%merizodump\fP to scan the data store directly: typically,
+\fI\%merizodump\fP saves entries as they appear in the index of
 the \fB_id\fP field. If you specify a query \fI\%\-\-query\fP,
-\fBmongodump\fP will use the most appropriate index to support that query.
+\fBmerizodump\fP will use the most appropriate index to support that query.
 .sp
 Use \fI\%\-\-forceTableScan\fP to skip the index and scan the data directly. Typically
 there are two cases where this behavior is preferable to the
@@ -710,7 +710,7 @@ Your database uses a custom \fB_id\fP field.
 .UNINDENT
 .sp
 When you run with \fI\%\-\-forceTableScan\fP, the dump produced by
-\fI\%mongodump\fP can reflect the state of the database at many
+\fI\%merizodump\fP can reflect the state of the database at many
 different points in time.
 .sp
 \fBIMPORTANT:\fP
@@ -727,26 +727,26 @@ consideration.
 New in version 3.2.
 
 .sp
-Compresses the output. If \fI\%mongodump\fP outputs to the dump
+Compresses the output. If \fI\%merizodump\fP outputs to the dump
 directory, the new feature compresses the individual files. The files
 have the suffix \fB\&.gz\fP\&.
 .sp
-If \fI\%mongodump\fP outputs to an archive file or the standard
+If \fI\%merizodump\fP outputs to an archive file or the standard
 out stream, the new feature compresses the archive file or the data
 output to the stream.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-out <path>, \-o <path>
-Specifies the directory where \fI\%mongodump\fP will write
+Specifies the directory where \fI\%merizodump\fP will write
 BSON files for the dumped databases. By default,
-\fI\%mongodump\fP saves output files in a directory named
+\fI\%merizodump\fP saves output files in a directory named
 \fBdump\fP in the current working directory.
 .sp
 To send the database dump to standard output, specify “\fB\-\fP” instead of
 a path. Write to standard output if you want process the output before
 saving it, such as to use \fBgzip\fP to compress the dump. When writing
-standard output, \fI\%mongodump\fP does not write the metadata that
+standard output, \fI\%merizodump\fP does not write the metadata that
 writes in a \fB<dbname>.metadata.json\fP file when writing to files
 directly.
 .sp
@@ -762,11 +762,11 @@ New in version 3.2.
 Writes the output to a single archive file or to the standard output
 (\fBstdout\fP).
 .sp
-To output the dump to an archive file, run \fI\%mongodump\fP with the new
+To output the dump to an archive file, run \fI\%merizodump\fP with the new
 \fB\-\-archive\fP option and the archive filename.
 .sp
 To output the dump to the standard output stream in order to pipe to
-another process, run \fI\%mongodump\fP with the \fBarchive\fP option
+another process, run \fI\%merizodump\fP with the \fBarchive\fP option
 but \fIomit\fP the filename.
 .sp
 You cannot use the \fB\-\-archive\fP option with the
@@ -779,22 +779,22 @@ You cannot use the \fB\-\-archive\fP option with the
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-When repairing a database, you should use \fBmongod \-\-repair\fP
+When repairing a database, you should use \fBmerizod \-\-repair\fP
 rather than this option. For instructions on repairing a database,
 refer to
 /tutorial/recover\-data\-following\-unexpected\-shutdown\&.
 .UNINDENT
 .UNINDENT
 .sp
-Changes the behavior of \fBmongodump\fP to only write valid data and
+Changes the behavior of \fBmerizodump\fP to only write valid data and
 exclude data that may be in an invalid state as a result of an
-improper shutdown or \fBmongod\fP crash.
+improper shutdown or \fBmerizod\fP crash.
 .sp
-\fI\%\-\-repair\fP is different from \fBmongod \-\-repair\fP, and may produce
+\fI\%\-\-repair\fP is different from \fBmerizod \-\-repair\fP, and may produce
 a large amount of duplicate documents. It is only available for use
-against \fBmongod\fP instances using the \fBmmapv1\fP storage
-engine. You cannot run \fI\%\-\-repair\fP against \fBmongos\fP, or against
-\fBmongod\fP instances that use the \fBwiredTiger\fP storage
+against \fBmerizod\fP instances using the \fBmmapv1\fP storage
+engine. You cannot run \fI\%\-\-repair\fP against \fBmerizos\fP, or against
+\fBmerizod\fP instances that use the \fBwiredTiger\fP storage
 engine.
 .sp
 For instructions on repairing a database, refer to
@@ -804,21 +804,21 @@ For instructions on repairing a database, refer to
 .TP
 .B \-\-oplog
 Creates a file named \fBoplog.bson\fP as part of the
-\fI\%mongodump\fP output. The \fBoplog.bson\fP file, located in
+\fI\%merizodump\fP output. The \fBoplog.bson\fP file, located in
 the top level of the output directory, contains oplog entries that
-occur during the \fI\%mongodump\fP operation. This file provides
+occur during the \fI\%merizodump\fP operation. This file provides
 an effective point\-in\-time snapshot of the state of a
-\fBmongod\fP instance. To restore to a specific point\-in\-time
+\fBmerizod\fP instance. To restore to a specific point\-in\-time
 backup, use the output created with this option in conjunction with
-\fBmongorestore \-\-oplogReplay\fP\&.
+\fBmerizorestore \-\-oplogReplay\fP\&.
 .sp
 Without \fI\%\-\-oplog\fP, if there are write operations during the dump
 operation, the dump will not reflect a single moment in time. Changes
 made to the database during the update process can affect the output of
 the backup.
 .sp
-\fI\%\-\-oplog\fP has no effect when running \fI\%mongodump\fP
-against a \fBmongos\fP instance to dump the entire contents of a
+\fI\%\-\-oplog\fP has no effect when running \fI\%merizodump\fP
+against a \fBmerizos\fP instance to dump the entire contents of a
 sharded cluster. However, you can use \fI\%\-\-oplog\fP to dump
 individual shards.
 .sp
@@ -830,8 +830,8 @@ oplog\&. This includes all members of a replica set.
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-To use \fI\%mongodump\fP with \fI\%\-\-oplog\fP, you must create a full dump of
-a replica set member. \fI\%mongodump\fP with  \fI\%\-\-oplog\fP fails
+To use \fI\%merizodump\fP with \fI\%\-\-oplog\fP, you must create a full dump of
+a replica set member. \fI\%merizodump\fP with  \fI\%\-\-oplog\fP fails
 if you use any of the following options to limit the data to be dumped:
 .INDENT 0.0
 .IP \(bu 2
@@ -845,7 +845,7 @@ if you use any of the following options to limit the data to be dumped:
 \fBSEE ALSO:\fP
 .INDENT 7.0
 .INDENT 3.5
-\fBmongorestore \-\-oplogReplay\fP
+\fBmerizorestore \-\-oplogReplay\fP
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -853,10 +853,10 @@ if you use any of the following options to limit the data to be dumped:
 .TP
 .B \-\-dumpDbUsersAndRoles
 Includes user and role definitions in the database’s dump directory
-when performing \fI\%mongodump\fP on a specific database. This
+when performing \fI\%merizodump\fP on a specific database. This
 option applies only when you specify a database in the
-\fI\%\-\-db\fP option. MongoDB always includes user and role
-definitions when \fI\%mongodump\fP applies to an entire instance
+\fI\%\-\-db\fP option. MerizoDB always includes user and role
+definitions when \fI\%merizodump\fP applies to an entire instance
 and not just a specific database.
 .UNINDENT
 .INDENT 0.0
@@ -865,7 +865,7 @@ and not just a specific database.
 New in version 3.0.
 
 .sp
-Excludes the specified collection from the \fBmongodump\fP output.
+Excludes the specified collection from the \fBmerizodump\fP output.
 To exclude multiple collections, specify the \fI\%\-\-excludeCollection\fP multiple times.
 .UNINDENT
 .INDENT 0.0
@@ -874,7 +874,7 @@ To exclude multiple collections, specify the \fI\%\-\-excludeCollection\fP multi
 New in version 3.0.
 
 .sp
-Excludes all collections with a specified prefix from the \fBmongodump\fP
+Excludes all collections with a specified prefix from the \fBmerizodump\fP
 outputs. To specify multiple prefixes, specify the \fI\%\-\-excludeCollectionsWithPrefix\fP multiple
 times.
 .UNINDENT
@@ -883,7 +883,7 @@ times.
 .B \-\-numParallelCollections int, \-j int
 \fIDefault\fP: 4
 .sp
-Number of collections \fBmongodump\fP should export
+Number of collections \fBmerizodump\fP should export
 in parallel.
 .UNINDENT
 .INDENT 0.0
@@ -892,18 +892,18 @@ in parallel.
 New in version 3.4.
 
 .sp
-When specified, \fBmongodump\fP exports read\-only views as collections. For each view, \fBmongodump\fP will
+When specified, \fBmerizodump\fP exports read\-only views as collections. For each view, \fBmerizodump\fP will
 produce a BSON file containing the documents in the view. If you
-\fBmongorestore\fP the produced BSON file, the view will be
+\fBmerizorestore\fP the produced BSON file, the view will be
 restored as a collection\&.
 .sp
 If you do \fInot\fP include \fI\%\-\-viewsAsCollections\fP,
-\fBmongodump\fP captures each view’s metadata. If you include a
-view’s metadata file in a \fBmongorestore\fP operation, the view
+\fBmerizodump\fP captures each view’s metadata. If you include a
+view’s metadata file in a \fBmerizorestore\fP operation, the view
 is recreated.
 .UNINDENT
 .SH EXAMPLES
-.SS \fBmongodump\fP a Collection
+.SS \fBmerizodump\fP a Collection
 .sp
 The following operation creates a dump file that contains only the
 collection named \fBcollection\fP in the database named \fBtest\fP\&. In
@@ -914,12 +914,12 @@ this case the database is running on the local interface on port
 .sp
 .nf
 .ft C
-mongodump  \-\-db test \-\-collection collection
+merizodump  \-\-db test \-\-collection collection
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
-.SS \fBmongodump\fP a Database Excluding Specified Collections
+.SS \fBmerizodump\fP a Database Excluding Specified Collections
 .sp
 The following operation dumps all collections in the \fBtest\fP database
 except for \fBusers\fP and \fBsalaries\fP:
@@ -928,16 +928,16 @@ except for \fBusers\fP and \fBsalaries\fP:
 .sp
 .nf
 .ft C
-mongodump  \-\-db test \-\-excludeCollection=users \-\-excludeCollection=salaries
+merizodump  \-\-db test \-\-excludeCollection=users \-\-excludeCollection=salaries
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
-.SS \fBmongodump\fP with Access Control
+.SS \fBmerizodump\fP with Access Control
 .sp
-In the next example, \fI\%mongodump\fP creates a database dump
-located at \fB/opt/backup/mongodump\-2011\-10\-24\fP, from a database
-running on port \fB37017\fP on the host \fBmongodb1.example.net\fP and
+In the next example, \fI\%merizodump\fP creates a database dump
+located at \fB/opt/backup/merizodump\-2011\-10\-24\fP, from a database
+running on port \fB37017\fP on the host \fBmerizodb1.example.net\fP and
 authenticating using the username \fBuser\fP and the password
 \fBpass\fP, as follows:
 .INDENT 0.0
@@ -945,7 +945,7 @@ authenticating using the username \fBuser\fP and the password
 .sp
 .nf
 .ft C
-mongodump \-\-host mongodb1.example.net \-\-port 37017 \-\-username user \-\-password "pass" \-\-out /opt/backup/mongodump\-2011\-10\-24
+merizodump \-\-host merizodb1.example.net \-\-port 37017 \-\-username user \-\-password "pass" \-\-out /opt/backup/merizodump\-2011\-10\-24
 .ft P
 .fi
 .UNINDENT
@@ -955,7 +955,7 @@ mongodump \-\-host mongodb1.example.net \-\-port 37017 \-\-username user \-\-pas
 New in version 3.2.
 
 .sp
-To output the dump to an archive file, run \fI\%mongodump\fP with the
+To output the dump to an archive file, run \fI\%merizodump\fP with the
 \fB\-\-archive\fP option and the archive filename. For example, the following
 operation creates a file \fBtest.20150715.archive\fP that contains the dump
 of the \fBtest\fP database.
@@ -964,7 +964,7 @@ of the \fBtest\fP database.
 .sp
 .nf
 .ft C
-mongodump \-\-archive=test.20150715.archive \-\-db test
+merizodump \-\-archive=test.20150715.archive \-\-db test
 .ft P
 .fi
 .UNINDENT
@@ -975,14 +975,14 @@ New in version 3.2.
 
 .sp
 To output the archive to the standard output stream in order to pipe to
-another process, run \fI\%mongodump\fP with the \fBarchive\fP
+another process, run \fI\%merizodump\fP with the \fBarchive\fP
 option but \fIomit\fP the filename:
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongodump \-\-archive \-\-db test \-\-port 27017 | mongorestore \-\-archive \-\-port 27018
+merizodump \-\-archive \-\-db test \-\-port 27017 | merizorestore \-\-archive \-\-port 27018
 .ft P
 .fi
 .UNINDENT
@@ -998,7 +998,7 @@ You cannot use the \fB\-\-archive\fP option with the
 .SS Compress the Output
 .sp
 To compress the files in the output dump directory, run
-\fI\%mongodump\fP with the new \fB\-\-gzip\fP option. For example,
+\fI\%merizodump\fP with the new \fB\-\-gzip\fP option. For example,
 the following operation outputs compressed files into the default
 \fBdump\fP directory.
 .INDENT 0.0
@@ -1006,13 +1006,13 @@ the following operation outputs compressed files into the default
 .sp
 .nf
 .ft C
-mongodump \-\-gzip \-\-db test
+merizodump \-\-gzip \-\-db test
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-To compress the archive file output by \fI\%mongodump\fP, use the
+To compress the archive file output by \fI\%merizodump\fP, use the
 \fB\-\-gzip\fP option in conjunction with the \fI\%\-\-archive\fP
 option, specifying the name of the compressed file.
 .INDENT 0.0
@@ -1020,13 +1020,13 @@ option, specifying the name of the compressed file.
 .sp
 .nf
 .ft C
-mongodump \-\-archive=test.20150715.gz \-\-gzip \-\-db test
+merizodump \-\-archive=test.20150715.gz \-\-gzip \-\-db test
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .SH AUTHOR
-MongoDB Documentation Project
+MerizoDB Documentation Project
 .SH COPYRIGHT
 2008-2018
 .\" Generated by docutils manpage writer.

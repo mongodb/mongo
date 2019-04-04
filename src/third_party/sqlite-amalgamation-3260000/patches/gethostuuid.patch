@@ -5,7 +5,7 @@
  #    define HAVE_GETHOSTUUID 1
  #  else
 -#    warning "gethostuuid() is disabled."
-+// MongoDB modification
++// MerizoDB modification
 +// Disable this warning so that this can be built with -Werror
 +// #    warning "gethostuuid() is disabled."
  #  endif

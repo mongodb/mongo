@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/change_stream_constants.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_change_stream_gen.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/resume_token.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "merizo/db/pipeline/change_stream_constants.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_change_stream.h"
+#include "merizo/db/pipeline/document_source_change_stream_gen.h"
+#include "merizo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/resume_token.h"
+#include "merizo/db/query/query_knobs_gen.h"
 
-namespace mongo {
+namespace merizo {
 /**
  * This checks for resumability on a single shard in the sharded case. The rules are
  *
@@ -118,8 +118,8 @@ public:
     StageConstraints constraints(Pipeline::SplitState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                // If this is parsed on mongos it should stay on mongos. If we're not in a sharded
-                // cluster then it's okay to run on mongod.
+                // If this is parsed on merizos it should stay on merizos. If we're not in a sharded
+                // cluster then it's okay to run on merizod.
                 HostTypeRequirement::kLocalOnly,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
@@ -129,7 +129,7 @@ public:
 
     boost::optional<MergingLogic> mergingLogic() final {
         MergingLogic logic;
-        // This stage must run on mongos to ensure it sees the resume token, which could have come
+        // This stage must run on merizos to ensure it sees the resume token, which could have come
         // from any shard.  We also must include a mergingPresorted $sort stage to communicate to
         // the AsyncResultsMerger that we need to merge the streams in a particular order.
         logic.mergingStage = this;
@@ -156,4 +156,4 @@ private:
     ResumeTokenData _tokenFromClient;
 };
 
-}  // namespace mongo
+}  // namespace merizo

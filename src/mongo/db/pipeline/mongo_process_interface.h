@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -36,32 +36,32 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/shim.h"
-#include "mongo/client/dbclient_base.h"
-#include "mongo/db/collection_index_usage_tracker.h"
-#include "mongo/db/generic_cursor.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/resource_yielder.h"
-#include "mongo/db/storage/backup_cursor_state.h"
-#include "mongo/s/chunk_version.h"
+#include "merizo/base/shim.h"
+#include "merizo/client/dbclient_base.h"
+#include "merizo/db/collection_index_usage_tracker.h"
+#include "merizo/db/generic_cursor.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/pipeline/lite_parsed_document_source.h"
+#include "merizo/db/pipeline/value.h"
+#include "merizo/db/query/explain_options.h"
+#include "merizo/db/repl/oplog_entry.h"
+#include "merizo/db/resource_yielder.h"
+#include "merizo/db/storage/backup_cursor_state.h"
+#include "merizo/s/chunk_version.h"
 
-namespace mongo {
+namespace merizo {
 
 class ExpressionContext;
 class Pipeline;
 class PipelineDeleter;
 
 /**
- * Any functionality needed by an aggregation stage that is either context specific to a mongod or
- * mongos process, or is only compiled in to one of those two binaries must be accessed via this
- * interface. This allows all DocumentSources to be parsed on either mongos or mongod, but only
+ * Any functionality needed by an aggregation stage that is either context specific to a merizod or
+ * merizos process, or is only compiled in to one of those two binaries must be accessed via this
+ * interface. This allows all DocumentSources to be parsed on either merizos or merizod, but only
  * executable where it makes sense.
  */
 class MongoProcessInterface {
@@ -98,7 +98,7 @@ public:
 
     /**
      * Always returns a DBDirectClient. The return type in the function signature is a DBClientBase*
-     * because DBDirectClient isn't linked into mongos.
+     * because DBDirectClient isn't linked into merizos.
      */
     virtual DBClientBase* directClient() = 0;
 
@@ -238,7 +238,7 @@ public:
      * indicates whether the returned fields of the document key are final and will never change for
      * the given collection, either because the collection was dropped or has become sharded.
      *
-     * This method is meant to be called from a mongod which owns at least one chunk for this
+     * This method is meant to be called from a merizod which owns at least one chunk for this
      * collection. It will inspect the CollectionShardingState, not the CatalogCache. If asked about
      * a collection not hosted on this shard, the answer will be incorrect.
      */
@@ -330,4 +330,4 @@ public:
     virtual std::unique_ptr<ResourceYielder> getResourceYielder() const = 0;
 };
 
-}  // namespace mongo
+}  // namespace merizo

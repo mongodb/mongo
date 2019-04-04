@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <vector>
 
-#include "mongo/bson/util/bson_check.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/oplog_application_checks.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/do_txn.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/service_context.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/uuid.h"
+#include "merizo/bson/util/bson_check.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/oplog_application_checks.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/do_txn.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/oplog_entry_gen.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/service_context.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 /**
@@ -171,4 +171,4 @@ public:
 MONGO_REGISTER_TEST_COMMAND(DoTxnCmd);
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

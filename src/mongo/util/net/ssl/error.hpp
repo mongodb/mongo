@@ -19,7 +19,7 @@
 #include "asio/error_code.hpp"
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-#include "mongo/util/net/ssl/detail/openssl_types.hpp"
+#include "merizo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 
 #include "asio/detail/push_options.hpp"
@@ -101,7 +101,7 @@ inline asio::error_code make_error_code(stream_errors e) {
 #include "asio/detail/pop_options.hpp"
 
 #if defined(ASIO_HEADER_ONLY)
-#include "mongo/util/net/ssl/impl/error.ipp"
+#include "merizo/util/net/ssl/impl/error.ipp"
 #endif  // defined(ASIO_HEADER_ONLY)
 
 #endif  // ASIO_SSL_ERROR_HPP

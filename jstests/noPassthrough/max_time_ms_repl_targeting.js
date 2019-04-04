@@ -2,13 +2,13 @@
 // @tags: [requires_replication]
 (function() {
     'use strict';
-    var st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2}});
+    var st = new ShardingTest({merizos: 1, shards: 1, rs: {nodes: 2}});
     var kDbName = 'test';
     var ns = 'test.foo';
-    var mongos = st.s0;
-    var testColl = mongos.getCollection(ns);
+    var merizos = st.s0;
+    var testColl = merizos.getCollection(ns);
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(merizos.adminCommand({enableSharding: kDbName}));
 
     // Since this test is timing sensitive, retry on failures since they could be transient.
     // If broken, this would *always* fail so if it ever passes this build is fine (or time went
@@ -59,10 +59,10 @@
     testColl.insert({_id: 1});
     tryFiveTimes("totally unsharded", runTest);
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(merizos.adminCommand({enableSharding: kDbName}));
     tryFiveTimes("sharded db", runTest);
 
-    assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
+    assert.commandWorked(merizos.adminCommand({shardCollection: ns, key: {_id: 1}}));
     tryFiveTimes("sharded collection", runTest);
 
     st.stop();

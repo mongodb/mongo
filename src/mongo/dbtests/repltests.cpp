@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/json.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/sync_tail.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/transport/transport_layer_asio.h"
-#include "mongo/util/log.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/mutable_bson_test_utils.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/json.h"
+#include "merizo/db/ops/update.h"
+#include "merizo/db/repl/oplog.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/sync_tail.h"
+#include "merizo/db/s/op_observer_sharding_impl.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/transport/transport_layer_asio.h"
+#include "merizo/util/log.h"
 
-using namespace mongo::repl;
+using namespace merizo::repl;
 
 namespace ReplTests {
 
@@ -104,7 +104,7 @@ public:
           _defaultReplSettings(
               ReplicationCoordinator::get(getGlobalServiceContext())->getSettings()) {
         // Replication is not supported by mobile SE.
-        if (mongo::storageGlobalParams.engine == "mobile") {
+        if (merizo::storageGlobalParams.engine == "mobile") {
             return;
         }
 
@@ -148,7 +148,7 @@ public:
     }
     ~Base() {
         // Replication is not supported by mobile SE.
-        if (mongo::storageGlobalParams.engine == "mobile") {
+        if (merizo::storageGlobalParams.engine == "mobile") {
             return;
         }
         try {
@@ -191,7 +191,7 @@ protected:
     }
     void check(const BSONObj& expected, const BSONObj& got) const {
         if (expected.woCompare(got)) {
-            ::mongo::log() << "expected: " << expected.toString() << ", got: " << got.toString()
+            ::merizo::log() << "expected: " << expected.toString() << ", got: " << got.toString()
                            << endl;
         }
         ASSERT_BSONOBJ_EQ(expected, got);
@@ -243,7 +243,7 @@ protected:
             OldClientContext ctx(&_opCtx, ns());
             for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
                 if (0) {
-                    mongo::unittest::log() << "op: " << *i << endl;
+                    merizo::unittest::log() << "op: " << *i << endl;
                 }
                 repl::UnreplicatedWritesBlock uwb(&_opCtx);
                 uassertStatusOK(applyOperation_inlock(
@@ -264,14 +264,14 @@ protected:
         }
 
         auto cursor = coll->getCursor(&_opCtx);
-        ::mongo::log() << "all for " << ns << endl;
+        ::merizo::log() << "all for " << ns << endl;
         while (auto record = cursor->next()) {
-            ::mongo::log() << record->data.releaseToBson() << endl;
+            ::merizo::log() << record->data.releaseToBson() << endl;
         }
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        ::mongo::writeConflictRetry(&_opCtx, "deleteAll", ns, [&] {
+        ::merizo::writeConflictRetry(&_opCtx, "deleteAll", ns, [&] {
             Lock::GlobalWrite lk(&_opCtx);
             OldClientContext ctx(&_opCtx, ns);
             WriteUnitOfWork wunit(&_opCtx);
@@ -329,7 +329,7 @@ class LogBasic : public Base {
 public:
     void run() {
         // Replication is not supported by mobile SE.
-        if (mongo::storageGlobalParams.engine == "mobile") {
+        if (merizo::storageGlobalParams.engine == "mobile") {
             return;
         }
         ASSERT_EQUALS(1, opCount());
@@ -345,7 +345,7 @@ public:
     virtual ~Base() {}
     void run() {
         // Replication is not supported by mobile SE.
-        if (mongo::storageGlobalParams.engine == "mobile") {
+        if (merizo::storageGlobalParams.engine == "mobile") {
             return;
         }
         reset();
@@ -1331,7 +1331,7 @@ class DeleteOpIsIdBased : public Base {
 public:
     void run() {
         // Replication is not supported by mobile SE.
-        if (mongo::storageGlobalParams.engine == "mobile") {
+        if (merizo::storageGlobalParams.engine == "mobile") {
             return;
         }
         insert(BSON("_id" << 0 << "a" << 10));
@@ -1383,7 +1383,7 @@ class FetchAndInsertMissingDocument : public Base {
 public:
     void run() {
         // Replication is not supported by mobile SE.
-        if (mongo::storageGlobalParams.engine == "mobile") {
+        if (merizo::storageGlobalParams.engine == "mobile") {
             return;
         }
         bool threw = false;

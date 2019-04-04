@@ -13,8 +13,8 @@ env.Library(
         'get_shard_map_cmd.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/s/grid',
     ]
 )
 
@@ -93,37 +93,37 @@ env.Library(
         env.Idlc('kill_sessions_remote.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/role_graph',
-        '$BUILD_DIR/mongo/db/auth/saslauth',
-        '$BUILD_DIR/mongo/db/commands/core',
-        '$BUILD_DIR/mongo/db/commands/current_op_common',
-        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
-        '$BUILD_DIR/mongo/db/commands/kill_common',
-        '$BUILD_DIR/mongo/db/commands/list_databases_command',
-        '$BUILD_DIR/mongo/db/commands/profile_common',
-        '$BUILD_DIR/mongo/db/commands/servers',
-        '$BUILD_DIR/mongo/db/commands/set_index_commit_quorum_idl',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/commands/write_commands_common',
-        '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
-        '$BUILD_DIR/mongo/db/shared_request_handling',
-        '$BUILD_DIR/mongo/db/logical_session_cache_impl',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation',
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/executor/async_multicaster',
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/s/query/cluster_aggregate',
-        '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
-        '$BUILD_DIR/mongo/s/sharding_api',
-        '$BUILD_DIR/mongo/s/sharding_legacy_api',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
-        '$BUILD_DIR/mongo/s/write_ops/cluster_write_op_conversion',
-        '$BUILD_DIR/mongo/transport/message_compressor',
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/merizo/db/audit',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/auth/role_graph',
+        '$BUILD_DIR/merizo/db/auth/saslauth',
+        '$BUILD_DIR/merizo/db/commands/core',
+        '$BUILD_DIR/merizo/db/commands/current_op_common',
+        '$BUILD_DIR/merizo/db/commands/feature_compatibility_parsers',
+        '$BUILD_DIR/merizo/db/commands/kill_common',
+        '$BUILD_DIR/merizo/db/commands/list_databases_command',
+        '$BUILD_DIR/merizo/db/commands/profile_common',
+        '$BUILD_DIR/merizo/db/commands/servers',
+        '$BUILD_DIR/merizo/db/commands/set_index_commit_quorum_idl',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/db/commands/write_commands_common',
+        '$BUILD_DIR/merizo/db/ftdc/ftdc_server',
+        '$BUILD_DIR/merizo/db/shared_request_handling',
+        '$BUILD_DIR/merizo/db/logical_session_cache_impl',
+        '$BUILD_DIR/merizo/db/pipeline/aggregation',
+        '$BUILD_DIR/merizo/db/stats/counters',
+        '$BUILD_DIR/merizo/db/views/views',
+        '$BUILD_DIR/merizo/executor/async_multicaster',
+        '$BUILD_DIR/merizo/idl/server_parameter',
+        '$BUILD_DIR/merizo/rpc/client_metadata',
+        '$BUILD_DIR/merizo/s/query/cluster_aggregate',
+        '$BUILD_DIR/merizo/s/query/cluster_client_cursor',
+        '$BUILD_DIR/merizo/s/sharding_api',
+        '$BUILD_DIR/merizo/s/sharding_legacy_api',
+        '$BUILD_DIR/merizo/s/sharding_router_api',
+        '$BUILD_DIR/merizo/s/write_ops/cluster_write_op_conversion',
+        '$BUILD_DIR/merizo/transport/message_compressor',
+        '$BUILD_DIR/merizo/transport/transport_layer_common',
         'shared_cluster_commands',
     ]
 )
@@ -135,7 +135,7 @@ env.Library(
     ],
     LIBDEPS=[
         'cluster_commands',
-        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+        '$BUILD_DIR/merizo/s/catalog_cache_test_fixture',
     ]
 )
 
@@ -152,8 +152,8 @@ env.CppUnitTest(
     LIBDEPS=[
         'cluster_commands',
         'cluster_command_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/saslauth',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/auth/saslauth',
     ],
 )
 
@@ -163,7 +163,7 @@ env.CppUnitTest(
         'document_shard_key_update_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'cluster_commands',
     ]
 )

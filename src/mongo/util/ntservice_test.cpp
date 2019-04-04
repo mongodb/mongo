@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <cstdarg>
 #include <cstdlib>
@@ -35,12 +35,12 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/client.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/ntservice.h"
-#include "mongo/util/text.h"
+#include "merizo/db/client.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/ntservice.h"
+#include "merizo/util/text.h"
 
-using namespace mongo;
+using namespace merizo;
 
 static std::vector<std::string> svec(const char* first, ...) {
     std::vector<std::string> result;
@@ -61,7 +61,7 @@ TEST(NtService, ConstructServiceCommandLine) {
     ASSERT_TRUE(
         svec("--dbpath=C:\\Data\\",
              "-logpath",
-             "C:\\Program Files (x86)\\MongoDB\\Logs\\MongoDB.log",
+             "C:\\Program Files (x86)\\MerizoDB\\Logs\\MerizoDB.log",
              "--service",
              NULL) ==
         ntservice::constructServiceArgv(svec("-service",
@@ -77,16 +77,16 @@ TEST(NtService, ConstructServiceCommandLine) {
                                              "--serviceUser",
                                              "andy",
                                              "--serviceName",
-                                             "MongoDB",
+                                             "MerizoDB",
                                              "-servicePassword==a\\b\\",
                                              "-servicePassword",
                                              "=a\\b\\",
                                              "-serviceUser",
                                              "andy",
                                              "-serviceName",
-                                             "MongoDB",
+                                             "MerizoDB",
                                              "-logpath",
-                                             "C:\\Program Files (x86)\\MongoDB\\Logs\\MongoDB.log",
+                                             "C:\\Program Files (x86)\\MerizoDB\\Logs\\MerizoDB.log",
                                              NULL)));
 }
 
@@ -95,13 +95,13 @@ TEST(NtService, RegressionSERVER_7252) {
     // in ticket SERVER-7252.
 
     const wchar_t inputCommandLine[] =
-        L"mongod --install --serviceName=\"My Service\" --serviceDescription \"My Service\" "
-        L"--serviceDisplayName \"My Service\" --dbpath C:\\mongo\\data\\config --port 20001 "
-        L"--logpath C:\\mongo\\logs\\mongo_config.log.txt --configsvr";
+        L"merizod --install --serviceName=\"My Service\" --serviceDescription \"My Service\" "
+        L"--serviceDisplayName \"My Service\" --dbpath C:\\merizo\\data\\config --port 20001 "
+        L"--logpath C:\\merizo\\logs\\merizo_config.log.txt --configsvr";
 
     const char expectedServiceCommandLine[] =
-        "mongod --dbpath C:\\mongo\\data\\config --port 20001 "
-        "--logpath C:\\mongo\\logs\\mongo_config.log.txt --configsvr --service";
+        "merizod --dbpath C:\\merizo\\data\\config --port 20001 "
+        "--logpath C:\\merizo\\logs\\merizo_config.log.txt --configsvr --service";
 
     // Convert the input wide-character command line into a UTF-8 vector of std::string.
     int inputArgc;

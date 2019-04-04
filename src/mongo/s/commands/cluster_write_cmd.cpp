@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/write_commands/write_commands_common.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/commands/document_shard_key_update_util.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/multi_statement_transaction_requests_sender.h"
-#include "mongo/s/transaction_router.h"
-#include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/chunk_manager_targeter.h"
-#include "mongo/s/write_ops/cluster_write.h"
-#include "mongo/util/log.h"
-#include "mongo/util/timer.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/client/remote_command_targeter.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/write_commands/write_commands_common.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/stats/counters.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_last_error_info.h"
+#include "merizo/s/commands/cluster_explain.h"
+#include "merizo/s/commands/document_shard_key_update_util.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/multi_statement_transaction_requests_sender.h"
+#include "merizo/s/transaction_router.h"
+#include "merizo/s/would_change_owning_shard_exception.h"
+#include "merizo/s/write_ops/batched_command_request.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/s/write_ops/chunk_manager_targeter.h"
+#include "merizo/s/write_ops/cluster_write.h"
+#include "merizo/util/log.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 void batchErrorToLastError(const BatchedCommandRequest& request,
@@ -199,7 +199,7 @@ bool updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
 }
 
 /**
- * Base class for mongos write commands.
+ * Base class for merizos write commands.
  */
 class ClusterWriteCmd : public Command {
 public:
@@ -553,4 +553,4 @@ private:
 } clusterDeleteCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

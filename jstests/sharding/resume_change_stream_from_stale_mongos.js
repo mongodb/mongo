@@ -1,4 +1,4 @@
-// Tests that resuming a change stream that has become sharded via a mongos that believes the
+// Tests that resuming a change stream that has become sharded via a merizos that believes the
 // collection is still unsharded will end up targeting the change stream to all shards after getting
 // a stale shard version.
 // @tags: [uses_change_streams]
@@ -19,7 +19,7 @@
     // data.
     const st = new ShardingTest({
         shards: 2,
-        mongos: 2,
+        merizos: 2,
         rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
     });
 
@@ -72,8 +72,8 @@
     assert.writeOK(firstMongosColl.insert({_id: -3}));
     assert.writeOK(firstMongosColl.insert({_id: 3}));
 
-    // Now try to resume the change stream using a stale mongos which believes the collection is
-    // unsharded. The first mongos should use the shard versioning protocol to discover that the
+    // Now try to resume the change stream using a stale merizos which believes the collection is
+    // unsharded. The first merizos should use the shard versioning protocol to discover that the
     // collection is no longer unsharded, and re-target to all shards in the cluster.
     changeStream.close();
     const secondMongosColl = st.s1.getDB(jsTestName()).test;

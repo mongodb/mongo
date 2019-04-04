@@ -16,14 +16,14 @@
     const nDocsToInsert = 300;
     const worksPerYield = 50;
 
-    // Start a mongod that will yield every 50 work cycles.
-    const mongod = MongoRunner.runMongod({
+    // Start a merizod that will yield every 50 work cycles.
+    const merizod = MongoRunner.runMongod({
         setParameter: `internalQueryExecYieldIterations=${worksPerYield}`,
         profile: 2,
     });
-    assert.neq(null, mongod, 'mongod was unable to start up');
+    assert.neq(null, merizod, 'merizod was unable to start up');
 
-    const coll = mongod.getDB('test').yield_during_writes;
+    const coll = merizod.getDB('test').yield_during_writes;
     coll.drop();
 
     for (let i = 0; i < nDocsToInsert; i++) {
@@ -39,5 +39,5 @@
     assert.writeOK(coll.remove({}, {multi: true}));
     assert.gt(countOpYields(coll, 'remove'), (nDocsToInsert / worksPerYield) - 2);
 
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 })();

@@ -15,7 +15,7 @@ var $config = extendWorkload($config, function($config, $super) {
     // The indexedField must be limited such that the namespace and indexedField does not
     // exceed 128 characters. The namespace defaults to // "test<i>_fsmdb<j>.fsmcoll<k>",
     // where i, j & k are increasing integers for each test, workload and thread.
-    // See https://docs.mongodb.com/manual/reference/limits/#Index-Name-Length
+    // See https://docs.merizodb.com/manual/reference/limits/#Index-Name-Length
     var length = 90;
     var prefix = 'indexed_insert_long_fieldname_';
     $config.data.indexedField = prefix + new Array(length - prefix.length + 1).join('x');

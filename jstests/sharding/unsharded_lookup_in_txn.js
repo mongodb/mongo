@@ -8,7 +8,7 @@
 
     load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
-    const st = new ShardingTest({shards: 2, mongos: 1});
+    const st = new ShardingTest({shards: 2, merizos: 1});
     const kDBName = "unsharded_lookup_in_txn";
 
     let session = st.s.startSession();

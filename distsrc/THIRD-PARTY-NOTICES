@@ -1,15 +1,15 @@
-MongoDB uses third-party libraries or other resources that may
-be distributed under licenses different than the MongoDB software.
+MerizoDB uses third-party libraries or other resources that may
+be distributed under licenses different than the MerizoDB software.
 
 In the event that we accidentally failed to list a required notice,
 please bring it to our attention through any of the ways detailed here :
 
-           mongodb-dev@googlegroups.com
+           merizodb-dev@googlegroups.com
 
 The attached notices are provided for information only.
 
 For any licenses that require disclosure of source, sources are available at
-https://github.com/mongodb/mongo.
+https://github.com/merizodb/merizo.
 
 
 1) License Notice for Boost
@@ -387,7 +387,7 @@ src/support/hash_city.c       | Google, Inc.                        | The MIT Li
 src/support/hash_fnv.c        | Authors                             | Public Domain
 
 
-Other optional 3rd party software included in the WiredTiger distribution is removed by MongoDB.
+Other optional 3rd party software included in the WiredTiger distribution is removed by MerizoDB.
 
 
 BSD-3-CLAUSE LICENSE
@@ -478,7 +478,7 @@ THE SOFTWARE.
 | mfbt/lz4.h                                     |                  |               |
 |------------------------------------------------|------------------|---------------|
 
-Other optional 3rd party software included in the SpiderMonkey distribution is removed by MongoDB.
+Other optional 3rd party software included in the SpiderMonkey distribution is removed by MerizoDB.
 
 
 Apple, Inc: BSD-2-Clause
@@ -1179,7 +1179,7 @@ Database section 7.
 The MIT License (MIT)
 
 Copyright (c) 2015-2017 Derick Rethans
-Copyright (c) 2017 MongoDB, Inc
+Copyright (c) 2017 MerizoDB, Inc
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

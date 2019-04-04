@@ -6,7 +6,7 @@
      * perform any shard version checks.
      */
     var runTest = function(writeFunc) {
-        var st = new ShardingTest({shards: 2, mongos: 2});
+        var st = new ShardingTest({shards: 2, merizos: 2});
 
         var testDB = st.s.getDB('test');
         testDB.dropDatabase();
@@ -22,7 +22,7 @@
         var testDB2 = st.s1.getDB('test');
         testDB2.user.insert({x: 123456});
 
-        // Move chunk to bump version on a different mongos.
+        // Move chunk to bump version on a different merizos.
         assert.commandWorked(testDB.adminCommand(
             {moveChunk: 'test.user', find: {x: 0}, to: st.shard0.shardName, _waitForDelete: true}));
 

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/crypto/sha512_block.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/crypto/sha256_block.h"
+#include "merizo/crypto/sha512_block.h"
 
-#include "mongo/config.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/config.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
 
 #ifndef MONGO_CONFIG_SSL
 #error This file should only be included in SSL-enabled builds
@@ -82,7 +82,7 @@ void HMAC_CTX_free(HMAC_CTX* ctx) {
 }  // namespace
 #endif
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -165,4 +165,4 @@ void SHA512BlockTraits::computeHmac(const uint8_t* key,
     return computeHmacImpl<SHA512BlockTraits::HashType>(EVP_sha512(), key, keyLen, input, output);
 }
 
-}  // namespace mongo
+}  // namespace merizo

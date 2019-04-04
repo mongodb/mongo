@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/find_and_modify_common.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/commands/document_shard_key_update_util.h"
-#include "mongo/s/commands/strategy.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/multi_statement_transaction_requests_sender.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/s/transaction_router.h"
-#include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/s/write_ops/cluster_write.h"
-#include "mongo/util/timer.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/find_and_modify_common.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/commands/cluster_explain.h"
+#include "merizo/s/commands/document_shard_key_update_util.h"
+#include "merizo/s/commands/strategy.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/multi_statement_transaction_requests_sender.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/s/transaction_router.h"
+#include "merizo/s/would_change_owning_shard_exception.h"
+#include "merizo/s/write_ops/cluster_write.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
@@ -301,4 +301,4 @@ private:
 } findAndModifyCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

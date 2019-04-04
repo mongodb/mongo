@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include "mongo/base/initializer.h"
-#include "mongo/client/connection_string.h"
-#include "mongo/db/service_context.h"
-#include "mongo/transport/transport_layer_asio.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/signal_handlers_synchronous.h"
+#include "merizo/base/initializer.h"
+#include "merizo/client/connection_string.h"
+#include "merizo/db/service_context.h"
+#include "merizo/transport/transport_layer_asio.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/log.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_section.h"
+#include "merizo/util/options_parser/options_parser.h"
+#include "merizo/util/options_parser/startup_option_init.h"
+#include "merizo/util/options_parser/startup_options.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/signal_handlers_synchronous.h"
 
-using namespace mongo;
+using namespace merizo;
 
 namespace {
 
@@ -57,7 +57,7 @@ ConnectionString fixtureConnectionString{};
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 namespace unittest {
 
 ConnectionString getFixtureConnectionString() {
@@ -65,7 +65,7 @@ ConnectionString getFixtureConnectionString() {
 }
 
 }  // namespace unittest
-}  // namespace mongo
+}  // namespace merizo
 
 int main(int argc, char** argv, char** envp) {
     setupSynchronousSignalHandlers();
@@ -74,7 +74,7 @@ int main(int argc, char** argv, char** envp) {
     quickExit(unittest::Suite::run(std::vector<std::string>(), "", 1));
 }
 
-namespace moe = mongo::optionenvironment;
+namespace moe = merizo::optionenvironment;
 
 MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
     auto& env = moe::startupOptionsParsed;

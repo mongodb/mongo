@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,10 +31,10 @@
 
 #include "boost/optional.hpp"
 
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/rpc/metadata/impersonated_user_metadata_gen.h"
 
-namespace mongo {
+namespace merizo {
 namespace rpc {
 
 /*
@@ -45,7 +45,7 @@ namespace rpc {
  * into the community edition and appears in network messages as "$audit" for backwards
  * compatibility.
  *
- * This metadata should only appear in requests from mongos to mongod.
+ * This metadata should only appear in requests from merizos to merizod.
  */
 static constexpr auto kImpersonationMetadataSectionName = "$audit"_sd;
 
@@ -71,4 +71,4 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
 void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBuilder* out);
 
 }  // namespace rpc
-}  // namespace mongo
+}  // namespace merizo

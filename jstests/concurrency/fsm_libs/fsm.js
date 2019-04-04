@@ -35,8 +35,8 @@ var fsm = (function() {
                 return conn;
             };
 
-            connCache = {mongos: [], config: [], shards: {}};
-            connCache.mongos = args.cluster.mongos.map(makeNewConnWithExistingSession);
+            connCache = {merizos: [], config: [], shards: {}};
+            connCache.merizos = args.cluster.merizos.map(makeNewConnWithExistingSession);
             connCache.config = args.cluster.config.map(makeNewConnWithExistingSession);
 
             var shardNames = Object.keys(args.cluster.shards);
@@ -90,7 +90,7 @@ var fsm = (function() {
     // Make a deep copy of an object for retrying transactions. We make deep copies of object and
     // array literals but not custom types like DB and DBCollection because they could have been
     // modified before a transaction aborts. This function is adapted from the implementation of
-    // Object.extend() in src/mongo/shell/types.js.
+    // Object.extend() in src/merizo/shell/types.js.
     function deepCopyObject(dst, src) {
         for (var k in src) {
             var v = src[k];

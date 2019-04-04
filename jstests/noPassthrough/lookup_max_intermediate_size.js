@@ -93,7 +93,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
     // Run tests in a sharded environment.
     const sharded = new ShardingTest({
-        mongos: 1,
+        merizos: 1,
         shards: 2,
         rs: {
             nodes: 1,

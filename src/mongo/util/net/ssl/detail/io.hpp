@@ -18,8 +18,8 @@
 #include "asio/detail/config.hpp"
 
 #include "asio/write.hpp"
-#include "mongo/util/net/ssl/detail/engine.hpp"
-#include "mongo/util/net/ssl/detail/stream_core.hpp"
+#include "merizo/util/net/ssl/detail/engine.hpp"
+#include "merizo/util/net/ssl/detail/stream_core.hpp"
 
 #include "asio/detail/push_options.hpp"
 

@@ -16,7 +16,7 @@ load("jstests/free_mon/libs/free_mon.js");
     };
 
     const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up');
+    assert.neq(null, conn, 'merizod was unable to start up');
 
     assert.commandWorked(conn.adminCommand({setFreeMonitoring: 1, action: "disable"}));
 

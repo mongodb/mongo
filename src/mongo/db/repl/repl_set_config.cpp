@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/repl_set_config.h"
+#include "merizo/db/repl/repl_set_config.h"
 
 #include <algorithm>
 
-#include "mongo/bson/util/bson_check.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/mongod_options.h"
-#include "mongo/db/server_options.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/bson/util/bson_check.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/merizod_options.h"
+#include "merizo/db/server_options.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 const size_t ReplSetConfig::kMaxMembers;
@@ -395,7 +395,7 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
 
     // Parse replica set ID.
     OID replicaSetId;
-    status = mongo::bsonExtractOIDField(settings, kReplicaSetIdFieldName, &replicaSetId);
+    status = merizo::bsonExtractOIDField(settings, kReplicaSetIdFieldName, &replicaSetId);
     if (status.isOK()) {
         if (!replicaSetId.isSet()) {
             return Status(ErrorCodes::BadValue,
@@ -544,9 +544,9 @@ Status ReplSetConfig::validate() const {
         return Status(
             ErrorCodes::BadValue,
             str::stream()
-                << "Support for replication protocol version 0 was removed in MongoDB 4.0. "
-                << "Downgrade to MongoDB version 3.6 and upgrade your protocol "
-                   "version to 1 before upgrading your MongoDB version");
+                << "Support for replication protocol version 0 was removed in MerizoDB 4.0. "
+                << "Downgrade to MerizoDB version 3.6 and upgrade your protocol "
+                   "version to 1 before upgrading your MerizoDB version");
     }
     if (_protocolVersion != 1) {
         return Status(ErrorCodes::BadValue,
@@ -867,4 +867,4 @@ bool ReplSetConfig::containsArbiter() const {
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

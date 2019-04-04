@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongorestore
+package merizorestore
 
 import (
 	"compress/gzip"
@@ -16,17 +16,17 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/mongodb/mongo-tools/common"
-	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common"
+	"github.com/merizodb/merizo-tools/common/archive"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/util"
 )
 
 // FileType describes the various types of restore documents.
 type FileType uint
 
-// File types constants used by mongorestore.
+// File types constants used by merizorestore.
 const (
 	UnknownFileType FileType = iota
 	BSONFileType
@@ -554,7 +554,7 @@ func hasMetadataFiles(files []archive.DirLike) bool {
 }
 
 // handleBSONInsteadOfDirectory updates -d and -c settings based on
-// the path to the BSON file passed to mongorestore. This is only
+// the path to the BSON file passed to merizorestore. This is only
 // applicable if the target path points to a .bson file.
 //
 // As an example, when the user passes 'dump/mydb/col.bson', this method

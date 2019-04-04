@@ -28,7 +28,7 @@ executor:
   - class: PeriodicKillSecondaries
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       syncdelay: 5
       set_parameters:
         enableTestCommands: 1

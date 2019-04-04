@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,34 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <sstream>
 #include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/plan_cache_commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/plan_ranker.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/plan_cache_commands.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/plan_ranker.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
 
 namespace {
 
 using std::string;
 using std::unique_ptr;
-using namespace mongo;
+using namespace merizo;
 
 
 /**
@@ -89,7 +89,7 @@ static Status getPlanCache(OperationContext* opCtx,
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetupPlanCacheCommands, MONGO_NO_PREREQUISITES)
 (InitializerContext* context) {
     // PlanCacheCommand constructors refer to static ActionType instances.
-    // Registering commands in a mongo static initializer ensures that
+    // Registering commands in a merizo static initializer ensures that
     // the ActionType construction will be completed first.
     new PlanCacheListQueryShapes();
     new PlanCacheClear();
@@ -100,7 +100,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupPlanCacheCommands, MONGO_NO_PREREQUISI
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 using std::stringstream;
@@ -453,4 +453,4 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

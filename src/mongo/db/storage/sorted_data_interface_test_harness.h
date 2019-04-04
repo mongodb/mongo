@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,16 +32,16 @@
 #include <initializer_list>
 #include <memory>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/storage/test_harness_helper.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/unowned_ptr.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/operation_context_noop.h"
+#include "merizo/db/record_id.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/sorted_data_interface.h"
+#include "merizo/db/storage/test_harness_helper.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/unowned_ptr.h"
 
-namespace mongo {
+namespace merizo {
 
 const BSONObj key0 = BSON("" << 0);
 const BSONObj key1 = BSON("" << 1);
@@ -139,4 +139,4 @@ inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
 inline std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper() {
     return dynamic_ptr_cast<SortedDataInterfaceHarnessHelper>(newHarnessHelper());
 }
-}  // namespace mongo
+}  // namespace merizo

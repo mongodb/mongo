@@ -26,15 +26,15 @@
         }
     });
 
-    const mongos = st.s;
-    const config = mongos.getDB("config");
-    const mongosDB = mongos.getDB("agg_explain_readPref");
-    assert.commandWorked(mongosDB.dropDatabase());
+    const merizos = st.s;
+    const config = merizos.getDB("config");
+    const merizosDB = merizos.getDB("agg_explain_readPref");
+    assert.commandWorked(merizosDB.dropDatabase());
 
-    const coll = mongosDB.getCollection("coll");
+    const coll = merizosDB.getCollection("coll");
 
-    assert.commandWorked(config.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), "agg_explain_readPref-rs0");
+    assert.commandWorked(config.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), "agg_explain_readPref-rs0");
     const rs0Primary = st.rs0.getPrimary();
     const rs0Secondary = st.rs0.getSecondary();
     const rs1Primary = st.rs1.getPrimary();
@@ -45,7 +45,7 @@
     }
 
     //
-    // Confirms that aggregations with explain run against mongos are executed against a tagged
+    // Confirms that aggregations with explain run against merizos are executed against a tagged
     // secondary or primary, as per readPreference setting.
     //
     function confirmReadPreference(primary, secondary) {
@@ -67,7 +67,7 @@
                 // targets the correct node in the replica set given by 'target'.
                 //
                 let comment = name + "_explain_within_query";
-                assert.commandWorked(mongosDB.runCommand({
+                assert.commandWorked(merizosDB.runCommand({
                     query: {
                         aggregate: "coll",
                         pipeline: [],
@@ -79,7 +79,7 @@
                 }));
 
                 // Look for an operation without an exception, since the shard throws a stale config
-                // exception if the shard or mongos has stale routing metadata, and the operation
+                // exception if the shard or merizos has stale routing metadata, and the operation
                 // gets retried.
                 // Note, we look for *at least one* (not exactly one) matching entry: Mongos cancels
                 // requests to all shards on receiving a stale version error from any shard.
@@ -102,7 +102,7 @@
                 // $queryOptions targets the correct node in the replica set given by 'target'.
                 //
                 comment = name + "_explain_wrapped_agg";
-                assert.commandWorked(mongosDB.runCommand({
+                assert.commandWorked(merizosDB.runCommand({
                     $query: {
                         explain: {
                             aggregate: "coll",
@@ -115,7 +115,7 @@
                 }));
 
                 // Look for an operation without an exception, since the shard throws a stale config
-                // exception if the shard or mongos has stale routing metadata, and the operation
+                // exception if the shard or merizos has stale routing metadata, and the operation
                 // gets retried.
                 // Note, we look for *at least one* (not exactly one) matching entry: Mongos cancels
                 // requests to all shards on receiving a stale version error from any shard.
@@ -141,21 +141,21 @@
     //
     // Test aggregate explains run against an unsharded collection.
     //
-    confirmReadPreference(rs0Primary.getDB(mongosDB.getName()),
-                          rs0Secondary.getDB(mongosDB.getName()));
+    confirmReadPreference(rs0Primary.getDB(merizosDB.getName()),
+                          rs0Secondary.getDB(merizosDB.getName()));
 
     //
     // Test aggregate explains run against a sharded collection.
     //
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
-    assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
-    assert.commandWorked(mongosDB.adminCommand(
+    assert.commandWorked(merizos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
+    assert.commandWorked(merizosDB.adminCommand(
         {moveChunk: coll.getFullName(), find: {a: 25}, to: "agg_explain_readPref-rs1"}));
 
     // Sharded tests are run against the non-primary shard for the "agg_explain_readPref" db.
-    confirmReadPreference(rs1Primary.getDB(mongosDB.getName()),
-                          rs1Secondary.getDB(mongosDB.getName()));
+    confirmReadPreference(rs1Primary.getDB(merizosDB.getName()),
+                          rs1Secondary.getDB(merizosDB.getName()));
 
     st.stop();
 })();

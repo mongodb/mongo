@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,9 +34,9 @@
 #include <tuple>
 #include <vector>
 
-#include "mongo/base/string_data.h"
+#include "merizo/base/string_data.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObjBuilder;
 
@@ -168,18 +168,18 @@ protected:
 /**
  * Returns a pretty string describing the current shell version.
  */
-std::string mongoShellVersion(const VersionInfoInterface& provider);
+std::string merizoShellVersion(const VersionInfoInterface& provider);
 
 /**
- * Returns a pretty string describing the current mongos version.
+ * Returns a pretty string describing the current merizos version.
  */
-std::string mongosVersion(const VersionInfoInterface& provider);
+std::string merizosVersion(const VersionInfoInterface& provider);
 
 /**
- * Returns a pretty string describing the current mongod version.
+ * Returns a pretty string describing the current merizod version.
  */
-std::string mongodVersion(const VersionInfoInterface& provider);
+std::string merizodVersion(const VersionInfoInterface& provider);
 
-}  // namespace mongo
+}  // namespace merizo
 
 #endif  // UTIL_VERSION_HEADER

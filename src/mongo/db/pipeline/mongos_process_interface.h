@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/mongo_process_common.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/async_requests_sender.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/query/cluster_aggregation_planner.h"
-#include "mongo/s/query/owned_remote_cursor.h"
+#include "merizo/db/pipeline/merizo_process_common.h"
+#include "merizo/db/pipeline/pipeline.h"
+#include "merizo/s/async_requests_sender.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/query/cluster_aggregation_planner.h"
+#include "merizo/s/query/owned_remote_cursor.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
- * Class to provide access to mongos-specific implementations of methods required by some
+ * Class to provide access to merizos-specific implementations of methods required by some
  * document sources.
  */
 class MongoSInterface final : public MongoProcessCommon {
@@ -175,7 +175,7 @@ public:
 
     /**
      * The following methods only make sense for data-bearing nodes and should never be called on
-     * a mongos.
+     * a merizos.
      */
     BackupCursorState openBackupCursor(OperationContext* opCtx) final {
         MONGO_UNREACHABLE;
@@ -192,9 +192,9 @@ public:
     }
 
     /**
-     * Mongos does not have a plan cache, so this method should never be called on mongos. Upstream
+     * Mongos does not have a plan cache, so this method should never be called on merizos. Upstream
      * checks are responsible for generating an error if a user attempts to introspect the plan
-     * cache on mongos.
+     * cache on merizos.
      */
     std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
                                                         const NamespaceString&,
@@ -224,9 +224,9 @@ protected:
     void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
                                           CurrentOpUserMode userMode,
                                           std::vector<BSONObj>* ops) const final {
-        // This implementation is a no-op, since mongoS does not maintain a SessionCatalog or
+        // This implementation is a no-op, since merizoS does not maintain a SessionCatalog or
         // hold stashed locks for idle sessions.
     }
 };
 
-}  // namespace mongo
+}  // namespace merizo

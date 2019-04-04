@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/text.h"
+#include "merizo/util/text.h"
 
 #include <boost/integer_traits.hpp>
 #include <errno.h>
@@ -41,11 +41,11 @@
 #include <io.h>
 #endif
 
-#include "mongo/platform/basic.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/platform/basic.h"
+#include "merizo/util/allocator.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 // --- StringSplitter ----
 
@@ -173,7 +173,7 @@ std::string toUtf8String(const std::wstring& wide) {
         }
     }
 
-    msgasserted(16091, mongoutils::str::stream() << "can't wstring to utf8: " << ::GetLastError());
+    msgasserted(16091, merizoutils::str::stream() << "can't wstring to utf8: " << ::GetLastError());
     return "";
 }
 
@@ -277,7 +277,7 @@ WindowsCommandLine::WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envp
         utf8argLength.push_back(argLength);
         blockSize += argLength;
     }
-    _argv = static_cast<char**>(mongoMalloc(blockSize));
+    _argv = static_cast<char**>(merizoMalloc(blockSize));
     for (int i = 0; i < argc; ++i) {
         _argv[i] = reinterpret_cast<char*>(_argv) + blockPtr;
         strcpy_s(_argv[i], utf8argLength[i], utf8args[i].c_str());
@@ -300,7 +300,7 @@ WindowsCommandLine::WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envp
         utf8envLength.push_back(envLength);
         blockSize += envLength;
     }
-    _envp = static_cast<char**>(mongoMalloc(blockSize));
+    _envp = static_cast<char**>(merizoMalloc(blockSize));
     size_t i;
     for (i = 0; i < envCount; ++i) {
         _envp[i] = reinterpret_cast<char*>(_envp) + blockPtr;
@@ -362,4 +362,4 @@ std::string constructUtf8WindowsCommandLine(const std::vector<std::string>& argv
     }
     return commandLine.str();
 }
-}  // namespace mongo
+}  // namespace merizo

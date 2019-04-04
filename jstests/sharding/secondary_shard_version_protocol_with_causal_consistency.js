@@ -12,7 +12,7 @@
     // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
     let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};
     let st =
-        new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}, causallyConsistent: true});
+        new ShardingTest({merizos: 2, shards: {rs0: rsOpts, rs1: rsOpts}, causallyConsistent: true});
     let dbName = 'test', collName = 'foo', ns = 'test.foo';
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
@@ -24,10 +24,10 @@
     let freshMongos = st.s0;
     let staleMongos = st.s1;
 
-    jsTest.log("do insert from stale mongos to make it load the routing table before the move");
+    jsTest.log("do insert from stale merizos to make it load the routing table before the move");
     assert.writeOK(staleMongos.getCollection(ns).insert({x: 1}));
 
-    jsTest.log("do moveChunk from fresh mongos");
+    jsTest.log("do moveChunk from fresh merizos");
     assert.commandWorked(freshMongos.adminCommand({
         moveChunk: ns,
         find: {x: 0},
@@ -45,7 +45,7 @@
 
     // Note: this query will not be registered by the profiler because it errors before reaching the
     // storage level.
-    jsTest.log("Do a secondary read from stale mongos with afterClusterTime and level 'available'");
+    jsTest.log("Do a secondary read from stale merizos with afterClusterTime and level 'available'");
     const staleMongosDB = staleMongos.getDB(dbName);
     assert.commandFailedWithCode(staleMongosDB.runCommand({
         count: collName,
@@ -58,7 +58,7 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
-    jsTest.log("Do a secondary read from stale mongos with afterClusterTime and no level");
+    jsTest.log("Do a secondary read from stale merizos with afterClusterTime and no level");
     let res = staleMongosDB.runCommand({
         count: collName,
         query: {x: 1},
@@ -68,8 +68,8 @@
     assert(res.ok);
     assert.eq(1, res.n, tojson(res));
 
-    // The stale mongos will first go to the donor shard and receive a stale shard version,
-    // prompting the stale mongos to refresh it's routing table and retarget to the recipient shard.
+    // The stale merizos will first go to the donor shard and receive a stale shard version,
+    // prompting the stale merizos to refresh it's routing table and retarget to the recipient shard.
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: donorShardSecondary.getDB(dbName),
         filter: {

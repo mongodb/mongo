@@ -1,17 +1,17 @@
 /**
- * Tests for the mongoebench executable.
+ * Tests for the merizoebench executable.
  */
 (function() {
     "use strict";
 
-    load("jstests/libs/mongoebench.js");  // for runMongoeBench
+    load("jstests/libs/merizoebench.js");  // for runMongoeBench
 
     if (jsTest.options().storageEngine !== "mobile") {
         print("Skipping test because storage engine isn't mobile");
         return;
     }
 
-    const dbpath = MongoRunner.dataPath + "mongoebench_test";
+    const dbpath = MongoRunner.dataPath + "merizoebench_test";
     resetDbpath(dbpath);
 
     // Test that the operations in the "pre" section of the configuration are run exactly once.
@@ -19,12 +19,12 @@
         {
           pre: [{
               op: "insert",
-              ns: "test.mongoebench_test",
+              ns: "test.merizoebench_test",
               doc: {pre: {"#SEQ_INT": {seq_id: 0, start: 0, step: 1, unique: true}}}
           }],
           ops: [{
               op: "update",
-              ns: "test.mongoebench_test",
+              ns: "test.merizoebench_test",
               update: {$inc: {ops: 1}},
               multi: true,
           }]
@@ -41,10 +41,10 @@
            () => "stats file doesn't report ops per second: " + tojson(stats));
 
     const conn = MongoRunner.runMongod({dbpath, noCleanData: true});
-    assert.neq(null, conn, "failed to start mongod after running mongoebench");
+    assert.neq(null, conn, "failed to start merizod after running merizoebench");
 
     const db = conn.getDB("test");
-    const count = db.mongoebench_test.find().itcount();
+    const count = db.merizoebench_test.find().itcount();
     assert.eq(1, count, "ops in 'pre' section ran more than once or didn't run at all");
 
     MongoRunner.stopMongod(conn);

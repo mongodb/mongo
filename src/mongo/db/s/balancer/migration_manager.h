@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,20 +33,20 @@
 #include <map>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/s/balancer/type_migration.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/notification.h"
-#include "mongo/util/concurrency/with_lock.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/s/balancer/balancer_policy.h"
+#include "merizo/db/s/balancer/type_migration.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/s/catalog/dist_lock_manager.h"
+#include "merizo/s/request_types/migration_secondary_throttle_options.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/concurrency/notification.h"
+#include "merizo/util/concurrency/with_lock.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 class ScopedMigrationRequest;
@@ -273,4 +273,4 @@ private:
     CollectionMigrationsStateMap _activeMigrations;
 };
 
-}  // namespace mongo
+}  // namespace merizo

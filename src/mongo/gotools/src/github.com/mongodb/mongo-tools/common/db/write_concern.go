@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -7,10 +7,10 @@
 package db
 
 import (
-	"github.com/mongodb/mongo-tools/common/connstring"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/connstring"
+	"github.com/merizodb/merizo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2"
 
 	"fmt"
@@ -35,7 +35,7 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 		// If the user passes a w value of 0, we set the session to use the
 		// unacknowledged write concern but only if journal commit acknowledgment,
 		// is not required. If commit acknowledgment is required, it prevails,
-		// and the server will require that mongod acknowledge the write operation
+		// and the server will require that merizod acknowledge the write operation
 		if sessionSafety.WMode == "" && sessionSafety.W == 0 && !sessionSafety.J {
 			sessionSafety = nil
 		}
@@ -155,7 +155,7 @@ func BuildWriteConcern(writeConcern string, nodeType NodeType, cs *connstring.Co
 		return nil, nil
 	}
 
-	// for standalone mongods, set the default write concern to 1
+	// for standalone merizods, set the default write concern to 1
 	if nodeType == Standalone {
 		log.Logvf(log.DebugLow, "standalone server: setting write concern %v to 1", w)
 		sessionSafety.W = 1

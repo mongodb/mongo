@@ -20,7 +20,7 @@
     "use strict";
 
     load('jstests/libs/profiler.js');
-    load('jstests/sharding/libs/last_stable_mongos_commands.js');
+    load('jstests/sharding/libs/last_stable_merizos_commands.js');
 
     let db = "test";
     let coll = "foo";
@@ -71,8 +71,8 @@
         addShard: {skip: "primary only"},
         addShardToZone: {skip: "primary only"},
         aggregate: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {aggregate: coll, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}},
             checkResults: function(res) {
@@ -107,8 +107,8 @@
         connectionStatus: {skip: "does not return user data"},
         convertToCapped: {skip: "primary only"},
         count: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {count: coll, query: {x: 1}},
             checkResults: function(res) {
@@ -128,9 +128,9 @@
         dbStats: {skip: "does not return user data"},
         delete: {skip: "primary only"},
         distinct: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {distinct: coll, key: "x"},
             checkResults: function(res) {
@@ -156,8 +156,8 @@
         features: {skip: "does not return user data"},
         filemd5: {skip: "does not return user data"},
         find: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {find: coll, filter: {x: 1}},
             checkResults: function(res) {
@@ -171,7 +171,7 @@
         forceerror: {skip: "does not return user data"},
         fsync: {skip: "does not return user data"},
         fsyncUnlock: {skip: "does not return user data"},
-        geoSearch: {skip: "not supported in mongos"},
+        geoSearch: {skip: "not supported in merizos"},
         getCmdLineOpts: {skip: "does not return user data"},
         getDiagnosticData: {skip: "does not return user data"},
         getLastError: {skip: "primary only"},
@@ -207,9 +207,9 @@
         logout: {skip: "does not return user data"},
         makeSnapshot: {skip: "does not return user data"},
         mapReduce: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            setUp: function(merizosConn) {
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
+                assert.writeOK(merizosConn.getCollection(nss).insert({x: 1}));
             },
             command: {
                 mapReduce: coll,
@@ -448,7 +448,7 @@
         dropRecreateAsUnshardedOnDifferentShard: function(
             staleMongos, freshMongos, test, commandProfile) {
             // There is no way to drop and recreate the collection as unsharded on a *different*
-            // shard without calling movePrimary, and it is known that a stale mongos will not
+            // shard without calling movePrimary, and it is known that a stale merizos will not
             // refresh its notion of the primary shard after it loads it once.
         },
         dropRecreateAsShardedOnDifferentShard: function(
@@ -533,7 +533,7 @@
 
     // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
     let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};
-    let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
+    let st = new ShardingTest({merizos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
 
     let freshMongos = st.s0;
     let staleMongos = st.s1;
@@ -577,9 +577,9 @@
             st.rs0.awaitReplication();
             st.rs1.awaitReplication();
 
-            // Do dummy read from the stale mongos so it loads the routing table into memory once.
+            // Do dummy read from the stale merizos so it loads the routing table into memory once.
             // Additionally, do a secondary read to ensure that the secondary has loaded the initial
-            // routing table -- the first read to the primary will refresh the mongos' shardVersion,
+            // routing table -- the first read to the primary will refresh the merizos' shardVersion,
             // which will then be used against the secondary to ensure the secondary is fresh.
             assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
             assert.commandWorked(freshMongos.getDB(db).runCommand({

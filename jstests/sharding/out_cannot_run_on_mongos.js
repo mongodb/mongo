@@ -1,4 +1,4 @@
-// Tests that special stages which must run on mongos cannot be run in combination with an $out
+// Tests that special stages which must run on merizos cannot be run in combination with an $out
 // stage.
 (function() {
     "use strict";
@@ -11,7 +11,7 @@
     // failing when the db is empty.
     assert.commandWorked(db.runCommand({create: "coll"}));
 
-    // These should fail because the initial stages require mongos execution and $out requires
+    // These should fail because the initial stages require merizos execution and $out requires
     // shard execution.
     assert.commandFailedWithCode(
         db.runCommand(

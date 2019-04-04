@@ -1,5 +1,5 @@
 /**
- * Tests that MongoDB gives errors when certain data files are missing.
+ * Tests that MerizoDB gives errors when certain data files are missing.
  *
  * @tags: [requires_wiredtiger]
  */
@@ -17,10 +17,10 @@
      */
 
     assertErrorOnStartupWhenFilesAreCorruptOrMissing(
-        dbpath, baseName, collName, (mongod, testColl) => {
+        dbpath, baseName, collName, (merizod, testColl) => {
             const testCollUri = getUriForColl(testColl);
             const testCollFile = dbpath + testCollUri + ".wt";
-            MongoRunner.stopMongod(mongod);
+            MongoRunner.stopMongod(merizod);
             jsTestLog("deleting collection file: " + testCollFile);
             removeFile(testCollFile);
         }, "Fatal Assertion 50882");
@@ -30,8 +30,8 @@
      */
 
     assertErrorOnStartupWhenFilesAreCorruptOrMissing(
-        dbpath, baseName, collName, (mongod, testColl) => {
-            MongoRunner.stopMongod(mongod);
+        dbpath, baseName, collName, (merizod, testColl) => {
+            MongoRunner.stopMongod(merizod);
             let mdbCatalogFile = dbpath + "_mdb_catalog.wt";
             jsTestLog("deleting catalog file: " + mdbCatalogFile);
             removeFile(mdbCatalogFile);
@@ -42,8 +42,8 @@
      */
 
     assertErrorOnStartupWhenFilesAreCorruptOrMissing(
-        dbpath, baseName, collName, (mongod, testColl) => {
-            MongoRunner.stopMongod(mongod);
+        dbpath, baseName, collName, (merizod, testColl) => {
+            MongoRunner.stopMongod(merizod);
             let WiredTigerWTFile = dbpath + "WiredTiger.wt";
             jsTestLog("deleting WiredTiger.wt");
             removeFile(WiredTigerWTFile);
@@ -57,11 +57,11 @@
         dbpath,
         baseName,
         collName,
-        (mongod, testColl) => {
+        (merizod, testColl) => {
             const indexName = "a_1";
             assert.commandWorked(testColl.createIndex({a: 1}, {name: indexName}));
             const indexUri = getUriForIndex(testColl, indexName);
-            MongoRunner.stopMongod(mongod);
+            MongoRunner.stopMongod(merizod);
             const indexFile = dbpath + indexUri + ".wt";
             jsTestLog("deleting index file: " + indexFile);
             removeFile(indexFile);

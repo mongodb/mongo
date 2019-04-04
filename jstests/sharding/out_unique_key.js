@@ -7,10 +7,10 @@
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
 
-    const mongosDB = st.s0.getDB("out_unique_key");
-    const firstColl = mongosDB.first;
-    const secondColl = mongosDB.second;
-    const sourceCollection = mongosDB.source;
+    const merizosDB = st.s0.getDB("out_unique_key");
+    const firstColl = merizosDB.first;
+    const secondColl = merizosDB.second;
+    const sourceCollection = merizosDB.source;
     assert.commandWorked(sourceCollection.insert([{a: 1, b: 1, c: 1, d: 1}, {a: 2, b: 2, c: 2}]));
 
     // Test that the unique key will be defaulted to the document key for a sharded collection.
@@ -18,7 +18,7 @@
                  {a: 1, b: 1, c: 1},
                  {a: 1, b: 1, c: 1},
                  {a: 1, b: MinKey, c: MinKey},
-                 mongosDB.getName());
+                 merizosDB.getName());
 
     // Write a document to each chunk.
     assert.commandWorked(firstColl.insert({_id: 1, a: -3, b: -5, c: -6}));
@@ -43,7 +43,7 @@
 
     // Test it with a different collection and shard key pattern.
     st.shardColl(
-        secondColl.getName(), {a: 1, b: 1}, {a: 1, b: 1}, {a: 1, b: MinKey}, mongosDB.getName());
+        secondColl.getName(), {a: 1, b: 1}, {a: 1, b: 1}, {a: 1, b: MinKey}, merizosDB.getName());
 
     // Write a document to each chunk.
     assert.commandWorked(secondColl.insert({_id: 3, a: -1, b: -3, c: 5}));
@@ -64,7 +64,7 @@
     }
 
     // Test that the uniqueKey is defaulted to _id for a collection which does not exist.
-    const doesNotExist = mongosDB.doesNotExist;
+    const doesNotExist = merizosDB.doesNotExist;
     doesNotExist.drop();
     withEachMode((mode) => {
         explainResult = sourceCollection.explain().aggregate(
@@ -73,7 +73,7 @@
     });
 
     // Test that the uniqueKey is defaulted to _id for an unsharded collection.
-    const unsharded = mongosDB.unsharded;
+    const unsharded = merizosDB.unsharded;
     unsharded.drop();
     assert.commandWorked(unsharded.insert({x: 1}));
     withEachMode((mode) => {

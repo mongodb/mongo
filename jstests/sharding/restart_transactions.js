@@ -148,9 +148,9 @@
                                      50911);
     }
 
-    const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+    const st = new ShardingTest({shards: 1, merizos: 1, config: 1});
 
-    // Directly connect to the shard primary to simulate internal retries by mongos.
+    // Directly connect to the shard primary to simulate internal retries by merizos.
     const shardDBName = "test";
     const shardSession = st.rs0.getPrimary().startSession({causalConsistency: false});
     const shardDB = shardSession.getDatabase(shardDBName);
@@ -160,7 +160,7 @@
     // TODO SERVER-36632: Consider allowing commands in a transaction to run against the config or
     // admin databases, excluding special collections.
     //
-    // Directly connect to the config sever primary to simulate internal retries by mongos.
+    // Directly connect to the config sever primary to simulate internal retries by merizos.
     // const configDBName = "config";
     // const configSession = st.configRS.getPrimary().startSession({causalConsistency: false});
     // const configDB = configSession.getDatabase(configDBName);

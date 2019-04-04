@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/replica_set_monitor.h"
+#include "merizo/client/replica_set_monitor.h"
 
 #include <algorithm>
 #include <limits>
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/global_conn_pool.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/client/replica_set_monitor_internal.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/server_options.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/util/background.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/timer.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/client/connpool.h"
+#include "merizo/client/global_conn_pool.h"
+#include "merizo/client/read_preference.h"
+#include "merizo/client/replica_set_monitor_internal.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/bson_extract_optime.h"
+#include "merizo/db/server_options.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/util/background.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/string_map.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::shared_ptr;
 using std::numeric_limits;

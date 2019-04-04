@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,41 +27,41 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/process_interface_standalone.h"
+#include "merizo/db/pipeline/process_interface_standalone.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/pipeline/pipeline_d.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/session_catalog.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/stats/fill_locker_info.h"
-#include "mongo/db/stats/storage_stats.h"
-#include "mongo/db/storage/backup_cursor_hooks.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/util/log.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/catalog/index_catalog_entry.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/cursor_manager.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/pipeline/document_source_cursor.h"
+#include "merizo/db/pipeline/lite_parsed_pipeline.h"
+#include "merizo/db/pipeline/pipeline_d.h"
+#include "merizo/db/repl/speculative_majority_read_info.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/session_catalog.h"
+#include "merizo/db/session_catalog_merizod.h"
+#include "merizo/db/stats/fill_locker_info.h"
+#include "merizo/db/stats/storage_stats.h"
+#include "merizo/db/storage/backup_cursor_hooks.h"
+#include "merizo/db/transaction_history_iterator.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/query/document_source_merge_cursors.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 using std::shared_ptr;
@@ -426,11 +426,11 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     const Document& documentKey,
     boost::optional<BSONObj> readConcern,
     bool allowSpeculativeMajorityRead) {
-    invariant(!readConcern);  // We don't currently support a read concern on mongod - it's only
-                              // expected to be necessary on mongos.
+    invariant(!readConcern);  // We don't currently support a read concern on merizod - it's only
+                              // expected to be necessary on merizos.
     invariant(!allowSpeculativeMajorityRead);  // We don't expect 'allowSpeculativeMajorityRead' on
-                                               // mongod - it's only expected to be necessary on
-                                               // mongos.
+                                               // merizod - it's only expected to be necessary on
+                                               // merizos.
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {
@@ -632,4 +632,4 @@ std::unique_ptr<ResourceYielder> MongoInterfaceStandalone::getResourceYielder() 
     return std::make_unique<MongoDResourceYielder>();
 }
 
-}  // namespace mongo
+}  // namespace merizo

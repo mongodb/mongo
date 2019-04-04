@@ -1,5 +1,5 @@
 /**
- * Tests whether various MongoDB commands automatically upgrade the index version of existing
+ * Tests whether various MerizoDB commands automatically upgrade the index version of existing
  * indexes when they are rebuilt on a collection.
  */
 (function() {
@@ -8,7 +8,7 @@
     load("jstests/libs/get_index_helpers.js");
 
     var conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
 
     var testDB = conn.getDB("test");
     assert.commandWorked(testDB.runCommand({create: "index_version_autoupgrade"}));
@@ -125,7 +125,7 @@
     // Test that the "cloneCollection" command doesn't upgrade existing indexes to the latest
     // version.
     var cloneConn = MongoRunner.runMongod({});
-    assert.neq(null, cloneConn, "mongod was unable to start up");
+    assert.neq(null, cloneConn, "merizod was unable to start up");
     testIndexVersionAutoUpgrades(function(coll) {
         var cloneDB = cloneConn.getDB(coll.getDB().getName());
         assert.commandWorked(cloneDB.runCommand({

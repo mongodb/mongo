@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,42 +27,42 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/transport/transport_layer_asio.h"
+#include "merizo/transport/transport_layer_asio.h"
 
 #include <asio.hpp>
 #include <asio/system_timer.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include "mongo/config.h"
+#include "merizo/config.h"
 
-#include "mongo/base/system_error.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/transport/asio_utils.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/sockaddr.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
+#include "merizo/base/system_error.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/transport/asio_utils.h"
+#include "merizo/transport/service_entry_point.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/net/sockaddr.h"
+#include "merizo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_options.h"
 
 #ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl.hpp"
+#include "merizo/util/net/ssl.hpp"
 #endif
 
 // session_asio.h has some header dependencies that require it to be the last header.
 
 #ifdef __linux__
-#include "mongo/transport/baton_asio_linux.h"
+#include "merizo/transport/baton_asio_linux.h"
 #endif
 
-#include "mongo/transport/session_asio.h"
+#include "merizo/transport/session_asio.h"
 
-namespace mongo {
+namespace merizo {
 namespace transport {
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
@@ -343,7 +343,7 @@ public:
 private:
     boost::optional<EndpointVector> _checkForUnixSocket(const HostAndPort& peer) {
 #ifndef _WIN32
-        if (mongoutils::str::contains(peer.host(), '/')) {
+        if (merizoutils::str::contains(peer.host(), '/')) {
             asio::local::stream_protocol::endpoint ep(peer.host());
             return EndpointVector{WrappedEndpoint(ep)};
         }
@@ -889,4 +889,4 @@ BatonHandle TransportLayerASIO::makeBaton(OperationContext* opCtx) const {
 #endif
 
 }  // namespace transport
-}  // namespace mongo
+}  // namespace merizo

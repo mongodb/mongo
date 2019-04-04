@@ -1,4 +1,4 @@
-// Tests mongos behavior on stale database version errors received in a transaction.
+// Tests merizos behavior on stale database version errors received in a transaction.
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
 (function() {
@@ -9,7 +9,7 @@
     const dbName = "test";
     const collName = "foo";
 
-    const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+    const st = new ShardingTest({shards: 2, merizos: 1, config: 1});
 
     enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
@@ -108,7 +108,7 @@
     assert.commandWorked(sessionOtherDB.runCommand({find: otherCollName}));
 
     // Target the first database which is on Shard0. The shard is stale and won't refresh its
-    // metadata, so mongos should exhaust its retries and implicitly abort the transaction.
+    // metadata, so merizos should exhaust its retries and implicitly abort the transaction.
     res = assert.commandFailedWithCode(
         sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}),
         ErrorCodes.StaleDbVersion);

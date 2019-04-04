@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <benchmark/benchmark.h>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/inline_decls.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/platform/random.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/init.h"
+#include "merizo/bson/inline_decls.h"
+#include "merizo/db/s/collection_metadata.h"
+#include "merizo/platform/random.h"
+#include "merizo/s/chunk_manager.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 ChunkRange getRangeForChunk(int i, int nChunks) {
@@ -354,4 +354,4 @@ MONGO_INITIALIZER(RegisterBenchmarks)(InitializerContext* context) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

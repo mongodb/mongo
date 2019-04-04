@@ -46,7 +46,7 @@ executor:
     n: 20
   fixture:
     class: ReplicaSetFixture
-    mongod_options:
+    merizod_options:
       bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1

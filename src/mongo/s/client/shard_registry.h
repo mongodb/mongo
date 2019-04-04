@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,15 +34,15 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/with_lock.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/stdx/condition_variable.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/concurrency/with_lock.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObjBuilder;
 struct HostAndPort;
@@ -75,7 +75,7 @@ public:
     std::shared_ptr<Shard> findByShardId(const ShardId&) const;
 
     /**
-     * Finds the Shard that the mongod listening at this HostAndPort is a member of.
+     * Finds the Shard that the merizod listening at this HostAndPort is a member of.
      */
     std::shared_ptr<Shard> findByHostAndPort(const HostAndPort&) const;
 
@@ -206,7 +206,7 @@ public:
     std::shared_ptr<Shard> getShardNoReload(const ShardId& shardId);
 
     /**
-     * Finds the Shard that the mongod listening at this HostAndPort is a member of. Will not
+     * Finds the Shard that the merizod listening at this HostAndPort is a member of. Will not
      * refresh the shard registry or otherwise perform any network traffic.
      */
     std::shared_ptr<Shard> getShardForHostNoReload(const HostAndPort& shardHost);
@@ -259,7 +259,7 @@ public:
     void shutdown();
 
     /**
-     * For use in mongos and mongod which needs notifications about changes to shard and config
+     * For use in merizos and merizod which needs notifications about changes to shard and config
      * server replset membership to update the ShardRegistry.
      *
      * This is expected to be run in an existing thread.
@@ -268,7 +268,7 @@ public:
                                                         const std::string& newConnectionString);
 
     /**
-     * For use in mongos which needs notifications about changes to shard replset membership to
+     * For use in merizos which needs notifications about changes to shard replset membership to
      * update the config.shards collection.
      *
      * This is expected to be run in a brand new thread.
@@ -310,4 +310,4 @@ private:
     bool _isShutdown{false};
 };
 
-}  // namespace mongo
+}  // namespace merizo

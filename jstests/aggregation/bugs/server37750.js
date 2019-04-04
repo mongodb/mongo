@@ -18,20 +18,20 @@
         rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}}
     });
 
-    const mongosDB = st.s.getDB(jsTestName());
-    const mongosColl = mongosDB.test;
+    const merizosDB = st.s.getDB(jsTestName());
+    const merizosColl = merizosDB.test;
 
     // Shard the test collection, split it at {_id: 0}, and move the upper chunk to shard1.
-    st.shardColl(mongosColl, {_id: 1}, {_id: 0}, {_id: 0});
+    st.shardColl(merizosColl, {_id: 1}, {_id: 0}, {_id: 0});
 
     // Insert enough documents on each shard to induce the $sample random-cursor optimization.
     for (let i = (-150); i < 150; ++i) {
-        assert.commandWorked(mongosColl.insert({_id: i}));
+        assert.commandWorked(merizosColl.insert({_id: i}));
     }
 
     // Run the initial aggregate for the $sample stage.
-    const cmdRes = assert.commandWorked(mongosDB.runCommand({
-        aggregate: mongosColl.getName(),
+    const cmdRes = assert.commandWorked(merizosDB.runCommand({
+        aggregate: merizosColl.getName(),
         pipeline: [{$sample: {size: 3}}],
         comment: "$sample random",
         cursor: {batchSize: 0}
@@ -40,11 +40,11 @@
 
     // Force each shard to hang on yield to allow for currentOp capture.
     FixtureHelpers.runCommandOnEachPrimary({
-        db: mongosDB.getSiblingDB("admin"),
+        db: merizosDB.getSiblingDB("admin"),
         cmdObj: {
             configureFailPoint: "setYieldAllLocksHang",
             mode: "alwaysOn",
-            data: {namespace: mongosColl.getFullName()}
+            data: {namespace: merizosColl.getFullName()}
         }
     });
 
@@ -68,10 +68,10 @@
             db: db.getSiblingDB("admin"),
             cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "off"}
         });
-    }, mongosDB.getMongo().port);
+    }, merizosDB.getMongo().port);
 
     // Retrieve the results for the $sample aggregation.
-    const sampleCursor = new DBCommandCursor(mongosDB, cmdRes);
+    const sampleCursor = new DBCommandCursor(merizosDB, cmdRes);
     assert.eq(sampleCursor.toArray().length, 3);
 
     // Confirm that the parallel shell completes successfully, and tear down the cluster.

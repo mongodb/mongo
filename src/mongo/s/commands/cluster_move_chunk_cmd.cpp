@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/config_server_client.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/util/log.h"
-#include "mongo/util/timer.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/write_concern_options.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/config_server_client.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/request_types/migration_secondary_throttle_options.h"
+#include "merizo/util/log.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class MoveChunkCmd : public ErrmsgCommandDeprecated {
@@ -204,4 +204,4 @@ public:
 } moveChunk;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,13 +31,13 @@
 
 #include <vector>
 
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/rewrite_expr.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/matcher/expression_tree.h"
+#include "merizo/db/matcher/rewrite_expr.h"
+#include "merizo/db/pipeline/expression.h"
+#include "merizo/db/pipeline/expression_context.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * MatchExpression for the top-level $expr keyword. Take an expression as an argument, evaluates and
@@ -101,4 +101,4 @@ private:
     boost::optional<RewriteExpr::RewriteResult> _rewriteResult;
 };
 
-}  // namespace mongo
+}  // namespace merizo

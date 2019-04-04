@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/sessions_collection_sharded.h"
+#include "merizo/db/sessions_collection_sharded.h"
 
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/sessions_collection_rs.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_find.h"
-#include "mongo/s/write_ops/batch_write_exec.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/cluster_write.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/db/sessions_collection_rs.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/op_msg.h"
+#include "merizo/rpc/op_msg_rpc_impls.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/query/cluster_find.h"
+#include "merizo/s/write_ops/batch_write_exec.h"
+#include "merizo/s/write_ops/batched_command_request.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/s/write_ops/cluster_write.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -171,4 +171,4 @@ Status SessionsCollectionSharded::removeTransactionRecords(OperationContext* opC
     return SessionsCollectionRS::removeTransactionRecordsHelper(opCtx, sessions);
 }
 
-}  // namespace mongo
+}  // namespace merizo

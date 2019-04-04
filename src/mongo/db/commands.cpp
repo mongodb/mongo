@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/commands.h"
+#include "merizo/db/commands.h"
 
 #include <string>
 #include <vector>
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/client.h"
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/rpc/protocol.h"
-#include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/invariant.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/db/audit.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/client.h"
+#include "merizo/db/command_generic_argument.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/rpc/factory.h"
+#include "merizo/rpc/metadata/client_metadata_ismaster.h"
+#include "merizo/rpc/op_msg_rpc_impls.h"
+#include "merizo/rpc/protocol.h"
+#include "merizo/rpc/write_concern_error_detail.h"
+#include "merizo/s/stale_exception.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/invariant.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 using logger::LogComponent;
 
@@ -73,7 +73,7 @@ const char kWriteConcernField[] = "writeConcern";
 const WriteConcernOptions kMajorityWriteConcern(
     WriteConcernOptions::kMajority,
     // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
-    // supported by the mongod.
+    // supported by the merizod.
     WriteConcernOptions::SyncMode::UNSET,
     WriteConcernOptions::kWriteConcernTimeoutUserCommand);
 
@@ -220,7 +220,7 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
-            first.canonicalType() == canonicalizeBSONType(mongo::String));
+            first.canonicalType() == canonicalizeBSONType(merizo::String));
     const NamespaceString nss(first.valueStringData());
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
@@ -231,9 +231,9 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
 NamespaceString CommandHelpers::parseNsCollectionRequired(StringData dbname,
                                                           const BSONObj& cmdObj) {
     // Accepts both BSON String and Symbol for collection name per SERVER-16260
-    // TODO(kangas) remove Symbol support in MongoDB 3.0 after Ruby driver audit
+    // TODO(kangas) remove Symbol support in MerizoDB 3.0 after Ruby driver audit
     BSONElement first = cmdObj.firstElement();
-    const bool isUUID = (first.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
+    const bool isUUID = (first.canonicalType() == canonicalizeBSONType(merizo::BinData) &&
                          first.binDataType() == BinDataType::newUUID);
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Collection name must be provided. UUID is not valid in this "
@@ -241,7 +241,7 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(StringData dbname,
             !isUUID);
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
-            first.canonicalType() == canonicalizeBSONType(mongo::String));
+            first.canonicalType() == canonicalizeBSONType(merizo::String));
     const NamespaceString nss(dbname, first.valueStringData());
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
@@ -265,7 +265,7 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(StringData dbname, const BSO
 
 std::string CommandHelpers::parseNsFromCommand(StringData dbname, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
-    if (first.type() != mongo::String)
+    if (first.type() != merizo::String)
         return dbname.toString();
     return str::stream() << dbname << '.' << cmdObj.firstElement().valueStringData();
 }
@@ -437,7 +437,7 @@ Status CommandHelpers::canUseTransactions(StringData dbName, StringData cmdName)
     if (cmdName == "count"_sd) {
         return {ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot run 'count' in a multi-document transaction. Please see "
-                "http://dochub.mongodb.org/core/transaction-count for a recommended alternative."};
+                "http://dochub.merizodb.org/core/transaction-count for a recommended alternative."};
     }
 
     if (txnCmdWhitelist.find(cmdName) == txnCmdWhitelist.cend()) {
@@ -730,4 +730,4 @@ CommandRegistry* globalCommandRegistry() {
     return reg;
 }
 
-}  // namespace mongo
+}  // namespace merizo

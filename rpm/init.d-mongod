@@ -1,28 +1,28 @@
 #!/bin/bash
 
-# mongod - Startup script for mongod
+# merizod - Startup script for merizod
 
 # chkconfig: 35 85 15
 # description: Mongo is a scalable, document-oriented database.
-# processname: mongod
-# config: /etc/mongod.conf
+# processname: merizod
+# config: /etc/merizod.conf
 
 . /etc/rc.d/init.d/functions
 
 # NOTE: if you change any OPTIONS here, you get what you pay for:
 # this script assumes all options are in the config file.
-CONFIGFILE="/etc/mongod.conf"
+CONFIGFILE="/etc/merizod.conf"
 OPTIONS=" -f $CONFIGFILE"
 
-mongod=${MONGOD-/usr/bin/mongod}
+merizod=${MONGOD-/usr/bin/merizod}
 
-MONGO_USER=mongod
-MONGO_GROUP=mongod
+MONGO_USER=merizod
+MONGO_GROUP=merizod
 
 # All variables set before this point can be overridden by users, by
 # setting them directly in the SYSCONFIG file. Use this to explicitly
 # override these values, at your own risk.
-SYSCONFIG="/etc/sysconfig/mongod"
+SYSCONFIG="/etc/sysconfig/merizod"
 if [ -f "$SYSCONFIG" ]; then
     . "$SYSCONFIG"
 fi
@@ -37,7 +37,7 @@ else
     NUMACTL=""
 fi
 
-# things from mongod.conf get there by mongod reading it
+# things from merizod.conf get there by merizod reading it
 PIDFILEPATH="`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(processManagement\.)?pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' \"$CONFIGFILE\" | tr -d \"[:blank:]\\"'\" | awk -F'#' '{print $1}'`"
 PIDDIR=`dirname $PIDFILEPATH`
 
@@ -50,13 +50,13 @@ start()
 
   # Make sure the pidfile does not exist
   if [ -f "$PIDFILEPATH" ]; then
-      echo "Error starting mongod. $PIDFILEPATH exists."
+      echo "Error starting merizod. $PIDFILEPATH exists."
       RETVAL=1
       return
   fi
 
-  # Recommended ulimit values for mongod or mongos
-  # See http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
+  # Recommended ulimit values for merizod or merizos
+  # See http://docs.merizodb.org/manual/reference/ulimit/#recommended-settings
   #
   ulimit -f unlimited
   ulimit -t unlimited
@@ -66,20 +66,20 @@ start()
   ulimit -u 64000
   ulimit -l unlimited
 
-  echo -n $"Starting mongod: "
-  daemon --user "$MONGO_USER" --check $mongod "$NUMACTL $mongod $OPTIONS >/dev/null 2>&1"
+  echo -n $"Starting merizod: "
+  daemon --user "$MONGO_USER" --check $merizod "$NUMACTL $merizod $OPTIONS >/dev/null 2>&1"
   RETVAL=$?
   echo
-  [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod
+  [ $RETVAL -eq 0 ] && touch /var/lock/subsys/merizod
 }
 
 stop()
 {
-  echo -n $"Stopping mongod: "
-  mongo_killproc "$PIDFILEPATH" $mongod
+  echo -n $"Stopping merizod: "
+  merizo_killproc "$PIDFILEPATH" $merizod
   RETVAL=$?
   echo
-  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
+  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/merizod
 }
 
 restart () {
@@ -92,7 +92,7 @@ restart () {
 # Built-in killproc() (found in /etc/init.d/functions) is on certain versions of Linux
 # where it sleeps for the full $delay seconds if process does not respond fast enough to
 # the initial TERM signal.
-mongo_killproc()
+merizo_killproc()
 {
   local pid_file=$1
   local procname=$2
@@ -131,10 +131,10 @@ case "$1" in
     restart
     ;;
   condrestart)
-    [ -f /var/lock/subsys/mongod ] && restart || :
+    [ -f /var/lock/subsys/merizod ] && restart || :
     ;;
   status)
-    status $mongod
+    status $merizod
     RETVAL=$?
     ;;
   *)

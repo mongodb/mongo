@@ -1,5 +1,5 @@
 /**
- * Tests aggregate command against mongos with slaveOk. For more tests on read preference,
+ * Tests aggregate command against merizos with slaveOk. For more tests on read preference,
  * please refer to jstests/sharding/read_pref_cmd.js.
  * @tags: [
  *   requires_replication,
@@ -26,7 +26,7 @@
         var secNode = st.rs0.getSecondary();
         secNode.getDB('test').setProfilingLevel(2);
 
-        // wait for mongos to recognize that the slave is up
+        // wait for merizos to recognize that the slave is up
         awaitRSClientHosts(st.s, secNode, {ok: true});
 
         var res =

@@ -10,8 +10,8 @@ env.Library(
         'sharding_catalog_client.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/db/keys_collection_document',
+        '$BUILD_DIR/merizo/db/write_concern_options',
+        '$BUILD_DIR/merizo/db/keys_collection_document',
     ],
 )
 
@@ -22,7 +22,7 @@ env.Library(
         'dist_lock_ping_info.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
 )
 
@@ -32,7 +32,7 @@ env.Library(
         'dist_lock_catalog.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/merizo/db/write_concern_options',
     ],
 )
 
@@ -42,11 +42,11 @@ env.Library(
         'replset_dist_lock_manager.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_interface',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/util/fail_point'
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_catalog_interface',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_manager',
+        '$BUILD_DIR/merizo/s/client/sharding_client',
+        '$BUILD_DIR/merizo/util/fail_point'
     ],
 )
 
@@ -56,17 +56,17 @@ env.Library(
         'dist_lock_catalog_impl.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/client/remote_command_targeter',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_interface',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/client/read_preference',
+        '$BUILD_DIR/merizo/client/remote_command_targeter',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/query/command_request_response',
+        '$BUILD_DIR/merizo/db/repl/read_concern_args',
+        '$BUILD_DIR/merizo/rpc/command_status',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_catalog_interface',
+        '$BUILD_DIR/merizo/s/client/sharding_client',
+        '$BUILD_DIR/merizo/s/write_ops/batch_write_types',
+        '$BUILD_DIR/merizo/util/net/network',
     ],
 )
 
@@ -76,11 +76,11 @@ env.Library(
         'sharding_catalog_client_impl.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
-        '$BUILD_DIR/mongo/executor/network_interface',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/merizo/db/repl/read_concern_args',
+        '$BUILD_DIR/merizo/db/storage/duplicate_key_error_info',
+        '$BUILD_DIR/merizo/executor/network_interface',
+        '$BUILD_DIR/merizo/s/client/sharding_client',
+        '$BUILD_DIR/merizo/s/coreshard',
         'dist_lock_manager',
         'sharding_catalog_client',
     ],
@@ -92,7 +92,7 @@ env.Library(
         'dist_lock_manager_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/unittest/unittest',
         'dist_lock_manager',
     ],
 )
@@ -103,8 +103,8 @@ env.Library(
         'dist_lock_catalog_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/common_s',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/s/common_s',
+        '$BUILD_DIR/merizo/unittest/unittest',
         'dist_lock_catalog_interface',
     ]
 )
@@ -127,11 +127,11 @@ env.CppUnitTest(
         'replset_dist_lock_manager_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
-        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/storage/duplicate_key_error_info',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_catalog_mock',
+        '$BUILD_DIR/merizo/s/catalog/sharding_catalog_client_mock',
+        '$BUILD_DIR/merizo/s/shard_server_test_fixture',
         'dist_lock_catalog_impl',
         'replset_dist_lock_manager',
     ]
@@ -144,7 +144,7 @@ env.CppUnitTest(
         'sharding_catalog_write_retry_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/merizo/db/storage/duplicate_key_error_info',
+        '$BUILD_DIR/merizo/s/sharding_router_test_fixture',
     ]
 )

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <set>
 #include <vector>
 
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/bson/bsonelement_comparator.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/json.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 TEST(DottedPathSupport, CompareObjectsAccordingToSort) {
     ASSERT_LT(dps::compareObjectsAccordingToSort(
@@ -608,4 +608,4 @@ TEST(ExtractElementAtPathOrArrayAlongPath, NumericalPathElementTreatedAsFieldNam
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

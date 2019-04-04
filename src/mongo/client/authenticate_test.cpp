@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <queue>
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/authenticate.h"
-#include "mongo/config.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/md5.hpp"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/password_digest.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/config.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/md5.hpp"
+#include "merizo/util/net/hostandport.h"
+#include "merizo/util/password_digest.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 
 /**
  * Utility class to support tests in this file.  Allows caller to load
  * with pre-made responses and requests to interject into authentication methods.
  */
-class AuthClientTest : public mongo::unittest::Test {
+class AuthClientTest : public merizo::unittest::Test {
 public:
     AuthClientTest()
         : _mockHost(),
@@ -175,7 +175,7 @@ public:
 };
 
 TEST_F(AuthClientTest, MongoCR) {
-    // This test excludes the MONGODB-CR support found in mongo/shell/mongodbcr.cpp
+    // This test excludes the MONGODB-CR support found in merizo/shell/merizodbcr.cpp
     // so it should fail to auth.
     // jstests exist to ensure MONGODB-CR continues to work from the client.
     auto params = loadMongoCRConversation();

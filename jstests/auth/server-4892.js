@@ -1,7 +1,7 @@
 /**
  * Regression test for SERVER-4892.
  *
- * Verify that a client can delete cursors that it creates, when mongod is running with "auth"
+ * Verify that a client can delete cursors that it creates, when merizod is running with "auth"
  * enabled.
  *
  * This test requires users to persist across a restart.
@@ -11,34 +11,34 @@
 var baseName = 'jstests_auth_server4892';
 var dbpath = MongoRunner.dataPath + baseName;
 resetDbpath(dbpath);
-var mongodCommonArgs = {
+var merizodCommonArgs = {
     dbpath: dbpath,
     noCleanData: true,
 };
 
 /*
- * Start an instance of mongod, pass it as a parameter to operation(), then stop the instance of
- * mongod before unwinding or returning out of with_mongod().
+ * Start an instance of merizod, pass it as a parameter to operation(), then stop the instance of
+ * merizod before unwinding or returning out of with_merizod().
  *
- * 'extraMongodArgs' are extra arguments to pass on the mongod command line, as an object.
+ * 'extraMongodArgs' are extra arguments to pass on the merizod command line, as an object.
  */
 function withMongod(extraMongodArgs, operation) {
-    var mongod = MongoRunner.runMongod(Object.merge(mongodCommonArgs, extraMongodArgs));
+    var merizod = MongoRunner.runMongod(Object.merge(merizodCommonArgs, extraMongodArgs));
 
     try {
-        operation(mongod);
+        operation(merizod);
     } finally {
-        MongoRunner.stopMongod(mongod);
+        MongoRunner.stopMongod(merizod);
     }
 }
 
 /*
- * Fail an assertion if the given "mongod" instance does not have exactly expectNumLiveCursors live
+ * Fail an assertion if the given "merizod" instance does not have exactly expectNumLiveCursors live
  * cursors on the server.
  */
-function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
-    var conn = new Mongo(mongod.host);
-    var db = mongod.getDB('admin');
+function expectNumLiveCursors(merizod, expectedNumLiveCursors) {
+    var conn = new Mongo(merizod.host);
+    var db = merizod.getDB('admin');
     db.auth('admin', 'admin');
     var actualNumLiveCursors = db.serverStatus().metrics.cursor.open.total;
     assert(actualNumLiveCursors == expectedNumLiveCursors,
@@ -46,9 +46,9 @@ function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
                expectedNumLiveCursors + ")");
 }
 
-withMongod({noauth: ""}, function setupTest(mongod) {
+withMongod({noauth: ""}, function setupTest(merizod) {
     var admin, somedb, conn;
-    conn = new Mongo(mongod.host);
+    conn = new Mongo(merizod.host);
     admin = conn.getDB('admin');
     somedb = conn.getDB('somedb');
     admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
@@ -61,16 +61,16 @@ withMongod({noauth: ""}, function setupTest(mongod) {
     admin.logout();
 });
 
-withMongod({auth: ""}, function runTest(mongod) {
-    var conn = new Mongo(mongod.host);
+withMongod({auth: ""}, function runTest(merizod) {
+    var conn = new Mongo(merizod.host);
     var somedb = conn.getDB('somedb');
     somedb.auth('frim', 'fram');
 
-    expectNumLiveCursors(mongod, 0);
+    expectNumLiveCursors(merizod, 0);
 
     var cursor = somedb.data.find({}, {'_id': 1}).batchSize(1);
     cursor.next();
-    expectNumLiveCursors(mongod, 1);
+    expectNumLiveCursors(merizod, 1);
 
     cursor.close();
 
@@ -79,5 +79,5 @@ withMongod({auth: ""}, function runTest(mongod) {
     // have to force a message to the server.
     somedb.data.findOne();
 
-    expectNumLiveCursors(mongod, 0);
+    expectNumLiveCursors(merizod, 0);
 });

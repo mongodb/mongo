@@ -1,8 +1,8 @@
 // This test is to ensure that limit() clauses are pushed down to the shards and evaluated
-// See: http://jira.mongodb.org/browse/SERVER-1896
+// See: http://jira.merizodb.org/browse/SERVER-1896
 (function() {
 
-    var s = new ShardingTest({name: "limit_push", shards: 2, mongos: 1});
+    var s = new ShardingTest({name: "limit_push", shards: 2, merizos: 1});
     var db = s.getDB("test");
 
     // Create some data

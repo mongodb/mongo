@@ -5,10 +5,10 @@
 /**
  * Allows synchronization between background ops and the test operations
  */
-var waitForLock = function(mongo, name) {
+var waitForLock = function(merizo, name) {
 
     var ts = new ObjectId();
-    var lockColl = mongo.getCollection("config.testLocks");
+    var lockColl = merizo.getCollection("config.testLocks");
 
     lockColl.update({_id: name, state: 0}, {$set: {state: 0}}, true);
 
@@ -49,37 +49,37 @@ var waitForLock = function(mongo, name) {
 /**
  * Allows a test or background op to say it's finished
  */
-var setFinished = function(mongo, name, finished) {
+var setFinished = function(merizo, name, finished) {
     if (finished || finished == undefined)
-        mongo.getCollection("config.testFinished").update({_id: name}, {_id: name}, true);
+        merizo.getCollection("config.testFinished").update({_id: name}, {_id: name}, true);
     else
-        mongo.getCollection("config.testFinished").remove({_id: name});
+        merizo.getCollection("config.testFinished").remove({_id: name});
 };
 
 /**
  * Checks whether a test or background op is finished
  */
-var isFinished = function(mongo, name) {
-    return mongo.getCollection("config.testFinished").findOne({_id: name}) != null;
+var isFinished = function(merizo, name) {
+    return merizo.getCollection("config.testFinished").findOne({_id: name}) != null;
 };
 
 /**
  * Sets the result of a background op
  */
-var setResult = function(mongo, name, result, err) {
-    mongo.getCollection("config.testResult")
+var setResult = function(merizo, name, result, err) {
+    merizo.getCollection("config.testResult")
         .update({_id: name}, {_id: name, result: result, err: err}, true);
 };
 
 /**
  * Gets the result for a background op
  */
-var getResult = function(mongo, name) {
-    return mongo.getCollection("config.testResult").findOne({_id: name});
+var getResult = function(merizo, name) {
+    return merizo.getCollection("config.testResult").findOne({_id: name});
 };
 
 /**
- * Overrides the parallel shell code in mongo
+ * Overrides the parallel shell code in merizo
  */
 function startParallelShell(jsCode, port) {
     if (TestData) {
@@ -88,9 +88,9 @@ function startParallelShell(jsCode, port) {
 
     var x;
     if (port) {
-        x = startMongoProgramNoConnect("mongo", "--port", port, "--eval", jsCode);
+        x = startMongoProgramNoConnect("merizo", "--port", port, "--eval", jsCode);
     } else {
-        x = startMongoProgramNoConnect("mongo", "--eval", jsCode, db ? db.getMongo().host : null);
+        x = startMongoProgramNoConnect("merizo", "--eval", jsCode, db ? db.getMongo().host : null);
     }
 
     return function() {
@@ -100,7 +100,7 @@ function startParallelShell(jsCode, port) {
     };
 }
 
-startParallelOps = function(mongo, proc, args, context) {
+startParallelOps = function(merizo, proc, args, context) {
 
     var procName = proc.name + "-" + new ObjectId();
     var seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join(""))
@@ -108,8 +108,8 @@ startParallelOps = function(mongo, proc, args, context) {
                    .getTime();
 
     // Make sure we aren't finished before we start
-    setFinished(mongo, procName, false);
-    setResult(mongo, procName, undefined, undefined);
+    setFinished(merizo, procName, false);
+    setResult(merizo, procName, undefined, undefined);
 
     // TODO: Make this a context of its own
     var procContext = {
@@ -173,7 +173,7 @@ startParallelOps = function(mongo, proc, args, context) {
 
     var contexts = [RandomFunctionContext, context];
 
-    var testDataColl = mongo.getCollection("config.parallelTest");
+    var testDataColl = merizo.getCollection("config.parallelTest");
 
     testDataColl.insert({
         _id: procName,
@@ -197,7 +197,7 @@ startParallelOps = function(mongo, proc, args, context) {
     if (typeof db !== 'undefined') {
         oldDB = db;
     }
-    db = mongo.getDB("test");
+    db = merizo.getDB("test");
 
     jsTest.log("Starting " + proc.name + " operations...");
 
@@ -206,10 +206,10 @@ startParallelOps = function(mongo, proc, args, context) {
     db = oldDB;
 
     var join = function() {
-        setFinished(mongo, procName, true);
+        setFinished(merizo, procName, true);
 
         rawJoin();
-        result = getResult(mongo, procName);
+        result = getResult(merizo, procName);
 
         assert.neq(result, null);
 
@@ -221,15 +221,15 @@ startParallelOps = function(mongo, proc, args, context) {
     };
 
     join.isFinished = function() {
-        return isFinished(mongo, procName);
+        return isFinished(merizo, procName);
     };
 
     join.setFinished = function(finished) {
-        return setFinished(mongo, procName, finished);
+        return setFinished(merizo, procName, finished);
     };
 
     join.waitForLock = function(name) {
-        return waitForLock(mongo, name);
+        return waitForLock(merizo, name);
     };
 
     return join;
@@ -280,7 +280,7 @@ var RandomFunctionContext = function(context) {
 
         var numShards = 2;  // Random.randInt( 1, 10 )
         var rs = false;     // Random.randBool()
-        var st = new ShardingTest({shards: numShards, mongos: 4, other: {rs: rs}});
+        var st = new ShardingTest({shards: numShards, merizos: 4, other: {rs: rs}});
 
         return st;
     };

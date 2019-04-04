@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/optional.hpp>
 #include <iostream>
 
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/service_context.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/util/timer.h"
+#include "merizo/client/dbclient_cursor.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/multi_index_block.h"
+#include "merizo/db/client.h"
+#include "merizo/db/clientcursor.h"
+#include "merizo/db/cursor_manager.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/dbhelpers.h"
+#include "merizo/db/exec/queued_data_stage.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/json.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_time.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/find.h"
+#include "merizo/db/service_context.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/util/timer.h"
 
 namespace {
 namespace QueryTests {
@@ -250,10 +250,10 @@ public:
 class ClientBase {
 public:
     ClientBase() : _client(&_opCtx) {
-        mongo::LastError::get(_opCtx.getClient()).reset();
+        merizo::LastError::get(_opCtx.getClient()).reset();
     }
     virtual ~ClientBase() {
-        mongo::LastError::get(_opCtx.getClient()).reset();
+        merizo::LastError::get(_opCtx.getClient()).reset();
     }
 
 protected:
@@ -954,7 +954,7 @@ public:
         _client.insert(ns, fromjson("{a:[1,2,3]}"));
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
         ASSERT(_client
-                   .query(NamespaceString(ns), QUERY("a" << mongo::BSIZE << 3).hint(BSON("a" << 1)))
+                   .query(NamespaceString(ns), QUERY("a" << merizo::BSIZE << 3).hint(BSON("a" << 1)))
                    ->more());
     }
 };

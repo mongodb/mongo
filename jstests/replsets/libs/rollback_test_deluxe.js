@@ -48,7 +48,7 @@ Random.setRandomSeed();
  * The underlying replica set must meet the following requirements:
  *
  *      1. It must have exactly five nodes: a primary, two secondaries and two arbiters.
- *      2. It must be running with mongobridge.
+ *      2. It must be running with merizobridge.
  *
  * If the caller does not provide their own replica set, a five-node replica set will be initialized
  * instead, with all nodes running the latest version.
@@ -175,7 +175,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
         assert(replSet instanceof ReplSetTest,
                `Must provide an instance of ReplSetTest. Have: ${tojson(replSet)}`);
 
-        assert.eq(true, replSet.usesBridge(), "Must set up ReplSetTest with mongobridge enabled.");
+        assert.eq(true, replSet.usesBridge(), "Must set up ReplSetTest with merizobridge enabled.");
         assert.eq(5, replSet.nodes.length, "Replica set must contain exactly five nodes.");
 
         // Make sure we have a primary.

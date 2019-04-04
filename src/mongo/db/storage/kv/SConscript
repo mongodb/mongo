@@ -8,7 +8,7 @@ env.Library(
     target='kv_prefix',
     source=['kv_prefix.cpp'],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
     ],
 )
 
@@ -20,13 +20,13 @@ env.Library(
         'kv_collection_catalog_entry.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/index_names',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
-        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/index/index_descriptor',
+        '$BUILD_DIR/merizo/db/index_names',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/storage/bson_collection_catalog_entry',
+        '$BUILD_DIR/merizo/db/catalog/uuid_catalog',
         'kv_drop_pending_ident_reaper',
         'kv_prefix',
         ],
@@ -37,8 +37,8 @@ env.Library(
     target='kv_drop_pending_ident_reaper',
     source=['kv_drop_pending_ident_reaper.cpp'],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/storage/write_unit_of_work',
         'kv_prefix',
     ],
 )
@@ -48,9 +48,9 @@ env.Library(
     target='kv_database_catalog_entry_core',
     source=['kv_database_catalog_entry_base.cpp'],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/storage/bson_collection_catalog_entry',
+        '$BUILD_DIR/merizo/db/storage/kv/kv_engine_core',
         'kv_drop_pending_ident_reaper',
     ],
 )
@@ -63,16 +63,16 @@ env.Library(
         'temporary_kv_record_store.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/catalog_control',
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/catalog/catalog_control',
+        '$BUILD_DIR/merizo/db/storage/kv/kv_engine_core',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
         'kv_database_catalog_entry_core',
         'kv_drop_pending_ident_reaper',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+        '$BUILD_DIR/merizo/db/logical_clock',
+        '$BUILD_DIR/merizo/db/storage/storage_repair_observer',
     ],
 )
 
@@ -82,7 +82,7 @@ env.Library(
         'kv_database_catalog_entry.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/merizo/db/index/index_access_methods',
         'kv_database_catalog_entry_core',
         'kv_engine_core',
         'kv_storage_engine',
@@ -97,8 +97,8 @@ env.Library(
         'kv_database_catalog_entry_mock.cpp'
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/s/sharding_runtime_d',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
         'kv_database_catalog_entry_core',
         'kv_engine_core',
         'kv_storage_engine',
@@ -113,11 +113,11 @@ env.Library(
         'kv_engine_timestamps_test.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/unittest/unittest',
+        '$BUILD_DIR/merizo/util/clock_source_mock',
         'kv_engine_mock',
         'kv_prefix',
         ],
@@ -129,7 +129,7 @@ env.CppUnitTest(
         'kv_drop_pending_ident_reaper_test.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
         'kv_drop_pending_ident_reaper',
     ],
 )
@@ -141,14 +141,14 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'kv_engine_mock',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
-        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
+        '$BUILD_DIR/merizo/db/catalog/collection_options',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/storage/devnull/storage_devnull_core',
+        '$BUILD_DIR/merizo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmocks'
+        '$BUILD_DIR/merizo/db/auth/authmocks'
     ],
 )
 
@@ -159,14 +159,14 @@ env.CppUnitTest(
         ],
     LIBDEPS=[
         'kv_engine_mock',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
-        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
+        '$BUILD_DIR/merizo/db/catalog/collection_options',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/storage/devnull/storage_devnull_core',
+        '$BUILD_DIR/merizo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmocks'
+        '$BUILD_DIR/merizo/db/auth/authmocks'
     ],
 )
 
@@ -176,14 +176,14 @@ env.CppUnitTest(
         'kv_storage_engine_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
-        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
-        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/catalog/collection_options',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/storage/devnull/storage_devnull_core',
+        '$BUILD_DIR/merizo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
+        '$BUILD_DIR/merizo/db/storage/storage_repair_observer',
         'kv_engine',
         'kv_engine_mock',
     ],

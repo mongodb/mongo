@@ -1,16 +1,16 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoimport
+package merizoimport
 
 var Usage = `<options> <file>
 
-Import CSV, TSV or JSON data into MongoDB. If no file is provided, mongoimport reads from stdin.
+Import CSV, TSV or JSON data into MerizoDB. If no file is provided, merizoimport reads from stdin.
 
-See http://docs.mongodb.org/manual/reference/program/mongoimport/ for more information.`
+See http://docs.merizodb.org/manual/reference/program/merizoimport/ for more information.`
 
 // InputOptions defines the set of options for reading input data.
 type InputOptions struct {
@@ -58,7 +58,7 @@ type IngestOptions struct {
 	// Sets the number of insertion routines to use
 	NumInsertionWorkers int `short:"j" value-name:"<number>" long:"numInsertionWorkers" description:"number of insert operations to run concurrently (defaults to 1)" default:"1" default-mask:"-"`
 
-	// Forces mongoimport to halt the import operation at the first insert or upsert error.
+	// Forces merizoimport to halt the import operation at the first insert or upsert error.
 	StopOnError bool `long:"stopOnError" description:"stop importing at first insert/upsert error"`
 
 	// Modify the import process.
@@ -75,7 +75,7 @@ type IngestOptions struct {
 	UpsertFields string `long:"upsertFields" value-name:"<field>[,<field>]*" description:"comma-separated fields for the query part when --mode is set to upsert or merge"`
 
 	// Sets write concern level for write operations.
-	// By default mongoimport uses a write concern of 'majority'.
+	// By default merizoimport uses a write concern of 'majority'.
 	// Cannot be used simultaneously with write concern options in a URI.
 	WriteConcern string `long:"writeConcern" value-name:"<write-concern-specifier>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
 

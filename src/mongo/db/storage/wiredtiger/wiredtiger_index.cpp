@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_index.h"
 
 #include <set>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/checked_cast.h"
+#include "merizo/db/catalog/index_catalog_entry.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/global_settings.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/json.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/storage/key_string.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/fail_point.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
 #define TRACING_ENABLED 0
 
@@ -71,7 +71,7 @@
     log()
 #endif
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
@@ -277,8 +277,8 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
             str::stream() << versionStatus.reason() << " Index: {name: " << desc->indexName()
                           << ", ns: "
                           << desc->parentNS()
-                          << "} - version too new for this mongod."
-                          << " See http://dochub.mongodb.org/core/4.2-downgrade-index for detailed"
+                          << "} - version too new for this merizod."
+                          << " See http://dochub.merizodb.org/core/4.2-downgrade-index for detailed"
                           << " instructions on how to handle this error.");
         fassertFailedWithStatusNoTrace(28579, indexVersionStatus);
     }
@@ -1729,4 +1729,4 @@ void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

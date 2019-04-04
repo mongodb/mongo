@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/db/exec/projection.h"
+#include "merizo/db/exec/projection.h"
 
 #include "boost/optional.hpp"
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/record_id.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/exec/plan_stage.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/exec/working_set_computed_data.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/record_id.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 static const char* kIdField = "_id";
 
@@ -136,7 +136,7 @@ void ProjectionStage::getSimpleInclusionFields(const BSONObj& projObj, FieldSet*
         BSONElement elt = projObjIt.next();
         // Must deal with the _id case separately as there is an implicit _id: 1 in the
         // projection.
-        if (mongoutils::str::equals(elt.fieldName(), kIdField) && !elt.trueValue()) {
+        if (merizoutils::str::equals(elt.fieldName(), kIdField) && !elt.trueValue()) {
             includeId = false;
             continue;
         }
@@ -318,4 +318,4 @@ Status ProjectionStageSimple::transform(WorkingSetMember* member) const {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

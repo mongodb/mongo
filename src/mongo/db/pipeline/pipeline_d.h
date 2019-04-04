@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,15 +32,15 @@
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/query/plan_executor.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/pipeline/aggregation_request.h"
+#include "merizo/db/pipeline/dependencies.h"
+#include "merizo/db/pipeline/document_source_cursor.h"
+#include "merizo/db/pipeline/document_source_group.h"
+#include "merizo/db/query/plan_executor.h"
 
-namespace mongo {
+namespace merizo {
 class Collection;
 class DocumentSourceCursor;
 class DocumentSourceMatch;
@@ -52,7 +52,7 @@ struct PlanSummaryStats;
 
 /**
  * PipelineD is an extension of the Pipeline class, but with additional material that references
- * symbols that are not available in mongos, where the remainder of the Pipeline class also
+ * symbols that are not available in merizos, where the remainder of the Pipeline class also
  * functions.  PipelineD is a friend of Pipeline so that it can have equal access to Pipeline's
  * members.
  *
@@ -189,4 +189,4 @@ private:
                                 const BSONObj& projectionObj = BSONObj());
 };
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,14 +31,14 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/mongo_process_interface.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/pipeline/merizo_process_interface.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * MongoProcessCommon provides base implementations of any MongoProcessInterface methods whose code
- * is largely identical on mongoD and mongoS.
+ * is largely identical on merizoD and merizoS.
  */
 class MongoProcessCommon : public MongoProcessInterface {
 public:
@@ -77,7 +77,7 @@ protected:
     /**
      * Returns a BSONObj representing a report of the operation which is currently being
      * executed by the supplied client. This method is called by the getCurrentOps method of
-     * MongoProcessCommon to delegate to the mongoS- or mongoD- specific implementation.
+     * MongoProcessCommon to delegate to the merizoS- or merizoD- specific implementation.
      */
     virtual BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                               Client* client,
@@ -92,4 +92,4 @@ protected:
                                                   std::vector<BSONObj>* ops) const = 0;
 };
 
-}  // namespace mongo
+}  // namespace merizo

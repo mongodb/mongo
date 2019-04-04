@@ -42,7 +42,7 @@
 
         if (!isMongos) {
             // Commands that run on existing regular collections should not be impacted by the
-            // presence of invalid views. However, applyOps doesn't work on mongos.
+            // presence of invalid views. However, applyOps doesn't work on merizos.
             assert.commandWorked(
                 db.adminCommand(  //
                     {
@@ -100,7 +100,7 @@
         const storageEngine = jsTest.options().storageEngine;
         if (isMongos || storageEngine === "ephemeralForTest" || storageEngine === "inMemory" ||
             storageEngine === "biggie") {
-            print("Not testing compact command on mongos or ephemeral storage engine");
+            print("Not testing compact command on merizos or ephemeral storage engine");
         } else {
             assert.commandWorked(viewsDB.runCommand({compact: "collection", force: true}),
                                  makeErrorMessage("compact"));

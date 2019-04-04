@@ -2,7 +2,7 @@
 
 . ../.env
 
-exec mongod $COMMONDOPTS \
+exec merizod $COMMONDOPTS \
 	--shardsvr \
 	--port 40003 \
 	--auth \

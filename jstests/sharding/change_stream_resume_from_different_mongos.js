@@ -1,4 +1,4 @@
-// Test resuming a change stream on a mongos other than the one the change stream was started on.
+// Test resuming a change stream on a merizos other than the one the change stream was started on.
 // @tags: [uses_change_streams]
 (function() {
     "use strict";
@@ -14,7 +14,7 @@
 
     const st = new ShardingTest({
         shards: 2,
-        mongos: 2,
+        merizos: 2,
         rs: {nodes: 3, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
     });
 
@@ -72,7 +72,7 @@
         assert.setEq(new Set(kIds), new Set(docsFoundInOrder.map(doc => doc.fullDocument._id)));
         cst.cleanUp();
 
-        // Now resume using the resume token from the first change on a different mongos.
+        // Now resume using the resume token from the first change on a different merizos.
         const otherCst =
             new ChangeStreamTest(ChangeStreamTest.getDBForChangeStream(watchMode, s1DB));
 

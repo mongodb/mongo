@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 #define LOG_FOR_ELECTION(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationElection)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationElection)
 #define LOG_FOR_HEARTBEATS(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationHeartbeats)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationHeartbeats)
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <algorithm>
 
-#include "mongo/base/status.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/heartbeat_response_action.h"
-#include "mongo/db/repl/repl_set_config_checks.h"
-#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
-#include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/repl/vote_requester.h"
-#include "mongo/db/service_context.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/status.h"
+#include "merizo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "merizo/db/index_builds_coordinator.h"
+#include "merizo/db/kill_sessions_local.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/logical_time_validator.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/heartbeat_response_action.h"
+#include "merizo/db/repl/repl_set_config_checks.h"
+#include "merizo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "merizo/db/repl/repl_set_heartbeat_response.h"
+#include "merizo/db/repl/replication_coordinator_impl.h"
+#include "merizo/db/repl/replication_process.h"
+#include "merizo/db/repl/topology_coordinator.h"
+#include "merizo/db/repl/vote_requester.h"
+#include "merizo/db/service_context.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/metadata/repl_set_metadata.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 namespace {
@@ -293,7 +293,7 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
                 _priorityTakeoverWhen = _replExecutor->now() + priorityTakeoverDelay + randomOffset;
                 LOG_FOR_ELECTION(0) << "Scheduling priority takeover at " << _priorityTakeoverWhen;
                 _priorityTakeoverCbh = _scheduleWorkAt(
-                    _priorityTakeoverWhen, [=](const mongo::executor::TaskExecutor::CallbackArgs&) {
+                    _priorityTakeoverWhen, [=](const merizo::executor::TaskExecutor::CallbackArgs&) {
                         _startElectSelfIfEligibleV1(
                             TopologyCoordinator::StartElectionReason::kPriorityTakeover);
                     });
@@ -307,7 +307,7 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
                 _catchupTakeoverWhen = _replExecutor->now() + catchupTakeoverDelay;
                 LOG_FOR_ELECTION(0) << "Scheduling catchup takeover at " << _catchupTakeoverWhen;
                 _catchupTakeoverCbh = _scheduleWorkAt(
-                    _catchupTakeoverWhen, [=](const mongo::executor::TaskExecutor::CallbackArgs&) {
+                    _catchupTakeoverWhen, [=](const merizo::executor::TaskExecutor::CallbackArgs&) {
                         _startElectSelfIfEligibleV1(
                             TopologyCoordinator::StartElectionReason::kCatchupTakeover);
                     });
@@ -388,7 +388,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
         };
 
         while (MONGO_FAIL_POINT(blockHeartbeatStepdown) && !inShutdown()) {
-            mongo::sleepsecs(1);
+            merizo::sleepsecs(1);
         }
     }
 
@@ -816,7 +816,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     LOG_FOR_ELECTION(4) << "Scheduling election timeout callback at " << when;
     _handleElectionTimeoutWhen = when;
     _handleElectionTimeoutCbh =
-        _scheduleWorkAt(when, [=](const mongo::executor::TaskExecutor::CallbackArgs&) {
+        _scheduleWorkAt(when, [=](const merizo::executor::TaskExecutor::CallbackArgs&) {
             _startElectSelfIfEligibleV1(TopologyCoordinator::StartElectionReason::kElectionTimeout);
         });
 }
@@ -897,4 +897,4 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

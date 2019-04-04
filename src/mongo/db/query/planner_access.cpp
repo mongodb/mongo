@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,39 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/query/planner_access.h"
+#include "merizo/db/query/planner_access.h"
 
 #include <algorithm>
 #include <memory>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_text.h"
-#include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/index_tag.h"
-#include "mongo/db/query/indexability.h"
-#include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/matcher/expression_array.h"
+#include "merizo/db/matcher/expression_geo.h"
+#include "merizo/db/matcher/expression_text.h"
+#include "merizo/db/query/index_bounds_builder.h"
+#include "merizo/db/query/index_tag.h"
+#include "merizo/db/query/indexability.h"
+#include "merizo/db/query/planner_wildcard_helpers.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 
-namespace wcp = ::mongo::wildcard_planning;
-namespace dps = ::mongo::dotted_path_support;
+namespace wcp = ::merizo::wildcard_planning;
+namespace dps = ::merizo::dotted_path_support;
 
 /**
  * Text node functors.
@@ -139,7 +139,7 @@ std::vector<bool> canProvideSortWithMergeSort(
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::vector;
@@ -1421,4 +1421,4 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     return solnRoot;
 }
 
-}  // namespace mongo
+}  // namespace merizo

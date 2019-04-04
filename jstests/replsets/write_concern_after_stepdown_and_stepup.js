@@ -59,7 +59,7 @@
     var doMajorityWrite = function() {
         // Run ismaster command with 'hangUpOnStepDown' set to false to mark this connection as
         // one that shouldn't be closed when the node steps down.  This simulates the scenario where
-        // the write was coming from a mongos.
+        // the write was coming from a merizos.
         assert.commandWorked(db.adminCommand({ismaster: 1, hangUpOnStepDown: false}));
 
         var res = db.getSiblingDB('wMajorityCheck').stepdownAndBackUp.insert({a: 2}, {

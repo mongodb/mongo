@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <iostream>
 
-#include "mongo/db/client.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/json.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/timer.h"
+#include "merizo/db/client.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/json.h"
+#include "merizo/db/lasterror.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/util/timer.h"
 
 namespace DirectClientTests {
 
@@ -47,10 +47,10 @@ using std::vector;
 class ClientBase {
 public:
     ClientBase() {
-        mongo::LastError::get(cc()).reset();
+        merizo::LastError::get(cc()).reset();
     }
     virtual ~ClientBase() {
-        mongo::LastError::get(cc()).reset();
+        merizo::LastError::get(cc()).reset();
     }
 };
 

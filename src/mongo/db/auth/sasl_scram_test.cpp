@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/native_sasl_client_session.h"
-#include "mongo/client/scram_client_cache.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authorization_session_impl.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/sasl_mechanism_registry.h"
-#include "mongo/db/auth/sasl_scram_server_conversation.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/log.h"
-#include "mongo/util/password_digest.h"
+#include "merizo/client/native_sasl_client_session.h"
+#include "merizo/client/scram_client_cache.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/crypto/sha256_block.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/authorization_manager_impl.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/authorization_session_impl.h"
+#include "merizo/db/auth/authz_manager_external_state_mock.h"
+#include "merizo/db/auth/authz_session_external_state_mock.h"
+#include "merizo/db/auth/sasl_mechanism_registry.h"
+#include "merizo/db/auth/sasl_scram_server_conversation.h"
+#include "merizo/db/service_context.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/log.h"
+#include "merizo/util/password_digest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 BSONObj generateSCRAMUserDocument(StringData username, StringData password) {
@@ -170,7 +170,7 @@ struct SCRAMStepsResult {
     }
 };
 
-class SCRAMFixture : public mongo::unittest::Test {
+class SCRAMFixture : public merizo::unittest::Test {
 protected:
     const SCRAMStepsResult goalState =
         SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 4), Status::OK());
@@ -206,7 +206,7 @@ protected:
         saslClientSession = std::make_unique<NativeSaslClientSession>();
         saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism,
                                         saslServerSession->mechanismName());
-        saslClientSession->setParameter(NativeSaslClientSession::parameterServiceName, "mongodb");
+        saslClientSession->setParameter(NativeSaslClientSession::parameterServiceName, "merizodb");
         saslClientSession->setParameter(NativeSaslClientSession::parameterServiceHostname,
                                         "MockServer.test");
         saslClientSession->setParameter(NativeSaslClientSession::parameterServiceHostAndPort,
@@ -227,7 +227,7 @@ protected:
 
     std::string createPasswordDigest(StringData username, StringData password) {
         if (_digestPassword) {
-            return mongo::createPasswordDigest(username, password);
+            return merizo::createPasswordDigest(username, password);
         } else {
             return password.toString();
         }
@@ -657,4 +657,4 @@ TEST(SCRAMCache, testSetAndReset) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

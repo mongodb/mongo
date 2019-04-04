@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <algorithm>
 #include <cmath>
 #include <utility>
 #include <vector>
 
-#include "mongo/db/query/plan_ranker.h"
+#include "merizo/db/query/plan_ranker.h"
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/log.h"
+#include "merizo/db/exec/plan_stage.h"
+#include "merizo/db/exec/working_set.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_solution.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/log.h"
 
 namespace {
 
@@ -59,7 +59,7 @@ bool scoreComparator(const std::pair<double, size_t>& lhs, const std::pair<doubl
 
 }  // namespace
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 using std::vector;
@@ -242,7 +242,7 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
     double score = baseScore + productivity + tieBreakers;
 
-    mongoutils::str::stream ss;
+    merizoutils::str::stream ss;
     ss << "score(" << score << ") = baseScore(" << baseScore << ")"
        << " + productivity((" << stats->common.advanced << " advanced)/(" << stats->common.works
        << " works) = " << productivity << ")"
@@ -263,4 +263,4 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     return score;
 }
 
-}  // namespace mongo
+}  // namespace merizo

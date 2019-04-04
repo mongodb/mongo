@@ -7,9 +7,9 @@ def jsToHeader(target, source):
     outFile = target
 
     h = [
-        '#include "mongo/base/string_data.h"',
-        '#include "mongo/scripting/engine.h"',
-        'namespace mongo {',
+        '#include "merizo/base/string_data.h"',
+        '#include "merizo/scripting/engine.h"',
+        'namespace merizo {',
         'namespace JSFiles{',
     ]
 
@@ -34,7 +34,7 @@ def jsToHeader(target, source):
                  (objname, filename.replace('\\', '/'), stringname, stringname))
 
     h.append("} // namespace JSFiles")
-    h.append("} // namespace mongo")
+    h.append("} // namespace merizo")
     h.append("")
 
     text = '\n'.join(h)

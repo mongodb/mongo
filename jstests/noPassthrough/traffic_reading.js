@@ -13,7 +13,7 @@
     // Create the recording directory if it does not already exist
     mkdir(recordingDir);
 
-    // Create the options and run mongod
+    // Create the options and run merizod
     var opts = {auth: "", setParameter: "trafficRecordingDirectory=" + recordingDir};
     m = MongoRunner.runMongod(opts);
 

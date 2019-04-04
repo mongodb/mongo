@@ -24,7 +24,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // "The total size of an index entry, which can include structural overhead depending on
         // the
         //  BSON type, must be less than 1024 bytes."
-        // http://docs.mongodb.org/manual/reference/limits/
+        // http://docs.merizodb.org/manual/reference/limits/
         var maxIndexedSize = 1023;
 
         var bsonOverhead = Object.bsonsize({'': ''});

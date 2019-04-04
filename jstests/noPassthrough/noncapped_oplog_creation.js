@@ -12,7 +12,7 @@
         dbpath: dbpath,
         noCleanData: true,
     });
-    assert.neq(null, conn, 'mongod was unable to start up');
+    assert.neq(null, conn, 'merizod was unable to start up');
 
     var localDB = conn.getDB('local');
 

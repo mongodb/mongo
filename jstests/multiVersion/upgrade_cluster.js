@@ -1,5 +1,5 @@
 /**
- * Tests that CRUD and aggregation commands through the mongos continue to work as expected on both
+ * Tests that CRUD and aggregation commands through the merizos continue to work as expected on both
  * sharded and unsharded collection at each step of cluster upgrade from last-stable to latest.
  *
  * TODO SERVER-36930 The tests about aggregation are specific to changes made in the 4.2 development
@@ -53,9 +53,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         var st = new ShardingTest({
             shards: 2,
-            mongos: 1,
+            merizos: 1,
             other: {
-                mongosOptions: {binVersion: "last-stable"},
+                merizosOptions: {binVersion: "last-stable"},
                 configOptions: {binVersion: "last-stable"},
                 shardOptions: {binVersion: "last-stable"},
 
@@ -102,8 +102,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         testCRUDAndAgg(st.s.getDB('unsharded'));
         testCRUDAndAgg(st.s.getDB('sharded'));
 
-        // Finally, upgrade mongos
-        jsTest.log('upgrading mongos servers');
+        // Finally, upgrade merizos
+        jsTest.log('upgrading merizos servers');
         st.upgradeCluster("latest", {upgradeConfigs: false, upgradeShards: false});
         st.restartMongoses();
 

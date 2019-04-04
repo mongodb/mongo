@@ -20,7 +20,7 @@
         var executionStats = explain.executionStats;
         assert("executionStages" in executionStats);
 
-        // If passed through mongos, then DELETE stage(s) should be below the SHARD_WRITE mongos
+        // If passed through merizos, then DELETE stage(s) should be below the SHARD_WRITE merizos
         // stage.  Otherwise the DELETE stage is the root stage.
         var execStages = executionStats.executionStages;
         if ("SHARD_WRITE" === execStages.stage) {

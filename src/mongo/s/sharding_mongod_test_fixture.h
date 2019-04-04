@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/s/sharding_test_fixture_common.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/s/sharding_test_fixture_common.h"
 
-namespace mongo {
+namespace merizo {
 
 class CatalogCacheLoader;
 class ConnectionString;
@@ -46,7 +46,7 @@ class ReplSettings;
 }  // namespace repl
 
 /**
- * Sets up this fixture as a mongod with a storage engine, OpObserver, and as a member of a replica
+ * Sets up this fixture as a merizod with a storage engine, OpObserver, and as a member of a replica
  * set.
  *
  * Additionally, provides an interface for initializing sharding components, mimicking the process
@@ -63,7 +63,7 @@ public:
     /**
      * Initializes sharding components according to the cluster role in
      * serverGlobalParams.clusterRole and puts the components on the Grid, mimicking the
-     * initialization done by an actual config or shard mongod server.
+     * initialization done by an actual config or shard merizod server.
      *
      * It is illegal to call this if serverGlobalParams.clusterRole is not ClusterRole::ShardServer
      * or ClusterRole::ConfigServer.
@@ -201,4 +201,4 @@ private:
     bool _executorPoolShutDown = false;
 };
 
-}  // namespace mongo
+}  // namespace merizo

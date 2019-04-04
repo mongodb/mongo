@@ -14,7 +14,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     function assertNCounted(num, obj, db) {
         var stage = obj.executionStats.executionStages;
-        // get sharded stage(s) if counting on mongos
+        // get sharded stage(s) if counting on merizos
         if (isMongos(db)) {
             stage = stage.shards[0].executionStages;
         }

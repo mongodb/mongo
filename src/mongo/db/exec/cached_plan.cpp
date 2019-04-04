@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/exec/cached_plan.h"
+#include "merizo/db/exec/cached_plan.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/stage_builder.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/exec/multi_plan.h"
+#include "merizo/db/exec/scoped_timer.h"
+#include "merizo/db/exec/working_set_common.h"
+#include "merizo/db/query/explain.h"
+#include "merizo/db/query/plan_cache.h"
+#include "merizo/db/query/plan_ranker.h"
+#include "merizo/db/query/plan_yield_policy.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/stage_builder.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
-namespace mongo {
+namespace merizo {
 
 // static
 const char* CachedPlanStage::kStageType = "CACHED_PLAN";
@@ -314,4 +314,4 @@ void CachedPlanStage::updatePlanCache() {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

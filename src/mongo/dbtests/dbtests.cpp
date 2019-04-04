@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,37 +31,37 @@
  * Runs db unit tests.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/dbtests/dbtests.h"
+#include "merizo/dbtests/dbtests.h"
 
-#include "mongo/base/init.h"
-#include "mongo/base/initializer.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_entry_point_mongod.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/dbtests/framework.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/transport/transport_layer_manager.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/startup_test.h"
-#include "mongo/util/text.h"
+#include "merizo/base/init.h"
+#include "merizo/base/initializer.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/catalog/multi_index_block.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/repl/drop_pending_collection_reaper.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/storage_interface_mock.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/service_entry_point_merizod.h"
+#include "merizo/db/wire_version.h"
+#include "merizo/dbtests/framework.h"
+#include "merizo/scripting/engine.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/transport/transport_layer_manager.h"
+#include "merizo/util/clock_source_mock.h"
+#include "merizo/util/quick_exit.h"
+#include "merizo/util/signal_handlers_synchronous.h"
+#include "merizo/util/startup_test.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 namespace dbtests {
 namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
@@ -162,15 +162,15 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
 }
 
 }  // namespace dbtests
-}  // namespace mongo
+}  // namespace merizo
 
 
 int dbtestsMain(int argc, char** argv, char** envp) {
-    ::mongo::setTestCommandsEnabled(true);
-    ::mongo::setupSynchronousSignalHandlers();
-    mongo::dbtests::initWireSpec();
+    ::merizo::setTestCommandsEnabled(true);
+    ::merizo::setupSynchronousSignalHandlers();
+    merizo::dbtests::initWireSpec();
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    merizo::runGlobalInitializersOrDie(argc, argv, envp);
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     repl::ReplSettings replSettings;
@@ -215,7 +215,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     AuthorizationManager::get(service)->setAuthEnabled(false);
     ScriptEngine::setup();
     StartupTest::runTests();
-    return mongo::dbtests::runDbTests(argc, argv);
+    return merizo::dbtests::runDbTests(argc, argv);
 }
 
 #if defined(_WIN32)

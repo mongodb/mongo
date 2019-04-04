@@ -6,12 +6,12 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # In MongoDB 4.0, transactions are not supported in sharded clusters.
+  # In MerizoDB 4.0, transactions are not supported in sharded clusters.
   - jstests/core/txns/**/*.js
   # Not expected to pass with replica-sets.
   - jstests/core/opcounters_write_cmd.js
   # The following tests fail because a certain command or functionality is not supported by
-  # mongos. This command or functionality is placed in a comment next to the failing test.
+  # merizos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
   - jstests/core/apitest_db_profile_level.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
@@ -25,7 +25,7 @@ selector:
   - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
-  - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/diagdata.js # Command not supported in merizos
   - jstests/core/do_txn*.js # doTxn
   - jstests/core/dropdb_race.js  # syncdelay.
   - jstests/core/fsync.js  # uses fsync.
@@ -41,9 +41,9 @@ selector:
   - jstests/core/tailable_cursor_invalidation.js # capped collections.
   - jstests/core/tailable_getmore_batch_size.js # capped collections.
   - jstests/core/tailable_skip_limit.js # capped collections.
-  # The following tests fail because mongos behaves differently from mongod when testing certain
+  # The following tests fail because merizos behaves differently from merizod when testing certain
   # functionality. The differences are in a comment next to the failing test.
-  - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos, SERVER-18047.
+  - jstests/core/explain_missing_database.js  # Behavior with no db different on merizos, SERVER-18047.
   - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
   - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
@@ -72,7 +72,7 @@ selector:
   - jstests/core/mr4.js
   # TODO: SERVER-30052
   - jstests/core/queryoptimizer3.js
-  # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
+  # TODO: SERVER-27269: merizos can't establish cursor if view has $collStats and views another view.
   - jstests/core/views/views_coll_stats.js
   # Tests that need triaging & remediation | blacklist decision
   # Comments list possible problem point under review.
@@ -130,7 +130,7 @@ selector:
   - jstests/core/dbstats.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
-  - assumes_against_mongod_not_mongos
+  - assumes_against_merizod_not_merizos
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
@@ -163,7 +163,7 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
-    mongos_options:
+    merizos_options:
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:
@@ -171,7 +171,7 @@ executor:
           network:
             verbosity: 1
             asio: 2
-    mongod_options:
+    merizod_options:
       enableMajorityReadConcern: ''
       set_parameters:
         enableTestCommands: 1

@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongostat
+package merizostat
 
 import (
 	"io/ioutil"
@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
-	"github.com/mongodb/mongo-tools/mongostat/status"
+	"github.com/merizodb/merizo-tools/common/testtype"
+	"github.com/merizodb/merizo-tools/merizostat/stat_consumer/line"
+	"github.com/merizodb/merizo-tools/merizostat/status"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -112,17 +112,17 @@ func TestIsMongos(t *testing.T) {
 	}
 
 	Convey("should accept reasonable process names", t, func() {
-		So(runCheck("/mongos-prod.exe"), ShouldBeTrue)
-		So(runCheck("/mongos.exe"), ShouldBeTrue)
-		So(runCheck("mongos"), ShouldBeTrue)
-		So(runCheck("mongodb/bin/mongos"), ShouldBeTrue)
-		So(runCheck(`C:\data\mci\48de1dc1ec3c2be5dcd6a53739578de4\src\mongos.exe`), ShouldBeTrue)
+		So(runCheck("/merizos-prod.exe"), ShouldBeTrue)
+		So(runCheck("/merizos.exe"), ShouldBeTrue)
+		So(runCheck("merizos"), ShouldBeTrue)
+		So(runCheck("merizodb/bin/merizos"), ShouldBeTrue)
+		So(runCheck(`C:\data\mci\48de1dc1ec3c2be5dcd6a53739578de4\src\merizos.exe`), ShouldBeTrue)
 	})
 	Convey("should accept reasonable process names", t, func() {
-		So(runCheck("mongosx/mongod"), ShouldBeFalse)
-		So(runCheck("mongostat"), ShouldBeFalse)
-		So(runCheck("mongos_stuff/mongod"), ShouldBeFalse)
-		So(runCheck("mongos.stuff/mongod"), ShouldBeFalse)
-		So(runCheck("mongodb/bin/mongod"), ShouldBeFalse)
+		So(runCheck("merizosx/merizod"), ShouldBeFalse)
+		So(runCheck("merizostat"), ShouldBeFalse)
+		So(runCheck("merizos_stuff/merizod"), ShouldBeFalse)
+		So(runCheck("merizos.stuff/merizod"), ShouldBeFalse)
+		So(runCheck("merizodb/bin/merizod"), ShouldBeFalse)
 	})
 }

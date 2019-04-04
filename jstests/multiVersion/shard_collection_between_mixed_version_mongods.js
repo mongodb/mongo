@@ -1,5 +1,5 @@
 //
-// Testing shardCollection between 4.0.1 and latest mongod versions for both config servers
+// Testing shardCollection between 4.0.1 and latest merizod versions for both config servers
 // and shards.
 //
 
@@ -10,9 +10,9 @@ load("./jstests/multiVersion/libs/verify_versions.js");
 
     var options = {
         shards: [{binVersion: "latest"}, {binVersion: "4.0.1"}, {binVersion: "4.0.1"}],
-        mongos: 1,
+        merizos: 1,
         other: {
-            mongosOptions: {binVersion: "latest"},
+            merizosOptions: {binVersion: "latest"},
             configOptions: {binVersion: "latest"},
             shardAsReplicaSet: true
         }
@@ -24,8 +24,8 @@ load("./jstests/multiVersion/libs/verify_versions.js");
     assert.binVersion(st.shard2, "4.0.1");
     assert.binVersion(st.s0, "latest");
 
-    var mongos = st.s0;
-    var admin = mongos.getDB('admin');
+    var merizos = st.s0;
+    var admin = merizos.getDB('admin');
 
     const kDBOnShardWithLatestBinary = "DBWithPrimaryOnLatestBinary";
     const kNSOnLatestShard = kDBOnShardWithLatestBinary + ".Coll";
@@ -46,8 +46,8 @@ load("./jstests/multiVersion/libs/verify_versions.js");
     // binVersion, but the primary is running with 4.0.1.
     assert.commandWorked(admin.runCommand({shardCollection: kNSOnOldShard, key: {a: 1}}));
 
-    mongos.getDB(kDBOnShardWithLatestBinary).Coll.drop();
-    mongos.getDB(kDBOnShardWithOldBinary).Coll.drop();
+    merizos.getDB(kDBOnShardWithLatestBinary).Coll.drop();
+    merizos.getDB(kDBOnShardWithOldBinary).Coll.drop();
 
     // Test that shardCollection with a hashed shard key succeeds when both the config server and
     // primary shard are running with latest binVersion, but other shards are running with 4.0.1

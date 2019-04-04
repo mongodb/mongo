@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/query/cluster_aggregation_planner.h"
+#include "merizo/s/query/cluster_aggregation_planner.h"
 
-#include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
-#include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_query_knobs_gen.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/query/document_source_update_on_add_shard.h"
-#include "mongo/s/query/owned_remote_cursor.h"
-#include "mongo/s/query/router_stage_limit.h"
-#include "mongo/s/query/router_stage_pipeline.h"
-#include "mongo/s/query/router_stage_remove_metadata_fields.h"
-#include "mongo/s/query/router_stage_skip.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/transaction_router.h"
+#include "merizo/db/pipeline/document_source_group.h"
+#include "merizo/db/pipeline/document_source_limit.h"
+#include "merizo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/document_source_out.h"
+#include "merizo/db/pipeline/document_source_project.h"
+#include "merizo/db/pipeline/document_source_sequential_document_cache.h"
+#include "merizo/db/pipeline/document_source_skip.h"
+#include "merizo/db/pipeline/document_source_sort.h"
+#include "merizo/db/pipeline/document_source_unwind.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/query/cluster_query_knobs_gen.h"
+#include "merizo/s/query/document_source_merge_cursors.h"
+#include "merizo/s/query/document_source_update_on_add_shard.h"
+#include "merizo/s/query/owned_remote_cursor.h"
+#include "merizo/s/query/router_stage_limit.h"
+#include "merizo/s/query/router_stage_pipeline.h"
+#include "merizo/s/query/router_stage_remove_metadata_fields.h"
+#include "merizo/s/query/router_stage_skip.h"
+#include "merizo/s/shard_id.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/s/transaction_router.h"
 
-namespace mongo {
+namespace merizo {
 namespace cluster_aggregation_planner {
 
 namespace {
@@ -589,4 +589,4 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
 }
 
 }  // namespace cluster_aggregation_planner
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -26,32 +26,32 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 #define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/replication_recovery.h"
+#include "merizo/db/repl/replication_recovery.h"
 
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/oplog_applier_impl.h"
-#include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/server_recovery.h"
-#include "mongo/db/session.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/util/log.h"
-#include "mongo/util/timer.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/apply_ops.h"
+#include "merizo/db/repl/oplog_applier_impl.h"
+#include "merizo/db/repl/oplog_buffer.h"
+#include "merizo/db/repl/replication_consistency_markers_impl.h"
+#include "merizo/db/repl/storage_interface.h"
+#include "merizo/db/server_recovery.h"
+#include "merizo/db/session.h"
+#include "merizo/db/transaction_history_iterator.h"
+#include "merizo/db/transaction_participant.h"
+#include "merizo/util/log.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 namespace {
@@ -73,7 +73,7 @@ public:
             << " (inclusive)). Operations applied so far: " << _numOpsApplied;
 
         _numOpsApplied += batch.size();
-        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,
+        if (shouldLog(::merizo::logger::LogComponent::kStorageRecovery,
                       kRecoveryOperationLogLevel)) {
             std::size_t i = 0;
             for (const auto& entry : batch) {
@@ -542,4 +542,4 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

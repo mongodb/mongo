@@ -6,9 +6,9 @@
     "use strict";
     const kRotationInterval = 30;
     let st = new ShardingTest({
-        mongos: 1,
+        merizos: 1,
         shards: {rs0: {nodes: 2}},
-        mongosWaitsForKeys: true,
+        merizosWaitsForKeys: true,
         other: {configOptions: {setParameter: "KeysRotationIntervalSec=30"}}
     });
 

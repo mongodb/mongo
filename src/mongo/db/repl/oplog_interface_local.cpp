@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/repl/oplog_interface_local.h"
+#include "merizo/db/repl/oplog_interface_local.h"
 
-#include "mongo/db/db_raii.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/socket_utils.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/internal_plans.h"
+#include "merizo/db/query/plan_executor.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/socket_utils.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 
 namespace {
@@ -106,4 +106,4 @@ HostAndPort OplogInterfaceLocal::hostAndPort() const {
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

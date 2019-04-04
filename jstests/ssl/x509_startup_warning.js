@@ -5,7 +5,7 @@
 
     function runTest(opts, expectWarning) {
         clearRawMongoProgramOutput();
-        const mongod = MongoRunner.runMongod(Object.assign({
+        const merizod = MongoRunner.runMongod(Object.assign({
             auth: '',
             sslMode: 'requireSSL',
             sslPEMKeyFile: 'jstests/libs/server.pem',
@@ -15,7 +15,7 @@
         assert.eq(expectWarning,
                   rawMongoProgramOutput().includes(
                       'WARNING: While invalid X509 certificates may be used'));
-        MongoRunner.stopMongod(mongod);
+        MongoRunner.stopMongod(merizod);
     }
 
     // Don't expect a warning when we're not using both options together.

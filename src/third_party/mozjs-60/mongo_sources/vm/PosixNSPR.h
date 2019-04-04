@@ -20,13 +20,13 @@ typedef nspr::Thread PRThread;
 typedef nspr::Lock PRLock;
 typedef nspr::CondVar PRCondVar;
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 void PR_BindThread(PRThread* thread);
 PRThread* PR_CreateFakeThread();
 void PR_DestroyFakeThread(PRThread* thread);
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo
 
 enum PRThreadType {
    PR_USER_THREAD,

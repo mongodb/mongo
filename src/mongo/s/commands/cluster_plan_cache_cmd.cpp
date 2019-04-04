@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/s/commands/strategy.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/stale_exception.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/init.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/query/collation/collation_spec.h"
+#include "merizo/s/commands/strategy.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/stale_exception.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::string;
@@ -45,7 +45,7 @@ using std::stringstream;
 using std::vector;
 
 /**
- * Base class for mongos plan cache commands.
+ * Base class for merizos plan cache commands.
  * Cluster plan cache commands don't do much more than
  * forwarding the commands to all shards and combining the results.
  */
@@ -173,4 +173,4 @@ MONGO_INITIALIZER(RegisterPlanCacheCommands)(InitializerContext* context) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/cyrus_sasl_client_session.h"
+#include "merizo/client/cyrus_sasl_client_session.h"
 
-#include "mongo/base/init.h"
-#include "mongo/client/native_sasl_client_session.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/signal_handlers_synchronous.h"
+#include "merizo/base/init.h"
+#include "merizo/client/native_sasl_client_session.h"
+#include "merizo/util/allocator.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/signal_handlers_synchronous.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 void saslSetError(sasl_conn_t* conn, const std::string& msg) {
@@ -68,7 +68,7 @@ typedef unsigned long SaslAllocSize;
 typedef int (*SaslCallbackFn)();
 
 void* saslOurMalloc(SaslAllocSize sz) {
-    return mongoMalloc(sz);
+    return merizoMalloc(sz);
 }
 
 void* saslOurCalloc(SaslAllocSize count, SaslAllocSize size) {
@@ -80,7 +80,7 @@ void* saslOurCalloc(SaslAllocSize count, SaslAllocSize size) {
 }
 
 void* saslOurRealloc(void* ptr, SaslAllocSize sz) {
-    return mongoRealloc(ptr, sz);
+    return merizoRealloc(ptr, sz);
 }
 
 /*
@@ -130,7 +130,7 @@ int saslClientLogSwallow(void* context, int priority, const char* message) throw
  * CyrusSaslAllocatorsAndMutexes as a prerequisite and CyrusSaslClientContext as a
  * dependent.  If it wishes to override both, it should implement a MONGO_INITIALIZER_GENERAL
  * with CyrusSaslAllocatorsAndMutexes and CyrusSaslClientContext as dependents, or
- * initialize the library before calling mongo::runGlobalInitializersOrDie().
+ * initialize the library before calling merizo::runGlobalInitializersOrDie().
  */
 MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
                                      ("NativeSaslClientContext", "CyrusSaslAllocatorsAndMutexes"))
@@ -146,7 +146,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
     int result = sasl_client_init(saslClientGlobalCallbacks);
     if (result != SASL_OK) {
         return Status(ErrorCodes::UnknownError,
-                      mongoutils::str::stream() << "Could not initialize sasl client components ("
+                      merizoutils::str::stream() << "Could not initialize sasl client components ("
                                                 << sasl_errstring(result, NULL, NULL)
                                                 << ")");
     }
@@ -268,7 +268,7 @@ Status CyrusSaslClientSession::initialize() {
 
     if (SASL_OK != result) {
         return Status(ErrorCodes::UnknownError,
-                      mongoutils::str::stream() << sasl_errstring(result, NULL, NULL));
+                      merizoutils::str::stream() << sasl_errstring(result, NULL, NULL));
     }
 
     return Status::OK();

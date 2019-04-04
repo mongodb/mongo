@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/projection_exec.h"
+#include "merizo/db/exec/projection_exec.h"
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/update/path_support.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/db/matcher/expression.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/query/collation/collator_interface.h"
+#include "merizo/db/query/query_request.h"
+#include "merizo/db/update/path_support.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::string;
 
-namespace mmb = mongo::mutablebson;
+namespace mmb = merizo::mutablebson;
 
 ProjectionExec::ProjectionExec(OperationContext* opCtx,
                                const BSONObj& spec,
@@ -61,7 +61,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
             invariant(1 == obj.nFields());
 
             BSONElement e2 = obj.firstElement();
-            if (mongoutils::str::equals(e2.fieldName(), "$slice")) {
+            if (merizoutils::str::equals(e2.fieldName(), "$slice")) {
                 if (e2.isNumber()) {
                     int i = e2.numberInt();
                     if (i < 0) {
@@ -82,7 +82,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
 
                     add(e.fieldName(), skip, limit);
                 }
-            } else if (mongoutils::str::equals(e2.fieldName(), "$elemMatch")) {
+            } else if (merizoutils::str::equals(e2.fieldName(), "$elemMatch")) {
                 _arrayOpType = ARRAY_OP_ELEM_MATCH;
 
                 // Create a MatchExpression for the elemMatch.
@@ -95,11 +95,11 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                     MatchExpressionParser::parse(elemMatchObj, std::move(expCtx));
                 invariant(statusWithMatcher.isOK());
                 // And store it in _matchers.
-                _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] =
+                _matchers[merizoutils::str::before(e.fieldName(), '.').c_str()] =
                     statusWithMatcher.getValue().release();
 
                 add(e.fieldName(), true);
-            } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
+            } else if (merizoutils::str::equals(e2.fieldName(), "$meta")) {
                 invariant(String == e2.type());
                 if (e2.valuestr() == QueryRequest::metaTextScore) {
                     _meta[e.fieldName()] = META_TEXT_SCORE;
@@ -125,7 +125,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
             } else {
                 MONGO_UNREACHABLE;
             }
-        } else if (mongoutils::str::equals(e.fieldName(), "_id") && !e.trueValue()) {
+        } else if (merizoutils::str::equals(e.fieldName(), "_id") && !e.trueValue()) {
             _includeID = false;
         } else {
             add(e.fieldName(), e.trueValue());
@@ -138,7 +138,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
             }
         }
 
-        if (mongoutils::str::contains(e.fieldName(), ".$")) {
+        if (merizoutils::str::contains(e.fieldName(), ".$")) {
             _arrayOpType = ARRAY_OP_POSITIONAL;
         }
     }
@@ -208,7 +208,7 @@ StatusWith<BSONObj> ProjectionExec::computeReturnKeyProjection(const BSONObj& in
     }
 
     // Must be possible to do both returnKey meta-projection and sortKey meta-projection so that
-    // mongos can support returnKey.
+    // merizos can support returnKey.
     for (auto fieldName : _sortKeyMetaFields)
         bob.append(fieldName, sortKey);
 
@@ -258,7 +258,7 @@ StatusWith<BSONObj> ProjectionExec::projectCovered(const std::vector<IndexKeyDat
     mmb::Document projectedDoc;
 
     for (auto&& specElt : _source) {
-        if (mongoutils::str::equals("_id", specElt.fieldName())) {
+        if (merizoutils::str::equals("_id", specElt.fieldName())) {
             continue;
         }
 
@@ -340,7 +340,7 @@ Status ProjectionExec::projectHelper(const BSONObj& in,
         BSONElement elt = it.next();
 
         // Case 1: _id
-        if (mongoutils::str::equals("_id", elt.fieldName())) {
+        if (merizoutils::str::equals("_id", elt.fieldName())) {
             if (_includeID) {
                 bob->append(elt);
             }
@@ -483,7 +483,7 @@ Status ProjectionExec::append(BSONObjBuilder* bob,
         if (details && arrayOpType == ARRAY_OP_POSITIONAL) {
             // $ positional operator specified
             if (!details->hasElemMatchKey()) {
-                mongoutils::str::stream error;
+                merizoutils::str::stream error;
                 error << "positional operator (" << elt.fieldName()
                       << ".$) requires corresponding field"
                       << " in query specifier";
@@ -506,4 +506,4 @@ Status ProjectionExec::append(BSONObjBuilder* bob,
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/index_builds_coordinator.h"
+#include "merizo/db/index_builds_coordinator.h"
 
-#include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_build_entry_gen.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index_build_entry_helpers.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/catalog/commit_quorum_options.h"
+#include "merizo/db/catalog/database_catalog_entry.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/catalog/index_build_entry_gen.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/catalog_raii.h"
+#include "merizo/db/concurrency/locker.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/db_raii.h"
+#include "merizo/db/index_build_entry_helpers.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/member_state.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/s/collection_sharding_state.h"
+#include "merizo/db/s/database_sharding_state.h"
+#include "merizo/db/service_context.h"
+#include "merizo/s/shard_key_pattern.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 using namespace indexbuildentryhelpers;
 
@@ -375,7 +375,7 @@ bool IndexBuildsCoordinator::inProgForDb(StringData db) const {
 void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
-            mongoutils::str::stream() << "cannot perform operation: there are currently "
+            merizoutils::str::stream() << "cannot perform operation: there are currently "
                                       << _allIndexBuilds.size()
                                       << " index builds running.",
             _allIndexBuilds.size() == 0);
@@ -384,14 +384,14 @@ void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
 void IndexBuildsCoordinator::assertNoIndexBuildInProgForCollection(
     const UUID& collectionUUID) const {
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
-            mongoutils::str::stream()
+            merizoutils::str::stream()
                 << "cannot perform operation: an index build is currently running",
             !inProgForCollection(collectionUUID));
 }
 
 void IndexBuildsCoordinator::assertNoBgOpInProgForDb(StringData db) const {
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
-            mongoutils::str::stream()
+            merizoutils::str::stream()
                 << "cannot perform operation: an index build is currently running for "
                    "database "
                 << db,
@@ -1146,4 +1146,4 @@ std::vector<BSONObj> IndexBuildsCoordinator::_addDefaultsAndFilterExistingIndexe
     return filteredSpecs;
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,36 +27,36 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/security_key.h"
+#include "merizo/db/auth/security_key.h"
 
 #include <string>
 #include <sys/stat.h>
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/client/authenticate.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/sasl_scram_server_conversation.h"
-#include "mongo/db/auth/security_file.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/icu.h"
-#include "mongo/util/log.h"
-#include "mongo/util/password_digest.h"
+#include "merizo/base/status_with.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/crypto/sha256_block.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/action_type.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/auth/sasl_scram_server_conversation.h"
+#include "merizo/db/auth/security_file.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/icu.h"
+#include "merizo/util/log.h"
+#include "merizo/util/password_digest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 constexpr size_t kMinKeyLength = 6;
 constexpr size_t kMaxKeyLength = 1024;
@@ -81,7 +81,7 @@ public:
                     << swSaslPassword.getStatus();
             return boost::none;
         }
-        const auto passwordDigest = mongo::createPasswordDigest(
+        const auto passwordDigest = merizo::createPasswordDigest(
             internalSecurity.user->getName().getUser().toString(), password);
 
         User::CredentialData credentials;
@@ -126,7 +126,7 @@ private:
 using std::string;
 
 bool setUpSecurityKey(const string& filename) {
-    auto swKeyStrings = mongo::readSecurityFile(filename);
+    auto swKeyStrings = merizo::readSecurityFile(filename);
     if (!swKeyStrings.isOK()) {
         log() << swKeyStrings.getStatus().reason();
         return false;
@@ -166,4 +166,4 @@ bool setUpSecurityKey(const string& filename) {
     return true;
 }
 
-}  // namespace mongo
+}  // namespace merizo

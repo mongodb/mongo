@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,19 +29,19 @@
 
 #pragma once
 
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/pipeline/mongo_process_common.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/ops/write_ops_exec.h"
+#include "merizo/db/ops/write_ops_gen.h"
+#include "merizo/db/pipeline/merizo_process_common.h"
+#include "merizo/db/pipeline/pipeline.h"
 
-namespace mongo {
+namespace merizo {
 
 using write_ops::Insert;
 using write_ops::Update;
 
 /**
- * Class to provide access to mongod-specific implementations of methods required by some
+ * Class to provide access to merizod-specific implementations of methods required by some
  * document sources.
  */
 class MongoInterfaceStandalone : public MongoProcessCommon {
@@ -175,4 +175,4 @@ private:
     std::map<UUID, std::unique_ptr<const CollatorInterface>> _collatorCache;
 };
 
-}  // namespace mongo
+}  // namespace merizo

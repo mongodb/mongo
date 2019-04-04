@@ -1,5 +1,5 @@
 //
-// Tests mongos's failure tolerance for single-node shards
+// Tests merizos's failure tolerance for single-node shards
 //
 // Sets up a cluster with three shards, the first shard of which has an unsharded collection and
 // half a sharded collection.  The second shard has the second half of the sharded collection, and
@@ -16,7 +16,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 3, mongos: 1});
+    var st = new ShardingTest({shards: 3, merizos: 1});
 
     var admin = st.s0.getDB("admin");
 
@@ -43,98 +43,98 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     jsTest.log("Inserting initial data...");
 
-    var mongosConnActive = new Mongo(st.s0.host);
-    var mongosConnIdle = null;
-    var mongosConnNew = null;
+    var merizosConnActive = new Mongo(st.s0.host);
+    var merizosConnIdle = null;
+    var merizosConnNew = null;
 
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -1}));
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 1}));
-    assert.writeOK(mongosConnActive.getCollection(collUnsharded.toString()).insert({_id: 1}));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: -1}));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: 1}));
+    assert.writeOK(merizosConnActive.getCollection(collUnsharded.toString()).insert({_id: 1}));
 
     jsTest.log("Stopping third shard...");
 
-    mongosConnIdle = new Mongo(st.s0.host);
+    merizosConnIdle = new Mongo(st.s0.host);
 
     st.rs2.stopSet();
 
     jsTest.log("Testing active connection...");
 
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -2}));
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 2}));
-    assert.writeOK(mongosConnActive.getCollection(collUnsharded.toString()).insert({_id: 2}));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: -2}));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: 2}));
+    assert.writeOK(merizosConnActive.getCollection(collUnsharded.toString()).insert({_id: 2}));
 
     jsTest.log("Testing idle connection...");
 
-    assert.writeOK(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: -3}));
-    assert.writeOK(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: 3}));
-    assert.writeOK(mongosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 3}));
+    assert.writeOK(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: -3}));
+    assert.writeOK(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: 3}));
+    assert.writeOK(merizosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 3}));
 
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     jsTest.log("Testing new connections...");
 
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.writeOK(mongosConnNew.getCollection(collSharded.toString()).insert({_id: -4}));
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.writeOK(mongosConnNew.getCollection(collSharded.toString()).insert({_id: 4}));
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.writeOK(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 4}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -4}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 4}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.writeOK(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 4}));
 
     gc();  // Clean up new connections
 
     jsTest.log("Stopping second shard...");
 
-    mongosConnIdle = new Mongo(st.s0.host);
+    merizosConnIdle = new Mongo(st.s0.host);
 
     st.rs1.stopSet();
     jsTest.log("Testing active connection...");
 
-    assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -5}));
+    assert.writeOK(merizosConnActive.getCollection(collSharded.toString()).insert({_id: -5}));
 
-    assert.writeError(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 5}));
-    assert.writeOK(mongosConnActive.getCollection(collUnsharded.toString()).insert({_id: 5}));
+    assert.writeError(merizosConnActive.getCollection(collSharded.toString()).insert({_id: 5}));
+    assert.writeOK(merizosConnActive.getCollection(collUnsharded.toString()).insert({_id: 5}));
 
     jsTest.log("Testing idle connection...");
 
-    assert.writeOK(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: -6}));
-    assert.writeError(mongosConnIdle.getCollection(collSharded.toString()).insert({_id: 6}));
-    assert.writeOK(mongosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 6}));
+    assert.writeOK(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: -6}));
+    assert.writeError(merizosConnIdle.getCollection(collSharded.toString()).insert({_id: 6}));
+    assert.writeOK(merizosConnIdle.getCollection(collUnsharded.toString()).insert({_id: 6}));
 
-    assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-    assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    assert.neq(null, merizosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
+    assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
     jsTest.log("Testing new connections...");
 
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
 
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.writeOK(mongosConnNew.getCollection(collSharded.toString()).insert({_id: -7}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -7}));
 
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_id: 7}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 7}));
 
-    mongosConnNew = new Mongo(st.s0.host);
-    assert.writeOK(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}));
+    merizosConnNew = new Mongo(st.s0.host);
+    assert.writeOK(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}));
 
     st.stop();
 

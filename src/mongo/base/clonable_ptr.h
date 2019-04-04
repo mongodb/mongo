@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,9 +34,9 @@
 #include <tuple>
 #include <type_traits>
 
-namespace mongo {
+namespace merizo {
 namespace clonable_ptr_detail {
-// This is the default `CloneFactory` conforming to `mongo::concept::CloneFactory` for
+// This is the default `CloneFactory` conforming to `merizo::concept::CloneFactory` for
 // `clonable_ptr`.
 template <typename Clonable>
 struct CloneFactory {
@@ -90,7 +90,7 @@ struct clonable_traits_impl<T, true> {
 /**
  * The 'clonable_traits' class is a specializable traits class for clonable-like types.  By
  * specializing this traits class for a type it is possible to change the global default
- * `CloneFactory` type for a specific type.  Types which conform to `mongo::concept::Clonable`
+ * `CloneFactory` type for a specific type.  Types which conform to `merizo::concept::Clonable`
  * will get a default `CloneFactory` type whch invokes their specific `Clonable::clone` function.  A
  * specialization can be used to make a type use a different clone factory function.  A type `T` may
  * specify `T::clone_factory_type` instead of specializing this traits type.
@@ -102,12 +102,12 @@ struct clonable_traits : clonable_ptr_detail::clonable_traits_impl<T> {};
  * The `clonable_ptr` represents a value-like type held at a distance.  The `clonable_ptr` class is
  * a smart-pointer type which functions like a `std::unique_ptr` with the added ability to create
  * new copies of the pointee on copy construction.  The default CloneFactory assumes that `T` is a
- * type which models the Concept `mongo::concept::Clonable`.  The supplied type may supply an
+ * type which models the Concept `merizo::concept::Clonable`.  The supplied type may supply an
  * alternative default `CloneFactory` type by either of two means:
  *
  *  * `T` may define a member `T::clone_factory_type` which conforms to
- *    `mongo::concept::CloneFactory`
- *  * `T` may have an accompanying specialization of `mongo::clonable_traits< T >` which
+ *    `merizo::concept::CloneFactory`
+ *  * `T` may have an accompanying specialization of `merizo::clonable_traits< T >` which
  *    defines `clonable_factory_type`.
  *
  * NOTE: The `CloneFactory` type is permitted to be stateful, but must be copy constructible and
@@ -116,8 +116,8 @@ struct clonable_traits : clonable_ptr_detail::clonable_traits_impl<T> {};
  * even when it has state.
  *
  * `T`: The type of the object being managed.
- * `CloneFactory`: A type which models the Concept `mongo::concept::CloneFactory`.
- * `UniquePtr`: A type which models the Concept `mongo::concept::UniquePtr`
+ * `CloneFactory`: A type which models the Concept `merizo::concept::CloneFactory`.
+ * `UniquePtr`: A type which models the Concept `merizo::concept::UniquePtr`
  */
 template <typename T,
           typename CloneFactory = typename clonable_traits<T>::clone_factory_type,
@@ -644,4 +644,4 @@ template <typename C, typename F, template <typename, typename...> class U>
 inline bool operator>=(const clonable_ptr<C, F, U>& lhs, const std::nullptr_t& rhs) {
     return !(lhs < rhs);
 }
-}  // namespace mongo
+}  // namespace merizo

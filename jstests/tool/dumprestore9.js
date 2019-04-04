@@ -12,7 +12,7 @@ if (0) {
         var s = new ShardingTest({
             name: "dumprestore9a",
             shards: 2,
-            mongos: 3,
+            merizos: 3,
             other: {chunkSize: 1, enableBalancer: true}
         });
 
@@ -53,18 +53,18 @@ if (0) {
 
         dumpdir = MongoRunner.dataDir + "/dumprestore9-dump1/";
         resetDbpath(dumpdir);
-        var exitCode = MongoRunner.runMongoTool("mongodump", {
+        var exitCode = MongoRunner.runMongoTool("merizodump", {
             host: s.s0.host,
             out: dumpdir,
         });
-        assert.eq(0, exitCode, "mongodump failed to dump data through one of the mongos processes");
+        assert.eq(0, exitCode, "merizodump failed to dump data through one of the merizos processes");
 
         step("Shutting down cluster");
 
         s.stop();
 
         step("Starting up clean cluster");
-        s = new ShardingTest({name: "dumprestore9b", shards: 2, mongos: 3, other: {chunkSize: 1}});
+        s = new ShardingTest({name: "dumprestore9b", shards: 2, merizos: 3, other: {chunkSize: 1}});
 
         db = s.getDB("aaa");
         coll = db.foo;
@@ -73,14 +73,14 @@ if (0) {
 
         step("Restore data and config");
 
-        exitCode = MongoRunner.runMongoTool("mongorestore", {
+        exitCode = MongoRunner.runMongoTool("merizorestore", {
             dir: dumpdir,
             host: s.s1.host,
             restoreShardingConfig: "",
             forceConfigRestore: "",
         });
         assert.eq(
-            0, exitCode, "mongorestore failed to restore data through the other mongos process");
+            0, exitCode, "merizorestore failed to restore data through the other merizos process");
 
         config = s.getDB("config");
         assert(config.databases.findOne({_id: 'aaa'}).partitioned,

@@ -173,7 +173,7 @@ const ImplicitlyShardAccessCollSettings = (function() {
 
         const originalCmdObj = Object.merge({}, cmdObj);
 
-        // SERVER-5448 'jsMode' is not supported through mongos. The 'jsMode' should not impact the
+        // SERVER-5448 'jsMode' is not supported through merizos. The 'jsMode' should not impact the
         // results at all, so can be safely deleted in the sharded environment.
         delete cmdObj.jsMode;
 

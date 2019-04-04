@@ -10,7 +10,7 @@ runReadOnlyTest(function() {
 
         load: function(writableCollection) {
 
-            // Catalog guarantees are neccessarily weaker in sharded systems since mongos is not
+            // Catalog guarantees are neccessarily weaker in sharded systems since merizos is not
             // read-only aware.
             if (TestData.fixture === "sharded")
                 return;
@@ -30,7 +30,7 @@ runReadOnlyTest(function() {
         },
         exec: function(readableCollection) {
 
-            // Catalog guarantees are neccessarily weaker in sharded systems since mongos is not
+            // Catalog guarantees are neccessarily weaker in sharded systems since merizos is not
             // read-only aware.
             if (TestData.fixture === "sharded")
                 return;

@@ -2,12 +2,12 @@
 // Tests that a migration does not overwrite duplicate _ids on data transfer
 //
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+var st = new ShardingTest({shards: 2, merizos: 1});
 st.stopBalancer();
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
+var merizos = st.s0;
+var admin = merizos.getDB("admin");
+var coll = merizos.getCollection("foo.bar");
 
 assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
 printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));

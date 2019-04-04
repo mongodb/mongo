@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/index_key_validate.h"
+#include "merizo/db/catalog/index_key_validate.h"
 
 #include <cmath>
 #include <limits>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/server_options.h"
-#include "mongo/unittest/ensure_fcv.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/commands/test_commands_enabled.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_test_service_context.h"
+#include "merizo/db/server_options.h"
+#include "merizo/unittest/ensure_fcv.h"
+#include "merizo/unittest/unittest.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using index_key_validate::validateIndexSpec;
@@ -979,4 +979,4 @@ TEST(IndexSpecWildcard, FailsWhenExclusionWithSubpath) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

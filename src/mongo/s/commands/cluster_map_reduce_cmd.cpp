@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/client/connpool.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/mr.h"
-#include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/commands/strategy.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/shard_collection_gen.h"
-#include "mongo/s/write_ops/cluster_write.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/bson/simple_bsonobj_comparator.h"
+#include "merizo/client/connpool.h"
+#include "merizo/db/catalog/document_validation.h"
+#include "merizo/db/command_generic_argument.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/commands/mr.h"
+#include "merizo/db/query/collation/collation_spec.h"
+#include "merizo/s/balancer_configuration.h"
+#include "merizo/s/catalog/dist_lock_manager.h"
+#include "merizo/s/catalog/sharding_catalog_client.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/client/shard_connection.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/commands/strategy.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/request_types/shard_collection_gen.h"
+#include "merizo/s/write_ops/cluster_write.h"
+#include "merizo/stdx/chrono.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 AtomicWord<unsigned> JOB_NUMBER;
@@ -117,7 +117,7 @@ BSONObj fixForShards(const BSONObj& orig,
 /**
  * Outline for sharded map reduce for sharded output, $out replace:
  *
- * ============= mongos =============
+ * ============= merizos =============
  * 1. Send map reduce command to all relevant shards with some extra info like the value for
  *    the chunkSize and the name of the temporary output collection.
  *
@@ -127,7 +127,7 @@ BSONObj fixForShards(const BSONObj& orig,
  * 3. Calls splitVector on itself against the output collection and puts the results into the
  *    response object.
  *
- * ============= mongos =============
+ * ============= merizos =============
  * 4. If the output collection is *not* sharded, uses the information from splitVector to
  *    create a pre-split sharded collection.
  *
@@ -146,7 +146,7 @@ BSONObj fixForShards(const BSONObj& orig,
  * 9. Atomically drops the old output collection and renames the temporary collection to the
  *    output collection.
  *
- * ============= mongos =============
+ * ============= merizos =============
  * 10. Releases the distributed lock acquired at step #5.
  *
  * 11. Inspects the BSONObject size from step #8 and determines if it needs to split.
@@ -539,8 +539,8 @@ public:
                 outputRoutingInfo = createShardedOutputCollection(
                     opCtx, outputCollNss, splitPts, &shardedOutputCollUUID);
             }
-            // This mongos might not have seen a UUID if setFCV was called on the cluster just after
-            // this mongos tried to obtain the sharded output collection's UUID, so appending the
+            // This merizos might not have seen a UUID if setFCV was called on the cluster just after
+            // this merizos tried to obtain the sharded output collection's UUID, so appending the
             // UUID is optional. If setFCV=3.6 has been called on the shard, the shard will error.
             // Else, the shard will pull the UUID from the config server on receiving setFCV=3.6.
             if (shardedOutputCollUUID) {
@@ -740,4 +740,4 @@ private:
 } clusterMapReduceCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

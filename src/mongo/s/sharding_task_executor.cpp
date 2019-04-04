@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/s/sharding_task_executor.h"
+#include "merizo/s/sharding_task_executor.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/operation_time_tracker.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/s/transaction_router.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/status_with.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/logical_time.h"
+#include "merizo/db/operation_time_tracker.h"
+#include "merizo/executor/thread_pool_task_executor.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/rpc/metadata/sharding_metadata.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_last_error_info.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/is_merizos.h"
+#include "merizo/s/transaction_router.h"
+#include "merizo/util/log.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 namespace executor {
 
 namespace {
@@ -70,7 +70,7 @@ void ShardingTaskExecutor::join() {
     _executor->join();
 }
 
-void ShardingTaskExecutor::appendDiagnosticBSON(mongo::BSONObjBuilder* builder) const {
+void ShardingTaskExecutor::appendDiagnosticBSON(merizo::BSONObjBuilder* builder) const {
     _executor->appendDiagnosticBSON(builder);
 }
 
@@ -173,7 +173,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         if (!args.response.isOK()) {
             if (isMongos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
                 severe()
-                    << "This mongos server must be upgraded. It is attempting to communicate with "
+                    << "This merizos server must be upgraded. It is attempting to communicate with "
                        "an upgraded cluster with which it is incompatible. Error: '"
                     << args.response.status.toString()
                     << "' Crashing in order to bring attention to the incompatibility, rather "
@@ -241,4 +241,4 @@ void ShardingTaskExecutor::appendConnectionStats(ConnectionPoolStats* stats) con
 }
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace merizo

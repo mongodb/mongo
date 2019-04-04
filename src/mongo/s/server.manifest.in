@@ -2,11 +2,11 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
     <assemblyIdentity 
         type="win32" 
-        name="MongoDB.Shard.Server"
-        version="@mongo_version_major@.@mongo_version_minor@.@mongo_version_patch@.0"
+        name="MerizoDB.Shard.Server"
+        version="@merizo_version_major@.@merizo_version_minor@.@merizo_version_patch@.0"
         processorArchitecture="IA64"
     />
-    <description>MongoDB Shard Server</description>
+    <description>MerizoDB Shard Server</description>
     <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
         <security>
             <requestedPrivileges>

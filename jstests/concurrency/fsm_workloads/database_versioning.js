@@ -118,12 +118,12 @@ var $config = (function() {
             assertAlways.commandWorked(db.getSiblingDB(databases[i]._id).foo.insert({x: 1}));
         }
 
-        // If this workload is run with --repeat, mongos will already have all the database entries
-        // cached. Because of SERVER-xxx (mongos does not mark its database entry as invalid on
-        // CannotImplicitlyCreateCollection), this mongos will never realize the databases have been
+        // If this workload is run with --repeat, merizos will already have all the database entries
+        // cached. Because of SERVER-xxx (merizos does not mark its database entry as invalid on
+        // CannotImplicitlyCreateCollection), this merizos will never realize the databases have been
         // dropped, and so will never send the implicit createDatabase for writes in the next run
         // (and instead will exhaust retries of CannotImplicitlyCreateCollection).
-        // As a temporary workaround, flush mongos's cache at the end of each workload.
+        // As a temporary workaround, flush merizos's cache at the end of each workload.
         assertAlways.commandWorked(db.adminCommand({flushRouterConfig: 1}));
     }
 

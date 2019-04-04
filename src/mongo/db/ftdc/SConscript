@@ -21,10 +21,10 @@ ftdcEnv.Library(
         'varint.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/service_context',
         '$BUILD_DIR/third_party/s2/s2', # For VarInt
         '$BUILD_DIR/third_party/shim_zlib',
     ],
@@ -34,11 +34,11 @@ platform_libs = []
 
 if env.TargetOSIs('linux'):
     platform_libs = [
-        '$BUILD_DIR/mongo/util/procparser'
+        '$BUILD_DIR/merizo/util/procparser'
     ]
 elif env.TargetOSIs('windows'):
     platform_libs = [
-        '$BUILD_DIR/mongo/util/perfctr_collect'
+        '$BUILD_DIR/merizo/util/perfctr_collect'
     ]
 
 env.Library(
@@ -50,40 +50,40 @@ env.Library(
         'ftdc_system_stats_${TARGET_OS}.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/util/processinfo',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/util/processinfo',
         'ftdc'
     ] + platform_libs,
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
 env.Library(
-    target='ftdc_mongod',
+    target='ftdc_merizod',
     source=[
         'ftdc_commands.cpp',
-        'ftdc_mongod.cpp',
+        'ftdc_merizod.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
         'ftdc_server'
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/auth/authprivilege',
     ],
 )
 
 env.Library(
-    target='ftdc_mongos',
+    target='ftdc_merizos',
     source=[
-        'ftdc_mongos.cpp',
+        'ftdc_merizos.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
         'ftdc_server'
     ],
 )
@@ -100,8 +100,8 @@ env.CppUnitTest(
         'varint_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/util/clock_source_mock',
         'ftdc',
     ],
 )

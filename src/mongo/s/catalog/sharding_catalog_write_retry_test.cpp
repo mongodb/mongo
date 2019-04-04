@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,39 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <set>
 #include <string>
 #include <vector>
 
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/type_changelog.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
+#include "merizo/client/remote_command_targeter_mock.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/storage/duplicate_key_error_info.h"
+#include "merizo/db/write_concern.h"
+#include "merizo/executor/network_interface_mock.h"
+#include "merizo/executor/task_executor.h"
+#include "merizo/rpc/metadata/repl_set_metadata.h"
+#include "merizo/s/catalog/dist_lock_manager_mock.h"
+#include "merizo/s/catalog/sharding_catalog_client_impl.h"
+#include "merizo/s/catalog/type_changelog.h"
+#include "merizo/s/catalog/type_chunk.h"
+#include "merizo/s/catalog/type_collection.h"
+#include "merizo/s/catalog/type_database.h"
+#include "merizo/s/catalog/type_shard.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/sharding_router_test_fixture.h"
+#include "merizo/s/write_ops/batched_command_response.h"
+#include "merizo/stdx/future.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using executor::NetworkInterfaceMock;
@@ -567,4 +567,4 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

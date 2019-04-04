@@ -75,12 +75,12 @@ sourcesList = [ "BinaryFragment.wxs",
 # Need to do this in order to get scons to translate path separators into native format
 buildDir = env.Dir("$BUILD_DIR").path
 if has_option("use-new-tools"):
-	toolBuildDir = "src\mongo-tools"
+	toolBuildDir = "src\merizo-tools"
 else:
-	toolBuildDir = buildDir + r'\mongo'
+	toolBuildDir = buildDir + r'\merizo'
 
-enterprisebase = 'src\mongo\db\modules\enterprise'
-enterpriseToolBuildDir = buildDir + r'\mongo\db\modules\enterprise'
+enterprisebase = 'src\merizo\db\modules\enterprise'
+enterpriseToolBuildDir = buildDir + r'\merizo\db\modules\enterprise'
 
 # Set up parameters to pass to wix -
 #
@@ -147,25 +147,25 @@ env.Command(objects,
             '"$WIXCANDLE" -wx'
             # cannot have anything other than x.x.x.x in version string.
             # we should choose a fourth version number that reflects pre-ness.
-            ' -dMongoDBMajorVersion=' + major_version +
-            ' -dMongoDBVersion=' + full_version +
+            ' -dMerizoDBMajorVersion=' + major_version +
+            ' -dMerizoDBVersion=' + full_version +
             ' -dLicenseSource=distsrc'
             r' -dEnterpriseBase=' + enterprisebase + '\\'
-            ' -dBinarySource=' + buildDir + r'\mongo'
+            ' -dBinarySource=' + buildDir + r'\merizo'
             ' -dToolBinarySource=' + toolBuildDir +
             ' -dEnterpriseToolBinarySource=' + enterpriseToolBuildDir +
             ' -dMergeModulesBasePath="$MERGEMODULESBASEPATH"'
             ' -dEdition=' + msi_edition +
             ' -d"ProductId=*\"'
             ' -dUpgradeCode=' + upgrade_code +
-            ' -dCustomActionDll=' + buildDir + r'\mongo\installer\msi\ca\mongoca.dll'
+            ' -dCustomActionDll=' + buildDir + r'\merizo\installer\msi\ca\merizoca.dll'
             ' -dConfiguration=Release'
             ' -dOutDir=' + buildDir + r'\msi'
             ' -dPlatform=' + msi_platform +
             ' -dFlavor=' + msi_flavor +
             r' -dProjectDir=buildscripts\packaging\msi\\'
-            ' -dProjectName=MongoDB'
-            ' -dCompassDir=src\mongo\installer\compass'
+            ' -dProjectName=MerizoDB'
+            ' -dCompassDir=src\merizo\installer\compass'
             ' -dTargetDir=' + buildDir + r'\msi'
             ' -dTargetExt=.msi'
             ' -dTargetFileName=${SERVER_ARCHIVE}'
@@ -187,7 +187,7 @@ pre_msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.pre.msi"
 # ICE82 - Suppress "duplicate sequence number"
 # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368798(v=vs.85).aspx
 # ICE30 - Suppress "different components install same file"
-# -- mongod.exe is installed in two different components but only one is ever used during an install
+# -- merizod.exe is installed in two different components but only one is ever used during an install
 #    so this consistency check can be ignored.
 # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368954(v=vs.85).aspx
 
@@ -200,19 +200,19 @@ pre_msi_cmd = env.Command(pre_msi,
 env.NoCache(pre_msi_cmd)
 
 # Generated Dependencies
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongo.exe')
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongod.exe')
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongos.exe')
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/installer/msi/ca/mongoca.dll')
-env.Depends(pre_msi_cmd, '#src/mongo/installer/compass/Install-Compass.ps1')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/merizo/merizo.exe')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/merizo/merizod.exe')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/merizo/merizos.exe')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/merizo/installer/msi/ca/merizoca.dll')
+env.Depends(pre_msi_cmd, '#src/merizo/installer/compass/Install-Compass.ps1')
 
 # Source Dependencies
-env.Depends(pre_msi_cmd, '#buildscripts/packaging/msi/mongod.yaml')
+env.Depends(pre_msi_cmd, '#buildscripts/packaging/msi/merizod.yaml')
 
 if 'enterprise' in env['MONGO_MODULES']:
-    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongodecrypt.exe")
-    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongoldap.exe")
-    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongocryptd.exe")
+    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/merizodecrypt.exe")
+    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/merizoldap.exe")
+    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/merizocryptd.exe")
 
 msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
 env.Command(msi,

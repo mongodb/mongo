@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,16 +34,16 @@
 #include <type_traits>
 #include <utility>
 
-#include "mongo/base/static_assert.h"
-#include "mongo/base/status.h"
-#include "mongo/platform/compiler.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/base/status.h"
+#include "merizo/platform/compiler.h"
 
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
-#include "mongo/util/invariant.h"
+#include "merizo/util/invariant.h"
 #undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 
 
-namespace mongo {
+namespace merizo {
 
 // Including builder.h here would cause a cycle.
 template <typename Allocator>
@@ -62,7 +62,7 @@ extern constexpr bool isStatusWith<StatusWith<T>> = true;
 
 template <typename T>
 extern constexpr bool isStatusOrStatusWith =
-    std::is_same<T, mongo::Status>::value || isStatusWith<T>;
+    std::is_same<T, merizo::Status>::value || isStatusWith<T>;
 
 template <typename T>
 using StatusOrStatusWith = std::conditional_t<std::is_void<T>::value, Status, StatusWith<T>>;
@@ -115,7 +115,7 @@ public:
     MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, const char* reason)
         : _status(code, reason) {}
     MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code,
-                                            const mongoutils::str::stream& reason)
+                                            const merizoutils::str::stream& reason)
         : _status(code, reason) {}
 
     /**
@@ -284,4 +284,4 @@ bool operator!=(const ErrorCodes::Error code, const StatusWith<T>& sw) {
     return !(code == sw);
 }
 
-}  // namespace mongo
+}  // namespace merizo

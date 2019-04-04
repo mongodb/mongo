@@ -5,13 +5,13 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='views_mongod',
+    target='views_merizod',
     source=[
         'durable_view_catalog.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/views/views',
+        '$BUILD_DIR/merizo/db/dbhelpers',
+        '$BUILD_DIR/merizo/db/views/views',
     ],
 )
 
@@ -24,10 +24,10 @@ env.Library(
     ],
     LIBDEPS=[
         'resolved_view',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/pipeline/aggregation',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/query/collation/collator_factory_interface',
     ]
 )
 
@@ -37,7 +37,7 @@ env.Library(
         'resolved_view.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
@@ -51,11 +51,11 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'views',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/s/is_mongos',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/db/auth/authmocks',
+        '$BUILD_DIR/merizo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/merizo/db/query/query_test_service_context',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/s/is_merizos',
+        '$BUILD_DIR/merizo/unittest/unittest',
     ],
 )

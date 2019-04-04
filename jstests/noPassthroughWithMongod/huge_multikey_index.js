@@ -1,4 +1,4 @@
-// https://jira.mongodb.org/browse/SERVER-4534
+// https://jira.merizodb.org/browse/SERVER-4534
 // Building an index in the forground on a field with a large array and few documents in
 // the collection used to open too many files and crash the server.
 t = db.huge_multikey_index;

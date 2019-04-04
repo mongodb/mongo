@@ -16,7 +16,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
     "use strict";
 
-    let st = new ShardingTest({shards: {rs0: {nodes: 2}}, mongosWaitsForKeys: true});
+    let st = new ShardingTest({shards: {rs0: {nodes: 2}}, merizosWaitsForKeys: true});
 
     // Verify after startup there is a new key in admin.system.keys.
     jsTestLog("Verify the admin.system.keys collection after startup.");
@@ -64,7 +64,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         "data": {"overrideMS": 1000}
     });
 
-    // Kill and restart all shards and mongos processes so they have no keys in memory.
+    // Kill and restart all shards and merizos processes so they have no keys in memory.
     st.rs0.stopSet(null /* signal */, true /* forRestart */);
     st.rs0.startSet({restart: true});
 

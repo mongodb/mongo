@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,26 +32,26 @@
  * the DBClientReplicaSet talks to, so the tests only covers the client side logic.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/base/string_data.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_rs.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/dbtests/mock/mock_conn_registry.h"
-#include "mongo/dbtests/mock/mock_replica_set.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/base/init.h"
+#include "merizo/base/string_data.h"
+#include "merizo/client/connpool.h"
+#include "merizo/client/dbclient_rs.h"
+#include "merizo/client/replica_set_monitor.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/dbtests/mock/mock_conn_registry.h"
+#include "merizo/dbtests/mock/mock_replica_set.h"
+#include "merizo/stdx/unordered_set.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::make_pair;
@@ -82,14 +82,14 @@ protected:
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
-        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+        ConnectionString::setConnectionHook(merizo::MockConnRegistry::get()->getConnStrHook());
     }
 
     void tearDown() {
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
-        mongo::ScopedDbConnection::clearPool();
+        merizo::ScopedDbConnection::clearPool();
     }
 
     MockReplicaSet* getReplSet() {
@@ -126,7 +126,7 @@ TEST_F(BasicRS, QueryPrimary) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::PrimaryOnly, BSONArray());
+    query.readPref(merizo::ReadPreference::PrimaryOnly, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -143,7 +143,7 @@ TEST_F(BasicRS, QuerySecondaryOnly) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
+    query.readPref(merizo::ReadPreference::SecondaryOnly, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -164,7 +164,7 @@ TEST_F(BasicRS, QueryPrimaryPreferred) {
     ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     Query query;
-    query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
+    query.readPref(merizo::ReadPreference::PrimaryPreferred, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -184,7 +184,7 @@ TEST_F(BasicRS, QuerySecondaryPreferred) {
     ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     Query query;
-    query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
+    query.readPref(merizo::ReadPreference::SecondaryPreferred, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -206,7 +206,7 @@ protected:
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
-        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+        ConnectionString::setConnectionHook(merizo::MockConnRegistry::get()->getConnStrHook());
 
         vector<HostAndPort> hostList(_replSet->getHosts());
         for (vector<HostAndPort>::const_iterator iter = hostList.begin(); iter != hostList.end();
@@ -219,7 +219,7 @@ protected:
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
-        mongo::ScopedDbConnection::clearPool();
+        merizo::ScopedDbConnection::clearPool();
     }
 
     MockReplicaSet* getReplSet() {
@@ -245,7 +245,7 @@ TEST_F(AllNodesDown, QueryPrimary) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::PrimaryOnly, BSONArray());
+    query.readPref(merizo::ReadPreference::PrimaryOnly, BSONArray());
     ASSERT_THROWS(replConn.query(NamespaceString(IdentityNS), query), AssertionException);
 }
 
@@ -258,7 +258,7 @@ TEST_F(AllNodesDown, QuerySecondaryOnly) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
+    query.readPref(merizo::ReadPreference::SecondaryOnly, BSONArray());
     ASSERT_THROWS(replConn.query(NamespaceString(IdentityNS), query), AssertionException);
 }
 
@@ -271,7 +271,7 @@ TEST_F(AllNodesDown, QueryPrimaryPreferred) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
+    query.readPref(merizo::ReadPreference::PrimaryPreferred, BSONArray());
     ASSERT_THROWS(replConn.query(NamespaceString(IdentityNS), query), AssertionException);
 }
 
@@ -284,7 +284,7 @@ TEST_F(AllNodesDown, QuerySecondaryPreferred) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
+    query.readPref(merizo::ReadPreference::SecondaryPreferred, BSONArray());
     ASSERT_THROWS(replConn.query(NamespaceString(IdentityNS), query), AssertionException);
 }
 
@@ -297,7 +297,7 @@ TEST_F(AllNodesDown, QueryNearest) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::Nearest, BSONArray());
+    query.readPref(merizo::ReadPreference::Nearest, BSONArray());
     ASSERT_THROWS(replConn.query(NamespaceString(IdentityNS), query), AssertionException);
 }
 
@@ -314,7 +314,7 @@ protected:
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
-        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+        ConnectionString::setConnectionHook(merizo::MockConnRegistry::get()->getConnStrHook());
         _replSet->kill(_replSet->getPrimary());
     }
 
@@ -322,7 +322,7 @@ protected:
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
-        mongo::ScopedDbConnection::clearPool();
+        merizo::ScopedDbConnection::clearPool();
     }
 
     MockReplicaSet* getReplSet() {
@@ -338,7 +338,7 @@ TEST_F(PrimaryDown, QueryPrimary) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::PrimaryOnly, BSONArray());
+    query.readPref(merizo::ReadPreference::PrimaryOnly, BSONArray());
     ASSERT_THROWS(replConn.query(NamespaceString(IdentityNS), query), AssertionException);
 }
 
@@ -351,7 +351,7 @@ TEST_F(PrimaryDown, QuerySecondaryOnly) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
+    query.readPref(merizo::ReadPreference::SecondaryOnly, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -369,7 +369,7 @@ TEST_F(PrimaryDown, QueryPrimaryPreferred) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
+    query.readPref(merizo::ReadPreference::PrimaryPreferred, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -387,7 +387,7 @@ TEST_F(PrimaryDown, QuerySecondaryPreferred) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
+    query.readPref(merizo::ReadPreference::SecondaryPreferred, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -405,7 +405,7 @@ TEST_F(PrimaryDown, Nearest) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::Nearest, BSONArray());
+    query.readPref(merizo::ReadPreference::Nearest, BSONArray());
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
     BSONObj doc = cursor->next();
     ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
@@ -420,7 +420,7 @@ protected:
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
-        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+        ConnectionString::setConnectionHook(merizo::MockConnRegistry::get()->getConnStrHook());
 
         _replSet->kill(_replSet->getSecondaries().front());
     }
@@ -429,7 +429,7 @@ protected:
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
-        mongo::ScopedDbConnection::clearPool();
+        merizo::ScopedDbConnection::clearPool();
     }
 
     MockReplicaSet* getReplSet() {
@@ -445,7 +445,7 @@ TEST_F(SecondaryDown, QueryPrimary) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::PrimaryOnly, BSONArray());
+    query.readPref(merizo::ReadPreference::PrimaryOnly, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -462,7 +462,7 @@ TEST_F(SecondaryDown, QuerySecondaryOnly) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
+    query.readPref(merizo::ReadPreference::SecondaryOnly, BSONArray());
     ASSERT_THROWS(replConn.query(NamespaceString(IdentityNS), query), AssertionException);
 }
 
@@ -475,7 +475,7 @@ TEST_F(SecondaryDown, QueryPrimaryPreferred) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
+    query.readPref(merizo::ReadPreference::PrimaryPreferred, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -492,7 +492,7 @@ TEST_F(SecondaryDown, QuerySecondaryPreferred) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
+    query.readPref(merizo::ReadPreference::SecondaryPreferred, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -509,7 +509,7 @@ TEST_F(SecondaryDown, QueryNearest) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     Query query;
-    query.readPref(mongo::ReadPreference::Nearest, BSONArray());
+    query.readPref(merizo::ReadPreference::Nearest, BSONArray());
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -537,20 +537,20 @@ protected:
 
         _replSet.reset(new MockReplicaSet("test", 5));
         _originalConnectionHook = ConnectionString::getConnectionHook();
-        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+        ConnectionString::setConnectionHook(merizo::MockConnRegistry::get()->getConnStrHook());
 
         {
-            mongo::repl::ReplSetConfig oldConfig = _replSet->getReplConfig();
+            merizo::repl::ReplSetConfig oldConfig = _replSet->getReplConfig();
 
-            mongo::BSONObjBuilder newConfigBuilder;
+            merizo::BSONObjBuilder newConfigBuilder;
             newConfigBuilder.append("_id", oldConfig.getReplSetName());
             newConfigBuilder.append("version", oldConfig.getConfigVersion());
             newConfigBuilder.append("protocolVersion", 1);
 
-            mongo::BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
+            merizo::BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
             {
                 const string host(_replSet->getPrimary());
-                const mongo::repl::MemberConfig* member =
+                const merizo::repl::MemberConfig* member =
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(
                     BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
@@ -565,7 +565,7 @@ protected:
 
             {
                 const string host(*secIter);
-                const mongo::repl::MemberConfig* member =
+                const merizo::repl::MemberConfig* member =
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(
                     BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
@@ -580,7 +580,7 @@ protected:
             {
                 ++secIter;
                 const string host(*secIter);
-                const mongo::repl::MemberConfig* member =
+                const merizo::repl::MemberConfig* member =
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(
                     BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
@@ -595,7 +595,7 @@ protected:
             {
                 ++secIter;
                 const string host(*secIter);
-                const mongo::repl::MemberConfig* member =
+                const merizo::repl::MemberConfig* member =
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(
                     BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
@@ -608,7 +608,7 @@ protected:
             {
                 ++secIter;
                 const string host(*secIter);
-                const mongo::repl::MemberConfig* member =
+                const merizo::repl::MemberConfig* member =
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(
                     BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
@@ -619,7 +619,7 @@ protected:
             }
 
             membersBuilder.done();
-            mongo::repl::ReplSetConfig newConfig;
+            merizo::repl::ReplSetConfig newConfig;
             fassert(28569, newConfig.initialize(newConfigBuilder.done()));
             fassert(28568, newConfig.validate());
             _replSet->setConfig(newConfig);
@@ -633,7 +633,7 @@ protected:
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
-        mongo::ScopedDbConnection::clearPool();
+        merizo::ScopedDbConnection::clearPool();
     }
 
     MockReplicaSet* getReplSet() {
@@ -655,7 +655,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldPinIfSameSettings) {
     string dest;
     {
         Query query;
-        query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
+        query.readPref(merizo::ReadPreference::PrimaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
         unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -665,7 +665,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldPinIfSameSettings) {
 
     {
         Query query;
-        query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
+        query.readPref(merizo::ReadPreference::PrimaryPreferred, BSONArray());
         unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
         BSONObj doc = cursor->next();
         const string newDest = doc[HostField.name()].str();
@@ -683,7 +683,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfHostMarkedAsFailed) {
     string dest;
     {
         Query query;
-        query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
+        query.readPref(merizo::ReadPreference::PrimaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
         unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -699,7 +699,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfHostMarkedAsFailed) {
 
     {
         Query query;
-        query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
+        query.readPref(merizo::ReadPreference::PrimaryPreferred, BSONArray());
         unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
         BSONObj doc = cursor->next();
         const string newDest = doc[HostField.name()].str();
@@ -720,7 +720,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffMode) {
     string dest;
     {
         Query query;
-        query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
+        query.readPref(merizo::ReadPreference::SecondaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
         unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
@@ -731,7 +731,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffMode) {
 
     {
         Query query;
-        query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
+        query.readPref(merizo::ReadPreference::SecondaryOnly, BSONArray());
         unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
         BSONObj doc = cursor->next();
         const string newDest = doc[HostField.name()].str();
@@ -752,7 +752,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffTag) {
     string dest;
     {
         Query query;
-        query.readPref(mongo::ReadPreference::SecondaryPreferred,
+        query.readPref(merizo::ReadPreference::SecondaryPreferred,
                        BSON_ARRAY(BSON("dc"
                                        << "sf")));
 
@@ -766,7 +766,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffTag) {
     {
         Query query;
         vector<pair<string, string>> tagSet;
-        query.readPref(mongo::ReadPreference::SecondaryPreferred, BSON_ARRAY(BSON("group" << 1)));
+        query.readPref(merizo::ReadPreference::SecondaryPreferred, BSON_ARRAY(BSON("group" << 1)));
         unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
         BSONObj doc = cursor->next();
         const string newDest = doc[HostField.name()].str();
@@ -787,7 +787,7 @@ TEST_F(TaggedFiveMemberRS, SlaveConnReturnsSecConn) {
     ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     string dest;
-    mongo::DBClientConnection& secConn = replConn.slaveConn();
+    merizo::DBClientConnection& secConn = replConn.slaveConn();
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = secConn.query(NamespaceString(IdentityNS), Query());
@@ -797,4 +797,4 @@ TEST_F(TaggedFiveMemberRS, SlaveConnReturnsSecConn) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

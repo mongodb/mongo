@@ -26,7 +26,7 @@ printjson(t.find()
               .toArray());
 
 // this should be 2!!  add assertion when fixed
-// http://jira.mongodb.org/browse/SERVER-675
+// http://jira.merizodb.org/browse/SERVER-675
 print(t.find()
           .min({"_id": "IBM.N|00000000000000000000"})
           .max({"_id": "IBM.N|99999999999999999999"})

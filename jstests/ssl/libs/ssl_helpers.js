@@ -60,12 +60,12 @@ var replShouldFail = function(name, opt1, opt2) {
     ssl_options2 = opt2;
     ssl_name = name;
     assert.throws(load, [replSetTestFile], "This setup should have failed");
-    // Note: this leaves running mongod processes.
+    // Note: this leaves running merizod processes.
 };
 
 /**
  * Test that $lookup works with a sharded source collection. This is tested because of
- * the connections opened between mongos/shards and between the shards themselves.
+ * the connections opened between merizos/shards and between the shards themselves.
  */
 function testShardedLookup(shardingTest) {
     var st = shardingTest;
@@ -100,7 +100,7 @@ function testShardedLookup(shardingTest) {
 }
 
 /**
- * Takes in two mongod/mongos configuration options and runs a basic
+ * Takes in two merizod/merizos configuration options and runs a basic
  * sharding test to see if they can work together...
  */
 function mixedShardTest(options1, options2, shouldSucceed) {
@@ -117,7 +117,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // Once SERVER-14017 is fixed the "enableBalancer" line can be removed.
         // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
         var st = new ShardingTest({
-            mongos: [options1],
+            merizos: [options1],
             config: [options1],
             shards: [options1, options2],
             other: {enableBalancer: true, shardAsReplicaSet: false}
@@ -135,7 +135,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // Test that $lookup works because it causes outgoing connections to be opened
         testShardedLookup(st);
 
-        // Test mongos talking to config servers
+        // Test merizos talking to config servers
         var r = st.adminCommand({enableSharding: "test"});
         assert.eq(r, true, "error enabling sharding for this configuration");
 
@@ -147,7 +147,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         r = st.adminCommand({shardCollection: "test.col", key: {_id: 1}});
         assert.eq(r, true, "error sharding collection for this configuration");
 
-        // Test mongos talking to shards
+        // Test merizos talking to shards
         var bigstr = Array(1024 * 1024).join("#");
 
         var bulk = db1.col.initializeUnorderedBulkOp();

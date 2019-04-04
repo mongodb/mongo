@@ -1,5 +1,5 @@
 // dumprestore_auth2.js
-// Tests that mongodump and mongorestore properly handle access control information
+// Tests that merizodump and merizorestore properly handle access control information
 // Tests that the default auth roles of backup and restore work properly.
 
 var dumpRestoreAuth2 = function(backup_role, restore_role) {

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -39,18 +39,18 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/client.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/service_context.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/concurrency/spin_lock.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/invariant.h"
-#include "mongo/util/net/hostandport.h"
+#include "merizo/db/client.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/service_context.h"
+#include "merizo/platform/random.h"
+#include "merizo/stdx/thread.h"
+#include "merizo/transport/session.h"
+#include "merizo/util/concurrency/spin_lock.h"
+#include "merizo/util/decorable.h"
+#include "merizo/util/invariant.h"
+#include "merizo/util/net/hostandport.h"
 
-namespace mongo {
+namespace merizo {
 
 class Collection;
 class OperationContext;
@@ -291,4 +291,4 @@ private:
 Client& cc();
 
 bool haveClient();
-}  // namespace mongo
+}  // namespace merizo

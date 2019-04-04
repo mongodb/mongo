@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <vector>
 
-#include "mongo/db/commands.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
+#include "merizo/db/commands.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/grid.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 void aggregateResults(const std::vector<AsyncRequestsSender::Response>& responses,
@@ -67,7 +67,7 @@ void aggregateResults(const std::vector<AsyncRequestsSender::Response>& response
     // TODO SERVER-26110: Add aggregated 'collections' and 'views' metrics.
     output.appendNumber("objects", objects);
 
-    // avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
+    // avgObjSize on merizod is not scaled based on the argument to db.stats(), so we use
     // unscaledDataSize here for consistency.  See SERVER-7347.
     output.append("avgObjSize", objects == 0 ? 0 : double(unscaledDataSize) / double(objects));
     output.appendNumber("dataSize", dataSize);
@@ -124,4 +124,4 @@ public:
 } clusterDBStatsCmd;
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

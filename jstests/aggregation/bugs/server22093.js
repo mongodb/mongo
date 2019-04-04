@@ -2,7 +2,7 @@
 // from the input documents will tell the query planner to use a count scan, which is faster than an
 // index scan. In this test file, we check this behavior through explain().
 //
-// Cannot implicitly shard accessed collections because the explain output from a mongod when run
+// Cannot implicitly shard accessed collections because the explain output from a merizod when run
 // against a sharded collection is wrapped in a "shards" object with keys for each shard.
 //
 // This test assumes that an initial $match will be absorbed by the query system, which will not

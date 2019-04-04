@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/index/btree_access_method.h"
+#include "merizo/db/index/btree_access_method.h"
 
 #include <utility>
 #include <vector>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/index/index_access_method_gen.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/timestamp_block.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/util/log.h"
-#include "mongo/util/progress_meter.h"
-#include "mongo/util/scopeguard.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/status.h"
+#include "merizo/db/catalog/index_catalog.h"
+#include "merizo/db/catalog/index_consistency.h"
+#include "merizo/db/client.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/index/index_access_method_gen.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/keypattern.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/repl/timestamp_block.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/util/log.h"
+#include "merizo/util/progress_meter.h"
+#include "merizo/util/scopeguard.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::endl;
 using std::pair;
@@ -91,7 +91,7 @@ const int TempKeyMaxSize = 1024;
 // TODO SERVER-36385: Completely remove the key size check in 4.4
 Status checkKeySize(const BSONObj& key) {
     if (key.objsize() >= TempKeyMaxSize) {
-        std::string msg = mongoutils::str::stream() << "Index key too large to index, failing "
+        std::string msg = merizoutils::str::stream() << "Index key too large to index, failing "
                                                     << key.objsize() << ' ' << redact(key);
         return Status(ErrorCodes::KeyTooLong, msg);
     }
@@ -818,7 +818,7 @@ std::string nextFileName() {
     return "extsort-index." + std::to_string(indexAccessMethodFileCounter.fetchAndAdd(1));
 }
 
-}  // namespace mongo
+}  // namespace merizo
 
-#include "mongo/db/sorter/sorter.cpp"
-MONGO_CREATE_SORTER(mongo::BSONObj, mongo::RecordId, mongo::BtreeExternalSortComparison);
+#include "merizo/db/sorter/sorter.cpp"
+MONGO_CREATE_SORTER(merizo::BSONObj, merizo::RecordId, merizo::BtreeExternalSortComparison);

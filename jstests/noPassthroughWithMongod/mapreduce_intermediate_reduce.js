@@ -40,8 +40,8 @@ assert.eq(outColl, expectedOutColl, "The output collection is incorrect.");
 assert.eq(out.counts.input, 490, "input count is wrong");
 assert.eq(out.counts.emit, 490, "emit count is wrong");
 
-// If this fails, most probably some of the configuration settings under mongo::mr::Config have
+// If this fails, most probably some of the configuration settings under merizo::mr::Config have
 // changed, such as reduceTriggerRatio or maxInMemSize. If not the case, then something else
-// must have changed with when intermediate reduces occur (see mongo::mr::State::checkSize).
+// must have changed with when intermediate reduces occur (see merizo::mr::State::checkSize).
 //
 assert.eq(out.counts.reduce, 14, "reduce count is wrong");

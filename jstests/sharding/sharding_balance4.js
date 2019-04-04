@@ -10,8 +10,8 @@
     // TODO (SERVER-37698): Lower logging level.
     var s = new ShardingTest({
         shards: [{verbose: 3}, {verbose: 3}],
-        mongos: 1,
-        other: {chunkSize: 1, enableAutoSplit: true, mongosOptions: {verbose: 3}}
+        merizos: 1,
+        other: {chunkSize: 1, enableAutoSplit: true, merizosOptions: {verbose: 3}}
     });
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));

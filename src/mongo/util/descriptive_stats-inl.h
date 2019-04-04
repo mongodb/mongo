@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,9 +32,9 @@
 #include <algorithm>
 #include <limits>
 
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 template <class Sample>
 BasicEstimators<Sample>::BasicEstimators()
@@ -189,7 +189,7 @@ BSONObj SummaryEstimators<Sample, NumQuantiles>::statisticSummaryToBSONObj() con
         for (size_t i = 1; i <= NumQuantiles; i++) {
             const double probability = this->DistributionEstimators<NumQuantiles>::probability(i);
             const double quantile = this->DistributionEstimators<NumQuantiles>::quantile(i);
-            quantilesBuilder.append(std::string(mongoutils::str::stream() << probability),
+            quantilesBuilder.append(std::string(merizoutils::str::stream() << probability),
                                     quantile);
         }
         quantilesBuilder.doneFast();
@@ -197,4 +197,4 @@ BSONObj SummaryEstimators<Sample, NumQuantiles>::statisticSummaryToBSONObj() con
     return b.obj();
 }
 
-}  // namespace mongo
+}  // namespace merizo

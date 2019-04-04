@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <deque>
 #include <vector>
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
-#include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
-#include "mongo/db/pipeline/value.h"
+#include "merizo/bson/bsonmisc.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/pipeline/aggregation_context_fixture.h"
+#include "merizo/db/pipeline/document.h"
+#include "merizo/db/pipeline/document_source_change_stream.h"
+#include "merizo/db/pipeline/document_source_lookup_change_post_image.h"
+#include "merizo/db/pipeline/document_source_mock.h"
+#include "merizo/db/pipeline/document_value_test_util.h"
+#include "merizo/db/pipeline/field_path.h"
+#include "merizo/db/pipeline/stub_merizo_process_interface.h"
+#include "merizo/db/pipeline/value.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 using boost::intrusive_ptr;
 using std::deque;
@@ -165,7 +165,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyO
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
@@ -187,7 +187,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationTyp
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
@@ -209,7 +209,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
@@ -231,7 +231,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
@@ -253,7 +253,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatch
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
@@ -278,7 +278,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDatabaseMismatchOnC
 
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
-    expCtx->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(mockForeignContents);
+    expCtx->merizoProcessInterface = stdx::make_unique<MockMongoInterface>(mockForeignContents);
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
 }
@@ -293,7 +293,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPassIfDatabaseMatchesOnCol
 
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
-    expCtx->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(mockForeignContents);
+    expCtx->merizoProcessInterface = stdx::make_unique<MockMongoInterface>(mockForeignContents);
 
     auto mockLocalSource = DocumentSourceMock::create(
         Document{{"_id", makeResumeToken(0)},
@@ -332,7 +332,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
     // Mock out the foreign collection to have two documents with the same document key.
     deque<DocumentSource::GetNextResult> foreignCollection = {Document{{"_id", 0}},
                                                               Document{{"_id", 0}}};
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         stdx::make_unique<MockMongoInterface>(std::move(foreignCollection));
 
     ASSERT_THROWS_CODE(
@@ -364,7 +364,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
                                                              Document{{"_id", 1}}};
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->merizoProcessInterface =
         stdx::make_unique<MockMongoInterface>(std::move(mockForeignContents));
 
     auto next = lookupChangeStage->getNext();
@@ -396,4 +396,4 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

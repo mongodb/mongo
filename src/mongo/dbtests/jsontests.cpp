@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,17 +31,17 @@
  * Tests for json.{h,cpp} code and BSONObj::jsonString()
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <limits>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/util/log.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/util/log.h"
 
 
 namespace JsonTests {
@@ -209,7 +209,7 @@ class NumberDecimal {
 public:
     void run() {
         BSONObjBuilder b;
-        b.append("a", mongo::Decimal128("123456789.12345"));
+        b.append("a", merizo::Decimal128("123456789.12345"));
         ASSERT_EQUALS("{ \"a\" : NumberDecimal(\"123456789.12345\") }",
                       b.done().jsonString(TenGen));
     }
@@ -219,7 +219,7 @@ class NumberDecimalStrict {
 public:
     void run() {
         BSONObjBuilder b;
-        b.append("a", mongo::Decimal128("123456789.12345"));
+        b.append("a", merizo::Decimal128("123456789.12345"));
         ASSERT_EQUALS("{ \"a\" : { \"$numberDecimal\" : \"123456789.12345\" } }",
                       b.done().jsonString(Strict));
     }
@@ -631,14 +631,14 @@ private:
     void assertEquals(const BSONObj& expected, const BSONObj& actual, const char* msg) {
         const bool bad = expected.woCompare(actual);
         if (bad) {
-            ::mongo::log() << "want:" << expected.jsonString() << " size: " << expected.objsize()
+            ::merizo::log() << "want:" << expected.jsonString() << " size: " << expected.objsize()
                            << endl;
-            ::mongo::log() << "got :" << actual.jsonString() << " size: " << actual.objsize()
+            ::merizo::log() << "got :" << actual.jsonString() << " size: " << actual.objsize()
                            << endl;
-            ::mongo::log() << expected.hexDump() << endl;
-            ::mongo::log() << actual.hexDump() << endl;
-            ::mongo::log() << msg << endl;
-            ::mongo::log() << "orig json:" << this->json();
+            ::merizo::log() << expected.hexDump() << endl;
+            ::merizo::log() << actual.hexDump() << endl;
+            ::merizo::log() << msg << endl;
+            ::merizo::log() << "orig json:" << this->json();
         }
         ASSERT(!bad);
     }
@@ -1103,7 +1103,7 @@ class DBRefConstructor : public Base {
     }
 };
 
-// Added for consistency with the mongo shell
+// Added for consistency with the merizo shell
 class DBRefConstructorCapitals : public Base {
     virtual BSONObj bson() const {
         BSONObjBuilder b;

@@ -1,4 +1,4 @@
-// mongo.js
+// merizo.js
 
 // NOTE 'Mongo' may be defined here or in MongoJS.cpp.  Add code to init, not to this constructor.
 if (typeof Mongo == "undefined") {
@@ -28,8 +28,8 @@ if (!Mongo.prototype.update)
         throw Error("update not implemented");
     };
 
-if (typeof mongoInject == "function") {
-    mongoInject(Mongo.prototype);
+if (typeof merizoInject == "function") {
+    merizoInject(Mongo.prototype);
 }
 
 Mongo.prototype.setSlaveOk = function(value) {
@@ -118,7 +118,7 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
             //   * nameOnly must not be false as we can't infer size information.
             //   * authorizedDatabases must not be false as those are the only DBs we can infer.
             // Note that if the above are valid and we get Unauthorized, that also means
-            // that we MUST be talking to a pre-4.0 mongod.
+            // that we MUST be talking to a pre-4.0 merizod.
             //
             // Like the server response mode, this path will return a simple list of
             // names if nameOnly is specified as true.
@@ -254,7 +254,7 @@ Mongo.prototype.getReadPrefTagSet = function() {
     return this._readPrefTagSet;
 };
 
-// Returns a readPreference object of the type expected by mongos.
+// Returns a readPreference object of the type expected by merizos.
 Mongo.prototype.getReadPref = function() {
     var obj = {}, mode, tagSet;
     if (typeof(mode = this.getReadPrefMode()) === "string") {
@@ -306,7 +306,7 @@ connect = function(url, user, pass) {
     // Validate connection string "url" as "hostName:portNumber/databaseName"
     //                                  or "hostName/databaseName"
     //                                  or "databaseName"
-    //                                  or full mongo uri.
+    //                                  or full merizo uri.
     var urlType = typeof url;
     if (urlType == "undefined") {
         throw Error("Missing connection string");
@@ -320,19 +320,19 @@ connect = function(url, user, pass) {
         throw Error("Empty connection string");
     }
 
-    if (!url.startsWith("mongodb://") && !url.startsWith("mongodb+srv://")) {
+    if (!url.startsWith("merizodb://") && !url.startsWith("merizodb+srv://")) {
         const colon = url.lastIndexOf(":");
         const slash = url.lastIndexOf("/");
         if (url.split("/").length > 1) {
             url = url.substring(0, slash).replace(/\//g, "%2F") + url.substring(slash);
         }
         if (slash == 0) {
-            throw Error("Failed to parse mongodb:// URL: " + url);
+            throw Error("Failed to parse merizodb:// URL: " + url);
         }
         if (slash == -1 && colon == -1) {
-            url = "mongodb://127.0.0.1:27017/" + url;
+            url = "merizodb://127.0.0.1:27017/" + url;
         } else if (slash != -1) {
-            url = "mongodb://" + url;
+            url = "merizodb://" + url;
         }
     }
 
@@ -346,8 +346,8 @@ connect = function(url, user, pass) {
     try {
         var m = new Mongo(url);
     } catch (e) {
-        if (url.indexOf(".mongodb.net") != -1) {
-            print("\n\n*** It looks like this is a MongoDB Atlas cluster. Please ensure that your" +
+        if (url.indexOf(".merizodb.net") != -1) {
+            print("\n\n*** It looks like this is a MerizoDB Atlas cluster. Please ensure that your" +
                   " IP whitelist allows connections from your network.\n\n");
         }
 
@@ -366,14 +366,14 @@ connect = function(url, user, pass) {
     }
 
     // Implicit sessions should not be used when opening a connection. In particular, the buildInfo
-    // command is erroneously marked as requiring auth in MongoDB 3.6 and therefore fails if a
+    // command is erroneously marked as requiring auth in MerizoDB 3.6 and therefore fails if a
     // logical session id is included in the request.
     const originalTestData = TestData;
     TestData = Object.merge(originalTestData, {disableImplicitSessions: true});
     try {
         // Check server version
         var serverVersion = db.version();
-        chatty("MongoDB server version: " + serverVersion);
+        chatty("MerizoDB server version: " + serverVersion);
 
         var shellVersion = version();
         if (serverVersion.slice(0, 3) != shellVersion.slice(0, 3)) {

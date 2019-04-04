@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/transaction_metrics_observer.h"
+#include "merizo/db/transaction_metrics_observer.h"
 
-#include "mongo/db/server_transactions_metrics.h"
-#include "mongo/db/transaction_participant.h"
+#include "merizo/db/server_transactions_metrics.h"
+#include "merizo/db/transaction_participant.h"
 
-namespace mongo {
+namespace merizo {
 
 void TransactionMetricsObserver::onStart(ServerTransactionsMetrics* serverTransactionsMetrics,
                                          bool isAutoCommit,
@@ -238,4 +238,4 @@ void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTran
     serverTransactionsMetrics->incrementTotalPrepared();
 }
 
-}  // namespace mongo
+}  // namespace merizo

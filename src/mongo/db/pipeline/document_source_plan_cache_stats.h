@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_match.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/document_source_match.h"
 
-namespace mongo {
+namespace merizo {
 
 class DocumentSourcePlanCacheStats final : public DocumentSource {
 public:
@@ -61,12 +61,12 @@ public:
         }
 
         bool allowedToForwardFromMongos() const override {
-            // $planCacheStats must be run locally on a mongod.
+            // $planCacheStats must be run locally on a merizod.
             return false;
         }
 
         bool allowedToPassthroughFromMongos() const override {
-            // $planCacheStats must be run locally on a mongod.
+            // $planCacheStats must be run locally on a merizod.
             return false;
         }
 
@@ -93,8 +93,8 @@ public:
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     // This stage must run on a mongod, and will fail at parse time
-                                     // if an attempt is made to run it on mongos.
+                                     // This stage must run on a merizod, and will fail at parse time
+                                     // if an attempt is made to run it on merizos.
                                      HostTypeRequirement::kAnyShard,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
@@ -131,7 +131,7 @@ private:
         MONGO_UNREACHABLE;  // Should call serializeToArray instead.
     }
 
-    // The result set for this change is produced through the mongo process interface on the first
+    // The result set for this change is produced through the merizo process interface on the first
     // call to getNext(), and then held by this data member.
     std::vector<BSONObj> _results;
 
@@ -146,4 +146,4 @@ private:
     boost::intrusive_ptr<DocumentSourceMatch> _absorbedMatch;
 };
 
-}  // namespace mongo
+}  // namespace merizo

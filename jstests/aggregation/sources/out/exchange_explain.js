@@ -10,12 +10,12 @@ load('jstests/aggregation/extras/utils.js');
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
-    const mongosDB = st.s.getDB("test_db");
+    const merizosDB = st.s.getDB("test_db");
 
-    const inColl = mongosDB["inColl"];
-    const outCollRange = mongosDB["outCollRange"];
-    const outCollRangeOtherField = mongosDB["outCollRangeOtherField"];
-    const outCollHash = mongosDB["outCollHash"];
+    const inColl = merizosDB["inColl"];
+    const outCollRange = merizosDB["outCollRange"];
+    const outCollRangeOtherField = merizosDB["outCollRangeOtherField"];
+    const outCollHash = merizosDB["outCollHash"];
 
     const numDocs = 1000;
 
@@ -53,7 +53,7 @@ load('jstests/aggregation/extras/utils.js');
     }
 
     // Shard the input collection.
-    st.shardColl(inColl, {a: 1}, {a: 500}, {a: 500}, mongosDB.getName());
+    st.shardColl(inColl, {a: 1}, {a: 500}, {a: 500}, merizosDB.getName());
 
     // Insert some data to the input collection.
     let bulk = inColl.initializeUnorderedBulkOp();
@@ -63,9 +63,9 @@ load('jstests/aggregation/extras/utils.js');
     assert.commandWorked(bulk.execute());
 
     // Shard the output collections.
-    st.shardColl(outCollRange, {_id: 1}, {_id: 500}, {_id: 500}, mongosDB.getName());
-    st.shardColl(outCollRangeOtherField, {b: 1}, {b: 500}, {b: 500}, mongosDB.getName());
-    st.shardColl(outCollHash, {_id: "hashed"}, false, false, mongosDB.getName());
+    st.shardColl(outCollRange, {_id: 1}, {_id: 500}, {_id: 500}, merizosDB.getName());
+    st.shardColl(outCollRangeOtherField, {b: 1}, {b: 500}, {b: 500}, merizosDB.getName());
+    st.shardColl(outCollHash, {_id: "hashed"}, false, false, merizosDB.getName());
 
     // Run the explain. We expect to see the range based exchange here.
     let explain = runExplainQuery(outCollRange);
@@ -108,7 +108,7 @@ load('jstests/aggregation/extras/utils.js');
                     50905);
 
     // Turn off the exchange and rerun the query.
-    assert.commandWorked(mongosDB.adminCommand({setParameter: 1, internalQueryDisableExchange: 1}));
+    assert.commandWorked(merizosDB.adminCommand({setParameter: 1, internalQueryDisableExchange: 1}));
     explain = runExplainQuery(outCollRange);
 
     // Make sure there is no exchange.
@@ -128,8 +128,8 @@ load('jstests/aggregation/extras/utils.js');
                     }],
                     50905);
 
-    // SERVER-38349 Make sure mongos rejects specifying exchange directly.
-    assert.commandFailedWithCode(mongosDB.runCommand({
+    // SERVER-38349 Make sure merizos rejects specifying exchange directly.
+    assert.commandFailedWithCode(merizosDB.runCommand({
         aggregate: inColl.getName(),
         pipeline: [],
         cursor: {},
@@ -143,7 +143,7 @@ load('jstests/aggregation/extras/utils.js');
     }),
                                  51028);
 
-    assert.commandFailedWithCode(mongosDB.runCommand({
+    assert.commandFailedWithCode(merizosDB.runCommand({
         aggregate: inColl.getName(),
         pipeline: [{$out: {to: outCollRange.getName(), mode: "replaceDocuments"}}],
         cursor: {},

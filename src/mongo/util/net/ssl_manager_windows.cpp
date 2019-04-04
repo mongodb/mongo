@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/net/ssl_manager.h"
+#include "merizo/util/net/ssl_manager.h"
 
 #include <asio.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -40,30 +40,30 @@
 #include <tuple>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/base/initializer_context.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/config.h"
-#include "mongo/db/server_options.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/private/ssl_expiration.h"
-#include "mongo/util/net/sockaddr.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/net/ssl.hpp"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/text.h"
-#include "mongo/util/uuid.h"
+#include "merizo/base/init.h"
+#include "merizo/base/initializer_context.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/config.h"
+#include "merizo/db/server_options.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/concurrency/mutex.h"
+#include "merizo/util/debug_util.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/net/private/ssl_expiration.h"
+#include "merizo/util/net/sockaddr.h"
+#include "merizo/util/net/socket_exception.h"
+#include "merizo/util/net/ssl.hpp"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/net/ssl_types.h"
+#include "merizo/util/text.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
+namespace merizo {
 
 extern SSLManagerInterface* theSSLManager;
 
@@ -220,7 +220,7 @@ using UniqueCertificateWithPrivateKey = std::tuple<UniqueCertificate, UniqueCryp
 
 
 StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(PCCERT_CONTEXT cert) {
-    PCERT_EXTENSION extension = CertFindExtension(mongodbRolesOID.identifier.c_str(),
+    PCERT_EXTENSION extension = CertFindExtension(merizodbRolesOID.identifier.c_str(),
                                                   cert->pCertInfo->cExtension,
                                                   cert->pCertInfo->rgExtension);
 
@@ -1423,7 +1423,7 @@ unsigned long long FiletimeToEpocMillis(FILETIME ft) {
     return ns100 / 1000;
 }
 
-// MongoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes
+// MerizoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes
 StatusWith<SSLX509Name> getCertificateSubjectName(PCCERT_CONTEXT cert) {
 
     auto swBlob =
@@ -1818,4 +1818,4 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeer
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace merizo

@@ -15,7 +15,7 @@ from buildscripts.resmokelib import utils
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_API_SERVER = "https://evergreen.mongodb.com"
+DEFAULT_API_SERVER = "https://evergreen.merizodb.com"
 
 EVERGREEN_FILES = ["./.evergreen.yml", "~/.evergreen.yml", "~/cli_bin/.evergreen.yml"]
 

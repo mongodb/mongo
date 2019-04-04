@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/op_observer_noop.h"
-#include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/logger/logger.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/memory.h"
+#include "merizo/db/catalog/collection_options.h"
+#include "merizo/db/catalog/database_holder.h"
+#include "merizo/db/client.h"
+#include "merizo/db/op_observer_noop.h"
+#include "merizo/db/repl/apply_ops.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/replication_coordinator_mock.h"
+#include "merizo/db/repl/storage_interface_impl.h"
+#include "merizo/db/service_context_d_test_fixture.h"
+#include "merizo/logger/logger.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/stdx/memory.h"
 
-namespace mongo {
+namespace merizo {
 namespace repl {
 namespace {
 
@@ -84,7 +84,7 @@ protected:
 };
 
 void ApplyOpsTest::setUp() {
-    // Set up mongod.
+    // Set up merizod.
     ServiceContextMongoDTest::setUp();
 
     auto service = getServiceContext();
@@ -509,4 +509,4 @@ TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
 
 }  // namespace
 }  // namespace repl
-}  // namespace mongo
+}  // namespace merizo

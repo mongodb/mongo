@@ -1,21 +1,21 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongorestore
+package merizorestore
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/merizodb/merizo-tools/common/db"
+	"github.com/merizodb/merizo-tools/common/intents"
+	"github.com/merizodb/merizo-tools/common/log"
+	"github.com/merizodb/merizo-tools/common/progress"
+	"github.com/merizodb/merizo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -26,7 +26,7 @@ import (
 // Note that ops > 8MB will still be buffered, just as single elements.
 const oplogMaxCommandSize = 1024 * 1024 * 8
 
-// RestoreOplog attempts to restore a MongoDB oplog.
+// RestoreOplog attempts to restore a MerizoDB oplog.
 func (restore *MongoRestore) RestoreOplog() error {
 	log.Logv(log.Always, "replaying oplog")
 	intent := restore.manager.Oplog()
@@ -127,7 +127,7 @@ func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{
 }
 
 // TimestampBeforeLimit returns true if the given timestamp is allowed to be
-// applied to mongorestore's target database.
+// applied to merizorestore's target database.
 func (restore *MongoRestore) TimestampBeforeLimit(ts bson.MongoTimestamp) bool {
 	if restore.oplogLimit == 0 {
 		// always valid if there is no --oplogLimit set

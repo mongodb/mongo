@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,29 +31,29 @@
  * Tests for jsobj.{h,cpp} code
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <cmath>
 #include <iostream>
 
-#include "mongo/bson/bsonobj_comparator.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/bson/bson_helper.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/embedded_builder.h"
-#include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
-#include "mongo/util/timer.h"
+#include "merizo/bson/bsonobj_comparator.h"
+#include "merizo/bson/simple_bsonelement_comparator.h"
+#include "merizo/bson/util/builder.h"
+#include "merizo/db/bson/bson_helper.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/dbtests/dbtests.h"
+#include "merizo/platform/decimal128.h"
+#include "merizo/util/allocator.h"
+#include "merizo/util/embedded_builder.h"
+#include "merizo/util/log.h"
+#include "merizo/util/stringutils.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::cout;
 using std::endl;
@@ -62,7 +62,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 namespace {
 
@@ -165,7 +165,7 @@ FieldCompareResult compareDottedFieldNames(const string& l, const string& r, con
     verify(0);
     return SAME;  // will never get here
 }
-}  // namespace mongo
+}  // namespace merizo
 
 namespace JsobjTests {
 
@@ -179,7 +179,7 @@ public:
             ASSERT(strcmp("foo", b.buf()) == 0);
         }
         {
-            mongo::StackBufBuilder b;
+            merizo::StackBufBuilder b;
             b.appendStr("foo");
             ASSERT_EQUALS(4, b.len());
             ASSERT(strcmp("foo", b.buf()) == 0);
@@ -199,7 +199,7 @@ public:
         } catch (const AssertionException&) {
         }
         // assert half of max buffer size was allocated before exception is thrown
-        ASSERT(written == mongo::BufferMaxSize / 2);
+        ASSERT(written == merizo::BufferMaxSize / 2);
     }
 };
 
@@ -607,7 +607,7 @@ struct AppendNumber {
         b.appendNumber("c", (1024LL * 1024 * 1024) - 1);
         b.appendNumber("d", (1024LL * 1024 * 1024 * 1024) - 1);
         b.appendNumber("e", 1024LL * 1024 * 1024 * 1024 * 1024 * 1024);
-        b.appendNumber("f", mongo::Decimal128("1"));
+        b.appendNumber("f", merizo::Decimal128("1"));
 
         BSONObj o = b.obj();
 
@@ -843,7 +843,7 @@ public:
         BSONObjBuilder b;
         b.appendNull("a");
         BSONObj o = b.done();
-        set(o, 4, mongo::Undefined);
+        set(o, 4, merizo::Undefined);
         ASSERT(o.valid(BSONVersion::kLatest));
     }
 };
@@ -1215,7 +1215,7 @@ class LabelSize : public LabelBase {
         return BSON("a" << BSON("$size" << 4));
     }
     BSONObj actual() {
-        return BSON("a" << mongo::BSIZE << 4);
+        return BSON("a" << merizo::BSIZE << 4);
     }
 };
 
@@ -1359,8 +1359,8 @@ public:
         ASSERT_EQUALS(objTypeOf(1LL), NumberLong);
         ASSERT_EQUALS(arrTypeOf(1LL), NumberLong);
 
-        ASSERT_EQUALS(objTypeOf(mongo::Decimal128("1")), NumberDecimal);
-        ASSERT_EQUALS(arrTypeOf(mongo::Decimal128("1")), NumberDecimal);
+        ASSERT_EQUALS(objTypeOf(merizo::Decimal128("1")), NumberDecimal);
+        ASSERT_EQUALS(arrTypeOf(merizo::Decimal128("1")), NumberDecimal);
 
         ASSERT_EQUALS(objTypeOf(MAXKEY), MaxKey);
         ASSERT_EQUALS(arrTypeOf(MAXKEY), MaxKey);
@@ -1741,7 +1741,7 @@ public:
         // The sorted iterator should perform numeric comparisons and return results in the same
         // order as the unsorted iterator.
         BSONObjIterator unsorted(arr);
-        mongo::BSONArrayIteratorSorted sorted(arr);
+        merizo::BSONArrayIteratorSorted sorted(arr);
         while (unsorted.more()) {
             ASSERT(sorted.more());
             ASSERT_EQUALS(string(unsorted.next().fieldName()), sorted.next().fieldName());
@@ -1849,7 +1849,7 @@ public:
     void run() {
         BSONObj x = BSON("_id" << 5 << "t" << 2);
         {
-            char* crap = (char*)mongoMalloc(x.objsize());
+            char* crap = (char*)merizoMalloc(x.objsize());
             memcpy(crap, x.objdata(), x.objsize());
             BSONObj y(crap);
             ASSERT_BSONOBJ_EQ(x, y);
@@ -1857,7 +1857,7 @@ public:
         }
 
         {
-            char* crap = (char*)mongoMalloc(x.objsize());
+            char* crap = (char*)merizoMalloc(x.objsize());
             memcpy(crap, x.objdata(), x.objsize());
             int* foo = (int*)crap;
             foo[0] = 123123123;

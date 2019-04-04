@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands.h"
-#include "mongo/db/operation_context.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/operation_context.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Base class for the killOp command, which attempts to kill a given operation. Contains code
- * common to mongos and mongod implementations.
+ * common to merizos and merizod implementations.
  */
 class KillOpCmdBase : public BasicCommand {
 public:
@@ -76,7 +76,7 @@ protected:
     findOpForKilling(Client* client, unsigned int opId);
 
     /**
-     * Kill an operation running on this instance of mongod or mongos.
+     * Kill an operation running on this instance of merizod or merizos.
      */
     static void killLocalOperation(OperationContext* opCtx, unsigned int opToKill);
 
@@ -89,13 +89,13 @@ protected:
     static unsigned int parseOpId(const BSONObj& cmdObj);
 
     /**
-     * Return whether the operation being killed is "local" or not. All operations on a mongod are
-     * local. On a mongos, killOp may may kill an operation on a shard, or an operation "local" to
-     * the mongos.
+     * Return whether the operation being killed is "local" or not. All operations on a merizod are
+     * local. On a merizos, killOp may may kill an operation on a shard, or an operation "local" to
+     * the merizos.
      *
      * Expects to be passed the "op" field of the command object.
      */
     static bool isKillingLocalOp(const BSONElement& opElem);
 };
 
-}  // namespace mongo
+}  // namespace merizo

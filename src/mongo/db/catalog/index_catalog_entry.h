@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,18 +32,18 @@
 #include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/debug_util.h"
+#include "merizo/base/owned_pointer_vector.h"
+#include "merizo/bson/ordering.h"
+#include "merizo/bson/timestamp.h"
+#include "merizo/db/index/multikey_paths.h"
+#include "merizo/db/record_id.h"
+#include "merizo/db/storage/kv/kv_prefix.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/functional.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/debug_util.h"
 
-namespace mongo {
+namespace merizo {
 class CollatorInterface;
 class CollectionCatalogEntry;
 class CollectionInfoCache;
@@ -215,4 +215,4 @@ public:
 private:
     std::vector<std::shared_ptr<IndexCatalogEntry>> _entries;
 };
-}  // namespace mongo
+}  // namespace merizo

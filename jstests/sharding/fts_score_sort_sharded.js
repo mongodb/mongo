@@ -3,10 +3,10 @@
 
 var st = new ShardingTest({shards: 2});
 st.stopBalancer();
-var mongos = st.s0;
+var merizos = st.s0;
 var shards = [st.shard0, st.shard1];
-var coll = mongos.getCollection("foo.bar");
-var admin = mongos.getDB("admin");
+var coll = merizos.getCollection("foo.bar");
+var admin = merizos.getDB("admin");
 var cursor;
 
 //
@@ -41,7 +41,7 @@ assert.eq(results[2]._id, -1);
 assert.eq(results[3]._id, 1);
 
 //
-// Verify that mongos requires the text metadata sort to be specified in the projection.
+// Verify that merizos requires the text metadata sort to be specified in the projection.
 //
 
 // Projection not specified at all.

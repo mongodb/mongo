@@ -18,20 +18,20 @@
     }
 
     function testCommandIsCalled(testFunc, checkFunc) {
-        const mongoRunCommandOriginal = Mongo.prototype.runCommand;
+        const merizoRunCommandOriginal = Mongo.prototype.runCommand;
 
         const sentinel = {};
         let cmdObjSeen = sentinel;
 
         Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
             cmdObjSeen = cmdObj;
-            return mongoRunCommandOriginal.apply(this, arguments);
+            return merizoRunCommandOriginal.apply(this, arguments);
         };
 
         try {
             assert.doesNotThrow(testFunc);
         } finally {
-            Mongo.prototype.runCommand = mongoRunCommandOriginal;
+            Mongo.prototype.runCommand = merizoRunCommandOriginal;
         }
 
         if (cmdObjSeen === sentinel) {
@@ -115,8 +115,8 @@
     checkNextChange(changeStreamCursor, expected);
 
     jsTestLog("Testing watch() with batchSize");
-    // Only test mongod because mongos uses batch size 0 for aggregate commands internally to
-    // establish cursors quickly. GetMore on mongos doesn't respect batch size due to SERVER-31992.
+    // Only test merizod because merizos uses batch size 0 for aggregate commands internally to
+    // establish cursors quickly. GetMore on merizos doesn't respect batch size due to SERVER-31992.
     const isMongos = FixtureHelpers.isMongos(db);
     if (!isMongos) {
         // Increase a field by 5 times and verify the batch size is respected.

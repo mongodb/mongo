@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,30 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
-#include "mongo/bson/bsonelement.h"
+#include "merizo/bson/bsonelement.h"
 
 #include <boost/functional/hash.hpp>
 #include <cmath>
 
-#include "mongo/base/compare_numbers.h"
-#include "mongo/base/data_cursor.h"
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/platform/strnlen.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/stringutils.h"
-#include "mongo/util/uuid.h"
+#include "merizo/base/compare_numbers.h"
+#include "merizo/base/data_cursor.h"
+#include "merizo/base/simple_string_data_comparator.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/platform/strnlen.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/duration.h"
+#include "merizo/util/hex.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/string_map.h"
+#include "merizo/util/stringutils.h"
+#include "merizo/util/uuid.h"
 
-namespace mongo {
-namespace str = mongoutils::str;
+namespace merizo {
+namespace str = merizoutils::str;
 
 using std::dec;
 using std::hex;
@@ -72,7 +72,7 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
     if (includeFieldNames)
         s << '"' << escape(fieldName()) << "\" : ";
     switch (type()) {
-        case mongo::String:
+        case merizo::String:
         case Symbol:
             s << '"' << escape(string(valuestr(), valuestrsize() - 1)) << '"';
             break;
@@ -116,7 +116,7 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
             else
                 s << "{ \"$numberDecimal\" : \"";
             // Recognize again that this is not valid JSON according to RFC-4627.
-            // Also, treat -NaN and +NaN as the same thing for MongoDB.
+            // Also, treat -NaN and +NaN as the same thing for MerizoDB.
             if (numberDecimal().isNaN()) {
                 s << "NaN";
             } else if (numberDecimal().isInfinite()) {
@@ -129,7 +129,7 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
             else
                 s << "\" }";
             break;
-        case mongo::Bool:
+        case merizo::Bool:
             s << (boolean() ? "true" : "false");
             break;
         case jstNULL:
@@ -145,7 +145,7 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
         case Object:
             embeddedObject().jsonStringStream(format, pretty, false, s);
             break;
-        case mongo::Array: {
+        case merizo::Array: {
             if (embeddedObject().isEmpty()) {
                 s << "[]";
                 break;
@@ -185,7 +185,7 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
             s << '"' << valuestr() << "\", ";
             if (format != TenGen)
                 s << "\"$id\" : ";
-            s << '"' << mongo::OID::from(valuestr() + valuestrsize()) << "\" ";
+            s << '"' << merizo::OID::from(valuestr() + valuestrsize()) << "\" ";
             if (format == TenGen)
                 s << ')';
             else
@@ -231,7 +231,7 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
             s << "\" }";
             break;
         }
-        case mongo::Date:
+        case merizo::Date:
             if (format == Strict) {
                 Date_t d = date();
                 s << "{ \"$date\" : ";
@@ -507,7 +507,7 @@ int BSONElement::compareElements(const BSONElement& l,
     any fields with non-numeric field names.
     */
 std::vector<BSONElement> BSONElement::Array() const {
-    chk(mongo::Array);
+    chk(merizo::Array);
     std::vector<BSONElement> v;
     BSONObjIterator i(Obj());
     while (i.more()) {
@@ -715,7 +715,7 @@ void BSONElement::toString(
     switch (type()) {
         case Object:
             return embeddedObject().toString(s, false, full, redactValues, depth + 1);
-        case mongo::Array:
+        case merizo::Array:
             return embeddedObject().toString(s, true, full, redactValues, depth + 1);
         default:
             break;
@@ -730,7 +730,7 @@ void BSONElement::toString(
         case EOO:
             s << "EOO";
             break;
-        case mongo::Date:
+        case merizo::Date:
             s << "new Date(" << date().toMillisSinceEpoch() << ')';
             break;
         case RegEx: {
@@ -751,7 +751,7 @@ void BSONElement::toString(
         case NumberDecimal:
             s << _numberDecimal().toString();
             break;
-        case mongo::Bool:
+        case merizo::Bool:
             s << (boolean() ? "true" : "false");
             break;
         case Undefined:
@@ -778,7 +778,7 @@ void BSONElement::toString(
             }
             break;
         case Symbol:
-        case mongo::String:
+        case merizo::String:
             s << '"';
             if (!full && valuestrsize() > 160) {
                 s.write(valuestr(), 150);
@@ -790,7 +790,7 @@ void BSONElement::toString(
             break;
         case DBRef:
             s << "DBRef('" << valuestr() << "',";
-            s << mongo::OID::from(valuestr() + valuestrsize()) << ')';
+            s << merizo::OID::from(valuestr() + valuestrsize()) << ')';
             break;
         case jstOID:
             s << "ObjectId('";
@@ -836,7 +836,7 @@ void BSONElement::toString(
 
 std::string BSONElement::_asCode() const {
     switch (type()) {
-        case mongo::String:
+        case merizo::String:
         case Code:
             return std::string(valuestr(), valuestrsize() - 1);
         case CodeWScope:
@@ -859,7 +859,7 @@ StringBuilder& operator<<(StringBuilder& s, const BSONElement& e) {
 }
 
 bool BSONElement::coerce(std::string* out) const {
-    if (type() != mongo::String)
+    if (type() != merizo::String)
         return false;
     *out = String();
     return true;
@@ -899,7 +899,7 @@ bool BSONElement::coerce(bool* out) const {
 }
 
 bool BSONElement::coerce(std::vector<std::string>* out) const {
-    if (type() != mongo::Array)
+    if (type() != merizo::Array)
         return false;
     return Obj().coerceVector<std::string>(out);
 }
@@ -917,4 +917,4 @@ bool BSONObj::coerceVector(std::vector<T>* out) const {
     return true;
 }
 
-}  // namespace mongo
+}  // namespace merizo

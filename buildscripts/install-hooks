@@ -71,10 +71,10 @@ if [ ! -d "$hooks_dir" ]; then
     exit 0
 fi
 
-# Only run if the remote URL matches the MongoDB repo.
+# Only run if the remote URL matches the MerizoDB repo.
 url=$2
-if [ "$this_script" == "pre-push" ] && ! [[ $url =~ (mongodb|10gen)/ ]]; then
-    echo "Skipping pre-push hook for non-MongoDB remote URL: $url"
+if [ "$this_script" == "pre-push" ] && ! [[ $url =~ (merizodb|10gen)/ ]]; then
+    echo "Skipping pre-push hook for non-MerizoDB remote URL: $url"
     exit 0
 fi
 

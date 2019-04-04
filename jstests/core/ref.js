@@ -1,5 +1,5 @@
 // to run:
-//   ./mongo jstests/ref.js
+//   ./merizo jstests/ref.js
 
 db.otherthings.drop();
 db.things.drop();

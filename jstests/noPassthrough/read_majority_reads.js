@@ -8,7 +8,7 @@
  *  - count
  *  - geoSearch
  *
- * Each operation is tested on a single node, and (if supported) through mongos on both sharded and
+ * Each operation is tested on a single node, and (if supported) through merizos on both sharded and
  * unsharded collections. Mongos doesn't directly handle readConcern majority, but these tests
  * should ensure that it correctly propagates the setting to the shards when running commands.
  * @tags: [requires_sharding, requires_majority_read_concern]
@@ -116,12 +116,12 @@
         },
     };
 
-    function runTests(coll, mongodConnection) {
+    function runTests(coll, merizodConnection) {
         function makeSnapshot() {
-            return assert.commandWorked(mongodConnection.adminCommand("makeSnapshot")).name;
+            return assert.commandWorked(merizodConnection.adminCommand("makeSnapshot")).name;
         }
         function setCommittedSnapshot(snapshot) {
-            assert.commandWorked(mongodConnection.adminCommand({"setCommittedSnapshot": snapshot}));
+            assert.commandWorked(merizodConnection.adminCommand({"setCommittedSnapshot": snapshot}));
         }
 
         assert.commandWorked(coll.createIndex({point: '2dsphere'}));
@@ -201,20 +201,20 @@
     replTest.initiateWithAnyNodeAsPrimary(
         null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
-    var mongod = replTest.getPrimary();
+    var merizod = replTest.getPrimary();
 
     (function testSingleNode() {
-        var db = mongod.getDB("singleNode");
-        runTests(db.collection, mongod);
+        var db = merizod.getDB("singleNode");
+        runTests(db.collection, merizod);
     })();
 
     var shardingTest = new ShardingTest({
         shards: 0,
-        mongos: 1,
+        merizos: 1,
     });
     assert(shardingTest.adminCommand({addShard: replTest.getURL()}));
 
-    // Remove tests of commands that aren't supported at all through mongos, even on unsharded
+    // Remove tests of commands that aren't supported at all through merizos, even on unsharded
     // collections.
     ['geoSearch'].forEach(function(cmd) {
         // Make sure it really isn't supported.
@@ -225,21 +225,21 @@
 
     (function testUnshardedDBThroughMongos() {
         var db = shardingTest.getDB("throughMongos");
-        runTests(db.unshardedDB, mongod);
+        runTests(db.unshardedDB, merizod);
     })();
 
     shardingTest.adminCommand({enableSharding: 'throughMongos'});
 
     (function testUnshardedCollectionThroughMongos() {
         var db = shardingTest.getDB("throughMongos");
-        runTests(db.unshardedCollection, mongod);
+        runTests(db.unshardedCollection, merizod);
     })();
 
     (function testShardedCollectionThroughMongos() {
         var db = shardingTest.getDB("throughMongos");
         var collection = db.shardedCollection;
         shardingTest.adminCommand({shardCollection: collection.getFullName(), key: {_id: 1}});
-        runTests(collection, mongod);
+        runTests(collection, merizod);
     })();
 
     shardingTest.stop();

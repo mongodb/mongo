@@ -11,11 +11,11 @@ dst.drop();
 src.insert({"_id": MaxKey});
 src.insert({"_id": MinKey});
 
-print('About to call mongoexport on: ' + exportimport_db.getName() + '.' + src.getName() +
+print('About to call merizoexport on: ' + exportimport_db.getName() + '.' + src.getName() +
       ' with file: ' + tt.extFile);
 tt.runTool('export', '--out', tt.extFile, '-d', exportimport_db.getName(), '-c', src.getName());
 
-print('About to call mongoimport on: ' + exportimport_db.getName() + '.' + dst.getName() +
+print('About to call merizoimport on: ' + exportimport_db.getName() + '.' + dst.getName() +
       ' with file: ' + tt.extFile);
 tt.runTool('import', '--file', tt.extFile, '-d', exportimport_db.getName(), '-c', dst.getName());
 

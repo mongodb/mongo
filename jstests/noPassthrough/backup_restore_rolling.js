@@ -6,7 +6,7 @@
  * - fsyncLock (or stop) Secondary
  * - cp (or rsync) DB files
  * - fsyncUnlock (or start) Secondary
- * - Start mongod as hidden secondary
+ * - Start merizod as hidden secondary
  * - Wait until new hidden node becomes secondary
  *
  * Some methods for backup used in this test checkpoint the files in the dbpath. This technique will

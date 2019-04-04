@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/repl/optime.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/stdx/mutex.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/s/client/shard.h"
+#include "merizo/stdx/mutex.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Implements the support for "read your own write" when run on a node of a replica set. Can be used
@@ -95,4 +95,4 @@ private:
     repl::OpTime _lastOpTime{};
 };
 
-}  // namespace mongo
+}  // namespace merizo

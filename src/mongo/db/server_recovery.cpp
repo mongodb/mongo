@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/server_recovery.h"
+#include "merizo/db/server_recovery.h"
 
-#include "mongo/db/namespace_string.h"
+#include "merizo/db/namespace_string.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 const auto getInReplicationRecovery = ServiceContext::declareDecoration<bool>();
 const auto getSizeRecoveryState = ServiceContext::declareDecoration<SizeRecoveryState>();
@@ -61,12 +61,12 @@ void SizeRecoveryState::clearStateBeforeRecovery() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _collectionsAlwaysNeedingSizeAdjustment.clear();
 }
-}  // namespace mongo
+}  // namespace merizo
 
-bool& mongo::inReplicationRecovery(ServiceContext* serviceCtx) {
+bool& merizo::inReplicationRecovery(ServiceContext* serviceCtx) {
     return getInReplicationRecovery(serviceCtx);
 }
 
-mongo::SizeRecoveryState& mongo::sizeRecoveryState(ServiceContext* serviceCtx) {
+merizo::SizeRecoveryState& merizo::sizeRecoveryState(ServiceContext* serviceCtx) {
     return getSizeRecoveryState(serviceCtx);
 }

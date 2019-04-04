@@ -8,7 +8,7 @@ Import("get_option")
 env = env.Clone()
 
 env.AppendUnique(
-    CPPPATH=["$BUILD_DIR/mongo/embedded"],
+    CPPPATH=["$BUILD_DIR/merizo/embedded"],
 )
 
 # Inject this before we call the framework directory SConscripts so that
@@ -16,7 +16,7 @@ env.AppendUnique(
 
 frameworksEnv = env.Clone()
 
-def mongo_export_file_generator(target, source, env, for_signature):
+def merizo_export_file_generator(target, source, env, for_signature):
     if env.ToolchainIs('msvc'):
         script = env.File(env.subst("${TARGET.base}.def", target=target))
         return script.get_csig() if for_signature else "/DEF:" + str(script)
@@ -28,7 +28,7 @@ def mongo_export_file_generator(target, source, env, for_signature):
         return script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
     else:
         pass
-frameworksEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = mongo_export_file_generator
+frameworksEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = merizo_export_file_generator
 
 # We need to set our bundle version in the plist file, but the format
 # is contrained to major.minor.patch. So trim off any '-pre' or '-rc'
@@ -48,8 +48,8 @@ for flag in frameworksEnv['CCFLAGS']:
 
 env.SConscript(
     dirs=[
-        'mongo_embedded',
-        'mongoc_embedded',
+        'merizo_embedded',
+        'merizoc_embedded',
         'stitch_support',
     ],
     exports={
@@ -82,45 +82,45 @@ env.Library(
         env.Idlc('embedded_options.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
-        '$BUILD_DIR/mongo/db/command_can_run_here',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/fsync_locked',
-        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
-        '$BUILD_DIR/mongo/db/commands/standalone',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/db/logical_session_cache',
-        '$BUILD_DIR/mongo/db/logical_session_cache_impl',
-        '$BUILD_DIR/mongo/db/op_observer_impl',
-        '$BUILD_DIR/mongo/db/pipeline/process_interface_standalone',
-        '$BUILD_DIR/mongo/db/repair_database_and_check_version',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
-        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
-        '$BUILD_DIR/mongo/db/s/sharding_runtime_d_embedded',
-        '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/db/server_options_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/service_entry_point_common',
-        '$BUILD_DIR/mongo/db/service_liaison_mongod',
-        '$BUILD_DIR/mongo/db/sessions_collection_standalone',
-        '$BUILD_DIR/mongo/db/storage/mobile/storage_mobile',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
-        '$BUILD_DIR/mongo/db/storage/storage_init_d',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/wire_version',
-        '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/merizo/db/auth/auth',
+        '$BUILD_DIR/merizo/db/catalog/catalog_impl',
+        '$BUILD_DIR/merizo/db/command_can_run_here',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/commands/fsync_locked',
+        '$BUILD_DIR/merizo/db/commands/merizod_fcv',
+        '$BUILD_DIR/merizo/db/commands/standalone',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/merizo/db/logical_session_cache',
+        '$BUILD_DIR/merizo/db/logical_session_cache_impl',
+        '$BUILD_DIR/merizo/db/op_observer_impl',
+        '$BUILD_DIR/merizo/db/pipeline/process_interface_standalone',
+        '$BUILD_DIR/merizo/db/repair_database_and_check_version',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/repl/replica_set_messages',
+        '$BUILD_DIR/merizo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/merizo/db/rw_concern_d',
+        '$BUILD_DIR/merizo/db/s/sharding_api_d',
+        '$BUILD_DIR/merizo/db/s/sharding_runtime_d_embedded',
+        '$BUILD_DIR/merizo/db/server_options',
+        '$BUILD_DIR/merizo/db/server_options_base',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/service_entry_point_common',
+        '$BUILD_DIR/merizo/db/service_liaison_merizod',
+        '$BUILD_DIR/merizo/db/sessions_collection_standalone',
+        '$BUILD_DIR/merizo/db/storage/mobile/storage_mobile',
+        '$BUILD_DIR/merizo/db/storage/storage_engine_common',
+        '$BUILD_DIR/merizo/db/storage/storage_engine_lock_file',
+        '$BUILD_DIR/merizo/db/storage/storage_engine_metadata',
+        '$BUILD_DIR/merizo/db/storage/storage_init_d',
+        '$BUILD_DIR/merizo/db/storage/storage_options',
+        '$BUILD_DIR/merizo/db/wire_version',
+        '$BUILD_DIR/merizo/rpc/client_metadata',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/util/version_impl',
     ]
 )
 
@@ -130,37 +130,37 @@ env.Library(
         'embedded_options_helpers.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/options_parser/options_parser',
     ],
 )
 
 if get_option('link-model') != 'dynamic-sdk':
-    mongoed = yamlEnv.Program(
-        target='mongoed',
+    merizoed = yamlEnv.Program(
+        target='merizoed',
         source=[
-            'mongoed_main.cpp',
+            'merizoed_main.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/commands/shell_protocol',
-            '$BUILD_DIR/mongo/db/mongod_options',
-            '$BUILD_DIR/mongo/db/repl/repl_set_status_commands',
-            '$BUILD_DIR/mongo/db/server_options',
-            "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger",
-            '$BUILD_DIR/mongo/embedded/embedded',
-            '$BUILD_DIR/mongo/embedded/embedded_integration_helpers',
-            '$BUILD_DIR/mongo/transport/service_entry_point',
-            '$BUILD_DIR/mongo/transport/transport_layer_manager',
-            '$BUILD_DIR/mongo/util/signal_handlers',
+            '$BUILD_DIR/merizo/db/commands/shell_protocol',
+            '$BUILD_DIR/merizo/db/merizod_options',
+            '$BUILD_DIR/merizo/db/repl/repl_set_status_commands',
+            '$BUILD_DIR/merizo/db/server_options',
+            "$BUILD_DIR/merizo/db/storage/wiredtiger/storage_wiredtiger",
+            '$BUILD_DIR/merizo/embedded/embedded',
+            '$BUILD_DIR/merizo/embedded/embedded_integration_helpers',
+            '$BUILD_DIR/merizo/transport/service_entry_point',
+            '$BUILD_DIR/merizo/transport/transport_layer_manager',
+            '$BUILD_DIR/merizo/util/signal_handlers',
         ],
         INSTALL_ALIAS=[
             'embedded-test',
         ],
     )
 
-    env.Alias('all', mongoed) # This ensures it compiles and links, but doesn't copy it anywhere.
+    env.Alias('all', merizoed) # This ensures it compiles and links, but doesn't copy it anywhere.
 
     hygienic = get_option('install-mode') == 'hygienic'
 
     if not hygienic:
-        env.Install('#/', mongoed)
+        env.Install('#/', merizoed)

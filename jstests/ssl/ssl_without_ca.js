@@ -1,8 +1,8 @@
 var SERVER_CERT = "jstests/libs/server.pem";
 var CLIENT_CERT = "jstests/libs/client.pem";
-var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
+var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MerizoDB,OU=KernelUser,CN=client";
 
-jsTest.log("Assert x509 auth is not allowed when a standalone mongod is run without a CA file.");
+jsTest.log("Assert x509 auth is not allowed when a standalone merizod is run without a CA file.");
 
 // allowSSL instead of requireSSL so that the non-SSL connection succeeds.
 var conn = MongoRunner.runMongod({sslMode: 'allowSSL', sslPEMKeyFile: SERVER_CERT, auth: ''});
@@ -18,7 +18,7 @@ external.createUser({
 
 // Should not be able to authenticate with x509.
 // Authenticate call will return 1 on success, 0 on error.
-var exitStatus = runMongoProgram('mongo',
+var exitStatus = runMongoProgram('merizo',
                                  '--ssl',
                                  '--sslAllowInvalidCertificates',
                                  '--sslPEMKeyFile',
@@ -34,25 +34,25 @@ assert.eq(exitStatus, 0, "authentication via MONGODB-X509 without CA succeeded")
 
 MongoRunner.stopMongod(conn);
 
-jsTest.log("Assert mongod doesn\'t start with CA file missing and clusterAuthMode=x509.");
+jsTest.log("Assert merizod doesn\'t start with CA file missing and clusterAuthMode=x509.");
 
 var sslParams = {clusterAuthMode: 'x509', sslMode: 'requireSSL', sslPEMKeyFile: SERVER_CERT};
 var conn = MongoRunner.runMongod(sslParams);
 assert.isnull(conn, "server started with x509 clusterAuthMode but no CA file");
 
-jsTest.log("Assert mongos doesn\'t start with CA file missing and clusterAuthMode=x509.");
+jsTest.log("Assert merizos doesn\'t start with CA file missing and clusterAuthMode=x509.");
 
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 assert.throws(function() {
     new ShardingTest({
         shards: 1,
-        mongos: 1,
+        merizos: 1,
         verbose: 2,
         other: {
             configOptions: sslParams,
-            mongosOptions: sslParams,
+            merizosOptions: sslParams,
             shardOptions: sslParams,
             shardAsReplicaSet: false
         }
     });
-}, [], "mongos started with x509 clusterAuthMode but no CA file");
+}, [], "merizos started with x509 clusterAuthMode but no CA file");

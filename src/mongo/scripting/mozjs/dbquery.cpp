@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/dbquery.h"
+#include "merizo/scripting/mozjs/dbquery.h"
 
-#include "mongo/scripting/mozjs/idwrapper.h"
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/internedstring.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
+#include "merizo/scripting/mozjs/idwrapper.h"
+#include "merizo/scripting/mozjs/implscope.h"
+#include "merizo/scripting/mozjs/internedstring.h"
+#include "merizo/scripting/mozjs/objectwrapper.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 const char* const DBQueryInfo::className = "DBQuery";
@@ -51,7 +51,7 @@ void DBQueryInfo::construct(JSContext* cx, JS::CallArgs args) {
     scope->getProto<DBQueryInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    o.setValue(InternedString::_mongo, args.get(0));
+    o.setValue(InternedString::_merizo, args.get(0));
     o.setValue(InternedString::_db, args.get(1));
     o.setValue(InternedString::_collection, args.get(2));
     o.setValue(InternedString::_ns, args.get(3));
@@ -147,4 +147,4 @@ void DBQueryInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, 
 }
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

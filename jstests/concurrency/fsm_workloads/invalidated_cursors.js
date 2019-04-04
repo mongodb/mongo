@@ -56,7 +56,7 @@ var $config = (function() {
                                  .aggregate([
                                      // idleConnections true so we can also kill cursors which are
                                      // not currently active.
-                                     // localOps true so that currentOp reports the mongos
+                                     // localOps true so that currentOp reports the merizos
                                      // operations when run on a sharded cluster, instead of the
                                      // shard's operations.
                                      {$currentOp: {idleConnections: true, localOps: true}},

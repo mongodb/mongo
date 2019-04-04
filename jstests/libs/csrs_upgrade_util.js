@@ -43,7 +43,7 @@ var CSRSUpgradeCoordinator = function() {
     };
 
     /**
-     * Returns a copy of the options used for starting a mongos in the coordinator's cluster.
+     * Returns a copy of the options used for starting a merizos in the coordinator's cluster.
      */
     this.getMongosConfig = function() {
         var sconfig = Object.extend({}, st.s0.fullOptions, /* deep */ true);
@@ -52,7 +52,7 @@ var CSRSUpgradeCoordinator = function() {
     };
 
     this.getMongos = function(n) {
-        return st._mongos[n];
+        return st._merizos[n];
     };
 
     this.getShardName = function(n) {
@@ -168,7 +168,7 @@ var CSRSUpgradeCoordinator = function() {
                 if (csrsStatus.members[0].stateStr == "STARTUP" ||
                     csrsStatus.members[0].stateStr == "STARTUP2" ||
                     csrsStatus.members[0].stateStr == "RECOVERING") {
-                    // Make sure first node is fully online or else mongoses still in SCCC mode
+                    // Make sure first node is fully online or else merizoses still in SCCC mode
                     // might not
                     // find any node online to talk to.
                     return false;

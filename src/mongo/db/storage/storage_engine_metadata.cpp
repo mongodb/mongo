@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/storage/storage_engine_metadata.h"
+#include "merizo/db/storage/storage_engine_metadata.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/optional.hpp>
@@ -48,18 +48,18 @@
 #include <sys/types.h>
 #endif
 
-#include "mongo/base/data_type_validated.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/file.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/data_type_validated.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/rpc/object_check.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/file.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 namespace {
 
@@ -185,7 +185,7 @@ Status StorageEngineMetadata::read() {
 
     // Validate 'storage.engine' field.
     BSONElement storageEngineElement = dps::extractElementAtPath(obj, "storage.engine");
-    if (storageEngineElement.type() != mongo::String) {
+    if (storageEngineElement.type() != merizo::String) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "The 'storage.engine' field in metadata must be a string: "
                                     << storageEngineElement.toString());
@@ -217,7 +217,7 @@ Status StorageEngineMetadata::read() {
 void flushMyDirectory(const boost::filesystem::path& file) {
 #ifdef __linux__  // this isn't needed elsewhere
     static bool _warnedAboutFilesystem = false;
-    // if called without a fully qualified path it asserts; that makes mongoperf fail.
+    // if called without a fully qualified path it asserts; that makes merizoperf fail.
     // so make a warning. need a better solution longer term.
     // massert(13652, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
     if (!file.has_branch_path()) {
@@ -241,9 +241,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
             if (!_warnedAboutFilesystem) {
                 log() << "\tWARNING: This file system is not supported. For further information"
                       << " see:" << startupWarningsLog;
-                log() << "\t\t\thttp://dochub.mongodb.org/core/unsupported-filesystems"
+                log() << "\t\t\thttp://dochub.merizodb.org/core/unsupported-filesystems"
                       << startupWarningsLog;
-                log() << "\t\tPlease notify MongoDB, Inc. if an unlisted filesystem generated "
+                log() << "\t\tPlease notify MerizoDB, Inc. if an unlisted filesystem generated "
                       << "this warning." << startupWarningsLog;
                 _warnedAboutFilesystem = true;
             }
@@ -354,4 +354,4 @@ Status StorageEngineMetadata::validateStorageEngineOption<bool>(
                       << " and cannot be changed");
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -23,41 +23,41 @@
         }
     });
 
-    const mongosDB = st.s0.getDB(jsTestName());
-    const mongosColl = mongosDB[jsTestName()];
+    const merizosDB = st.s0.getDB(jsTestName());
+    const merizosColl = merizosDB[jsTestName()];
 
-    assert.commandWorked(mongosDB.dropDatabase());
+    assert.commandWorked(merizosDB.dropDatabase());
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+    assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));
+    st.ensurePrimaryShard(merizosDB.getName(), st.rs0.getURL());
 
     // Shard the test collection on a field called 'shardKey'.
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {shardKey: 1}}));
 
     // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
     assert.commandWorked(
-        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: 0}}));
+        merizosDB.adminCommand({split: merizosColl.getFullName(), middle: {shardKey: 0}}));
 
     // Move the [0, MaxKey] chunk to st.shard1.shardName.
-    assert.commandWorked(mongosDB.adminCommand(
-        {moveChunk: mongosColl.getFullName(), find: {shardKey: 1}, to: st.rs1.getURL()}));
+    assert.commandWorked(merizosDB.adminCommand(
+        {moveChunk: merizosColl.getFullName(), find: {shardKey: 1}, to: st.rs1.getURL()}));
 
     // Write a document to each chunk.
-    assert.writeOK(mongosColl.insert({shardKey: -1, _id: -1}, {writeConcern: {w: "majority"}}));
-    assert.writeOK(mongosColl.insert({shardKey: 1, _id: 1}, {writeConcern: {w: "majority"}}));
+    assert.writeOK(merizosColl.insert({shardKey: -1, _id: -1}, {writeConcern: {w: "majority"}}));
+    assert.writeOK(merizosColl.insert({shardKey: 1, _id: 1}, {writeConcern: {w: "majority"}}));
 
-    let changeStream = mongosColl.watch();
+    let changeStream = merizosColl.watch();
 
     // We awaited the replication of the first writes, so the change stream shouldn't return them.
-    assert.writeOK(mongosColl.update({shardKey: -1, _id: -1}, {$set: {updated: true}}));
-    assert.writeOK(mongosColl.update({shardKey: 1, _id: 1}, {$set: {updated: true}}));
-    assert.writeOK(mongosColl.insert({shardKey: 2, _id: 2}));
+    assert.writeOK(merizosColl.update({shardKey: -1, _id: -1}, {$set: {updated: true}}));
+    assert.writeOK(merizosColl.update({shardKey: 1, _id: 1}, {$set: {updated: true}}));
+    assert.writeOK(merizosColl.insert({shardKey: 2, _id: 2}));
 
     // Drop the collection and test that we return a "drop" entry, followed by an "invalidate"
     // entry.
-    mongosColl.drop();
+    merizosColl.drop();
 
     // Test that we see the two writes that happened before the collection drop.
     assert.soon(() => changeStream.hasNext());
@@ -79,7 +79,7 @@
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
     assert.eq(next.operationType, "drop");
-    assert.eq(next.ns, {db: mongosDB.getName(), coll: mongosColl.getName()});
+    assert.eq(next.ns, {db: merizosDB.getName(), coll: merizosColl.getName()});
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
@@ -87,7 +87,7 @@
     assert(changeStream.isExhausted());
 
     // With an explicit collation, test that we can resume from before the collection drop.
-    changeStream = mongosColl.watch(
+    changeStream = merizosColl.watch(
         [], {resumeAfter: resumeTokenFromFirstUpdate, collation: {locale: "simple"}});
 
     assert.soon(() => changeStream.hasNext());
@@ -103,7 +103,7 @@
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
     assert.eq(next.operationType, "drop");
-    assert.eq(next.ns, {db: mongosDB.getName(), coll: mongosColl.getName()});
+    assert.eq(next.ns, {db: merizosDB.getName(), coll: merizosColl.getName()});
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
@@ -111,40 +111,40 @@
     assert(changeStream.isExhausted());
 
     // Test that we can resume the change stream without specifying an explicit collation.
-    assert.commandWorked(mongosDB.runCommand({
-        aggregate: mongosColl.getName(),
+    assert.commandWorked(merizosDB.runCommand({
+        aggregate: merizosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
         cursor: {}
     }));
 
     // Recreate and shard the collection.
-    assert.commandWorked(mongosDB.createCollection(mongosColl.getName()));
+    assert.commandWorked(merizosDB.createCollection(merizosColl.getName()));
 
     // Shard the test collection on shardKey.
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+        merizosDB.adminCommand({shardCollection: merizosColl.getFullName(), key: {shardKey: 1}}));
 
     // Test that resuming the change stream on the recreated collection succeeds, since we will not
     // attempt to inherit the collection's default collation and can therefore ignore the new UUID.
-    assert.commandWorked(mongosDB.runCommand({
-        aggregate: mongosColl.getName(),
+    assert.commandWorked(merizosDB.runCommand({
+        aggregate: merizosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
         cursor: {}
     }));
 
     // Recreate the collection as unsharded and open a change stream on it.
-    assertDropAndRecreateCollection(mongosDB, mongosColl.getName());
+    assertDropAndRecreateCollection(merizosDB, merizosColl.getName());
 
-    changeStream = mongosColl.watch();
+    changeStream = merizosColl.watch();
 
     // Drop the database and verify that the stream returns a collection drop followed by an
     // invalidate.
-    assert.commandWorked(mongosDB.dropDatabase());
+    assert.commandWorked(merizosDB.dropDatabase());
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
     assert.eq(next.operationType, "drop");
-    assert.eq(next.ns, {db: mongosDB.getName(), coll: mongosColl.getName()});
+    assert.eq(next.ns, {db: merizosDB.getName(), coll: merizosColl.getName()});
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();

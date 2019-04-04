@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,14 +32,14 @@
 #include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/type_chunk_base_gen.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/s/catalog/type_chunk_base_gen.h"
+#include "merizo/s/chunk_version.h"
+#include "merizo/s/shard_id.h"
+#include "merizo/s/shard_key_pattern.h"
 
-namespace mongo {
+namespace merizo {
 
 class BSONObjBuilder;
 class Status;
@@ -112,7 +112,7 @@ private:
 class ChunkHistory : public ChunkHistoryBase {
 public:
     ChunkHistory() : ChunkHistoryBase() {}
-    ChunkHistory(mongo::Timestamp ts, mongo::ShardId shard) : ChunkHistoryBase() {
+    ChunkHistory(merizo::Timestamp ts, merizo::ShardId shard) : ChunkHistoryBase() {
         setValidAfter(std::move(ts));
         setShard(std::move(shard));
     }
@@ -305,4 +305,4 @@ private:
     std::vector<ChunkHistory> _history;
 };
 
-}  // namespace mongo
+}  // namespace merizo

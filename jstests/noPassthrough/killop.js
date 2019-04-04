@@ -1,4 +1,4 @@
-// Confirms basic killOp execution via mongod and mongos.
+// Confirms basic killOp execution via merizod and merizos.
 // @tags: [requires_replication, requires_sharding]
 
 (function() {
@@ -7,8 +7,8 @@
     const dbName = "killop";
     const collName = "test";
 
-    // 'conn' is a connection to either a mongod when testing a replicaset or a mongos when testing
-    // a sharded cluster. 'shardConn' is a connection to the mongod we enable failpoints on.
+    // 'conn' is a connection to either a merizod when testing a replicaset or a merizos when testing
+    // a sharded cluster. 'shardConn' is a connection to the merizod we enable failpoints on.
     function runTest(conn, shardConn) {
         const db = conn.getDB(dbName);
         assert.commandWorked(db.dropDatabase());
@@ -60,13 +60,13 @@
         assert(result.inprog.length === 0, tojson(db.currentOp()));
     }
 
-    const st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
+    const st = new ShardingTest({shards: 1, rs: {nodes: 1}, merizos: 1});
     const shardConn = st.rs0.getPrimary();
 
-    // Test killOp against mongod.
+    // Test killOp against merizod.
     runTest(shardConn, shardConn);
 
-    // Test killOp against mongos.
+    // Test killOp against merizos.
     runTest(st.s, shardConn);
 
     st.stop();

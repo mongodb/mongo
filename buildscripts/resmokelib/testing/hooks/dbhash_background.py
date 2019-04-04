@@ -29,7 +29,7 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
 
     def before_suite(self, test_report):
         """Start the background thread."""
-        client = self.fixture.mongo_client()
+        client = self.fixture.merizo_client()
         server_status = client.admin.command("serverStatus")
         if not server_status["storageEngine"].get("supportsSnapshotReadConcern", False):
             self.logger.info("Not enabling the background thread because '%s' storage engine"
@@ -77,7 +77,7 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
 
         if self._background_job.exc_info is not None:
             if isinstance(self._background_job.exc_info[1], errors.TestFailure):
-                # If the mongo shell process running the JavaScript file exited with a non-zero
+                # If the merizo shell process running the JavaScript file exited with a non-zero
                 # return code, then we raise an errors.ServerFailure exception to cause resmoke.py's
                 # test execution to stop.
                 raise errors.ServerFailure(self._background_job.exc_info[1].args[0])

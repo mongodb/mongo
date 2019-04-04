@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/catalog/index_key_validate.h"
+#include "merizo/db/catalog/index_key_validate.h"
 
 #include <boost/optional.hpp>
 #include <cmath>
 #include <limits>
 #include <set>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/wildcard_key_generator.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/service_context.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/represent_as.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/db/field_ref.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/index/wildcard_key_generator.h"
+#include "merizo/db/index_names.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/matcher/expression_parser.h"
+#include "merizo/db/namespace_string.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/service_context.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/represent_as.h"
 
-namespace mongo {
+namespace merizo {
 namespace index_key_validate {
 
 std::function<void(std::set<StringData>&)> filterAllowedIndexFieldNames;
@@ -122,7 +122,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
     if (pluginName.size()) {
         if (!IndexNames::isKnownName(pluginName))
             return Status(
-                code, mongoutils::str::stream() << "Unknown index plugin '" << pluginName << '\'');
+                code, merizoutils::str::stream() << "Unknown index plugin '" << pluginName << '\'');
     }
 
     BSONObjIterator it(key);
@@ -199,11 +199,11 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
         }
 
         // "$**" is acceptable for a text index or wildcard index.
-        if (mongoutils::str::equals(keyElement.fieldName(), "$**") &&
+        if (merizoutils::str::equals(keyElement.fieldName(), "$**") &&
             ((keyElement.isNumber()) || (keyElement.valuestrsafe() == IndexNames::TEXT)))
             continue;
 
-        if (mongoutils::str::equals(keyElement.fieldName(), "_fts") &&
+        if (merizoutils::str::equals(keyElement.fieldName(), "_fts") &&
             keyElement.valuestrsafe() != IndexNames::TEXT) {
             return Status(code, "Index key contains an illegal field name: '_fts'");
         }
@@ -306,7 +306,7 @@ StatusWith<BSONObj> validateIndexSpec(
                 (IndexNames::findPluginName(indexSpec.getObjectField(
                      IndexDescriptor::kKeyPatternFieldName)) == IndexNames::WILDCARD)) {
                 return {ErrorCodes::CannotCreateIndex,
-                        mongoutils::str::stream() << "Unknown index plugin '"
+                        merizoutils::str::stream() << "Unknown index plugin '"
                                                   << IndexNames::WILDCARD
                                                   << "'"};
             }
@@ -622,4 +622,4 @@ GlobalInitializerRegisterer filterAllowedIndexFieldNamesInitializer(
     });
 
 }  // namespace index_key_validate
-}  // namespace mongo
+}  // namespace merizo

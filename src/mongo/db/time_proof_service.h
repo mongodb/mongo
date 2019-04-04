@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/stdx/mutex.h"
+#include "merizo/base/status.h"
+#include "merizo/crypto/sha1_block.h"
+#include "merizo/db/logical_time.h"
+#include "merizo/stdx/mutex.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
- * The TimeProofService holds the key used by mongod and mongos processes to verify cluster times
+ * The TimeProofService holds the key used by merizod and merizos processes to verify cluster times
  * and contains the logic to generate this key. As a performance optimization to avoid expensive
  * signature generation the class also holds the cache.
  */
@@ -96,4 +96,4 @@ private:
     boost::optional<CacheEntry> _cache;
 };
 
-}  // namespace mongo
+}  // namespace merizo

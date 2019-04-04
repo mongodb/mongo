@@ -44,9 +44,9 @@
 
     let st = new ShardingTest({name: "views_sharded", shards: 2, other: {enableBalancer: false}});
 
-    let mongos = st.s;
-    let config = mongos.getDB("config");
-    let db = mongos.getDB(jsTestName());
+    let merizos = st.s;
+    let config = merizos.getDB("config");
+    let db = merizos.getDB(jsTestName());
     db.dropDatabase();
 
     let coll = db.getCollection("coll");
@@ -55,7 +55,7 @@
     st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
     assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 
-    assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
+    assert.commandWorked(merizos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
     assert.commandWorked(
         db.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: st.shard1.shardName}));
 

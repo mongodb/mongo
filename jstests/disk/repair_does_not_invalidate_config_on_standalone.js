@@ -15,17 +15,17 @@
     const dbpath = MongoRunner.dataPath + baseName + "/";
     resetDbpath(dbpath);
 
-    let mongod = MongoRunner.runMongod({dbpath: dbpath});
-    const port = mongod.port;
+    let merizod = MongoRunner.runMongod({dbpath: dbpath});
+    const port = merizod.port;
 
-    let testColl = mongod.getDB(dbName)[collName];
+    let testColl = merizod.getDB(dbName)[collName];
 
     assert.commandWorked(testColl.insert({_id: 0, foo: "bar"}));
 
     let collUri = getUriForColl(testColl);
     let collFile = dbpath + "/" + collUri + ".wt";
 
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 
     jsTestLog("Deleting collection file: " + collFile);
     removeFile(collFile);

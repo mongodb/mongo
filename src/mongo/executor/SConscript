@@ -10,15 +10,15 @@ env.Library(
         'connection_pool_stats.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/net/network',
     ])
 
 env.Library(target='async_timer_mock',
             source=['async_timer_mock.cpp'],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/base/system_error',
+                '$BUILD_DIR/merizo/base',
+                '$BUILD_DIR/merizo/base/system_error',
             ])
 
 env.Library(target='remote_command',
@@ -27,8 +27,8 @@ env.Library(target='remote_command',
                 'remote_command_response.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/rpc/metadata',
-                '$BUILD_DIR/mongo/util/net/network',
+                '$BUILD_DIR/merizo/rpc/metadata',
+                '$BUILD_DIR/merizo/util/net/network',
             ])
 
 env.Library(target='async_multicaster',
@@ -38,8 +38,8 @@ env.Library(target='async_multicaster',
             LIBDEPS=[
                 'remote_command',
                 'task_executor_interface',
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/util/net/network',
+                '$BUILD_DIR/merizo/base',
+                '$BUILD_DIR/merizo/util/net/network',
             ])
 
 env.Library(target='task_executor_interface',
@@ -47,7 +47,7 @@ env.Library(target='task_executor_interface',
                 'task_executor.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/merizo/base',
                 'remote_command',
             ])
 
@@ -63,9 +63,9 @@ env.Library('network_interface_mock',
                 'thread_pool_mock.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/rpc/metadata',
-                '$BUILD_DIR/mongo/util/net/network',
+                '$BUILD_DIR/merizo/base',
+                '$BUILD_DIR/merizo/rpc/metadata',
+                '$BUILD_DIR/merizo/util/net/network',
                 'network_interface',
                 'task_executor_interface',
             ])
@@ -76,8 +76,8 @@ env.Library(
        'connection_pool.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/net/network',
         'connection_pool_stats',
         'remote_command',
     ],
@@ -113,8 +113,8 @@ env.CppUnitTest(
 env.Library(target='network_test_env',
             source=['network_test_env.cpp',],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/commands',
-                '$BUILD_DIR/mongo/db/query/command_request_response',
+                '$BUILD_DIR/merizo/db/commands',
+                '$BUILD_DIR/merizo/db/query/command_request_response',
                 'network_interface_mock',
                 'task_executor_interface',
             ])
@@ -124,7 +124,7 @@ env.Library(target='egress_tag_closer_manager',
                 'egress_tag_closer_manager.cpp',
             ],
             LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/db/service_context',
+                '$BUILD_DIR/merizo/db/service_context',
             ])
 
 env.Library(
@@ -134,12 +134,12 @@ env.Library(
         'network_interface_tl.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/async_client',
-        '$BUILD_DIR/mongo/transport/transport_layer',
+        '$BUILD_DIR/merizo/client/async_client',
+        '$BUILD_DIR/merizo/transport/transport_layer',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/transport/transport_layer_manager',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/transport/transport_layer_manager',
         'connection_pool_executor',
         'network_interface',
     ]
@@ -151,13 +151,13 @@ env.Library(
         'network_interface_integration_fixture.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/integration_test_main',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/merizo/unittest/integration_test_main',
+        '$BUILD_DIR/merizo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/merizo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/merizo/executor/network_interface_factory',
+        '$BUILD_DIR/merizo/rpc/command_status',
+        '$BUILD_DIR/merizo/util/concurrency/thread_pool',
+        '$BUILD_DIR/merizo/util/version_impl',
     ]
 )
 
@@ -168,9 +168,9 @@ env.CppIntegrationTest(
     ],
     LIBDEPS=[
         'network_interface_fixture',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/wire_version',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/db/wire_version',
+        '$BUILD_DIR/merizo/transport/transport_layer_egress_init',
     ],
 )
 
@@ -195,8 +195,8 @@ env.Library(
         'task_executor_test_fixture.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/merizo/util/clock_source_mock',
+        '$BUILD_DIR/merizo/unittest/unittest',
         'network_interface_mock',
         'task_executor_interface',
     ]
@@ -209,8 +209,8 @@ env.Library(
     ],
     LIBDEPS=[
         'task_executor_interface',
-        '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/util/fail_point',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
     LIBDEPS_PRIVATE=[
         'network_interface',
@@ -223,7 +223,7 @@ env.Library(
         'network_interface_thread_pool.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ]
 )
 
@@ -255,8 +255,8 @@ env.Library(
         env.Idlc("task_executor_pool_parameters.idl")[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/util/processinfo',
+        '$BUILD_DIR/merizo/idl/server_parameter',
+        '$BUILD_DIR/merizo/util/processinfo',
         'task_executor_interface',
     ],
 )

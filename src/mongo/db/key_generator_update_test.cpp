@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #include <set>
 #include <string>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/key_generator.h"
-#include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/keys_collection_document.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/config_server_test_fixture.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/fail_point_service.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/key_generator.h"
+#include "merizo/db/keys_collection_client_sharded.h"
+#include "merizo/db/keys_collection_document.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/s/catalog/dist_lock_manager_mock.h"
+#include "merizo/s/config_server_test_fixture.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/clock_source_mock.h"
+#include "merizo/util/fail_point_service.h"
 
-namespace mongo {
+namespace merizo {
 
 class KeyGeneratorUpdateTest : public ConfigServerTestFixture {
 protected:
@@ -416,4 +416,4 @@ TEST_F(KeyGeneratorUpdateTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPo
     ASSERT_EQ(0U, allKeys.size());
 }
 
-}  // namespace mongo
+}  // namespace merizo

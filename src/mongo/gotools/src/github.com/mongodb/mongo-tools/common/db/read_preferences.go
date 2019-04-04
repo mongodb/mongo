@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -9,7 +9,7 @@ package db
 import (
 	"fmt"
 
-	"github.com/mongodb/mongo-tools/common/json"
+	"github.com/merizodb/merizo-tools/common/json"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -21,7 +21,7 @@ type readPrefDoc struct {
 
 const (
 	WarningNonPrimaryMongosConnection = "Warning: using a non-primary readPreference with a " +
-		"connection to mongos may produce inconsistent duplicates or miss some documents."
+		"connection to merizos may produce inconsistent duplicates or miss some documents."
 )
 
 func ParseReadPreference(rp string) (mgo.Mode, bson.D, error) {

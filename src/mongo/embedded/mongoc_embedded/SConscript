@@ -12,7 +12,7 @@ if not env['MONGO_HAVE_LIBMONGOC']:
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'share/doc/mongoc_embedded',
+        'share/doc/merizoc_embedded',
         source=[
             '#/LICENSE-Community.txt',
             '../LICENSE-Embedded.txt',
@@ -22,55 +22,55 @@ if get_option('install-mode') == 'hygienic':
         ],
     )
 
-def create_mongoc_env(env):
-    mongocEnv = env.Clone()
-    if mongocEnv['MONGO_HAVE_LIBMONGOC'] == "framework":
-        mongocEnv.AppendUnique(FRAMEWORKS=['bson', 'mongoc'])
+def create_merizoc_env(env):
+    merizocEnv = env.Clone()
+    if merizocEnv['MONGO_HAVE_LIBMONGOC'] == "framework":
+        merizocEnv.AppendUnique(FRAMEWORKS=['bson', 'merizoc'])
     else:
-        mongocEnv.AppendUnique(LIBS=['bson-1.0', 'mongoc-1.0'])
-    return mongocEnv
+        merizocEnv.AppendUnique(LIBS=['bson-1.0', 'merizoc-1.0'])
+    return merizocEnv
 
-mongocEmbeddedEnv = create_mongoc_env(env)
+merizocEmbeddedEnv = create_merizoc_env(env)
 
-mongocEmbeddedEnv.AppendUnique(
+merizocEmbeddedEnv.AppendUnique(
     CPPDEFINES=[
         'MONGOC_EMBEDDED_COMPILING',
      ],
 )
 
 if get_option('link-model') == 'static':
-    mongocEmbeddedEnv.AppendUnique(
+    merizocEmbeddedEnv.AppendUnique(
         CPPDEFINES=[
             'MONGOC_EMBEDDED_STATIC',
         ],
     )
 
-# Please see the note in ../mongo_embedded/SConscript about how to
+# Please see the note in ../merizo_embedded/SConscript about how to
 # interpret and adjust the current and compatibility versinos.
-mongocEmbeddedEnv.AppendUnique(
+merizocEmbeddedEnv.AppendUnique(
     SHLINKFLAGS=[
         '$MONGO_EXPORT_FILE_SHLINKFLAGS',
     ],
 )
 
-if mongocEmbeddedEnv.TargetOSIs('darwin'):
-    # Please see the note in ../mongo_embedded/SConscript about how to
+if merizocEmbeddedEnv.TargetOSIs('darwin'):
+    # Please see the note in ../merizo_embedded/SConscript about how to
     # interpret and adjust the current and compatibility versinos.
-    mongocEmbeddedEnv.AppendUnique(
+    merizocEmbeddedEnv.AppendUnique(
         SHLINKFLAGS=[
             '-Wl,-current_version,1',
             '-Wl,-compatibility_version,1',
         ],
     )
 
-mongocEmbeddedTargets = mongocEmbeddedEnv.Library(
-    target='mongoc_embedded',
+merizocEmbeddedTargets = merizocEmbeddedEnv.Library(
+    target='merizoc_embedded',
     source=[
-        'mongoc_embedded.cpp',
+        'merizoc_embedded.cpp',
     ],
     LIBDEPS=[
-        # No LIBDEPS or LIBDEPS_PRIVATE to mongo libraries are allowed in this library. They would get duplicated in mongo_embedded_capi.
-        '$BUILD_DIR/mongo/embedded/mongo_embedded/mongo_embedded',
+        # No LIBDEPS or LIBDEPS_PRIVATE to merizo libraries are allowed in this library. They would get duplicated in merizo_embedded_capi.
+        '$BUILD_DIR/merizo/embedded/merizo_embedded/merizo_embedded',
     ],
     INSTALL_ALIAS=[
         'embedded-dev',
@@ -79,8 +79,8 @@ mongocEmbeddedTargets = mongocEmbeddedEnv.Library(
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'include/mongoc_embedded/v1/mongoc_embedded',
-        source=['mongoc_embedded.h'],
+        'include/merizoc_embedded/v1/merizoc_embedded',
+        source=['merizoc_embedded.h'],
         INSTALL_ALIAS=[
             'embedded-dev',
         ],
@@ -90,19 +90,19 @@ yamlEnv = env.Clone()
 yamlEnv.InjectThirdParty(libraries=['yaml'])
 
 if get_option('link-model') != 'dynamic-sdk':
-    mongocEmbeddedTestEnv = create_mongoc_env(yamlEnv)
-    clientTest = mongocEmbeddedTestEnv.Program(
-        target='mongoc_embedded_test',
+    merizocEmbeddedTestEnv = create_merizoc_env(yamlEnv)
+    clientTest = merizocEmbeddedTestEnv.Program(
+        target='merizoc_embedded_test',
         source=[
-            'mongoc_embedded_test.cpp',
-            env.Idlc('mongoc_embedded_test.idl')[0],
+            'merizoc_embedded_test.cpp',
+            env.Idlc('merizoc_embedded_test.idl')[0],
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/server_options_core',
-            '$BUILD_DIR/mongo/unittest/unittest',
-            '$BUILD_DIR/mongo/util/options_parser/options_parser',
-            'mongoc_embedded',
+            '$BUILD_DIR/merizo/base',
+            '$BUILD_DIR/merizo/db/server_options_core',
+            '$BUILD_DIR/merizo/unittest/unittest',
+            '$BUILD_DIR/merizo/util/options_parser/options_parser',
+            'merizoc_embedded',
         ],
         INSTALL_ALIAS=[
             'embedded-test',
@@ -122,7 +122,7 @@ if get_option('link-model') != 'dynamic-sdk':
 if get_option('link-model') != 'dynamic-sdk' or get_option('install-mode') != 'hygienic' or not env.TargetOSIs('darwin') or env.TargetOSIs('macOS'):
     Return()
 
-frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/mongoc_embedded.framework')
+frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/merizoc_embedded.framework')
 env.Alias('install-embedded-dev', frameworkDir)
 
 resourceDir = frameworkDir
@@ -136,26 +136,26 @@ env.Install(
             'LICENSE-Community.txt',
             'LICENSE-Embedded.txt',
         ],
-        directory=env.Dir('$INSTALL_DIR/share/doc/mongoc_embedded'),
+        directory=env.Dir('$INSTALL_DIR/share/doc/merizoc_embedded'),
     ),
 )
 
 env.Install(
     target=frameworkDir.Dir('Headers'),
-    source=env.File('mongoc_embedded.h'),
+    source=env.File('merizoc_embedded.h'),
 )
 
 env.InstallAs(
     target=frameworkDir.File('Modules/module.modulemap'),
-    source="mongoc_embedded.modulemap"
+    source="merizoc_embedded.modulemap"
 )
 
-mongocEmbeddedPlist = env.Substfile(
+merizocEmbeddedPlist = env.Substfile(
     target="Info.plist",
     source='../Info.plist.in',
     SUBST_DICT=[
-        ('@CFBundleExecutable@', 'mongoc_embedded'),
-        ('@CFBundleIdentifier@', 'org.mongodb.mongoc-embedded'),
+        ('@CFBundleExecutable@', 'merizoc_embedded'),
+        ('@CFBundleIdentifier@', 'org.merizodb.merizoc-embedded'),
         ('@CFBundleVersion@', env['PLIST_MONGO_BUNDLE_VERSION']),
         ('@CFBundleShortVersionString@', env['PLIST_MONGO_BUNDLE_VERSION']),
         ('@MinimumOSVersion@', env['PLIST_MINIMUM_OS_VERSION'])
@@ -164,36 +164,36 @@ mongocEmbeddedPlist = env.Substfile(
 
 env.Install(
     target=resourceDir,
-    source=mongocEmbeddedPlist,
+    source=merizocEmbeddedPlist,
 )
 
-mongocEmbeddedFwLib = env.InstallAs(
-    target=frameworkDir.File('mongoc_embedded'),
-    source=mongocEmbeddedTargets[0],
+merizocEmbeddedFwLib = env.InstallAs(
+    target=frameworkDir.File('merizoc_embedded'),
+    source=merizocEmbeddedTargets[0],
 )
 
 env.AddPostAction(
-    files=mongocEmbeddedFwLib,
+    files=merizocEmbeddedFwLib,
     action=[
         "install_name_tool -delete_rpath @loader_path/../lib $TARGET",
-        "install_name_tool -id @rpath/mongoc_embedded.framework/mongoc_embedded $TARGET",
-        "install_name_tool -change @rpath/libmongo_embedded.dylib @rpath/mongo_embedded.framework/mongo_embedded $TARGET",
+        "install_name_tool -id @rpath/merizoc_embedded.framework/merizoc_embedded $TARGET",
+        "install_name_tool -change @rpath/libmerizo_embedded.dylib @rpath/merizo_embedded.framework/merizo_embedded $TARGET",
     ],
 )
 
-mongocEmbeddedDSYM = getattr(mongocEmbeddedTargets[0].attributes, "separate_debug_file", None)
-if mongocEmbeddedDSYM:
-    frameworkDSYMDir = '$INSTALL_DIR/Frameworks/mongoc_embedded.framework.dSYM'
+merizocEmbeddedDSYM = getattr(merizocEmbeddedTargets[0].attributes, "separate_debug_file", None)
+if merizocEmbeddedDSYM:
+    frameworkDSYMDir = '$INSTALL_DIR/Frameworks/merizoc_embedded.framework.dSYM'
     env.Alias('install-embedded-dev', frameworkDSYMDir)
 
     env.InstallAs(
         target=frameworkDSYMDir,
-        source=mongocEmbeddedDSYM,
+        source=merizocEmbeddedDSYM,
     )
 
-mongocEmbeddedBCSymbolMap = getattr(mongocEmbeddedTargets[0].attributes, "bcsymbolmap_file", None)
-if mongocEmbeddedBCSymbolMap:
+merizocEmbeddedBCSymbolMap = getattr(merizocEmbeddedTargets[0].attributes, "bcsymbolmap_file", None)
+if merizocEmbeddedBCSymbolMap:
     env.Install(
         target=frameworkDir.Dir('BCSymbolMaps'),
-        source=mongocEmbeddedBCSymbolMap,
+        source=merizocEmbeddedBCSymbolMap,
     )

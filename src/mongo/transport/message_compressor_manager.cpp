@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/transport/message_compressor_manager.h"
+#include "merizo/transport/message_compressor_manager.h"
 
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_endian.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/rpc/message.h"
-#include "mongo/transport/message_compressor_registry.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/log.h"
+#include "merizo/base/data_range_cursor.h"
+#include "merizo/base/data_type_endian.h"
+#include "merizo/bson/bsonobj.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/rpc/message.h"
+#include "merizo/transport/message_compressor_registry.h"
+#include "merizo/transport/session.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 // TODO(JBR): This should be changed so it 's closer to the MSGHEADER View/ConstView classes
@@ -242,7 +242,7 @@ void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuil
     // rather than doing a negotiation
     if (elem.eoo()) {
         // If we haven't negotiated any compressors yet, then don't append anything to the
-        // output - this makes this compatible with older versions of MongoDB that don't
+        // output - this makes this compatible with older versions of MerizoDB that don't
         // support compression.
         if (_negotiated.size() > 0) {
             BSONArrayBuilder sub(output->subarrayStart("compression"));
@@ -299,4 +299,4 @@ MessageCompressorManager& MessageCompressorManager::forSession(
     return getForSession(session.get());
 }
 
-}  // namespace mongo
+}  // namespace merizo

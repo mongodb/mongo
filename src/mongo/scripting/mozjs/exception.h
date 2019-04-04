@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,17 +31,17 @@
 
 #include <jsapi.h>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/util/assert_util.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/string_data.h"
+#include "merizo/util/assert_util.h"
 
-namespace mongo {
+namespace merizo {
 namespace mozjs {
 
 /**
  * Turns a current C++ exception into a JS exception
  */
-void mongoToJSException(JSContext* cx);
+void merizoToJSException(JSContext* cx);
 
 /**
  * Turns a status into a js exception
@@ -86,4 +86,4 @@ MONGO_COMPILER_NORETURN void throwCurrentJSException(JSContext* cx,
                                                      StringData altReason);
 
 }  // namespace mozjs
-}  // namespace mongo
+}  // namespace merizo

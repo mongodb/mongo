@@ -3,8 +3,8 @@
     'use strict';
     const dbpath = MongoRunner.dataPath + jsTest.name();
     resetDbpath(dbpath);
-    const mongod = MongoRunner.runMongod({dbpath: dbpath});
-    const db = mongod.getDB("test");
+    const merizod = MongoRunner.runMongod({dbpath: dbpath});
+    const db = merizod.getDB("test");
     const collName = jsTest.name();
     const coll = db.getCollection(collName);
 
@@ -128,7 +128,7 @@ if (${ canYield }) {
     );
 }
 `,
-                                                     mongod.port);
+                                                     merizod.port);
 
             // Wait until we can see the command running.
             assert.soon(
@@ -219,5 +219,5 @@ if (${ canYield }) {
     assertCommandPropogatesPlanExecutorKillReason(
         {delete: coll.getName(), deletes: [{q: {a: {$gte: 0}}, limit: 0}]},
         {curOpFilter: {op: 'remove'}, usesIndex: true});
-    MongoRunner.stopMongod(mongod);
+    MongoRunner.stopMongod(merizod);
 })();

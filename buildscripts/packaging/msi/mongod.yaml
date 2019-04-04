@@ -1,7 +1,7 @@
-# mongod.conf
+# merizod.conf
 
 # for documentation of all options, see:
-#   http://docs.mongodb.org/manual/reference/configuration-options/
+#   http://docs.merizodb.org/manual/reference/configuration-options/
 
 # Where and how to store data.
 storage:
@@ -16,7 +16,7 @@ storage:
 systemLog:
   destination: file
   logAppend: true
-  path:  %MONGO_LOG_PATH%\mongod.log
+  path:  %MONGO_LOG_PATH%\merizod.log
 
 # network interfaces
 net:

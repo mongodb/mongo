@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -33,16 +33,16 @@
  * String utilities.
  *
  * TODO: De-inline.
- * TODO: Retire the mongoutils namespace, and move str under the mongo namespace.
+ * TODO: Retire the merizoutils namespace, and move str under the merizo namespace.
  */
 
 #include <sstream>
 #include <string>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/builder.h"
+#include "merizo/base/string_data.h"
+#include "merizo/bson/util/builder.h"
 
-namespace mongoutils {
+namespace merizoutils {
 
 namespace str {
 
@@ -56,11 +56,11 @@ namespace str {
 
     TODO: To avoid implicit conversions in relational operation expressions, this stream
     class should provide a full symmetric set of relational operators vs itself, vs
-    std::string, vs mongo::StringData, and vs const char*, but that's a lot of functions.
+    std::string, vs merizo::StringData, and vs const char*, but that's a lot of functions.
 */
 class stream {
 public:
-    mongo::StringBuilder ss;
+    merizo::StringBuilder ss;
     template <class T>
     stream& operator<<(const T& v) {
         ss << v;
@@ -69,7 +69,7 @@ public:
     operator std::string() const {
         return ss.str();
     }
-    operator mongo::StringData() const {
+    operator merizo::StringData() const {
         return ss.stringData();
     }
 
@@ -264,7 +264,7 @@ inline bool isUTF8ContinuationByte(char charByte) {
  * Assuming 'str' stores a UTF-8 string, returns the number of UTF codepoints. The return value is
  * undefined if the input is not a well formed UTF-8 string.
  */
-inline size_t lengthInUTF8CodePoints(mongo::StringData str) {
+inline size_t lengthInUTF8CodePoints(merizo::StringData str) {
     size_t strLen = 0;
     for (char byte : str) {
         strLen += !isUTF8ContinuationByte(byte);
@@ -275,10 +275,10 @@ inline size_t lengthInUTF8CodePoints(mongo::StringData str) {
 
 }  // namespace str
 
-}  // namespace mongoutils
+}  // namespace merizoutils
 
-namespace mongo {
-using namespace mongoutils;
+namespace merizo {
+using namespace merizoutils;
 
 #if defined(_WIN32)
 inline int strcasecmp(const char* s1, const char* s2) {
@@ -286,4 +286,4 @@ inline int strcasecmp(const char* s1, const char* s2) {
 }
 #endif
 
-}  // namespace mongo
+}  // namespace merizo

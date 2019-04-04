@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/base/error_codes.h"
+#include "merizo/base/error_codes.h"
 
-#include "mongo/base/static_assert.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/base/static_assert.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/merizoutils/str.h"
 
 //#set $codes_with_extra = [ec for ec in $codes if ec.extra]
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 // You can thing of this namespace as a compile-time map<ErrorCodes::Error, ErrorExtraInfoParser*>.
@@ -58,7 +58,7 @@ std::string ErrorCodes::errorString(Error err) {
             return "$ec.name";
         //#end for
         default:
-            return mongoutils::str::stream() << "Location" << int(err);
+            return merizoutils::str::stream() << "Location" << int(err);
     }
 }
 
@@ -153,4 +153,4 @@ void error_details::throwExceptionForStatus(const Status& status) {
     }
 }
 
-}  // namespace mongo
+}  // namespace merizo

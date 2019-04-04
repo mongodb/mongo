@@ -21,7 +21,7 @@
     TestData.transactionLifetimeLimitSeconds = 10;
 
     const rsOpts = {nodes: 3};
-    let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts, rs2: rsOpts}});
+    let st = new ShardingTest({merizos: 2, shards: {rs0: rsOpts, rs1: rsOpts, rs2: rsOpts}});
 
     const coordinator = st.shard0;
     const participant1 = st.shard1;

@@ -11,10 +11,10 @@
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
-    const mongosDB = st.s.getDB("use_cases");
+    const merizosDB = st.s.getDB("use_cases");
 
-    const metricsColl = mongosDB["metrics"];
-    const rollupColl = mongosDB["rollup"];
+    const metricsColl = merizosDB["metrics"];
+    const rollupColl = merizosDB["rollup"];
 
     function incDateByMinutes(date, mins) {
         return new Date(date.getTime() + (60 * 1000 * mins));
@@ -59,7 +59,7 @@
     // Shard the metrics (source) collection on _id, which is the date of the sample.
     const hourZero = new ISODate("2018-08-15T00:00:00.000Z");
     const hourOne = incDateByMinutes(hourZero, 60);
-    st.shardColl(metricsColl, {_id: 1}, {_id: hourOne}, {_id: hourOne}, mongosDB.getName());
+    st.shardColl(metricsColl, {_id: 1}, {_id: hourOne}, {_id: hourOne}, merizosDB.getName());
 
     // Insert sample documents into the metrics collection.
     const samplesPerHour = 10;
@@ -95,7 +95,7 @@
 
     // Shard the output collection into 2 chunks, and make the split hour 6.
     const hourSix = incDateByMinutes(hourZero, 60 * 6);
-    st.shardColl(rollupColl, {_id: 1}, {_id: hourSix}, {_id: hourSix}, mongosDB.getName());
+    st.shardColl(rollupColl, {_id: 1}, {_id: hourSix}, {_id: hourSix}, merizosDB.getName());
 
     // Insert hour 7 data into the metrics collection and re-run the aggregation.
     [ticksSum, tempSum] = insertRandomData(metricsColl, hourSix, samplesPerHour);

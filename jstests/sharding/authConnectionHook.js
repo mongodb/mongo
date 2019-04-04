@@ -2,7 +2,7 @@
  * Test for SERVER-8786 - if the first operation on an authenticated shard is moveChunk, it breaks
  * the cluster.
  *
- * Any tests that restart a shard mongod and send sharding requests to it after restart cannot make
+ * Any tests that restart a shard merizod and send sharding requests to it after restart cannot make
  * the shard use an in-memory storage engine, since the shardIdentity document will be lost after
  * restart.
  *
@@ -27,9 +27,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         }
     });
 
-    var mongos = st.s;
-    var adminDB = mongos.getDB('admin');
-    var db = mongos.getDB('test');
+    var merizos = st.s;
+    var adminDB = merizos.getDB('admin');
+    var db = merizos.getDB('test');
 
     adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
 

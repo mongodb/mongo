@@ -25,48 +25,48 @@
         }
     });
 
-    const mongosDB = st.s0.getDB("test");
-    const mongosColl = mongosDB[jsTestName()];
+    const merizosDB = st.s0.getDB("test");
+    const merizosColl = merizosDB[jsTestName()];
 
-    let cst = new ChangeStreamTest(mongosDB);
+    let cst = new ChangeStreamTest(merizosDB);
     let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
     // Test that if there are no changes, we return an empty batch.
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
     // Test that the change stream returns operations on the unsharded test collection.
-    assert.writeOK(mongosColl.insert({_id: 0}));
+    assert.writeOK(merizosColl.insert({_id: 0}));
     let expected = {
         documentKey: {_id: 0},
         fullDocument: {_id: 0},
-        ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+        ns: {db: merizosDB.getName(), coll: merizosColl.getName()},
         operationType: "insert",
     };
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
     // Create a new sharded collection.
-    mongosDB.createCollection(jsTestName() + "_sharded_on_x");
-    const mongosCollShardedOnX = mongosDB[jsTestName() + "_sharded_on_x"];
+    merizosDB.createCollection(jsTestName() + "_sharded_on_x");
+    const merizosCollShardedOnX = merizosDB[jsTestName() + "_sharded_on_x"];
 
     // Shard, split, and move one chunk to shard1.
-    st.shardColl(mongosCollShardedOnX.getName(), {x: 1}, {x: 0}, {x: 1}, mongosDB.getName());
+    st.shardColl(merizosCollShardedOnX.getName(), {x: 1}, {x: 0}, {x: 1}, merizosDB.getName());
 
     // Write a document to each chunk.
-    assert.writeOK(mongosCollShardedOnX.insert({_id: 0, x: -1}));
-    assert.writeOK(mongosCollShardedOnX.insert({_id: 1, x: 1}));
+    assert.writeOK(merizosCollShardedOnX.insert({_id: 0, x: -1}));
+    assert.writeOK(merizosCollShardedOnX.insert({_id: 1, x: 1}));
 
     // Verify that the change stream returns both inserts.
     expected = [
         {
           documentKey: {_id: 0, x: -1},
           fullDocument: {_id: 0, x: -1},
-          ns: {db: mongosDB.getName(), coll: mongosCollShardedOnX.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosCollShardedOnX.getName()},
           operationType: "insert",
         },
         {
           documentKey: {_id: 1, x: 1},
           fullDocument: {_id: 1, x: 1},
-          ns: {db: mongosDB.getName(), coll: mongosCollShardedOnX.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosCollShardedOnX.getName()},
           operationType: "insert",
         }
     ];
@@ -74,53 +74,53 @@
 
     // Now send inserts to both the sharded and unsharded collections, and verify that the change
     // streams returns them in order.
-    assert.writeOK(mongosCollShardedOnX.insert({_id: 2, x: 2}));
-    assert.writeOK(mongosColl.insert({_id: 1}));
+    assert.writeOK(merizosCollShardedOnX.insert({_id: 2, x: 2}));
+    assert.writeOK(merizosColl.insert({_id: 1}));
 
     // Verify that the change stream returns both inserts.
     expected = [
         {
           documentKey: {_id: 2, x: 2},
           fullDocument: {_id: 2, x: 2},
-          ns: {db: mongosDB.getName(), coll: mongosCollShardedOnX.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosCollShardedOnX.getName()},
           operationType: "insert",
         },
         {
           documentKey: {_id: 1},
           fullDocument: {_id: 1},
-          ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosColl.getName()},
           operationType: "insert",
         }
     ];
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
     // Create a third sharded collection with a compound shard key.
-    mongosDB.createCollection(jsTestName() + "_sharded_compound");
-    const mongosCollShardedCompound = mongosDB[jsTestName() + "_sharded_compound"];
+    merizosDB.createCollection(jsTestName() + "_sharded_compound");
+    const merizosCollShardedCompound = merizosDB[jsTestName() + "_sharded_compound"];
 
     // Shard, split, and move one chunk to shard1.
-    st.shardColl(mongosCollShardedCompound.getName(),
+    st.shardColl(merizosCollShardedCompound.getName(),
                  {y: 1, x: 1},
                  {y: 1, x: MinKey},
                  {y: 1, x: MinKey},
-                 mongosDB.getName());
+                 merizosDB.getName());
 
     // Write a document to each chunk.
-    assert.writeOK(mongosCollShardedCompound.insert({_id: 0, y: -1, x: 0}));
-    assert.writeOK(mongosCollShardedCompound.insert({_id: 1, y: 1, x: 0}));
+    assert.writeOK(merizosCollShardedCompound.insert({_id: 0, y: -1, x: 0}));
+    assert.writeOK(merizosCollShardedCompound.insert({_id: 1, y: 1, x: 0}));
 
     // Verify that the change stream returns both inserts.
     expected = [
         {
           documentKey: {_id: 0, y: -1, x: 0},
           fullDocument: {_id: 0, y: -1, x: 0},
-          ns: {db: mongosDB.getName(), coll: mongosCollShardedCompound.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosCollShardedCompound.getName()},
           operationType: "insert",
         },
         {
           documentKey: {_id: 1, y: 1, x: 0},
           fullDocument: {_id: 1, y: 1, x: 0},
-          ns: {db: mongosDB.getName(), coll: mongosCollShardedCompound.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosCollShardedCompound.getName()},
           operationType: "insert",
         }
     ];
@@ -128,28 +128,28 @@
 
     // Send inserts to all 3 collections and verify that the results contain the correct
     // documentKeys and are in the correct order.
-    assert.writeOK(mongosCollShardedOnX.insert({_id: 3, x: 3}));
-    assert.writeOK(mongosColl.insert({_id: 3}));
-    assert.writeOK(mongosCollShardedCompound.insert({_id: 2, x: 0, y: -2}));
+    assert.writeOK(merizosCollShardedOnX.insert({_id: 3, x: 3}));
+    assert.writeOK(merizosColl.insert({_id: 3}));
+    assert.writeOK(merizosCollShardedCompound.insert({_id: 2, x: 0, y: -2}));
 
     // Verify that the change stream returns both inserts.
     expected = [
         {
           documentKey: {_id: 3, x: 3},
           fullDocument: {_id: 3, x: 3},
-          ns: {db: mongosDB.getName(), coll: mongosCollShardedOnX.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosCollShardedOnX.getName()},
           operationType: "insert",
         },
         {
           documentKey: {_id: 3},
           fullDocument: {_id: 3},
-          ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosColl.getName()},
           operationType: "insert",
         },
         {
           documentKey: {_id: 2, x: 0, y: -2},
           fullDocument: {_id: 2, x: 0, y: -2},
-          ns: {db: mongosDB.getName(), coll: mongosCollShardedCompound.getName()},
+          ns: {db: merizosDB.getName(), coll: merizosCollShardedCompound.getName()},
           operationType: "insert",
         },
     ];
@@ -160,17 +160,17 @@
 
     // Write one more document to the collection that will be dropped, to be returned after
     // resuming.
-    assert.writeOK(mongosCollShardedOnX.insert({_id: 4, x: 4}));
+    assert.writeOK(merizosCollShardedOnX.insert({_id: 4, x: 4}));
 
     // Drop the collection, invalidating the open change stream.
-    assertDropCollection(mongosDB, mongosCollShardedOnX.getName());
+    assertDropCollection(merizosDB, merizosCollShardedOnX.getName());
 
     // Resume the change stream from before the collection drop, and verify that the documentKey
     // field contains the extracted shard key from the resume token.
     cursor = cst.startWatchingChanges({
         pipeline: [
             {$changeStream: {resumeAfter: resumeTokenBeforeDrop}},
-            {$match: {"ns.coll": mongosCollShardedOnX.getName()}}
+            {$match: {"ns.coll": merizosCollShardedOnX.getName()}}
         ],
         collection: 1
     });
@@ -180,7 +180,7 @@
             {
               documentKey: {_id: 4, x: 4},
               fullDocument: {_id: 4, x: 4},
-              ns: {db: mongosDB.getName(), coll: mongosCollShardedOnX.getName()},
+              ns: {db: merizosDB.getName(), coll: merizosCollShardedOnX.getName()},
               operationType: "insert",
             },
         ]

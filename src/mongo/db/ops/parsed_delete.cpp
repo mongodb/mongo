@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/ops/parsed_delete.h"
+#include "merizo/db/ops/parsed_delete.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/ops/delete_request.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/database.h"
+#include "merizo/db/exec/delete.h"
+#include "merizo/db/matcher/extensions_callback_real.h"
+#include "merizo/db/ops/delete_request.h"
+#include "merizo/db/query/canonical_query.h"
+#include "merizo/db/query/get_executor.h"
+#include "merizo/db/query/query_planner_common.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 
 ParsedDelete::ParsedDelete(OperationContext* opCtx, const DeleteRequest* request)
     : _opCtx(opCtx), _request(request) {}
@@ -122,4 +122,4 @@ std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
     return std::move(_canonicalQuery);
 }
 
-}  // namespace mongo
+}  // namespace merizo

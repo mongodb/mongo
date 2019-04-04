@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -46,14 +46,14 @@ var terminatorBytes = []byte{0xFF, 0xFF, 0xFF, 0xFF} // TODO, rectify this with 
 const MagicNumber uint32 = 0x8199e26d
 const archiveFormatVersion = "0.1"
 
-// Writer is the top level object to contain information about archives in mongodump
+// Writer is the top level object to contain information about archives in merizodump
 type Writer struct {
 	Out     io.WriteCloser
 	Prelude *Prelude
 	Mux     *Multiplexer
 }
 
-// Reader is the top level object to contain information about archives in mongorestore
+// Reader is the top level object to contain information about archives in merizorestore
 type Reader struct {
 	In      io.ReadCloser
 	Demux   *Demultiplexer

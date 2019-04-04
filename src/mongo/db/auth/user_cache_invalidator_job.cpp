@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,33 +27,33 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/user_cache_invalidator_job.h"
+#include "merizo/db/auth/user_cache_invalidator_job.h"
 
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/client/connpool.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/user_cache_invalidator_job_parameters_gen.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/grid.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/background.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/client/connpool.h"
+#include "merizo/db/auth/authorization_manager.h"
+#include "merizo/db/auth/user_cache_invalidator_job_parameters_gen.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands.h"
+#include "merizo/platform/compiler.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/grid.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/util/background.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/duration.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/time_support.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 class ThreadSleepInterval {
@@ -151,7 +151,7 @@ void UserCacheInvalidator::initialize(OperationContext* opCtx) {
     if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
         warning() << "_getUserCacheGeneration command not found while fetching initial user "
                      "cache generation from the config server(s).  This most likely means you are "
-                     "running an outdated version of mongod on the config servers";
+                     "running an outdated version of merizod on the config servers";
     } else {
         warning() << "An error occurred while fetching initial user cache generation from "
                      "config servers: "
@@ -176,7 +176,7 @@ void UserCacheInvalidator::run() {
         if (!currentGeneration.isOK()) {
             if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
                 warning() << "_getUserCacheGeneration command not found on config server(s), "
-                             "this most likely means you are running an outdated version of mongod "
+                             "this most likely means you are running an outdated version of merizod "
                              "on the config servers";
             } else {
                 warning() << "An error occurred while fetching current user cache generation "
@@ -210,4 +210,4 @@ std::string UserCacheInvalidator::name() const {
     return "UserCacheInvalidatorThread";
 }
 
-}  // namespace mongo
+}  // namespace merizo

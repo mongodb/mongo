@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,11 +32,11 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/config.h"
+#include "merizo/base/status.h"
+#include "merizo/base/status_with.h"
+#include "merizo/config.h"
 
-namespace mongo {
+namespace merizo {
 
 #if (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS) || \
     (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE)
@@ -122,9 +122,9 @@ struct SSLParams {
 extern SSLParams sslGlobalParams;
 
 /**
- * Older versions of mongod/mongos accepted --sslDisabledProtocols values
+ * Older versions of merizod/merizos accepted --sslDisabledProtocols values
  * in the form 'noTLS1_0,noTLS1_1'.  kAcceptNegativePrefix allows us to
- * continue accepting this format on mongod/mongos while only supporting
+ * continue accepting this format on merizod/merizos while only supporting
  * the "standard" TLS1_X format in the shell.
  */
 enum class SSLDisabledProtocolsMode {
@@ -147,4 +147,4 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
                                 StringData name,
                                 StringData value);
 
-}  // namespace mongo
+}  // namespace merizo

@@ -16,7 +16,7 @@ var mrResult = testDB.runCommand({mapReduce: 'bar', map: map, reduce: reduce, ou
 
 assert.eq(0, mrResult.ok, 'mr result: ' + tojson(mrResult));
 
-// Confirm that mongod did not crash
+// Confirm that merizod did not crash
 var cmdResult = testDB.adminCommand({serverStatus: 1});
 assert(cmdResult.ok, 'serverStatus failed, result: ' + tojson(cmdResult));
 MongoRunner.stopMongod(conn);

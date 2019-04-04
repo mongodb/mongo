@@ -11,36 +11,36 @@ load('jstests/libs/sessions_collection.js');
     var configSvr = st.configRS.getPrimary();
     var configAdmin = configSvr.getDB("admin");
 
-    var mongos = st.s;
-    var mongosAdmin = mongos.getDB("admin");
-    var mongosConfig = mongos.getDB("config");
+    var merizos = st.s;
+    var merizosAdmin = merizos.getDB("admin");
+    var merizosConfig = merizos.getDB("config");
 
     // Test that we can use sessions on the config server before we add any shards.
     {
         validateSessionsCollection(configSvr, false, false);
-        validateSessionsCollection(mongos, false, false);
+        validateSessionsCollection(merizos, false, false);
 
         assert.commandWorked(configAdmin.runCommand({startSession: 1}));
 
         validateSessionsCollection(configSvr, false, false);
-        validateSessionsCollection(mongos, false, false);
+        validateSessionsCollection(merizos, false, false);
     }
 
-    // Test that we can use sessions on a mongos before we add any shards.
+    // Test that we can use sessions on a merizos before we add any shards.
     {
         validateSessionsCollection(configSvr, false, false);
-        validateSessionsCollection(mongos, false, false);
+        validateSessionsCollection(merizos, false, false);
 
-        assert.commandWorked(mongosAdmin.runCommand({startSession: 1}));
+        assert.commandWorked(merizosAdmin.runCommand({startSession: 1}));
 
         validateSessionsCollection(configSvr, false, false);
-        validateSessionsCollection(mongos, false, false);
+        validateSessionsCollection(merizos, false, false);
     }
 
     // Test that the config server does not create the sessions collection
     // if there are not any shards.
     {
-        assert.eq(mongosConfig.shards.count(), 0);
+        assert.eq(merizosConfig.shards.count(), 0);
 
         assert.commandWorked(configAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
 
@@ -62,8 +62,8 @@ load('jstests/libs/sessions_collection.js');
         shardConfig.system.sessions.insert({"hey": "you"});
         validateSessionsCollection(shard, true, false);
 
-        assert.commandWorked(mongosAdmin.runCommand({addShard: rs.getURL()}));
-        assert.eq(mongosConfig.shards.count(), 1);
+        assert.commandWorked(merizosAdmin.runCommand({addShard: rs.getURL()}));
+        assert.eq(merizosConfig.shards.count(), 1);
         validateSessionsCollection(shard, false, false);
     }
 
@@ -79,18 +79,18 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(shard, false, false);
     }
 
-    // Test that we can use sessions from a mongos before the sessions collection
+    // Test that we can use sessions from a merizos before the sessions collection
     // is set up by the config servers.
     {
         validateSessionsCollection(configSvr, false, false);
         validateSessionsCollection(shard, false, false);
-        validateSessionsCollection(mongos, false, false);
+        validateSessionsCollection(merizos, false, false);
 
-        assert.commandWorked(mongosAdmin.runCommand({startSession: 1}));
+        assert.commandWorked(merizosAdmin.runCommand({startSession: 1}));
 
         validateSessionsCollection(configSvr, false, false);
         validateSessionsCollection(shard, false, false);
-        validateSessionsCollection(mongos, false, false);
+        validateSessionsCollection(merizos, false, false);
     }
 
     // Test that if we do a refresh (write) from a shard server while there
@@ -121,8 +121,8 @@ load('jstests/libs/sessions_collection.js');
         assert.commandWorked(shardAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
         assert.eq(shardConfig.system.sessions.count(), 2, "did not flush shard's sessions");
 
-        assert.commandWorked(mongosAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
-        assert.eq(shardConfig.system.sessions.count(), 4, "did not flush mongos' sessions");
+        assert.commandWorked(merizosAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+        assert.eq(shardConfig.system.sessions.count(), 4, "did not flush merizos' sessions");
     }
 
     // Test that if we drop the index on the sessions collection,

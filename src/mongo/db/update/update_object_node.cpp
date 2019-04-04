@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/update/update_object_node.h"
+#include "merizo/db/update/update_object_node.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/update/field_checker.h"
-#include "mongo/db/update/modifier_table.h"
-#include "mongo/db/update/update_array_node.h"
-#include "mongo/db/update/update_leaf_node.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/stringutils.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/update/field_checker.h"
+#include "merizo/db/update/modifier_table.h"
+#include "merizo/db/update/update_array_node.h"
+#include "merizo/db/update/update_leaf_node.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/stringutils.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -456,4 +456,4 @@ UpdateNode::ApplyResult UpdateObjectNode::apply(ApplyParams applyParams) const {
     return applyResult;
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -40,20 +40,20 @@ env.Library(
         env.Idlc("expression_index_knobs.idl")[0],
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/index/expression_params",
-        "$BUILD_DIR/mongo/db/index/key_generator",
-        "$BUILD_DIR/mongo/db/index_names",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
-        "$BUILD_DIR/mongo/db/mongohasher",
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/db/bson/dotted_path_support",
+        "$BUILD_DIR/merizo/db/index/expression_params",
+        "$BUILD_DIR/merizo/db/index/key_generator",
+        "$BUILD_DIR/merizo/db/index_names",
+        "$BUILD_DIR/merizo/db/matcher/expressions",
+        "$BUILD_DIR/merizo/db/merizohasher",
         "collation/collator_factory_interface",
         "collation/collator_interface",
         "command_request_response",
         "query_knobs",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/server_parameter",
+        "$BUILD_DIR/merizo/idl/server_parameter",
     ],
 )
 
@@ -73,11 +73,11 @@ env.Library(
         env.Idlc('distinct_command.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ],
 )
 
-# Shared mongod/mongos query code.
+# Shared merizod/merizos query code.
 env.Library(
     target="query_common",
     source=[
@@ -85,8 +85,8 @@ env.Library(
         "parsed_distinct.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/fail_point",
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/util/fail_point",
         "collation/collator_factory_icu",
         "collation/collator_icu",
         "datetime/init_timezone_data",
@@ -103,7 +103,7 @@ env.Library(
         "explain_options.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/merizo/base",
     ],
 )
 
@@ -123,7 +123,7 @@ env.CppUnitTest(
         "parsed_distinct_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
+        "$BUILD_DIR/merizo/db/pipeline/aggregation_request",
         "query_test_service_context",
         "query_common",
     ],
@@ -136,10 +136,10 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "query_test_service_context",
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/dbtests/mocklib",
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        "$BUILD_DIR/merizo/db/query_exec",
+        "$BUILD_DIR/merizo/db/service_context_d",
+        "$BUILD_DIR/merizo/dbtests/mocklib",
     ],
 )
 
@@ -156,13 +156,13 @@ env.Library(
         'view_response_formatter.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/repl/optime',
+        '$BUILD_DIR/merizo/rpc/command_status',
+        '$BUILD_DIR/merizo/rpc/rpc',
         'query_request',
     ]
 )
@@ -179,8 +179,8 @@ env.CppUnitTest(
         'view_response_formatter_test.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
-        '$BUILD_DIR/mongo/rpc/rpc',
+        "$BUILD_DIR/merizo/db/pipeline/aggregation_request",
+        '$BUILD_DIR/merizo/rpc/rpc',
         'command_request_response',
     ]
 )
@@ -193,9 +193,9 @@ env.Library(
         env.Idlc("tailable_mode.idl")[0],
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/repl/read_concern_args",
-        "$BUILD_DIR/mongo/db/catalog/uuid_catalog"
+        "$BUILD_DIR/merizo/base",
+        "$BUILD_DIR/merizo/db/repl/read_concern_args",
+        "$BUILD_DIR/merizo/db/catalog/uuid_catalog"
     ],
 )
 
@@ -205,7 +205,7 @@ env.Library(
         env.Idlc('query_knobs.idl')[0]
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter'
+        '$BUILD_DIR/merizo/idl/server_parameter'
     ]
 )
 
@@ -216,8 +216,8 @@ env.Library(
     ],
     LIBDEPS=[
         "collation/collator_factory_mock",
-        "$BUILD_DIR/mongo/db/logical_session_id",
-        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/merizo/db/logical_session_id",
+        "$BUILD_DIR/merizo/db/service_context",
     ],
     LIBDEPS_PRIVATE=[
     ],
@@ -230,7 +230,7 @@ env.Library(
     ],
     LIBDEPS=[
         "query_planner_test_lib",
-        "$BUILD_DIR/mongo/unittest/unittest",
+        "$BUILD_DIR/merizo/unittest/unittest",
     ],
 )
 
@@ -290,9 +290,9 @@ env.CppUnitTest(
         "query_request_test.cpp"
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "$BUILD_DIR/merizo/db/pipeline/aggregation_request",
+        "$BUILD_DIR/merizo/db/concurrency/lock_manager",
+        "$BUILD_DIR/merizo/db/service_context_test_fixture",
         "query_request",
     ],
 )
@@ -398,9 +398,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "query_planner_test_fixture",
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/dbtests/mocklib",
+        "$BUILD_DIR/merizo/db/auth/authmocks",
+        "$BUILD_DIR/merizo/db/query_exec",
+        "$BUILD_DIR/merizo/db/service_context_d",
+        "$BUILD_DIR/merizo/dbtests/mocklib",
     ],
 )

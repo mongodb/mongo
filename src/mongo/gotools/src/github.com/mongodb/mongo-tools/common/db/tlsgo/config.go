@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2018-present.
+// Copyright (C) MerizoDB, Inc. 2018-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// This file contains code adapted from the MongoDB Go Driver.
+// This file contains code adapted from the MerizoDB Go Driver.
 
 // Package tlsgo provides a mgo connection using Go's native TLS library.
 package tlsgo

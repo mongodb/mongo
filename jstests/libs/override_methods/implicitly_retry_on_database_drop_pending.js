@@ -7,8 +7,8 @@
 
     const defaultTimeout = 10 * 60 * 1000;
 
-    const mongoRunCommandOriginal = Mongo.prototype.runCommand;
-    const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
+    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
+    const merizoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
     function awaitLatestOperationMajorityConfirmed(primary) {
         // Get the latest optime from the primary.
@@ -166,7 +166,7 @@
         return runCommandWithRetries(this,
                                      dbName,
                                      commandObj,
-                                     mongoRunCommandOriginal,
+                                     merizoRunCommandOriginal,
                                      (commandObj) => [dbName, commandObj, options]);
     };
 
@@ -174,7 +174,7 @@
         return runCommandWithRetries(this,
                                      dbName,
                                      commandArgs,
-                                     mongoRunCommandWithMetadataOriginal,
+                                     merizoRunCommandWithMetadataOriginal,
                                      (commandArgs) => [dbName, metadata, commandArgs]);
     };
 })();

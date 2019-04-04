@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/background_thread_clock_source.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/system_clock_source.h"
-#include "mongo/util/time_support.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/background_thread_clock_source.h"
+#include "merizo/util/clock_source.h"
+#include "merizo/util/clock_source_mock.h"
+#include "merizo/util/system_clock_source.h"
+#include "merizo/util/time_support.h"
 
 namespace {
 
-using namespace mongo;
+using namespace merizo;
 
-class BTCSTest : public mongo::unittest::Test {
+class BTCSTest : public merizo::unittest::Test {
 public:
     void setUpClocks(Milliseconds granularity) {
         auto csMock = std::make_unique<ClockSourceMock>();

@@ -13,7 +13,7 @@
     load("jstests/libs/parallel_shell_helpers.js");
 
     const conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "merizod was unable to start up");
     jsTestLog("Create collection.");
     let listRenameDB = conn.getDB(dbName);
     listRenameDB.dropDatabase();

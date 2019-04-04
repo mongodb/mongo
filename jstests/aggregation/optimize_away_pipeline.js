@@ -291,7 +291,7 @@
         });
     }
     // Test getMore puts a correct namespace into profile data for a colletion with optimized away
-    // pipeline. Cannot be run on mongos as profiling can be enabled only on mongod. Also profiling
+    // pipeline. Cannot be run on merizos as profiling can be enabled only on merizod. Also profiling
     // is supported on WiredTiger only.
     if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
         db.system.profile.drop();

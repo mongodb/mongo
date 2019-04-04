@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/util/net/ssl_parameters.h"
+#include "merizo/util/net/ssl_parameters.h"
 
-#include "mongo/config.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/net/ssl_parameters_gen.h"
+#include "merizo/config.h"
+#include "merizo/db/auth/sasl_command_constants.h"
+#include "merizo/db/server_options.h"
+#include "merizo/util/log.h"
+#include "merizo/util/net/ssl_options.h"
+#include "merizo/util/net/ssl_parameters_gen.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 std::string clusterAuthModeFormat() {
@@ -142,9 +142,9 @@ Status TLSModeServerParameter::setFromString(const std::string& strMode) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace merizo
 
-mongo::Status mongo::validateOpensslCipherConfig(const std::string&) {
+merizo::Status merizo::validateOpensslCipherConfig(const std::string&) {
     if (!sslGlobalParams.sslCipherConfig.empty()) {
         return {ErrorCodes::BadValue,
                 "opensslCipherConfig setParameter is incompatible with net.tls.tlsCipherConfig"};
@@ -159,7 +159,7 @@ mongo::Status mongo::validateOpensslCipherConfig(const std::string&) {
     return Status::OK();
 }
 
-mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&) {
+merizo::Status merizo::validateDisableNonTLSConnectionLogging(const bool&) {
     if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
         return {ErrorCodes::BadValue,
                 "Error parsing command line: Multiple occurrences of option "
@@ -168,7 +168,7 @@ mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&) {
     return Status::OK();
 }
 
-mongo::Status mongo::onUpdateDisableNonTLSConnectionLogging(const bool&) {
+merizo::Status merizo::onUpdateDisableNonTLSConnectionLogging(const bool&) {
     // disableNonSSLConnectionLogging is a write-once setting.
     // Once we've updated it, we're not allowed to specify the set-param again.
     // Record that update in a second bool value.

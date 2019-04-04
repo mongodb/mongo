@@ -1,10 +1,10 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ import (
 )
 
 // CommandReplyOp is a struct for parsing OP_COMMANDREPLY as defined here:
-// https://github.com/mongodb/mongo/blob/master/src/mongo/rpc/command_reply.h.
+// https://github.com/merizodb/merizo/blob/master/src/merizo/rpc/command_reply.h.
 // Although this file parses the wire protocol message into a more usable
 // struct, it does not currently provide functionality to execute the operation,
 // as it is not implemented fully in llmgo.
@@ -172,7 +172,7 @@ func (op *CommandReplyOp) FromReader(r io.Reader) error {
 }
 
 // Execute logs a warning and returns nil because OP_COMMANDREPLY cannot yet be
-// handled fully by mongoreplay.
+// handled fully by merizoreplay.
 func (op *CommandReplyOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
 	userInfoLogger.Logv(Always, "Skipping unimplemented op: OP_COMMANDREPLY")
 	return nil, nil

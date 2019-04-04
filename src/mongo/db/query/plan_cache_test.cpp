@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -28,34 +28,34 @@
  */
 
 /**
- * This file contains tests for mongo/db/query/plan_cache.h
+ * This file contains tests for merizo/db/query/plan_cache.h
  */
 
-#include "mongo/db/query/plan_cache.h"
+#include "merizo/db/query/plan_cache.h"
 
 #include <algorithm>
 #include <memory>
 #include <ostream>
 
-#include "mongo/db/index/wildcard_key_generator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_test_lib.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "merizo/db/index/wildcard_key_generator.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/json.h"
+#include "merizo/db/matcher/extensions_callback_noop.h"
+#include "merizo/db/pipeline/expression_context_for_test.h"
+#include "merizo/db/query/canonical_query_encoder.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/db/query/plan_ranker.h"
+#include "merizo/db/query/query_knobs_gen.h"
+#include "merizo/db/query/query_planner.h"
+#include "merizo/db/query/query_planner_test_lib.h"
+#include "merizo/db/query/query_solution.h"
+#include "merizo/db/query/query_test_service_context.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/transitional_tools_do_not_use/vector_spooling.h"
 
-using namespace mongo;
+using namespace merizo;
 
 using unittest::assertGet;
 
@@ -881,7 +881,7 @@ TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
  * a full-blown QuerySolution. Finally, assert that the query solution
  * recovered from the cache is identical to the original "best solution".
  */
-class CachePlanSelectionTest : public mongo::unittest::Test {
+class CachePlanSelectionTest : public merizo::unittest::Test {
 protected:
     void setUp() {
         params.options = QueryPlannerParams::INCLUDE_COLLSCAN;

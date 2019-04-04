@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/embedded/service_entry_point_embedded.h"
+#include "merizo/embedded/service_entry_point_embedded.h"
 
-#include "mongo/db/read_concern.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/service_entry_point_common.h"
-#include "mongo/embedded/not_implemented.h"
-#include "mongo/embedded/periodic_runner_embedded.h"
+#include "merizo/db/read_concern.h"
+#include "merizo/db/repl/speculative_majority_read_info.h"
+#include "merizo/db/service_entry_point_common.h"
+#include "merizo/embedded/not_implemented.h"
+#include "merizo/embedded/periodic_runner_embedded.h"
 
-namespace mongo {
+namespace merizo {
 
 class ServiceEntryPointEmbedded::Hooks final : public ServiceEntryPointCommon::Hooks {
 public:
@@ -53,7 +53,7 @@ public:
         const auto prepareConflictBehavior = invocation->canIgnorePrepareConflicts()
             ? PrepareConflictBehavior::kIgnore
             : PrepareConflictBehavior::kEnforce;
-        auto rcStatus = mongo::waitForReadConcern(opCtx,
+        auto rcStatus = merizo::waitForReadConcern(opCtx,
                                                   repl::ReadConcernArgs::get(opCtx),
                                                   invocation->allowsAfterClusterTime(),
                                                   prepareConflictBehavior);
@@ -61,7 +61,7 @@ public:
     }
 
     void waitForSpeculativeMajorityReadConcern(OperationContext* opCtx) const override {
-        auto rcStatus = mongo::waitForSpeculativeMajorityReadConcern(
+        auto rcStatus = merizo::waitForSpeculativeMajorityReadConcern(
             opCtx, repl::SpeculativeMajorityReadInfo::get(opCtx));
         uassertStatusOK(rcStatus);
     }
@@ -72,7 +72,7 @@ public:
                              BSONObjBuilder& commandResponseBuilder) const override {
         WriteConcernResult res;
         auto waitForWCStatus =
-            mongo::waitForWriteConcern(opCtx, lastOpBeforeRun, opCtx->getWriteConcern(), &res);
+            merizo::waitForWriteConcern(opCtx, lastOpBeforeRun, opCtx->getWriteConcern(), &res);
 
         CommandHelpers::appendCommandWCStatus(commandResponseBuilder, waitForWCStatus, res);
     }
@@ -80,7 +80,7 @@ public:
     void waitForLinearizableReadConcern(OperationContext* opCtx) const override {
         if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
             repl::ReadConcernLevel::kLinearizableReadConcern) {
-            uassertStatusOK(mongo::waitForLinearizableReadConcern(opCtx, 0));
+            uassertStatusOK(merizo::waitForLinearizableReadConcern(opCtx, 0));
         }
     }
 
@@ -140,4 +140,4 @@ size_t ServiceEntryPointEmbedded::numOpenSessions() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-}  // namespace mongo
+}  // namespace merizo

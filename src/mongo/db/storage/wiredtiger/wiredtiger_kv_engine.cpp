@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 #define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
 #define LOG_FOR_ROLLBACK(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationRollback)
+    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationRollback)
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
 #ifdef _WIN32
 #define NVALGRIND
@@ -41,7 +41,7 @@
 
 #include <memory>
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -49,52 +49,52 @@
 #include <boost/system/error_code.hpp>
 #include <valgrind/valgrind.h>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/snapshot_window_options.h"
-#include "mongo/db/storage/journal_listener.h"
-#include "mongo/db/storage/storage_file_util.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/background.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/log.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/bson/bsonobjbuilder.h"
+#include "merizo/db/bson/dotted_path_support.h"
+#include "merizo/db/catalog/collection.h"
+#include "merizo/db/catalog/collection_catalog_entry.h"
+#include "merizo/db/client.h"
+#include "merizo/db/commands/server_status_metric.h"
+#include "merizo/db/concurrency/locker.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/global_settings.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/repl/repl_settings.h"
+#include "merizo/db/repl/replication_coordinator.h"
+#include "merizo/db/server_options.h"
+#include "merizo/db/service_context.h"
+#include "merizo/db/snapshot_window_options.h"
+#include "merizo/db/storage/journal_listener.h"
+#include "merizo/db/storage/storage_file_util.h"
+#include "merizo/db/storage/storage_options.h"
+#include "merizo/db/storage/storage_repair_observer.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_cursor.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_extensions.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "merizo/db/storage/wiredtiger/wiredtiger_size_storer.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/util/background.h"
+#include "merizo/util/concurrency/idle_thread_block.h"
+#include "merizo/util/concurrency/ticketholder.h"
+#include "merizo/util/exit.h"
+#include "merizo/util/log.h"
+#include "merizo/util/processinfo.h"
+#include "merizo/util/scopeguard.h"
+#include "merizo/util/time_support.h"
 
 #if !defined(__has_feature)
 #define __has_feature(x) 0
 #endif
 
-namespace mongo {
+namespace merizo {
 
 bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
                                             bool repairMode,
@@ -165,7 +165,7 @@ std::string WiredTigerFileVersion::getDowngradeString() {
 using std::set;
 using std::string;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::merizo::dotted_path_support;
 
 const int WiredTigerKVEngine::kDefaultJournalDelayMillis = 100;
 
@@ -589,7 +589,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
         ss << "verbose=(recovery_progress),";
 
-        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,
+        if (shouldLog(::merizo::logger::LogComponent::kStorageRecovery,
                       logger::LogSeverity::Debug(3))) {
             ss << "verbose=(recovery),";
         }
@@ -1996,4 +1996,4 @@ std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     return tmp;
 }
 
-}  // namespace mongo
+}  // namespace merizo

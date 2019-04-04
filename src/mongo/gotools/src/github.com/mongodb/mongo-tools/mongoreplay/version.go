@@ -1,14 +1,14 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongoreplay
+package merizoreplay
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/merizodb/merizo-tools/common/options"
 	"runtime"
 )
 
@@ -22,7 +22,7 @@ func (o *VersionOptions) PrintVersion() bool {
 }
 
 func printVersionInfo() {
-	fmt.Printf("%v version: %v\n", "mongoreplay", options.VersionStr)
+	fmt.Printf("%v version: %v\n", "merizoreplay", options.VersionStr)
 	fmt.Printf("git version: %v\n", options.Gitspec)
 	fmt.Printf("Go version: %v\n", runtime.Version())
 	fmt.Printf("   os: %v\n", runtime.GOOS)

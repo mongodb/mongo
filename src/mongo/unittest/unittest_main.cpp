@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,29 +31,29 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
-#include "mongo/logger/logger.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/unittest/unittest_options_gen.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/signal_handlers_synchronous.h"
+#include "merizo/base/initializer.h"
+#include "merizo/base/status.h"
+#include "merizo/logger/logger.h"
+#include "merizo/unittest/unittest.h"
+#include "merizo/unittest/unittest_options_gen.h"
+#include "merizo/util/options_parser/environment.h"
+#include "merizo/util/options_parser/option_section.h"
+#include "merizo/util/options_parser/options_parser.h"
+#include "merizo/util/signal_handlers_synchronous.h"
 
-using mongo::Status;
+using merizo::Status;
 
-namespace moe = ::mongo::optionenvironment;
+namespace moe = ::merizo::optionenvironment;
 
 int main(int argc, char** argv, char** envp) {
-    ::mongo::clearSignalMask();
-    ::mongo::setupSynchronousSignalHandlers();
+    ::merizo::clearSignalMask();
+    ::merizo::setupSynchronousSignalHandlers();
 
-    ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    ::merizo::runGlobalInitializersOrDie(argc, argv, envp);
 
     moe::OptionSection options;
 
-    Status status = mongo::unittest::addUnitTestOptions(&options);
+    Status status = merizo::unittest::addUnitTestOptions(&options);
     if (!status.isOK()) {
         std::cerr << status;
         return EXIT_FAILURE;
@@ -88,16 +88,16 @@ int main(int argc, char** argv, char** envp) {
         std::cerr << options.helpString();
         return EXIT_FAILURE;
     }
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Debug(verbose.length()));
+    ::merizo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::merizo::logger::LogSeverity::Debug(verbose.length()));
 
     if (list) {
-        auto suiteNames = ::mongo::unittest::getAllSuiteNames();
+        auto suiteNames = ::merizo::unittest::getAllSuiteNames();
         for (auto name : suiteNames) {
             std::cout << name << std::endl;
         }
         return EXIT_SUCCESS;
     }
 
-    return ::mongo::unittest::Suite::run(suites, filter, repeat);
+    return ::merizo::unittest::Suite::run(suites, filter, repeat);
 }

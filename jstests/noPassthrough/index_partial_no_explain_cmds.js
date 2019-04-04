@@ -1,5 +1,5 @@
 // Test partial indexes with commands that don't use explain.  These commands are tested against
-// mongod with the --notablescan flag set, so that they fail if the index is not used.
+// merizod with the --notablescan flag set, so that they fail if the index is not used.
 (function() {
     "use strict";
     var runner = MongoRunner.runMongod({setParameter: "notablescan=1"});

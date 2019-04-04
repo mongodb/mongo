@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,19 +31,19 @@
 
 #include <memory>
 
-#include "mongo/client/authenticate.h"
-#include "mongo/db/service_context.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/protocol.h"
-#include "mongo/rpc/unique_message.h"
-#include "mongo/transport/baton.h"
-#include "mongo/transport/message_compressor_manager.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/future.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/db/service_context.h"
+#include "merizo/executor/network_connection_hook.h"
+#include "merizo/executor/remote_command_request.h"
+#include "merizo/executor/remote_command_response.h"
+#include "merizo/rpc/protocol.h"
+#include "merizo/rpc/unique_message.h"
+#include "merizo/transport/baton.h"
+#include "merizo/transport/message_compressor_manager.h"
+#include "merizo/transport/transport_layer.h"
+#include "merizo/util/future.h"
 
-namespace mongo {
+namespace merizo {
 
 class AsyncDBClient : public std::enable_shared_from_this<AsyncDBClient> {
 public:
@@ -95,4 +95,4 @@ private:
     boost::optional<rpc::Protocol> _negotiatedProtocol;
 };
 
-}  // namespace mongo
+}  // namespace merizo

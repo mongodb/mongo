@@ -90,13 +90,13 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         """Return the tests to run based on the 'test_kind'-specific filtering policy."""
         selector_config = self.get_selector_config()
 
-        # The mongos_test doesn't have to filter anything, the selector_config is just the
-        # arguments to the mongos program to be used as the test case.
-        if test_kind == "mongos_test":
-            mongos_options = selector_config  # Just for easier reading.
-            if not isinstance(mongos_options, dict):
-                raise TypeError("Expected dictionary of arguments to mongos")
-            return [mongos_options], []
+        # The merizos_test doesn't have to filter anything, the selector_config is just the
+        # arguments to the merizos program to be used as the test case.
+        if test_kind == "merizos_test":
+            merizos_options = selector_config  # Just for easier reading.
+            if not isinstance(merizos_options, dict):
+                raise TypeError("Expected dictionary of arguments to merizos")
+            return [merizos_options], []
 
         return _selector.filter_tests(test_kind, selector_config)
 

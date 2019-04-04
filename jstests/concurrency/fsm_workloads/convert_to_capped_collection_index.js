@@ -6,7 +6,7 @@
  * collection, ensuring that the storage size of the
  * collection is still a multiple of 256.
  *
- * MongoDB raises the storage size of a capped collection
+ * MerizoDB raises the storage size of a capped collection
  * to an integer multiple of 256.
  *
  * Make sure that we can create indexes on any collection

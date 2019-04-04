@@ -3,8 +3,8 @@ var col = db.memoryTest;
 var buildInfo = assert.commandWorked(db.adminCommand("buildInfo"));
 var serverStatus = assert.commandWorked(db.adminCommand("serverStatus"));
 
-// If mongod was compiled with the code coverage flag, then we reduce the length of some of the
-// tests as they take an excessive amount of time. If the mongod is running with an in-memory
+// If merizod was compiled with the code coverage flag, then we reduce the length of some of the
+// tests as they take an excessive amount of time. If the merizod is running with an in-memory
 // storage engine, then we reduce the length of some of the tests to avoid an OOM due to the number
 // of documents inserted.
 var codeCoverageVariant = buildInfo.buildEnvironment.ccflags.includes("-ftest-coverage");

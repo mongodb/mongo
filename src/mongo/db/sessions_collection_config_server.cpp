@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,25 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/sessions_collection_config_server.h"
+#include "merizo/db/sessions_collection_config_server.h"
 
-#include "mongo/client/query.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/shard_collection_gen.h"
-#include "mongo/util/log.h"
+#include "merizo/client/query.h"
+#include "merizo/db/commands.h"
+#include "merizo/db/dbdirectclient.h"
+#include "merizo/db/logical_session_id.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/rpc/get_status_from_command_result.h"
+#include "merizo/s/client/shard_registry.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/request_types/shard_collection_gen.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 // Returns an error if the collection didn't exist and we couldn't
 // shard it into existence, either.
@@ -127,4 +127,4 @@ Status SessionsCollectionConfigServer::checkSessionsCollectionExists(OperationCo
     return _checkCacheForSessionsCollection(opCtx);
 }
 
-}  // namespace mongo
+}  // namespace merizo

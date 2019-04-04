@@ -1,5 +1,5 @@
 /**
- * Tests that the mongod chunk filtering stage properly filters out unowned documents even after
+ * Tests that the merizod chunk filtering stage properly filters out unowned documents even after
  * the shards are restarted.
  *
  * This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
@@ -44,7 +44,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             fooCount = testDB.foo.find().itcount();
             break;
         } catch (e) {
-            // expected for reestablishing connections broken by the mongod restart.
+            // expected for reestablishing connections broken by the merizod restart.
             assert.eq(ErrorCodes.HostUnreachable, e.code, tojson(e));
         }
     }

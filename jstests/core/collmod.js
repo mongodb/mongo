@@ -127,7 +127,7 @@ var res = db.runCommand({"collMod": coll, "noPadding": false});
 debug(res);
 assert.commandWorked(res);
 if (!isMongos) {
-    // don't check this for sharding passthrough since mongos has a different output format.
+    // don't check this for sharding passthrough since merizos has a different output format.
     assert.eq(res.noPadding_old, true, tojson(res));
     assert.eq(res.noPadding_new, false, tojson(res));
 }

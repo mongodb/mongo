@@ -102,7 +102,7 @@
         {filemd5: 1, root: "fs"},
     ];
 
-    // There is no applyOps command on mongos.
+    // There is no applyOps command on merizos.
     if (!isMongos) {
         sessionCommands.push(
             {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]});
@@ -146,7 +146,7 @@
     // Test that doTxn is not allowed at positions after the first in transactions.
     //
 
-    // There is no doTxn command on mongos.
+    // There is no doTxn command on merizos.
     if (!isMongos) {
         assert.commandWorked(sessionDb.runCommand({
             find: collName,

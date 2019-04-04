@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/connection_pool.h"
+#include "merizo/client/connection_pool.h"
 
-#include "mongo/client/authenticate.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/mongo_uri.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/unique_message.h"
+#include "merizo/client/authenticate.h"
+#include "merizo/client/connpool.h"
+#include "merizo/client/merizo_uri.h"
+#include "merizo/executor/network_connection_hook.h"
+#include "merizo/executor/remote_command_request.h"
+#include "merizo/executor/remote_command_response.h"
+#include "merizo/rpc/reply_interface.h"
+#include "merizo/rpc/unique_message.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 const Date_t kNeverTooStale = Date_t::max();
@@ -276,4 +276,4 @@ void ConnectionPool::ConnectionPtr::done(Date_t now) {
     _pool = NULL;
 }
 
-}  // namespace mongo
+}  // namespace merizo

@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -32,18 +32,18 @@
 #include <iosfwd>
 #include <string>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/error_extra_info.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/compiler.h"
+#include "merizo/base/error_codes.h"
+#include "merizo/base/error_extra_info.h"
+#include "merizo/platform/atomic_word.h"
+#include "merizo/platform/compiler.h"
 
-namespace mongoutils {
+namespace merizoutils {
 namespace str {
 class stream;
 }  // namespace str
-}  // namespace mongoutils
+}  // namespace merizoutils
 
-namespace mongo {
+namespace merizo {
 
 // Including builder.h here would cause a cycle.
 template <typename Allocator>
@@ -81,7 +81,7 @@ public:
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, StringData reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
-                                        const mongoutils::str::stream& reason);
+                                        const merizoutils::str::stream& reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
                                         StringData message,
                                         const BSONObj& extraInfoHolder);
@@ -269,6 +269,6 @@ std::ostream& operator<<(std::ostream& os, const Status& status);
 template <typename Allocator>
 StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, const Status& status);
 
-}  // namespace mongo
+}  // namespace merizo
 
-#include "mongo/base/status-inl.h"
+#include "merizo/base/status-inl.h"

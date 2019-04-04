@@ -8,7 +8,7 @@
     var s = new ShardingTest({
         name: "auto1",
         shards: 2,
-        mongos: 1,
+        merizos: 1,
         other: {enableAutoSplit: true, chunkSize: 10},
     });
 

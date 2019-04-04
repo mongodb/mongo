@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,12 +31,12 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/migration_chunk_cloner_source.h"
-#include "mongo/s/request_types/move_chunk_request.h"
-#include "mongo/util/timer.h"
+#include "merizo/db/s/collection_sharding_runtime.h"
+#include "merizo/db/s/migration_chunk_cloner_source.h"
+#include "merizo/s/request_types/move_chunk_request.h"
+#include "merizo/util/timer.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 struct ShardingStatistics;
@@ -191,7 +191,7 @@ private:
     /**
      * If this donation moves the first chunk to the recipient (i.e., the recipient didn't have any
      * chunks), this function writes a no-op message to the oplog, so that change stream will notice
-     * that and close the cursor in order to notify mongos to target the new shard as well.
+     * that and close the cursor in order to notify merizos to target the new shard as well.
      */
     void _notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
                                                    const ScopedCollectionMetadata& metadata);
@@ -243,4 +243,4 @@ private:
     boost::optional<CollectionCriticalSection> _critSec;
 };
 
-}  // namespace mongo
+}  // namespace merizo

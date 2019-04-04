@@ -1,5 +1,5 @@
-Ticket reference tags refer to tickets in the MongoDB JIRA tracking system:
-https://jira.mongodb.org
+Ticket reference tags refer to tickets in the MerizoDB JIRA tracking system:
+https://jira.merizodb.org
 
 WiredTiger release 3.1.0, 2018-07-12
 ------------------------------------
@@ -7,7 +7,7 @@ WiredTiger release 3.1.0, 2018-07-12
 See the upgrading documentation for details of API and behavior changes.
 
 See JIRA changelog for a full listing:
-https://jira.mongodb.org/projects/WT/versions/19708
+https://jira.merizodb.org/projects/WT/versions/19708
 
 WiredTiger release 3.0.0, 2018-01-08
 ------------------------------------
@@ -36,7 +36,7 @@ Significant changes:
 * WT-3752	Allow trimming of obsolete modify updates.
 
 See JIRA changelog for a full listing:
-https://jira.mongodb.org/projects/WT/versions/18401
+https://jira.merizodb.org/projects/WT/versions/18401
 
 WiredTiger release 2.9.3, 2017-06-27
 ------------------------------------
@@ -60,7 +60,7 @@ Significant changes:
 * WT-3379       Change when pages can be split to avoid excessively slowing some operations
 
 See JIRA changelog for a full listing:
-https://jira.mongodb.org/browse/WT/fixforversion/18291
+https://jira.merizodb.org/browse/WT/fixforversion/18291
 
 WiredTiger release 2.9.2, 2017-05-25
 ------------------------------------
@@ -69,7 +69,7 @@ See the upgrading documentation for details of API and behavior changes.
 
 Significant changes:
 * SERVER-16796  Increase logging activity for journal recovery operations
-* SERVER-28168  Cannot start or repair MongoDB after unexpected shutdown.
+* SERVER-28168  Cannot start or repair MerizoDB after unexpected shutdown.
 * SERVER-28194  Fix a bug where a missing WiredTiger.turtle file can result in data loss
 * WT-98         Update the current cursor value without a search
 * WT-2439       Enhance reconciliation page layout
@@ -96,7 +96,7 @@ Significant changes:
 * WT-3262       Stop making schema operations wait for cache
 
 See JIRA changelog for a full listing:
-https://jira.mongodb.org/browse/WT/fixforversion/17874
+https://jira.merizodb.org/browse/WT/fixforversion/17874
 
 
 WiredTiger release 2.9.1, 2016-12-22
@@ -175,7 +175,7 @@ Significant changes and bug fixes:
 * WT-2757	Fix a bug in column stores where it was not possible to retrieve the new record number after an append
 * WT-2816	Improve eviction performance
 
-Issues fixed in MongoDB:
+Issues fixed in MerizoDB:
 
 * SERVER-23504	Resolve a resource leak
 * SERVER-23588	Stop using _open_osfhandle on Windows
@@ -388,7 +388,7 @@ Other noteworthy changes since the previous release:
 * WT-2824	Fix double concatenation the config strings
 * WT-2826	Fix a clang38 false positive on uninitialized variable
 * WT-2827	Set a reasonable minimum for log_size
-* WT-2828	Change wtperf long tests to better match MongoDB workloads
+* WT-2828	Change wtperf long tests to better match MerizoDB workloads
 * WT-2829	Fix missing define for BerkeleyDB
 * WT-2831	Skip checkpointing if there have been no modifications
 * WT-2832	Python test uses hard-coded temporary directory
@@ -543,7 +543,7 @@ Significant changes and bug fixes:
 * WT-2451       Allow the WiredTiger metadata to be evicted
 * WT-2490       Fix a bug in column-store where search_near() returns the wrong key
 
-Issues fixed in MongoDB:
+Issues fixed in MerizoDB:
 
 * SERVER-21619  sys-perf: WT crash during core_workloads_WT execution
 * SERVER-21833  Enhance WT_SESSION::compact to more reliably release space
@@ -638,7 +638,7 @@ Other noteworthy changes since the previous release:
 * WT-2423       Fix a bug in session reference counting on error handling
 * WT-2425       Fix a performance regression in wtperf evict-btree read workload
 * WT-2426       Fix a deadlock caused by recent changes to checkpoint handle locking
-* WT-2428       Make statistics logging compatible with MongoDB
+* WT-2428       Make statistics logging compatible with MerizoDB
 * WT-2429       Add a statistic that tracks aggressive mode in eviction
 * WT-2430       Add statistics for join cursor
 * WT-2432       Fix a performance regression on LSM and read only workloads
@@ -729,7 +729,7 @@ Lookaside table:
 * WT-2190 Fix transaction visibility test that is applied to the lookaside table.
 * SERVER-21585 Don't use the lookaside file until the cache is stuck full.
 
-Issues fixed in MongoDB:
+Issues fixed in MerizoDB:
 
 * SERVER-18829 Have pages start in the middle of the LRU queue for eviction.
 * SERVER-18838 During drops, don't remove files until the metadata is durable.
@@ -1469,11 +1469,11 @@ WiredTiger release 2.5.0, 2014-12-24
 The WiredTiger 2.5.0 release contains significant new features, API changes
 and many bug fixes.
 
-Now that WiredTiger is part of MongoDB, we are tracking issues related to
-MongoDB usage of WiredTiger in the MongoDB JIRA system.  Some entries in
+Now that WiredTiger is part of MerizoDB, we are tracking issues related to
+MerizoDB usage of WiredTiger in the MerizoDB JIRA system.  Some entries in
 the changelog now reference JIRA tickets that can be found at:
 
-  http://jira.mongodb.org
+  http://jira.merizodb.org
 
 New features and API changes:
 

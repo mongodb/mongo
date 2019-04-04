@@ -49,7 +49,7 @@
                              'Failed to disable rsSyncApplyStop failpoint.');
     }
 
-    // If any of these assertions fail, we need to disable the fail point in order for the mongod to
+    // If any of these assertions fail, we need to disable the fail point in order for the merizod to
     // shut down.
     try {
         jsTestLog('Write to primary to make secondary out of sync.');

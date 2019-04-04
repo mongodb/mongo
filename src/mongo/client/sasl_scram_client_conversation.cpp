@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/client/sasl_scram_client_conversation.h"
+#include "merizo/client/sasl_scram_client_conversation.h"
 
 #include <boost/algorithm/string/replace.hpp>
 
-#include "mongo/base/parse_number.h"
-#include "mongo/client/scram_client_cache.h"
-#include "mongo/platform/random.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/password_digest.h"
-#include "mongo/util/text.h"
+#include "merizo/base/parse_number.h"
+#include "merizo/client/scram_client_cache.h"
+#include "merizo/platform/random.h"
+#include "merizo/util/base64.h"
+#include "merizo/util/merizoutils/str.h"
+#include "merizo/util/password_digest.h"
+#include "merizo/util/text.h"
 
-namespace mongo {
+namespace merizo {
 
 using std::unique_ptr;
 using std::string;
@@ -59,7 +59,7 @@ StatusWith<bool> SaslSCRAMClientConversation::step(StringData inputData, std::st
         default:
             return StatusWith<bool>(
                 ErrorCodes::AuthenticationFailed,
-                mongoutils::str::stream() << "Invalid SCRAM authentication step: " << _step);
+                merizoutils::str::stream() << "Invalid SCRAM authentication step: " << _step);
     }
 }
 
@@ -219,4 +219,4 @@ StatusWith<bool> SaslSCRAMClientConversation::_thirdStep(StringData inputData,
 
     return true;
 }
-}  // namespace mongo
+}  // namespace merizo

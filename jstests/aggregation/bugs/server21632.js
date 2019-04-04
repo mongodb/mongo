@@ -1,4 +1,4 @@
-// Cannot implicitly shard accessed collections because the coll.stats() output from a mongod when
+// Cannot implicitly shard accessed collections because the coll.stats() output from a merizod when
 // run against a sharded collection is wrapped in a "shards" object with keys for each shard.
 // @tags: [assumes_unsharded_collection]
 

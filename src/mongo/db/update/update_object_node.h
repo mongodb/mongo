@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -34,15 +34,15 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/clonable_ptr.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/matcher/expression_with_placeholder.h"
-#include "mongo/db/update/modifier_table.h"
-#include "mongo/db/update/update_internal_node.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/unordered_map.h"
+#include "merizo/base/clonable_ptr.h"
+#include "merizo/bson/bsonelement.h"
+#include "merizo/db/matcher/expression_with_placeholder.h"
+#include "merizo/db/update/modifier_table.h"
+#include "merizo/db/update/update_internal_node.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/unordered_map.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * An internal node in the prefix tree of update modifier expressions, representing updates to an
@@ -138,4 +138,4 @@ private:
     mutable stdx::unordered_map<std::string, clonable_ptr<UpdateNode>> _mergedChildrenCache;
 };
 
-}  // namespace mongo
+}  // namespace merizo

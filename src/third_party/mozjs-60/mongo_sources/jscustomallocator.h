@@ -1,4 +1,4 @@
-/*    Copyright 2015 MongoDB Inc.
+/*    Copyright 2015 MerizoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -34,13 +34,13 @@
 
 #include "jscustomallocator_oom.h"
 
-namespace mongo {
+namespace merizo {
 namespace sm {
 JS_PUBLIC_API(size_t) get_total_bytes();
 JS_PUBLIC_API(void) reset(size_t max_bytes);
 JS_PUBLIC_API(size_t) get_max_bytes();
 }  // namespace sm
-}  // namespace mongo
+}  // namespace merizo
 
 #ifdef DEBUG
 extern JS_PUBLIC_DATA(uint32_t) OOM_maxAllocations;

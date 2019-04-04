@@ -60,7 +60,7 @@
     };
     runPinnedCursorKillTest(testParameters);
 
-    // Check the case where a killCursor is run as we're building a getMore batch on mongod.
+    // Check the case where a killCursor is run as we're building a getMore batch on merizod.
     (function() {
         testParameters.conn = rs0Conn;
         testParameters.failPointName = "waitWithPinnedCursorDuringGetMoreBatch";
@@ -73,9 +73,9 @@
     })();
 
     (function() {
-        // Run the equivalent test on the mongos. This time, we will force the shards to hang as
-        // well. This is so that we can guarantee that the mongos is checking for interruption at
-        // the appropriate time, and not just propagating an error it receives from the mongods.
+        // Run the equivalent test on the merizos. This time, we will force the shards to hang as
+        // well. This is so that we can guarantee that the merizos is checking for interruption at
+        // the appropriate time, and not just propagating an error it receives from the merizods.
         testParameters.failPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
         FixtureHelpers.runCommandOnEachPrimary({
             db: st.s.getDB("admin"),
@@ -93,7 +93,7 @@
     })();
 
     // Check this case where the interrupt comes in after the batch has been built, and is about to
-    // be returned. This is relevant for both mongod and mongos.
+    // be returned. This is relevant for both merizod and merizos.
     const connsToRunOn = [st.s, rs0Conn];
     for (let conn of connsToRunOn) {
         jsTestLog("Running on conn: " + tojson(conn));

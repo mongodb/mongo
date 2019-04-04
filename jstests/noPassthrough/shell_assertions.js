@@ -1,5 +1,5 @@
 /**
- * Tests for the assertion functions in mongo/shell/assert.js.
+ * Tests for the assertion functions in merizo/shell/assert.js.
  */
 (() => {
     "use strict";

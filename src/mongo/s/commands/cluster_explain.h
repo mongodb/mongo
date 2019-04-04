@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,17 +31,17 @@
 
 #include <string>
 
-#include "mongo/db/query/explain_options.h"
-#include "mongo/s/async_requests_sender.h"
-#include "mongo/s/commands/strategy.h"
+#include "merizo/db/query/explain_options.h"
+#include "merizo/s/async_requests_sender.h"
+#include "merizo/s/commands/strategy.h"
 
-namespace mongo {
+namespace merizo {
 
 class OperationContext;
 
 /**
  * Namespace for the collection of static methods used by commands in the implementation of
- * explain on mongos.
+ * explain on merizos.
  */
 class ClusterExplain {
 public:
@@ -63,27 +63,27 @@ public:
     static BSONObj wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity);
 
     /**
-     * Determines the kind of "execution stage" that mongos would use in order to collect
+     * Determines the kind of "execution stage" that merizos would use in order to collect
      * the results from the shards, assuming that the command being explained is a read
      * operation such as find or count.
      */
     static const char* getStageNameForReadOp(size_t numShards, const BSONObj& explainObj);
 
     /**
-     * Command implementations on mongos use this method to construct the sharded explain
+     * Command implementations on merizos use this method to construct the sharded explain
      * output format based on the results from the shards in 'shardResults'.
      *
      * On success, the output is added to the BSONObj builder 'out'.
      */
     static Status buildExplainResult(OperationContext* opCtx,
                                      const std::vector<Strategy::CommandResult>& shardResults,
-                                     const char* mongosStageName,
+                                     const char* merizosStageName,
                                      long long millisElapsed,
                                      BSONObjBuilder* out);
 
 
     //
-    // Names of mock mongos execution stages.
+    // Names of mock merizos execution stages.
     //
 
     static const char* kSingleShard;
@@ -102,25 +102,25 @@ private:
      * Populates the BSONObj builder 'out' with query planner explain information, based on
      * the results from the shards contained in 'shardResults'.
      *
-     * The planner info will display 'mongosStageName' as the name of the execution stage
-     * performed by mongos after gathering results from the shards.
+     * The planner info will display 'merizosStageName' as the name of the execution stage
+     * performed by merizos after gathering results from the shards.
      */
     static void buildPlannerInfo(OperationContext* opCtx,
                                  const std::vector<Strategy::CommandResult>& shardResults,
-                                 const char* mongosStageName,
+                                 const char* merizosStageName,
                                  BSONObjBuilder* out);
 
     /**
      * Populates the BSONObj builder 'out' with execution stats explain information,
      * if the results from the shards in 'shardsResults' contain this info.
      *
-     * Will display 'mongosStageName' as the name of the execution stage performed by mongos,
-     * and 'millisElapsed' as the execution time of the mongos stage.
+     * Will display 'merizosStageName' as the name of the execution stage performed by merizos,
+     * and 'millisElapsed' as the execution time of the merizos stage.
      */
     static void buildExecStats(const std::vector<Strategy::CommandResult>& shardResults,
-                               const char* mongosStageName,
+                               const char* merizosStageName,
                                long long millisElapsed,
                                BSONObjBuilder* out);
 };
 
-}  // namespace mongo
+}  // namespace merizo

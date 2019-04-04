@@ -17,7 +17,7 @@ var RPC_PROTOCOLS = {OP_QUERY: "opQueryOnly", OP_MSG: "opMsgOnly"};
     assert.commandWorked(db.setProfilingLevel(2));
 
     function runInShell(rpcProtocol, func) {
-        assert(0 == _runMongoProgram("mongo",
+        assert(0 == _runMongoProgram("merizo",
                                      "--rpcProtocols=" + rpcProtocol,
                                      "--readMode=commands",  // ensure we use the find command.
                                      "--eval",

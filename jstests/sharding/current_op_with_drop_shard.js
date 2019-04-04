@@ -7,7 +7,7 @@
     // We need the balancer to remove a shard.
     st.startBalancer();
 
-    const mongosDB = st.s.getDB(jsTestName());
+    const merizosDB = st.s.getDB(jsTestName());
     const shardName = st.shard0.shardName;
 
     var res = st.s.adminCommand({removeShard: shardName});
@@ -19,7 +19,7 @@
         return ('completed' === res.state);
     }, "removeShard never completed for shard " + shardName);
 
-    assert.commandWorked(mongosDB.currentOp());
+    assert.commandWorked(merizosDB.currentOp());
 
     st.stop();
 })();

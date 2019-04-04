@@ -100,7 +100,7 @@ function testNumericServerParameter(parameterName,
                 MongoRunner.runMongod({setParameter: parameterName + "=" + lowerOutOfBounds});
             assert.eq(null,
                       conn3,
-                      "expected mongod to fail to startup with an invalid '" + parameterName + "'" +
+                      "expected merizod to fail to startup with an invalid '" + parameterName + "'" +
                           " server parameter setting '" + lowerOutOfBounds + "'.");
         }
 
@@ -111,7 +111,7 @@ function testNumericServerParameter(parameterName,
                 MongoRunner.runMongod({setParameter: parameterName + "=" + upperOutOfBounds});
             assert.eq(null,
                       conn4,
-                      "expected mongod to fail to startup with an invalid '" + parameterName + "'" +
+                      "expected merizod to fail to startup with an invalid '" + parameterName + "'" +
                           " server parameter setting '" + upperOutOfBounds + "'.");
         }
     }

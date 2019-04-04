@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,49 +27,49 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_manager_impl.h"
+#include "merizo/db/auth/authorization_manager_impl.h"
 
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/address_restriction.h"
-#include "mongo/db/auth/authorization_manager_impl_parameters_gen.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authorization_session_impl.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/auth/role_graph.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/db/auth/user_name.h"
+#include "merizo/base/init.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/element.h"
+#include "merizo/bson/util/bson_extract.h"
+#include "merizo/crypto/mechanism_scram.h"
+#include "merizo/db/auth/action_set.h"
+#include "merizo/db/auth/address_restriction.h"
+#include "merizo/db/auth/authorization_manager_impl_parameters_gen.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/auth/authorization_session_impl.h"
+#include "merizo/db/auth/authz_manager_external_state.h"
+#include "merizo/db/auth/privilege.h"
+#include "merizo/db/auth/privilege_parser.h"
+#include "merizo/db/auth/role_graph.h"
+#include "merizo/db/auth/sasl_options.h"
+#include "merizo/db/auth/user.h"
+#include "merizo/db/auth/user_document_parser.h"
+#include "merizo/db/auth/user_management_commands_parser.h"
+#include "merizo/db/auth/user_name.h"
 
-#include "mongo/db/global_settings.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/mongod_options.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "merizo/db/global_settings.h"
+#include "merizo/db/jsobj.h"
+#include "merizo/db/merizod_options.h"
+#include "merizo/platform/compiler.h"
+#include "merizo/stdx/memory.h"
+#include "merizo/stdx/mutex.h"
+#include "merizo/stdx/unordered_map.h"
+#include "merizo/util/assert_util.h"
+#include "merizo/util/log.h"
+#include "merizo/util/merizoutils/str.h"
 
-namespace mongo {
+namespace merizo {
 namespace {
 
 using std::back_inserter;
@@ -91,8 +91,8 @@ MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
     RoleGraph::generateUniversalPrivileges(&privileges);
     user->addPrivileges(privileges);
 
-    if (mongodGlobalParams.whitelistedClusterNetwork) {
-        const auto& whitelist = *mongodGlobalParams.whitelistedClusterNetwork;
+    if (merizodGlobalParams.whitelistedClusterNetwork) {
+        const auto& whitelist = *merizodGlobalParams.whitelistedClusterNetwork;
 
         auto restriction = std::make_unique<ClientSourceRestriction>(whitelist);
         auto restrictionSet = std::make_unique<RestrictionSet<>>(std::move(restriction));
@@ -447,7 +447,7 @@ Status AuthorizationManagerImpl::_initializeUserFromPrivilegeDocument(User* user
     std::string userName = parser.extractUserNameFromUserDocument(privDoc);
     if (userName != user->getName().getUser()) {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "User name from privilege document \""
+                      merizoutils::str::stream() << "User name from privilege document \""
                                                 << userName
                                                 << "\" doesn't match name of provided User \""
                                                 << user->getName().getUser()
@@ -613,7 +613,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::_acquireUserSlowPath(CacheGuard
         switch (authzVersion) {
             default:
                 status = Status(ErrorCodes::BadValue,
-                                mongoutils::str::stream()
+                                merizoutils::str::stream()
                                     << "Illegal value for authorization data schema version, "
                                     << authzVersion);
                 break;
@@ -624,10 +624,10 @@ StatusWith<UserHandle> AuthorizationManagerImpl::_acquireUserSlowPath(CacheGuard
                 break;
             case schemaVersion24:
                 status = Status(ErrorCodes::AuthSchemaIncompatible,
-                                mongoutils::str::stream()
+                                merizoutils::str::stream()
                                     << "Authorization data schema version "
                                     << schemaVersion24
-                                    << " not supported after MongoDB version 2.6.");
+                                    << " not supported after MerizoDB version 2.6.");
                 break;
         }
         if (status.isOK())
@@ -893,4 +893,4 @@ void AuthorizationManagerImpl::setInUserManagementCommand(OperationContext* opCt
     _externalState->setInUserManagementCommand(opCtx, val);
 }
 
-}  // namespace mongo
+}  // namespace merizo

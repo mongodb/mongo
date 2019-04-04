@@ -1,4 +1,4 @@
-// Copyright (C) MongoDB, Inc. 2014-present.
+// Copyright (C) MerizoDB, Inc. 2014-present.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License. You may obtain
@@ -8,8 +8,8 @@ package main
 
 import (
 	"github.com/jessevdk/go-flags"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/mongoreplay"
+	"github.com/merizodb/merizo-tools/common/options"
+	"github.com/merizodb/merizo-tools/merizoreplay"
 
 	"fmt"
 	"os"
@@ -24,7 +24,7 @@ const (
 )
 
 func main() {
-	versionOpts := mongoreplay.VersionOptions{}
+	versionOpts := merizoreplay.VersionOptions{}
 	versionFlagParser := flags.NewParser(&versionOpts, flags.Default)
 	versionFlagParser.Options = flags.IgnoreUnknown
 	_, err := versionFlagParser.Parse()
@@ -37,16 +37,16 @@ func main() {
 	}
 
 	if runtime.NumCPU() == 1 {
-		fmt.Fprint(os.Stderr, "mongoreplay must be run with multiple threads")
+		fmt.Fprint(os.Stderr, "merizoreplay must be run with multiple threads")
 		os.Exit(ExitError)
 	}
 
-	opts := mongoreplay.Options{}
+	opts := merizoreplay.Options{}
 
 	var parser = flags.NewParser(&opts, flags.Default)
 
-	playCmd := &mongoreplay.PlayCommand{GlobalOpts: &opts}
-	playCmdParser, err := parser.AddCommand("play", "Play captured traffic against a mongodb instance", "", playCmd)
+	playCmd := &merizoreplay.PlayCommand{GlobalOpts: &opts}
+	playCmdParser, err := parser.AddCommand("play", "Play captured traffic against a merizodb instance", "", playCmd)
 	if err != nil {
 		panic(err)
 	}
@@ -58,20 +58,20 @@ func main() {
 		}
 	}
 
-	_, err = parser.AddCommand("record", "Convert network traffic into mongodb queries", "",
-		&mongoreplay.RecordCommand{GlobalOpts: &opts})
+	_, err = parser.AddCommand("record", "Convert network traffic into merizodb queries", "",
+		&merizoreplay.RecordCommand{GlobalOpts: &opts})
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = parser.AddCommand("monitor", "Inspect live or pre-recorded mongodb traffic", "",
-		&mongoreplay.MonitorCommand{GlobalOpts: &opts})
+	_, err = parser.AddCommand("monitor", "Inspect live or pre-recorded merizodb traffic", "",
+		&merizoreplay.MonitorCommand{GlobalOpts: &opts})
 	if err != nil {
 		panic(err)
 	}
 
 	_, err = parser.AddCommand("filter", "Filter playback file", "",
-		&mongoreplay.FilterCommand{GlobalOpts: &opts})
+		&merizoreplay.FilterCommand{GlobalOpts: &opts})
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +80,7 @@ func main() {
 
 	if err != nil {
 		switch err.(type) {
-		case mongoreplay.ErrPacketsDropped:
+		case merizoreplay.ErrPacketsDropped:
 			os.Exit(ExitNonFatal)
 		default:
 			os.Exit(ExitError)

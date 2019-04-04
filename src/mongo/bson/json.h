@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -31,16 +31,16 @@
 
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/bsonobj.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Create a BSONObj from a JSON <http://www.json.org>,
  * <http://www.ietf.org/rfc/rfc4627.txt> string.  In addition to the JSON
  * extensions extensions described here
- * <http://dochub.mongodb.org/core/mongodbextendedjson>, this function
+ * <http://dochub.merizodb.org/core/merizodbextendedjson>, this function
  * accepts unquoted field names and allows single quotes to optionally be
  * used when specifying field names and std::string values instead of double
  * quotes.  JSON unicode escape sequences (of the form \uXXXX) are
@@ -495,4 +495,4 @@ private:
     const char* const _input_end;
 };
 
-}  // namespace mongo
+}  // namespace merizo

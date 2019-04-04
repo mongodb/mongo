@@ -1,5 +1,5 @@
 /**
- * Derived from test cases at https://github.com/mongodb/specifications
+ * Derived from test cases at https://github.com/merizodb/specifications
  */
 
 (function() {

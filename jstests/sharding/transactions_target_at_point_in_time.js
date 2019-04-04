@@ -1,4 +1,4 @@
-// Verifies mongos uses a versioned routing table to target subsequent requests in transactions with
+// Verifies merizos uses a versioned routing table to target subsequent requests in transactions with
 // snapshot level read concern.
 //
 // @tags: [
@@ -24,7 +24,7 @@
     const collName = "foo";
     const ns = dbName + '.' + collName;
 
-    const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
+    const st = new ShardingTest({shards: 3, merizos: 1, config: 1});
 
     // Set up one sharded collection with 2 chunks, both on the primary shard.
 

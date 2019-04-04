@@ -1,8 +1,8 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2018-present MerizoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
+# as published by MerizoDB, Inc.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
+# <http://www.merizodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -27,14 +27,14 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+  cpp_namespace: "merizo"
   configs:
     source: [ cli]
   cpp_includes:
-    - "mongo/tools/mongobridge_options.h"
+    - "merizo/tools/merizobridge_options.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "merizo/idl/basic_types.idl"
 
 configs:
   help:
@@ -43,10 +43,10 @@ configs:
     arg_vartype: Switch
 
   port:
-    description: "port to listen on for MongoDB messages"
+    description: "port to listen on for MerizoDB messages"
     short_name: port
     arg_vartype: Int
-    cpp_varname: mongoBridgeGlobalParams.port
+    cpp_varname: merizoBridgeGlobalParams.port
 
   seed:
     description: "random seed to use"
@@ -54,10 +54,10 @@ configs:
     arg_vartype: Long
 
   dest:
-    description: "URI of remote MongoDB process"
+    description: "URI of remote MerizoDB process"
     short_name: dest
     arg_vartype: String
-    cpp_varname: mongoBridgeGlobalParams.destUri
+    cpp_varname: merizoBridgeGlobalParams.destUri
 
   vebose:
     description: "log more verbose output"

@@ -23,8 +23,8 @@ env.Library(
         'restriction_environment.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/net/network',
     ],
 )
 
@@ -34,7 +34,7 @@ env.CppUnitTest(
         'restriction_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
         'authentication_restriction',
     ],
 )
@@ -52,8 +52,8 @@ env.Library(
         'role_name.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -64,12 +64,12 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'auth',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/op_observer',
-        '$BUILD_DIR/mongo/db/op_observer_util',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/catalog/collection_options',
+        '$BUILD_DIR/merizo/db/index/index_descriptor',
+        '$BUILD_DIR/merizo/db/op_observer',
+        '$BUILD_DIR/merizo/db/op_observer_util',
+        '$BUILD_DIR/merizo/db/s/sharding_api_d',
     ]
 )
 
@@ -79,11 +79,11 @@ env.CppUnitTest(
     LIBDEPS=[
         'authmocks',
         'auth_op_observer',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/repl/oplog',
+        '$BUILD_DIR/merizo/db/repl/oplog_interface_local',
+        '$BUILD_DIR/merizo/db/repl/replmocks',
+        '$BUILD_DIR/merizo/db/service_context_d_test_fixture',
     ],
 )
 
@@ -94,8 +94,8 @@ env.Library(
     ],
     LIBDEPS=[
         'authprivilege',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/crypto/sha_block_${MONGO_CRYPTO}',
     ],
 )
 
@@ -118,8 +118,8 @@ env.Library(
     LIBDEPS=[
         'auth',
         'authprivilege',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson',
     ],
 )
 
@@ -132,9 +132,9 @@ env.Library(
         'auth',
         'user',
         'role_graph_update',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
     ],
 )
 
@@ -147,7 +147,7 @@ env.Library(
     LIBDEPS=[
         'auth',
         'role_graph',
-        '$BUILD_DIR/mongo/db/update/update_driver',
+        '$BUILD_DIR/merizo/db/update/update_driver',
     ],
 )
 
@@ -171,22 +171,22 @@ env.Library(
         'sasl_options',
         'user',
         'user_document_parser',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/base/secure_allocator',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/global_settings',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
-        '$BUILD_DIR/mongo/db/update/update_driver',
-        '$BUILD_DIR/mongo/util/icu',
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
-        '$BUILD_DIR/mongo/util/net/ssl_types',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/base/secure_allocator',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/merizo/bson/util/bson_extract',
+        '$BUILD_DIR/merizo/db/catalog/document_validation',
+        '$BUILD_DIR/merizo/db/common',
+        '$BUILD_DIR/merizo/db/global_settings',
+        '$BUILD_DIR/merizo/db/namespace_string',
+        '$BUILD_DIR/merizo/db/pipeline/lite_parsed_document_source',
+        '$BUILD_DIR/merizo/db/update/update_driver',
+        '$BUILD_DIR/merizo/util/icu',
+        '$BUILD_DIR/merizo/util/net/ssl_manager',
+        '$BUILD_DIR/merizo/util/net/ssl_types',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
@@ -204,12 +204,12 @@ env.Library(
     LIBDEPS=[
         'auth',
         'address_restriction',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/merizo/db/common',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
+        '$BUILD_DIR/merizo/rpc/metadata_impersonated_user',
     ]
 )
 
@@ -220,12 +220,12 @@ env.Library(
         env.Idlc('authorization_manager_global_parameters.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
     LIBDEPS=[
         'auth',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/merizo/db/server_options_core',
+        '$BUILD_DIR/merizo/db/service_context',
     ],
 )
 
@@ -235,17 +235,17 @@ env.Library(
         'security_key.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
         'sasl_options',
         'security_file',
         'user',
-        '$BUILD_DIR/mongo/base/secure_allocator',
-        '$BUILD_DIR/mongo/client/authentication',
-        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
-        '$BUILD_DIR/mongo/util/icu',
-        '$BUILD_DIR/mongo/util/md5',
+        '$BUILD_DIR/merizo/base/secure_allocator',
+        '$BUILD_DIR/merizo/client/authentication',
+        '$BUILD_DIR/merizo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/merizo/util/icu',
+        '$BUILD_DIR/merizo/util/md5',
     ],
 )
 
@@ -277,11 +277,11 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'sasl_options_init',
-        '$BUILD_DIR/mongo/client/sasl_client',
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/servers',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/client/sasl_client',
+        '$BUILD_DIR/merizo/db/audit',
+        '$BUILD_DIR/merizo/db/commands',
+        '$BUILD_DIR/merizo/db/commands/servers',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
     ],
 )
 
@@ -293,7 +293,7 @@ yamlEnv.Library(
         'security_file.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/merizo/base',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_yaml',
@@ -306,8 +306,8 @@ env.Library(
         'sasl_options.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
@@ -321,8 +321,8 @@ env.Library(
     'sasl_options'
   ],
   LIBDEPS_PRIVATE=[
-       '$BUILD_DIR/mongo/util/options_parser/options_parser',
-       '$BUILD_DIR/mongo/util/net/network',
+       '$BUILD_DIR/merizo/util/options_parser/options_parser',
+       '$BUILD_DIR/merizo/util/net/network',
   ],
 )     
 
@@ -338,13 +338,13 @@ env.Library(
         'authprivilege',
         'sasl_options',
         'user',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/base/secure_allocator',
-        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/util/icu',
-        '$BUILD_DIR/mongo/util/md5',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/base/secure_allocator',
+        '$BUILD_DIR/merizo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/merizo/util/icu',
+        '$BUILD_DIR/merizo/util/md5',
+        '$BUILD_DIR/merizo/util/net/network',
     ],
 )
 
@@ -353,13 +353,13 @@ env.CppUnitTest(target='sasl_mechanism_registry_test',
                     'sasl_mechanism_registry_test.cpp',
                 ],
                 LIBDEPS=[
-                    '$BUILD_DIR/mongo/db/service_context_test_fixture',
+                    '$BUILD_DIR/merizo/db/service_context_test_fixture',
                     'authmocks',
                     'saslauth',
                 ])
 
 env.Library(
-    target='authmongod',
+    target='authmerizod',
     source=[
         'authz_manager_external_state_d.cpp',
         'authz_session_external_state_d.cpp',
@@ -367,18 +367,18 @@ env.Library(
     LIBDEPS=[
         'authservercommon',
         'auth_impl_internal_local',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/merizo/db/db_raii',
+        '$BUILD_DIR/merizo/db/dbdirectclient',
+        '$BUILD_DIR/merizo/db/dbhelpers',
+        '$BUILD_DIR/merizo/db/repl/repl_coordinator_interface',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/merizo/db/concurrency/lock_manager',
     ],
 )
 
 env.Library(
-    target='authmongos',
+    target='authmerizos',
     source=[
         'authz_manager_external_state_s.cpp',
         'authz_session_external_state_s.cpp',
@@ -387,11 +387,11 @@ env.Library(
         ],
     LIBDEPS=[
         'authservercommon',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
-        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/merizo/s/catalog/dist_lock_manager',
+        '$BUILD_DIR/merizo/s/coreshard',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/merizo/idl/server_parameter',
     ],
 )
 
@@ -402,9 +402,9 @@ env.Library(
         'authz_session_external_state_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/update/update_driver',
+        '$BUILD_DIR/merizo/db/matcher/expressions',
+        '$BUILD_DIR/merizo/db/service_context',
+        '$BUILD_DIR/merizo/db/update/update_driver',
         'auth',
         'auth_impl_internal',
         'auth_impl_internal_local',
@@ -419,7 +419,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'auth',
         'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )
 
@@ -431,7 +431,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'auth',
         'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )
 
@@ -443,7 +443,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'auth',
         'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )
 
@@ -455,7 +455,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'auth',
         'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )
 
@@ -467,7 +467,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'auth',
         'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )
 
@@ -479,9 +479,9 @@ env.CppUnitTest(
     LIBDEPS=[
         'auth',
         'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/transport/transport_layer_common',
+        '$BUILD_DIR/merizo/transport/transport_layer_mock',
     ],
 )
 
@@ -496,9 +496,9 @@ env.CppUnitTest(
         'authmocks',
         'auth_impl_internal',
         'saslauth',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/merizo/db/pipeline/pipeline',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/transport/transport_layer_mock',
     ],
 )
 
@@ -510,9 +510,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'authentication_restriction',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/util/net/network',
+        '$BUILD_DIR/merizo/idl/idl_parser',
     ],
 )
 
@@ -523,9 +523,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'address_restriction',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/merizo/base',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/util/net/network',
     ],
 )
 
@@ -538,8 +538,8 @@ env.CppUnitTest(
     LIBDEPS_PRIVATE=[
         'authmocks',
         'saslauth',
-        '$BUILD_DIR/mongo/client/sasl_client',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/merizo/client/sasl_client',
+        '$BUILD_DIR/merizo/db/service_context_test_fixture',
     ],
 )
 

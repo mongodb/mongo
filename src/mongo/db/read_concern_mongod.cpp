@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
-#include "mongo/db/read_concern.h"
-#include "mongo/base/status.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/read_concern_mongod_gen.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/concurrency/notification.h"
-#include "mongo/util/log.h"
+#include "merizo/db/read_concern.h"
+#include "merizo/base/status.h"
+#include "merizo/db/concurrency/d_concurrency.h"
+#include "merizo/db/concurrency/write_conflict_exception.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/logical_clock.h"
+#include "merizo/db/op_observer.h"
+#include "merizo/db/operation_context.h"
+#include "merizo/db/read_concern_merizod_gen.h"
+#include "merizo/db/repl/optime.h"
+#include "merizo/db/repl/repl_client_info.h"
+#include "merizo/db/repl/speculative_majority_read_info.h"
+#include "merizo/db/s/sharding_state.h"
+#include "merizo/db/server_options.h"
+#include "merizo/s/grid.h"
+#include "merizo/util/concurrency/notification.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 namespace {
 
@@ -454,4 +454,4 @@ MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
 }
 
 
-}  // namespace mongo
+}  // namespace merizo

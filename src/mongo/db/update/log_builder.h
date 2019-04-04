@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/document.h"
+#include "merizo/base/status.h"
+#include "merizo/bson/mutable/document.h"
 
-namespace mongo {
+namespace merizo {
 
 /**
  * Previously, there were multiple supported versions of the update language.
@@ -57,7 +57,7 @@ public:
     static constexpr StringData kUpdateSemanticsFieldName = "$v"_sd;
 
     /** Construct a new LogBuilder. Log entries will be recorded as new children under the
-     *  'logRoot' Element, which must be of type mongo::Object and have no children.
+     *  'logRoot' Element, which must be of type merizo::Object and have no children.
      */
     inline LogBuilder(mutablebson::Element logRoot)
         : _logRoot(logRoot),
@@ -65,7 +65,7 @@ public:
           _setAccumulator(_logRoot.getDocument().end()),
           _unsetAccumulator(_setAccumulator),
           _updateSemantics(_setAccumulator) {
-        dassert(logRoot.isType(mongo::Object));
+        dassert(logRoot.isType(merizo::Object));
         dassert(!logRoot.hasChildren());
     }
 
@@ -117,7 +117,7 @@ public:
      */
     Status setUpdateSemantics(UpdateSemantics updateSemantics);
 
-    /** Obtain, via the out parameter 'outElt', a pointer to the mongo::Object type Element
+    /** Obtain, via the out parameter 'outElt', a pointer to the merizo::Object type Element
      *  to which the components of an object replacement should be recorded. It is an error
      *  to call this if any Elements have been added by calling either addToSets or
      *  addToUnsets, and attempts to do so will return a non-OK Status. Similarly, if there
@@ -141,4 +141,4 @@ private:
     mutablebson::Element _updateSemantics;
 };
 
-}  // namespace mongo
+}  // namespace merizo

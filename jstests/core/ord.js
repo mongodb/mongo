@@ -37,7 +37,7 @@
     // Dropping an index kills all cursors on the indexed namespace, not just those
     // cursors using the dropped index.
     if (FixtureHelpers.isMongos(db)) {
-        // mongos may have some data left from a previous batch stored in memory, so it might not
+        // merizos may have some data left from a previous batch stored in memory, so it might not
         // return an error immediately, but it should eventually.
         assert.soon(function() {
             try {

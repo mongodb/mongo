@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_source_out_gen.h"
-#include "mongo/db/pipeline/document_source_out_in_place.h"
-#include "mongo/db/pipeline/document_source_out_replace_coll.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
+#include "merizo/db/curop_failpoint_helpers.h"
+#include "merizo/db/ops/write_ops.h"
+#include "merizo/db/pipeline/document_path_support.h"
+#include "merizo/db/pipeline/document_source_out.h"
+#include "merizo/db/pipeline/document_source_out_gen.h"
+#include "merizo/db/pipeline/document_source_out_in_place.h"
+#include "merizo/db/pipeline/document_source_out_replace_coll.h"
+#include "merizo/util/fail_point_service.h"
+#include "merizo/util/log.h"
 
-namespace mongo {
+namespace merizo {
 
 MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 
@@ -185,7 +185,7 @@ void ensureUniqueKeyHasSupportingIndex(const boost::intrusive_ptr<ExpressionCont
         50938,
         str::stream() << "Cannot find index to verify that $out's unique key will be unique: "
                       << userSpecifiedUniqueKey,
-        expCtx->mongoProcessInterface->uniqueKeyIsSupportedByIndex(expCtx, outputNs, uniqueKey));
+        expCtx->merizoProcessInterface->uniqueKeyIsSupportedByIndex(expCtx, outputNs, uniqueKey));
 }
 }  // namespace
 
@@ -302,13 +302,13 @@ intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
             readConcernLevel != repl::ReadConcernLevel::kLinearizableReadConcern);
 
     // Although we perform a check for "replaceCollection" mode with a sharded output collection
-    // during lite parsing, we need to do it here as well in case mongos is stale or the command is
+    // during lite parsing, we need to do it here as well in case merizos is stale or the command is
     // sent directly to the shard.
     if (mode == WriteModeEnum::kModeReplaceCollection) {
         uassert(17017,
                 str::stream() << "$out with mode " << WriteMode_serializer(mode)
                               << " is not supported to an existing *sharded* output collection.",
-                !expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, outputNs));
+                !expCtx->merizoProcessInterface->isSharded(expCtx->opCtx, outputNs));
     }
     uassert(17385, "Can't $out to special collection: " + outputNs.coll(), !outputNs.isSpecial());
 
@@ -381,20 +381,20 @@ DocumentSourceOut::resolveUniqueKeyOnMongoD(const boost::intrusive_ptr<Expressio
     auto targetCollectionVersion = spec.getTargetCollectionVersion();
     if (targetCollectionVersion) {
         uassert(51018, "Unexpected target chunk version specified", expCtx->fromMongos);
-        // If mongos has sent us a target shard version, we need to be sure we are prepared to
-        // act as a router which is at least as recent as that mongos.
-        expCtx->mongoProcessInterface->checkRoutingInfoEpochOrThrow(
+        // If merizos has sent us a target shard version, we need to be sure we are prepared to
+        // act as a router which is at least as recent as that merizos.
+        expCtx->merizoProcessInterface->checkRoutingInfoEpochOrThrow(
             expCtx, outputNs, *targetCollectionVersion);
     }
 
     auto userSpecifiedUniqueKey = spec.getUniqueKey();
     if (!userSpecifiedUniqueKey) {
-        uassert(51017, "Expected uniqueKey to be provided from mongos", !expCtx->fromMongos);
+        uassert(51017, "Expected uniqueKey to be provided from merizos", !expCtx->fromMongos);
         return {std::set<FieldPath>{"_id"}, targetCollectionVersion};
     }
 
     // Make sure the uniqueKey has a supporting index. Skip this check if the command is sent
-    // from mongos since the uniqueKey check would've happened already.
+    // from merizos since the uniqueKey check would've happened already.
     auto uniqueKey = parseUniqueKeyFromSpec(userSpecifiedUniqueKey.get());
     if (!expCtx->fromMongos) {
         ensureUniqueKeyHasSupportingIndex(expCtx, outputNs, uniqueKey, *userSpecifiedUniqueKey);
@@ -408,7 +408,7 @@ DocumentSourceOut::resolveUniqueKeyOnMongoS(const boost::intrusive_ptr<Expressio
                                             const NamespaceString& outputNs) {
     invariant(expCtx->inMongos);
     uassert(50984,
-            "$out received unexpected 'targetCollectionVersion' on mongos",
+            "$out received unexpected 'targetCollectionVersion' on merizos",
             !spec.getTargetCollectionVersion());
 
     if (auto userSpecifiedUniqueKey = spec.getUniqueKey()) {
@@ -423,7 +423,7 @@ DocumentSourceOut::resolveUniqueKeyOnMongoS(const boost::intrusive_ptr<Expressio
 
     // In case there are multiple shards which will perform this $out in parallel, we need to figure
     // out and attach the collection's shard version to ensure each shard is talking about the same
-    // version of the collection. This mongos will coordinate that. We force a catalog refresh to do
+    // version of the collection. This merizos will coordinate that. We force a catalog refresh to do
     // so because there is no shard versioning protocol on this namespace and so we otherwise could
     // not be sure this node is (or will be come) at all recent. We will also figure out and attach
     // the uniqueKey to send to the shards. We don't need to do this for 'replaceCollection' mode
@@ -431,16 +431,16 @@ DocumentSourceOut::resolveUniqueKeyOnMongoS(const boost::intrusive_ptr<Expressio
 
     // There are cases where the aggregation could fail if the collection is dropped or re-created
     // during or near the time of the aggregation. This is okay - we are mostly paranoid that this
-    // mongos is very stale and want to prevent returning an error if the collection was dropped a
+    // merizos is very stale and want to prevent returning an error if the collection was dropped a
     // long time ago. Because of this, we are okay with piggy-backing off another thread's request
     // to refresh the cache, simply waiting for that request to return instead of forcing another
     // refresh.
     boost::optional<ChunkVersion> targetCollectionVersion =
         spec.getMode() == WriteModeEnum::kModeReplaceCollection
         ? boost::none
-        : expCtx->mongoProcessInterface->refreshAndGetCollectionVersion(expCtx, outputNs);
+        : expCtx->merizoProcessInterface->refreshAndGetCollectionVersion(expCtx, outputNs);
 
-    auto docKeyPaths = expCtx->mongoProcessInterface->collectDocumentKeyFieldsActingAsRouter(
+    auto docKeyPaths = expCtx->merizoProcessInterface->collectDocumentKeyFieldsActingAsRouter(
         expCtx->opCtx, outputNs);
     return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
                                 std::make_move_iterator(docKeyPaths.end())),
@@ -467,4 +467,4 @@ DepsTracker::State DocumentSourceOut::getDependencies(DepsTracker* deps) const {
     deps->needWholeDocument = true;
     return DepsTracker::State::EXHAUSTIVE_ALL;
 }
-}  // namespace mongo
+}  // namespace merizo

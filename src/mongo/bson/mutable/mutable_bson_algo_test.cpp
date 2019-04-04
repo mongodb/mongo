@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,24 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/bson/mutable/algorithm.h"
+#include "merizo/bson/mutable/algorithm.h"
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/platform/basic.h"
-#include "mongo/unittest/unittest.h"
+#include "merizo/bson/mutable/document.h"
+#include "merizo/bson/mutable/mutable_bson_test_utils.h"
+#include "merizo/db/json.h"
+#include "merizo/db/query/collation/collator_interface_mock.h"
+#include "merizo/platform/basic.h"
+#include "merizo/unittest/unittest.h"
 
 namespace {
 
-using mongo::CollatorInterfaceMock;
-using mongo::Status;
-using namespace mongo::mutablebson;
+using merizo::CollatorInterfaceMock;
+using merizo::Status;
+using namespace merizo::mutablebson;
 
-class DocumentTest : public mongo::unittest::Test {
+class DocumentTest : public merizo::unittest::Test {
 public:
     DocumentTest() : _doc() {}
 
@@ -312,31 +312,31 @@ TEST_F(CountTest, CountSiblingsMany) {
 }
 
 TEST(DeduplicateTest, ManyDuplicates) {
-    Document doc(mongo::fromjson("{ x : [ 1, 2, 2, 3, 3, 3, 4, 4, 4 ] }"));
+    Document doc(merizo::fromjson("{ x : [ 1, 2, 2, 3, 3, 3, 4, 4, 4 ] }"));
     deduplicateChildren(doc.root().leftChild(), woEqual(nullptr, false));
-    ASSERT_TRUE(checkDoc(doc, mongo::fromjson("{x : [ 1, 2, 3, 4 ]}")));
+    ASSERT_TRUE(checkDoc(doc, merizo::fromjson("{x : [ 1, 2, 3, 4 ]}")));
 }
 
 TEST(FullNameTest, RootField) {
-    Document doc(mongo::fromjson("{ x : 1 }"));
+    Document doc(merizo::fromjson("{ x : 1 }"));
     ASSERT_EQUALS("x", getFullName(doc.root().leftChild()));
 }
 
 TEST(FullNameTest, OneLevel) {
-    Document doc(mongo::fromjson("{ x : { y: 1 } }"));
+    Document doc(merizo::fromjson("{ x : { y: 1 } }"));
     ASSERT_EQUALS("x.y", getFullName(doc.root().leftChild().leftChild()));
 }
 
 TEST(FullNameTest, InsideArray) {
-    Document doc(mongo::fromjson("{ x : { y: [ 1 , 2 ] } }"));
+    Document doc(merizo::fromjson("{ x : { y: [ 1 , 2 ] } }"));
     ASSERT_EQUALS("x.y.1",
                   getFullName(doc.root().leftChild().leftChild().leftChild().rightSibling()));
 }
 
 TEST(WoLessTest, CollationAware) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    Document less(mongo::fromjson("{ x: 'cbc' }"));
-    Document greater(mongo::fromjson("{ x: 'abd' }"));
+    Document less(merizo::fromjson("{ x: 'cbc' }"));
+    Document greater(merizo::fromjson("{ x: 'abd' }"));
 
     woLess comp(&collator, true);
     ASSERT_TRUE(comp(less.root(), greater.root()));
@@ -345,8 +345,8 @@ TEST(WoLessTest, CollationAware) {
 
 TEST(WoGreaterTest, CollationAware) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    Document less(mongo::fromjson("{ x: 'cbc' }"));
-    Document greater(mongo::fromjson("{ x: 'abd' }"));
+    Document less(merizo::fromjson("{ x: 'cbc' }"));
+    Document greater(merizo::fromjson("{ x: 'abd' }"));
 
     woGreater comp(&collator, true);
     ASSERT_TRUE(comp(greater.root(), less.root()));
@@ -355,8 +355,8 @@ TEST(WoGreaterTest, CollationAware) {
 
 TEST(WoEqualTest, CollationAware) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    Document docA(mongo::fromjson("{ x: 'not' }"));
-    Document docB(mongo::fromjson("{ x: 'equal' }"));
+    Document docA(merizo::fromjson("{ x: 'not' }"));
+    Document docB(merizo::fromjson("{ x: 'equal' }"));
 
     woEqual comp(&collator, true);
     ASSERT_TRUE(comp(docA.root(), docB.root()));
@@ -365,8 +365,8 @@ TEST(WoEqualTest, CollationAware) {
 
 TEST(WoEqualToTest, CollationAware) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    Document docA(mongo::fromjson("{ x: 'not' }"));
-    Document docB(mongo::fromjson("{ x: 'equal' }"));
+    Document docA(merizo::fromjson("{ x: 'not' }"));
+    Document docB(merizo::fromjson("{ x: 'equal' }"));
 
     woEqualTo comp(docA.root(), &collator, true);
     ASSERT_TRUE(comp(docB.root()));

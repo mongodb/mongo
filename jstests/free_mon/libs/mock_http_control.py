@@ -13,7 +13,7 @@ import mock_http_common
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description='MongoDB Mock Free Monitoring Endpoint.')
+    parser = argparse.ArgumentParser(description='MerizoDB Mock Free Monitoring Endpoint.')
 
     parser.add_argument('-p', '--port', type=int, default=8000, help="Port to listen on")
 

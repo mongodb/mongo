@@ -7,7 +7,7 @@
 
 // Tests whether the geospatial search is stable under btree updates
 //
-// Tests the implementation of the 2d search, not the behavior we promise.  MongoDB currently
+// Tests the implementation of the 2d search, not the behavior we promise.  MerizoDB currently
 // promises no isolation, so there is no guarantee that we get the results we expect in this file.
 
 // The old query system, if it saw a 2d query, would never consider a collscan.

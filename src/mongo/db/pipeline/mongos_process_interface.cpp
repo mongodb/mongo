@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,7 +12,7 @@
  *
  *    You should have received a copy of the Server Side Public License
  *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *    <http://www.merizodb.com/licensing/server-side-public-license>.
  *
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
@@ -27,31 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "merizo/platform/basic.h"
 
-#include "mongo/db/pipeline/mongos_process_interface.h"
+#include "merizo/db/pipeline/merizos_process_interface.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/sharded_agg_helpers.h"
-#include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/query/establish_cursors.h"
-#include "mongo/s/query/router_exec_stage.h"
-#include "mongo/s/transaction_router.h"
-#include "mongo/util/fail_point.h"
+#include "merizo/db/auth/authorization_session.h"
+#include "merizo/db/catalog/uuid_catalog.h"
+#include "merizo/db/curop.h"
+#include "merizo/db/index/index_descriptor.h"
+#include "merizo/db/pipeline/document_source.h"
+#include "merizo/db/pipeline/sharded_agg_helpers.h"
+#include "merizo/db/query/collation/collation_spec.h"
+#include "merizo/db/query/collation/collator_factory_interface.h"
+#include "merizo/db/repl/read_concern_args.h"
+#include "merizo/db/s/scoped_collection_metadata.h"
+#include "merizo/executor/task_executor_pool.h"
+#include "merizo/s/catalog_cache.h"
+#include "merizo/s/cluster_commands_helpers.h"
+#include "merizo/s/grid.h"
+#include "merizo/s/query/cluster_cursor_manager.h"
+#include "merizo/s/query/establish_cursors.h"
+#include "merizo/s/query/router_exec_stage.h"
+#include "merizo/s/transaction_router.h"
+#include "merizo/util/fail_point.h"
 
-namespace mongo {
+namespace merizo {
 
 using boost::intrusive_ptr;
 using std::shared_ptr;
@@ -186,7 +186,7 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
             // Find by UUID and shard versioning do not work together (SERVER-31946).  In the
             // sharded case we've already checked the UUID, so find by namespace is safe.  In the
             // unlikely case that the collection has been deleted and a new collection with the same
-            // name created through a different mongos, the shard version will be detected as stale,
+            // name created through a different merizos, the shard version will be detected as stale,
             // as shard versions contain an 'epoch' field unique to the collection.
             findCmd = findCmd.addField(BSON("find" << nss.coll()).firstElement());
             findCmdIsByUuid = false;
@@ -295,4 +295,4 @@ bool MongoSInterface::uniqueKeyIsSupportedByIndex(
         });
 }
 
-}  // namespace mongo
+}  // namespace merizo
