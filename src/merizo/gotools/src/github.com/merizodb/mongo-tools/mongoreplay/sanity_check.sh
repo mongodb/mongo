@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PORT=27017
-STARTMONGO=false
+STARTMERIZO=false
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PCAPFILE="$SCRIPT_DIR/merizoreplay_test.out"
 
@@ -19,7 +19,7 @@ while test $# -gt 0; do
 			;;
 		-m|--start-merizo)
 			shift
-			STARTMONGO=true
+			STARTMERIZO=true
 			;;
 		*)
 			echo "Unknown arg: $1"
@@ -39,18 +39,18 @@ set -o verbose
 OUTFILE="$(echo $PCAPFILE | cut -f 1 -d '.').playback"
 merizoreplay record -f $PCAPFILE -p $OUTFILE
 
-if [ "$STARTMONGO" = true ]; then
+if [ "$STARTMERIZO" = true ]; then
 	rm -rf /data/merizoreplay/
 	mkdir /data/merizoreplay/
 	echo "starting MERIZOD"
 	merizod --port=$PORT --dbpath=/data/merizoreplay &
-	MONGOPID=$!
+	MERIZOPID=$!
 fi
 
 merizo --port=$PORT merizoplay_test --eval "db.setProfilingLevel(2);" 
 merizo --port=$PORT merizoplay_test --eval "db.createCollection('sanity_check', {});" 
 
-export MONGOREPLAY_HOST="merizodb://localhost:$PORT"
+export MERIZOREPLAY_HOST="merizodb://localhost:$PORT"
 merizoreplay play -p $OUTFILE
 merizo --port=$PORT merizoplay_test --eval "var profile_results = db.system.profile.find({'ns':'merizoplay_test.sanity_check'});
 assert.gt(profile_results.size(), 0);" 
@@ -64,8 +64,8 @@ gunzip -t ${OUTFILE}
 
 echo "Success!"
 
-if [ "$STARTMONGO" = true ]; then
-	kill $MONGOPID
+if [ "$STARTMERIZO" = true ]; then
+	kill $MERIZOPID
 fi
 
 

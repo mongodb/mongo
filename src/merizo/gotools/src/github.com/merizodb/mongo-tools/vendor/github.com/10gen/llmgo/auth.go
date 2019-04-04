@@ -197,7 +197,7 @@ func (socket *MerizoSocket) Login(cred Credential) error {
 
 	var err error
 	switch cred.Mechanism {
-	case "MERIZODB-CR", "MONGO-CR": // Name changed to MERIZODB-CR in SERVER-8501.
+	case "MERIZODB-CR", "MERIZO-CR": // Name changed to MERIZODB-CR in SERVER-8501.
 		err = socket.loginClassic(cred)
 	case "PLAIN":
 		err = socket.loginPlain(cred)

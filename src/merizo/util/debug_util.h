@@ -1,9 +1,9 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MerizoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
+ *    as published by MerizoDB, Inc.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -34,14 +34,14 @@
 
 namespace merizo {
 
-#if defined(MONGO_CONFIG_DEBUG_BUILD)
+#if defined(MERIZO_CONFIG_DEBUG_BUILD)
 constexpr bool kDebugBuild = true;
 #else
 constexpr bool kDebugBuild = false;
 #endif
 
-#define MONGO_DEV if (kDebugBuild)
-#define DEV MONGO_DEV
+#define MERIZO_DEV if (kDebugBuild)
+#define DEV MERIZO_DEV
 
 template <unsigned period>
 class SampleEveryNth {

@@ -85,7 +85,7 @@ done
 if [ ${#WORKLOADS[@]} -eq 0 ]; then
   # default workload/assert
   WORKLOADS=( "$SCRIPT_DIR/testWorkloads/crud.js" )
-  MONGOASSERT=( 'db.bench.count() === 15000' )
+  MERIZOASSERT=( 'db.bench.count() === 15000' )
 elif [ ${#ASSERTIONS[@]} -eq 0 ]; then
   log "must specify BOTH -a/--assert AND -w/--workload"
   exit 1
@@ -108,7 +108,7 @@ rm -rf $DBPATH
 mkdir $DBPATH
 log "starting MERIZOD"
 merizod --port=$PORT --dbpath=$DBPATH >/dev/null &
-MONGOPID=$!
+MERIZOPID=$!
 
 check_integrity() {
   set +e
@@ -119,7 +119,7 @@ check_integrity() {
     STATUS=$?
     if [ $STATUS != 0 ]; then
       log "integrity check FAILED: $assertion"
-      log "for further analysis, check db at localhost:$PORT, pid=$MONGOPID"
+      log "for further analysis, check db at localhost:$PORT, pid=$MERIZOPID"
       exit 1
     fi
   done
@@ -189,7 +189,7 @@ sleep 15
 log "killing MERIZOD"
 merizo --port=$PORT merizoreplay_test --eval "db.dropDatabase()" >/dev/null 2>&1
 sleep 1
-kill $MONGOPID
+kill $MERIZOPID
 sleep 2 # give it a chance to dump FTDC
 
 log "gathering FTDC statistics"

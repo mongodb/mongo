@@ -13,7 +13,7 @@
 #define SET_SIZE(p, n) ((int *)(p))[-1] = n
 #define CAPACITY(p)    ((int *)(p))[-2]
 
-// MONGO including utilities.c and marking all of its functions as static inline significantly
+// MERIZO including utilities.c and marking all of its functions as static inline significantly
 // improves stemmer perf. SERVER-19936
 #ifdef _MSC_VER
 #define SNOWBALL_INLINE static __inline

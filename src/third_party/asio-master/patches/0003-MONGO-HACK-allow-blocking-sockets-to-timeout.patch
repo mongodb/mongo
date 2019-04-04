@@ -1,7 +1,7 @@
 From bf6b0974903d15c97eeb24fdbfa6385e37ba5176 Mon Sep 17 00:00:00 2001
 From: Lier! <me@asdf.com>
 Date: Fri, 28 Apr 2017 11:22:56 -0400
-Subject: [PATCH 3/4] MONGO - FIX BROKEN
+Subject: [PATCH 3/4] MERIZO - FIX BROKEN
 
 ---
  asio/include/asio/detail/impl/socket_ops.ipp | 3 ++-

@@ -1,7 +1,7 @@
 From bf6b0974903d15c97eeb24fdbfa6385e37ba5176 Mon Sep 17 00:00:00 2001
 From: Jonathan Reams <jbreams@merizodb.com>
 Date:   Tue Feb 20 14:33:42 2018 -0500
-Subject: [PATCH 5/4] MONGO - Timeout connect
+Subject: [PATCH 5/4] MERIZO - Timeout connect
 
 ---
  asio/include/asio/detail/impl/socket_ops.ipp | 3 ++-
