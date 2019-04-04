@@ -1,4 +1,5 @@
 // Test SERVER-18622 listCollections should special case filtering by name.
+// @tags: [requires_replication]
 (function() {
     "use strict";
     var mydb = db.getSiblingDB("list_collections_filter");
@@ -8,7 +9,10 @@
     assert.commandWorked(mydb.createCollection("lists"));
     assert.commandWorked(mydb.createCollection("ordered_sets"));
     assert.commandWorked(mydb.createCollection("unordered_sets"));
-    assert.commandWorked(mydb.createCollection("arrays_temp", {temp: true}));
+    assert.commandWorked(mydb.runCommand({
+        applyOps:
+            [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "arrays_temp", temp: true}}]
+    }));
 
     /**
      * Asserts that the names of the collections returned from running the listCollections

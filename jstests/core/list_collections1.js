@@ -1,6 +1,7 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_getmore]
+// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_getmore,
+// requires_replication]
 
 // Basic functional tests for the listCollections command.
 //
@@ -82,7 +83,8 @@
 
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
-    assert.commandWorked(mydb.createCollection("bar", {temp: true}));
+    assert.commandWorked(mydb.runCommand(
+        {applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "bar", temp: true}}]}));
     assert.eq(1, cursorCountMatching(getListCollectionsCursor(), function(c) {
                   return c.name === "foo" && c.options.temp === undefined;
               }));
@@ -96,7 +98,8 @@
 
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
-    assert.commandWorked(mydb.createCollection("bar", {temp: true}));
+    assert.commandWorked(mydb.runCommand(
+        {applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "bar", temp: true}}]}));
     assert.eq(2, cursorCountMatching(getListCollectionsCursor({filter: {}}), function(c) {
                   return c.name === "foo" || c.name === "bar";
               }));

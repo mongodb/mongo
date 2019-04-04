@@ -1,5 +1,6 @@
 // Tests that the server is able to restart in read-only mode with data files that contain one or
 // more temporary collections. See SERVER-24719 for details.
+// @tags: [requires_replication]
 
 'use strict';
 load('jstests/readonly/lib/read_only_test.js');
@@ -13,7 +14,13 @@ runReadOnlyTest((function() {
             var writableDB = writableCollection.getDB();
             writableDB[collName].drop();
 
-            assert.commandWorked(writableDB.createCollection(collName, {temp: true}));
+            assert.commandWorked(writableDB.runCommand({
+                applyOps: [{
+                    op: "c",
+                    ns: writableDB.getName() + ".$cmd",
+                    o: {create: collName, temp: true}
+                }]
+            }));
 
             var collectionInfos = writableDB.getCollectionInfos();
             var collectionExists = false;

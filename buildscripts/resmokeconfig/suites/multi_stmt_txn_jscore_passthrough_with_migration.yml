@@ -378,6 +378,12 @@ selector:
   - jstests/core/cursora.js
   - jstests/core/bench_test1.js
 
+  # The tests below use applyOps, SERVER-1439.
+  - jstests/core/list_collections1.js
+  - jstests/core/list_collections_filter.js
+  - jstests/core/rename_stayTemp.js
+  - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
+
   exclude_with_any_tags:
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged

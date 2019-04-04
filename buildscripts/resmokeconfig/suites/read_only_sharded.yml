@@ -3,6 +3,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/readonly/*.js
+  exclude_files:
+  # The test below use applyOps, SERVER-1439.
+  - jstests/readonly/temp_collection.js
 
 executor:
   config:
