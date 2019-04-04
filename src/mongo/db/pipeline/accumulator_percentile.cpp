@@ -60,21 +60,16 @@ const char countName[] = "count";
 void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
 
     // Determining 'digest_size'
-    // ToDo: Try to find a better evaluation
-    // ToDo: Check how to pass the default value. From configurations?
-    if (input.getDocument()["digest_size"].missing())
-        this->digest_size = 1000;
-    else
-        this->digest_size = input.getDocument()["digest_size"].getDouble();
-
-
-    // // Determining 'chunk_size' used in TDigest
-    // ToDo: Try to find a better evaluation
-    // ToDo: Check how to pass the default value. From configurations?
-    if (input.getDocument()["chunk_size"].missing())
-        this->chunk_size = 1000;
-    else
-        this->digest_size = input.getDocument()["digest_size"].getDouble();
+    if (this->digest_size == 0){
+        
+        if (input.getDocument()["digest_size"].missing()){
+            this->digest_size = 1000;
+            }
+        else
+            {
+            this->digest_size = input.getDocument()["digest_size"].getDouble();
+            }
+    }
 
     // ToDo: error codes are not accurate. Set better numbers later
     // ToDo: It might be better evaluations for this part.
@@ -85,7 +80,6 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     !input.getDocument()["value"].missing());
 
     this->perc_val = input.getDocument()["perc"].getDouble() / 100;  // Converting Percentile to Quantile - [0:100] to [0:1]
-    this->digest_size = input.getDocument()["digest_size"].getDouble();
 
     // ToDo: Choose a better name for perc_input and refactor later
     Value perc_input = input.getDocument()["value"];
@@ -111,12 +105,9 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     // ToDo: Not sure 1) Is it important for TDigest to distinguish?  2) Is it important for MongoDB to distinguish?
     // ToDo: Going to cover all Decimal, Long and Double as a temporary, need to decide on this.
     switch (perc_input.getType()) {
+
         case NumberDecimal:
-            values.push_back(perc_input.getDouble()); // ToDo: need to discuss
-            break;
         case NumberLong:
-            values.push_back(perc_input.getDouble()); // ToDo: need to discuss
-            break;
         case NumberInt:
         case NumberDouble:
             values.push_back(perc_input.getDouble());
@@ -127,8 +118,9 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     }
     _count++;
 
-    if (values.size() == this->chunk_size)
+    if (values.size() == this->chunk_size){
         _add_to_tdigest(values);
+        }
     else
         return;
 }
@@ -145,8 +137,9 @@ Decimal128 AccumulatorPercentile::_getDecimalTotal() const {
 Value AccumulatorPercentile::getValue(bool toBeMerged) {
 
     // To add remainders left over a chunk
-    if (values.size() > 0)
+    if (values.size() > 0){
         _add_to_tdigest(values);
+        }
 
     // ToDo: Unchanged copy from 'avg' module, need to change this for Percentile
     if (toBeMerged) {
@@ -159,8 +152,9 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
             Document{{subTotalName, total}, {countName, _count}, {subTotalErrorName, error}});
     }
 
-    if (_count == 0)
+    if (_count == 0){
         return Value(BSONNULL);
+        }
 
     return Value(this->digest.estimateQuantile(this->perc_val));
 }
@@ -168,7 +162,7 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
 AccumulatorPercentile::AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : Accumulator(expCtx), _isDecimal(false), _count(0) {
 
-    // Higher 'digest_size' results in higher memory consumption
+    // Higher 'digest_size' results in higher memory consumption and better precision
     mongo::TDigest digest(this->digest_size);
 
     // This is a fixed size Accumulator so we never need to update this

@@ -49,6 +49,7 @@ using std::string;
  * expected results as its second argument, and asserts that for the given Accumulator the arguments
  * evaluate to the expected results.
  */
+
 static void assertExpectedResults(
     std::string accumulatorName,
     const intrusive_ptr<ExpressionContext>& expCtx,
@@ -97,6 +98,20 @@ static void assertExpectedResults(
             throw;
         }
     }
+}
+
+TEST(Accumulators, Percentile) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+
+    assertExpectedResults(
+        "$percentile",
+        expCtx,
+        {
+         {{Value(Document({{"perc", 20.00}, {"digest_size", 100},{"value", 10}})),
+           Value(Document({{"perc", 20.00}, {"digest_size", 100},{"value", 20}})),
+           Value(Document({{"perc", 20.00}, {"digest_size", 100},{"value", 30}})),
+           Value(Document({{"perc", 20.00}, {"digest_size", 100},{"value", 40}})),
+           }, Value(13.00)}});
 }
 
 TEST(Accumulators, Avg) {
