@@ -198,10 +198,9 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     // Use the query planning module to plan the whole query.
     auto statusWithSolutions = QueryPlanner::plan(*_canonicalQuery, _plannerParams);
     if (!statusWithSolutions.isOK()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "error processing query: " << _canonicalQuery->toString()
-                                    << " planner returned error: "
-                                    << statusWithSolutions.getStatus().reason());
+        return statusWithSolutions.getStatus().withContext(
+            str::stream() << "error processing query: " << _canonicalQuery->toString()
+                          << " planner returned error");
     }
 
     auto solutions = std::move(statusWithSolutions.getValue());

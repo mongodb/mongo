@@ -151,6 +151,7 @@ static BSONObj getKeyFromQuery(const BSONObj& keyPattern, const BSONObj& query) 
 static bool indexCompatibleMaxMin(const BSONObj& obj,
                                   const CollatorInterface* queryCollator,
                                   const IndexEntry& indexEntry) {
+    // Wildcard indexes should have been filtered out by the time this is called.
     if (indexEntry.type == IndexType::INDEX_WILDCARD) {
         return false;
     }
@@ -596,6 +597,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // indexes.
     std::vector<IndexEntry> fullIndexList;
 
+    // Will hold a copy of the index entry chosen by the hint.
+    boost::optional<IndexEntry> hintedIndexEntry;
     if (hintedIndex.isEmpty()) {
         fullIndexList = params.indices;
     } else {
@@ -613,6 +616,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                                         << " and "
                                         << fullIndexList[1].toString());
         }
+
+        hintedIndexEntry.emplace(fullIndexList.front());
     }
 
     // Figure out what fields we care about.
@@ -625,7 +630,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     fullIndexList = QueryPlannerIXSelect::expandIndexes(fields, std::move(fullIndexList));
     std::vector<IndexEntry> relevantIndices;
 
-    if (hintedIndex.isEmpty()) {
+    if (!hintedIndexEntry) {
         relevantIndices = QueryPlannerIXSelect::findRelevantIndices(fields, fullIndexList);
     } else {
         relevantIndices = fullIndexList;
@@ -639,60 +644,45 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
-    // TODO SERVER-35335 Ensure min/max can generate bounds over $** index.
     // Deal with the .min() and .max() query options.  If either exist we can only use an index
     // that matches the object inside.
     if (!query.getQueryRequest().getMin().isEmpty() ||
         !query.getQueryRequest().getMax().isEmpty()) {
+
+        if (!hintedIndexEntry) {
+            return Status(ErrorCodes::Error(51173),
+                          "When using min()/max() a hint of which index to use must be provided");
+        }
+
         BSONObj minObj = query.getQueryRequest().getMin();
         BSONObj maxObj = query.getQueryRequest().getMax();
 
-        // The unfinished siblings of these objects may not be proper index keys because they
-        // may be empty objects or have field names. When an index is picked to use for the
-        // min/max query, these "finished" objects will always be valid index keys for the
-        // index's key pattern.
-        BSONObj finishedMinObj;
-        BSONObj finishedMaxObj;
+        if (!indexCompatibleMaxMin(
+                minObj.isEmpty() ? maxObj : minObj, query.getCollator(), *hintedIndexEntry)) {
+            return Status(ErrorCodes::Error(51174),
+                          "The index chosen is not compatible with min/max");
+        }
+        // Be sure that index expansion didn't do anything. As wildcard indexes are banned for
+        // min/max, we expect to find a single hinted index entry.
+        invariant(fullIndexList.size() == 1);
+        invariant(*hintedIndexEntry == fullIndexList.front());
 
-        // Index into the 'fulledIndexList' vector indicating the index that we will use to answer
-        // this min/max query.
-        size_t idxNo = numeric_limits<size_t>::max();
+        // In order to be fully compatible, the min has to be less than the max according to the
+        // index key pattern ordering. The first step in verifying this is "finish" the min and max
+        // by replacing empty objects and stripping field names.
+        BSONObj finishedMinObj = finishMinObj(*hintedIndexEntry, minObj, maxObj);
+        BSONObj finishedMaxObj = finishMaxObj(*hintedIndexEntry, minObj, maxObj);
 
-        for (size_t i = 0; i < fullIndexList.size(); ++i) {
-            const auto& indexEntry = fullIndexList[i];
-
-            const BSONObj toUse = minObj.isEmpty() ? maxObj : minObj;
-            if (indexCompatibleMaxMin(toUse, query.getCollator(), indexEntry)) {
-                // In order to be fully compatible, the min has to be less than the max
-                // according to the index key pattern ordering. The first step in verifying
-                // this is "finish" the min and max by replacing empty objects and stripping
-                // field names.
-                finishedMinObj = finishMinObj(indexEntry, minObj, maxObj);
-                finishedMaxObj = finishMaxObj(indexEntry, minObj, maxObj);
-
-                // Now we have the final min and max. This index is only relevant for
-                // the min/max query if min < max.
-                if (0 > finishedMinObj.woCompare(finishedMaxObj, indexEntry.keyPattern, false)) {
-                    // Found a relevant index.
-                    idxNo = i;
-                    break;
-                }
-
-                // This index is not relevant; move on to the next.
-            }
+        // Now we have the final min and max. This index is only relevant for the min/max query if
+        // min < max.
+        if (finishedMinObj.woCompare(finishedMaxObj, hintedIndexEntry->keyPattern, false) >= 0) {
+            return Status(ErrorCodes::Error(51175),
+                          "The value provided for min() does not come before the value provided "
+                          "for max() in the hinted index");
         }
 
-        if (idxNo == numeric_limits<size_t>::max()) {
-            LOG(5) << "Can't find relevant index to use for max/min query";
-            // Can't find an index to use, bail out.
-            return Status(ErrorCodes::BadValue, "unable to find relevant index for max/min query");
-        }
-
-        LOG(5) << "Max/min query using index " << fullIndexList[idxNo].toString();
-
-        // Make our scan and output.
         std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeIndexScan(
-            fullIndexList[idxNo], query, params, finishedMinObj, finishedMaxObj));
+            *hintedIndexEntry, query, params, finishedMinObj, finishedMaxObj));
         invariant(solnRoot);
 
         auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));

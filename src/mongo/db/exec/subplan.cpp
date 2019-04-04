@@ -372,9 +372,9 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     // Use the query planning module to plan the whole query.
     auto statusWithSolutions = QueryPlanner::plan(*_query, _plannerParams);
     if (!statusWithSolutions.isOK()) {
-        return Status(ErrorCodes::BadValue,
-                      "error processing query: " + _query->toString() +
-                          " planner returned error: " + statusWithSolutions.getStatus().reason());
+        return statusWithSolutions.getStatus().withContext(
+            str::stream() << "error processing query: " << _query->toString()
+                          << " planner returned error");
     }
 
     auto solutions = std::move(statusWithSolutions.getValue());

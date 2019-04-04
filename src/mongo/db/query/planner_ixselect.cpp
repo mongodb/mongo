@@ -321,14 +321,13 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findRelevantIndices(
 }
 
 std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
-    const stdx::unordered_set<std::string>& fields,
-    const std::vector<IndexEntry>& relevantIndices) {
+    const stdx::unordered_set<std::string>& fields, std::vector<IndexEntry> relevantIndices) {
     std::vector<IndexEntry> out;
     for (auto&& entry : relevantIndices) {
         if (entry.type == IndexType::INDEX_WILDCARD) {
             wcp::expandWildcardIndexEntry(entry, fields, &out);
         } else {
-            out.push_back(entry);
+            out.push_back(std::move(entry));
         }
     }
 

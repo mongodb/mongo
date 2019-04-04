@@ -93,7 +93,7 @@
     // Min/max with $** index hint.
     assert.commandFailedWithCode(
         db.runCommand({find: coll.getName(), filter: {"b": 1}, min: {"a": 1}, hint: {"$**": 1}}),
-        ErrorCodes.BadValue);
+        51174);
 
     // Hint a $** index on a query with compound fields.
     assertExpectedIndexAnswersQueryWithHint(

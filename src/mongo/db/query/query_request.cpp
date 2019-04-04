@@ -583,7 +583,7 @@ Status QueryRequest::validate() const {
     // Min and Max objects must have the same fields.
     if (!_min.isEmpty() && !_max.isEmpty()) {
         if (!_min.isFieldNamePrefixOf(_max) || (_min.nFields() != _max.nFields())) {
-            return Status(ErrorCodes::BadValue, "min and max must have the same field names");
+            return Status(ErrorCodes::Error(51176), "min and max must have the same field names");
         }
     }
 

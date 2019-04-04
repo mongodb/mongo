@@ -394,7 +394,8 @@ TEST(PlanCacheTest, ShouldNotCacheQueryWithHint) {
  * Min queries are a specialized case of hinted queries
  */
 TEST(PlanCacheTest, ShouldNotCacheQueryWithMin) {
-    unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}", 0, 0, "{}", "{a: 100}", "{}"));
+    unique_ptr<CanonicalQuery> cq(
+        canonicalize("{a: 1}", "{}", "{}", 0, 0, "{a: 1}", "{a: 100}", "{}"));
     assertShouldNotCacheQuery(*cq);
 }
 
@@ -402,7 +403,8 @@ TEST(PlanCacheTest, ShouldNotCacheQueryWithMin) {
  *  Max queries are non-cacheable for the same reasons as min queries.
  */
 TEST(PlanCacheTest, ShouldNotCacheQueryWithMax) {
-    unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}", 0, 0, "{}", "{}", "{a: 100}"));
+    unique_ptr<CanonicalQuery> cq(
+        canonicalize("{a: 1}", "{}", "{}", 0, 0, "{a: 1}", "{}", "{a: 100}"));
     assertShouldNotCacheQuery(*cq);
 }
 
@@ -1659,7 +1661,7 @@ TEST_F(CachePlanSelectionTest, GeoNear2DNotCached) {
 
 TEST_F(CachePlanSelectionTest, MinNotCached) {
     addIndex(BSON("a" << 1), "a_1");
-    runQueryHintMinMax(BSONObj(), BSONObj(), fromjson("{a: 1}"), BSONObj());
+    runQueryHintMinMax(BSONObj(), fromjson("{a: 1}"), fromjson("{a: 1}"), BSONObj());
     assertNotCached(
         "{fetch: {filter: null, "
         "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
@@ -1667,7 +1669,7 @@ TEST_F(CachePlanSelectionTest, MinNotCached) {
 
 TEST_F(CachePlanSelectionTest, MaxNotCached) {
     addIndex(BSON("a" << 1), "a_1");
-    runQueryHintMinMax(BSONObj(), BSONObj(), BSONObj(), fromjson("{a: 1}"));
+    runQueryHintMinMax(BSONObj(), fromjson("{a: 1}"), BSONObj(), fromjson("{a: 1}"));
     assertNotCached(
         "{fetch: {filter: null, "
         "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");

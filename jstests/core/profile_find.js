@@ -146,11 +146,11 @@
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert.eq(profileObj.command.maxTimeMS, maxTimeMS, tojson(profileObj));
 
-    assert.eq(coll.find().max({_id: 3}).itcount(), 1);
+    assert.eq(coll.find().max({_id: 3}).hint({_id: 1}).itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert.eq(profileObj.command.max, {_id: 3}, tojson(profileObj));
 
-    assert.eq(coll.find().min({_id: 0}).itcount(), 1);
+    assert.eq(coll.find().min({_id: 0}).hint({_id: 1}).itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert.eq(profileObj.command.min, {_id: 0}, tojson(profileObj));
 

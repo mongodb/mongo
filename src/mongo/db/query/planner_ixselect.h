@@ -133,7 +133,7 @@ public:
      * "expanded" indexes (where the $** indexes in the given list have been expanded).
      */
     static std::vector<IndexEntry> expandIndexes(const stdx::unordered_set<std::string>& fields,
-                                                 const std::vector<IndexEntry>& relevantIndices);
+                                                 std::vector<IndexEntry> relevantIndices);
 
     /**
      * Check if this match expression is a leaf and is supported by a wildcard index.

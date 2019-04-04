@@ -28,7 +28,7 @@
     assert.eq(res[1].a, 2);
     assert.eq(res[2].a, 1);
 
-    res = coll.find().min({a: 1}).max({a: 3}).toArray();
+    res = coll.find().min({a: 1}).max({a: 3}).hint({a: 1}).toArray();
     assert.eq(res.length, 2);
     if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {
         assert.eq(res[0].a, 1);
@@ -39,7 +39,7 @@
         assert(resultsEq(res.map((result) => result.a), [1, 2]));
     }
 
-    res = coll.find().min({a: 1}).max({a: 3}).sort({a: -1}).toArray();
+    res = coll.find().min({a: 1}).max({a: 3}).sort({a: -1}).hint({a: 1}).toArray();
     assert.eq(res.length, 2);
     assert.eq(res[0].a, 2);
     assert.eq(res[1].a, 1);
@@ -58,7 +58,7 @@
     assert.eq(res[1].b, 2);
     assert.eq(res[2].b, 3);
 
-    res = coll.find().min({b: 3}).max({b: 1}).toArray();
+    res = coll.find().min({b: 3}).max({b: 1}).hint({b: -1}).toArray();
     assert.eq(res.length, 2);
     if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {
         assert.eq(res[0].b, 3);
@@ -69,7 +69,7 @@
         assert(resultsEq(res.map((result) => result.b), [3, 2]));
     }
 
-    res = coll.find().min({b: 3}).max({b: 1}).sort({b: 1}).toArray();
+    res = coll.find().min({b: 3}).max({b: 1}).sort({b: 1}).hint({b: -1}).toArray();
     assert.eq(res.length, 2);
     assert.eq(res[0].b, 2);
     assert.eq(res[1].b, 3);

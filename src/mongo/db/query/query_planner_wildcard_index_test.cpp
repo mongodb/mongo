@@ -1691,24 +1691,19 @@ TEST_F(QueryPlannerWildcardTest, PathSpecifiedWildcardIndexDoesNotSupportMinMax)
         fromjson("{x: {$eq: 5}}"), BSON("x.$**" << 1), fromjson("{x: 1}"), fromjson("{x: 10}"));
 }
 
-TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotEffectValidMinMax) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotAffectValidMinMax) {
     addWildcardIndex(BSON("$**" << 1));
     addIndex(BSON("x" << 1));
 
-    runQueryHintMinMax(
-        fromjson("{x: {$eq: 5}}"), BSONObj(), fromjson("{x: 1}"), fromjson("{x: 10}"));
+    runQueryHintMinMax(fromjson("{x: {$eq: 5}}"),
+                       BSONObj(fromjson("{x: 1}")),
+                       fromjson("{x: 1}"),
+                       fromjson("{x: 10}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: 5}}, "
         "node: {ixscan: {filter: null, pattern: {x: 1}}}}}");
-}
-
-TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotSupportMinMaxWithoutHint) {
-    addWildcardIndex(BSON("$**" << 1));
-
-    runInvalidQueryHintMinMax(
-        fromjson("{x: {$eq: 5}}"), BSONObj(), fromjson("{x: 1}"), fromjson("{x: 10}"));
 }
 
 TEST_F(QueryPlannerWildcardTest, CanAnswerEqualityToEmptyObject) {

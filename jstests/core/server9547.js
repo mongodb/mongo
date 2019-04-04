@@ -11,10 +11,10 @@ for (var i = 0; i < 10; i++) {
 t.ensureIndex({a: 1});
 
 // note: max() value is exclusive upper bound
-assert.eq(4, t.find({}).max({a: 4}).toArray().length, "no order");
+assert.eq(4, t.find({}).max({a: 4}).hint({a: 1}).toArray().length, "no order");
 
 // Ascending order is fine.
-assert.eq(4, t.find({}).max({a: 4}).sort({a: 1}).toArray().length, "ascending");
+assert.eq(4, t.find({}).max({a: 4}).sort({a: 1}).hint({a: 1}).toArray().length, "ascending");
 
 // Descending order is fine.
-assert.eq(4, t.find({}).max({a: 4}).sort({a: -1}).toArray().length, "descending");
+assert.eq(4, t.find({}).max({a: 4}).sort({a: -1}).hint({a: 1}).toArray().length, "descending");

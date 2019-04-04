@@ -1358,7 +1358,7 @@ TEST_F(QueryPlannerTest, OrWithExactAndInexact3) {
 
 TEST_F(QueryPlannerTest, MinValid) {
     addIndex(BSON("a" << 1));
-    runQueryHintMinMax(BSONObj(), BSONObj(), fromjson("{a: 1}"), BSONObj());
+    runQueryHintMinMax(BSONObj(), BSONObj(fromjson("{a: 1}")), fromjson("{a: 1}"), BSONObj());
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -1367,7 +1367,8 @@ TEST_F(QueryPlannerTest, MinValid) {
 }
 
 TEST_F(QueryPlannerTest, MinWithoutIndex) {
-    runInvalidQueryHintMinMax(BSONObj(), BSONObj(), fromjson("{a: 1}"), BSONObj());
+    runInvalidQueryHintMinMax(
+        BSONObj(), BSONObj(fromjson("{a: 1}")), fromjson("{a: 1}"), BSONObj());
 }
 
 TEST_F(QueryPlannerTest, MinBadHint) {
@@ -1377,7 +1378,7 @@ TEST_F(QueryPlannerTest, MinBadHint) {
 
 TEST_F(QueryPlannerTest, MaxValid) {
     addIndex(BSON("a" << 1));
-    runQueryHintMinMax(BSONObj(), BSONObj(), BSONObj(), fromjson("{a: 1}"));
+    runQueryHintMinMax(BSONObj(), BSONObj(fromjson("{a: 1}")), BSONObj(), fromjson("{a: 1}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -1387,11 +1388,13 @@ TEST_F(QueryPlannerTest, MaxValid) {
 
 TEST_F(QueryPlannerTest, MinMaxSameValue) {
     addIndex(BSON("a" << 1));
-    runInvalidQueryHintMinMax(BSONObj(), BSONObj(), fromjson("{a: 1}"), fromjson("{a: 1}"));
+    runInvalidQueryHintMinMax(
+        BSONObj(), BSONObj(fromjson("{a: 1}")), fromjson("{a: 1}"), fromjson("{a: 1}"));
 }
 
 TEST_F(QueryPlannerTest, MaxWithoutIndex) {
-    runInvalidQueryHintMinMax(BSONObj(), BSONObj(), BSONObj(), fromjson("{a: 1}"));
+    runInvalidQueryHintMinMax(
+        BSONObj(), BSONObj(fromjson("{a: 1}")), BSONObj(), fromjson("{a: 1}"));
 }
 
 TEST_F(QueryPlannerTest, MaxBadHint) {
@@ -1408,7 +1411,7 @@ TEST_F(QueryPlannerTest, MaxMinSort) {
                  BSONObj(),
                  0,
                  0,
-                 BSONObj(),
+                 fromjson("{a: 1}"),
                  fromjson("{a: 2}"),
                  fromjson("{a: 8}"));
 
@@ -1425,7 +1428,7 @@ TEST_F(QueryPlannerTest, MaxMinSortEqualityFirstSortSecond) {
                  BSONObj(),
                  0,
                  0,
-                 BSONObj(),
+                 fromjson("{a: 1, b: 1}"),
                  fromjson("{a: 1, b: 1}"),
                  fromjson("{a: 1, b: 2}"));
 
@@ -1442,7 +1445,7 @@ TEST_F(QueryPlannerTest, MaxMinSortInequalityFirstSortSecond) {
                  BSONObj(),
                  0,
                  0,
-                 BSONObj(),
+                 fromjson("{a: 1, b: 1}"),
                  fromjson("{a: 1, b: 1}"),
                  fromjson("{a: 2, b: 2}"));
 
@@ -1461,7 +1464,7 @@ TEST_F(QueryPlannerTest, MaxMinReverseSort) {
                  BSONObj(),
                  0,
                  0,
-                 BSONObj(),
+                 fromjson("{a: 1}"),
                  fromjson("{a: 2}"),
                  fromjson("{a: 8}"));
 
@@ -1478,7 +1481,7 @@ TEST_F(QueryPlannerTest, MaxMinReverseIndexDir) {
                  BSONObj(),
                  0,
                  0,
-                 BSONObj(),
+                 fromjson("{a: -1}"),
                  fromjson("{a: 8}"),
                  fromjson("{a: 2}"));
 
@@ -1496,7 +1499,7 @@ TEST_F(QueryPlannerTest, MaxMinReverseIndexDirSort) {
                  BSONObj(),
                  0,
                  0,
-                 BSONObj(),
+                 fromjson("{a: -1}"),
                  fromjson("{a: 8}"),
                  fromjson("{a: 2}"));
 
@@ -1508,34 +1511,13 @@ TEST_F(QueryPlannerTest, MaxMinReverseIndexDirSort) {
 
 TEST_F(QueryPlannerTest, MaxMinNoMatchingIndexDir) {
     addIndex(BSON("a" << -1));
-    runInvalidQueryHintMinMax(BSONObj(), fromjson("{a: 2}"), BSONObj(), fromjson("{a: 8}"));
+    runInvalidQueryHintMinMax(
+        BSONObj(), fromjson("{a: 1}"), BSONObj(fromjson("{a: 2}")), fromjson("{a: 8}"));
 }
 
-TEST_F(QueryPlannerTest, MaxMinSelectCorrectlyOrderedIndex) {
+TEST_F(QueryPlannerTest, MaxMinBadHintIfIndexOrderDoesNotMatch) {
     // There are both ascending and descending indices on 'a'.
     addIndex(BSON("a" << 1));
-    addIndex(BSON("a" << -1));
-
-    // The ordering of min and max means that we *must* use the descending index.
-    runQueryFull(
-        BSONObj(), BSONObj(), BSONObj(), 0, 0, BSONObj(), fromjson("{a: 8}"), fromjson("{a: 2}"));
-
-    assertNumSolutions(1);
-    assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: 1, pattern: {a: -1}}}}}");
-
-    // If we switch the ordering, then we use the ascending index.
-    // The ordering of min and max means that we *must* use the descending index.
-    runQueryFull(
-        BSONObj(), BSONObj(), BSONObj(), 0, 0, BSONObj(), fromjson("{a: 2}"), fromjson("{a: 8}"));
-
-    assertNumSolutions(1);
-    assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: 1, pattern: {a: 1}}}}}");
-}
-
-TEST_F(QueryPlannerTest, MaxMinBadHintSelectsReverseIndex) {
-    // There are both ascending and descending indices on 'a'.
-    addIndex(BSON("a" << 1));
-    addIndex(BSON("a" << -1));
 
     // A query hinting on {a: 1} is bad if min is {a: 8} and {a: 2} because this
     // min/max pairing requires a descending index.

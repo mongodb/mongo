@@ -1058,30 +1058,27 @@ public:
         _client.insert(ns, BSON("a" << 2 << "b" << 2));
 
         ASSERT_EQUALS(4, count(_client.query(NamespaceString(ns), BSONObj())));
-        BSONObj hints[] = {BSONObj(), BSON("a" << 1 << "b" << 1)};
-        for (int i = 0; i < 2; ++i) {
-            check(0, 0, 3, 3, 4, hints[i]);
-            check(1, 1, 2, 2, 3, hints[i]);
-            check(1, 2, 2, 2, 2, hints[i]);
-            check(1, 2, 2, 1, 1, hints[i]);
+        BSONObj hint = BSON("a" << 1 << "b" << 1);
+        check(0, 0, 3, 3, 4, hint);
+        check(1, 1, 2, 2, 3, hint);
+        check(1, 2, 2, 2, 2, hint);
+        check(1, 2, 2, 1, 1, hint);
 
-            unique_ptr<DBClientCursor> c = query(1, 2, 2, 2, hints[i]);
-            BSONObj obj = c->next();
-            ASSERT_EQUALS(1, obj.getIntField("a"));
-            ASSERT_EQUALS(2, obj.getIntField("b"));
-            obj = c->next();
-            ASSERT_EQUALS(2, obj.getIntField("a"));
-            ASSERT_EQUALS(1, obj.getIntField("b"));
-            ASSERT(!c->more());
-        }
+        unique_ptr<DBClientCursor> c = query(1, 2, 2, 2, hint);
+        BSONObj obj = c->next();
+        ASSERT_EQUALS(1, obj.getIntField("a"));
+        ASSERT_EQUALS(2, obj.getIntField("b"));
+        obj = c->next();
+        ASSERT_EQUALS(2, obj.getIntField("a"));
+        ASSERT_EQUALS(1, obj.getIntField("b"));
+        ASSERT(!c->more());
     }
 
 private:
     unique_ptr<DBClientCursor> query(int minA, int minB, int maxA, int maxB, const BSONObj& hint) {
         Query q;
         q = q.minKey(BSON("a" << minA << "b" << minB)).maxKey(BSON("a" << maxA << "b" << maxB));
-        if (!hint.isEmpty())
-            q.hint(hint);
+        q.hint(hint);
         return _client.query(NamespaceString(ns), q);
     }
     void check(

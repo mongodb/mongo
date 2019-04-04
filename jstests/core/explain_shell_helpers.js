@@ -137,18 +137,18 @@ assert.commandWorked(explain);
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
 // .min()
-explain = t.explain().find().min({a: 1}).finish();
+explain = t.explain().find().min({a: 1}).hint({a: 1}).finish();
 assert.commandWorked(explain);
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
-explain = t.find().min({a: 1}).explain();
+explain = t.find().min({a: 1}).hint({a: 1}).explain();
 assert.commandWorked(explain);
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
 // .max()
-explain = t.explain().find().max({a: 1}).finish();
+explain = t.explain().find().max({a: 1}).hint({a: 1}).finish();
 assert.commandWorked(explain);
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
-explain = t.find().max({a: 1}).explain();
+explain = t.find().max({a: 1}).hint({a: 1}).explain();
 assert.commandWorked(explain);
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
 

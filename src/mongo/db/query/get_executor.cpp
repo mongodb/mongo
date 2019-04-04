@@ -469,9 +469,9 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
     auto statusWithSolutions = QueryPlanner::plan(*canonicalQuery, plannerParams);
     if (!statusWithSolutions.isOK()) {
-        return Status(ErrorCodes::BadValue,
-                      "error processing query: " + canonicalQuery->toString() +
-                          " planner returned error: " + statusWithSolutions.getStatus().reason());
+        return statusWithSolutions.getStatus().withContext(
+            str::stream() << "error processing query: " << canonicalQuery->toString()
+                          << " planner returned error");
     }
     auto solutions = std::move(statusWithSolutions.getValue());
 

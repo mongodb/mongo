@@ -71,6 +71,8 @@ struct CoreIndexInfo {
         invariant((type == IndexType::INDEX_WILDCARD) == (projExec != nullptr));
     }
 
+    virtual ~CoreIndexInfo() = default;
+
     /**
      * This struct is used to uniquely identify an index. The index "Identifier" has two
      * components: catalog name, and "disambiguator". The catalog name is just the name of the
@@ -163,6 +165,12 @@ struct IndexEntry : CoreIndexInfo {
         // The caller must not supply multikey metadata in two different formats.
         invariant(multikeyPaths.empty() || multikeyPathSet.empty());
     }
+
+    IndexEntry(const IndexEntry&) = default;
+    IndexEntry(IndexEntry&&) = default;
+
+    IndexEntry& operator=(const IndexEntry&) = default;
+    IndexEntry& operator=(IndexEntry&&) = default;
 
     ~IndexEntry() {
         // An IndexEntry should never have both formats of multikey metadata simultaneously.
