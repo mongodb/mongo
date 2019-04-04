@@ -28,6 +28,18 @@ execute 'extract artifacts' do
 end
 
 if platform_family? 'debian'
+
+  # SERVER-40491 Debian 8 sources.list need to point to archive url
+  if node['platform_version'] == '8.1'
+    cookbook_file '/etc/apt/sources.list' do
+      source 'sources.list.debian8'
+      owner 'root'
+      group 'root'
+      mode '0644'
+      action :create
+    end
+  end
+
   execute 'apt-get update' do
     command 'apt-get update'
   end
