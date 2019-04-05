@@ -7,6 +7,8 @@
     load('jstests/libs/parallelTester.js');     // For ScopedThread.
 
     function checkReplicatedDataHashesThread(hosts) {
+        load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');
+
         try {
             const excludedDBs = jsTest.options().excludedDBsFromDBHash;
             const rst = new ReplSetTest(hosts[0]);
