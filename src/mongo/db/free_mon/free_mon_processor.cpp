@@ -349,12 +349,17 @@ void FreeMonProcessor::doServerRegister(
         if (!state.is_initialized()) {
             _registerOnTransitionToPrimary = regType;
         } else {
-            // We are standalone, if we have a registration id, then send a registration
-            // notification, else wait for the user to register us
+            // We are standalone or secondary, if we have a registration id, then send a
+            // registration notification, else wait for the user to register us.
             if (state.get().getState() == StorageStateEnum::enabled) {
                 enqueue(FreeMonRegisterCommandMessage::createNow(msg->getPayload().second));
             }
         }
+
+        // Ensure we read the state once.
+        // This is important on a disabled secondary so that the in-memory state knows we are
+        // disabled.
+        readState(optCtx.get());
     }
 }
 
