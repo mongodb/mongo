@@ -1557,6 +1557,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
