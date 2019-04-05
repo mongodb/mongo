@@ -126,11 +126,6 @@ private:
     void _remove(const LogicalSessionId& lsid, TxnNumber txnNumber);
 
     /**
-     * Goes through the '_coordinatorsToCleanup' list and deletes entries from it
-     */
-    void _cleanupCompletedCoordinators();
-
-    /**
      * Constructs a string representation of all the coordinators registered on the catalog.
      */
     std::string _toString(WithLock wl) const;
@@ -146,9 +141,6 @@ private:
     // Used only for testing. Contains TransactionCoordinator objects which have completed their
     // commit coordination and would normally be expunged from memory.
     LogicalSessionIdMap<TransactionCoordinatorMap> _coordinatorsBySessionDefunct;
-
-    // Set of coordinators which have completed, but have not yet been destroyed.
-    std::list<std::shared_ptr<TransactionCoordinator>> _coordinatorsToCleanup;
 
     // Stores the result of the coordinator catalog's recovery attempt (the status passed to
     // exitStepUp). This is what the values mean:

@@ -74,8 +74,6 @@ void TransactionCoordinatorCatalog::onStepDown() {
     for (auto&& coordinator : coordinatorsToCancel) {
         coordinator->cancelIfCommitNotYetStarted();
     }
-
-    _cleanupCompletedCoordinators();
 }
 
 void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
@@ -85,8 +83,6 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
                                            bool forStepUp) {
     LOG(3) << "Inserting coordinator " << lsid.getId() << ':' << txnNumber
            << " into in-memory catalog";
-
-    ON_BLOCK_EXIT([&] { _cleanupCompletedCoordinators(); });
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
     if (!forStepUp) {
@@ -116,8 +112,6 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
 
 std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
     OperationContext* opCtx, const LogicalSessionId& lsid, TxnNumber txnNumber) {
-    _cleanupCompletedCoordinators();
-
     stdx::unique_lock<stdx::mutex> ul(_mutex);
     _waitForStepUpToComplete(ul, opCtx);
 
@@ -152,8 +146,6 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
 boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
 TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
                                                   const LogicalSessionId& lsid) {
-    _cleanupCompletedCoordinators();
-
     stdx::unique_lock<stdx::mutex> ul(_mutex);
     _waitForStepUpToComplete(ul, opCtx);
 
@@ -203,11 +195,6 @@ void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNum
                 }
             }
 
-            // Since the '_remove' method executes on the AWS of the coordinator which is being
-            // removed, we cannot destroy it inline. Because of this, put it on a cleanup list so
-            // that subsequent catalog operations will perform the cleanup.
-            _coordinatorsToCleanup.emplace_back(coordinatorForTxnIter->second);
-
             coordinatorsForSession.erase(coordinatorForTxnIter);
             if (coordinatorsForSession.empty()) {
                 _coordinatorsBySession.erase(coordinatorsForSessionIter);
@@ -244,15 +231,6 @@ void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<s
         _stepUpCompleteCV, lk, [this]() { return bool(_stepUpCompletionStatus); });
 
     uassertStatusOK(*_stepUpCompletionStatus);
-}
-
-void TransactionCoordinatorCatalog::_cleanupCompletedCoordinators() {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
-    auto coordinatorsToCleanup = std::move(_coordinatorsToCleanup);
-
-    // Ensure the destructors run outside of the lock in order to minimize the time this methods
-    // spends in a critical section
-    ul.unlock();
 }
 
 std::string TransactionCoordinatorCatalog::_toString(WithLock wl) const {

@@ -637,13 +637,9 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownAllowedFromScheduleWorkAtCallback) {
 
 TEST_F(AsyncWorkSchedulerTest, DestroyingSchedulerCapturedInFutureCallback) {
     auto async = std::make_unique<AsyncWorkScheduler>(getServiceContext());
+    auto future = async->scheduleWork([](OperationContext* opCtx) {})
+                      .tapAll([async = std::move(async)](Status) mutable { async.reset(); });
 
-    Barrier barrier(2);
-    auto future =
-        async->scheduleWork([&barrier](OperationContext* opCtx) { barrier.countDownAndWait(); })
-            .tapAll([ async = std::move(async), &barrier ](Status){});
-
-    barrier.countDownAndWait();
     future.get();
 }
 
