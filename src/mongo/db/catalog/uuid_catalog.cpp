@@ -105,6 +105,8 @@ private:
 UUIDCatalog::iterator::iterator(StringData dbName, uint64_t genNum, const UUIDCatalog& uuidCatalog)
     : _dbName(dbName), _genNum(genNum), _uuidCatalog(&uuidCatalog) {
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+
+    stdx::lock_guard<stdx::mutex> lock(_uuidCatalog->_catalogLock);
     _mapIter = _uuidCatalog->_orderedCollections.lower_bound(std::make_pair(_dbName, minUuid));
 
     // The entry _mapIter points to is valid if it's not at the end of _orderedCollections and
