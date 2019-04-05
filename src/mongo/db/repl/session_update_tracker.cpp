@@ -111,7 +111,8 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
         boost::none,  // statementId
         boost::none,  // prevWriteOpTime
         boost::none,  // preImangeOpTime
-        boost::none   // postImageOpTime
+        boost::none,  // postImageOpTime
+        boost::none   // prepare
         );
 }
 

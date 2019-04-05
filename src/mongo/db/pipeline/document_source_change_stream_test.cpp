@@ -310,7 +310,8 @@ public:
                                 boost::none,                        // statement id
                                 boost::none,   // optime of previous write within same transaction
                                 boost::none,   // pre-image optime
-                                boost::none);  // post-image optime
+                                boost::none,   // post-image optime
+                                boost::none);  // prepare
     }
 };
 
@@ -952,7 +953,8 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
         boost::none,                      // statement id
         kPreparedTransactionOpTime,       // optime of previous write within same transaction
         boost::none,                      // pre-image optime
-        boost::none);                     // post-image optime
+        boost::none,                      // post-image optime
+        boost::none);                     // prepare
 
     // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
     // expect it to return the insert op within our 'preparedApplyOps' oplog entry.

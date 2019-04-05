@@ -91,7 +91,8 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             stmtId,                           // statement id
                             prevOpTime,    // optime of previous write within same transaction
                             boost::none,   // pre-image optime
-                            boost::none);  // post-image optime
+                            boost::none,   // post-image optime
+                            boost::none);  // prepare
 }
 
 }  // namespace

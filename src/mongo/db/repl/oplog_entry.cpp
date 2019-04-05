@@ -107,7 +107,8 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
                           const boost::optional<StmtId>& statementId,
                           const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                           const boost::optional<OpTime>& preImageOpTime,
-                          const boost::optional<OpTime>& postImageOpTime) {
+                          const boost::optional<OpTime>& postImageOpTime,
+                          const boost::optional<bool>& prepare) {
     BSONObjBuilder builder;
     sessionInfo.serialize(&builder);
     builder.append(OplogEntryBase::kTimestampFieldName, opTime.getTimestamp());
@@ -149,6 +150,9 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     if (postImageOpTime) {
         const BSONObj localObject = postImageOpTime.get().toBSON();
         builder.append(OplogEntryBase::kPostImageOpTimeFieldName, localObject);
+    }
+    if (prepare) {
+        builder.append(OplogEntryBase::kPrepareFieldName, prepare.get());
     }
     return builder.obj();
 }
@@ -233,7 +237,8 @@ OplogEntry::OplogEntry(OpTime opTime,
                        const boost::optional<StmtId>& statementId,
                        const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                        const boost::optional<OpTime>& preImageOpTime,
-                       const boost::optional<OpTime>& postImageOpTime)
+                       const boost::optional<OpTime>& postImageOpTime,
+                       const boost::optional<bool>& prepare)
     : OplogEntry(makeOplogEntryDoc(opTime,
                                    hash,
                                    opType,
@@ -249,7 +254,8 @@ OplogEntry::OplogEntry(OpTime opTime,
                                    statementId,
                                    prevWriteOpTimeInTransaction,
                                    preImageOpTime,
-                                   postImageOpTime)) {}
+                                   postImageOpTime,
+                                   prepare)) {}
 
 bool OplogEntry::isCommand() const {
     return getOpType() == OpTypeEnum::kCommand;

@@ -126,7 +126,8 @@ public:
                const boost::optional<StmtId>& statementId,
                const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                const boost::optional<OpTime>& preImageOpTime,
-               const boost::optional<OpTime>& postImageOpTime);
+               const boost::optional<OpTime>& postImageOpTime,
+               const boost::optional<bool>& prepare);
 
     // DEPRECATED: This constructor can throw. Use static parse method instead.
     explicit OplogEntry(BSONObj raw);
