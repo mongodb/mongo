@@ -77,6 +77,10 @@
     // Check that we have two transactions in the transactions table.
     assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
 
+    // This characterizes the current behavior of fastcount, which is that the two open transaction
+    // count toward the value.
+    assert.eq(testColl.count(), 4);
+
     // The following commit and abort will be rolled back.
     rollbackTest.transitionToRollbackOperations();
     PrepareHelpers.commitTransaction(session1, prepareTimestamp);
@@ -103,11 +107,11 @@
     arrayEq(testColl.find().toArray(), [{_id: 1}, {_id: 2}]);
 
     // This check characterizes the current behavior of fastcount after rollback. It will not be
-    // correct, but reflects the count at the point before rollback where both transactions were
-    // completed. Because prepared transactions are guaranteed to be aborted or committed again
-    // after rollback, the count will eventually be correct once the commit and abort are retried.
-    assert.eq(sessionColl1.count(), 3);
-    assert.eq(testColl.count(), 3);
+    // correct, but reflects the count at the point where both transactions are not yet committed or
+    // aborted (because the operations were not majority committed). The count will eventually be
+    // correct once the commit and abort are retried.
+    assert.eq(sessionColl1.count(), 4);
+    assert.eq(testColl.count(), 4);
 
     // Get the correct primary after the topology changes.
     primary = rollbackTest.getPrimary();

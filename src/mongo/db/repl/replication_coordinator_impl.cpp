@@ -505,6 +505,8 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     // Read the last op from the oplog after cleaning up any partially applied batches.
     const auto stableTimestamp = boost::none;
     _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
+    _replicationProcess->getReplicationRecovery()->reconstructPreparedTransactions(opCtx);
+
     const auto lastOpTimeAndWallTimeResult = _externalState->loadLastOpTimeAndWallTime(opCtx);
 
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
@@ -777,6 +779,8 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
             // for the recoveryTimestamp just like on replica set recovery.
             const auto stableTimestamp = boost::none;
             _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
+            _replicationProcess->getReplicationRecovery()->reconstructPreparedTransactions(opCtx);
+
             warning() << "Setting mongod to readOnly mode as a result of specifying "
                          "'recoverFromOplogAsStandalone'.";
             storageGlobalParams.readOnly = true;

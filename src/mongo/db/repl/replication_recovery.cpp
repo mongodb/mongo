@@ -271,14 +271,12 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     } else {
         _recoverFromUnstableCheckpoint(opCtx, appliedThrough, topOfOplog);
     }
-
-    _reconstructPreparedTransactions(opCtx);
 } catch (...) {
     severe() << "Caught exception during replication recovery: " << exceptionToStatus();
     std::terminate();
 }
 
-void ReplicationRecoveryImpl::_reconstructPreparedTransactions(OperationContext* opCtx) {
+void ReplicationRecoveryImpl::reconstructPreparedTransactions(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     const auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
                                      {BSON("state"

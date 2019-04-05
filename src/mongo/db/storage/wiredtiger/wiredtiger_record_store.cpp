@@ -1658,7 +1658,7 @@ public:
     NumRecordsChange(WiredTigerRecordStore* rs, int64_t diff) : _rs(rs), _diff(diff) {}
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        LOG(3) << "WiredTigerRecordStore: rolling back NumRecordsChange" << -_diff;
+        LOG(3) << "WiredTigerRecordStore: rolling back NumRecordsChange " << -_diff;
         _rs->_sizeInfo->numRecords.fetchAndAdd(-_diff);
     }
 

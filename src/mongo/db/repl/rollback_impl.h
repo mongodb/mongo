@@ -366,7 +366,7 @@ private:
      * info structures. This function assumes that oplog entries are processed in descending
      * timestamp order (that is, starting from the newest oplog entry, going backwards).
      */
-    Status _processRollbackOp(const OplogEntry& oplogEntry);
+    Status _processRollbackOp(OperationContext* opCtx, const OplogEntry& oplogEntry);
 
     /**
      * Iterates through the _countDiff map and retrieves the count of the record store pointed to

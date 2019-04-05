@@ -57,7 +57,9 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/remove_saver.h"
+#include "mongo/db/transaction_history_iterator.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -215,16 +217,6 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         return status;
     }
 
-    // Ask the record store for the pre-rollback counts of any collections whose counts will change
-    // and create a map with the adjusted counts for post-rollback. While finding the common
-    // point, we keep track of how much each collection's count will change during the rollback.
-    // Note: these numbers are relative to the common point, not the stable timestamp, and thus
-    // must be set after recovering from the oplog.
-    status = _findRecordStoreCounts(opCtx);
-    if (!status.isOK()) {
-        return status;
-    }
-
     // Increment the Rollback ID of this node. The Rollback ID is a natural number that it is
     // incremented by 1 every time a rollback occurs. Note that the Rollback ID must be incremented
     // before modifying any local data.
@@ -245,10 +237,24 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         log() << "Not writing rollback files. 'createRollbackDataFiles' set to false.";
     }
 
+    // Before computing record store counts, abort all active transactions. This ensures that the
+    // count adjustments are based on correct values where no prepared transactions are active and
+    // all in-memory counts have been rolled-back.
     // Before calling recoverToStableTimestamp, we must abort the storage transaction of any
     // prepared transaction. This will require us to scan all sessions and call
     // abortPreparedTransactionForRollback() on any txnParticipant with a prepared transaction.
     killSessionsAbortAllPreparedTransactions(opCtx);
+
+    // Ask the record store for the pre-rollback counts of any collections whose counts will change
+    // and create a map with the adjusted counts for post-rollback. While finding the common
+    // point, we keep track of how much each collection's count will change during the rollback.
+    // Note: these numbers are relative to the common point, not the stable timestamp, and thus
+    // must be set after recovering from the oplog.
+    // TODO (SERVER-40614): This error should be fatal.
+    status = _findRecordStoreCounts(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
 
     // If there were rolled back operations on any session, invalidate all sessions.
     // We invalidate sessions before we recover so that we avoid invalidating sessions that had
@@ -259,6 +265,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
 
     // Recover to the stable timestamp.
     auto stableTimestampSW = _recoverToStableTimestamp(opCtx);
+    // TODO (SERVER-40614): This error should be fatal.
     if (!stableTimestampSW.isOK()) {
         return stableTimestampSW.getStatus();
     }
@@ -281,6 +288,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // We cannot have an interrupt point between setting the oplog truncation point and fixing the
     // record store counts or else a clean shutdown could produce incorrect counts. We explicitly
     // check for shutdown here to safely maximize interruptibility.
+    // TODO (SERVER-40614): This interrupt point should be removed.
     if (_isInShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
@@ -312,6 +320,12 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // Sets the correct post-rollback counts on any collections whose counts changed during the
     // rollback.
     _correctRecordStoreCounts(opCtx);
+
+    // Reconstruct prepared transactions after counts have been adjusted. Since prepared
+    // transactions were aborted (i.e. the in-memory counts were rolled-back) before computing
+    // collection counts, reconstruct the prepared transactions now, adding on any additional counts
+    // to the now corrected record store.
+    _replicationProcess->getReplicationRecovery()->reconstructPreparedTransactions(opCtx);
 
     // At this point, the last applied and durable optimes on this node still point to ops on
     // the divergent branch of history. We therefore update the last optimes to the top of the
@@ -553,6 +567,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
 }
 
 Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
+    // TODO (SERVER-40614): This interrupt point should be removed.
     if (_isInShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
@@ -630,7 +645,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
  * Process a single oplog entry that is getting rolled back and update the necessary rollback info
  * structures.
  */
-Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
+Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntry& oplogEntry) {
     ++_observerInfo.numberOfEntriesObserved;
 
     NamespaceString opNss = oplogEntry.getNss();
@@ -650,7 +665,7 @@ Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
         try {
             auto subOps = ApplyOps::extractOperations(oplogEntry);
             for (auto& subOp : subOps) {
-                auto subStatus = _processRollbackOp(subOp);
+                auto subStatus = _processRollbackOp(opCtx, subOp);
                 if (!subStatus.isOK()) {
                     return subStatus;
                 }
@@ -780,6 +795,33 @@ Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
             } else {
                 _newCounts[dropTargetUUID] = kCollectionScanRequired;
             }
+        } else if (oplogEntry.getCommandType() == OplogEntry::CommandType::kCommitTransaction) {
+            // If we are rolling-back the commit of a prepared transaction, use the prepare oplog
+            // entry to compute size adjustments. After recovering to the stable timestamp, prepared
+            // transactions are reconstituted and any count adjustments will be replayed and
+            // committed again.
+            // TODO (SERVER-40566): Handle new oplog format for transactions larger than 16 MB
+
+            if (const auto prepareOpTime = oplogEntry.getPrevWriteOpTimeInTransaction()) {
+                TransactionHistoryIterator iter(*prepareOpTime);
+                invariant(iter.hasNext());
+
+                const auto prepareOplogEntry = iter.next(opCtx);
+                if (prepareOplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+                    // Transform the prepare command into a normal applyOps command. If the
+                    // "prepare" field were not removed, the operation would be ignored.
+                    const auto swApplyOpsEntry =
+                        OplogEntry::parse(prepareOplogEntry.toBSON().removeField("prepare"));
+                    if (!swApplyOpsEntry.isOK()) {
+                        return swApplyOpsEntry.getStatus();
+                    }
+
+                    auto subStatus = _processRollbackOp(opCtx, swApplyOpsEntry.getValue());
+                    if (!subStatus.isOK()) {
+                        return subStatus;
+                    }
+                }
+            }
         }
     }
 
@@ -813,7 +855,7 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     // restarting will have cleared out any invalid in-memory state anyway.
     auto onLocalOplogEntryFn = [&](const BSONObj& operation) {
         OplogEntry oplogEntry(operation);
-        return _processRollbackOp(oplogEntry);
+        return _processRollbackOp(opCtx, oplogEntry);
     };
 
     // Calls syncRollBackLocalOperations to find the common point and run onLocalOplogEntryFn on
@@ -1038,6 +1080,7 @@ void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
 }
 
 StatusWith<Timestamp> RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
+    // TODO (SERVER-40614): This interrupt point should be removed.
     if (_isInShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
@@ -1049,6 +1092,7 @@ StatusWith<Timestamp> RollbackImpl::_recoverToStableTimestamp(OperationContext* 
             if (!stableTimestampSW.isOK()) {
                 severe() << "RecoverToStableTimestamp failed. "
                          << causedBy(stableTimestampSW.getStatus());
+                // TODO (SERVER-40614): fassert here instead of depending on the caller to do it
                 return {ErrorCodes::UnrecoverableRollbackError,
                         "Recover to stable timestamp failed."};
             }

@@ -9,6 +9,7 @@ selector:
   - jstests/replsets/recover_prepared_transaction_state.js
   - jstests/replsets/*initial_sync*.js
   - jstests/replsets/rollback_aborted_prepared_transaction.js
+  - jstests/replsets/rollback_prepare_transaction.js
 
 executor:
   config:
