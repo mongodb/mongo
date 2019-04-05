@@ -50,6 +50,7 @@ class BufferedHandler(logging.Handler):
         self.__emit_buffer = []
         self.__flush_event = None  # A handle to the event that calls self.flush().
         self.__flush_scheduled_by_emit = False
+        self.__close_called = False
 
         self.__flush_lock = threading.Lock()  # Serializes callers of self.flush().
 
@@ -113,7 +114,7 @@ class BufferedHandler(logging.Handler):
         self.__flush(close_called=False)
 
         with self.__emit_lock:
-            if self.__flush_event is not None:
+            if self.__flush_event is not None and not self.__close_called:
                 # We cancel 'self.__flush_event' in case flush() was called by someone other than
                 # the flush thread to avoid having multiple flush() events scheduled.
                 flush.cancel(self.__flush_event)
@@ -150,6 +151,8 @@ class BufferedHandler(logging.Handler):
         """
 
         with self.__emit_lock:
+            self.__close_called = True
+
             if self.__flush_event is not None:
                 flush.cancel(self.__flush_event)
 
