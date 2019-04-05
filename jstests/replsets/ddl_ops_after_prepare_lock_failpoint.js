@@ -132,6 +132,9 @@
                     .getDatabase(dbName)
                     .getCollection(collName));
 
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
+
     session.abortTransaction_forTesting();
     rst.stopSet();
 })();
