@@ -278,10 +278,6 @@ public:
         return _sources;
     }
 
-    SourceContainer& getSources() {
-        return _sources;
-    }
-
     /**
      * Removes and returns the first stage of the pipeline. Returns nullptr if the pipeline is
      * empty.

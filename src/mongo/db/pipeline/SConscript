@@ -615,12 +615,3 @@ env.CppUnitTest(
         'document_sources_idl',
     ],
 )
-
-env.CppUnitTest(
-    target='pipeline_metadata_tree_test',
-    source='pipeline_metadata_tree_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'pipeline',
-    ],
-)

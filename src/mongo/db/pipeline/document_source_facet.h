@@ -134,10 +134,6 @@ public:
         return _facets;
     }
 
-    auto& getFacetPipelines() {
-        return _facets;
-    }
-
     // The following are overridden just to forward calls to sub-pipelines.
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* involvedNssSet) const final;
     void detachFromOperationContext() final;
