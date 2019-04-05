@@ -140,6 +140,7 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -834,7 +835,7 @@ void setUpReplication(ServiceContext* serviceContext) {
         stdx::make_unique<repl::TopologyCoordinator>(topoCoordOptions),
         replicationProcess,
         storageInterface,
-        static_cast<int64_t>(curTimeMillis64()));
+        SecureRandom::create()->nextInt64());
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName(serviceContext);
 
