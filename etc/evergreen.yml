@@ -7711,10 +7711,9 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
     test_flags: >-
       --excludeWithAnyTags=requires_http_client
-      --repeatSuites=5
+      --repeatSuites=10
       --shuffle
-    # TODO: SERVER-39479 Increase the number of executions back to 10
-    resmoke_repeat_suites: 5
+    resmoke_repeat_suites: 10
     # TODO: There are currently 2 ways of repeating suites, one for regular suites and one for
     # generated suites. Once everything is converted to generated suites, we should remove the
     # '--repeatSuites=10' from the test_flags. This will be done in SERVER-38817.
