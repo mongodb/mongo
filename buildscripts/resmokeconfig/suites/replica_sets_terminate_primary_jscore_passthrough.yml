@@ -127,6 +127,7 @@ executor:
       # TODO SERVER-33229: Remove override of startParallelShell
       eval: >-
         testingReplication = true;
+        load("jstests/libs/override_methods/causally_consistent_index_builds.js");
         load('jstests/libs/override_methods/network_error_and_txn_override.js');
         db = connect(TestData.connectionString);
         load("jstests/libs/override_methods/enable_sessions.js");
