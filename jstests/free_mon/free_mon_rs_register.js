@@ -56,7 +56,6 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(isUUID(last_register.payload.uuid['local.oplog.rs']), true);
 
     // Restart the secondary
-    // Now we're going to shut down all nodes
     var s1 = rst._slaves[0];
     var s1Id = rst.getNodeId(s1);
 
@@ -66,6 +65,28 @@ load("jstests/free_mon/libs/free_mon.js");
     rst.restart(s1Id);
 
     mock_web.waitRegisters(3);
+
+    // Now disable it
+    assert.commandWorked(rst.getPrimary().adminCommand({setFreeMonitoring: 1, action: "disable"}));
+
+    WaitForUnRegistration(rst.getPrimary());
+    WaitForUnRegistration(rst.getSecondary());
+
+    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'disabled');
+    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'disabled');
+
+    // Restart the secondary with it disabled
+    var s1 = rst._slaves[0];
+    var s1Id = rst.getNodeId(s1);
+
+    rst.stop(s1Id);
+    rst.waitForState(s1, ReplSetTest.State.DOWN);
+
+    rst.restart(s1Id);
+
+    // Make sure it is disabled
+    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'disabled');
+    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'disabled');
 
     rst.stopSet();
 

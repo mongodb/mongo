@@ -223,8 +223,9 @@ class FreeMonWebServer {
  * Wait for registration information to be populated in the database.
  *
  * @param {object} conn
+ * @param {string} state
  */
-function WaitForRegistration(conn) {
+function WaitForDiskState(conn, state) {
     'use strict';
 
     const admin = conn.getDB("admin");
@@ -233,8 +234,26 @@ function WaitForRegistration(conn) {
     assert.soon(function() {
         const docs = admin.system.version.find({_id: "free_monitoring"});
         const da = docs.toArray();
-        return da.length === 1 && da[0].state === "enabled";
-    }, "Failed to register", 60 * 1000);
+        return da.length === 1 && da[0].state === state;
+    }, "Failed to disk state", 60 * 1000);
+}
+
+/**
+ * Wait for registration information to be populated in the database.
+ *
+ * @param {object} conn
+ */
+function WaitForRegistration(conn) {
+    WaitForDiskState(conn, 'enabled');
+}
+
+/**
+ * Wait for unregistration information to be populated in the database.
+ *
+ * @param {object} conn
+ */
+function WaitForUnRegistration(conn) {
+    WaitForDiskState(conn, 'disabled');
 }
 
 /**
