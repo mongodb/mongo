@@ -851,6 +851,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.EXIT_NET_ERROR = 48;
     MongoRunner.EXIT_WINDOWS_SERVICE_STOP = 49;
     MongoRunner.EXIT_POSSIBLE_CORRUPTION = 60;
+    MongoRunner.EXIT_NEED_DOWNGRADE = 62;
     MongoRunner.EXIT_UNCAUGHT = 100;  // top level exception that wasn't caught
     MongoRunner.EXIT_TEST = 101;
 

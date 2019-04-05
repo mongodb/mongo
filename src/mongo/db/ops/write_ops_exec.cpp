@@ -279,41 +279,6 @@ bool handleError(OperationContext* opCtx,
     return !wholeOp.getOrdered();
 }
 
-SingleWriteResult createIndex(OperationContext* opCtx,
-                              const NamespaceString& systemIndexes,
-                              const BSONObj& spec) {
-    BSONElement nsElement = spec["ns"];
-    uassert(ErrorCodes::NoSuchKey, "Missing \"ns\" field in index description", !nsElement.eoo());
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Expected \"ns\" field of index description to be a "
-                             "string, "
-                             "but found a "
-                          << typeName(nsElement.type()),
-            nsElement.type() == String);
-    const NamespaceString ns(nsElement.valueStringData());
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Cannot create an index on " << ns.ns() << " with an insert to "
-                          << systemIndexes.ns(),
-            ns.db() == systemIndexes.db());
-
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder << "createIndexes" << ns.coll();
-    cmdBuilder << "indexes" << BSON_ARRAY(spec);
-
-    auto cmdResult = CommandHelpers::runCommandDirectly(
-        opCtx, OpMsgRequest::fromDBAndBody(systemIndexes.db(), cmdBuilder.obj()));
-    uassertStatusOK(getStatusFromCommandResult(cmdResult));
-
-    // Unlike normal inserts, it is not an error to "insert" a duplicate index.
-    long long n =
-        cmdResult["numIndexesAfter"].numberInt() - cmdResult["numIndexesBefore"].numberInt();
-    CurOp::get(opCtx)->debug().additiveMetrics.incrementNinserted(n);
-
-    SingleWriteResult result;
-    result.setN(n);
-    return result;
-}
-
 LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
     return nss.isSystemDotViews() ? MODE_X : mode;
 }
