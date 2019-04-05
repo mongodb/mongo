@@ -152,7 +152,7 @@ bool MobileRecoveryUnit::waitUntilDurable() {
                                             &checkpointedFrames);
         }
         embedded::checkStatus(ret, SQLITE_OK, "sqlite3_wal_checkpoint_v2");
-        fassert(51160,
+        fassert(51164,
                 framesInWAL != -1 && checkpointedFrames != -1 && framesInWAL == checkpointedFrames);
         RECOVERY_UNIT_TRACE() << "Checkpointed " << checkpointedFrames << " of the " << framesInWAL
                               << " total frames in the WAL";
