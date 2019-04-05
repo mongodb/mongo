@@ -187,6 +187,10 @@ void configureSession(sqlite3* session) {
         SqliteStatement::execQuery(session, "PRAGMA ", pragma, " = ", value, ";");
         LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE session configuration: " << pragma << " = " << value;
     };
+    // We don't manually use VACUUM so set incremental(2) mode to reclaim space
+    // This need to be set the first thing we do, before any internal tables are created.
+    executePragma("auto_vacuum"_sd, "incremental"_sd);
+
     // Set SQLite in Write-Ahead Logging mode. https://sqlite.org/wal.html
     executePragma("journal_mode"_sd, "WAL"_sd);
 
@@ -196,14 +200,14 @@ void configureSession(sqlite3* session) {
     // Set full fsync on OSX (only supported there) to ensure durability
     executePragma("fullfsync"_sd, "1"_sd);
 
-    // We don't manually use VACUUM so set incremental mode to reclaim space
-    executePragma("auto_vacuum"_sd, "incremental"_sd);
-
     // We just use SQLite as key-value store, so disable foreign keys
     executePragma("foreign_keys"_sd, "0"_sd);
 
     // Set some additional internal sizes for this session
-    executePragma("cache_size"_sd, std::to_string(mobileGlobalOptions.mobileCacheSizeKB));
+    // Cache size described as KB should be set as negative number
+    // https://sqlite.org/pragma.html#pragma_cache_size
+    executePragma("cache_size"_sd,
+                  std::to_string(-static_cast<int32_t>(mobileGlobalOptions.mobileCacheSizeKB)));
     executePragma("mmap_size"_sd, std::to_string(mobileGlobalOptions.mobileMmapSizeKB * 1024));
     executePragma("journal_size_limit"_sd,
                   std::to_string(mobileGlobalOptions.mobileJournalSizeLimitKB * 1024));
