@@ -25,10 +25,6 @@
         assert(serverStatusResponse.transactions.hasOwnProperty("currentPrepared"),
                "Expected the serverStatus response to have a 'currentPrepared' field: " +
                    tojson(serverStatusResponse));
-        assert(
-            serverStatusResponse.transactions.hasOwnProperty("oldestOpenUnpreparedReadTimestamp"),
-            "Expected the serverStatus response to have a 'oldestOpenUnpreparedReadTimestamp' " +
-                "field: " + tojson(serverStatusResponse));
     }
 
     /**
@@ -93,28 +89,19 @@
     const doc1 = {_id: 1, x: 1};
 
     // Start transaction and prepare transaction.
-    session.startTransaction({readConcern: {level: 'snapshot'}});
+    session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc1));
-
-    // Trigger the oldestOpenUnpreparedReadTimestamp to be set.
-    assert.eq(sessionColl.find(doc1).itcount(), 1);
-    let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
-    assert.gt(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     const prepareTimestampForCommit = PrepareHelpers.prepareTransaction(session);
 
     // Verify the total and current prepared transaction counter is updated and the oldest active
     // oplog entry timestamp is shown.
-    newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+    let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalPrepared", 1);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentPrepared", 1);
-
-    // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
-    // has been prepared.
-    assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // Verify that the prepare entry has the oldest timestamp of any active transaction
     // in the transactions table.
@@ -135,9 +122,6 @@
         initialStatus.transactions, newStatus.transactions, "totalPreparedThenAborted", 0);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalPrepared", 1);
-    // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
-    // is closed.
-    assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // Test server metrics for a prepared transaction that is aborted.
     jsTest.log("Prepare a transaction and then abort it");
@@ -145,13 +129,8 @@
     const doc2 = {_id: 2, x: 2};
 
     // Start transaction and prepare transaction.
-    session.startTransaction({readConcern: {level: 'snapshot'}});
+    session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc2));
-
-    // Trigger the oldestOpenUnpreparedReadTimestamp to be set.
-    assert.eq(sessionColl.find(doc2).itcount(), 1);
-    newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
-    assert.gt(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     const prepareTimestampForAbort = PrepareHelpers.prepareTransaction(session);
 
@@ -163,10 +142,6 @@
         initialStatus.transactions, newStatus.transactions, "totalPrepared", 2);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentPrepared", 1);
-
-    // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
-    // has been prepared.
-    assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // Verify that the prepare entry has the oldest timestamp of any active transaction
     // in the transactions table.
@@ -181,10 +156,6 @@
         initialStatus.transactions, newStatus.transactions, "totalPreparedThenAborted", 1);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentPrepared", 0);
-
-    // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
-    // is closed.
-    assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // Verify that other prepared transaction metrics have not changed.
     verifyServerStatusChange(

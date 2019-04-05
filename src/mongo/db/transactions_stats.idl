@@ -83,5 +83,3 @@ structs:
       currentPrepared:
         type: long
         default: 0
-      oldestOpenUnpreparedReadTimestamp:
-        type: timestamp

@@ -90,16 +90,9 @@ public:
     /**
      * Appends the accumulated stats to a transactions stats object.
      */
-    void updateStats(TransactionsStats* stats, OperationContext* opCtx);
+    void updateStats(TransactionsStats* stats);
 
 private:
-    /**
-     * Returns the oldest read timestamp in use by any open unprepared transaction. This will
-     * return a null timestamp if there is no oldest open unprepared read timestamp to be
-     * returned.
-     */
-    static Timestamp _getOldestOpenUnpreparedReadTimestamp(OperationContext* opCtx);
-
     // The number of multi-document transactions currently active.
     AtomicWord<unsigned long long> _currentActive{0};
 

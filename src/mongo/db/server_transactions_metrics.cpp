@@ -149,15 +149,7 @@ void ServerTransactionsMetrics::decrementCurrentPrepared() {
     _currentPrepared.fetchAndSubtract(1);
 }
 
-Timestamp ServerTransactionsMetrics::_getOldestOpenUnpreparedReadTimestamp(
-    OperationContext* opCtx) {
-    // The history is not pinned in memory once a transaction has been prepared since reads
-    // are no longer possible. Therefore, the timestamp returned by the storage engine refers
-    // to the oldest read timestamp for any open unprepared transaction.
-    return opCtx->getServiceContext()->getStorageEngine()->getOldestOpenReadTimestamp();
-}
-
-void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, OperationContext* opCtx) {
+void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setCurrentActive(_currentActive.load());
     stats->setCurrentInactive(_currentInactive.load());
     stats->setCurrentOpen(_currentOpen.load());
@@ -168,8 +160,6 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, OperationC
     stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.load());
     stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.load());
     stats->setCurrentPrepared(_currentPrepared.load());
-    stats->setOldestOpenUnpreparedReadTimestamp(
-        ServerTransactionsMetrics::_getOldestOpenUnpreparedReadTimestamp(opCtx));
 }
 
 namespace {
@@ -192,7 +182,7 @@ public:
         // lifecycle within a session. Both are assigned transaction numbers, and so both are often
         // referred to as “transactions”.
         RetryableWritesStats::get(opCtx)->updateStats(&stats);
-        ServerTransactionsMetrics::get(opCtx)->updateStats(&stats, opCtx);
+        ServerTransactionsMetrics::get(opCtx)->updateStats(&stats);
         return stats.toBSON();
     }
 
