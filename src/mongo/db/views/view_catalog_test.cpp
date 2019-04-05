@@ -528,6 +528,15 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
     }
 }
 
+TEST_F(ViewCatalogFixture, ResolveViewOnCollectionNamespace) {
+    const NamespaceString collectionNamespace("db.coll");
+
+    auto resolvedView = uassertStatusOK(viewCatalog.resolveView(opCtx.get(), collectionNamespace));
+
+    ASSERT_EQ(resolvedView.getNamespace(), collectionNamespace);
+    ASSERT_EQ(resolvedView.getPipeline().size(), 0U);
+}
+
 TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
     const NamespaceString view1("db.view1");
     const NamespaceString view2("db.view2");

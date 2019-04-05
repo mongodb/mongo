@@ -505,7 +505,9 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                                           << ViewGraph::kMaxViewPipelineSizeBytes};
                 }
                 return StatusWith<ResolvedView>(
-                    {*resolvedNss, std::move(resolvedPipeline), std::move(collation.get())});
+                    {*resolvedNss,
+                     std::move(resolvedPipeline),
+                     collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec});
             }
 
             resolvedNss = &view->viewOn();
