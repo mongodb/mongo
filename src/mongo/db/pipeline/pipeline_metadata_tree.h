@@ -260,9 +260,9 @@ inline Stage<T> makeTree(
     std::deque<T>&& initialStageContents,
     const Pipeline& pipeline,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
-    return std::move(*detail::makeTreeWithOffTheEndStage(
-                std::move(initialStageContents), pipeline, propagator)
-                .first);
+    return std::move(
+        *detail::makeTreeWithOffTheEndStage(std::move(initialStageContents), pipeline, propagator)
+             .first);
 }
 
 /**
