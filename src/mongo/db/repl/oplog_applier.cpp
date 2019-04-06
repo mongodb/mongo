@@ -39,6 +39,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {
@@ -211,6 +212,19 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
                 << entry.getVersion() << " in oplog entry: " << redact(entry.toBSON());
             severe() << message;
             return {ErrorCodes::BadValue, message};
+        }
+
+        if (batchLimits.slaveDelayLatestTimestamp) {
+            auto entryTime =
+                Date_t::fromDurationSinceEpoch(Seconds(entry.getTimestamp().getSecs()));
+            if (entryTime > *batchLimits.slaveDelayLatestTimestamp) {
+                if (ops.empty()) {
+                    // Sleep if we've got nothing to do. Only sleep for 1 second at a time to allow
+                    // reconfigs and shutdown to occur.
+                    sleepsecs(1);
+                }
+                return std::move(ops);
+            }
         }
 
         if (mustProcessStandalone(entry)) {
