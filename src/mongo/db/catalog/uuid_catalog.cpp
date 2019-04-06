@@ -432,7 +432,8 @@ boost::optional<CollectionUUID> UUIDCatalog::next(StringData db, CollectionUUID 
     }
 
     auto nextEntry = std::next(entry, 1);
-    while (nextEntry->first.first == db && nextEntry->second->collectionPtr == nullptr) {
+    while (nextEntry != _orderedCollections.end() && nextEntry->first.first == db &&
+           nextEntry->second->collectionPtr == nullptr) {
         nextEntry = std::next(nextEntry, 1);
     }
     // If the element was the last entry or is from a different database.
