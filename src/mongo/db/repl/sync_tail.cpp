@@ -630,13 +630,14 @@ private:
             cc().makeOperationContext().get(), _storageInterface);
 
         while (true) {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(rsSyncApplyStop);
+
             batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
 
             // Check this once per batch since users can change it at runtime.
             batchLimits.ops = OplogApplier::getBatchLimitOperations();
 
             OpQueue ops(batchLimits.ops);
-            // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
             {
                 auto opCtx = cc().makeOperationContext();
 
@@ -648,8 +649,21 @@ private:
                 // handling.
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-                while (!_syncTail->tryPopAndWaitForMore(
-                    opCtx.get(), _oplogBuffer, &ops, batchLimits)) {
+                auto oplogEntries =
+                    fassertNoTrace(31004, _getNextApplierBatchFn(opCtx.get(), batchLimits));
+                for (const auto& oplogEntry : oplogEntries) {
+                    ops.emplace_back(oplogEntry.raw);
+                }
+
+                // If we don't have anything in the queue, wait a bit for something to appear.
+                if (oplogEntries.empty()) {
+                    if (_syncTail->inShutdown()) {
+                        ops.setMustShutdownFlag();
+                    } else {
+                        // Block up to 1 second. We still return true in this case because we want
+                        // this op to be the first in a new batch with a new start time.
+                        _oplogBuffer->waitForData(Seconds(1));
+                    }
                 }
             }
 
@@ -868,12 +882,6 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
         // processed.
         if (!ops->empty() && (ops->getBytes() + size_t(op.objsize())) > limits.bytes) {
             return true;  // Return before wasting time parsing the op.
-        }
-
-        // Don't consume the op if we are told to stop.
-        if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
-            sleepmillis(10);
-            return true;
         }
 
         ops->emplace_back(std::move(op));  // Parses the op in-place.

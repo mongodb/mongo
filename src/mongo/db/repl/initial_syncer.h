@@ -102,8 +102,7 @@ struct InitialSyncerOptions {
 
     // InitialSyncer waits this long before retrying getApplierBatchCallback() if there are
     // currently no operations available to apply or if the 'rsSyncApplyStop' failpoint is active.
-    // This default value is based on the duration in BackgroundSync::waitForMore() and
-    // SyncTail::tryPopAndWaitForMore().
+    // This default value is based on the duration in SyncTail::OpQueueBatcher::run().
     Milliseconds getApplierBatchCallbackRetryWait{1000};
 
     // Replication settings
