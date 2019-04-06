@@ -34,6 +34,7 @@
 #include "mongo/db/repl/oplog_applier.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -128,6 +129,69 @@ void OplogApplier::enqueue(OperationContext* opCtx,
     _oplogBuffer->pushAllNonBlocking(opCtx, begin, end);
 }
 
+namespace {
+
+/**
+ * Returns whether an oplog entry represents a commitTransaction for a transaction which has not
+ * been prepared.  An entry is an unprepared commit if it has a boolean "prepared" field set to
+ * false.
+ */
+bool isUnpreparedCommit(const OplogEntry& entry) {
+    if (entry.getCommandType() != OplogEntry::CommandType::kCommitTransaction) {
+        return false;
+    }
+
+    auto preparedElement = entry.getObject()[CommitTransactionOplogObject::kPreparedFieldName];
+    if (!preparedElement.isBoolean()) {
+        return false;
+    }
+
+    auto isPrepared = preparedElement.boolean();
+    return !isPrepared;
+}
+
+/**
+ * Returns whether an oplog entry represents an applyOps which is a self-contained atomic operation,
+ * as opposed to part of a prepared transaction.
+ */
+bool isUnpreparedApplyOps(const OplogEntry& entry) {
+    return entry.getCommandType() == OplogEntry::CommandType::kApplyOps && !entry.shouldPrepare();
+}
+
+/**
+ * Returns true if this oplog entry must be processed in its own batch and cannot be grouped with
+ * other entries.
+ *
+ * Commands must be processed one at a time. The exceptions to this are unprepared applyOps, because
+ * applyOps oplog entries are effectively containers for CRUD operations, and unprepared
+ * commitTransaction, because that also expands to CRUD operations. Therefore, it is safe to batch
+ * applyOps commands with CRUD operations when reading from the oplog buffer.
+ *
+ * Oplog entries on 'system.views' should also be processed one at a time. View catalog immediately
+ * reflects changes for each oplog entry so we can see inconsistent view catalog if multiple oplog
+ * entries on 'system.views' are being applied out of the original order.
+ *
+ * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
+ * processing each operation matches the primary's when committing that operation.
+ */
+bool mustProcessStandalone(const OplogEntry& entry) {
+    if (entry.isCommand()) {
+        if (isUnpreparedCommit(entry)) {
+            return false;
+        } else if (isUnpreparedApplyOps(entry)) {
+            return false;
+        }
+        return true;
+    } else if (entry.getNss().isSystemDotViews()) {
+        return true;
+    } else if (entry.getNss().isServerConfigurationCollection()) {
+        return true;
+    }
+    return false;
+}
+
+}  // namespace
+
 StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
     OperationContext* opCtx, const BatchLimits& batchLimits) {
     if (batchLimits.ops == 0) {
@@ -149,28 +213,15 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
             return {ErrorCodes::BadValue, message};
         }
 
-        // Commands must be processed one at a time. The only exception to this is applyOps because
-        // applyOps oplog entries are effectively containers for CRUD operations. Therefore, it is
-        // safe to batch applyOps commands with CRUD operations when reading from the oplog buffer.
-        //
-        // Oplog entries on 'system.views' should also be processed one at a time. View catalog
-        // immediately reflects changes for each oplog entry so we can see inconsistent view catalog
-        // if multiple oplog entries on 'system.views' are being applied out of the original order.
-        //
-        // Process updates to 'admin.system.version' individually as well so the secondary's FCV
-        // when processing each operation matches the primary's when committing that operation.
-        if ((entry.isCommand() && (entry.getCommandType() != OplogEntry::CommandType::kApplyOps ||
-                                   entry.shouldPrepare())) ||
-            entry.getNss().isSystemDotViews() || entry.getNss().isServerConfigurationCollection()) {
+        if (mustProcessStandalone(entry)) {
             if (ops.empty()) {
-                // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
                 BSONObj opToPopAndDiscard;
                 invariant(_oplogBuffer->tryPop(opCtx, &opToPopAndDiscard));
                 dassert(ops.back() == OplogEntry(opToPopAndDiscard));
             }
 
-            // Otherwise, apply what we have so far and come back for the command.
+            // Otherwise, apply what we have so far and come back for this entry.
             return std::move(ops);
         }
 

@@ -691,6 +691,7 @@ env.CppUnitTest(
         'oplog_applier_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/unittest/unittest',
         'oplog_application_interface',
         'oplog_buffer_blocking_queue',

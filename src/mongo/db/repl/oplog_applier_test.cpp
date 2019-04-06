@@ -33,6 +33,7 @@
 #include <limits>
 #include <memory>
 
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
@@ -150,6 +151,34 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare) {
 }
 
 /**
+ * Generates a commitTransaction oplog entry with the given number used for the timestamp.
+ */
+OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepared, int count) {
+    auto nss = NamespaceString(dbName).getCommandNS();
+    CommitTransactionOplogObject cmdObj;
+    cmdObj.setPrepared(prepared);
+    cmdObj.setCount(count);
+    BSONObj oField = cmdObj.toBSON();
+    return OplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                      boost::none,                 // hash
+                      OpTypeEnum::kCommand,        // op type
+                      nss,                         // namespace
+                      boost::none,                 // uuid
+                      boost::none,                 // fromMigrate
+                      OplogEntry::kOplogVersion,   // version
+                      oField,                      // o
+                      boost::none,                 // o2
+                      {},                          // sessionInfo
+                      boost::none,                 // upsert
+                      Date_t::min() + Seconds(t),  // wall clock time
+                      boost::none,                 // statement id
+                      boost::none,   // optime of previous write within same transaction
+                      boost::none,   // pre-image optime
+                      boost::none,   // post-image optime
+                      boost::none);  // prepare
+}
+
+/**
  * Returns string representation of OplogApplier::Operations.
  */
 std::string toString(const OplogApplier::Operations& ops) {
@@ -220,6 +249,29 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsServerConfigurationOpInOwnBat
     auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
+}
+
+TEST_F(OplogApplierTest, GetNextApplierBatchReturnsPreparedCommitTransactionOpInOwnBatch) {
+    OplogApplier::Operations srcOps;
+    srcOps.push_back(makeCommitTransactionOplogEntry(1, dbName, true, 3));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+}
+
+TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpWithOtherOps) {
+    OplogApplier::Operations srcOps;
+    srcOps.push_back(makeCommitTransactionOplogEntry(1, dbName, false, 3));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+    ASSERT_EQUALS(srcOps[1], batch[1]);
 }
 
 }  // namespace
