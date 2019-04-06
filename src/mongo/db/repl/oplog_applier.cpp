@@ -152,8 +152,13 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
         // Commands must be processed one at a time. The only exception to this is applyOps because
         // applyOps oplog entries are effectively containers for CRUD operations. Therefore, it is
         // safe to batch applyOps commands with CRUD operations when reading from the oplog buffer.
-        if (entry.isCommand() && (entry.getCommandType() != OplogEntry::CommandType::kApplyOps ||
-                                  entry.shouldPrepare())) {
+        //
+        // Oplog entries on 'system.views' should also be processed one at a time. View catalog
+        // immediately reflects changes for each oplog entry so we can see inconsistent view catalog
+        // if multiple oplog entries on 'system.views' are being applied out of the original order.
+        if ((entry.isCommand() && (entry.getCommandType() != OplogEntry::CommandType::kApplyOps ||
+                                   entry.shouldPrepare())) ||
+            entry.getNss().isSystemDotViews()) {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
