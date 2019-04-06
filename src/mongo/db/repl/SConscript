@@ -676,11 +676,24 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'oplog_entry',
     ],
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
+    ],
+)
+
+env.CppUnitTest(
+    target='oplog_applier_test',
+    source=[
+        'oplog_applier_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'oplog_application_interface',
+        'oplog_buffer_blocking_queue',
     ],
 )
 
