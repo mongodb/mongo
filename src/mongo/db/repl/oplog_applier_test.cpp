@@ -211,6 +211,17 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsSystemDotViewsOpInOwnBatch) {
     ASSERT_EQUALS(srcOps[0], batch[0]);
 }
 
+TEST_F(OplogApplierTest, GetNextApplierBatchReturnsServerConfigurationOpInOwnBatch) {
+    OplogApplier::Operations srcOps;
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString::kServerConfigurationNamespace));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
