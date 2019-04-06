@@ -850,6 +850,19 @@ DBCollection.prototype.hashAllDocs = function() {
  */
 DBCollection.prototype.dropIndex = function(index) {
     assert(index, "need to specify index to dropIndex");
+
+    // Need an extra check for array because 'Array' is an 'object', but not every 'object' is an
+    // 'Array'.
+    if (typeof index != "string" && typeof index != "object" || index instanceof Array) {
+        throw new Error(
+            "The index to drop must be either the index name or the index specification document");
+    }
+
+    if (typeof index == "string" && index === "*") {
+        throw new Error(
+            "To drop indexes in the collection using '*', use db.collection.dropIndexes()");
+    }
+
     var res = this._dbCommand("dropIndexes", {index: index});
     return res;
 };
