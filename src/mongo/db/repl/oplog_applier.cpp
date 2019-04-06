@@ -105,6 +105,14 @@ Future<void> OplogApplier::startup() {
 
 void OplogApplier::shutdown() {
     _shutdown();
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _inShutdown = true;
+}
+
+bool OplogApplier::inShutdown() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _inShutdown;
 }
 
 /**
@@ -230,9 +238,7 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
         if (mustProcessStandalone(entry)) {
             if (ops.empty()) {
                 ops.push_back(std::move(entry));
-                BSONObj opToPopAndDiscard;
-                invariant(_oplogBuffer->tryPop(opCtx, &opToPopAndDiscard));
-                dassert(ops.back() == OplogEntry(opToPopAndDiscard));
+                _consume(opCtx, _oplogBuffer);
             }
 
             // Otherwise, apply what we have so far and come back for this entry.
@@ -252,9 +258,7 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
         // Add op to buffer.
         totalBytes += entry.getRawObjSizeBytes();
         ops.push_back(std::move(entry));
-        BSONObj opToPopAndDiscard;
-        invariant(_oplogBuffer->tryPop(opCtx, &opToPopAndDiscard));
-        dassert(ops.back() == OplogEntry(opToPopAndDiscard));
+        _consume(opCtx, _oplogBuffer);
     }
     return std::move(ops);
 }
@@ -264,6 +268,17 @@ StatusWith<OpTime> OplogApplier::multiApply(OperationContext* opCtx, Operations 
     auto lastApplied = _multiApply(opCtx, std::move(ops));
     _observer->onBatchEnd(lastApplied, {});
     return lastApplied;
+}
+
+void OplogApplier::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
+    // This is just to get the op off the queue; it's been peeked at and queued for application
+    // already.
+    // If we failed to get an op off the queue, this means that shutdown() was called between the
+    // consumer's calls to peek() and consume(). shutdown() cleared the buffer so there is nothing
+    // for us to consume here. Since our postcondition is already met, it is safe to return
+    // successfully.
+    BSONObj opToPopAndDiscard;
+    invariant(oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || inShutdown());
 }
 
 }  // namespace repl

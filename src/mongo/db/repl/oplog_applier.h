@@ -39,6 +39,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -153,6 +154,11 @@ public:
     void shutdown();
 
     /**
+     * Returns true if we are shutting down.
+     */
+    bool inShutdown() const;
+
+    /**
      * Pushes operations read into oplog buffer.
      * Accepts both Operations (OplogEntry) and OplogBuffer::Batch (BSONObj) iterators.
      * This supports current implementations of OplogFetcher and OplogBuffer which work in terms of
@@ -194,6 +200,11 @@ public:
 
 private:
     /**
+     * Pops the operation at the front of the OplogBuffer.
+     */
+    void _consume(OperationContext* opCtx, OplogBuffer* oplogBuffer);
+
+    /**
      * Called from startup() to run oplog application loop.
      * Currently applicable to steady state replication only.
      * Implemented in subclasses but not visible otherwise.
@@ -222,6 +233,12 @@ private:
 
     // Not owned by us.
     Observer* const _observer;
+
+    // Protects member data of OplogApplier.
+    mutable stdx::mutex _mutex;
+
+    // Set to true if shutdown() has been called.
+    bool _inShutdown = false;
 };
 
 /**
