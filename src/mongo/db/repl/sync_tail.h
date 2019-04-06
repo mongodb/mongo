@@ -114,7 +114,9 @@ public:
      * Retrieves operations from the OplogBuffer in batches that will be applied in parallel using
      * multiApply().
      */
-    void oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator* replCoord);
+    void oplogApplication(OplogBuffer* oplogBuffer,
+                          OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn,
+                          ReplicationCoordinator* replCoord);
 
     /**
      * Shuts down oplogApplication() processing.
@@ -249,9 +251,7 @@ private:
 
     class OpQueueBatcher;
 
-    void _oplogApplication(OplogBuffer* oplogBuffer,
-                           ReplicationCoordinator* replCoord,
-                           OpQueueBatcher* batcher) noexcept;
+    void _oplogApplication(ReplicationCoordinator* replCoord, OpQueueBatcher* batcher) noexcept;
 
     void _fillWriterVectors(OperationContext* opCtx,
                             MultiApplier::Operations* ops,

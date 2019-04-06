@@ -1657,7 +1657,12 @@ DEATH_TEST_F(SyncTailTest,
 
     // SyncTail::oplogApplication() creates its own OperationContext in the current thread context.
     _opCtx = {};
-    syncTail.oplogApplication(oplogBuffer.get(), &replCoord);
+    auto getNextApplierBatchFn =
+        [](OperationContext* opCtx,
+           const OplogApplier::BatchLimits& batchLimits) -> StatusWith<OplogApplier::Operations> {
+        return OplogApplier::Operations();
+    };
+    syncTail.oplogApplication(oplogBuffer.get(), getNextApplierBatchFn, &replCoord);
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {

@@ -40,6 +40,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -96,6 +97,10 @@ public:
     class Observer;
 
     using Operations = std::vector<OplogEntry>;
+
+    // Used by SyncTail to access batching logic.
+    using GetNextApplierBatchFn = stdx::function<StatusWith<OplogApplier::Operations>(
+        OperationContext* opCtx, const BatchLimits& batchLimits)>;
 
     /**
      * Lower bound of batch limit size (in bytes) returned by calculateBatchLimitBytes().

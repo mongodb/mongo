@@ -51,7 +51,10 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
 }
 
 void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
-    _syncTail.oplogApplication(oplogBuffer, _replCoord);
+    auto getNextApplierBatchFn = [this](OperationContext* opCtx, const BatchLimits& batchLimits) {
+        return getNextApplierBatch(opCtx, batchLimits);
+    };
+    _syncTail.oplogApplication(oplogBuffer, getNextApplierBatchFn, _replCoord);
 }
 
 void OplogApplierImpl::_shutdown() {

@@ -576,10 +576,14 @@ class SyncTail::OpQueueBatcher {
     OpQueueBatcher& operator=(const OpQueueBatcher&) = delete;
 
 public:
-    OpQueueBatcher(SyncTail* syncTail, StorageInterface* storageInterface, OplogBuffer* oplogBuffer)
+    OpQueueBatcher(SyncTail* syncTail,
+                   StorageInterface* storageInterface,
+                   OplogBuffer* oplogBuffer,
+                   OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn)
         : _syncTail(syncTail),
           _storageInterface(storageInterface),
           _oplogBuffer(oplogBuffer),
+          _getNextApplierBatchFn(getNextApplierBatchFn),
           _ops(0),
           _thread([this] { run(); }) {}
     ~OpQueueBatcher() {
@@ -668,6 +672,7 @@ private:
     SyncTail* const _syncTail;
     StorageInterface* const _storageInterface;
     OplogBuffer* const _oplogBuffer;
+    OplogApplier::GetNextApplierBatchFn const _getNextApplierBatchFn;
 
     stdx::mutex _mutex;  // Guards _ops.
     stdx::condition_variable _cv;
@@ -680,18 +685,19 @@ private:
     stdx::thread _thread;  // Must be last so all other members are initialized before starting.
 };
 
-void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator* replCoord) {
+void SyncTail::oplogApplication(OplogBuffer* oplogBuffer,
+                                OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn,
+                                ReplicationCoordinator* replCoord) {
     // We don't start data replication for arbiters at all and it's not allowed to reconfig
     // arbiterOnly field for any member.
     invariant(!replCoord->getMemberState().arbiter());
 
-    OpQueueBatcher batcher(this, _storageInterface, oplogBuffer);
+    OpQueueBatcher batcher(this, _storageInterface, oplogBuffer, getNextApplierBatchFn);
 
-    _oplogApplication(oplogBuffer, replCoord, &batcher);
+    _oplogApplication(replCoord, &batcher);
 }
 
-void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
-                                 ReplicationCoordinator* replCoord,
+void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
                                  OpQueueBatcher* batcher) noexcept {
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
         getGlobalServiceContext()->getStorageEngine()->isDurable()
