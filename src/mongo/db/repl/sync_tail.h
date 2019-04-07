@@ -198,18 +198,6 @@ public:
     using BatchLimits = OplogApplier::BatchLimits;
 
     /**
-     * Attempts to pop an OplogEntry off the BGSync queue and add it to ops.
-     *
-     * Returns true if the (possibly empty) batch in ops should be ended and a new one started.
-     * If ops is empty on entry and nothing can be added yet, will wait up to a second before
-     * returning true.
-     */
-    bool tryPopAndWaitForMore(OperationContext* opCtx,
-                              OplogBuffer* oplogBuffer,
-                              OpQueue* ops,
-                              const BatchLimits& limits);
-
-    /**
      * Fetch a single document referenced in the operation from the sync source.
      *
      * The sync source is specified at construction in
@@ -243,12 +231,6 @@ public:
     StatusWith<OpTime> multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
 private:
-    /**
-     * Pops the operation at the front of the OplogBuffer.
-     * Updates stats on BackgroundSync.
-     */
-    void _consume(OperationContext* opCtx, OplogBuffer* oplogBuffer);
-
     class OpQueueBatcher;
 
     void _oplogApplication(ReplicationCoordinator* replCoord, OpQueueBatcher* batcher) noexcept;
