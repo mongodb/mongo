@@ -274,6 +274,54 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpW
     ASSERT_EQUALS(srcOps[1], batch[1]);
 }
 
+TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForNumberOfOperations) {
+    OplogApplier::Operations srcOps;
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeInsertOplogEntry(4, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeInsertOplogEntry(5, NamespaceString(dbName, "bar")));
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    // Set batch limits so that each batch contains a maximum of 'BatchLimit::ops'.
+    _limits.ops = 3U;
+
+    // First batch: [insert, insert, insert]
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(3U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+    ASSERT_EQUALS(srcOps[1], batch[1]);
+    ASSERT_EQUALS(srcOps[2], batch[2]);
+
+    // Second batch: [insert, insert]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[3], batch[0]);
+    ASSERT_EQUALS(srcOps[4], batch[1]);
+}
+
+TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOperations) {
+    OplogApplier::Operations srcOps;
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")));
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    // Set batch limits so that only the first two operations can fit into the first batch.
+    _limits.bytes = std::size_t(srcOps[0].getRawObjSizeBytes() + srcOps[1].getRawObjSizeBytes());
+
+    // First batch: [insert, insert]
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+    ASSERT_EQUALS(srcOps[1], batch[1]);
+
+    // Second batch: [insert]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[2], batch[0]);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

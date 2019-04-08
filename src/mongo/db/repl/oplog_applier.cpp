@@ -199,6 +199,15 @@ bool mustProcessStandalone(const OplogEntry& entry) {
     return false;
 }
 
+/**
+ * Returns the number of logical operations represented by an oplog entry.
+ * This is usually one but may be greater than one in certain cases, such as in a commitTransaction
+ * command.
+ */
+std::size_t getOpCount(const OplogEntry& entry) {
+    return 1U;
+}
+
 }  // namespace
 
 StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
@@ -207,6 +216,7 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
         return Status(ErrorCodes::InvalidOptions, "Batch size must be greater than 0.");
     }
 
+    std::size_t totalOps = 0;
     std::uint32_t totalBytes = 0;
     Operations ops;
     BSONObj op;
@@ -245,18 +255,18 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
             return std::move(ops);
         }
 
-        // Apply replication batch limits.
-        if (ops.size() >= batchLimits.ops) {
-            return std::move(ops);
-        }
-
-        // Never return an empty batch if there are operations left.
-        if ((totalBytes + entry.getRawObjSizeBytes() >= batchLimits.bytes) && (ops.size() > 0)) {
-            return std::move(ops);
+        // Apply replication batch limits. Avoid returning an empty batch.
+        auto opCount = getOpCount(entry);
+        auto opBytes = entry.getRawObjSizeBytes();
+        if (totalOps > 0) {
+            if (totalOps + opCount > batchLimits.ops || totalBytes + opBytes > batchLimits.bytes) {
+                return std::move(ops);
+            }
         }
 
         // Add op to buffer.
-        totalBytes += entry.getRawObjSizeBytes();
+        totalOps += opCount;
+        totalBytes += opBytes;
         ops.push_back(std::move(entry));
         _consume(opCtx, _oplogBuffer);
     }
