@@ -55,7 +55,7 @@ NamespaceSerializer::ScopedLock::~ScopedLock() {
 
     iter->second->numWaiting--;
     iter->second->isInProgress = false;
-    iter->second->cvLocked.notify_one();
+    iter->second->cvLocked.notify_all();
 
     if (iter->second->numWaiting == 0) {
         _nsSerializer._inProgressMap.erase(_ns);
@@ -71,8 +71,10 @@ NamespaceSerializer::ScopedLock NamespaceSerializer::lock(OperationContext* opCt
     } else {
         auto nsLock = iter->second;
         nsLock->numWaiting++;
+        auto guard = MakeGuard([&] { nsLock->numWaiting--; });
         opCtx->waitForConditionOrInterrupt(
             nsLock->cvLocked, lock, [nsLock]() { return !nsLock->isInProgress; });
+        guard.Dismiss();
         nsLock->isInProgress = true;
     }
 
