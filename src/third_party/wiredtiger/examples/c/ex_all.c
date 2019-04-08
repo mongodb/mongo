@@ -921,7 +921,7 @@ transaction_ops(WT_SESSION *session_arg)
 	error_check(session->prepare_transaction(
 	    session, "prepare_timestamp=2a"));
 	error_check(session->commit_transaction(
-	    session, "commit_timestamp=2b"));
+	    session, "commit_timestamp=2b,durable_timestamp=2b"));
 	/*! [transaction prepare] */
 	}
 

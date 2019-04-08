@@ -403,9 +403,9 @@ typedef uint64_t wt_timestamp_t;
 
 #include "buf.i"                        /* required by cell.i */
 #include "cache.i"			/* required by txn.i */
-#include "mutex.i"			/* required by txn.i */
-#include "txn.i"			/* required by cell.i */
 #include "cell.i"			/* required by btree.i */
+#include "mutex.i"			/* required by btree.i */
+#include "txn.i"			/* required by btree.i */
 
 #include "bitstring.i"
 #include "btree.i"			/* required by cursor.i */

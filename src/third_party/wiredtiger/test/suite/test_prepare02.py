@@ -109,7 +109,9 @@ class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         c1 = self.session.open_cursor("table:mytable", None)
         self.session.prepare_transaction("prepare_timestamp=2a")
-        self.session.commit_transaction("commit_timestamp=2b")
+        self.session.timestamp_transaction("commit_timestamp=2b")
+        self.session.timestamp_transaction("durable_timestamp=2b")
+        self.session.commit_transaction()
 
         # Setting commit timestamp via timestamp_transaction after
         # prepare is also permitted.
@@ -117,6 +119,7 @@ class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
         c1 = self.session.open_cursor("table:mytable", None)
         self.session.prepare_transaction("prepare_timestamp=2a")
         self.session.timestamp_transaction("commit_timestamp=2b")
+        self.session.timestamp_transaction("durable_timestamp=2b")
         self.session.commit_transaction()
 
         # Rollback after prepare is permitted.

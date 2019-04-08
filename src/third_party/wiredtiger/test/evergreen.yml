@@ -16,6 +16,30 @@ functions:
         remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
         bucket: build_external
         extract_to: wiredtiger
+  "fetch artifacts from little-endian" :
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: wiredtiger/little-endian/${revision}/artifacts/WT_TEST.tgz
+        bucket: build_external
+        local_file: WT_TEST-little-endian.tgz
+    - command: archive.targz_extract
+      params:
+        path: "WT_TEST-little-endian.tgz"
+        destination: "wiredtiger/build_posix/test/format"
+  "fetch artifacts from big-endian" :
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: wiredtiger/big-endian/${revision}/artifacts/WT_TEST.tgz
+        bucket: build_external
+        local_file: WT_TEST-big-endian.tgz
+    - command: archive.targz_extract
+      params:
+        path: "WT_TEST-big-endian.tgz"
+        destination: "wiredtiger/build_posix/test/format"
   "fetch mongo-tests repo" :
     command: shell.exec
     params:
@@ -59,7 +83,7 @@ post:
         set -o errexit
         set -o verbose
         cd wiredtiger
-        tar cvfz ../wiredtiger.tgz .
+        tar cfz ../wiredtiger.tgz .
         cd ..
   - command: s3.put
     params:
@@ -976,6 +1000,128 @@ tasks:
             set -o verbose
             test/evergreen/compatibility_test_for_mongodb_releases.sh
 
+  - name: generate-datafile-little-endian
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/format"
+          script: |
+            set -o errexit
+            set -o verbose
+            for i in $(seq 10)
+            do
+              ./t -1 -h "WT_TEST.$i" -c $(pwd)/../../../test/format/CONFIG.endian
+            done
+            # Archive the WT_TEST directories which include the generated wt data files
+            tar -zcvf WT_TEST.tgz WT_TEST*
+          shell: bash
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          local_file: wiredtiger/build_posix/test/format/WT_TEST.tgz
+          bucket: build_external
+          permissions: public-read
+          content_type: application/tar
+          display_name: WT_TEST
+          remote_file: wiredtiger/little-endian/${revision}/artifacts/WT_TEST.tgz
+
+  - name: verify-datafile-little-endian
+    depends_on:
+    - name: compile
+    - name: generate-datafile-little-endian
+    commands:
+      - func: "fetch artifacts"
+      - func: "fetch artifacts from little-endian"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            ./test/evergreen/verify_wt_datafiles.sh 2>&1
+
+  - name: verify-datafile-from-little-endian
+    depends_on:
+    - name: compile
+    - name: generate-datafile-little-endian
+      variant: little-endian
+    commands:
+      - func: "fetch artifacts"
+      - func: "fetch artifacts from little-endian"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            ./test/evergreen/verify_wt_datafiles.sh 2>&1
+
+  - name: generate-datafile-big-endian
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/format"
+          script: |
+            set -o errexit
+            set -o verbose
+            for i in $(seq 10)
+            do
+              ./t -1 -h "WT_TEST.$i" -c $(pwd)/../../../test/format/CONFIG.endian
+            done
+            # Archive the WT_TEST directories which include the generated wt data files
+            tar -zcvf WT_TEST.tgz WT_TEST*
+          shell: bash
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          local_file: wiredtiger/build_posix/test/format/WT_TEST.tgz
+          bucket: build_external
+          permissions: public-read
+          content_type: application/tar
+          display_name: WT_TEST
+          remote_file: wiredtiger/big-endian/${revision}/artifacts/WT_TEST.tgz
+
+  - name: verify-datafile-big-endian
+    depends_on:
+    - name: compile
+    - name: generate-datafile-big-endian
+    commands:
+      - func: "fetch artifacts"
+      - func: "fetch artifacts from big-endian"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            ./test/evergreen/verify_wt_datafiles.sh 2>&1
+
+  - name: verify-datafile-from-big-endian
+    depends_on:
+    - name: compile
+    - name: generate-datafile-big-endian
+      variant: big-endian
+    commands:
+      - func: "fetch artifacts"
+      - func: "fetch artifacts from big-endian"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            ./test/evergreen/verify_wt_datafiles.sh 2>&1
+
 
 buildvariants:
 - name: ubuntu1404
@@ -1095,3 +1241,34 @@ buildvariants:
     - name: unit-test
     - name: fops
 
+- name: little-endian
+  display_name: Little-endian (x86)
+  run_on:
+  - ubuntu1404-test
+  batchtime: 1440 # 1 day
+  expansions:
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+  tasks:
+  - name: compile
+  - name: generate-datafile-little-endian
+  - name: verify-datafile-little-endian
+  - name: verify-datafile-from-big-endian
+
+- name: big-endian
+  display_name: Big-endian (s390x/zSeries)
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1604-zseries-small
+  batchtime: 1440 # 1 day
+  expansions:
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+  tasks:
+  - name: compile
+  - name: generate-datafile-big-endian
+  - name: verify-datafile-big-endian
+  - name: verify-datafile-from-little-endian

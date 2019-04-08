@@ -1341,8 +1341,7 @@ methods = {
     Config('prepare_timestamp', '', r'''
         set the prepare timestamp for the updates of the current transaction.
         The supplied value must not be older than any active read timestamps.
-        This configuration option is mandatory.  See
-        @ref transaction_timestamps'''),
+        See @ref transaction_timestamps'''),
 ]),
 
 'WT_SESSION.timestamp_transaction' : Method([
@@ -1358,10 +1357,14 @@ methods = {
         current transaction.  The value must also not be older than the
         current stable timestamp.  See
         @ref transaction_timestamps'''),
+    Config('prepare_timestamp', '', r'''
+        set the prepare timestamp for the updates of the current transaction.
+        The supplied value must not be older than any active read timestamps.
+        See @ref transaction_timestamps'''),
     Config('read_timestamp', '', r'''
         read using the specified timestamp.  The supplied value must not be
         older than the current oldest timestamp.  This can only be set once
-        for a transaction.  @ref transaction_timestamps'''),
+        for a transaction. See @ref transaction_timestamps'''),
     Config('round_to_oldest', 'false', r'''
         if read timestamp is earlier than oldest timestamp,
         read timestamp will be rounded to oldest timestamp''',

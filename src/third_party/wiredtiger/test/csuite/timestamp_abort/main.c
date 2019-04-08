@@ -370,10 +370,16 @@ thread_run(void *arg)
 				    prepared_session, tscfg));
 				if (i % PREPARE_YIELD == 0)
 					__wt_yield();
-			}
-			testutil_check(
-			    __wt_snprintf(tscfg, sizeof(tscfg),
-			    "commit_timestamp=%" PRIx64, active_ts));
+				testutil_check(
+				    __wt_snprintf(tscfg, sizeof(tscfg),
+				    "commit_timestamp=%" PRIx64
+				    ",durable_timestamp=%" PRIx64,
+				    active_ts, active_ts));
+			} else
+				testutil_check(
+				    __wt_snprintf(tscfg, sizeof(tscfg),
+				    "commit_timestamp=%" PRIx64, active_ts));
+
 			testutil_check(
 			    prepared_session->commit_transaction(
 			    prepared_session, tscfg));

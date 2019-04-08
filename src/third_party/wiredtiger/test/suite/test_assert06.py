@@ -368,8 +368,9 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
             'prepare_timestamp=' + timestamp_str(22))
         self.session.timestamp_transaction(
             'commit_timestamp=' + timestamp_str(22))
-        self.session.commit_transaction('durable_timestamp=' +
-            timestamp_str(22))
+        self.session.timestamp_transaction(
+            'durable_timestamp=' + timestamp_str(22))
+        self.session.commit_transaction()
         c.close()
 
         c = self.session.open_cursor(uri)

@@ -56,7 +56,9 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
         # Check setting the prepare timestamp same as oldest timestamp is valid.
         self.session.begin_transaction()
         self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(2))
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction()
 
         # In a single transaction it is illegal to set a commit timestamp
         # before invoking prepare for this transaction.
@@ -102,7 +104,7 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
             'commit_timestamp=' + timestamp_str(4)),
-            "/older than the prepare timestamp/")
+            "/less than the prepare timestamp/")
 
         # It is legal to set a commit timestamp as same as prepare
         # timestamp.
@@ -110,7 +112,9 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
         c[1] = 1
         self.session.prepare_transaction(
                 'prepare_timestamp=' + timestamp_str(5))
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction()
 
 if __name__ == '__main__':
     wttest.run()

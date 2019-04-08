@@ -57,7 +57,7 @@ __wt_conn_compat_config(
 	uint16_t max_major, max_minor, min_major, min_minor;
 	uint16_t rel_major, rel_minor;
 	char *value;
-	bool txn_active;
+	bool txn_active, unchg;
 
 	conn = S2C(session);
 	value = NULL;
@@ -65,6 +65,7 @@ __wt_conn_compat_config(
 	max_minor = WT_CONN_COMPAT_NONE;
 	min_major = WT_CONN_COMPAT_NONE;
 	min_minor = WT_CONN_COMPAT_NONE;
+	unchg = false;
 
 	WT_RET(__wt_config_gets(session, cfg, "compatibility.release", &cval));
 	if (cval.len == 0) {
@@ -76,21 +77,31 @@ __wt_conn_compat_config(
 		    session, &cval, &rel_major, &rel_minor));
 
 		/*
-		 * We're doing an upgrade or downgrade, check whether
-		 * transactions are active.
+		 * If the user is running downgraded, then the compatibility
+		 * string is part of the configuration string. Determine if
+		 * the user is actually changing the compatibility.
 		 */
-		WT_RET(__wt_txn_activity_check(session, &txn_active));
-		if (txn_active)
-			WT_RET_MSG(session, ENOTSUP,
-			    "system must be quiescent"
-			    " for upgrade or downgrade");
+		if (reconfig && rel_major == conn->compat_major &&
+		    rel_minor == conn->compat_minor)
+			unchg = true;
+		else {
+			/*
+			 * We're doing an upgrade or downgrade, check whether
+			 * transactions are active.
+			 */
+			WT_RET(__wt_txn_activity_check(session, &txn_active));
+			if (txn_active)
+				WT_RET_MSG(session, ENOTSUP,
+				    "system must be quiescent"
+				    " for upgrade or downgrade");
+		}
 		F_SET(conn, WT_CONN_COMPATIBILITY);
 	}
 	/*
-	 * If we're a reconfigure and the user did not set any compatibility,
-	 * we're done.
+	 * If we're a reconfigure and the user did not set any compatibility
+	 * or did not change the setting, we're done.
 	 */
-	if (reconfig && !F_ISSET(conn, WT_CONN_COMPATIBILITY))
+	if (reconfig && (!F_ISSET(conn, WT_CONN_COMPATIBILITY) || unchg))
 		goto done;
 
 	/*

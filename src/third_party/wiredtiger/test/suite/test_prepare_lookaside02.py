@@ -74,7 +74,8 @@ class test_prepare_lookaside02(wttest.WiredTigerTestCase, suite_subprocess):
         # update the value with in this transaction
         self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(100))
         if self.txn_commit == True:
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(101))
+            self.session.commit_transaction(
+                'commit_timestamp=' + timestamp_str(101) + ',durable_timestamp=' + timestamp_str(101))
         else:
             self.session.rollback_transaction()
 
@@ -95,7 +96,8 @@ class test_prepare_lookaside02(wttest.WiredTigerTestCase, suite_subprocess):
         c[2] = 2
         self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(200))
         if self.txn_commit == True:
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(201))
+            self.session.commit_transaction(
+                'commit_timestamp=' + timestamp_str(201) + ',durable_timestamp=' + timestamp_str(201))
         else:
             self.session.rollback_transaction()
 
@@ -121,7 +123,8 @@ class test_prepare_lookaside02(wttest.WiredTigerTestCase, suite_subprocess):
         c.remove()
         self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(300))
         if self.txn_commit == True:
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(301))
+            self.session.commit_transaction(
+                'commit_timestamp=' + timestamp_str(301) + ',durable_timestamp=' + timestamp_str(301))
         else:
             self.session.rollback_transaction()
 
@@ -158,7 +161,8 @@ class test_prepare_lookaside02(wttest.WiredTigerTestCase, suite_subprocess):
         cur.remove()
         self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(400))
         if self.txn_commit == True:
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(401))
+            self.session.commit_transaction(
+                'commit_timestamp=' + timestamp_str(401) + ',durable_timestamp=' + timestamp_str(401))
         else:
             self.session.rollback_transaction()
 

@@ -87,7 +87,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.next(), 0)
 
         session.prepare_transaction('prepare_timestamp=' + timestamp_str(150))
-        msg = "/older than the first commit timestamp/"
+        msg = "/is less than the commit timestamp/"
         # Check for error when commit timestamp > durable timestamp.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: session.commit_transaction('commit_timestamp=' + timestamp_str(200) + ',durable_timestamp=' + timestamp_str(180)), msg)
 
@@ -107,7 +107,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
 
         session.prepare_transaction('prepare_timestamp=' + timestamp_str(150))
 
-        msg = "/older than stable timestamp/"
+        msg = "/is less than the stable timestamp/"
         # Check that error is returned when durable timestamp < stable timestamp.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: session.commit_transaction('commit_timestamp=' + timestamp_str(200) + ',durable_timestamp=' + timestamp_str(240)), msg)
 

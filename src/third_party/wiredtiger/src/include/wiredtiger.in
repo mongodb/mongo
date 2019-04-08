@@ -1878,9 +1878,8 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.prepare_transaction, see dist/api_data.py}
 	 * @config{prepare_timestamp, set the prepare timestamp for the updates
 	 * of the current transaction.  The supplied value must not be older
-	 * than any active read timestamps.  This configuration option is
-	 * mandatory.  See @ref transaction_timestamps., a string; default
-	 * empty.}
+	 * than any active read timestamps.  See @ref transaction_timestamps., a
+	 * string; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1922,9 +1921,13 @@ struct __wt_session {
 	 * timestamp set for the current transaction.  The value must also not
 	 * be older than the current stable timestamp.  See @ref
 	 * transaction_timestamps., a string; default empty.}
+	 * @config{prepare_timestamp, set the prepare timestamp for the updates
+	 * of the current transaction.  The supplied value must not be older
+	 * than any active read timestamps.  See @ref transaction_timestamps., a
+	 * string; default empty.}
 	 * @config{read_timestamp, read using the specified timestamp.  The
 	 * supplied value must not be older than the current oldest timestamp.
-	 * This can only be set once for a transaction.  @ref
+	 * This can only be set once for a transaction.  See @ref
 	 * transaction_timestamps., a string; default empty.}
 	 * @config{round_to_oldest, if read timestamp is earlier than oldest
 	 * timestamp\, read timestamp will be rounded to oldest timestamp., a

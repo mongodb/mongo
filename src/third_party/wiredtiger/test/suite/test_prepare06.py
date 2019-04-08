@@ -47,6 +47,7 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         # It is illegal to set the prepare timestamp older than the oldest
         # timestamp.
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(20))
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(30))
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.prepare_transaction(
@@ -58,7 +59,21 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         # oldest timestamp is valid with roundup_timestamps settings.
         self.session.begin_transaction('roundup_timestamps=(prepared=true)')
         self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(10))
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(35))
+        self.session.commit_transaction()
+
+        # Check setting a prepared transaction timestamps earlier than the
+        # oldest timestamp is invalid, if durable timestamp is less than the
+        # stable timestamp.
+        self.session.begin_transaction('roundup_timestamps=(prepared=true)')
+        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(10))
+        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(15))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.timestamp_transaction(
+            'durable_timestamp=' + timestamp_str(25)),
+            "/is less than the stable timestamp/")
+        self.session.rollback_transaction()
 
         # Check the cases with an active reader.
         # Start a new reader to have an active read timestamp.
@@ -67,7 +82,7 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # It is illegal to set the prepare timestamp as earlier than an active
         # read timestamp even with roundup_timestamps settings.
-        self.session.begin_transaction()
+        self.session.begin_transaction('roundup_timestamps=(prepared=true)')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.prepare_transaction(
             'prepare_timestamp=' + timestamp_str(10)),
@@ -76,14 +91,14 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # It is illegal to set the prepare timestamp the same as an active read
         # timestamp even with roundup_timestamps settings.
-        self.session.begin_transaction()
+        self.session.begin_transaction('roundup_timestamps=(prepared=true)')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.prepare_transaction(
             'prepare_timestamp=' + timestamp_str(40)),
             "/must be greater than the latest active read timestamp/")
         self.session.rollback_transaction()
 
-        # It is illegal to set a commit timestamp older than the prepare
+        # It is illegal to set a commit timestamp less than the prepare
         # timestamp of a transaction.
         self.session.begin_transaction()
         c[1] = 1
@@ -92,7 +107,7 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
             'commit_timestamp=' + timestamp_str(30)),
-            "/older than the prepare timestamp/")
+            "/less than the prepare timestamp/")
 
         # It is legal to set a commit timestamp older than prepare timestamp of
         # a transaction with roundup_timestamps settings.
@@ -100,7 +115,13 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         c[1] = 1
         self.session.prepare_transaction(
             'prepare_timestamp=' + timestamp_str(45))
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(30))
+        #self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(30))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.timestamp_transaction(
+            'durable_timestamp=' + timestamp_str(30)),
+            "/is less than the commit timestamp/")
+        self.session.rollback_transaction()
 
         s_reader.commit_transaction()
 

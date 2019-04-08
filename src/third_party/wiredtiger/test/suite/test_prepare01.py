@@ -116,7 +116,9 @@ class test_prepare01(wttest.WiredTigerTestCase):
             if i > 0 and i % (self.nentries / 37) == 0:
                 self.check(cursor, committed, i)
                 self.session.prepare_transaction("prepare_timestamp=2a")
-                self.session.commit_transaction("commit_timestamp=3a")
+                self.session.timestamp_transaction("commit_timestamp=3a")
+                self.session.timestamp_transaction("durable_timestamp=3a")
+                self.session.commit_transaction()
                 committed = i
                 self.session.begin_transaction()
 
@@ -132,8 +134,11 @@ class test_prepare01(wttest.WiredTigerTestCase):
 
         self.check(cursor, committed, self.nentries)
 
-        self.session.prepare_transaction("prepare_timestamp=2a")
-        self.session.commit_transaction("commit_timestamp=3a")
+        self.session.timestamp_transaction("prepare_timestamp=2a")
+        self.session.prepare_transaction()
+        self.session.timestamp_transaction("commit_timestamp=3a")
+        self.session.timestamp_transaction("durable_timestamp=3a")
+        self.session.commit_transaction()
         self.check(cursor, self.nentries, self.nentries)
 
 # Test that read-committed is the default isolation level.
@@ -154,7 +159,9 @@ class test_read_committed_default(wttest.WiredTigerTestCase):
         cursor['key: aaa'] = 'value: aaa'
 
         self.session.prepare_transaction("prepare_timestamp=2a")
-        self.session.commit_transaction("commit_timestamp=3a")
+        self.session.timestamp_transaction("commit_timestamp=3a")
+        self.session.timestamp_transaction("durable_timestamp=3a")
+        self.session.commit_transaction()
         self.session.begin_transaction()
         cursor['key: bbb'] = 'value: bbb'
 
@@ -165,13 +172,17 @@ class test_read_committed_default(wttest.WiredTigerTestCase):
 
         s.prepare_transaction("prepare_timestamp=4a")
         # commit timestamp can be same as prepare timestamp
-        s.commit_transaction("commit_timestamp=4a")
+        s.timestamp_transaction("commit_timestamp=4a")
+        s.timestamp_transaction("durable_timestamp=4a")
+        s.commit_transaction()
         s.begin_transaction()
         self.assertEqual(self.cursor_count(cursor), 1)
         s.prepare_transaction("prepare_timestamp=7a")
 
         # commit timestamp can be greater than prepare timestamp
-        s.commit_transaction("commit_timestamp=8a")
+        s.timestamp_transaction("commit_timestamp=8a")
+        s.timestamp_transaction("durable_timestamp=8a")
+        s.commit_transaction()
         s.close()
 
 if __name__ == '__main__':

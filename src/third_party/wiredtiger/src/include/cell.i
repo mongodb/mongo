@@ -188,29 +188,15 @@ __wt_timestamp_value_check(
  */
 static inline void
 __cell_pack_timestamp_value(WT_SESSION_IMPL *session,
-    uint8_t **pp, wt_timestamp_t *start_tsp, wt_timestamp_t *stop_tsp)
+    uint8_t **pp, wt_timestamp_t start_ts, wt_timestamp_t stop_ts)
 {
-	wt_timestamp_t start_ts, stop_ts;
-
-	__wt_timestamp_value_check(session, *start_tsp, *stop_tsp);
+	__wt_timestamp_value_check(session, start_ts, stop_ts);
 
 	/*
-	 * Finalize the timestamps, checking if they're globally visible and
-	 * won't need to be written.
-	 *
 	 * TIMESTAMP-FIXME
 	 * Values (presumably) have associated transaction IDs, but we haven't
-	 * yet decided how to handle them. For now, ignore them in determining
-	 * value durability.
-	 */
-	if (*start_tsp != WT_TS_NONE &&
-	    __wt_txn_visible_all(session, WT_TXN_NONE, *start_tsp))
-		*start_tsp = WT_TS_NONE;
-
-	start_ts = *start_tsp;
-	stop_ts = *stop_tsp;
-
-	/*
+	 * yet decided how to handle them.
+	 *
 	 * Historic versions and globally visible values don't have associated
 	 * timestamps, else set a flag bit and store the packed timestamp pair.
 	 */
@@ -302,8 +288,7 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session,
  */
 static inline size_t
 __wt_cell_pack_value(WT_SESSION_IMPL *session, WT_CELL *cell,
-    wt_timestamp_t *start_tsp, wt_timestamp_t *stop_tsp,
-    uint64_t rle, size_t size)
+    wt_timestamp_t start_ts, wt_timestamp_t stop_ts, uint64_t rle, size_t size)
 {
 	uint8_t byte, *p;
 	bool ts;
@@ -312,7 +297,7 @@ __wt_cell_pack_value(WT_SESSION_IMPL *session, WT_CELL *cell,
 	p = cell->__chunk;
 	*p = '\0';
 
-	__cell_pack_timestamp_value(session, &p, start_tsp, stop_tsp);
+	__cell_pack_timestamp_value(session, &p, start_ts, stop_ts);
 
 	/*
 	 * Short data cells without timestamps or run-length encoding have 6
@@ -411,8 +396,7 @@ __wt_cell_pack_value_match(WT_CELL *page_cell,
  */
 static inline size_t
 __wt_cell_pack_copy(WT_SESSION_IMPL *session, WT_CELL *cell,
-    wt_timestamp_t *start_tsp, wt_timestamp_t *stop_tsp,
-    uint64_t rle, uint64_t v)
+    wt_timestamp_t start_ts, wt_timestamp_t stop_ts, uint64_t rle, uint64_t v)
 {
 	uint8_t *p;
 
@@ -420,7 +404,7 @@ __wt_cell_pack_copy(WT_SESSION_IMPL *session, WT_CELL *cell,
 	p = cell->__chunk;
 	*p = '\0';
 
-	__cell_pack_timestamp_value(session, &p, start_tsp, stop_tsp);
+	__cell_pack_timestamp_value(session, &p, start_ts, stop_ts);
 
 	if (rle < 2)
 		cell->__chunk[0] |= WT_CELL_VALUE_COPY;	/* Type */
@@ -439,7 +423,7 @@ __wt_cell_pack_copy(WT_SESSION_IMPL *session, WT_CELL *cell,
  */
 static inline size_t
 __wt_cell_pack_del(WT_SESSION_IMPL *session, WT_CELL *cell,
-    wt_timestamp_t *start_tsp, wt_timestamp_t *stop_tsp, uint64_t rle)
+    wt_timestamp_t start_ts, wt_timestamp_t stop_ts, uint64_t rle)
 {
 	uint8_t *p;
 
@@ -447,7 +431,7 @@ __wt_cell_pack_del(WT_SESSION_IMPL *session, WT_CELL *cell,
 	p = cell->__chunk;
 	*p = '\0';
 
-	__cell_pack_timestamp_value(session, &p, start_tsp, stop_tsp);
+	__cell_pack_timestamp_value(session, &p, start_ts, stop_ts);
 
 	if (rle < 2)
 		cell->__chunk[0] |= WT_CELL_DEL;	/* Type */
@@ -538,8 +522,7 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size_t size)
  */
 static inline size_t
 __wt_cell_pack_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell, uint8_t type,
-    wt_timestamp_t *start_tsp, wt_timestamp_t *stop_tsp,
-    uint64_t rle, size_t size)
+    wt_timestamp_t start_ts, wt_timestamp_t stop_ts, uint64_t rle, size_t size)
 {
 	uint8_t *p;
 
@@ -554,7 +537,7 @@ __wt_cell_pack_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell, uint8_t type,
 		break;
 	case WT_CELL_VALUE_OVFL:
 	case WT_CELL_VALUE_OVFL_RM:
-		__cell_pack_timestamp_value(session, &p, start_tsp, stop_tsp);
+		__cell_pack_timestamp_value(session, &p, start_ts, stop_ts);
 		break;
 	}
 

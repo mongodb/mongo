@@ -132,6 +132,7 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.query_timestamp('get=prepare'), '10')
 
         self.session.timestamp_transaction('commit_timestamp=20')
+        self.session.timestamp_transaction('durable_timestamp=20')
         self.assertTimestampsEqual(
             self.session.query_timestamp('get=prepare'), '10')
         self.assertTimestampsEqual(
