@@ -552,6 +552,7 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "initialsync"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
