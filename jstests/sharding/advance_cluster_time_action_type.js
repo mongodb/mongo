@@ -14,7 +14,6 @@
         config: 1,
         shards: 1,
         keyFile: 'jstests/libs/key1',
-        mongosWaitsForKeys: true,
         other: {shardAsReplicaSet: false}
     });
 

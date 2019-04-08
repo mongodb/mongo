@@ -6,7 +6,7 @@
     "use strict";
 
     // Setup 2 mongos processes with mongobridge.
-    let st = new ShardingTest({shards: 1, mongos: 2, useBridge: true, mongosWaitsForKeys: true});
+    let st = new ShardingTest({shards: 1, mongos: 2, useBridge: true});
 
     // Sever outgoing communications from the second mongos.
     st.s0.disconnect(st.s1);

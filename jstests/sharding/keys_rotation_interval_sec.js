@@ -8,7 +8,6 @@
     let st = new ShardingTest({
         mongos: 1,
         shards: {rs0: {nodes: 2}},
-        mongosWaitsForKeys: true,
         other: {configOptions: {setParameter: "KeysRotationIntervalSec=30"}}
     });
 

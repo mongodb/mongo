@@ -18,8 +18,7 @@
 
     // A mongos that talks to a non-sharded collection on a sharded replica set returns an
     // operationTime that is a Timestamp.
-    var st = new ShardingTest(
-        {name: "operation_time_api", shards: {rs0: {nodes: 1}}, mongosWaitsForKeys: true});
+    var st = new ShardingTest({name: "operation_time_api", shards: {rs0: {nodes: 1}}});
 
     var testDB = st.s.getDB("test");
     var res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 1}]}));

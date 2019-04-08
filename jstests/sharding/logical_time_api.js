@@ -39,8 +39,7 @@
 
     // A mongos that talks to a non-sharded collection on a sharded replica set returns a
     // logicalTime BSON object that matches the expected format.
-    var st = new ShardingTest(
-        {name: "logical_time_api", shards: {rs0: {nodes: 1}}, mongosWaitsForKeys: true});
+    var st = new ShardingTest({name: "logical_time_api", shards: {rs0: {nodes: 1}}});
 
     var testDB = st.s.getDB("test");
     var res =

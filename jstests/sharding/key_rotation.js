@@ -16,7 +16,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
     "use strict";
 
-    let st = new ShardingTest({shards: {rs0: {nodes: 2}}, mongosWaitsForKeys: true});
+    let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
     // Verify after startup there is a new key in admin.system.keys.
     jsTestLog("Verify the admin.system.keys collection after startup.");

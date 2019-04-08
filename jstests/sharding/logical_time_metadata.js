@@ -11,7 +11,7 @@
         assert.hasFields(res.$clusterTime, ['clusterTime', 'signature']);
     }
 
-    var st = new ShardingTest({shards: {rs0: {nodes: 3}}, mongosWaitsForKeys: true});
+    var st = new ShardingTest({shards: {rs0: {nodes: 3}}});
     st.s.adminCommand({enableSharding: 'test'});
 
     var db = st.s.getDB('test');

@@ -34,7 +34,6 @@
     const st = new ShardingTest({
         mongos: 1,
         manualAddShard: true,
-        mongosWaitsForKeys: true,
         other: {keyFile: "jstests/libs/key1", shardAsReplicaSet: false}
     });
 
