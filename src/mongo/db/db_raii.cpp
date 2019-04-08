@@ -147,6 +147,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
         if (readAtLastAppliedTimestamp) {
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
+            readSource = opCtx->recoveryUnit()->getTimestampReadSource();
         }
 
         // This timestamp could be earlier than the timestamp seen when the transaction is opened
@@ -160,7 +161,6 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             return;
         }
 
-        readSource = opCtx->recoveryUnit()->getTimestampReadSource();
         invariant(lastAppliedTimestamp ||
                   readSource == RecoveryUnit::ReadSource::kMajorityCommitted);
         invariant(readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
