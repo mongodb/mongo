@@ -55,7 +55,7 @@ a notice will be included in
 [ASIO]: https://github.com/chriskohlhoff/asio
 [benchmark]: https://github.com/google/benchmark
 [Boost]: http://www.boost.org/
-[fmt]: http://www.fmtlib.net/
+[fmt]: http://fmtlib.net/
 [GPerfTools]: https://github.com/gperftools/gperftools
 [ICU4]: http://site.icu-project.org/download/
 [Intel Decimal FP Library]: https://software.intel.com/en-us/articles/intel-decimal-floating-point-math-library
