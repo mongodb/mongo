@@ -484,6 +484,21 @@ protected:
         gUseMultipleOplogEntryFormatForTransactions = false;
         SyncTailTest::tearDown();
     }
+
+    void checkTxnTable(const LogicalSessionId& lsid,
+                       const TxnNumber& txnNum,
+                       const repl::OpTime& expectedOpTime,
+                       Date_t expectedWallClock,
+                       boost::optional<repl::OpTime> expectedStartOpTime,
+                       DurableTxnStateEnum expectedState) {
+        repl::checkTxnTable(_opCtx.get(),
+                            lsid,
+                            txnNum,
+                            expectedOpTime,
+                            expectedWallClock,
+                            expectedStartOpTime,
+                            expectedState);
+    }
 };
 
 TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
@@ -552,13 +567,20 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
 
     // Apply a batch with only the first operation.  This should result in the first oplog entry
-    // being put in the oplog, but with no effect because the operation is part of a pending
-    // transaction.
+    // being put in the oplog and updating the transaction table, but not actually being applied
+    // because they are part of a pending transaction.
+    const auto expectedStartOpTime = insertOp1.getOpTime();
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp1}));
     ASSERT_EQ(1U, insertedOplogEntries.size());
     ASSERT_BSONOBJ_EQ(insertedOplogEntries.back(), insertOp1.toBSON());
     ASSERT_TRUE(insertedDocs1.empty());
     ASSERT_TRUE(insertedDocs2.empty());
+    checkTxnTable(lsid,
+                  txnNum,
+                  insertOp1.getOpTime(),
+                  *insertOp1.getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kInProgress);
 
     // Apply a batch with only the second operation.  This should result in the second oplog entry
     // being put in the oplog, but with no effect because the operation is part of a pending
@@ -568,6 +590,14 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
     ASSERT_BSONOBJ_EQ(insertedOplogEntries.back(), insertOp2.toBSON());
     ASSERT_TRUE(insertedDocs1.empty());
     ASSERT_TRUE(insertedDocs2.empty());
+    // The transaction table should not have been updated for inTxn operations that are not the
+    // first in a transaction.
+    checkTxnTable(lsid,
+                  txnNum,
+                  insertOp1.getOpTime(),
+                  *insertOp1.getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kInProgress);
 
     // Apply a batch with only the commit.  This should result in the commit being put in the
     // oplog, and the two previous entries being applied.
@@ -576,6 +606,12 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
     ASSERT_EQ(1U, insertedDocs1.size());
     ASSERT_EQ(1U, insertedDocs2.size());
     ASSERT_BSONOBJ_EQ(insertedOplogEntries.back(), commitOp.toBSON());
+    checkTxnTable(lsid,
+                  txnNum,
+                  commitOp.getOpTime(),
+                  *commitOp.getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kCommitted);
 }
 
 TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionAllAtOnce) {
@@ -657,6 +693,12 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionAllAtOnce) {
     ASSERT_EQ(0U, insertedOplogEntries.size());
     ASSERT_EQ(1U, insertedDocs1.size());
     ASSERT_EQ(1U, insertedDocs2.size());
+    checkTxnTable(lsid,
+                  txnNum,
+                  commitOp.getOpTime(),
+                  *commitOp.getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kCommitted);
 }
 
 TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionTwoBatches) {
@@ -721,10 +763,17 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionTwoBatches) {
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
     // but the entry should not be applied as it is part of a pending transaction.
+    const auto expectedStartOpTime = insertOps[0].getOpTime();
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOps[0]}));
     ASSERT_EQ(1U, insertedOplogEntries.size());
     ASSERT_EQ(0U, insertedDocs1.size());
     ASSERT_EQ(0U, insertedDocs2.size());
+    checkTxnTable(lsid,
+                  txnNum,
+                  insertOps[0].getOpTime(),
+                  *insertOps[0].getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kInProgress);
 
     // Insert the rest of the entries, including the commit.  These entries should be added to the
     // oplog, and all the entries including the first should be applied.
@@ -733,6 +782,12 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionTwoBatches) {
     ASSERT_EQ(5U, insertedOplogEntries.size());
     ASSERT_EQ(3U, insertedDocs1.size());
     ASSERT_EQ(1U, insertedDocs2.size());
+    checkTxnTable(lsid,
+                  txnNum,
+                  commitOp.getOpTime(),
+                  *commitOp.getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kCommitted);
 
     // Check docs and ordering of docs in nss1.
     // The insert into nss2 is unordered with respect to those.
@@ -850,6 +905,12 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
     ASSERT_EQ(6U, insertedOplogEntries.size());
     ASSERT_EQ(4, replOpCounters.getInsert()->load() - insertsBefore);
     ASSERT_EQ(4U, insertedDocs1.size());
+    checkTxnTable(lsid,
+                  txnNum2,
+                  commitOp2.getOpTime(),
+                  *commitOp2.getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kCommitted);
 
     // Check docs and ordering of docs in nss1.
     ASSERT_BSONOBJ_EQ(insertOps1[0].getObject(), insertedDocs1[0]);
@@ -916,7 +977,14 @@ protected:
             _prepareOp->getOpTime());
         // This re-parse puts the commit op into a normalized form for comparison.
         _commitOp = uassertStatusOK(OplogEntry::parse(_commitOp->toBSON()));
-
+        _abortOp = makeCommandOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(1), 4), 1LL},
+                                                                 _nss1,
+                                                                 BSON("abortTransaction" << 1),
+                                                                 _lsid,
+                                                                 _txnNum,
+                                                                 StmtId(3),
+                                                                 _prepareOp->getOpTime());
+        _abortOp = uassertStatusOK(OplogEntry::parse(_abortOp->toBSON()));
         _opObserver->onInsertsFn =
             [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
                 stdx::lock_guard<stdx::mutex> lock(_insertMutex);
@@ -940,7 +1008,7 @@ protected:
     LogicalSessionId _lsid;
     TxnNumber _txnNum;
     boost::optional<OplogEntry> _insertOp1, _insertOp2;
-    boost::optional<OplogEntry> _prepareOp, _commitOp;
+    boost::optional<OplogEntry> _prepareOp, _commitOp, _abortOp;
     std::map<NamespaceString, std::vector<BSONObj>> _insertedDocs;
     std::unique_ptr<ThreadPool> _writerPool;
 
@@ -953,14 +1021,21 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, _writerPool.get());
 
     // Apply a batch with the insert operations.  This should result in the oplog entries
-    // being put in the oplog, but with no effect because the operation is part of a pending
-    // transaction.
+    // being put in the oplog and updating the transaction table, but not actually being applied
+    // because they are part of a pending transaction.
+    const auto expectedStartOpTime = _insertOp1->getOpTime();
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {*_insertOp1, *_insertOp2}));
     ASSERT_EQ(2U, oplogDocs().size());
     ASSERT_BSONOBJ_EQ(_insertOp1->toBSON(), oplogDocs()[0]);
     ASSERT_BSONOBJ_EQ(_insertOp2->toBSON(), oplogDocs()[1]);
     ASSERT_TRUE(_insertedDocs[_nss1].empty());
     ASSERT_TRUE(_insertedDocs[_nss2].empty());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _insertOp1->getOpTime(),
+                  *_insertOp1->getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kInProgress);
 
     // Apply a batch with only the prepare.  This should result in the prepare being put in the
     // oplog, and the two previous entries being applied (but in a transaction).
@@ -969,6 +1044,12 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
     ASSERT_BSONOBJ_EQ(_prepareOp->toBSON(), oplogDocs().back());
     ASSERT_EQ(1U, _insertedDocs[_nss1].size());
     ASSERT_EQ(1U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _prepareOp->getOpTime(),
+                  *_prepareOp->getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kPrepared);
 
     // Apply a batch with only the commit.  This should result in the commit being put in the
     // oplog, and the two previous entries being committed.
@@ -976,6 +1057,52 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
     ASSERT_BSONOBJ_EQ(_commitOp->toBSON(), oplogDocs().back());
     ASSERT_EQ(1U, _insertedDocs[_nss1].size());
     ASSERT_EQ(1U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _commitOp->getOpTime(),
+                  *_commitOp->getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kCommitted);
+}
+
+TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactionCheckTxnTable) {
+    SyncTail syncTail(
+        nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, _writerPool.get());
+
+    // Apply a batch with the insert operations.  This should result in the oplog entries
+    // being put in the oplog and updating the transaction table, but not actually being applied
+    // because they are part of a pending transaction.
+    const auto expectedStartOpTime = _insertOp1->getOpTime();
+    ASSERT_OK(syncTail.multiApply(_opCtx.get(), {*_insertOp1, *_insertOp2}));
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _insertOp1->getOpTime(),
+                  *_insertOp1->getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kInProgress);
+
+    // Apply a batch with only the prepare.  This should result in the prepare being put in the
+    // oplog, and the two previous entries being applied (but in a transaction).
+    ASSERT_OK(syncTail.multiApply(_opCtx.get(), {*_prepareOp}));
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _prepareOp->getOpTime(),
+                  *_prepareOp->getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kPrepared);
+
+    // Apply a batch with only the abort.  This should result in the abort being put in the
+    // oplog and the transaction table being updated accordingly.
+    ASSERT_OK(syncTail.multiApply(_opCtx.get(), {*_abortOp}));
+    ASSERT_BSONOBJ_EQ(_abortOp->toBSON(), oplogDocs().back());
+    ASSERT_EQ(1U, _insertedDocs[_nss1].size());
+    ASSERT_EQ(1U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _abortOp->getOpTime(),
+                  *_abortOp->getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kAborted);
 }
 
 TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInitialSync) {
@@ -987,14 +1114,21 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
                       SyncTailTest::makeInitialSyncOptions());
 
     // Apply a batch with the insert operations.  This should result in the oplog entries
-    // being put in the oplog, but with no effect because the operation is part of a pending
-    // transaction.
+    // being put in the oplog and updating the transaction table, but not actually being applied
+    // because they are part of a pending transaction.
+    const auto expectedStartOpTime = _insertOp1->getOpTime();
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {*_insertOp1, *_insertOp2}));
     ASSERT_EQ(2U, oplogDocs().size());
     ASSERT_BSONOBJ_EQ(_insertOp1->toBSON(), oplogDocs()[0]);
     ASSERT_BSONOBJ_EQ(_insertOp2->toBSON(), oplogDocs()[1]);
     ASSERT_TRUE(_insertedDocs[_nss1].empty());
     ASSERT_TRUE(_insertedDocs[_nss2].empty());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _insertOp1->getOpTime(),
+                  *_insertOp1->getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kInProgress);
 
     // Apply a batch with only the prepare.  This should result in the prepare being put in the
     // oplog, but, since this is initial sync, nothing else.
@@ -1003,6 +1137,12 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
     ASSERT_BSONOBJ_EQ(_prepareOp->toBSON(), oplogDocs().back());
     ASSERT_TRUE(_insertedDocs[_nss1].empty());
     ASSERT_TRUE(_insertedDocs[_nss2].empty());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _prepareOp->getOpTime(),
+                  *_prepareOp->getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kPrepared);
 
     // Apply a batch with only the commit.  This should result in the commit being put in the
     // oplog, and the two previous entries being applied.
@@ -1010,6 +1150,12 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
     ASSERT_BSONOBJ_EQ(_commitOp->toBSON(), oplogDocs().back());
     ASSERT_EQ(1U, _insertedDocs[_nss1].size());
     ASSERT_EQ(1U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _commitOp->getOpTime(),
+                  *_commitOp->getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kCommitted);
 }
 
 TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionRecovery) {
@@ -1033,16 +1179,29 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
 
     // Apply a batch with the insert operations.  This should have no effect, because this is
     // recovery.
+    const auto expectedStartOpTime = _insertOp1->getOpTime();
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {*_insertOp1, *_insertOp2}));
     ASSERT_TRUE(oplogDocs().empty());
     ASSERT_TRUE(_insertedDocs[_nss1].empty());
     ASSERT_TRUE(_insertedDocs[_nss2].empty());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _insertOp1->getOpTime(),
+                  *_insertOp1->getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kInProgress);
 
     // Apply a batch with only the prepare.  This should have no effect, since this is recovery.
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {*_prepareOp}));
     ASSERT_TRUE(oplogDocs().empty());
     ASSERT_TRUE(_insertedDocs[_nss1].empty());
     ASSERT_TRUE(_insertedDocs[_nss2].empty());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _prepareOp->getOpTime(),
+                  *_prepareOp->getWallClockTime(),
+                  expectedStartOpTime,
+                  DurableTxnStateEnum::kPrepared);
 
     // Apply a batch with only the commit.  This should result in the the two previous entries being
     // applied.
@@ -1050,6 +1209,12 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
     ASSERT_TRUE(oplogDocs().empty());
     ASSERT_EQ(1U, _insertedDocs[_nss1].size());
     ASSERT_EQ(1U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _commitOp->getOpTime(),
+                  *_commitOp->getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kCommitted);
 }
 
 void testWorkerMultikeyPaths(OperationContext* opCtx,
@@ -2232,18 +2397,13 @@ public:
         invariant(sessionInfo.getSessionId());
         invariant(sessionInfo.getTxnNumber());
 
-        DBDirectClient client(_opCtx.get());
-        auto result = client.findOne(
-            NamespaceString::kSessionTransactionsTableNamespace.ns(),
-            {BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON())});
-        ASSERT_FALSE(result.isEmpty());
-
-        auto txnRecord =
-            SessionTxnRecord::parse(IDLParserErrorContext("parse txn record for test"), result);
-
-        ASSERT_EQ(*sessionInfo.getTxnNumber(), txnRecord.getTxnNum());
-        ASSERT_EQ(expectedOpTime, txnRecord.getLastWriteOpTime());
-        ASSERT_EQ(expectedWallClock, txnRecord.getLastWriteDate());
+        repl::checkTxnTable(_opCtx.get(),
+                            *sessionInfo.getSessionId(),
+                            *sessionInfo.getTxnNumber(),
+                            expectedOpTime,
+                            expectedWallClock,
+                            {},
+                            {});
     }
 
     static const NamespaceString& nss() {

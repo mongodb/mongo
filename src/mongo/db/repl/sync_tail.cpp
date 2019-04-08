@@ -74,6 +74,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_participant_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -1100,7 +1101,6 @@ Status multiSyncApply(OperationContext* opCtx,
     return Status::OK();
 }
 
-
 /**
  * ops - This only modifies the isForCappedCollection field on each op. It does not alter the ops
  *      vector in any other way.
@@ -1140,7 +1140,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
         // We need to track all types of ops, including type 'n' (these are generated from chunk
         // migrations).
         if (sessionUpdateTracker) {
-            if (auto newOplogWrites = sessionUpdateTracker->updateOrFlush(op)) {
+            if (auto newOplogWrites = sessionUpdateTracker->updateSession(op)) {
                 derivedOps->emplace_back(std::move(*newOplogWrites));
                 _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
             }

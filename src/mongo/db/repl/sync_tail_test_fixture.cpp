@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
@@ -248,6 +249,34 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
     return Status::OK();
 }
 
+void checkTxnTable(OperationContext* opCtx,
+                   const LogicalSessionId& lsid,
+                   const TxnNumber& txnNum,
+                   const repl::OpTime& expectedOpTime,
+                   Date_t expectedWallClock,
+                   boost::optional<repl::OpTime> expectedStartOpTime,
+                   boost::optional<DurableTxnStateEnum> expectedState) {
+    DBDirectClient client(opCtx);
+    auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                                 {BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON())});
+    ASSERT_FALSE(result.isEmpty());
+
+    auto txnRecord =
+        SessionTxnRecord::parse(IDLParserErrorContext("parse txn record for test"), result);
+
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_EQ(expectedOpTime, txnRecord.getLastWriteOpTime());
+    ASSERT_EQ(expectedWallClock, txnRecord.getLastWriteDate());
+    if (expectedStartOpTime) {
+        ASSERT(txnRecord.getStartOpTime());
+        ASSERT_EQ(*expectedStartOpTime, *txnRecord.getStartOpTime());
+    } else {
+        ASSERT(!txnRecord.getStartOpTime());
+    }
+    if (expectedState) {
+        ASSERT(*expectedState == txnRecord.getState());
+    }
+}
 
 }  // namespace repl
 }  // namespace mongo
