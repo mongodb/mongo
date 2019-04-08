@@ -206,6 +206,7 @@ functions:
           revision: ${revision}
           project_dir: ${project_dir}
           branch_name: ${branch_name}
+          project: ${project}
 
           # sys-perf expansions
           # Shouldn't be needed: testList: ${testList}
