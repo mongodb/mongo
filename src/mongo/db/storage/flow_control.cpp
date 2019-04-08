@@ -35,6 +35,7 @@
 #include "mongo/db/storage/flow_control.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -49,6 +50,20 @@ namespace mongo {
 
 namespace {
 const auto getFlowControl = ServiceContext::declareDecoration<std::unique_ptr<FlowControl>>();
+
+int multiplyWithOverflowCheck(double term1, double term2, int maxValue) {
+    if (static_cast<double>(std::numeric_limits<int>::max()) / term2 < term1) {
+        // Multiplying term1 and term2 would overflow, return maxValue.
+        return maxValue;
+    }
+
+    double ret = term1 * term2;
+    if (ret >= maxValue) {
+        return maxValue;
+    }
+
+    return static_cast<int>(ret);
+}
 }  // namespace
 
 FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord)
@@ -181,22 +196,28 @@ int FlowControl::getNumTickets() {
             LOG(DEBUG_LOG_LEVEL) << "LocksPerOp: " << locksPerOp
                                  << " Sustainer: " << sustainerAppliedCount
                                  << " Target: " << sustainerAppliedPenalty;
-            ret = static_cast<int>(locksPerOp * sustainerAppliedPenalty);
+            ret = multiplyWithOverflowCheck(locksPerOp, sustainerAppliedPenalty, maxTickets);
         } else {
             // We don't know how many ops the sustainer applied. Hand out less tickets than were
             // used in the last period.
-            ret = static_cast<int>(locksUsedLastPeriod / 2.0);
+            if (locksUsedLastPeriod / 2.0 <= static_cast<double>(maxTickets))
+                ret = static_cast<int>(locksUsedLastPeriod / 2.0);
+            else
+                ret = maxTickets;
             _lastTargetTicketsPermitted.store(-1);
         }
 
         // Always have at least 100 tickets.
         ret = std::max(ret, 100);
     } else {
-        ret = static_cast<int>((_lastTargetTicketsPermitted.load() + 1000) * 1.1);
+        ret = multiplyWithOverflowCheck(_lastTargetTicketsPermitted.load() + 1000, 1.1, maxTickets);
     }
 
     _prevMemberData = std::move(currMemberData);
 
+    // This is a paranoid check. The evaluation of `ret` is non-trivial and thus proving the
+    // invariant that `ret <= maxTickets` remains to be true after code modification is not an
+    // exercise readers would be delighted to spend their time on.
     ret = std::min(ret, maxTickets);
 
     LOG(DEBUG_LOG_LEVEL) << "Are lagged? " << areWeLagged << " Prev lag: " << _prevLagSecs
