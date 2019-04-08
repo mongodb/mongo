@@ -49,9 +49,8 @@ public:
     explicit CollectionImpl(OperationContext* opCtx,
                             StringData fullNS,
                             OptionalCollectionUUID uuid,
-                            CollectionCatalogEntry* details,  // does not own
-                            RecordStore* recordStore,         // does not own
-                            DatabaseCatalogEntry* dbce);      // does not own
+                            CollectionCatalogEntry* details,
+                            RecordStore* recordStore);
 
     ~CollectionImpl();
 
@@ -368,10 +367,6 @@ public:
 
     void establishOplogCollectionForLogging(OperationContext* opCtx) final;
 
-    inline DatabaseCatalogEntry* dbce() const final {
-        return this->_dbce;
-    }
-
 private:
     /**
      * Returns a non-ok Status if document does not pass this collection's validator.
@@ -398,7 +393,6 @@ private:
     OptionalCollectionUUID _uuid;
     CollectionCatalogEntry* const _details;
     RecordStore* const _recordStore;
-    DatabaseCatalogEntry* const _dbce;
     const bool _needCappedLock;
     std::unique_ptr<CollectionInfoCache> _infoCache;
     std::unique_ptr<IndexCatalog> _indexCatalog;

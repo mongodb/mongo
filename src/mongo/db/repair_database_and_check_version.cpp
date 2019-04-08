@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -267,17 +266,14 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         NamespaceString collNss(indexNamespace.first);
         const std::string& indexName = indexNamespace.second;
 
-        DatabaseCatalogEntry* dbce = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
-        invariant(dbce,
-                  str::stream() << "couldn't get database catalog entry for database "
-                                << collNss.db());
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNss.ns());
+        CollectionCatalogEntry* cce =
+            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
         invariant(cce,
                   str::stream() << "couldn't get collection catalog entry for collection "
                                 << collNss.toString());
 
         auto swIndexSpecs = getIndexNameObjs(
-            opCtx, dbce, cce, [&indexName](const std::string& name) { return name == indexName; });
+            opCtx, cce, [&indexName](const std::string& name) { return name == indexName; });
         if (!swIndexSpecs.isOK() || swIndexSpecs.getValue().first.empty()) {
             fassert(40590,
                     {ErrorCodes::InternalError,
@@ -299,15 +295,14 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 
-        auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
-        auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
+        auto collCatalogEntry =
+            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
         for (const auto& indexName : entry.second.first) {
             log() << "Rebuilding index. Collection: " << collNss << " Index: " << indexName;
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
-        fassert(40592,
-                rebuildIndexesOnCollection(opCtx, dbCatalogEntry, collCatalogEntry, indexSpecs));
+        fassert(40592, rebuildIndexesOnCollection(opCtx, collCatalogEntry, indexSpecs));
     }
 }
 
@@ -350,8 +345,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
-    std::vector<std::string> dbNames;
-    storageEngine->listDatabases(&dbNames);
+    std::vector<std::string> dbNames = storageEngine->listDatabases();
 
     // Rebuilding indexes must be done before a database can be opened, except when using repair,
     // which rebuilds all indexes when it is done.
@@ -471,8 +465,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     bool nonLocalDatabases = false;
 
     // Refresh list of database names to include newly-created admin, if it exists.
-    dbNames.clear();
-    storageEngine->listDatabases(&dbNames);
+    dbNames = storageEngine->listDatabases();
     for (const auto& dbName : dbNames) {
         if (dbName != "local") {
             nonLocalDatabases = true;
@@ -484,7 +477,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
 
         // First thing after opening the database is to check for file compatibility,
         // otherwise we might crash if this is a deprecated format.
-        auto status = db->getDatabaseCatalogEntry()->currentFilesCompatible(opCtx);
+        auto status = storageEngine->currentFilesCompatible(opCtx);
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::CanRepairToDowngrade) {
                 // Convert CanRepairToDowngrade statuses to MustUpgrade statuses to avoid logging a

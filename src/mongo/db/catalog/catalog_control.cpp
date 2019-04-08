@@ -35,7 +35,6 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
@@ -53,8 +52,8 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgress();
 
     MinVisibleTimestampMap minVisibleTimestampMap;
-    std::vector<std::string> allDbs;
-    opCtx->getServiceContext()->getStorageEngine()->listDatabases(&allDbs);
+    std::vector<std::string> allDbs =
+        opCtx->getServiceContext()->getStorageEngine()->listDatabases();
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     for (auto&& dbName : allDbs) {
@@ -118,17 +117,14 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         NamespaceString collNss(indexNamespace.first);
         auto indexName = indexNamespace.second;
 
-        auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
-        invariant(dbCatalogEntry,
-                  str::stream() << "couldn't get database catalog entry for database "
-                                << collNss.db());
-        auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
+        auto collCatalogEntry =
+            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
         invariant(collCatalogEntry,
                   str::stream() << "couldn't get collection catalog entry for collection "
                                 << collNss.toString());
 
-        auto indexSpecs = getIndexNameObjs(
-            opCtx, dbCatalogEntry, collCatalogEntry, [&indexName](const std::string& name) {
+        auto indexSpecs =
+            getIndexNameObjs(opCtx, collCatalogEntry, [&indexName](const std::string& name) {
                 return name == indexName;
             });
         if (!indexSpecs.isOK() || indexSpecs.getValue().first.empty()) {
@@ -156,11 +152,8 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 
-        auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
-        invariant(dbCatalogEntry,
-                  str::stream() << "couldn't get database catalog entry for database "
-                                << collNss.db());
-        auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
+        auto collCatalogEntry =
+            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
         invariant(collCatalogEntry,
                   str::stream() << "couldn't get collection catalog entry for collection "
                                 << collNss.toString());
@@ -171,29 +164,23 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
-        fassert(40690,
-                rebuildIndexesOnCollection(opCtx, dbCatalogEntry, collCatalogEntry, indexSpecs));
+        fassert(40690, rebuildIndexesOnCollection(opCtx, collCatalogEntry, indexSpecs));
     }
 
     // Open all databases and repopulate the UUID catalog.
     log() << "openCatalog: reopening all databases";
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    std::vector<std::string> databasesToOpen;
-    storageEngine->listDatabases(&databasesToOpen);
+    std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
     for (auto&& dbName : databasesToOpen) {
         LOG(1) << "openCatalog: dbholder reopening database " << dbName;
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
-
-        std::list<std::string> collections;
-        db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
-        for (auto&& collName : collections) {
+        for (auto&& collNss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(dbName)) {
             // Note that the collection name already includes the database component.
-            NamespaceString collNss(collName);
-            auto collection = db->getCollection(opCtx, collName);
+            auto collection = db->getCollection(opCtx, collNss.ns());
             invariant(collection,
                       str::stream() << "failed to get valid collection pointer for namespace "
-                                    << collName);
+                                    << collNss);
 
             auto uuid = collection->uuid();
             invariant(uuid);

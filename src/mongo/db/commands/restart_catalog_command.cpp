@@ -94,8 +94,8 @@ public:
         // marked drop-pending. (Otherwise, the Database object will be reconstructed when
         // re-opening the catalog, but with the drop pending flag cleared.)
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        std::vector<std::string> allDbs;
-        getGlobalServiceContext()->getStorageEngine()->listDatabases(&allDbs);
+        std::vector<std::string> allDbs =
+            getGlobalServiceContext()->getStorageEngine()->listDatabases();
         for (auto&& dbName : allDbs) {
             const auto db = databaseHolder->getDb(opCtx, dbName);
             if (db->isDropPending(opCtx)) {

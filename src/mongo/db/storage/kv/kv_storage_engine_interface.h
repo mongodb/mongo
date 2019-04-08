@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,16 +29,21 @@
 
 #pragma once
 
-#include "mongo/db/storage/kv/kv_database_catalog_entry_base.h"
-
 namespace mongo {
 
-class KVDatabaseCatalogEntry : public KVDatabaseCatalogEntryBase {
-public:
-    using KVDatabaseCatalogEntryBase::KVDatabaseCatalogEntryBase;
+class KVEngine;
+class KVCatalog;
+class StorageEngine;
 
-    IndexAccessMethod* getIndex(OperationContext* opCtx,
-                                const CollectionCatalogEntry* collection,
-                                IndexCatalogEntry* index) final;
+class KVStorageEngineInterface {
+public:
+    KVStorageEngineInterface() = default;
+    virtual ~KVStorageEngineInterface() = default;
+    virtual StorageEngine* getStorageEngine() = 0;
+    virtual KVEngine* getEngine() = 0;
+    virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
+                                     const NamespaceString& nss,
+                                     StringData ident) = 0;
+    virtual KVCatalog* getCatalog() = 0;
 };
-}  // namespace mongo
+}

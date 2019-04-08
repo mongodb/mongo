@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/head_manager.h"
@@ -63,11 +62,12 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 bool collectionExists(OldClientContext* ctx, const string& ns) {
-    const DatabaseCatalogEntry* dbEntry = ctx->db()->getDatabaseCatalogEntry();
-    list<string> names;
-    dbEntry->getCollectionNamespaces(&names);
-    return std::find(names.begin(), names.end(), ns) != names.end();
+    auto nss = NamespaceString(ns);
+    std::vector<NamespaceString> collections =
+        UUIDCatalog::get(getGlobalServiceContext()).getAllCollectionNamesFromDb(nss.db());
+    return std::count(collections.begin(), collections.end(), nss) > 0;
 }
+
 void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
     OldClientContext ctx(opCtx, nss.ns());

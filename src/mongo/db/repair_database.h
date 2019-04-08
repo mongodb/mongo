@@ -36,7 +36,6 @@
 
 namespace mongo {
 class CollectionCatalogEntry;
-class DatabaseCatalogEntry;
 class OperationContext;
 class Status;
 class StorageEngine;
@@ -52,7 +51,6 @@ typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
  *               should be included in the result.
  */
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
-                                           DatabaseCatalogEntry* dbce,
                                            CollectionCatalogEntry* cce,
                                            stdx::function<bool(const std::string&)> filter =
                                                [](const std::string& indexName) { return true; });
@@ -62,7 +60,6 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
  * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
  */
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  DatabaseCatalogEntry* dbce,
                                   CollectionCatalogEntry* cce,
                                   const std::vector<BSONObj>& indexSpecs);
 

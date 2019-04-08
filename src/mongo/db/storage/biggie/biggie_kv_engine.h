@@ -111,7 +111,6 @@ public:
 
     virtual void setCachePressureForTest(int pressure) override;
 
-    // only called by KVDatabaseCatalogEntryBase::sizeOnDisk so return 0
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) {
         return 0;
     }

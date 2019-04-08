@@ -36,7 +36,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_impl.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
@@ -137,16 +136,14 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     // requirement for X-lock on the database when we enter. So there is no way we can insert two
     // different databases for the same name.
     lk.unlock();
-    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-    DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(opCtx, dbname);
 
-    if (!entry->exists()) {
+    if (UUIDCatalog::get(opCtx).getAllCatalogEntriesFromDb(dbname).empty()) {
         audit::logCreateDatabase(opCtx->getClient(), dbname);
         if (justCreated)
             *justCreated = true;
     }
 
-    auto newDb = stdx::make_unique<DatabaseImpl>(dbname, entry, ++_epoch);
+    auto newDb = stdx::make_unique<DatabaseImpl>(dbname, ++_epoch);
     newDb->init(opCtx);
 
     // Finally replace our nullptr entry with the new Database pointer.
@@ -290,9 +287,8 @@ std::unique_ptr<Collection> DatabaseHolderImpl::makeCollection(
     const StringData fullNS,
     OptionalCollectionUUID uuid,
     CollectionCatalogEntry* const details,
-    RecordStore* const recordStore,
-    DatabaseCatalogEntry* const dbce) {
-    return std::make_unique<CollectionImpl>(opCtx, fullNS, uuid, details, recordStore, dbce);
+    RecordStore* const recordStore) {
+    return std::make_unique<CollectionImpl>(opCtx, fullNS, uuid, details, recordStore);
 }
 
 }  // namespace mongo

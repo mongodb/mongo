@@ -585,10 +585,9 @@ void _updateUniqueIndexesForDatabase(OperationContext* opCtx, const std::string&
 void updateUniqueIndexesOnUpgrade(OperationContext* opCtx) {
     // Update all unique indexes except the _id index.
     std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
-        storageEngine->listDatabases(&dbNames);
+        dbNames = UUIDCatalog::get(opCtx).getAllDbNames();
     }
 
     for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
@@ -620,10 +619,9 @@ Status updateNonReplicatedUniqueIndexes(OperationContext* opCtx) {
     // Update all unique indexes belonging to all non-replicated collections.
     // (_id indexes are not updated).
     std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
-        storageEngine->listDatabases(&dbNames);
+        dbNames = UUIDCatalog::get(opCtx).getAllDbNames();
     }
     for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
         auto dbName = *it;

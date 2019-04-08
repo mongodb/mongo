@@ -282,10 +282,6 @@ public:
         std::abort();
     }
 
-    DatabaseCatalogEntry* dbce() const {
-        std::abort();
-    }
-
     OptionalCollectionUUID uuid() const {
         return _uuid;
     }

@@ -378,8 +378,8 @@ Status StorageInterfaceImpl::insertDocuments(OperationContext* opCtx,
 Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
     Lock::GlobalWrite globalWriteLock(opCtx);
 
-    std::vector<std::string> dbNames;
-    opCtx->getServiceContext()->getStorageEngine()->listDatabases(&dbNames);
+    std::vector<std::string> dbNames =
+        opCtx->getServiceContext()->getStorageEngine()->listDatabases();
     invariant(!dbNames.empty());
     log() << "dropReplicatedDatabases - dropping " << dbNames.size() << " databases";
 

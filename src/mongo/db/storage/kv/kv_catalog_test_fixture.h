@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,22 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
+#include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/unittest/unittest.h"
 
-#include <memory>
+namespace mongo {
+class KVCatalogTest : public unittest::Test {
+protected:
+    Status newCollection(OperationContext* opCtx,
+                         const NamespaceString& ns,
+                         const CollectionOptions& options,
+                         KVPrefix prefix,
+                         KVCatalog* catalog) {
+        return catalog->_addEntry(opCtx, ns, options, prefix);
+    }
+    Status renameCollection(OperationContext* opCtx,
+                            StringData fromNS,
+                            StringData toNS,
+                            bool stayTemp,
+                            KVCatalog* catalog) {
+        return catalog->_replaceEntry(opCtx, fromNS, toNS, stayTemp);
+    }
 
-#include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-
-std::unique_ptr<mongo::KVDatabaseCatalogEntryMock> mongo::kvDatabaseCatalogEntryMockFactory(
-    const StringData name, KVStorageEngineInterface* const engine) {
-    return stdx::make_unique<KVDatabaseCatalogEntryMock>(name, engine);
-}
-
-// Used to satisfy link dependencies in unit test - not invoked.
-mongo::IndexAccessMethod* mongo::KVDatabaseCatalogEntryMock::getIndex(
-    OperationContext* opCtx, const CollectionCatalogEntry* collection, IndexCatalogEntry* index) {
-    MONGO_UNREACHABLE;
+    Status dropCollection(OperationContext* opCtx, StringData ns, KVCatalog* catalog) {
+        return catalog->_removeEntry(opCtx, ns);
+    }
+};
 }

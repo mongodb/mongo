@@ -48,9 +48,8 @@ public:
     RecoveryUnit* newRecoveryUnit() final {
         return nullptr;
     }
-    void listDatabases(std::vector<std::string>* out) const final {}
-    DatabaseCatalogEntry* getDatabaseCatalogEntry(OperationContext* opCtx, StringData db) final {
-        return nullptr;
+    std::vector<std::string> listDatabases() const final {
+        return {};
     }
     bool supportsDocLocking() const final {
         return false;
@@ -93,6 +92,12 @@ public:
     }
     std::set<std::string> getDropPendingIdents() const final {
         return {};
+    }
+    Status currentFilesCompatible(OperationContext* opCtx) const final {
+        return Status::OK();
+    }
+    int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {
+        return 0;
     }
 };
 

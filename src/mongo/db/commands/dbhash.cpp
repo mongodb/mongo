@@ -37,7 +37,6 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -181,10 +180,10 @@ public:
         }
         AutoGetDb autoDb(opCtx, ns, lockMode);
         Database* db = autoDb.getDb();
-        std::list<std::string> colls;
+        std::vector<NamespaceString> collections;
         if (db) {
-            db->getDatabaseCatalogEntry()->getCollectionNamespaces(&colls);
-            colls.sort();
+            collections = UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(db->name());
+            std::sort(collections.begin(), collections.end());
         }
 
         result.append("host", prettyHostName());
@@ -205,10 +204,7 @@ public:
         BSONObjBuilder collectionsByUUID;
 
         BSONObjBuilder bb(result.subobjStart("collections"));
-        for (const auto& collectionName : colls) {
-
-            NamespaceString collNss(collectionName);
-
+        for (const auto& collNss : collections) {
             if (collNss.size() - 1 <= dbname.size()) {
                 errmsg = str::stream() << "weird fullCollectionName [" << collNss.toString() << "]";
                 return false;
@@ -233,7 +229,7 @@ public:
             if (collNss.isDropPendingNamespace())
                 continue;
 
-            if (Collection* collection = db->getCollection(opCtx, collectionName)) {
+            if (Collection* collection = db->getCollection(opCtx, collNss.ns())) {
                 if (collection->isCapped()) {
                     cappedCollections.append(collNss.coll());
                 }

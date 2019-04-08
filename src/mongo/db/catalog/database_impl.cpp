@@ -45,7 +45,6 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -66,6 +65,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -85,18 +85,17 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 
 std::unique_ptr<Collection> _createCollectionInstance(OperationContext* opCtx,
-                                                      DatabaseCatalogEntry* dbEntry,
                                                       const NamespaceString& nss) {
 
-    auto cce = dbEntry->getCollectionCatalogEntry(nss.ns());
-    auto rs = dbEntry->getRecordStore(nss.ns());
+    auto cce = UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
+    auto rs = cce->getRecordStore();
     auto uuid = cce->getCollectionOptions(opCtx).uuid;
     invariant(rs,
               str::stream() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
                             << uuid);
     invariant(uuid);
 
-    auto coll = std::make_unique<CollectionImpl>(opCtx, nss.ns(), uuid, cce, rs, dbEntry);
+    auto coll = std::make_unique<CollectionImpl>(opCtx, nss.ns(), uuid, cce, rs);
 
     return coll;
 }
@@ -149,9 +148,8 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
     return Status::OK();
 }
 
-DatabaseImpl::DatabaseImpl(const StringData name, DatabaseCatalogEntry* dbEntry, uint64_t epoch)
+DatabaseImpl::DatabaseImpl(const StringData name, uint64_t epoch)
     : _name(name.toString()),
-      _dbEntry(dbEntry),
       _epoch(epoch),
       _profileName(_name + ".system.profile"),
       _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()) {
@@ -170,13 +168,9 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
         uasserted(10028, status.toString());
     }
 
-    std::list<std::string> collections;
-    _dbEntry->getCollectionNamespaces(&collections);
-
     auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    for (auto ns : collections) {
-        NamespaceString nss(ns);
-        auto ownedCollection = _createCollectionInstance(opCtx, _dbEntry, nss);
+    for (const auto& nss : uuidCatalog.getAllCollectionNamesFromDb(_name)) {
+        auto ownedCollection = _createCollectionInstance(opCtx, nss);
         invariant(ownedCollection);
 
         // Call registerCollectionObject directly because we're not in a WUOW.
@@ -202,31 +196,26 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
-    std::list<std::string> collections;
-    _dbEntry->getCollectionNamespaces(&collections);
-
-    for (auto ns : collections) {
-        invariant(NamespaceString::normal(ns));
-
-        CollectionCatalogEntry* coll = _dbEntry->getCollectionCatalogEntry(ns);
-
+    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(_name)) {
+        CollectionCatalogEntry* coll =
+            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
         CollectionOptions options = coll->getCollectionOptions(opCtx);
 
         if (!options.temp)
             continue;
         try {
             WriteUnitOfWork wunit(opCtx);
-            Status status = dropCollection(opCtx, ns, {});
+            Status status = dropCollection(opCtx, nss.ns(), {});
 
             if (!status.isOK()) {
-                warning() << "could not drop temp collection '" << ns << "': " << redact(status);
+                warning() << "could not drop temp collection '" << nss << "': " << redact(status);
                 continue;
             }
 
             wunit.commit();
         } catch (const WriteConflictException&) {
-            warning() << "could not drop temp collection '" << ns << "' due to "
-                                                                     "WriteConflictException";
+            warning() << "could not drop temp collection '" << nss << "' due to "
+                                                                      "WriteConflictException";
             opCtx->recoveryUnit()->abandonSnapshot();
         }
     }
@@ -288,13 +277,10 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     long long indexSize = 0;
 
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
-    std::list<std::string> collections;
-    _dbEntry->getCollectionNamespaces(&collections);
 
-
-    for (auto ns : collections) {
-        Lock::CollectionLock colLock(opCtx->lockState(), ns, MODE_IS);
-        Collection* collection = getCollection(opCtx, ns);
+    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(_name)) {
+        Lock::CollectionLock colLock(opCtx->lockState(), nss.ns(), MODE_IS);
+        Collection* collection = getCollection(opCtx, nss.ns());
 
         if (!collection)
             continue;
@@ -322,8 +308,6 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     output->appendNumber("numExtents", numExtents);
     output->appendNumber("indexes", indexes);
     output->appendNumber("indexSize", indexSize / scale);
-
-    _dbEntry->appendExtraStats(opCtx, output, scale);
 
     if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         boost::filesystem::path dbpath(
@@ -511,7 +495,9 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& fullns,
                                            Collection* collection) const {
     log() << "Finishing collection drop for " << fullns << " (" << collection->uuid() << ").";
-    return _dbEntry->dropCollection(opCtx, fullns.toString());
+    auto storageEngine =
+        checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
+    return storageEngine->getCatalog()->dropCollection(opCtx, fullns.toString());
 }
 
 Collection* DatabaseImpl::getCollection(OperationContext* opCtx, StringData ns) const {
@@ -575,7 +561,9 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
 
-    Status status = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
+    auto storageEngine =
+        checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
+    Status status = storageEngine->getCatalog()->renameCollection(opCtx, fromNS, toNS, stayTemp);
 
     // Set the namespace of 'collToRename' from within the UUIDCatalog. This is necessary because
     // the UUIDCatalog mutex synchronizes concurrent access to the collection's namespace for
@@ -714,13 +702,15 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         log() << "createCollection: " << ns << " with no UUID.";
     }
 
-    massertStatusOK(
-        _dbEntry->createCollection(opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
+    auto storageEngine =
+        checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
+    massertStatusOK(storageEngine->getCatalog()->createCollection(
+        opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
 
     auto& uuidCatalog = UUIDCatalog::get(opCtx);
     invariant(!uuidCatalog.lookupCollectionByNamespace(nss));
 
-    auto ownedCollection = _createCollectionInstance(opCtx, _dbEntry, nss);
+    auto ownedCollection = _createCollectionInstance(opCtx, nss);
     Collection* collection = ownedCollection.get();
     invariant(collection);
     uuidCatalog.onCreateCollection(opCtx, std::move(ownedCollection), *(collection->uuid()));
@@ -767,10 +757,6 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     }
 
     return collection;
-}
-
-const DatabaseCatalogEntry* DatabaseImpl::getDatabaseCatalogEntry() const {
-    return _dbEntry;
 }
 
 StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
@@ -843,29 +829,24 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         return;
     }
 
-    std::list<std::string> collectionNames;
-    getDatabaseCatalogEntry()->getCollectionNamespaces(&collectionNames);
-
-    for (const auto& collectionName : collectionNames) {
-        const NamespaceString ns(collectionName);
-
-        if (ns.isDropPendingNamespace()) {
-            auto dropOpTime = fassert(40459, ns.getDropPendingNamespaceOpTime());
-            log() << "Found drop-pending namespace " << ns << " with drop optime " << dropOpTime;
-            repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(dropOpTime, ns);
+    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(_name)) {
+        if (nss.isDropPendingNamespace()) {
+            auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
+            log() << "Found drop-pending namespace " << nss << " with drop optime " << dropOpTime;
+            repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(dropOpTime, nss);
         }
 
-        if (ns.isSystem())
+        if (nss.isSystem())
             continue;
 
-        Collection* coll = getCollection(opCtx, collectionName);
+        Collection* coll = getCollection(opCtx, nss.ns());
         if (!coll)
             continue;
 
         if (coll->getIndexCatalog()->findIdIndex(opCtx))
             continue;
 
-        log() << "WARNING: the collection '" << collectionName << "' lacks a unique index on _id."
+        log() << "WARNING: the collection '" << nss << "' lacks a unique index on _id."
               << " This index is needed for replication to function properly" << startupWarningsLog;
         log() << "\t To fix this, you need to create a unique index on _id."
               << " See http://dochub.mongodb.org/core/build-replica-set-indexes"

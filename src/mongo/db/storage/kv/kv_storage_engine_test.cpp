@@ -42,10 +42,10 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
-#include "mongo/db/storage/kv/kv_database_catalog_entry.h"
-#include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
+#include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/kv_storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
 #include "mongo/stdx/memory.h"
@@ -55,153 +55,6 @@
 
 namespace mongo {
 namespace {
-
-class KVStorageEngineTest : public ServiceContextMongoDTest {
-public:
-    KVStorageEngineTest(RepairAction repair)
-        : ServiceContextMongoDTest("ephemeralForTest", repair),
-          _storageEngine(checked_cast<KVStorageEngine*>(getServiceContext()->getStorageEngine())) {}
-
-    KVStorageEngineTest() : KVStorageEngineTest(RepairAction::kNoRepair) {}
-
-    /**
-     * Create a collection in the catalog and in the KVEngine. Return the storage engine's `ident`.
-     */
-    StatusWith<std::string> createCollection(OperationContext* opCtx, NamespaceString ns) {
-        AutoGetDb db(opCtx, ns.db(), LockMode::MODE_X);
-        DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, ns.db());
-        CollectionOptions options;
-        options.uuid = UUID::gen();
-        auto ret = dbce->createCollection(opCtx, ns, options, true);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        return _storageEngine->getCatalog()->getCollectionIdent(ns.ns());
-    }
-
-    std::unique_ptr<TemporaryRecordStore> makeTemporary(OperationContext* opCtx) {
-        return _storageEngine->makeTemporaryRecordStore(opCtx);
-    }
-
-    /**
-     * Create a collection table in the KVEngine not reflected in the KVCatalog.
-     */
-    Status createCollTable(OperationContext* opCtx, NamespaceString collName) {
-        const std::string identName = "collection-" + collName.ns();
-        return _storageEngine->getEngine()->createGroupedRecordStore(
-            opCtx, collName.ns(), identName, CollectionOptions(), KVPrefix::kNotPrefixed);
-    }
-
-    Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, std::string indexName) {
-        std::string indexIdent =
-            _storageEngine->getCatalog()->getIndexIdent(opCtx, nss.ns(), indexName);
-        return dropIdent(opCtx, indexIdent);
-    }
-
-    Status dropIdent(OperationContext* opCtx, StringData ident) {
-        return _storageEngine->getEngine()->dropIdent(opCtx, ident);
-    }
-
-    StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> reconcile(
-        OperationContext* opCtx) {
-        return _storageEngine->reconcileCatalogAndIdents(opCtx);
-    }
-
-    std::vector<std::string> getAllKVEngineIdents(OperationContext* opCtx) {
-        return _storageEngine->getEngine()->getAllIdents(opCtx);
-    }
-
-    bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-        std::vector<std::string> allCollections;
-        _storageEngine->getCatalog()->getAllCollections(&allCollections);
-        return std::find(allCollections.begin(), allCollections.end(), nss.toString()) !=
-            allCollections.end();
-    }
-    bool identExists(OperationContext* opCtx, const std::string& ident) {
-        auto idents = getAllKVEngineIdents(opCtx);
-        return std::find(idents.begin(), idents.end(), ident) != idents.end();
-    }
-
-    /**
-     * Create an index with a key of `{<key>: 1}` and a `name` of <key>.
-     */
-    Status createIndex(OperationContext* opCtx,
-                       NamespaceString collNs,
-                       std::string key,
-                       bool isBackgroundSecondaryBuild) {
-        auto ret = startIndexBuild(opCtx, collNs, key, isBackgroundSecondaryBuild);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        indexBuildSuccess(opCtx, collNs, key);
-        return Status::OK();
-    }
-
-    Status startIndexBuild(OperationContext* opCtx,
-                           NamespaceString collNs,
-                           std::string key,
-                           bool isBackgroundSecondaryBuild) {
-        Collection* coll = nullptr;
-        BSONObjBuilder builder;
-        {
-            BSONObjBuilder keyObj;
-            builder.append("key", keyObj.append(key, 1).done());
-        }
-        BSONObj spec = builder.append("name", key).append("ns", collNs.ns()).append("v", 2).done();
-
-        auto descriptor =
-            stdx::make_unique<IndexDescriptor>(coll, IndexNames::findPluginName(spec), spec);
-
-        DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
-        const auto protocol = IndexBuildProtocol::kTwoPhase;
-        auto ret = cce->prepareForIndexBuild(
-            opCtx, descriptor.get(), protocol, isBackgroundSecondaryBuild);
-        return ret;
-    }
-
-    void indexBuildScan(OperationContext* opCtx,
-                        NamespaceString collNs,
-                        std::string key,
-                        std::string sideWritesIdent,
-                        std::string constraintViolationsIdent) {
-        DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
-        cce->setIndexBuildScanning(opCtx, key, sideWritesIdent, constraintViolationsIdent);
-    }
-
-    void indexBuildDrain(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
-        cce->setIndexBuildDraining(opCtx, key);
-    }
-
-    void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
-        cce->indexBuildSuccess(opCtx, key);
-    }
-
-
-    KVStorageEngine* _storageEngine;
-};
-
-class KVStorageEngineRepairTest : public KVStorageEngineTest {
-public:
-    KVStorageEngineRepairTest() : KVStorageEngineTest(RepairAction::kRepair) {}
-
-    void tearDown() {
-        auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
-        ASSERT(repairObserver->isDone());
-
-        unittest::log() << "Modifications: ";
-        for (const auto& mod : repairObserver->getModifications()) {
-            unittest::log() << "  " << mod;
-        }
-    }
-};
 
 TEST_F(KVStorageEngineTest, ReconcileIdentsTest) {
     auto opCtx = cc().makeOperationContext();
@@ -442,7 +295,7 @@ TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     // Only drop the catalog entry; storage engine still knows about this ident.
     // This simulates an unclean shutdown happening between dropping the catalog entry and
     // the actual drop in storage engine.
-    ASSERT_OK(_storageEngine->getCatalog()->dropCollection(opCtx.get(), collNs.ns()));
+    ASSERT_OK(removeEntry(opCtx.get(), collNs.ns(), _storageEngine->getCatalog()));
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
     // When in a repair context, loadCatalog() recreates catalog entries for orphaned idents.
@@ -470,7 +323,7 @@ TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphans) {
     // Only drop the catalog entry; storage engine still knows about this ident.
     // This simulates an unclean shutdown happening between dropping the catalog entry and
     // the actual drop in storage engine.
-    ASSERT_OK(_storageEngine->getCatalog()->dropCollection(opCtx.get(), collNs.ns()));
+    ASSERT_OK(removeEntry(opCtx.get(), collNs.ns(), _storageEngine->getCatalog()));
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
     // When in a normal startup context, loadCatalog() does not recreate catalog entries for

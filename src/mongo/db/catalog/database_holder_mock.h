@@ -59,8 +59,7 @@ public:
                                                const StringData fullNS,
                                                OptionalCollectionUUID uuid,
                                                CollectionCatalogEntry* const details,
-                                               RecordStore* const recordStore,
-                                               DatabaseCatalogEntry* const dbce) override {
+                                               RecordStore* const recordStore) override {
         return {};
     }
 };

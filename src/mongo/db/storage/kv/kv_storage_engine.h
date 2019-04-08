@@ -38,8 +38,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
-#include "mongo/db/storage/kv/kv_database_catalog_entry_base.h"
+#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
+#include "mongo/db/storage/kv/kv_storage_engine_interface.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/temporary_record_store.h"
@@ -59,42 +60,12 @@ struct KVStorageEngineOptions {
     bool forRepair = false;
 };
 
-/**
- * Minimal interface for KVDatabaseCatalogEntryBase to access KVStorageEngine.
- */
-class KVStorageEngineInterface {
-public:
-    KVStorageEngineInterface() = default;
-    virtual ~KVStorageEngineInterface() = default;
-    virtual StorageEngine* getStorageEngine() = 0;
-    virtual KVEngine* getEngine() = 0;
-    virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
-                                     const NamespaceString& nss,
-                                     StringData ident) = 0;
-    virtual KVCatalog* getCatalog() = 0;
-};
-
-/*
- * The actual definition for this function is in
- * `src/mongo/db/storage/kv/kv_database_catalog_entry.cpp` This unusual forward declaration is to
- * facilitate better linker error messages.  Tests need to pass a mock construction factory, whereas
- * main implementations should pass the `default...` factory which is linked in with the main
- * `KVDatabaseCatalogEntry` code.
- */
-std::unique_ptr<KVDatabaseCatalogEntryBase> defaultDatabaseCatalogEntryFactory(
-    const StringData name, KVStorageEngineInterface* const engine);
-
-using KVDatabaseCatalogEntryFactory = decltype(defaultDatabaseCatalogEntryFactory);
-
 class KVStorageEngine final : public KVStorageEngineInterface, public StorageEngine {
 public:
     /**
      * @param engine - ownership passes to me
      */
-    KVStorageEngine(KVEngine* engine,
-                    KVStorageEngineOptions options = KVStorageEngineOptions(),
-                    stdx::function<KVDatabaseCatalogEntryFactory> databaseCatalogEntryFactory =
-                        defaultDatabaseCatalogEntryFactory);
+    KVStorageEngine(KVEngine* engine, KVStorageEngineOptions options = KVStorageEngineOptions());
 
     virtual ~KVStorageEngine();
 
@@ -102,10 +73,7 @@ public:
 
     virtual RecoveryUnit* newRecoveryUnit();
 
-    virtual void listDatabases(std::vector<std::string>* out) const;
-
-    KVDatabaseCatalogEntryBase* getDatabaseCatalogEntry(OperationContext* opCtx,
-                                                        StringData db) override;
+    virtual std::vector<std::string> listDatabases() const;
 
     virtual bool supportsDocLocking() const {
         return _supportsDocLocking;
@@ -368,19 +336,18 @@ public:
         return _dropPendingIdentReaper.getAllIdents();
     }
 
+    Status currentFilesCompatible(OperationContext* opCtx) const override {
+        // Delegate to the FeatureTracker as to whether the data files are compatible or not.
+        return _catalog->getFeatureTracker()->isCompatibleWithCurrentCode(opCtx);
+    }
+
+    int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 
     Status _dropCollectionsNoTimestamp(OperationContext* opCtx,
-                                       KVDatabaseCatalogEntryBase* dbce,
-                                       CollIter begin,
-                                       CollIter end);
-
-    Status _dropCollectionsWithTimestamp(OperationContext* opCtx,
-                                         KVDatabaseCatalogEntryBase* dbce,
-                                         std::list<std::string>& toDrop,
-                                         CollIter begin,
-                                         CollIter end);
+                                       std::vector<NamespaceString>& toDrop);
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection
@@ -411,8 +378,6 @@ private:
 
     const KVStorageEngineOptions _options;
 
-    stdx::function<KVDatabaseCatalogEntryFactory> _databaseCatalogEntryFactory;
-
     // Manages drop-pending idents. Requires access to '_engine'.
     KVDropPendingIdentReaper _dropPendingIdentReaper;
 
@@ -431,10 +396,5 @@ private:
     bool _inBackupMode = false;
 
     std::unique_ptr<TimestampMonitor> _timestampMonitor;
-
-    // Protects '_dbs'.
-    mutable stdx::mutex _dbsLock;
-    using DBMap = std::map<std::string, KVDatabaseCatalogEntryBase*>;
-    DBMap _dbs;
 };
 }  // namespace mongo

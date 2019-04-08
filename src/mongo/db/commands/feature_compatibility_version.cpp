@@ -130,9 +130,8 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 }
 
 bool FeatureCompatibilityVersion::isCleanStartUp() {
-    std::vector<std::string> dbNames;
     StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-    storageEngine->listDatabases(&dbNames);
+    std::vector<std::string> dbNames = storageEngine->listDatabases();
 
     for (auto&& dbName : dbNames) {
         if (dbName != "local") {

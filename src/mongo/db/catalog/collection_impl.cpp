@@ -45,7 +45,6 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_info_cache_impl.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_consistency.h"
@@ -197,14 +196,12 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                StringData fullNS,
                                OptionalCollectionUUID uuid,
                                CollectionCatalogEntry* details,
-                               RecordStore* recordStore,
-                               DatabaseCatalogEntry* dbce)
+                               RecordStore* recordStore)
     : _magic(kMagicNumber),
       _ns(fullNS),
       _uuid(uuid),
       _details(details),
       _recordStore(recordStore),
-      _dbce(dbce),
       _needCappedLock(supportsDocLocking() && _recordStore->isCapped() && _ns.db() != "local"),
       _infoCache(std::make_unique<CollectionInfoCacheImpl>(this, _ns)),
       _indexCatalog(

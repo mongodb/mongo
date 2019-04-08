@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"

@@ -44,7 +44,6 @@
 
 namespace mongo {
 
-class DatabaseCatalogEntry;
 class OperationContext;
 
 /**
@@ -119,8 +118,6 @@ public:
     virtual void getStats(OperationContext* const opCtx,
                           BSONObjBuilder* const output,
                           const double scale = 1) const = 0;
-
-    virtual const DatabaseCatalogEntry* getDatabaseCatalogEntry() const = 0;
 
     /**
      * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if

@@ -360,6 +360,19 @@ public:
     std::vector<CollectionUUID> getAllCollectionUUIDsFromDb(StringData dbName) const;
 
     /**
+     * This function gets the ns of all collections from `dbName`. The result is not sorted.
+     *
+     * Returns empty vector if the 'dbName' is not known.
+     */
+    std::vector<NamespaceString> getAllCollectionNamesFromDb(StringData dbName) const;
+
+    /**
+     * This functions gets all the database names. The result is sorted in alphabetical ascending
+     * order.
+     */
+    std::vector<std::string> getAllDbNames() const;
+
+    /**
      * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
      * to the pre-close state to resolve queries for currently unknown UUIDs. This allows processes,
      * like authorization and replication, which need to do lookups outside of database locks, to

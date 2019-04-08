@@ -40,7 +40,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"

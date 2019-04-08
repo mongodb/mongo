@@ -616,9 +616,8 @@ namespace {
  * Used to set the hasData field on replset heartbeat command response.
  */
 bool replHasDatabases(OperationContext* opCtx) {
-    std::vector<string> names;
     StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-    storageEngine->listDatabases(&names);
+    std::vector<string> names = storageEngine->listDatabases();
 
     if (names.size() >= 2)
         return true;

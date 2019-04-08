@@ -34,7 +34,6 @@
 #include "mongo/db/index_builds_coordinator.h"
 
 #include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog/uuid_catalog.h"
@@ -153,7 +152,6 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
 
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRebuildForRecovery(
     OperationContext* opCtx,
-    DatabaseCatalogEntry* dbce,
     CollectionCatalogEntry* cce,
     const std::vector<BSONObj>& specs,
     const UUID& buildUUID) {
@@ -173,7 +171,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
     }
 
     const auto& ns = cce->ns().ns();
-    auto rs = dbce->getRecordStore(ns);
+    auto rs = cce->getRecordStore();
 
     ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
 
@@ -201,7 +199,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
         // open a bad index and fail.
         const auto uuid = cce->getCollectionOptions(opCtx).uuid;
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        collection = databaseHolder->makeCollection(opCtx, ns, uuid, cce, rs, dbce);
+        collection = databaseHolder->makeCollection(opCtx, ns, uuid, cce, rs);
 
         // Register the index build. During recovery, collections may not have UUIDs present yet to
         // due upgrading. We don't require collection UUIDs during recovery except to create a

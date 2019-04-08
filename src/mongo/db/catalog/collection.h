@@ -58,7 +58,6 @@
 namespace mongo {
 class CappedCallback;
 class CollectionCatalogEntry;
-class DatabaseCatalogEntry;
 class ExtentManager;
 class IndexCatalog;
 class IndexCatalogEntry;
@@ -468,8 +467,6 @@ public:
      * onto the global lock in exclusive mode.
      */
     virtual void establishOplogCollectionForLogging(OperationContext* opCtx) = 0;
-
-    virtual DatabaseCatalogEntry* dbce() const = 0;
 };
 
 }  // namespace mongo

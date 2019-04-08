@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -136,7 +135,7 @@ public:
             Lock::GlobalLock lk(opCtx, MODE_IS);
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
-            storageEngine->listDatabases(&dbNames);
+            dbNames = storageEngine->listDatabases();
         }
 
         vector<BSONObj> dbInfos;
@@ -165,14 +164,13 @@ public:
                 if (!db)
                     continue;
 
-                const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
-                invariant(entry);
-
-                writeConflictRetry(
-                    opCtx, "sizeOnDisk", dbname, [&] { size = entry->sizeOnDisk(opCtx); });
+                writeConflictRetry(opCtx, "sizeOnDisk", dbname, [&] {
+                    size = storageEngine->sizeOnDiskForDb(opCtx, dbname);
+                });
                 b.append("sizeOnDisk", static_cast<double>(size));
 
-                b.appendBool("empty", entry->isEmpty());
+                b.appendBool("empty",
+                             UUIDCatalog::get(opCtx).getAllCatalogEntriesFromDb(dbname).empty());
             }
             BSONObj curDbObj = b.obj();
 

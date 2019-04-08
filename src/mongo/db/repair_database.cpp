@@ -43,7 +43,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -62,7 +61,6 @@
 namespace mongo {
 
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
-                                           DatabaseCatalogEntry* dbce,
                                            CollectionCatalogEntry* cce,
                                            stdx::function<bool(const std::string&)> filter) {
     IndexNameObjs ret;
@@ -111,7 +109,6 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 }
 
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  DatabaseCatalogEntry* dbce,
                                   CollectionCatalogEntry* cce,
                                   const std::vector<BSONObj>& indexSpecs) {
     // Skip the rest if there are no indexes to rebuild.
@@ -122,15 +119,14 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     UUID buildUUID = UUID::gen();
     auto swRebuild =
-        indexBuildsCoord->startIndexRebuildForRecovery(opCtx, dbce, cce, indexSpecs, buildUUID);
+        indexBuildsCoord->startIndexRebuildForRecovery(opCtx, cce, indexSpecs, buildUUID);
     if (!swRebuild.isOK()) {
         return swRebuild.getStatus();
     }
 
     auto[numRecords, dataSize] = swRebuild.getValue();
 
-    const auto& ns = cce->ns().ns();
-    auto rs = dbce->getRecordStore(ns);
+    auto rs = cce->getRecordStore();
 
     // Update the record store stats after finishing and committing the index builds.
     WriteUnitOfWork wuow(opCtx);
@@ -146,33 +142,31 @@ Status repairCollections(OperationContext* opCtx,
                          const std::string& dbName,
                          stdx::function<void(const std::string& dbName)> onRecordStoreRepair) {
 
-    DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(opCtx, dbName);
+    auto colls = UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(dbName);
 
-    std::list<std::string> colls;
-    dbce->getCollectionNamespaces(&colls);
-
-    for (std::list<std::string>::const_iterator it = colls.begin(); it != colls.end(); ++it) {
+    for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
 
-        log() << "Repairing collection " << *it;
+        log() << "Repairing collection " << nss;
 
-        Status status = engine->repairRecordStore(opCtx, *it);
+        Status status = engine->repairRecordStore(opCtx, nss.ns());
         if (!status.isOK())
             return status;
     }
 
     onRecordStoreRepair(dbName);
 
-    for (std::list<std::string>::const_iterator it = colls.begin(); it != colls.end(); ++it) {
+    for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
 
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(*it);
-        auto swIndexNameObjs = getIndexNameObjs(opCtx, dbce, cce);
+        CollectionCatalogEntry* cce =
+            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
+        auto swIndexNameObjs = getIndexNameObjs(opCtx, cce);
         if (!swIndexNameObjs.isOK())
             return swIndexNameObjs.getStatus();
 
         std::vector<BSONObj> indexSpecs = swIndexNameObjs.getValue().second;
-        Status status = rebuildIndexesOnCollection(opCtx, dbce, cce, indexSpecs);
+        Status status = rebuildIndexesOnCollection(opCtx, cce, indexSpecs);
         if (!status.isOK())
             return status;
 

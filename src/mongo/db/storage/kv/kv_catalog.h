@@ -44,31 +44,26 @@ namespace mongo {
 
 class OperationContext;
 class RecordStore;
+class KVStorageEngineInterface;
 
 class KVCatalog {
 public:
     class FeatureTracker;
 
     /**
-     * @param rs - does NOT take ownership. The RecordStore must be thread-safe, in particular
-     * with concurrent calls to RecordStore::find, updateRecord, insertRecord, deleteRecord and
-     * dataFor. The KVCatalog does not utilize Cursors and those methods may omit further
-     * protection.
+     * The RecordStore must be thread-safe, in particular with concurrent calls to
+     * RecordStore::find, updateRecord, insertRecord, deleteRecord and dataFor. The KVCatalog does
+     * not utilize Cursors and those methods may omit further protection.
      */
-    KVCatalog(RecordStore* rs, bool directoryPerDb, bool directoryForIndexes);
+    KVCatalog(RecordStore* rs,
+              bool directoryPerDb,
+              bool directoryForIndexes,
+              KVStorageEngineInterface* engine);
     ~KVCatalog();
 
     void init(OperationContext* opCtx);
 
     void getAllCollections(std::vector<std::string>* out) const;
-
-    /**
-     * @return error or ident for instance
-     */
-    Status newCollection(OperationContext* opCtx,
-                         const NamespaceString& ns,
-                         const CollectionOptions& options,
-                         KVPrefix prefix);
 
     std::string getCollectionIdent(StringData ns) const;
 
@@ -78,13 +73,6 @@ public:
     void putMetaData(OperationContext* opCtx,
                      StringData ns,
                      BSONCollectionCatalogEntry::MetaData& md);
-
-    Status renameCollection(OperationContext* opCtx,
-                            StringData fromNS,
-                            StringData toNS,
-                            bool stayTemp);
-
-    Status dropCollection(OperationContext* opCtx, StringData ns);
 
     std::vector<std::string> getAllIdentsForDB(StringData db) const;
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
@@ -119,11 +107,41 @@ public:
      */
     std::string newInternalIdent();
 
+    void initCollection(OperationContext* opCtx, const std::string& ns, bool forRepair);
+
+    void reinitCollectionAfterRepair(OperationContext* opCtx, const std::string& ns);
+
+    Status createCollection(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const CollectionOptions& options,
+                            bool allocateDefaultSpace);
+
+    Status renameCollection(OperationContext* opCtx,
+                            StringData fromNS,
+                            StringData toNS,
+                            bool stayTemp);
+
+    Status dropCollection(OperationContext* opCtx, StringData ns);
+
 private:
     class AddIdentChange;
     class RemoveIdentChange;
+    class FinishDropCatalogEntryChange;
+
+    friend class KVStorageEngine;
+    friend class KVCatalogTest;
+    friend class KVStorageEngineTest;
 
     BSONObj _findEntry(OperationContext* opCtx, StringData ns, RecordId* out = NULL) const;
+    Status _addEntry(OperationContext* opCtx,
+                     const NamespaceString& ns,
+                     const CollectionOptions& options,
+                     KVPrefix prefix);
+    Status _replaceEntry(OperationContext* opCtx,
+                         StringData fromNS,
+                         StringData toNS,
+                         bool stayTemp);
+    Status _removeEntry(OperationContext* opCtx, StringData ns);
 
     /**
      * Generates a new unique identifier for a new "thing".
@@ -157,5 +175,7 @@ private:
     // Manages the feature document that may be present in the KVCatalog. '_featureTracker' is
     // guaranteed to be non-null after KVCatalog::init() is called.
     std::unique_ptr<FeatureTracker> _featureTracker;
+
+    KVStorageEngineInterface* const _engine;
 };
 }

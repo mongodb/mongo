@@ -37,7 +37,7 @@ namespace mongo {
 
 class DatabaseImpl final : public Database {
 public:
-    explicit DatabaseImpl(StringData name, DatabaseCatalogEntry* dbEntry, uint64_t epoch);
+    explicit DatabaseImpl(StringData name, uint64_t epoch);
 
     void init(OperationContext*) const final;
 
@@ -71,8 +71,6 @@ public:
     bool isDropPending(OperationContext* opCtx) const final;
 
     void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale = 1) const final;
-
-    const DatabaseCatalogEntry* getDatabaseCatalogEntry() const final;
 
     /**
      * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if
@@ -181,8 +179,6 @@ private:
                                 Collection* collection) const;
 
     const std::string _name;  // "dbname"
-
-    DatabaseCatalogEntry* _dbEntry;  // not owned here
 
     const uint64_t _epoch;
 

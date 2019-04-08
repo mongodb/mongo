@@ -677,4 +677,32 @@ DEATH_TEST_F(UUIDCatalogResourceTest, AddInvalidResourceType, "invariant") {
     catalog.addResource(rid, "");
 }
 
+TEST_F(UUIDCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
+    NamespaceString aColl("dbA", "collA");
+    NamespaceString b1Coll("dbB", "collB1");
+    NamespaceString b2Coll("dbB", "collB2");
+    NamespaceString cColl("dbC", "collC");
+    NamespaceString d1Coll("dbD", "collD1");
+    NamespaceString d2Coll("dbD", "collD2");
+    NamespaceString d3Coll("dbD", "collD3");
+
+    std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
+    for (auto& nss : nsss) {
+        auto newColl = std::make_unique<CollectionMock>(nss);
+        auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
+        auto uuid = CollectionUUID::gen();
+        catalog.registerCatalogEntry(uuid, std::move(newCatalogEntry));
+        catalog.registerCollectionObject(uuid, std::move(newColl));
+    }
+
+    std::vector<NamespaceString> dCollList = {d1Coll, d2Coll, d3Coll};
+    auto res = catalog.getAllCollectionNamesFromDb("dbD");
+    std::sort(res.begin(), res.end());
+    ASSERT(res == dCollList);
+
+    std::vector<std::string> dbNames = {"dbA", "dbB", "dbC", "dbD", "testdb"};
+    ASSERT(catalog.getAllDbNames() == dbNames);
+
+    catalog.deregisterAllCatalogEntriesAndCollectionObjects();
+}
 }  // namespace

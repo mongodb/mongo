@@ -40,7 +40,6 @@ namespace mongo {
 
 class CollectionCatalogEntry;
 class Database;
-class DatabaseCatalogEntry;
 class OperationContext;
 class RecordStore;
 
@@ -114,8 +113,7 @@ public:
                                                        const StringData fullNS,
                                                        OptionalCollectionUUID uuid,
                                                        CollectionCatalogEntry* const details,
-                                                       RecordStore* const recordStore,
-                                                       DatabaseCatalogEntry* const dbce) = 0;
+                                                       RecordStore* const recordStore) = 0;
 };
 
 }  // namespace mongo

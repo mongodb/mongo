@@ -125,7 +125,6 @@ public:
      */
     StatusWith<std::pair<long long, long long>> startIndexRebuildForRecovery(
         OperationContext* opCtx,
-        DatabaseCatalogEntry* dbce,
         CollectionCatalogEntry* cce,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID);

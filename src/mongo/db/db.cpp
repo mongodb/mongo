@@ -52,7 +52,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"

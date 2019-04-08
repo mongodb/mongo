@@ -33,7 +33,8 @@ env.Library(
         'biggie_init.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_storage_engine',
         'storage_biggie_core',
     ],
     LIBDEPS_PRIVATE=[

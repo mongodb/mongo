@@ -415,6 +415,27 @@ std::vector<CollectionUUID> UUIDCatalog::getAllCollectionUUIDsFromDb(StringData 
     return ret;
 }
 
+std::vector<NamespaceString> UUIDCatalog::getAllCollectionNamesFromDb(StringData dbName) const {
+    std::vector<NamespaceString> ret;
+    for (auto catalogEntry : getAllCatalogEntriesFromDb(dbName)) {
+        ret.push_back(catalogEntry->ns());
+    }
+    return ret;
+}
+
+std::vector<std::string> UUIDCatalog::getAllDbNames() const {
+    std::vector<std::string> ret;
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
+    auto iter = _orderedCollections.upper_bound(std::make_pair("", maxUuid));
+    while (iter != _orderedCollections.end()) {
+        auto dbName = iter->first.first;
+        ret.push_back(dbName);
+        iter = _orderedCollections.upper_bound(std::make_pair(dbName, maxUuid));
+    }
+    return ret;
+}
+
 boost::optional<CollectionUUID> UUIDCatalog::prev(StringData db, CollectionUUID uuid) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto dbIdPair = std::make_pair(db.toString(), uuid);
