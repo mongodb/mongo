@@ -20,7 +20,7 @@
     // abort job to run.
     TestData.transactionLifetimeLimitSeconds = 10;
 
-    const rsOpts = {nodes: 3};
+    const rsOpts = {nodes: 3, settings: {chainingAllowed: false}};
     let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts, rs2: rsOpts}});
 
     const coordinator = st.shard0;
