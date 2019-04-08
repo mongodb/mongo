@@ -140,6 +140,7 @@ functions:
           version_id: ${version_id}
           workdir: ${workdir}
           revision: ${revision}
+          project: ${project}
           project_dir: ${project_dir}
           branch_name: ${branch_name}
 
