@@ -31,11 +31,10 @@
 
 #include "mongo/util/intrusive_counter.h"
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 using boost::intrusive_ptr;
-using namespace mongoutils;
 
 intrusive_ptr<const RCString> RCString::create(StringData s) {
     uassert(16493,

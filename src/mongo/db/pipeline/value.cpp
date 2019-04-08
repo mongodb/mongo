@@ -45,11 +45,10 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
-using namespace mongoutils;
 using boost::intrusive_ptr;
 using std::min;
 using std::numeric_limits;

@@ -47,9 +47,9 @@
 #include "mongo/util/debugger.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

@@ -40,7 +40,7 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 #include "yaml-cpp/yaml.h"
 

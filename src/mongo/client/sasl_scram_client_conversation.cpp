@@ -37,8 +37,8 @@
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/password_digest.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -57,9 +57,9 @@ StatusWith<bool> SaslSCRAMClientConversation::step(StringData inputData, std::st
         case 3:
             return _thirdStep(inputData, outputData);
         default:
-            return StatusWith<bool>(
-                ErrorCodes::AuthenticationFailed,
-                mongoutils::str::stream() << "Invalid SCRAM authentication step: " << _step);
+            return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
+                                    str::stream() << "Invalid SCRAM authentication step: "
+                                                  << _step);
     }
 }
 

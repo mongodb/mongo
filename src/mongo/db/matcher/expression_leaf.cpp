@@ -44,8 +44,8 @@
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/regex_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

@@ -3627,8 +3627,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
                 return;
             }
         }
-        FAIL(mongoutils::str::stream() << "No prepared transaction with start timestamp (1, " << i
-                                       << ")");
+        FAIL(str::stream() << "No prepared transaction with start timestamp (1, " << i << ")");
     };
 
     auto oldestActiveTransactionTS = [&]() {

@@ -114,8 +114,7 @@ public:
         : _status(code, std::move(reason)) {}
     MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, const char* reason)
         : _status(code, reason) {}
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code,
-                                            const mongoutils::str::stream& reason)
+    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, const str::stream& reason)
         : _status(code, reason) {}
 
     /**

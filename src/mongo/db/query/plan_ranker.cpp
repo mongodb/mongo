@@ -242,7 +242,7 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
     double score = baseScore + productivity + tieBreakers;
 
-    mongoutils::str::stream ss;
+    str::stream ss;
     ss << "score(" << score << ") = baseScore(" << baseScore << ")"
        << " + productivity((" << stats->common.advanced << " advanced)/(" << stats->common.works
        << " works) = " << productivity << ")"

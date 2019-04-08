@@ -36,7 +36,7 @@
 #include <algorithm>
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

@@ -37,7 +37,7 @@
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -46,7 +46,6 @@ namespace fts {
 
 using std::map;
 using std::string;
-using namespace mongoutils;
 namespace dps = ::mongo::dotted_path_support;
 
 const double DEFAULT_WEIGHT = 1;

@@ -38,8 +38,8 @@
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 using std::string;

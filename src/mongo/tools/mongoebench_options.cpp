@@ -40,8 +40,8 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/shell/bench.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

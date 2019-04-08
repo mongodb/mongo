@@ -39,11 +39,11 @@
 #include "asio/error.hpp"
 
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
 #include "mongo/util/net/ssl/error.hpp"
+#include "mongo/util/str.h"
 
 namespace asio {
 namespace ssl {

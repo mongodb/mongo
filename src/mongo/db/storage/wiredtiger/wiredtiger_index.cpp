@@ -55,7 +55,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 #define TRACING_ENABLED 0
 

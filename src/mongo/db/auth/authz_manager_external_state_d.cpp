@@ -47,7 +47,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -115,9 +115,8 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
         return Status::OK();
     }
     return Status(ErrorCodes::NoMatchingDocument,
-                  mongoutils::str::stream() << "No document in " << collectionName.ns()
-                                            << " matches "
-                                            << query);
+                  str::stream() << "No document in " << collectionName.ns() << " matches "
+                                << query);
 }
 
 MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)

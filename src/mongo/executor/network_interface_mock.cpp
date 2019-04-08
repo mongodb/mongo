@@ -40,7 +40,7 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

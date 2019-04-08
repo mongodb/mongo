@@ -55,8 +55,6 @@
 #define __has_feature(x) 0
 #endif
 
-using namespace mongoutils;
-
 namespace mongo {
 
 // Generated symbols for JS files

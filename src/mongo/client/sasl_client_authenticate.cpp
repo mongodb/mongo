@@ -35,11 +35,9 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
-
-using namespace mongoutils;
 
 Future<void> (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
                                        const HostAndPort& hostname,

@@ -42,7 +42,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

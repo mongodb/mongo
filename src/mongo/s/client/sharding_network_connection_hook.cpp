@@ -40,8 +40,8 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

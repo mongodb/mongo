@@ -49,7 +49,7 @@
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/logger.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {

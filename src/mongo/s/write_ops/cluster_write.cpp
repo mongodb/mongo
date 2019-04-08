@@ -50,7 +50,7 @@
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/chunk_manager_targeter.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

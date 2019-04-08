@@ -35,7 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

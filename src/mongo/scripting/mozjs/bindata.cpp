@@ -43,7 +43,7 @@
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

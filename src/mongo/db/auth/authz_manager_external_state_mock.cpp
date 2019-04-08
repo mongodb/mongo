@@ -46,7 +46,7 @@
 #include "mongo/db/update/update_driver.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -81,11 +81,10 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
             fassert(17179,
                     warningsElement.appendString(
                         "",
-                        std::string(mongoutils::str::stream()
-                                    << "Skipped privileges on resource "
-                                    << privileges[i].getResourcePattern().toString()
-                                    << ". Reason: "
-                                    << errmsg)));
+                        std::string(str::stream() << "Skipped privileges on resource "
+                                                  << privileges[i].getResourcePattern().toString()
+                                                  << ". Reason: "
+                                                  << errmsg)));
         }
     }
 }

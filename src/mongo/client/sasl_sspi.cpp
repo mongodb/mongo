@@ -40,8 +40,8 @@
 #include "mongo/base/status.h"
 #include "mongo/client/sasl_sspi_options.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 extern "C" int plain_client_plug_init(const sasl_utils_t* utils,
@@ -98,7 +98,7 @@ void HandleLastError(const sasl_utils_t* utils, DWORD errCode, const char* msg) 
         return;
     }
 
-    std::string buffer(mongoutils::str::stream() << "SSPI: " << msg << ": " << err);
+    std::string buffer(str::stream() << "SSPI: " << msg << ": " << err);
     saslSetError(utils, buffer);
     LocalFree(err);
 }
@@ -481,10 +481,9 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
     int ret = sasl_client_add_plugin(sspiPluginName, sspiClientPluginInit);
     if (SASL_OK != ret) {
         return Status(ErrorCodes::UnknownError,
-                      mongoutils::str::stream() << "could not add SASL Client SSPI plugin "
-                                                << sspiPluginName
-                                                << ": "
-                                                << sasl_errstring(ret, NULL, NULL));
+                      str::stream() << "could not add SASL Client SSPI plugin " << sspiPluginName
+                                    << ": "
+                                    << sasl_errstring(ret, NULL, NULL));
     }
 
     return Status::OK();
@@ -496,10 +495,9 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin,
     int ret = sasl_client_add_plugin("PLAIN", plain_client_plug_init);
     if (SASL_OK != ret) {
         return Status(ErrorCodes::UnknownError,
-                      mongoutils::str::stream() << "Could not add SASL Client PLAIN plugin "
-                                                << sspiPluginName
-                                                << ": "
-                                                << sasl_errstring(ret, NULL, NULL));
+                      str::stream() << "Could not add SASL Client PLAIN plugin " << sspiPluginName
+                                    << ": "
+                                    << sasl_errstring(ret, NULL, NULL));
     }
 
     return Status::OK();

@@ -34,10 +34,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

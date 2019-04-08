@@ -31,7 +31,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

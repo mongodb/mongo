@@ -57,9 +57,9 @@
 #include "mongo/util/concurrency/value.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/str.h"
 #include "mongo/util/winutil.h"
 
 namespace mongo {
@@ -175,7 +175,7 @@ void setSocketKeepAliveParams(int sock,
 }
 
 std::string makeUnixSockPath(int port) {
-    return mongoutils::str::stream() << serverGlobalParams.socket << "/mongodb-" << port << ".sock";
+    return str::stream() << serverGlobalParams.socket << "/mongodb-" << port << ".sock";
 }
 
 // If an ip address is passed in, just return that.  If a hostname is passed

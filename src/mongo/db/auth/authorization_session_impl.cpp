@@ -54,7 +54,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -256,7 +256,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
     const NamespaceString& nss, const BSONObj& cmdObj, bool isMongos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
-                      mongoutils::str::stream() << "Invalid input namespace, " << nss.ns());
+                      str::stream() << "Invalid input namespace, " << nss.ns());
     }
 
     PrivilegeVector privileges;

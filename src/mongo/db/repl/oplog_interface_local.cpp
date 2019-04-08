@@ -35,8 +35,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {

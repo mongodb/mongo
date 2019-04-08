@@ -30,7 +30,7 @@
 #include "mongo/bson/util/bson_extract.h"
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -52,8 +52,7 @@ Status bsonExtractFieldImpl(const BSONObj& object,
         return kDefaultCase;
     }
     return Status(ErrorCodes::NoSuchKey,
-                  mongoutils::str::stream() << "Missing expected field \"" << fieldName.toString()
-                                            << "\"");
+                  str::stream() << "Missing expected field \"" << fieldName.toString() << "\"");
 }
 
 Status bsonExtractTypedFieldImpl(const BSONObj& object,
@@ -66,11 +65,10 @@ Status bsonExtractTypedFieldImpl(const BSONObj& object,
         return status;
     if (type != outElement->type()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "\"" << fieldName
-                                                << "\" had the wrong type. Expected "
-                                                << typeName(type)
-                                                << ", found "
-                                                << typeName(outElement->type()));
+                      str::stream() << "\"" << fieldName << "\" had the wrong type. Expected "
+                                    << typeName(type)
+                                    << ", found "
+                                    << typeName(outElement->type()));
     }
     return status;
 }
@@ -85,18 +83,17 @@ Status bsonExtractIntegerFieldImpl(const BSONObj& object,
         return status;
     if (!element.isNumber()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "Expected field \"" << fieldName
-                                                << "\" to have numeric type, but found "
-                                                << typeName(element.type()));
+                      str::stream() << "Expected field \"" << fieldName
+                                    << "\" to have numeric type, but found "
+                                    << typeName(element.type()));
     }
     long long result = element.safeNumberLong();
     if (result != element.numberDouble()) {
-        return Status(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Expected field \"" << fieldName
-                                      << "\" to have a value "
-                                         "exactly representable as a 64-bit integer, but found "
-                                      << element);
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Expected field \"" << fieldName
+                                    << "\" to have a value "
+                                       "exactly representable as a 64-bit integer, but found "
+                                    << element);
     }
     *out = result;
     return status;
@@ -112,9 +109,9 @@ Status bsonExtractDoubleFieldImpl(const BSONObj& object,
         return status;
     if (!element.isNumber()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "Expected field \"" << fieldName
-                                                << "\" to have numeric type, but found "
-                                                << typeName(element.type()));
+                      str::stream() << "Expected field \"" << fieldName
+                                    << "\" to have numeric type, but found "
+                                    << typeName(element.type()));
     }
     *out = element.numberDouble();
     return status;
@@ -157,10 +154,9 @@ Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
 
     if (!element.isNumber() && !element.isBoolean()) {
         return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "Expected boolean or number type for field \""
-                                                << fieldName
-                                                << "\", found "
-                                                << typeName(element.type()));
+                      str::stream() << "Expected boolean or number type for field \"" << fieldName
+                                    << "\", found "
+                                    << typeName(element.type()));
     }
     *out = element.trueValue();
     return status;
@@ -263,11 +259,10 @@ Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
         return status;
     }
     if (!pred(*out)) {
-        return Status(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Invalid value in field \"" << fieldName << "\": " << *out
-                                      << ": "
-                                      << predDescription);
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid value in field \"" << fieldName << "\": " << *out
+                                    << ": "
+                                    << predDescription);
     }
     return status;
 }

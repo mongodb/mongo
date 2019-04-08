@@ -67,7 +67,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -447,11 +447,10 @@ Status AuthorizationManagerImpl::_initializeUserFromPrivilegeDocument(User* user
     std::string userName = parser.extractUserNameFromUserDocument(privDoc);
     if (userName != user->getName().getUser()) {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "User name from privilege document \""
-                                                << userName
-                                                << "\" doesn't match name of provided User \""
-                                                << user->getName().getUser()
-                                                << "\"");
+                      str::stream() << "User name from privilege document \"" << userName
+                                    << "\" doesn't match name of provided User \""
+                                    << user->getName().getUser()
+                                    << "\"");
     }
 
     user->setID(parser.extractUserIDFromUserDocument(privDoc));
@@ -612,10 +611,10 @@ StatusWith<UserHandle> AuthorizationManagerImpl::_acquireUserSlowPath(CacheGuard
 
         switch (authzVersion) {
             default:
-                status = Status(ErrorCodes::BadValue,
-                                mongoutils::str::stream()
-                                    << "Illegal value for authorization data schema version, "
-                                    << authzVersion);
+                status =
+                    Status(ErrorCodes::BadValue,
+                           str::stream() << "Illegal value for authorization data schema version, "
+                                         << authzVersion);
                 break;
             case schemaVersion28SCRAM:
             case schemaVersion26Final:
@@ -623,11 +622,10 @@ StatusWith<UserHandle> AuthorizationManagerImpl::_acquireUserSlowPath(CacheGuard
                 status = _fetchUserV2(opCtx, userName, &user);
                 break;
             case schemaVersion24:
-                status = Status(ErrorCodes::AuthSchemaIncompatible,
-                                mongoutils::str::stream()
-                                    << "Authorization data schema version "
-                                    << schemaVersion24
-                                    << " not supported after MongoDB version 2.6.");
+                status =
+                    Status(ErrorCodes::AuthSchemaIncompatible,
+                           str::stream() << "Authorization data schema version " << schemaVersion24
+                                         << " not supported after MongoDB version 2.6.");
                 break;
         }
         if (status.isOK())

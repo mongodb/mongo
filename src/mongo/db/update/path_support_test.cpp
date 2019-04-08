@@ -52,13 +52,13 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace {
 
 using namespace mongo;
 using namespace pathsupport;
-using mongoutils::str::stream;
+using str::stream;
 using mutablebson::Element;
 using std::unique_ptr;
 using std::string;

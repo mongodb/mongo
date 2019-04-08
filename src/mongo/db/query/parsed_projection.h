@@ -31,7 +31,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

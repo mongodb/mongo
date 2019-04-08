@@ -28,12 +28,11 @@
  */
 
 #include "mongo/db/update/log_builder.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 using mutablebson::Element;
-namespace str = mongoutils::str;
 
 namespace {
 const char kSet[] = "$set";

@@ -125,7 +125,7 @@ Status SubplanStage::planSubqueries() {
         // Turn the i-th child into its own query.
         auto statusWithCQ = CanonicalQuery::canonicalize(getOpCtx(), *_query, orChild);
         if (!statusWithCQ.isOK()) {
-            mongoutils::str::stream ss;
+            str::stream ss;
             ss << "Can't canonicalize subchild " << orChild->debugString() << " "
                << statusWithCQ.getStatus().reason();
             return Status(ErrorCodes::BadValue, ss);
@@ -158,7 +158,7 @@ Status SubplanStage::planSubqueries() {
             invariant(branchResult->solutions.empty());
             auto solutions = QueryPlanner::plan(*branchResult->canonicalQuery, _plannerParams);
             if (!solutions.isOK()) {
-                mongoutils::str::stream ss;
+                str::stream ss;
                 ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
                    << solutions.getStatus().reason();
                 return Status(ErrorCodes::BadValue, ss);
@@ -169,7 +169,7 @@ Status SubplanStage::planSubqueries() {
 
             if (0 == branchResult->solutions.size()) {
                 // If one child doesn't have an indexed solution, bail out.
-                mongoutils::str::stream ss;
+                str::stream ss;
                 ss << "No solutions for subchild " << branchResult->canonicalQuery->toString();
                 return Status(ErrorCodes::BadValue, ss);
             }
@@ -194,13 +194,13 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
     // We want a well-formed *indexed* solution.
     if (NULL == branchCacheData) {
         // For example, we don't cache things for 2d indices.
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "No cache data for subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
 
     if (SolutionCacheData::USE_INDEX_TAGS_SOLN != branchCacheData->solnType) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "No indexed cache data for subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
@@ -210,7 +210,7 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
         QueryPlanner::tagAccordingToCache(orChild, branchCacheData->tree.get(), indexMap);
 
     if (!tagStatus.isOK()) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Failed to extract indices from subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
@@ -290,7 +290,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             }
 
             if (!multiPlanStage->bestPlanChosen()) {
-                mongoutils::str::stream ss;
+                str::stream ss;
                 ss << "Failed to pick best plan for subchild "
                    << branchResult->canonicalQuery->toString();
                 return Status(ErrorCodes::BadValue, ss);
@@ -301,13 +301,13 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             // Check that we have good cache data. For example, we don't cache things
             // for 2d indices.
             if (NULL == bestSoln->cacheData.get()) {
-                mongoutils::str::stream ss;
+                str::stream ss;
                 ss << "No cache data for subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
 
             if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
-                mongoutils::str::stream ss;
+                str::stream ss;
                 ss << "No indexed cache data for subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
@@ -317,7 +317,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
                 orChild, bestSoln->cacheData->tree.get(), _indexMap);
 
             if (!tagStatus.isOK()) {
-                mongoutils::str::stream ss;
+                str::stream ss;
                 ss << "Failed to extract indices from subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
@@ -334,7 +334,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         *_query, std::move(_orExpression), _plannerParams.indices, _plannerParams));
 
     if (!solnRoot) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Failed to build indexed data path for subplanned query\n";
         return Status(ErrorCodes::BadValue, ss);
     }
@@ -346,7 +346,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         QueryPlannerAnalysis::analyzeDataAccess(*_query, _plannerParams, std::move(solnRoot));
 
     if (NULL == _compositeSolution.get()) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Failed to analyze subplanned query";
         return Status(ErrorCodes::BadValue, ss);
     }

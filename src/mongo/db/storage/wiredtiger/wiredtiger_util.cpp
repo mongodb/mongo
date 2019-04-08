@@ -44,9 +44,9 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -649,7 +649,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
             BSONObjBuilder*& sub = subs[prefix.toString()];
             if (!sub)
                 sub = new BSONObjBuilder();
-            sub->appendNumber(mongoutils::str::ltrim(suffix.toString()), v);
+            sub->appendNumber(str::ltrim(suffix.toString()), v);
         }
     }
 

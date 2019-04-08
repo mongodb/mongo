@@ -54,7 +54,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/dh_openssl.h"
 #include "mongo/util/net/private/ssl_expiration.h"
@@ -62,6 +61,7 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 #ifndef _WIN32

@@ -59,7 +59,7 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

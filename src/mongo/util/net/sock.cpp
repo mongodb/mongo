@@ -63,11 +63,11 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/private/socket_poll.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/str.h"
 #include "mongo/util/winutil.h"
 
 namespace mongo {

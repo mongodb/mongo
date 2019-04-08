@@ -39,7 +39,7 @@
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -139,7 +139,7 @@ void assertEqualsIndexKeys(std::set<std::string>& expectedKeys, const BSONObjSet
         string s = key.firstElement().String();
         std::set<string>::const_iterator j = expectedKeys.find(s);
         if (j == expectedKeys.end()) {
-            mongoutils::str::stream ss;
+            str::stream ss;
             ss << "unexpected key " << s << " in FTSIndexFormat::getKeys result. "
                << "expected keys:";
             for (std::set<string>::const_iterator k = expectedKeys.begin(); k != expectedKeys.end();
@@ -166,7 +166,7 @@ TEST(FTSIndexFormat, LongWordsTextIndexVersion1) {
     string longWordCat = longPrefix + "cat";
     // "aaa...aaasat"
     string longWordSat = longPrefix + "sat";
-    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat;
+    string text = str::stream() << longWordCat << " " << longWordSat;
     FTSIndexFormat::getKeys(spec, BSON("data" << text), &keys);
 
     // Hard-coded expected computed keys for future-proofing.
@@ -198,8 +198,7 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion2) {
     string longWordSat = longPrefix + "sat";
     // "aaa...aaamongodbfts"
     string longWordMongoDBFts = longPrefix + "mongodbfts";
-    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat << " "
-                                            << longWordMongoDBFts;
+    string text = str::stream() << longWordCat << " " << longWordSat << " " << longWordMongoDBFts;
     FTSIndexFormat::getKeys(spec, BSON("data" << text), &keys);
 
     // Hard-coded expected computed keys for future-proofing.
@@ -231,7 +230,7 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion3) {
     string longWordCat = longPrefix + "cat";
     // "aaa...aaasat"
     string longWordSat = longPrefix + "sat";
-    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat;
+    string text = str::stream() << longWordCat << " " << longWordSat;
     FTSIndexFormat::getKeys(spec, BSON("data" << text), &keys);
 
     // Hard-coded expected computed keys for future-proofing.

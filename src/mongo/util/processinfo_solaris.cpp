@@ -47,9 +47,9 @@
 
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -70,15 +70,14 @@ struct ProcPsinfo {
     ProcPsinfo() {
         FILE* f = fopen("/proc/self/psinfo", "r");
         massert(16846,
-                mongoutils::str::stream() << "couldn't open \"/proc/self/psinfo\": "
-                                          << errnoWithDescription(),
+                str::stream() << "couldn't open \"/proc/self/psinfo\": " << errnoWithDescription(),
                 f);
         size_t num = fread(&psinfo, sizeof(psinfo), 1, f);
         int err = errno;
         fclose(f);
         massert(16847,
-                mongoutils::str::stream() << "couldn't read from \"/proc/self/psinfo\": "
-                                          << errnoWithDescription(err),
+                str::stream() << "couldn't read from \"/proc/self/psinfo\": "
+                              << errnoWithDescription(err),
                 num == 1);
     }
     psinfo_t psinfo;
@@ -88,15 +87,14 @@ struct ProcUsage {
     ProcUsage() {
         FILE* f = fopen("/proc/self/usage", "r");
         massert(16848,
-                mongoutils::str::stream() << "couldn't open \"/proc/self/usage\": "
-                                          << errnoWithDescription(),
+                str::stream() << "couldn't open \"/proc/self/usage\": " << errnoWithDescription(),
                 f);
         size_t num = fread(&prusage, sizeof(prusage), 1, f);
         int err = errno;
         fclose(f);
         massert(16849,
-                mongoutils::str::stream() << "couldn't read from \"/proc/self/usage\": "
-                                          << errnoWithDescription(err),
+                str::stream() << "couldn't read from \"/proc/self/usage\": "
+                              << errnoWithDescription(err),
                 num == 1);
     }
     prusage_t prusage;
@@ -149,13 +147,13 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     char buf_native[32];
     if (sysinfo(SI_ARCHITECTURE_64, buf_64, sizeof(buf_64)) != -1 &&
         sysinfo(SI_ARCHITECTURE_NATIVE, buf_native, sizeof(buf_native)) != -1) {
-        addrSize = mongoutils::str::equals(buf_64, buf_native) ? 64 : 32;
+        addrSize = str::equals(buf_64, buf_native) ? 64 : 32;
     } else {
         log() << "Unable to determine system architecture: " << strerror(errno);
     }
 
     osType = unameData.sysname;
-    osName = mongoutils::str::ltrim(readLineFromFile("/etc/release"));
+    osName = str::ltrim(readLineFromFile("/etc/release"));
     osVersion = unameData.version;
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
     memSize = pageSize * static_cast<unsigned long long>(sysconf(_SC_PHYS_PAGES));
@@ -169,7 +167,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     // 2. Illumos kernel releases (which is all non Oracle Solaris releases)
     preferMsyncOverFSync = false;
 
-    if (mongoutils::str::startsWith(osName, "Oracle Solaris")) {
+    if (str::startsWith(osName, "Oracle Solaris")) {
         std::vector<std::string> versionComponents;
         splitStringDelim(osVersion, &versionComponents, '.');
 

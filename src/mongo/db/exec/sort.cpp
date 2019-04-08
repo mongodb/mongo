@@ -103,7 +103,7 @@ bool SortStage::isEOF() {
 PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
     const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes.load());
     if (_memUsage > maxBytes) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Sort operation used more than the maximum " << maxBytes
            << " bytes of RAM. Add an index, or specify a smaller limit.";
         Status status(ErrorCodes::OperationFailed, ss);

@@ -33,8 +33,8 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create;

@@ -34,7 +34,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

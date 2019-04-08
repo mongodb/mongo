@@ -44,8 +44,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_types.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -87,12 +87,11 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
             return Status::OK();
         } else if (versionElement.eoo()) {
             return Status(ErrorCodes::NoSuchKey,
-                          mongoutils::str::stream() << "No "
-                                                    << AuthorizationManager::schemaVersionFieldName
-                                                    << " field in version document.");
+                          str::stream() << "No " << AuthorizationManager::schemaVersionFieldName
+                                        << " field in version document.");
         } else {
             return Status(ErrorCodes::TypeMismatch,
-                          mongoutils::str::stream()
+                          str::stream()
                               << "Could not determine schema version of authorization data.  "
                                  "Bad (non-numeric) type "
                               << typeName(versionElement.type())
@@ -136,11 +135,10 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
             fassert(17157,
                     warningsElement.appendString(
                         "",
-                        std::string(mongoutils::str::stream()
-                                    << "Skipped privileges on resource "
-                                    << privileges[i].getResourcePattern().toString()
-                                    << ". Reason: "
-                                    << errmsg)));
+                        std::string(str::stream() << "Skipped privileges on resource "
+                                                  << privileges[i].getResourcePattern().toString()
+                                                  << ". Reason: "
+                                                  << errmsg)));
         }
     }
 }
@@ -298,11 +296,11 @@ Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* opCtx,
                             userDoc);
 
     if (status == ErrorCodes::NoMatchingDocument) {
-        status = Status(ErrorCodes::UserNotFound,
-                        mongoutils::str::stream() << "Could not find user \"" << userName.getUser()
-                                                  << "\" for db \""
-                                                  << userName.getDB()
-                                                  << "\"");
+        status =
+            Status(ErrorCodes::UserNotFound,
+                   str::stream() << "Could not find user \"" << userName.getUser() << "\" for db \""
+                                 << userName.getDB()
+                                 << "\"");
     }
     return status;
 }
@@ -570,7 +568,7 @@ private:
         size_t splitPoint = idstr.find('.');
         if (splitPoint == std::string::npos) {
             return StatusWith<UserName>(ErrorCodes::FailedToParse,
-                                        mongoutils::str::stream()
+                                        str::stream()
                                             << "_id entries for user documents must be of "
                                                "the form <dbname>.<username>.  Found: "
                                             << idstr);

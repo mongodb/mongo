@@ -174,7 +174,7 @@ protected:
 
     void dumpSolutions() const;
 
-    void dumpSolutions(mongoutils::str::stream& ost) const;
+    void dumpSolutions(str::stream& ost) const;
 
     /**
      * Will use a relaxed bounds check for the remaining assert* calls. Subsequent calls to assert*

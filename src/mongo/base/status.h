@@ -37,13 +37,11 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 
-namespace mongoutils {
+namespace mongo {
+
 namespace str {
 class stream;
 }  // namespace str
-}  // namespace mongoutils
-
-namespace mongo {
 
 // Including builder.h here would cause a cycle.
 template <typename Allocator>
@@ -80,8 +78,7 @@ public:
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const std::string& reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, StringData reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
-                                        const mongoutils::str::stream& reason);
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const str::stream& reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
                                         StringData message,
                                         const BSONObj& extraInfoHolder);

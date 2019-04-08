@@ -36,7 +36,7 @@
 #include <fstream>
 
 #include "mongo/base/string_data.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace logger {
@@ -211,33 +211,29 @@ Status RotatableFileWriter::Use::rotate(bool renameOnRotate, const std::string& 
         if (renameOnRotate) {
             try {
                 if (boost::filesystem::exists(renameTarget)) {
-                    return Status(
-                        ErrorCodes::FileRenameFailed,
-                        mongoutils::str::stream() << "Renaming file " << _writer->_fileName
-                                                  << " to "
-                                                  << renameTarget
-                                                  << " failed; destination already exists");
+                    return Status(ErrorCodes::FileRenameFailed,
+                                  str::stream() << "Renaming file " << _writer->_fileName << " to "
+                                                << renameTarget
+                                                << " failed; destination already exists");
                 }
             } catch (const std::exception& e) {
-                return Status(
-                    ErrorCodes::FileRenameFailed,
-                    mongoutils::str::stream() << "Renaming file " << _writer->_fileName << " to "
-                                              << renameTarget
-                                              << " failed; Cannot verify whether destination "
-                                                 "already exists: "
-                                              << e.what());
+                return Status(ErrorCodes::FileRenameFailed,
+                              str::stream() << "Renaming file " << _writer->_fileName << " to "
+                                            << renameTarget
+                                            << " failed; Cannot verify whether destination "
+                                               "already exists: "
+                                            << e.what());
             }
 
             boost::system::error_code ec;
             boost::filesystem::rename(_writer->_fileName, renameTarget, ec);
             if (ec) {
                 return Status(ErrorCodes::FileRenameFailed,
-                              mongoutils::str::stream() << "Failed  to rename \""
-                                                        << _writer->_fileName
-                                                        << "\" to \""
-                                                        << renameTarget
-                                                        << "\": "
-                                                        << ec.message());
+                              str::stream() << "Failed  to rename \"" << _writer->_fileName
+                                            << "\" to \""
+                                            << renameTarget
+                                            << "\": "
+                                            << ec.message());
                 // TODO(schwerin): Make errnoWithDescription() available in the logger library, and
                 // use it here.
             }
@@ -249,13 +245,11 @@ Status RotatableFileWriter::Use::rotate(bool renameOnRotate, const std::string& 
 Status RotatableFileWriter::Use::status() {
     if (!_writer->_stream) {
         return Status(ErrorCodes::FileNotOpen,
-                      mongoutils::str::stream() << "File \"" << _writer->_fileName
-                                                << "\" not open");
+                      str::stream() << "File \"" << _writer->_fileName << "\" not open");
     }
     if (_writer->_stream->fail()) {
         return Status(ErrorCodes::FileStreamFailed,
-                      mongoutils::str::stream() << "File \"" << _writer->_fileName
-                                                << "\" in failed state");
+                      str::stream() << "File \"" << _writer->_fileName << "\" in failed state");
     }
     return Status::OK();
 }

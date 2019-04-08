@@ -31,7 +31,7 @@
 
 #include "mongo/util/net/socket_exception.h"
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

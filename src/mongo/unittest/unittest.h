@@ -49,7 +49,7 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest_helpers.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 /**
  * Fail unconditionally, reporting the given message.
@@ -206,7 +206,7 @@
         std::string myString(BIG_STRING);                                                       \
         std::string myContains(CONTAINS);                                                       \
         if (myString.find(myContains) == std::string::npos) {                                   \
-            ::mongoutils::str::stream err;                                                      \
+            ::mongo::str::stream err;                                                           \
             err << "Expected to find " #CONTAINS " (" << myContains << ") in " #BIG_STRING " (" \
                 << myString << ")";                                                             \
             ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream();          \

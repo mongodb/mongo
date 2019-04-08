@@ -36,10 +36,9 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
-using namespace mongoutils;
 using boost::intrusive_ptr;
 using std::string;
 using std::vector;

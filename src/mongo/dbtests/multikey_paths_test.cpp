@@ -40,7 +40,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

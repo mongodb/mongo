@@ -779,8 +779,7 @@ void BenchRunState::waitForState(State awaitedState) {
             }
             break;
         default:
-            msgasserted(16152,
-                        mongoutils::str::stream() << "Cannot wait for state " << awaitedState);
+            msgasserted(16152, str::stream() << "Cannot wait for state " << awaitedState);
     }
 }
 

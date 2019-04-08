@@ -34,11 +34,9 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
-
-namespace str = mongoutils::str;
 
 class FieldRef;
 

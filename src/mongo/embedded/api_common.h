@@ -30,7 +30,7 @@
 #include <string>
 
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -127,7 +127,7 @@ private:
 public:
     ReentrancyGuard() {
         uassert(ErrorCodes::ReentrancyNotAllowed,
-                mongoutils::str::stream() << "Reentry into library is not allowed",
+                str::stream() << "Reentry into library is not allowed",
                 !inLibrary());
         inLibrary() = true;
     }

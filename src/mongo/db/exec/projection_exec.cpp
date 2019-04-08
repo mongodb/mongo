@@ -35,7 +35,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/update/path_support.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -95,7 +95,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                     MatchExpressionParser::parse(elemMatchObj, std::move(expCtx));
                 invariant(statusWithMatcher.isOK());
                 // And store it in _matchers.
-                _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] =
+                _matchers[str::before(e.fieldName(), '.').c_str()] =
                     statusWithMatcher.getValue().release();
 
                 add(e.fieldName(), true);
@@ -138,7 +138,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
             }
         }
 
-        if (mongoutils::str::contains(e.fieldName(), ".$")) {
+        if (str::contains(e.fieldName(), ".$")) {
             _arrayOpType = ARRAY_OP_POSITIONAL;
         }
     }
@@ -483,7 +483,7 @@ Status ProjectionExec::append(BSONObjBuilder* bob,
         if (details && arrayOpType == ARRAY_OP_POSITIONAL) {
             // $ positional operator specified
             if (!details->hasElemMatchKey()) {
-                mongoutils::str::stream error;
+                str::stream error;
                 error << "positional operator (" << elt.fieldName()
                       << ".$) requires corresponding field"
                       << " in query specifier";

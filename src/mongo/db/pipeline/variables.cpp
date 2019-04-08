@@ -32,7 +32,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

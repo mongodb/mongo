@@ -53,12 +53,12 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/str.h"
 
 using std::endl;
 using std::string;

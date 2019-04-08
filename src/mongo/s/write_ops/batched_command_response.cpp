@@ -36,14 +36,14 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::string;
 
-using mongoutils::str::stream;
+using str::stream;
 
 const BSONField<long long> BatchedCommandResponse::n("n", 0);
 const BSONField<long long> BatchedCommandResponse::nModified("nModified", 0);

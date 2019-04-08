@@ -389,7 +389,7 @@ PlanStage* buildStages(OperationContext* opCtx,
         case STAGE_TRIAL:
         case STAGE_UNKNOWN:
         case STAGE_UPDATE: {
-            mongoutils::str::stream ss;
+            str::stream ss;
             root->appendToString(&ss, 0);
             string nodeStr(ss);
             warning() << "Can't build exec tree for node " << nodeStr << endl;

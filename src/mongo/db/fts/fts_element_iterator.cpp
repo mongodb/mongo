@@ -30,7 +30,7 @@
 #include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 #include <stack>
@@ -63,7 +63,7 @@ inline bool _matchPrefix(const string& dottedName, const string& weight) {
     if (weight == dottedName) {
         return true;
     }
-    return mongoutils::str::startsWith(weight, dottedName + '.');
+    return str::startsWith(weight, dottedName + '.');
 }
 }
 

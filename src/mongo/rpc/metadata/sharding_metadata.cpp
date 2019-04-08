@@ -37,7 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace rpc {

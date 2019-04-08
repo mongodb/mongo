@@ -42,7 +42,7 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace {

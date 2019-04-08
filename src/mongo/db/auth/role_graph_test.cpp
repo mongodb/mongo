@@ -36,8 +36,8 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/sequence_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -206,7 +206,7 @@ TEST(RoleGraphTest, AddRemoveRoles) {
     } else if (cur == roleC) {
         ASSERT_EQUALS(it.next().getFullName(), roleB.getFullName());
     } else {
-        FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        FAIL(str::stream() << "unexpected role returned: " << cur.getFullName());
     }
     ASSERT_FALSE(it.more());
 
@@ -226,7 +226,7 @@ TEST(RoleGraphTest, AddRemoveRoles) {
         } else if (cur == roleD) {
             hasD = true;
         } else {
-            FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+            FAIL(str::stream() << "unexpected role returned: " << cur.getFullName());
         }
     }
     ASSERT_EQUALS(3, num);
@@ -241,7 +241,7 @@ TEST(RoleGraphTest, AddRemoveRoles) {
     } else if (cur == roleD) {
         ASSERT_EQUALS(it.next().getFullName(), roleC.getFullName());
     } else {
-        FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        FAIL(str::stream() << "unexpected role returned: " << cur.getFullName());
     }
     ASSERT_FALSE(it.more());
 
@@ -262,7 +262,7 @@ TEST(RoleGraphTest, AddRemoveRoles) {
     } else if (cur == roleB) {
         ASSERT_EQUALS(it.next().getFullName(), roleA.getFullName());
     } else {
-        FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        FAIL(str::stream() << "unexpected role returned: " << cur.getFullName());
     }
     ASSERT_FALSE(it.more());
 

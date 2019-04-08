@@ -34,7 +34,7 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

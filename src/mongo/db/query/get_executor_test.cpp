@@ -42,7 +42,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 using namespace mongo;
 

@@ -29,19 +29,19 @@
 
 #include "mongo/base/data_type.h"
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 Status DataType::makeTrivialLoadStatus(size_t sizeOfT, size_t length, size_t debug_offset) {
-    mongoutils::str::stream ss;
+    str::stream ss;
     ss << "buffer size too small to read (" << sizeOfT << ") bytes out of buffer[" << length
        << "] at offset: " << debug_offset;
     return Status(ErrorCodes::Overflow, ss);
 }
 
 Status DataType::makeTrivialStoreStatus(size_t sizeOfT, size_t length, size_t debug_offset) {
-    mongoutils::str::stream ss;
+    str::stream ss;
     ss << "buffer size too small to write (" << sizeOfT << ") bytes into buffer[" << length
        << "] at offset: " << debug_offset;
     return Status(ErrorCodes::Overflow, ss);

@@ -30,7 +30,7 @@
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 
 #include "mongo/db/field_parser.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

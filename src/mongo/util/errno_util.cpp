@@ -38,8 +38,8 @@
 #include <errno.h>  // For errno
 #endif
 
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 namespace mongo {

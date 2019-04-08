@@ -91,8 +91,8 @@ const int TempKeyMaxSize = 1024;
 // TODO SERVER-36385: Completely remove the key size check in 4.4
 Status checkKeySize(const BSONObj& key) {
     if (key.objsize() >= TempKeyMaxSize) {
-        std::string msg = mongoutils::str::stream() << "Index key too large to index, failing "
-                                                    << key.objsize() << ' ' << redact(key);
+        std::string msg = str::stream() << "Index key too large to index, failing " << key.objsize()
+                                        << ' ' << redact(key);
         return Status(ErrorCodes::KeyTooLong, msg);
     }
     return Status::OK();

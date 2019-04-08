@@ -52,7 +52,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace QueryStageAnd {
 
@@ -77,7 +77,7 @@ public:
         std::vector<const IndexDescriptor*> indexes;
         coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         if (indexes.empty()) {
-            FAIL(mongoutils::str::stream() << "Unable to find index with key pattern " << obj);
+            FAIL(str::stream() << "Unable to find index with key pattern " << obj);
         }
         return indexes[0];
     }

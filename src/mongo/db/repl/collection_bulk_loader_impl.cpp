@@ -46,8 +46,8 @@
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {

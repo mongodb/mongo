@@ -96,8 +96,8 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -1993,8 +1993,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
         auto op = kOpsMap.find(o.firstElementFieldName());
         if (op == kOpsMap.end()) {
             return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Invalid key '" << o.firstElementFieldName()
-                                                    << "' found in field 'o'");
+                          str::stream() << "Invalid key '" << o.firstElementFieldName()
+                                        << "' found in field 'o'");
         }
 
         const ApplyOpMetadata& curOpToApply = op->second;

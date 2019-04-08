@@ -54,7 +54,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -70,7 +70,7 @@ Status upsert(OperationContext* opCtx, IndexBuildEntry indexBuildEntry) {
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
                                   Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
-                                      mongoutils::str::stream ss;
+                                      str::stream ss;
                                       ss << "Collection not found: "
                                          << NamespaceString::kIndexBuildEntryNamespace.ns();
                                       return Status(ErrorCodes::NamespaceNotFound, ss);
@@ -126,7 +126,7 @@ Status addIndexBuildEntry(OperationContext* opCtx, IndexBuildEntry indexBuildEnt
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
                                   Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
-                                      mongoutils::str::stream ss;
+                                      str::stream ss;
                                       ss << "Collection not found: "
                                          << NamespaceString::kIndexBuildEntryNamespace.ns();
                                       return Status(ErrorCodes::NamespaceNotFound, ss);
@@ -153,7 +153,7 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
                 opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
             Collection* collection = autoCollection.getCollection();
             if (!collection) {
-                mongoutils::str::stream ss;
+                str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
                 return Status(ErrorCodes::NamespaceNotFound, ss);
             }
@@ -161,7 +161,7 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
             RecordId rid = Helpers::findOne(
                 opCtx, collection, BSON("_id" << indexBuildUUID), /*requireIndex=*/true);
             if (rid.isNull()) {
-                mongoutils::str::stream ss;
+                str::stream ss;
                 ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;
                 return Status(ErrorCodes::NoMatchingDocument, ss);
             }
@@ -178,7 +178,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
     Collection* collection = autoCollection.getCollection();
     if (!collection) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
         return Status(ErrorCodes::NamespaceNotFound, ss);
     }
@@ -187,7 +187,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     bool foundObj = Helpers::findOne(
         opCtx, collection, BSON("_id" << indexBuildUUID), obj, /*requireIndex=*/true);
     if (!foundObj) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;
         return Status(ErrorCodes::NoMatchingDocument, ss);
     }
@@ -197,7 +197,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
         IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
         return indexBuildEntry;
     } catch (...) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Invalid BSON found for matching document with indexBuildUUID: " << indexBuildUUID;
         return Status(ErrorCodes::InvalidBSON, ss);
     }
@@ -208,7 +208,7 @@ StatusWith<std::vector<IndexBuildEntry>> getIndexBuildEntries(OperationContext* 
     AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
     Collection* collection = autoCollection.getCollection();
     if (!collection) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
         return Status(ErrorCodes::NamespaceNotFound, ss);
     }
@@ -250,7 +250,7 @@ StatusWith<std::vector<IndexBuildEntry>> getIndexBuildEntries(OperationContext* 
             IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
             indexBuildEntries.push_back(indexBuildEntry);
         } catch (...) {
-            mongoutils::str::stream ss;
+            str::stream ss;
             ss << "Invalid BSON found for RecordId " << loc << " in collection "
                << collection->ns();
             return Status(ErrorCodes::InvalidBSON, ss);
@@ -356,7 +356,7 @@ Status clearAllIndexBuildEntries(OperationContext* opCtx) {
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_X);
                                   Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
-                                      mongoutils::str::stream ss;
+                                      str::stream ss;
                                       ss << "Collection not found: "
                                          << NamespaceString::kIndexBuildEntryNamespace.ns();
                                       return Status(ErrorCodes::NamespaceNotFound, ss);

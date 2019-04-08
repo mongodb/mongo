@@ -38,7 +38,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 using std::string;
 

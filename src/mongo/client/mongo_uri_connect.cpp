@@ -36,8 +36,8 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/password_digest.h"
+#include "mongo/util/str.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>

@@ -47,9 +47,9 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -177,7 +177,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
     if (params.count("writeMode")) {
         std::string mode = params["writeMode"].as<string>();
         if (mode != "commands" && mode != "legacy" && mode != "compatibility") {
-            uasserted(17396, mongoutils::str::stream() << "Unknown writeMode option: " << mode);
+            uasserted(17396, str::stream() << "Unknown writeMode option: " << mode);
         }
         shellGlobalParams.writeMode = mode;
     }
@@ -185,10 +185,8 @@ Status storeMongoShellOptions(const moe::Environment& params,
         std::string mode = params["readMode"].as<string>();
         if (mode != "commands" && mode != "compatibility" && mode != "legacy") {
             uasserted(17397,
-                      mongoutils::str::stream()
-                          << "Unknown readMode option: '"
-                          << mode
-                          << "'. Valid modes are: {commands, compatibility, legacy}");
+                      str::stream() << "Unknown readMode option: '" << mode
+                                    << "'. Valid modes are: {commands, compatibility, legacy}");
         }
         shellGlobalParams.readMode = mode;
     }

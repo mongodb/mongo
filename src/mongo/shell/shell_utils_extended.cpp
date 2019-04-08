@@ -45,10 +45,10 @@
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/password.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -140,7 +140,7 @@ BSONObj cd(const BSONObj& args, void* data) {
         return BSONObj();
     }
 #endif
-    uasserted(16832, mongoutils::str::stream() << "cd command failed: " << errnoWithDescription());
+    uasserted(16832, str::stream() << "cd command failed: " << errnoWithDescription());
     return BSONObj();
 }
 

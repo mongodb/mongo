@@ -47,8 +47,8 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/sequence_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace auth {

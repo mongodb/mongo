@@ -68,8 +68,8 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -742,8 +742,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
-            mongoutils::str::stream()
-                << "cannot perform operation: an index build is currently running",
+            str::stream() << "cannot perform operation: an index build is currently running",
             !haveAnyIndexesInProgress());
 
     // make sure nothing in progress

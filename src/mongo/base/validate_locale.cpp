@@ -34,7 +34,7 @@
 #include <locale>
 
 #include "mongo/base/init.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

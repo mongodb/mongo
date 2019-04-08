@@ -43,8 +43,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/producer_consumer_queue.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

@@ -120,7 +120,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
         }
     } catch (std::out_of_range&) {
         return Status(ErrorCodes::AuthenticationFailed,
-                      mongoutils::str::stream() << "Incorrectly formatted PLAIN client message");
+                      str::stream() << "Incorrectly formatted PLAIN client message");
     }
 
     // The authentication database is also the source database for the user.

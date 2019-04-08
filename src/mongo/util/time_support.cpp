@@ -41,7 +41,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 #if defined(_WIN32)
 #include "mongo/util/concurrency/mutex.h"

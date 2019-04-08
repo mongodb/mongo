@@ -44,7 +44,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -165,7 +165,7 @@ void BackgroundJob::jobBody() {
 void BackgroundJob::go() {
     stdx::unique_lock<stdx::mutex> l(_status->mutex);
     massert(17234,
-            mongoutils::str::stream() << "backgroundJob already running: " << name(),
+            str::stream() << "backgroundJob already running: " << name(),
             _status->state != Running);
 
     // If the job is already 'done', for instance because it was cancelled or already

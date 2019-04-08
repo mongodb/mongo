@@ -29,7 +29,7 @@
 
 #include "mongo/base/data_type_terminated.h"
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {

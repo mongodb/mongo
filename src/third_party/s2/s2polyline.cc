@@ -18,8 +18,8 @@ using std::vector;
 #include "s2latlng.h"
 #include "s2edgeutil.h"
 
-#include "mongo/util/mongoutils/str.h"
-using mongoutils::str::stream;
+#include "mongo/util/str.h"
+using mongo::str::stream;
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 

@@ -33,7 +33,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -122,7 +122,7 @@ PlanStage::StageState AndSortedStage::getTargetRecordId(WorkingSetID* out) {
         // failed, in which case 'id' is valid.  If ID is invalid, we
         // create our own error message.
         if (WorkingSet::INVALID_ID == id) {
-            mongoutils::str::stream ss;
+            str::stream ss;
             ss << "sorted AND stage failed to read in results from first child";
             Status status(ErrorCodes::InternalError, ss);
             *out = WorkingSetCommon::allocateStatusMember(_ws, status);

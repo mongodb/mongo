@@ -141,7 +141,7 @@ public:
         // Finally, we get to compare the sorted results against what we expect.
         BSONObj expectedObj = fromjson(expectedStr);
         if (SimpleBSONObjComparator::kInstance.evaluate(outputObj != expectedObj)) {
-            mongoutils::str::stream ss;
+            str::stream ss;
             // Even though we have the original string representation of the expected output,
             // we invoke BSONObj::toString() to get a format consistent with outputObj.
             ss << "Unexpected sort result with pattern=" << patternStr << "; limit=" << limit

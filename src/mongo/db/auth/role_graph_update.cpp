@@ -40,7 +40,7 @@
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/update/update_driver.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -90,12 +90,11 @@ Status checkIdMatchesRoleName(const BSONElement& idElement, const RoleName& role
     if (firstDot == std::string::npos || idField.substr(0, firstDot) != roleName.getDB() ||
         idField.substr(firstDot + 1) != roleName.getRole()) {
         return Status(ErrorCodes::FailedToParse,
-                      mongoutils::str::stream()
-                          << "Role document _id fields must be encoded as the string "
-                             "dbname.rolename.  Found "
-                          << idField
-                          << " for "
-                          << roleName.getFullName());
+                      str::stream() << "Role document _id fields must be encoded as the string "
+                                       "dbname.rolename.  Found "
+                                    << idField
+                                    << " for "
+                                    << roleName.getFullName());
     }
     return Status::OK();
 }
@@ -369,8 +368,7 @@ Status RoleGraph::handleLogOp(OperationContext* opCtx,
         return Status::OK();
     if (op[0] == '\0' || op[1] != '\0') {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "Unrecognized \"op\" field value \"" << op
-                                                << '"');
+                      str::stream() << "Unrecognized \"op\" field value \"" << op << '"');
     }
 
     if (ns.db() != AuthorizationManager::rolesCollectionNamespace.db())
@@ -405,8 +403,7 @@ Status RoleGraph::handleLogOp(OperationContext* opCtx,
                           "Namespace admin.system.roles is not a valid target for commands");
         default:
             return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Unrecognized \"op\" field value \"" << op
-                                                    << '"');
+                          str::stream() << "Unrecognized \"op\" field value \"" << op << '"');
     }
 }
 

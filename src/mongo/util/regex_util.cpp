@@ -31,7 +31,7 @@
 #include "mongo/util/regex_util.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace regex_util {

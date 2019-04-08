@@ -47,9 +47,9 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
+#include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/text.h"
 
@@ -298,9 +298,9 @@ void canonicalizeClusterDN(std::vector<std::string>* dn) {
     for (size_t i = 0; i < dn->size(); i++) {
         std::string& comp = dn->at(i);
         boost::algorithm::trim(comp);
-        if (!mongoutils::str::startsWith(comp.c_str(), "DC=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "O=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "OU=")) {
+        if (!str::startsWith(comp.c_str(), "DC=") &&  //
+            !str::startsWith(comp.c_str(), "O=") &&   //
+            !str::startsWith(comp.c_str(), "OU=")) {
             dn->erase(dn->begin() + i);
             i--;
         }
@@ -1158,10 +1158,8 @@ SSLManagerInterface* getSSLManager() {
     return theSSLManager;
 }
 
-}  // namespace mongo
-
 // TODO SERVER-11601 Use NFC Unicode canonicalization
-bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
+bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
     nameToMatch = removeFQDNRoot(std::move(nameToMatch));
     certHostName = removeFQDNRoot(std::move(certHostName));
 
@@ -1173,8 +1171,10 @@ bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::strin
     if (certHostName[0] == '*' && certHostName[1] == '.') {
         // allow name.example.com if the cert is *.example.com, '*' does not match '.'
         const char* subName = strchr(nameToMatch.c_str(), '.');
-        return subName && !strcasecmp(certHostName.c_str() + 1, subName);
+        return subName && !str::caseInsensitiveCompare(certHostName.c_str() + 1, subName);
     } else {
-        return !strcasecmp(nameToMatch.c_str(), certHostName.c_str());
+        return !str::caseInsensitiveCompare(nameToMatch.c_str(), certHostName.c_str());
     }
 }
+
+}  // namespace mongo

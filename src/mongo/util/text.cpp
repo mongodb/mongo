@@ -43,7 +43,7 @@
 
 #include "mongo/platform/basic.h"
 #include "mongo/util/allocator.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -173,7 +173,7 @@ std::string toUtf8String(const std::wstring& wide) {
         }
     }
 
-    msgasserted(16091, mongoutils::str::stream() << "can't wstring to utf8: " << ::GetLastError());
+    msgasserted(16091, str::stream() << "can't wstring to utf8: " << ::GetLastError());
     return "";
 }
 

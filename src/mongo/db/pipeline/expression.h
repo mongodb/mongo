@@ -48,7 +48,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -343,14 +343,12 @@ public:
 
     void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(28667,
-                mongoutils::str::stream() << "Expression " << this->getOpName()
-                                          << " takes at least "
-                                          << MinArgs
-                                          << " arguments, and at most "
-                                          << MaxArgs
-                                          << ", but "
-                                          << args.size()
-                                          << " were passed in.",
+                str::stream() << "Expression " << this->getOpName() << " takes at least " << MinArgs
+                              << " arguments, and at most "
+                              << MaxArgs
+                              << ", but "
+                              << args.size()
+                              << " were passed in.",
                 MinArgs <= args.size() && args.size() <= MaxArgs);
     }
 };
@@ -364,11 +362,10 @@ public:
 
     void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(16020,
-                mongoutils::str::stream() << "Expression " << this->getOpName() << " takes exactly "
-                                          << NArgs
-                                          << " arguments. "
-                                          << args.size()
-                                          << " were passed in.",
+                str::stream() << "Expression " << this->getOpName() << " takes exactly " << NArgs
+                              << " arguments. "
+                              << args.size()
+                              << " were passed in.",
                 args.size() == NArgs);
     }
 };

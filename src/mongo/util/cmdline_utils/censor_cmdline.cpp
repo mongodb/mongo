@@ -32,17 +32,18 @@
 #include <set>
 #include <string>
 
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace cmdline_utils {
 
 namespace {
+
 struct InsensitiveCompare {
     bool operator()(const std::string& a, const std::string& b) const {
-        return strcasecmp(a.c_str(), b.c_str()) < 0;
+        return str::caseInsensitiveCompare(a.c_str(), b.c_str()) < 0;
     }
 };
 

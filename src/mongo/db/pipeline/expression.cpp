@@ -47,15 +47,13 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/regex_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/summation.h"
 
 namespace mongo {
 using Parser = Expression::Parser;
-
-using namespace mongoutils;
 
 using boost::intrusive_ptr;
 using std::map;

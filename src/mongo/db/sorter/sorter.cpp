@@ -64,7 +64,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
@@ -72,7 +72,6 @@ namespace mongo {
 namespace sorter {
 
 using std::shared_ptr;
-using namespace mongoutils;
 
 // We need to use the "real" errno everywhere, not GetLastError() on Windows
 inline std::string myErrnoWithDescription() {
@@ -904,7 +903,6 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
                                                const std::streampos fileStartOffset,
                                                const Settings& settings)
     : _settings(settings) {
-    namespace str = mongoutils::str;
 
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(
@@ -946,8 +944,6 @@ void SortedFileWriter<Key, Value>::addAlreadySorted(const Key& key, const Value&
 
 template <typename Key, typename Value>
 void SortedFileWriter<Key, Value>::spill() {
-    namespace str = mongoutils::str;
-
     int32_t size = _buffer.len();
     char* outBuffer = _buffer.buf();
 

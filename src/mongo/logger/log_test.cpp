@@ -49,7 +49,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 using namespace mongo::logger;
 

@@ -30,7 +30,7 @@
 #include "mongo/db/fts/fts_spec.h"
 
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -44,7 +44,6 @@ namespace fts {
 
 using std::map;
 using std::string;
-using namespace mongoutils;
 
 namespace dps = ::mongo::dotted_path_support;
 

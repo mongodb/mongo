@@ -32,7 +32,7 @@
 #include <iostream>
 
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -40,8 +40,6 @@ using std::cerr;
 using std::endl;
 using std::map;
 using std::string;
-
-using namespace mongoutils;
 
 MetricTree* MetricTree::theMetricTree = NULL;
 

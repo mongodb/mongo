@@ -45,8 +45,8 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_types.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {

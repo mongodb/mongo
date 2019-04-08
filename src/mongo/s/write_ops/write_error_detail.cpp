@@ -32,7 +32,7 @@
 #include "mongo/s/write_ops/write_error_detail.h"
 
 #include "mongo/db/field_parser.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

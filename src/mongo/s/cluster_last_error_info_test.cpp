@@ -40,7 +40,7 @@
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

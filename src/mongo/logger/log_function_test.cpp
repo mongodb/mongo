@@ -42,7 +42,7 @@
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 using namespace mongo::logger;
 

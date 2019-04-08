@@ -33,7 +33,6 @@
  * String utilities.
  *
  * TODO: De-inline.
- * TODO: Retire the mongoutils namespace, and move str under the mongo namespace.
  */
 
 #include <sstream>
@@ -42,9 +41,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 
-namespace mongoutils {
-
-namespace str {
+namespace mongo::str {
 
 /** the idea here is to make one liners easy.  e.g.:
 
@@ -269,17 +266,12 @@ inline size_t lengthInUTF8CodePoints(mongo::StringData str) {
     return strLen;
 }
 
-}  // namespace str
-
-}  // namespace mongoutils
-
-namespace mongo {
-using namespace mongoutils;
-
+inline int caseInsensitiveCompare(const char* s1, const char* s2) {
 #if defined(_WIN32)
-inline int strcasecmp(const char* s1, const char* s2) {
     return _stricmp(s1, s2);
-}
+#else
+    return strcasecmp(s1, s2);
 #endif
+}
 
-}  // namespace mongo
+}  // namespace mongo::str

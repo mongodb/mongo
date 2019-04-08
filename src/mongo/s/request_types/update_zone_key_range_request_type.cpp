@@ -106,12 +106,12 @@ StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::_parseFromComma
         isRemove = true;
     } else {
         return {ErrorCodes::TypeMismatch,
-                mongoutils::str::stream() << "\"" << kZoneName << "\" had the wrong type. Expected "
-                                          << typeName(String)
-                                          << " or "
-                                          << typeName(jstNULL)
-                                          << ", found "
-                                          << typeName(zoneElem.type())};
+                str::stream() << "\"" << kZoneName << "\" had the wrong type. Expected "
+                              << typeName(String)
+                              << " or "
+                              << typeName(jstNULL)
+                              << ", found "
+                              << typeName(zoneElem.type())};
     }
 
     if (isRemove) {

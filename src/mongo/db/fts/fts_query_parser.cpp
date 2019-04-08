@@ -30,7 +30,7 @@
 #include <string>
 
 #include "mongo/db/fts/fts_query_parser.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {

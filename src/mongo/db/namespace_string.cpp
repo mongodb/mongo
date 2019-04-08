@@ -34,7 +34,7 @@
 #include <ostream>
 
 #include "mongo/base/parse_number.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

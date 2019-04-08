@@ -35,7 +35,7 @@
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/query/count_request.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

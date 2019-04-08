@@ -38,7 +38,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -108,7 +108,7 @@ void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
 
     ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbname, cmdObj));
     uassert(ErrorCodes::InvalidNamespace,
-            mongoutils::str::stream() << "Invalid input resource " << inputResource.toString(),
+            str::stream() << "Invalid input resource " << inputResource.toString(),
             inputResource.isExactNamespacePattern());
     out->push_back(Privilege(inputResource, ActionType::find));
 
@@ -128,8 +128,7 @@ void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
         ResourcePattern outputResource(
             ResourcePattern::forExactNamespace(NamespaceString(outputOptions.finalNamespace)));
         uassert(ErrorCodes::InvalidNamespace,
-                mongoutils::str::stream() << "Invalid target namespace "
-                                          << outputResource.ns().ns(),
+                str::stream() << "Invalid target namespace " << outputResource.ns().ns(),
                 outputResource.ns().isValid());
 
         // TODO: check if outputNs exists and add createCollection privilege if not

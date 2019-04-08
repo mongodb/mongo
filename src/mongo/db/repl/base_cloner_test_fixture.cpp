@@ -35,7 +35,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {

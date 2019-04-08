@@ -69,8 +69,8 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

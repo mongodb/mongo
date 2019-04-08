@@ -38,7 +38,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -88,20 +88,20 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
                                                    const PositionalPathInfo& positionalInfo,
                                                    const char** field,
                                                    bool* arrayNestedArray) const {
-    std::string firstField = mongoutils::str::before(*field, '.');
+    std::string firstField = str::before(*field, '.');
     bool haveObjField = !obj.getField(firstField).eoo();
     BSONElement arrField = positionalInfo.positionallyIndexedElt;
 
     // An index component field name cannot exist in both a document
     // array and one of that array's children.
-    uassert(16746,
-            mongoutils::str::stream()
-                << "Ambiguous field name found in array (do not use numeric field names in "
-                   "embedded elements in an array), field: '"
-                << arrField.fieldName()
-                << "' for array: "
-                << positionalInfo.arrayObj,
-            !haveObjField || !positionalInfo.hasPositionallyIndexedElt());
+    uassert(
+        16746,
+        str::stream() << "Ambiguous field name found in array (do not use numeric field names in "
+                         "embedded elements in an array), field: '"
+                      << arrField.fieldName()
+                      << "' for array: "
+                      << positionalInfo.arrayObj,
+        !haveObjField || !positionalInfo.hasPositionallyIndexedElt());
 
     *arrayNestedArray = false;
     if (haveObjField) {

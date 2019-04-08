@@ -50,7 +50,7 @@
     try {                                                                          \
         EXPRESSION;                                                                \
     } catch (const AssertionException& e) {                                        \
-        ::mongoutils::str::stream err;                                             \
+        ::mongo::str::stream err;                                                  \
         err << "Threw an exception incorrectly: " << e.toString();                 \
         ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
     }
@@ -58,7 +58,7 @@
 namespace mongo {
 namespace {
 
-using mongoutils::str::stream;
+using str::stream;
 using unittest::assertGet;
 
 TEST(Parse, Normal) {

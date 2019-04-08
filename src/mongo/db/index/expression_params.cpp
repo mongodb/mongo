@@ -35,12 +35,12 @@
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "third_party/s2/s2.h"
 
 namespace mongo {
 
-using mongoutils::str::stream;
+using str::stream;
 
 void ExpressionParams::parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParams* out) {
     BSONObjIterator i(infoObj.getObjectField("key"));

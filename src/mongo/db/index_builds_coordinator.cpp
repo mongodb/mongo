@@ -53,7 +53,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -375,26 +375,24 @@ bool IndexBuildsCoordinator::inProgForDb(StringData db) const {
 void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
-            mongoutils::str::stream() << "cannot perform operation: there are currently "
-                                      << _allIndexBuilds.size()
-                                      << " index builds running.",
+            str::stream() << "cannot perform operation: there are currently "
+                          << _allIndexBuilds.size()
+                          << " index builds running.",
             _allIndexBuilds.size() == 0);
 }
 
 void IndexBuildsCoordinator::assertNoIndexBuildInProgForCollection(
     const UUID& collectionUUID) const {
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
-            mongoutils::str::stream()
-                << "cannot perform operation: an index build is currently running",
+            str::stream() << "cannot perform operation: an index build is currently running",
             !inProgForCollection(collectionUUID));
 }
 
 void IndexBuildsCoordinator::assertNoBgOpInProgForDb(StringData db) const {
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
-            mongoutils::str::stream()
-                << "cannot perform operation: an index build is currently running for "
-                   "database "
-                << db,
+            str::stream() << "cannot perform operation: an index build is currently running for "
+                             "database "
+                          << db,
             !inProgForDb(db));
 }
 

@@ -34,14 +34,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
+namespace mongo {
 namespace {
-
-using mongo::FieldRef;
-using mongo::StringData;
-using mongoutils::str::stream;
-using std::string;
 
 TEST(Empty, NoFields) {
     FieldRef fieldRef("");
@@ -50,7 +46,7 @@ TEST(Empty, NoFields) {
 }
 
 TEST(Empty, NoFieldNames) {
-    string field = ".";
+    std::string field = ".";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 2U);
     ASSERT_EQUALS(fieldRef.getPart(0), "");
@@ -59,7 +55,7 @@ TEST(Empty, NoFieldNames) {
 }
 
 TEST(Empty, NoFieldNames2) {
-    string field = "..";
+    std::string field = "..";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 3U);
     ASSERT_EQUALS(fieldRef.getPart(0), "");
@@ -69,7 +65,7 @@ TEST(Empty, NoFieldNames2) {
 }
 
 TEST(Empty, EmptyFieldName) {
-    string field = ".b.";
+    std::string field = ".b.";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 3U);
     ASSERT_EQUALS(fieldRef.getPart(0), "");
@@ -88,7 +84,7 @@ TEST(Empty, ReinitializeWithEmptyString) {
 }
 
 TEST(Normal, SinglePart) {
-    string field = "a";
+    std::string field = "a";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 1U);
     ASSERT_EQUALS(fieldRef.getPart(0), field);
@@ -96,7 +92,7 @@ TEST(Normal, SinglePart) {
 }
 
 TEST(Normal, ParseTwice) {
-    string field = "a";
+    std::string field = "a";
     FieldRef fieldRef;
     for (int i = 0; i < 2; i++) {
         fieldRef.parse(field);
@@ -109,7 +105,7 @@ TEST(Normal, ParseTwice) {
 TEST(Normal, MulitplePartsVariable) {
     const char* parts[] = {"a", "b", "c", "d", "e"};
     size_t size = sizeof(parts) / sizeof(char*);
-    string field(parts[0]);
+    std::string field(parts[0]);
     for (size_t i = 1; i < size; i++) {
         field.append(1, '.');
         field.append(parts[i]);
@@ -124,12 +120,12 @@ TEST(Normal, MulitplePartsVariable) {
 }
 
 TEST(Replacement, SingleField) {
-    string field = "$";
+    std::string field = "$";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 1U);
     ASSERT_EQUALS(fieldRef.getPart(0), "$");
 
-    string newField = "a";
+    std::string newField = "a";
     fieldRef.setPart(0, newField);
     ASSERT_EQUALS(fieldRef.numParts(), 1U);
     ASSERT_EQUALS(fieldRef.getPart(0), newField);
@@ -137,12 +133,12 @@ TEST(Replacement, SingleField) {
 }
 
 TEST(Replacement, InMultipleField) {
-    string field = "a.b.c.$.e";
+    std::string field = "a.b.c.$.e";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 5U);
     ASSERT_EQUALS(fieldRef.getPart(3), "$");
 
-    string newField = "d";
+    std::string newField = "d";
     fieldRef.setPart(3, newField);
     ASSERT_EQUALS(fieldRef.numParts(), 5U);
     ASSERT_EQUALS(fieldRef.getPart(3), newField);
@@ -150,8 +146,8 @@ TEST(Replacement, InMultipleField) {
 }
 
 TEST(Replacement, SameFieldMultipleReplacements) {
-    string prefix = "a.";
-    string field = prefix + "$";
+    std::string prefix = "a.";
+    std::string field = prefix + "$";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 2U);
 
@@ -877,3 +873,4 @@ TEST(NumericPathComponents, FieldsWithLeadingZeroesAreNotConsideredNumeric) {
 }
 
 }  // namespace
+}  // namespace mongo

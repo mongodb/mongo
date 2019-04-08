@@ -39,7 +39,7 @@
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

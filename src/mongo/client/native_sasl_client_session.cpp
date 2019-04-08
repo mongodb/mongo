@@ -38,7 +38,7 @@
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -79,8 +79,7 @@ Status NativeSaslClientSession::initialize() {
             new SaslSCRAMClientConversationImpl<SHA256Block>(this, scramsha256ClientCache));
     } else {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "SASL mechanism " << mechanism
-                                                << " is not supported");
+                      str::stream() << "SASL mechanism " << mechanism << " is not supported");
     }
 
     return Status::OK();
@@ -89,7 +88,7 @@ Status NativeSaslClientSession::initialize() {
 Status NativeSaslClientSession::step(StringData inputData, std::string* outputData) {
     if (!_saslConversation) {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream()
+                      str::stream()
                           << "The client authentication session has not been properly initialized");
     }
 

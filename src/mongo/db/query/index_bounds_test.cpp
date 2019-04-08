@@ -38,7 +38,7 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 using namespace mongo;
@@ -981,7 +981,7 @@ void testFindIntervalForField(int key,
     IndexBoundsChecker::Location location =
         IndexBoundsChecker::findIntervalForField(keyElt, oil, expectedDirection, &intervalIndex);
     if (expectedLocation != location) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Unexpected location from findIntervalForField: key=" << keyElt
            << "; intervals=" << oil.toString() << "; direction=" << expectedDirection
            << ". Expected: " << toString(expectedLocation) << ". Actual: " << toString(location);
@@ -991,7 +991,7 @@ void testFindIntervalForField(int key,
     if ((IndexBoundsChecker::BEHIND == expectedLocation ||
          IndexBoundsChecker::WITHIN == expectedLocation) &&
         expectedIntervalIndex != intervalIndex) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "Unexpected interval index from findIntervalForField: key=" << keyElt
            << "; intervals=" << oil.toString() << "; direction=" << expectedDirection
            << "; location= " << toString(location) << ". Expected: " << expectedIntervalIndex

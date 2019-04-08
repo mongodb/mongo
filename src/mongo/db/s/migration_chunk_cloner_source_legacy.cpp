@@ -55,8 +55,8 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

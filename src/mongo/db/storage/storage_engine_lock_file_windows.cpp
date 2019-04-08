@@ -40,7 +40,7 @@
 
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 namespace mongo {

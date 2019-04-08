@@ -49,7 +49,7 @@
 #include "mongo/util/dns_name.h"
 #include "mongo/util/dns_query.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 using namespace std::literals::string_literals;
 

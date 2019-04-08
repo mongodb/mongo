@@ -31,11 +31,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
-using mongoutils::str::stream;
+using str::stream;
 
 namespace fieldchecker {
 
@@ -51,10 +51,8 @@ Status isUpdatable(const FieldRef& field) {
 
         if (part.empty()) {
             return Status(ErrorCodes::EmptyFieldName,
-                          mongoutils::str::stream()
-                              << "The update path '"
-                              << field.dottedField()
-                              << "' contains an empty field name, which is not allowed.");
+                          str::stream() << "The update path '" << field.dottedField()
+                                        << "' contains an empty field name, which is not allowed.");
         }
     }
 

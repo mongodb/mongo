@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include <string>
 
 namespace mongo {
@@ -39,7 +39,7 @@ namespace mongo {
 std::string getShutdownSignalName(int processId) {
     const char* strEventNamePrefix = "Global\\Mongo_";
 
-    return mongoutils::str::stream() << strEventNamePrefix << processId;
+    return str::stream() << strEventNamePrefix << processId;
 }
 #endif
 }

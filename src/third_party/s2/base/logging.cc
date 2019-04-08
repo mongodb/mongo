@@ -19,13 +19,13 @@
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 using ::mongo::logger::LogstreamBuilder;
 
 LogMessageBase::LogMessageBase(LogstreamBuilder builder, const char* file, int line) :
     _lsb(std::move(builder)) {
-    _lsb.setBaseMessage(mongoutils::str::stream() << file << ':' << line << ": ");
+    _lsb.setBaseMessage(::mongo::str::stream() << file << ':' << line << ": ");
 }
 
 LogMessageBase::LogMessageBase(LogstreamBuilder builder) : _lsb(std::move(builder)) { }

@@ -36,8 +36,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

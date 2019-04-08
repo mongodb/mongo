@@ -45,7 +45,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

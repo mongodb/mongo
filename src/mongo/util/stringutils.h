@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-// see also mongoutils/str.h - perhaps move these there?
+// see also mongo/util/str.h - perhaps move these there?
 // see also text.h
 
 void splitStringDelim(const std::string& str, std::vector<std::string>* res, char delim);

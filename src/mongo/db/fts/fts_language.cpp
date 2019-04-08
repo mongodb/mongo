@@ -38,7 +38,7 @@
 #include "mongo/db/fts/fts_unicode_tokenizer.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/stringutils.h"
 
@@ -278,9 +278,8 @@ StatusWithFTSLanguage FTSLanguage::make(StringData langName, TextIndexVersion te
 
         if (it == languageMap->end()) {
             // TEXT_INDEX_VERSION_2 and above reject unrecognized language strings.
-            Status status =
-                Status(ErrorCodes::BadValue,
-                       mongoutils::str::stream() << "unsupported language: \"" << langName
+            Status status = Status(ErrorCodes::BadValue,
+                                   str::stream() << "unsupported language: \"" << langName
                                                  << "\" for text index version "
                                                  << textIndexVersion);
             return StatusWithFTSLanguage(status);

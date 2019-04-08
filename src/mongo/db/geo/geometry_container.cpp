@@ -31,7 +31,7 @@
 
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {

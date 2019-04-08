@@ -75,8 +75,8 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

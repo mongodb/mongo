@@ -59,10 +59,10 @@
 #include "mongo/logger/syslog_appender.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/str.h"
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -254,17 +254,15 @@ MONGO_INITIALIZER_GENERAL(
             exists = boost::filesystem::exists(absoluteLogpath);
         } catch (boost::filesystem::filesystem_error& e) {
             return Status(ErrorCodes::FileNotOpen,
-                          mongoutils::str::stream() << "Failed probe for \"" << absoluteLogpath
-                                                    << "\": "
-                                                    << e.code().message());
+                          str::stream() << "Failed probe for \"" << absoluteLogpath << "\": "
+                                        << e.code().message());
         }
 
         if (exists) {
             if (boost::filesystem::is_directory(absoluteLogpath)) {
-                return Status(
-                    ErrorCodes::FileNotOpen,
-                    mongoutils::str::stream() << "logpath \"" << absoluteLogpath
-                                              << "\" should name a file, not a directory.");
+                return Status(ErrorCodes::FileNotOpen,
+                              str::stream() << "logpath \"" << absoluteLogpath
+                                            << "\" should name a file, not a directory.");
             }
 
             if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
@@ -276,7 +274,7 @@ MONGO_INITIALIZER_GENERAL(
                           << renameTarget << "\".";
                 } else {
                     return Status(ErrorCodes::FileRenameFailed,
-                                  mongoutils::str::stream()
+                                  str::stream()
                                       << "Could not rename preexisting log file \""
                                       << absoluteLogpath
                                       << "\" to \""

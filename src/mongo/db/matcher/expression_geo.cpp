@@ -36,7 +36,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -216,7 +216,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
     // Just one arg. to $geoNear.
     if (objIt.more()) {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream()
+                      str::stream()
                           << "geo near accepts just one argument when querying for a GeoJSON "
                           << "point. Extra field found: "
                           << objIt.next());
@@ -231,8 +231,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
 
     if (PathAcceptingKeyword::GEO_NEAR != MatchExpressionParser::parsePathAcceptingKeyword(e)) {
         return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "invalid geo near query operator: "
-                                                << e.fieldName());
+                      str::stream() << "invalid geo near query operator: " << e.fieldName());
     }
 
     // Iterate over the argument.

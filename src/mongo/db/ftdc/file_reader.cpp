@@ -41,7 +41,7 @@
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/object_check.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

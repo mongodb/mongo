@@ -48,8 +48,8 @@ using std::string;
 using std::vector;
 
 std::string getPathPrefix(std::string path) {
-    if (mongoutils::str::contains(path, '.')) {
-        return mongoutils::str::before(path, '.');
+    if (str::contains(path, '.')) {
+        return str::before(path, '.');
     } else {
         return path;
     }
@@ -282,7 +282,7 @@ Status PlanEnumerator::init() {
 }
 
 std::string PlanEnumerator::dumpMemo() {
-    mongoutils::str::stream ss;
+    str::stream ss;
 
     // Note that this needs to be kept in sync with allocateAssignment which assigns memo IDs.
     for (size_t i = 1; i <= _memo.size(); ++i) {
@@ -293,7 +293,7 @@ std::string PlanEnumerator::dumpMemo() {
 
 string PlanEnumerator::NodeAssignment::toString() const {
     if (NULL != andAssignment) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "AND enumstate counter " << andAssignment->counter;
         for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
             ss << "\n\tchoice " << i << ":\n";
@@ -319,7 +319,7 @@ string PlanEnumerator::NodeAssignment::toString() const {
         }
         return ss;
     } else if (NULL != arrayAssignment) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [ ";
         for (size_t i = 0; i < arrayAssignment->subnodes.size(); ++i) {
             ss << arrayAssignment->subnodes[i] << " ";
@@ -328,7 +328,7 @@ string PlanEnumerator::NodeAssignment::toString() const {
         return ss;
     } else {
         verify(NULL != orAssignment);
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "ALL OF: [ ";
         for (size_t i = 0; i < orAssignment->subnodes.size(); ++i) {
             ss << orAssignment->subnodes[i] << " ";

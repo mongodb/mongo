@@ -61,10 +61,9 @@ unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const 
     ParsedProjection* out = NULL;
     Status status = ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.get(), &out);
     if (!status.isOK()) {
-        FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj << " (query: "
-                                       << query
-                                       << "): "
-                                       << status.toString());
+        FAIL(str::stream() << "failed to parse projection " << projObj << " (query: " << query
+                           << "): "
+                           << status.toString());
     }
     ASSERT(out);
     return unique_ptr<ParsedProjection>(out);

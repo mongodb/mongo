@@ -38,7 +38,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/logger/redaction.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

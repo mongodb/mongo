@@ -43,8 +43,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

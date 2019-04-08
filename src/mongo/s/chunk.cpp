@@ -35,7 +35,7 @@
 
 #include "mongo/platform/random.h"
 #include "mongo/s/chunk_writes_tracker.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

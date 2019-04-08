@@ -36,13 +36,11 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/views/durable_view_catalog.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 using std::string;
-
-using namespace mongoutils;
 
 namespace {
 /**

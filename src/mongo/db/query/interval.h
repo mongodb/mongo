@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -53,7 +53,7 @@ struct Interval {
     Interval();
 
     std::string toString() const {
-        mongoutils::str::stream ss;
+        str::stream ss;
         if (startInclusive) {
             ss << "[";
         } else {

@@ -38,7 +38,7 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -622,7 +622,7 @@ void BSONObj::toString(
 Status DataType::Handler<BSONObj>::store(
     const BSONObj& bson, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
     if (bson.objsize() > static_cast<int>(length)) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "buffer too small to write bson of size (" << bson.objsize()
            << ") at offset: " << debug_offset;
         return Status(ErrorCodes::Overflow, ss);

@@ -33,7 +33,7 @@
 #include "mongo/util/fail_point_server_parameter_gen.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

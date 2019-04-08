@@ -40,7 +40,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/update/path_support.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {

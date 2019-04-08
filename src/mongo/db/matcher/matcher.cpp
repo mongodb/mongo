@@ -35,8 +35,8 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/path.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

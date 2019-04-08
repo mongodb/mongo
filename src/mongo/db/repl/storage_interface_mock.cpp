@@ -35,7 +35,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {

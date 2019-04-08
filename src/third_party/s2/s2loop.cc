@@ -29,8 +29,8 @@ using std::make_pair;
 #include "s2cell.h"
 #include "s2edgeindex.h"
 
-#include "mongo/util/mongoutils/str.h"
-using mongoutils::str::stream;
+#include "mongo/util/str.h"
+using mongo::str::stream;
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 

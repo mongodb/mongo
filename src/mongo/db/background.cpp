@@ -39,7 +39,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -139,7 +139,7 @@ bool BackgroundOperation::inProgForNs(StringData ns) {
 void BackgroundOperation::assertNoBgOpInProg() {
     for (auto& db : dbsInProg) {
         uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
-                mongoutils::str::stream()
+                str::stream()
                     << "cannot perform operation: a background operation is currently running for "
                        "database "
                     << db.first,
@@ -149,7 +149,7 @@ void BackgroundOperation::assertNoBgOpInProg() {
 
 void BackgroundOperation::assertNoBgOpInProgForDb(StringData db) {
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
-            mongoutils::str::stream()
+            str::stream()
                 << "cannot perform operation: a background operation is currently running for "
                    "database "
                 << db,
@@ -158,7 +158,7 @@ void BackgroundOperation::assertNoBgOpInProgForDb(StringData db) {
 
 void BackgroundOperation::assertNoBgOpInProgForNs(StringData ns) {
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
-            mongoutils::str::stream()
+            str::stream()
                 << "cannot perform operation: a background operation is currently running for "
                    "collection "
                 << ns,

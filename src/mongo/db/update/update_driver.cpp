@@ -45,16 +45,10 @@
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/util/embedded_builder.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
-
-namespace str = mongoutils::str;
-namespace mb = mongo::mutablebson;
-
-using std::unique_ptr;
-using std::vector;
 
 using pathsupport::EqualityMatches;
 
@@ -211,7 +205,7 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     return populateDocumentWithQueryFields(*cq, immutablePaths, doc);
 }

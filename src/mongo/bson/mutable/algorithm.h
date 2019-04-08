@@ -36,7 +36,7 @@
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/element.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace mutablebson {
@@ -290,7 +290,7 @@ std::string getFullName(ElementType element, char delim = '.') {
         curr = curr.parent();
     }
 
-    mongoutils::str::stream name;
+    str::stream name;
     bool first = true;
     for (std::vector<StringData>::reverse_iterator it = names.rbegin(); it != names.rend(); ++it) {
         if (!first)

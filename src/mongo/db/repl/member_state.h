@@ -38,7 +38,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status_with.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {

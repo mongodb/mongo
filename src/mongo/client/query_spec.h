@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/query.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 /**

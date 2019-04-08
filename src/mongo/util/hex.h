@@ -35,7 +35,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 // can't use hex namespace because it conflicts with hex iostream function

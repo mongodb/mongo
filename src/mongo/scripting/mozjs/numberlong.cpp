@@ -40,8 +40,8 @@
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 namespace mongo {

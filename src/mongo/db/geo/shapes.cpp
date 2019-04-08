@@ -29,12 +29,9 @@
 
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 using std::abs;
-
-// So we can get at the str namespace.
-using namespace mongoutils;
 
 namespace mongo {
 

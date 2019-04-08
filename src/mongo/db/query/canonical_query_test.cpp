@@ -57,7 +57,7 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!status.isOK()) {
-        mongoutils::str::stream ss;
+        str::stream ss;
         ss << "failed to parse query: " << obj.toString()
            << ". Reason: " << status.getStatus().toString();
         FAIL(ss);
@@ -72,7 +72,7 @@ void assertEquivalent(const char* queryStr,
     if (actual->equivalent(expected)) {
         return;
     }
-    mongoutils::str::stream ss;
+    str::stream ss;
     ss << "Match expressions are not equivalent."
        << "\nOriginal query: " << queryStr << "\nExpected: " << expected->debugString()
        << "\nActual: " << actual->debugString();
@@ -85,7 +85,7 @@ void assertNotEquivalent(const char* queryStr,
     if (!actual->equivalent(expected)) {
         return;
     }
-    mongoutils::str::stream ss;
+    str::stream ss;
     ss << "Match expressions are equivalent."
        << "\nOriginal query: " << queryStr << "\nExpected: " << expected->debugString()
        << "\nActual: " << actual->debugString();

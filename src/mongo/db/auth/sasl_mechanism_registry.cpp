@@ -78,10 +78,10 @@ StatusWith<std::unique_ptr<ServerMechanismBase>> SASLServerMechanismRegistry::ge
     }
 
     return Status(ErrorCodes::BadValue,
-                  mongoutils::str::stream() << "Unsupported mechanism '" << mechanismName
-                                            << "' on authentication database '"
-                                            << authenticationDatabase
-                                            << "'");
+                  str::stream() << "Unsupported mechanism '" << mechanismName
+                                << "' on authentication database '"
+                                << authenticationDatabase
+                                << "'");
 }
 
 void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContext* opCtx,

@@ -46,7 +46,6 @@
 #include "mongo/db/json.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/options_parser/constraints.h"
@@ -55,6 +54,7 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shell_exec.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -724,7 +724,7 @@ Status checkLongName(const po::variables_map& vm,
                  ++keyValueVectorIt) {
                 std::string key;
                 std::string value;
-                if (!mongoutils::str::splitOn(*keyValueVectorIt, '=', key, value)) {
+                if (!str::splitOn(*keyValueVectorIt, '=', key, value)) {
                     StringBuilder sb;
                     sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
                     return Status(ErrorCodes::BadValue, sb.str());

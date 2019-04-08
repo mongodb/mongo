@@ -41,16 +41,13 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 #include "third_party/s2/s2polygonbuilder.h"
 
-#define BAD_VALUE(error) Status(ErrorCodes::BadValue, ::mongoutils::str::stream() << error)
+#define BAD_VALUE(error) Status(ErrorCodes::BadValue, str::stream() << error)
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::stringstream;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -116,7 +113,7 @@ static Status coordToPoint(double lng, double lat, S2Point* out) {
     S2LatLng ll = S2LatLng::FromDegrees(lat, lng).Normalized();
     // This shouldn't happen since we should only have valid lng/lats.
     if (!ll.is_valid()) {
-        stringstream ss;
+        std::stringstream ss;
         ss << "coords invalid after normalization, lng = " << lng << " lat = " << lat << endl;
         uasserted(17125, ss.str());
     }
@@ -325,7 +322,7 @@ static Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimpl
         return BAD_VALUE("Loop must have at least 3 different vertices: " << elem.toString(false));
     }
 
-    unique_ptr<S2Loop> loop(new S2Loop(exteriorVertices));
+    std::unique_ptr<S2Loop> loop(new S2Loop(exteriorVertices));
     // Check whether this loop is valid.
     if (!loop->IsValid(&err)) {
         return BAD_VALUE("Loop is not valid: " << elem.toString(false) << " " << err);

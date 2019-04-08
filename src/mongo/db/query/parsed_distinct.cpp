@@ -39,7 +39,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

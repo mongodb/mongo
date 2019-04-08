@@ -40,7 +40,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/query/collation/collator_interface_icu.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

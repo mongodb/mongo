@@ -42,7 +42,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 #include <memory>
 

@@ -38,7 +38,7 @@
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

@@ -32,7 +32,7 @@
 #include "mongo/db/query/count_request.h"
 
 #include "mongo/db/query/query_request.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

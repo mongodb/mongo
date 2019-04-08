@@ -53,8 +53,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/sequence_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {

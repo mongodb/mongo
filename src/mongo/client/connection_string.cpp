@@ -34,7 +34,7 @@
 #include "mongo/client/connection_string.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

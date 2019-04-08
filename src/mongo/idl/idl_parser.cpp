@@ -35,7 +35,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/command_generic_argument.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

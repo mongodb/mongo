@@ -37,7 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/functional.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

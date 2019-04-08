@@ -37,7 +37,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

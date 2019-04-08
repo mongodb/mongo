@@ -33,7 +33,7 @@
 
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_document.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

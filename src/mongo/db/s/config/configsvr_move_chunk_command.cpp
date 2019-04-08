@@ -41,7 +41,7 @@
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/s/request_types/balance_chunk_request_type.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

@@ -32,15 +32,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
-
-using std::set;
-using std::string;
-using std::vector;
-
-namespace str = mongoutils::str;
 
 constexpr DepsTracker::MetadataAvailable DepsTracker::kAllGeoNearDataAvailable;
 
@@ -90,15 +84,15 @@ BSONObj DepsTracker::toProjection() const {
     }
 
     bool needId = false;
-    string last;
-    for (set<string>::const_iterator it(fields.begin()), end(fields.end()); it != end; ++it) {
-        if (str::startsWith(*it, "_id") && (it->size() == 3 || (*it)[3] == '.')) {
+    std::string last;
+    for (const auto& field : fields) {
+        if (str::startsWith(field, "_id") && (field.size() == 3 || field[3] == '.')) {
             // _id and subfields are handled specially due in part to SERVER-7502
             needId = true;
             continue;
         }
 
-        if (!last.empty() && str::startsWith(*it, last)) {
+        if (!last.empty() && str::startsWith(field, last)) {
             // we are including a parent of *it so we don't need to include this field
             // explicitly. In fact, due to SERVER-6527 if we included this field, the parent
             // wouldn't be fully included.  This logic relies on on set iterators going in
@@ -107,8 +101,8 @@ BSONObj DepsTracker::toProjection() const {
             continue;
         }
 
-        last = *it + '.';
-        bb.append(*it, 1);
+        last = field + '.';
+        bb.append(field, 1);
     }
 
     if (needId)  // we are explicit either way
@@ -131,17 +125,17 @@ boost::optional<ParsedDeps> DepsTracker::toParsedDeps() const {
         return boost::none;
     }
 
-    string last;
-    for (set<string>::const_iterator it(fields.begin()), end(fields.end()); it != end; ++it) {
-        if (!last.empty() && str::startsWith(*it, last)) {
+    std::string last;
+    for (const auto& field : fields) {
+        if (!last.empty() && str::startsWith(field, last)) {
             // we are including a parent of *it so we don't need to include this field
             // explicitly. In fact, if we included this field, the parent wouldn't be fully
             // included.  This logic relies on on set iterators going in lexicographic order so
             // that a string is always directly before of all fields it prefixes.
             continue;
         }
-        last = *it + '.';
-        md.setNestedField(*it, Value(true));
+        last = field + '.';
+        md.setNestedField(field, Value(true));
     }
 
     return ParsedDeps(md.freeze());
@@ -230,7 +224,7 @@ Document documentHelper(const BSONObj& bson, const Document& neededFields, int n
 Value arrayHelper(const BSONObj& bson, const Document& neededFields) {
     BSONObjIterator it(bson);
 
-    vector<Value> values;
+    std::vector<Value> values;
     while (it.more()) {
         BSONElement bsonElement(it.next());
         if (bsonElement.type() == Object) {

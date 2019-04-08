@@ -42,8 +42,8 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/str.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
 
 namespace mongo {

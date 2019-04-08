@@ -127,7 +127,7 @@ bool IndexBounds::operator!=(const IndexBounds& other) const {
 }
 
 string OrderedIntervalList::toString() const {
-    mongoutils::str::stream ss;
+    str::stream ss;
     ss << "['" << name << "']: ";
     for (size_t j = 0; j < intervals.size(); ++j) {
         ss << intervals[j].toString();
@@ -297,7 +297,7 @@ void OrderedIntervalList::complement() {
 }
 
 string IndexBounds::toString() const {
-    mongoutils::str::stream ss;
+    str::stream ss;
     if (isSimpleRange) {
         if (IndexBounds::isStartIncludedInBound(boundInclusion)) {
             ss << "[";

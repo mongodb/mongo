@@ -34,14 +34,14 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 using std::string;
 using std::vector;
 
-using mongoutils::str::stream;
+using str::stream;
 
 const BSONField<bool> ParsedResource::anyResource("anyResource");
 const BSONField<bool> ParsedResource::cluster("cluster");

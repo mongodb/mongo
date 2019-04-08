@@ -73,10 +73,10 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/sequence_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -174,8 +174,8 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
         const RoleName& roleToAdd = *it;
         if (roleToAdd == role) {
             return Status(ErrorCodes::InvalidRoleModification,
-                          mongoutils::str::stream() << "Cannot grant role " << role.getFullName()
-                                                    << " to itself.");
+                          str::stream() << "Cannot grant role " << role.getFullName()
+                                        << " to itself.");
         }
 
         if (role.getDB() != "admin" && roleToAdd.getDB() != role.getDB()) {
@@ -202,11 +202,10 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
         }
 
         if (sequenceContains(indirectRoles, role)) {
-            return Status(
-                ErrorCodes::InvalidRoleModification,
-                mongoutils::str::stream() << "Granting " << roleToAdd.getFullName() << " to "
-                                          << role.getFullName()
-                                          << " would introduce a cycle in the role graph.");
+            return Status(ErrorCodes::InvalidRoleModification,
+                          str::stream() << "Granting " << roleToAdd.getFullName() << " to "
+                                        << role.getFullName()
+                                        << " would introduce a cycle in the role graph.");
         }
     }
     return Status::OK();

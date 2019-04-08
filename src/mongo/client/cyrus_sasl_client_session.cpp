@@ -36,8 +36,8 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -146,9 +146,9 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
     int result = sasl_client_init(saslClientGlobalCallbacks);
     if (result != SASL_OK) {
         return Status(ErrorCodes::UnknownError,
-                      mongoutils::str::stream() << "Could not initialize sasl client components ("
-                                                << sasl_errstring(result, NULL, NULL)
-                                                << ")");
+                      str::stream() << "Could not initialize sasl client components ("
+                                    << sasl_errstring(result, NULL, NULL)
+                                    << ")");
     }
 
     SaslClientSession::create = createCyrusSaslClientSession;
@@ -268,7 +268,7 @@ Status CyrusSaslClientSession::initialize() {
 
     if (SASL_OK != result) {
         return Status(ErrorCodes::UnknownError,
-                      mongoutils::str::stream() << sasl_errstring(result, NULL, NULL));
+                      str::stream() << sasl_errstring(result, NULL, NULL));
     }
 
     return Status::OK();

@@ -40,7 +40,7 @@
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

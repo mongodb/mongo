@@ -33,7 +33,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -61,10 +61,8 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
     int ret = _data.second->reconfigure(str.c_str());
     if (ret != 0) {
         string result =
-            (mongoutils::str::stream() << "WiredTiger reconfiguration failed with error code ("
-                                       << ret
-                                       << "): "
-                                       << wiredtiger_strerror(ret));
+            (str::stream() << "WiredTiger reconfiguration failed with error code (" << ret << "): "
+                           << wiredtiger_strerror(ret));
         error() << result;
 
         return Status(ErrorCodes::BadValue, result);

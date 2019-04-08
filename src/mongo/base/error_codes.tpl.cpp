@@ -33,7 +33,7 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 //#set $codes_with_extra = [ec for ec in $codes if ec.extra]
 
@@ -58,7 +58,7 @@ std::string ErrorCodes::errorString(Error err) {
             return "$ec.name";
         //#end for
         default:
-            return mongoutils::str::stream() << "Location" << int(err);
+            return str::stream() << "Location" << int(err);
     }
 }
 

@@ -134,7 +134,7 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
         _hostOrIp = "127.0.0.1";
     }
 
-    if (mongoutils::str::contains(_hostOrIp, '/') || familyHint == AF_UNIX) {
+    if (str::contains(_hostOrIp, '/') || familyHint == AF_UNIX) {
         initUnixDomainSocket(_hostOrIp, port);
         return;
     }
@@ -165,7 +165,7 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
 
 std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family_t familyHint) {
     std::string hostOrIp = target.toString();
-    if (mongoutils::str::contains(hostOrIp, '/')) {
+    if (str::contains(hostOrIp, '/')) {
         std::vector<SockAddr> ret = {SockAddr()};
         ret[0].initUnixDomainSocket(hostOrIp, port);
         // Currently, this is always valid since initUnixDomainSocket()
@@ -281,9 +281,8 @@ std::string SockAddr::getAddr() const {
             const int buflen = 128;
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-            massert(13082,
-                    mongoutils::str::stream() << "getnameinfo error " << getAddrInfoStrError(ret),
-                    ret == 0);
+            massert(
+                13082, str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
             return buffer;
         }
 

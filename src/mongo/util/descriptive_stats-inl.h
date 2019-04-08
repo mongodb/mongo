@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <limits>
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -189,8 +189,7 @@ BSONObj SummaryEstimators<Sample, NumQuantiles>::statisticSummaryToBSONObj() con
         for (size_t i = 1; i <= NumQuantiles; i++) {
             const double probability = this->DistributionEstimators<NumQuantiles>::probability(i);
             const double quantile = this->DistributionEstimators<NumQuantiles>::quantile(i);
-            quantilesBuilder.append(std::string(mongoutils::str::stream() << probability),
-                                    quantile);
+            quantilesBuilder.append(std::string(str::stream() << probability), quantile);
         }
         quantilesBuilder.doneFast();
     }

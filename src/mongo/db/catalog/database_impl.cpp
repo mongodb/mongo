@@ -557,18 +557,17 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
     invariant(!collToRename->getIndexCatalog()->haveAnyIndexesInProgress(),
-              mongoutils::str::stream()
-                  << "cannot perform operation: an index build is currently running for "
-                     "collection "
-                  << fromNSS);
+              str::stream() << "cannot perform operation: an index build is currently running for "
+                               "collection "
+                            << fromNSS);
 
     Collection* toColl = getCollection(opCtx, toNSS);
     if (toColl) {
-        invariant(!toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
-                  mongoutils::str::stream()
-                      << "cannot perform operation: an index build is currently running for "
-                         "collection "
-                      << toNSS);
+        invariant(
+            !toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
+            str::stream() << "cannot perform operation: an index build is currently running for "
+                             "collection "
+                          << toNSS);
     }
 
     log() << "renameCollection: renaming collection " << collToRename->uuid()->toString()

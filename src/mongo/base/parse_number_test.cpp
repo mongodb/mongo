@@ -36,7 +36,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"  // for str::stream()!
+#include "mongo/util/str.h"  // for str::stream()!
 
 #define ASSERT_PARSES(TYPE, INPUT_STRING, EXPECTED_VALUE)    \
     do {                                                     \
@@ -147,7 +147,6 @@ public:
     }
 
     static void TestParsingLimits() {
-        using namespace mongoutils;
         NumberType ignored;
         ASSERT_PARSES(NumberType, std::string(str::stream() << Limits::max()), Limits::max());
         ASSERT_PARSES(NumberType, std::string(str::stream() << Limits::min()), Limits::min());
@@ -226,7 +225,7 @@ TEST(ParseNumber, Int8) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("900", &ignored));
 
     for (int32_t i = -128; i <= 127; ++i)
-        ASSERT_PARSES(int8_t, std::string(mongoutils::str::stream() << i), i);
+        ASSERT_PARSES(int8_t, std::string(str::stream() << i), i);
 }
 
 TEST(ParseNumber, UInt8) {
@@ -238,7 +237,7 @@ TEST(ParseNumber, UInt8) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("+900", &ignored));
 
     for (uint32_t i = 0; i <= 255; ++i)
-        ASSERT_PARSES(uint8_t, std::string(mongoutils::str::stream() << i), i);
+        ASSERT_PARSES(uint8_t, std::string(str::stream() << i), i);
 }
 
 TEST(ParseNumber, TestParsingOverflow) {

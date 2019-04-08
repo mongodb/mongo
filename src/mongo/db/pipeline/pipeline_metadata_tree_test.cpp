@@ -63,7 +63,7 @@
     try {                                                                          \
         EXPRESSION;                                                                \
     } catch (const AssertionException& e) {                                        \
-        ::mongoutils::str::stream err;                                             \
+        ::mongo::str::stream err;                                                  \
         err << "Threw an exception incorrectly: " << e.toString()                  \
             << " Exception occured in: " << #EXPRESSION;                           \
         ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \

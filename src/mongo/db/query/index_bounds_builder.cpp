@@ -50,7 +50,7 @@
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
 
@@ -194,7 +194,7 @@ string IndexBoundsBuilder::simpleRegex(const char* regex,
         }
     }
 
-    mongoutils::str::stream ss;
+    str::stream ss;
 
     string r = "";
     while (*regex) {

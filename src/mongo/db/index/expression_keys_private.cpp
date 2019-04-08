@@ -48,7 +48,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/str.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
 
@@ -279,7 +279,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                 BSONElement locElement = oi.next();
 
                 uassert(16804,
-                        mongoutils::str::stream()
+                        str::stream()
                             << "location object expected, location array not in correct format",
                         locElement.isABSONObj());
 
@@ -437,7 +437,7 @@ int ExpressionKeysPrivate::hashHaystackElement(const BSONElement& e, double buck
 
 // static
 std::string ExpressionKeysPrivate::makeHaystackString(int hashedX, int hashedY) {
-    mongoutils::str::stream ss;
+    str::stream ss;
     ss << hashedX << "_" << hashedY;
     return ss;
 }
