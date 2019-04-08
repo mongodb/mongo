@@ -107,10 +107,7 @@
     // Test that changing the shard key works correctly when either the update or findAndModify
     // command is used and when the command is run either as a retryable write or in a transaction.
     // Pairs represent [shouldRunCommandInTxn, runUpdateAsFindAndModifyCmd]
-    //
-    // TODO: SERVER-39843 add [false, true] to run retryable write findAndModify commands that
-    // update the shard key
-    let changeShardKeyOptions = [[false, false], [true, false], [true, true]];
+    let changeShardKeyOptions = [[false, false], [true, false], [false, true], [true, true]];
     changeShardKeyOptions.forEach(function(updatePair) {
         let runInTxn = updatePair[0];
         let isFindAndModify = updatePair[1];

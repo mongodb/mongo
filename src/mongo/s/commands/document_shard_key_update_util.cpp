@@ -142,8 +142,8 @@ TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx) {
     return txnRouter;
 }
 
-void commitShardKeyUpdateTransaction(OperationContext* opCtx, TransactionRouter* txnRouter) {
-    auto commitResponse = txnRouter->commitTransaction(opCtx, boost::none);
+BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx, TransactionRouter* txnRouter) {
+    return txnRouter->commitTransaction(opCtx, boost::none);
 }
 
 BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,

@@ -75,7 +75,7 @@ TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx);
  * Commits the transaction on this session. This method is called to commit the transaction started
  * when WouldChangeOwningShard is thrown for a write that is not in a transaction already.
  */
-void commitShardKeyUpdateTransaction(OperationContext* opCtx, TransactionRouter* txnRouter);
+BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx, TransactionRouter* txnRouter);
 
 /**
  * Creates the BSONObj that will be used to delete the pre-image document. Will also attach

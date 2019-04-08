@@ -46,6 +46,7 @@
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -83,20 +84,11 @@ void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
                                                       Status responseStatus,
                                                       const BSONObj& cmdObj,
                                                       BSONObjBuilder* result) {
-    auto txnRouter = TransactionRouter::get(opCtx);
-    bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
-
     BSONObjBuilder extraInfoBuilder;
     responseStatus.extraInfo()->serialize(&extraInfoBuilder);
     auto extraInfo = extraInfoBuilder.obj();
     auto wouldChangeOwningShardExtraInfo =
         WouldChangeOwningShardInfo::parseFromCommandError(extraInfo);
-
-    if (isRetryableWrite) {
-        // TODO: SERVER-39843 Start txn and resend command
-        uasserted(ErrorCodes::ImmutableField,
-                  "After applying the update, an immutable field was found to have been altered.");
-    }
 
     try {
         auto matchedDoc = documentShardKeyUpdateUtil::updateShardKeyForDocument(
@@ -118,8 +110,7 @@ void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
         result->append("ok", 1.0);
     } catch (const DBException& e) {
         auto status = e.toStatus();
-        if (!isRetryableWrite)
-            uassertStatusOK(status.withContext("findAndModify"));
+        uassertStatusOK(status.withContext("findAndModify"));
     }
 }
 
@@ -250,14 +241,13 @@ private:
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result) {
+        bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
         const auto response = [&] {
             std::vector<AsyncRequestsSender::Request> requests;
             requests.emplace_back(
                 shardId,
                 appendShardVersion(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
                                    shardVersion));
-
-            bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
 
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
@@ -283,8 +273,43 @@ private:
         }
 
         if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
-            updateShardKeyValueOnWouldChangeOwningShardError(
-                opCtx, nss, responseStatus, cmdObj, result);
+            if (isRetryableWrite) {
+                RouterOperationContextSession routerSession(opCtx);
+                try {
+                    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+                    readConcernArgs =
+                        repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+                    // Re-run the findAndModify command that will change the shard key value in a
+                    // transaction. We call _runCommand recursively, and this second time through
+                    // since it will be run as a transaction it will take the other code path to
+                    // updateShardKeyValueOnWouldChangeOwningShardError.
+                    auto txnRouterForShardKeyChange =
+                        documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
+                    _runCommand(opCtx, shardId, shardVersion, nss, cmdObj, result);
+                    auto commitResponse =
+                        documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(
+                            opCtx, txnRouterForShardKeyChange);
+
+                    // TODO SERVER-40666: Check the commit response returned success for all shards
+                    if (commitResponse.hasField("ok") && !commitResponse["ok"].trueValue()) {
+                        // TODO SERVER-40646: Change error reported to something more useful to user
+                        uassertStatusOK(
+                            Status{ErrorCodes::Error(commitResponse.getIntField("code")),
+                                   commitResponse.getStringField("errmsg")});
+                    }
+                } catch (const DBException& e) {
+                    auto txnRouterForAbort = TransactionRouter::get(opCtx);
+                    if (txnRouterForAbort)
+                        txnRouterForAbort->implicitlyAbortTransaction(opCtx, e.toStatus());
+
+                    throw;
+                }
+            } else {
+                updateShardKeyValueOnWouldChangeOwningShardError(
+                    opCtx, nss, responseStatus, cmdObj, result);
+            }
+
             return;
         }
 
