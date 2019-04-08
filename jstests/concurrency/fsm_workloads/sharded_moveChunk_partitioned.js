@@ -100,9 +100,6 @@ var $config = extendWorkload($config, function($config, $super) {
             msg = 'moveChunk failed but original shard did not contain all documents.\n' + msgBase +
                 ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
             assertWhenOwnColl.eq(fromShardNumDocsAfter, numDocsBefore, msg);
-            msg = 'moveChunk failed but new shard had documents.\n' + msgBase +
-                ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
-            assertWhenOwnColl.eq(toShardNumDocsAfter, 0, msg);
         }
 
         // Verify that all config servers have the correct after-state.
