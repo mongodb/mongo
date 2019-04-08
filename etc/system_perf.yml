@@ -85,7 +85,7 @@ functions:
           /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python2 "${workdir}/venv"
           source "${workdir}/compile_venv/bin/activate"
 
-          python2 -m pip install -r etc/pip/compile-requirements.txt
+          python -m pip install -r etc/pip/compile-requirements.txt
 
     - command: shell.exec
       params:
