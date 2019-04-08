@@ -357,7 +357,6 @@ DBQuery.prototype._convertToCountCmd = function(applySkipLimit) {
             cmd.query = this._query;
         }
     }
-    cmd.fields = this._fields || {};
 
     if (applySkipLimit) {
         if (this._limit)

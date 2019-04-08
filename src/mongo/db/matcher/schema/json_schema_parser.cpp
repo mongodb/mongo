@@ -233,7 +233,7 @@ StatusWithMatchExpression parseLength(StringData path,
                                       BSONElement length,
                                       InternalSchemaTypeExpression* typeExpr,
                                       BSONType restrictionType) {
-    auto parsedLength = MatchExpressionParser::parseIntegerElementToNonNegativeLong(length);
+    auto parsedLength = length.parseIntegerElementToNonNegativeLong();
     if (!parsedLength.isOK()) {
         return parsedLength.getStatus();
     }
@@ -658,8 +658,7 @@ template <class T>
 StatusWithMatchExpression parseNumProperties(StringData path,
                                              BSONElement numProperties,
                                              InternalSchemaTypeExpression* typeExpr) {
-    auto parsedNumProps =
-        MatchExpressionParser::parseIntegerElementToNonNegativeLong(numProperties);
+    auto parsedNumProps = numProperties.parseIntegerElementToNonNegativeLong();
     if (!parsedNumProps.isOK()) {
         return parsedNumProps.getStatus();
     }

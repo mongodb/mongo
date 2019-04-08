@@ -35,6 +35,7 @@
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -189,7 +190,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
  * executing a count.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
-    OperationContext* opCtx, Collection* collection, const CountRequest& request, bool explain);
+    OperationContext* opCtx,
+    Collection* collection,
+    const CountCommand& request,
+    bool explain,
+    const NamespaceString& nss);
 
 /**
  * Get a PlanExecutor for a delete operation. 'parsedDelete' describes the query predicate

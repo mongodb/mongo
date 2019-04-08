@@ -77,6 +77,17 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target="count_command_test",
+    source=[
+        "count_command_test.cpp",
+    ],
+    LIBDEPS=[
+        "command_request_response",
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
+    ]
+)
+
 # Shared mongod/mongos query code.
 env.Library(
     target="query_common",
@@ -146,7 +157,8 @@ env.CppUnitTest(
 env.Library(
     target='command_request_response',
     source=[
-        'count_request.cpp',
+        "count_command_as_aggregation_command.cpp",
+        "count_request.cpp",
         'cursor_request.cpp',
         'cursor_response.cpp',
         'find_and_modify_request.cpp',
@@ -154,6 +166,7 @@ env.Library(
         'killcursors_request.cpp',
         'killcursors_response.cpp',
         'view_response_formatter.cpp',
+        env.Idlc('count_command.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -161,6 +174,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/optime',
+        "$BUILD_DIR/mongo/idl/idl_parser",
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
         'query_request',
@@ -170,7 +184,6 @@ env.Library(
 env.CppUnitTest(
     target='command_request_response_test',
     source=[
-        'count_request_test.cpp',
         'cursor_response_test.cpp',
         'find_and_modify_request_test.cpp',
         'getmore_request_test.cpp',

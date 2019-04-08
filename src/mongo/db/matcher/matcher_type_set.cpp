@@ -89,7 +89,7 @@ Status parseSingleType(BSONElement elt,
         return addAliasToTypeSet(elt.valueStringData(), aliasMap, typeSet);
     }
 
-    auto valueAsInt = MatchExpressionParser::parseIntegerElementToInt(elt);
+    auto valueAsInt = elt.parseIntegerElementToInt();
     if (!valueAsInt.isOK()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Invalid numerical type code: " << elt.number());

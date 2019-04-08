@@ -27,37 +27,18 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/count_command_gen.h"
 
 namespace mongo {
-namespace count_request {
-/**
- * Parses a limit for a CountCommand. If the limit is negative, returns the absolute value.
- * Throws on invalid values.
- */
-long long countParseLimit(const BSONElement& element);
 
 /**
- * Parses a skip for a CountCommand. Errors if the value passed is negative.
- * Throws on invalid values.
+ * Converts this CountCommand into an aggregation.
  */
-long long countParseSkip(const BSONElement& element);
+StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommand& cmd,
+                                                     const NamespaceString& nss);
 
-/**
- * Parses a hint for a CountCommand. Returns the hint object, or if the element was a string the
- * string wrapped in an object of the form {"$hint": <index_name>}.
- */
-BSONObj countParseHint(const BSONElement& element);
-
-/**
- * Parses a maxTimeMS for a CountCommand. Errors if the value passed is negative.
- * Throws on invalid values.
- */
-long long countParseMaxTime(const BSONElement& element);
-
-}  // namespace count_request
 }  // namespace mongo

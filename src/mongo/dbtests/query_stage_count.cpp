@@ -43,6 +43,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/count_command_gen.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageCount {
@@ -139,7 +140,7 @@ public:
     //  - asserts count is not trivial
     //  - asserts nCounted is equal to expected_n
     //  - asserts nSkipped is correct
-    void testCount(const CountRequest& request, int expected_n = kDocuments, bool indexed = false) {
+    void testCount(const CountCommand& request, int expected_n = kDocuments, bool indexed = false) {
         setup();
         getRecordIds();
 
@@ -160,13 +161,17 @@ public:
             scan = createCollScan(expression.get(), ws.get());
         }
 
-        CountStageParams params(request);
-        CountStage countStage(&_opCtx, _coll, std::move(params), ws.get(), scan);
+        CountStage countStage(&_opCtx,
+                              _coll,
+                              request.getLimit().value_or(0),
+                              request.getSkip().value_or(0),
+                              ws.get(),
+                              scan);
 
         const CountStats* stats = runCount(countStage);
 
         ASSERT_EQUALS(stats->nCounted, expected_n);
-        ASSERT_EQUALS(stats->nSkipped, request.getSkip());
+        ASSERT_EQUALS(stats->nSkipped, request.getSkip().value_or(0));
     }
 
     // Performs a test using a count stage whereby each unit of work is interjected
@@ -237,7 +242,8 @@ protected:
 class QueryStageCountNoChangeDuringYield : public CountStageTest {
 public:
     void run() {
-        CountRequest request(NamespaceString(ns()), BSON("x" << LT << kDocuments / 2));
+        CountCommand request((NamespaceString(ns())));
+        request.setQuery(BSON("x" << LT << kDocuments / 2));
 
         testCount(request, kDocuments / 2);
         testCount(request, kDocuments / 2, true);
@@ -247,7 +253,8 @@ public:
 class QueryStageCountYieldWithSkip : public CountStageTest {
 public:
     void run() {
-        CountRequest request(NamespaceString(ns()), BSON("x" << GTE << 0));
+        CountCommand request((NamespaceString(ns())));
+        request.setQuery(BSON("x" << GTE << 0));
         request.setSkip(2);
 
         testCount(request, kDocuments - 2);
@@ -258,7 +265,8 @@ public:
 class QueryStageCountYieldWithLimit : public CountStageTest {
 public:
     void run() {
-        CountRequest request(NamespaceString(ns()), BSON("x" << GTE << 0));
+        CountCommand request((NamespaceString(ns())));
+        request.setQuery(BSON("x" << GTE << 0));
         request.setSkip(0);
         request.setLimit(2);
 
@@ -271,7 +279,8 @@ public:
 class QueryStageCountInsertDuringYield : public CountStageTest {
 public:
     void run() {
-        CountRequest request(NamespaceString(ns()), BSON("x" << 1));
+        CountCommand request((NamespaceString(ns())));
+        request.setQuery(BSON("x" << 1));
 
         testCount(request, kInterjections + 1);
         testCount(request, kInterjections + 1, true);
@@ -288,7 +297,8 @@ public:
     void run() {
         // expected count would be 99 but we delete the second record
         // after doing the first unit of work
-        CountRequest request(NamespaceString(ns()), BSON("x" << GTE << 1));
+        CountCommand request((NamespaceString(ns())));
+        request.setQuery(BSON("x" << GTE << 1));
 
         testCount(request, kDocuments - 2);
         testCount(request, kDocuments - 2, true);
@@ -313,7 +323,8 @@ public:
     void run() {
         // expected count would be kDocuments-2 but we update the first and second records
         // after doing the first unit of work so they wind up getting counted later on
-        CountRequest request(NamespaceString(ns()), BSON("x" << GTE << 2));
+        CountCommand request((NamespaceString(ns())));
+        request.setQuery(BSON("x" << GTE << 2));
 
         testCount(request, kDocuments);
         testCount(request, kDocuments, true);
@@ -334,7 +345,8 @@ public:
 class QueryStageCountMultiKeyDuringYield : public CountStageTest {
 public:
     void run() {
-        CountRequest request(NamespaceString(ns()), BSON("x" << 1));
+        CountCommand request((NamespaceString(ns())));
+        request.setQuery(BSON("x" << 1));
         testCount(request, kDocuments + 1, true);  // only applies to indexed case
     }
 

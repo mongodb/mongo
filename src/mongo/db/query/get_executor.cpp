@@ -1182,12 +1182,17 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
 }  // namespace
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
-    OperationContext* opCtx, Collection* collection, const CountRequest& request, bool explain) {
+    OperationContext* opCtx,
+    Collection* collection,
+    const CountCommand& request,
+    bool explain,
+    const NamespaceString& nss) {
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
 
-    auto qr = stdx::make_unique<QueryRequest>(request.getNs());
+    auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(request.getQuery());
-    qr->setCollation(request.getCollation());
+    auto collation = request.getCollation().value_or(BSONObj());
+    qr->setCollation(collation);
     qr->setHint(request.getHint());
     qr->setExplain(explain);
 
@@ -1212,16 +1217,16 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
         ? PlanExecutor::INTERRUPT_ONLY
         : PlanExecutor::YIELD_AUTO;
 
-    const CountStageParams params(request);
+    const auto skip = request.getSkip().value_or(0);
+    const auto limit = request.getLimit().value_or(0);
 
     if (!collection) {
         // Treat collections that do not exist as empty collections. Note that the explain reporting
         // machinery always assumes that the root stage for a count operation is a CountStage, so in
         // this case we put a CountStage on top of an EOFStage.
-        unique_ptr<PlanStage> root = make_unique<CountStage>(
-            opCtx, collection, std::move(params), ws.get(), new EOFStage(opCtx));
-        return PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
+        unique_ptr<PlanStage> root =
+            make_unique<CountStage>(opCtx, collection, limit, skip, ws.get(), new EOFStage(opCtx));
+        return PlanExecutor::make(opCtx, std::move(ws), std::move(root), nss, yieldPolicy);
     }
 
     // If the query is empty, then we can determine the count by just asking the collection
@@ -1235,9 +1240,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
 
     if (useRecordStoreCount) {
         unique_ptr<PlanStage> root =
-            make_unique<RecordStoreFastCountStage>(opCtx, collection, params.skip, params.limit);
-        return PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
+            make_unique<RecordStoreFastCountStage>(opCtx, collection, skip, limit);
+        return PlanExecutor::make(opCtx, std::move(ws), std::move(root), nss, yieldPolicy);
     }
 
     size_t plannerOptions = QueryPlannerParams::IS_COUNT;
@@ -1257,7 +1261,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
     invariant(root);
 
     // Make a CountStage to be the new root.
-    root = make_unique<CountStage>(opCtx, collection, std::move(params), ws.get(), root.release());
+    root = make_unique<CountStage>(opCtx, collection, limit, skip, ws.get(), root.release());
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be NULL. Takes ownership of all args other than 'collection' and 'opCtx'
     return PlanExecutor::make(opCtx,

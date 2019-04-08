@@ -140,7 +140,7 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
         auto sliceIt = clausesFound.find(kSliceClauseName);
         if (sliceIt != clausesFound.end()) {
             auto sliceClause = sliceIt->second;
-            auto parsedSliceValue = MatchExpressionParser::parseIntegerElementToLong(sliceClause);
+            auto parsedSliceValue = sliceClause.parseIntegerElementToLong();
             if (parsedSliceValue.isOK()) {
                 _slice = parsedSliceValue.getValue();
             } else {
@@ -183,8 +183,7 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
         auto positionIt = clausesFound.find(kPositionClauseName);
         if (positionIt != clausesFound.end()) {
             auto positionClause = positionIt->second;
-            auto parsedPositionValue =
-                MatchExpressionParser::parseIntegerElementToLong(positionClause);
+            auto parsedPositionValue = positionClause.parseIntegerElementToLong();
             if (parsedPositionValue.isOK()) {
                 _position = parsedPositionValue.getValue();
             } else {

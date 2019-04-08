@@ -30,23 +30,8 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/query/count_request.h"
 
 namespace mongo {
-
-struct CountStageParams {
-    CountStageParams(const CountRequest& request)
-        : nss(request.getNs()), limit(request.getLimit()), skip(request.getSkip()) {}
-
-    // Namespace to operate on (e.g. "foo.bar").
-    NamespaceString nss;
-
-    // An integer limiting the number of documents to count. 0 means no limit.
-    long long limit;
-
-    // An integer indicating to not include the first n documents in the count. 0 means no skip.
-    long long skip;
-};
 
 /**
  * Stage used by the count command. This stage sits at the root of a plan tree and counts the number
@@ -63,7 +48,8 @@ class CountStage final : public PlanStage {
 public:
     CountStage(OperationContext* opCtx,
                Collection* collection,
-               CountStageParams params,
+               long long limit,
+               long long skip,
                WorkingSet* ws,
                PlanStage* child);
 
@@ -81,7 +67,11 @@ public:
     static const char* kStageType;
 
 private:
-    CountStageParams _params;
+    // An integer limiting the number of documents to count. 0 means no limit.
+    long long _limit;
+
+    // An integer indicating to not include the first n documents in the count. 0 means no skip.
+    long long _skip;
 
     // The number of documents that we still need to skip.
     long long _leftToSkip;

@@ -274,6 +274,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/pipeline/mongo_process_interface',
         '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/stats/counters',

@@ -567,6 +567,84 @@ bool BSONElement::binaryEqualValues(const BSONElement& rhs) const {
     return (valueSize == 0) || (memcmp(value(), rhs.value(), valueSize) == 0);
 }
 
+StatusWith<long long> BSONElement::parseIntegerElementToNonNegativeLong() const {
+    auto number = parseIntegerElementToLong();
+    if (!number.isOK()) {
+        return number;
+    }
+
+    if (number.getValue() < 0) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Expected a positive number in: " << toString(true, true));
+    }
+
+    return number;
+}
+
+StatusWith<long long> BSONElement::parseIntegerElementToLong() const {
+    if (!isNumber()) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Expected a number in: " << toString(true, true));
+    }
+
+    long long number = 0;
+    if (type() == BSONType::NumberDouble) {
+        auto eDouble = numberDouble();
+
+        // NaN doubles are rejected.
+        if (std::isnan(eDouble)) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Expected an integer, but found NaN in: "
+                                        << toString(true, true));
+        }
+
+        // No integral doubles that are too large to be represented as a 64 bit signed integer.
+        // We use 'kLongLongMaxAsDouble' because if we just did eDouble > 2^63-1, it would be
+        // compared against 2^63. eDouble=2^63 would not get caught that way.
+        if (eDouble >= kLongLongMaxPlusOneAsDouble ||
+            eDouble < std::numeric_limits<long long>::min()) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Cannot represent as a 64-bit integer: "
+                                        << toString(true, true));
+        }
+
+        // This checks if elem is an integral double.
+        if (eDouble != static_cast<double>(static_cast<long long>(eDouble))) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Expected an integer: " << toString(true, true));
+        }
+
+        number = numberLong();
+    } else if (type() == BSONType::NumberDecimal) {
+        uint32_t signalingFlags = Decimal128::kNoFlag;
+        number = numberDecimal().toLongExact(&signalingFlags);
+        if (signalingFlags != Decimal128::kNoFlag) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Cannot represent as a 64-bit integer: "
+                                        << toString(true, true));
+        }
+    } else {
+        number = numberLong();
+    }
+
+    return number;
+}
+
+StatusWith<int> BSONElement::parseIntegerElementToInt() const {
+    auto parsedLong = parseIntegerElementToLong();
+    if (!parsedLong.isOK()) {
+        return parsedLong.getStatus();
+    }
+
+    auto valueLong = parsedLong.getValue();
+    if (valueLong < std::numeric_limits<int>::min() ||
+        valueLong > std::numeric_limits<int>::max()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Cannot represent " << toString(true, true) << " in an int"};
+    }
+    return static_cast<int>(valueLong);
+}
+
 BSONObj BSONElement::embeddedObjectUserCheck() const {
     if (MONGO_likely(isABSONObj()))
         return BSONObj(value(), BSONObj::LargeSizeTrait{});

@@ -33,7 +33,8 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/count_request.h"
+#include "mongo/db/query/count_command_as_aggregation_command.h"
+#include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -159,8 +160,9 @@ public:
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
 
-            auto countRequest = uassertStatusOK(CountRequest::parseFromBSON(nss, cmdObj, false));
-            auto aggCmdOnView = uassertStatusOK(countRequest.asAggregationCommand());
+            auto countRequest = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
+            auto aggCmdOnView =
+                uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
             auto aggRequestOnView =
                 uassertStatusOK(AggregationRequest::parseFromBSON(nss, aggCmdOnView));
 
@@ -257,12 +259,14 @@ public:
                                                            targetingQuery,
                                                            targetingCollation);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            auto countRequest = CountRequest::parseFromBSON(nss, cmdObj, true);
-            if (!countRequest.isOK()) {
-                return countRequest.getStatus();
+            CountCommand countRequest(NamespaceStringOrUUID(NamespaceString{}));
+            try {
+                countRequest = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
+            } catch (...) {
+                return exceptionToStatus();
             }
 
-            auto aggCmdOnView = countRequest.getValue().asAggregationCommand();
+            auto aggCmdOnView = countCommandAsAggregationCommand(countRequest, nss);
             if (!aggCmdOnView.isOK()) {
                 return aggCmdOnView.getStatus();
             }

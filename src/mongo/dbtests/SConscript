@@ -137,6 +137,7 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
             "$BUILD_DIR/mongo/db/pipeline/document_value_test_util",
             "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
+            "$BUILD_DIR/mongo/db/query/command_request_response",
             "$BUILD_DIR/mongo/db/query_exec",
             "$BUILD_DIR/mongo/db/query/query_planner_test_lib",
             "$BUILD_DIR/mongo/db/query/query_test_service_context",

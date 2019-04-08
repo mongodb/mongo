@@ -208,5 +208,102 @@ TEST(BSONElement, SafeNumberLongNegativeBound) {
     ASSERT_EQ(obj["negativeInfinity"].safeNumberLong(), std::numeric_limits<long long>::lowest());
 }
 
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsNegative) {
+    BSONObj query = BSON("" << -2LL);
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongAcceptsNegative) {
+    BSONObj query = BSON("" << -2LL);
+    auto result = query.firstElement().parseIntegerElementToLong();
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(-2LL, result.getValue());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsTooLargeDouble) {
+    BSONObj query = BSON("" << BSONElement::kLongLongMaxPlusOneAsDouble);
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongRejectsTooLargeDouble) {
+    BSONObj query = BSON("" << BSONElement::kLongLongMaxPlusOneAsDouble);
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongRejectsTooLargeNegativeDouble) {
+    BSONObj query = BSON("" << std::numeric_limits<double>::min());
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsString) {
+    BSONObj query = BSON(""
+                         << "1");
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongRejectsString) {
+    BSONObj query = BSON(""
+                         << "1");
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsNonIntegralDouble) {
+    BSONObj query = BSON("" << 2.5);
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongRejectsNonIntegralDouble) {
+    BSONObj query = BSON("" << 2.5);
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsNonIntegralDecimal) {
+    BSONObj query = BSON("" << Decimal128("2.5"));
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongRejectsNonIntegralDecimal) {
+    BSONObj query = BSON("" << Decimal128("2.5"));
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsLargestDecimal) {
+    BSONObj query = BSON("" << Decimal128(Decimal128::kLargestPositive));
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongRejectsLargestDecimal) {
+    BSONObj query = BSON("" << Decimal128(Decimal128::kLargestPositive));
+    ASSERT_NOT_OK(query.firstElement().parseIntegerElementToLong());
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongAcceptsZero) {
+    BSONObj query = BSON("" << 0);
+    auto result = query.firstElement().parseIntegerElementToNonNegativeLong();
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue(), 0LL);
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongAcceptsZero) {
+    BSONObj query = BSON("" << 0);
+    auto result = query.firstElement().parseIntegerElementToLong();
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue(), 0LL);
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongAcceptsThree) {
+    BSONObj query = BSON("" << 3.0);
+    auto result = query.firstElement().parseIntegerElementToNonNegativeLong();
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue(), 3LL);
+}
+
+TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongAcceptsThree) {
+    BSONObj query = BSON("" << 3.0);
+    auto result = query.firstElement().parseIntegerElementToLong();
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue(), 3LL);
+}
+
 }  // namespace
 }  // namespace mongo

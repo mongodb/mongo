@@ -359,6 +359,36 @@ public:
      */
     long long safeNumberLongForHash() const;
 
+    /**
+     * Parses a BSONElement of any numeric type into a positive long long, failing if the value
+     * is any of the following:
+     *
+     * - NaN.
+     * - Negative.
+     * - A floating point number which is not integral.
+     * - Too large to fit within a 64-bit signed integer.
+     */
+    StatusWith<long long> parseIntegerElementToNonNegativeLong() const;
+
+    /**
+     * Parses a BSONElement of any numeric type into a long long, failing if the value
+     * is any of the following:
+     *
+     * - NaN.
+     * - A floating point number which is not integral.
+     * - Too large in the positive or negative direction to fit within a 64-bit signed integer.
+     */
+    StatusWith<long long> parseIntegerElementToLong() const;
+
+    /**
+     * Parses a BSONElement of any numeric type into an integer, failing if the value is:
+     *
+     * - NaN
+     * - a non-integral number
+     * - too large in the positive or negative direction to fit in an int
+     */
+    StatusWith<int> parseIntegerElementToInt() const;
+
     /** Retrieve decimal value for the element safely. */
     Decimal128 numberDecimal() const;
 

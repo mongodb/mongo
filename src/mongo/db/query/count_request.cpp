@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -31,182 +31,49 @@
 
 #include "mongo/db/query/count_request.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/query_request.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
-namespace {
+namespace count_request {
 
-const char kCmdName[] = "count";
-const char kQueryField[] = "query";
-const char kLimitField[] = "limit";
-const char kSkipField[] = "skip";
-const char kHintField[] = "hint";
-const char kCollationField[] = "collation";
-const char kExplainField[] = "explain";
-const char kCommentField[] = "comment";
-const char kMaxTimeMSField[] = "maxTimeMS";
-const char kReadConcernField[] = "readConcern";
-}  // namespace
+long long countParseLimit(const BSONElement& element) {
+    uassert(ErrorCodes::BadValue, "limit value is not a valid number", element.isNumber());
+    auto limit = uassertStatusOK(element.parseIntegerElementToLong());
+    // The absolute value of the smallest long long is too large to be represented as a long
+    // long, so we fail to parse such count commands.
+    uassert(ErrorCodes::BadValue,
+            "limit value for count cannot be min long",
+            limit != std::numeric_limits<long long>::min());
 
-CountRequest::CountRequest(NamespaceString nss, BSONObj query)
-    : _nss(std::move(nss)), _query(query.getOwned()) {}
-
-void CountRequest::setHint(BSONObj hint) {
-    _hint = hint.getOwned();
+    // For counts, limit and -limit mean the same thing.
+    if (limit < 0) {
+        limit = -limit;
+    }
+    return limit;
 }
 
-void CountRequest::setCollation(BSONObj collation) {
-    _collation = collation.getOwned();
+long long countParseSkip(const BSONElement& element) {
+    uassert(ErrorCodes::BadValue, "skip value is not a valid number", element.isNumber());
+    auto skip = uassertStatusOK(element.parseIntegerElementToNonNegativeLong());
+    return skip;
 }
 
-StatusWith<CountRequest> CountRequest::parseFromBSON(const NamespaceString& nss,
-                                                     const BSONObj& cmdObj,
-                                                     bool isExplain) {
-
-    // We don't validate that "query" is a nested object due to SERVER-15456.
-    CountRequest request(nss, cmdObj.getObjectField(kQueryField));
-
-    // Limit
-    if (cmdObj[kLimitField].isNumber()) {
-        long long limit = cmdObj[kLimitField].numberLong();
-
-        if (limit == std::numeric_limits<long long>::min()) {
-            // The absolute value of the smallest long long is too large to be represented as a long
-            // long, so we fail to parse such count commands.
-            return Status(ErrorCodes::BadValue, "limit value for count cannot be min long");
-        }
-
-        // For counts, limit and -limit mean the same thing.
-        if (limit < 0) {
-            limit = -limit;
-        }
-
-        request.setLimit(limit);
-    } else if (cmdObj[kLimitField].ok()) {
-        return Status(ErrorCodes::BadValue, "limit value is not a valid number");
+BSONObj countParseHint(const BSONElement& element) {
+    if (element.type() == BSONType::String) {
+        return BSON("$hint" << element.valueStringData());
+    } else if (element.type() == BSONType::Object) {
+        return element.Obj();
+    } else {
+        uasserted(31012, "Hint must be a string or an object");
     }
-
-    // Skip
-    if (cmdObj[kSkipField].isNumber()) {
-        long long skip = cmdObj[kSkipField].numberLong();
-        if (skip < 0) {
-            return Status(ErrorCodes::BadValue, "skip value is negative in count query");
-        }
-
-        request.setSkip(skip);
-    } else if (cmdObj[kSkipField].ok()) {
-        return Status(ErrorCodes::BadValue, "skip value is not a valid number");
-    }
-
-    // maxTimeMS
-    if (cmdObj[kMaxTimeMSField].ok()) {
-        auto maxTimeMS = QueryRequest::parseMaxTimeMS(cmdObj[kMaxTimeMSField]);
-        if (!maxTimeMS.isOK()) {
-            return maxTimeMS.getStatus();
-        }
-        request.setMaxTimeMS(static_cast<unsigned int>(maxTimeMS.getValue()));
-    }
-
-    // Hint
-    if (BSONType::Object == cmdObj[kHintField].type()) {
-        request.setHint(cmdObj[kHintField].Obj());
-    } else if (String == cmdObj[kHintField].type()) {
-        const std::string hint = cmdObj.getStringField(kHintField);
-        request.setHint(BSON("$hint" << hint));
-    }
-
-    // Collation
-    if (BSONType::Object == cmdObj[kCollationField].type()) {
-        request.setCollation(cmdObj[kCollationField].Obj());
-    } else if (cmdObj[kCollationField].ok()) {
-        return Status(ErrorCodes::BadValue, "collation value is not a document");
-    }
-
-    // readConcern
-    if (BSONType::Object == cmdObj[kReadConcernField].type()) {
-        request.setReadConcern(cmdObj[kReadConcernField].Obj());
-    } else if (cmdObj[kReadConcernField].ok()) {
-        return Status(ErrorCodes::BadValue, "readConcern value is not a document");
-    }
-
-    // unwrappedReadPref
-    if (BSONType::Object == cmdObj[QueryRequest::kUnwrappedReadPrefField].type()) {
-        request.setUnwrappedReadPref(cmdObj[QueryRequest::kUnwrappedReadPrefField].Obj());
-    } else if (cmdObj[QueryRequest::kUnwrappedReadPrefField].ok()) {
-        return Status(ErrorCodes::BadValue, "readPreference value is not a document");
-    }
-
-    // Comment
-    if (BSONType::String == cmdObj[kCommentField].type()) {
-        request.setComment(cmdObj[kCommentField].valueStringData());
-    } else if (cmdObj[kCommentField].ok()) {
-        return Status(ErrorCodes::BadValue, "comment value is not a string");
-    }
-
-
-    // Explain
-    request.setExplain(isExplain);
-
-    return request;
+    MONGO_UNREACHABLE;
 }
 
-StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
-    BSONObjBuilder aggregationBuilder;
-    aggregationBuilder.append("aggregate", _nss.coll());
-
-    // Build an aggregation pipeline that performs the counting. We add stages that satisfy the
-    // query, skip and limit before finishing with the actual $count stage.
-    BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
-    if (!_query.isEmpty()) {
-        BSONObjBuilder matchBuilder(pipelineBuilder.subobjStart());
-        matchBuilder.append("$match", _query);
-        matchBuilder.doneFast();
-    }
-    if (_skip) {
-        BSONObjBuilder skipBuilder(pipelineBuilder.subobjStart());
-        skipBuilder.append("$skip", *_skip);
-        skipBuilder.doneFast();
-    }
-    if (_limit) {
-        BSONObjBuilder limitBuilder(pipelineBuilder.subobjStart());
-        limitBuilder.append("$limit", *_limit);
-        limitBuilder.doneFast();
-    }
-
-    BSONObjBuilder countBuilder(pipelineBuilder.subobjStart());
-    countBuilder.append("$count", "count");
-    countBuilder.doneFast();
-    pipelineBuilder.doneFast();
-
-    // Complete the command by appending the other options to count.
-    if (_collation) {
-        aggregationBuilder.append(kCollationField, *_collation);
-    }
-
-    if (_hint) {
-        aggregationBuilder.append(kHintField, *_hint);
-    }
-
-    if (!_comment.empty()) {
-        aggregationBuilder.append(kCommentField, _comment);
-    }
-
-    if (_maxTimeMS > 0) {
-        aggregationBuilder.append(kMaxTimeMSField, _maxTimeMS);
-    }
-
-    if (!_readConcern.isEmpty()) {
-        aggregationBuilder.append(kReadConcernField, _readConcern);
-    }
-
-    if (!_unwrappedReadPref.isEmpty()) {
-        aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, _unwrappedReadPref);
-    }
-
-    // The 'cursor' option is always specified so that aggregation uses the cursor interface.
-    aggregationBuilder.append("cursor", BSONObj());
-
-    return aggregationBuilder.obj();
+long long countParseMaxTime(const BSONElement& element) {
+    auto maxTimeVal = uassertStatusOK(QueryRequest::parseMaxTimeMS(element));
+    return static_cast<long long>(maxTimeVal);
 }
+}  // namespace count_request
 }  // namespace mongo

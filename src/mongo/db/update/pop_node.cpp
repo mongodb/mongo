@@ -36,7 +36,7 @@
 namespace mongo {
 
 Status PopNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto popVal = MatchExpressionParser::parseIntegerElementToLong(modExpr);
+    auto popVal = modExpr.parseIntegerElementToLong();
     if (!popVal.isOK()) {
         return popVal.getStatus();
     }

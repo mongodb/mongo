@@ -47,16 +47,19 @@ const char* CountStage::kStageType = "COUNT";
 
 CountStage::CountStage(OperationContext* opCtx,
                        Collection* collection,
-                       CountStageParams params,
+                       long long limit,
+                       long long skip,
                        WorkingSet* ws,
                        PlanStage* child)
-    : PlanStage(kStageType, opCtx), _params(std::move(params)), _leftToSkip(_params.skip), _ws(ws) {
+    : PlanStage(kStageType, opCtx), _limit(limit), _skip(skip), _leftToSkip(_skip), _ws(ws) {
+    invariant(_skip >= 0);
+    invariant(_limit >= 0);
     invariant(child);
     _children.emplace_back(child);
 }
 
 bool CountStage::isEOF() {
-    if (_params.limit > 0 && _specificStats.nCounted >= _params.limit) {
+    if (_limit > 0 && _specificStats.nCounted >= _limit) {
         return true;
     }
 
