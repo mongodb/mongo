@@ -205,6 +205,12 @@ bool mustProcessStandalone(const OplogEntry& entry) {
  * command.
  */
 std::size_t getOpCount(const OplogEntry& entry) {
+    if (isUnpreparedCommit(entry)) {
+        auto count = entry.getObject().getIntField(CommitTransactionOplogObject::kCountFieldName);
+        if (count > 0) {
+            return std::size_t(count);
+        }
+    }
     return 1U;
 }
 

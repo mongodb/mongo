@@ -322,6 +322,78 @@ TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOperations
     ASSERT_EQUALS(srcOps[2], batch[0]);
 }
 
+TEST_F(OplogApplierTest,
+       GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp1) {
+    OplogApplier::Operations srcOps;
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeCommitTransactionOplogEntry(2, dbName, false, 3));
+    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")));
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    // Set batch limits so that commit transaction entry has to go into next batch as the only entry
+    // after taking into account the embedded op count.
+    _limits.ops = 3U;
+
+    // First batch: [insert]
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+
+    // Second batch: [commit]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[1], batch[0]);
+}
+
+TEST_F(OplogApplierTest,
+       GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp2) {
+    OplogApplier::Operations srcOps;
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeCommitTransactionOplogEntry(3, dbName, false, 3));
+    srcOps.push_back(makeInsertOplogEntry(4, NamespaceString(dbName, "bar")));
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    // Set batch limits so that commit transaction entry has to go into next batch after taking into
+    // account embedded op count.
+    _limits.ops = 4U;
+
+    // First batch: [insert, insert]
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+    ASSERT_EQUALS(srcOps[1], batch[1]);
+
+    // Second batch: [commit, insert]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[2], batch[0]);
+    ASSERT_EQUALS(srcOps[3], batch[1]);
+}
+
+TEST_F(OplogApplierTest,
+       GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp3) {
+    OplogApplier::Operations srcOps;
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
+    srcOps.push_back(makeCommitTransactionOplogEntry(2, dbName, false, 5));
+    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")));
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    // Set batch limits so that commit transaction entry goes into its own batch because its
+    // embedded count exceeds the batch limit for ops.
+    _limits.ops = 4U;
+
+    // First batch: [insert]
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+
+    // Second batch: [commit]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[1], batch[0]);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
