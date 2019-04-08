@@ -104,7 +104,7 @@ class AdbControlTest(AdbControlTestCase):
         args = {}
         arg_file_list = []
         for arg_name in arg_list:
-            arg_test_file = tempfile.NamedTemporaryFile(delete=False).name
+            arg_test_file = tempfile.NamedTemporaryFile(dir=self.temp_dir, delete=False).name
             args[arg_name] = arg_test_file
             arg_file_list.append(arg_test_file)
         adb_control = adb_monitor.AdbControl(self.adb, collection_time_secs=collection_time_secs,
