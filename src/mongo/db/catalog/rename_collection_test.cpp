@@ -61,7 +61,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace {
 
@@ -987,9 +986,9 @@ TEST_F(RenameCollectionTest, RenameDifferentDatabaseStayTempTrueSourceNotTempora
 void _checkOplogEntries(const std::vector<std::string>& actualOplogEntries,
                         const std::vector<std::string>& expectedOplogEntries) {
     std::string actualOplogEntriesStr;
-    joinStringDelim(actualOplogEntries, &actualOplogEntriesStr, ',');
+    str::joinStringDelim(actualOplogEntries, &actualOplogEntriesStr, ',');
     std::string expectedOplogEntriesStr;
-    joinStringDelim(expectedOplogEntries, &expectedOplogEntriesStr, ',');
+    str::joinStringDelim(expectedOplogEntries, &expectedOplogEntriesStr, ',');
     ASSERT_EQUALS(expectedOplogEntries.size(), actualOplogEntries.size())
 
         << "Incorrect number of oplog entries written to oplog. Actual: " << actualOplogEntriesStr

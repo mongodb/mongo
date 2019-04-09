@@ -39,7 +39,6 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -655,7 +654,7 @@ public:
     bool operator()(const char* s1, const char* s2) const;
 
 private:
-    LexNumCmp _cmp;
+    str::LexNumCmp _cmp;
 };
 
 BSONIteratorSorted::ElementFieldCmp::ElementFieldCmp(bool isArray) : _cmp(!isArray) {}

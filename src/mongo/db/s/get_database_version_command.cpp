@@ -39,7 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/s/request_types/get_database_version_gen.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

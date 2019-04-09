@@ -157,7 +157,7 @@ public:
 
     Status setFromString(const std::string& str) {
         std::vector<std::string> strList;
-        splitStringDelim(str, &strList, ',');
+        str::splitStringDelim(str, &strList, ',');
 
         std::vector<UserName> out;
         for (const auto& nameStr : strList) {

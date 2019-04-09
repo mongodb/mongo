@@ -47,11 +47,21 @@
 #undef _WCHAR_T
 
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace {
+
+std::string toAsciiLowerCase(mongo::StringData input) {
+    std::string res = input.toString();
+    for (char& c : res) {
+        c = tolower(c);
+    }
+    return res;
+}
+
 void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags) {
     // Input must be of these forms:
     // * Valid decimal (standard or scientific notation):

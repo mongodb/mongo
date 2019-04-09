@@ -40,7 +40,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 

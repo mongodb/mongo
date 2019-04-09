@@ -263,9 +263,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="stringutils_test",
+    target="str_test",
     source=[
-        "stringutils_test.cpp",
+        "str_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

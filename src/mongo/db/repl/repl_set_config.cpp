@@ -39,7 +39,7 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {
@@ -707,7 +707,7 @@ StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patt
     if (iter == _customWriteConcernModes.end()) {
         return StatusWith<ReplSetTagPattern>(
             ErrorCodes::UnknownReplWriteConcern,
-            str::stream() << "No write concern mode named '" << escape(patternName.toString())
+            str::stream() << "No write concern mode named '" << str::escape(patternName.toString())
                           << "' found in replica set configuration");
     }
     return StatusWith<ReplSetTagPattern>(iter->second);

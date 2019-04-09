@@ -37,7 +37,7 @@
 #include "mongo/db/update/update_array_node.h"
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -89,7 +89,7 @@ mutablebson::Element getChild(mutablebson::Element element, StringData field) {
     if (element.getType() == BSONType::Object) {
         return element[field];
     } else if (element.getType() == BSONType::Array) {
-        auto indexFromField = parseUnsignedBase10Integer(field);
+        auto indexFromField = str::parseUnsignedBase10Integer(field);
         if (indexFromField) {
             return element.findNthChild(*indexFromField);
         }

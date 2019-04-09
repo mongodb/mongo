@@ -30,9 +30,9 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/util/hex.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
-namespace mongo {
+namespace mongo::str {
 
 using std::string;
 
@@ -63,7 +63,7 @@ TEST(StringUtilsTest, Simple1) {
 }
 
 void assertCmp(int expected, StringData s1, StringData s2, bool lexOnly = false) {
-    mongo::LexNumCmp cmp(lexOnly);
+    LexNumCmp cmp(lexOnly);
     ASSERT_EQUALS(expected, cmp.cmp(s1, s2, lexOnly));
     ASSERT_EQUALS(expected, cmp.cmp(s1, s2));
     ASSERT_EQUALS(expected < 0, cmp(s1, s2));
@@ -270,4 +270,4 @@ TEST(StringUtilsTest, WhitespaceWithinNumberFailsToParse) {
     boost::optional<size_t> result = parseUnsignedBase10Integer(" 10");
     ASSERT(!result);
 }
-}  // namespace mongo
+}  // namespace mongo::str

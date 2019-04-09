@@ -54,7 +54,7 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -615,7 +615,7 @@ string OpDebug::report(Client* client,
     if (clientMetadata) {
         auto appName = clientMetadata.get().getApplicationName();
         if (!appName.empty()) {
-            s << " appName: \"" << escape(appName) << '\"';
+            s << " appName: \"" << str::escape(appName) << '\"';
         }
     }
 
@@ -687,7 +687,7 @@ string OpDebug::report(Client* client,
     if (!errInfo.isOK()) {
         s << " ok:" << 0;
         if (!errInfo.reason().empty()) {
-            s << " errMsg:\"" << escape(redact(errInfo.reason())) << "\"";
+            s << " errMsg:\"" << str::escape(redact(errInfo.reason())) << "\"";
         }
         s << " errName:" << errInfo.code();
         s << " errCode:" << static_cast<int>(errInfo.code());

@@ -44,7 +44,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
 #if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
@@ -353,7 +353,7 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
     ElfW(Ehdr) eHeader;
     memcpy(&eHeader, reinterpret_cast<const char*>(info.dlpi_addr) + phdr.p_vaddr, sizeof(eHeader));
 
-    std::string quotedFileName = "\"" + escape(info.dlpi_name) + "\"";
+    std::string quotedFileName = "\"" + str::escape(info.dlpi_name) + "\"";
 
     if (memcmp(&eHeader.e_ident[0], ELFMAG, SELFMAG)) {
         warning() << "Bad ELF magic number in image of " << quotedFileName;

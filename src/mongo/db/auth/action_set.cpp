@@ -40,7 +40,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -96,7 +95,7 @@ bool ActionSet::isSupersetOf(const ActionSet& other) const {
 
 Status ActionSet::parseActionSetFromString(const std::string& actionsString, ActionSet* result) {
     std::vector<std::string> actionsList;
-    splitStringDelim(actionsString, &actionsList, ',');
+    str::splitStringDelim(actionsString, &actionsList, ',');
     std::vector<std::string> unrecognizedActions;
     Status status = parseActionSetFromStringVector(actionsList, result, &unrecognizedActions);
     invariant(status);
@@ -104,7 +103,7 @@ Status ActionSet::parseActionSetFromString(const std::string& actionsString, Act
         return Status::OK();
     }
     std::string unrecognizedActionsString;
-    joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
+    str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
     return Status(ErrorCodes::FailedToParse,
                   str::stream() << "Unrecognized action privilege strings: "
                                 << unrecognizedActionsString);

@@ -44,7 +44,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 #include <asio.hpp>
 

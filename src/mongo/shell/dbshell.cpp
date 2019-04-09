@@ -68,7 +68,7 @@
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
@@ -844,7 +844,7 @@ int _main(int argc, char* argv[], char** envp) {
     // Parse the output of getURIFromArgs which will determine if --host passed in a URI
     MongoURI parsedURI;
     parsedURI = uassertStatusOK(MongoURI::parse(getURIFromArgs(
-        cmdlineURI, escape(shellGlobalParams.dbhost), escape(shellGlobalParams.port))));
+        cmdlineURI, str::escape(shellGlobalParams.dbhost), str::escape(shellGlobalParams.port))));
 
     // TODO: add in all of the relevant shellGlobalParams to parsedURI
     parsedURI.setOptionIfNecessary("compressors"s, shellGlobalParams.networkMessageCompressors);
@@ -855,14 +855,14 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
         std::stringstream ss;
-        ss << "DB.prototype._defaultAuthenticationMechanism = \"" << escape(authMechanisms.get())
-           << "\";" << std::endl;
+        ss << "DB.prototype._defaultAuthenticationMechanism = \""
+           << str::escape(authMechanisms.get()) << "\";" << std::endl;
         mongo::shell_utils::dbConnect += ss.str();
     }
 
     if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
         std::stringstream ss;
-        ss << "DB.prototype._defaultGssapiServiceName = \"" << escape(gssapiServiveName.get())
+        ss << "DB.prototype._defaultGssapiServiceName = \"" << str::escape(gssapiServiveName.get())
            << "\";" << std::endl;
         mongo::shell_utils::dbConnect += ss.str();
     }

@@ -38,7 +38,6 @@
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 namespace fts {
@@ -69,7 +68,7 @@ bool BasicFTSTokenizer::moveNext() {
             continue;
         }
 
-        string word = tolowerString(token.data);
+        string word = str::toLower(token.data);
 
         // Stop words are case-sensitive so we need them to be lower cased to check
         // against the stop word list

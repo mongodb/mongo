@@ -43,7 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -478,7 +477,7 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
         }
         if (unrecognizedActions.size()) {
             std::string unrecognizedActionsString;
-            joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
+            str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
             warning() << "Encountered unrecognized actions \" " << unrecognizedActionsString
                       << "\" while parsing user document for " << user->getName();
         }

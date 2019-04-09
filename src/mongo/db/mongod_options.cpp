@@ -55,7 +55,6 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -451,7 +450,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         for (const std::string& whitelistEntry :
              params["security.clusterIpSourceWhitelist"].as<std::vector<std::string>>()) {
             std::vector<std::string> intermediates;
-            splitStringDelim(whitelistEntry, &intermediates, ',');
+            str::splitStringDelim(whitelistEntry, &intermediates, ',');
             std::copy(intermediates.begin(),
                       intermediates.end(),
                       std::back_inserter(*mongodGlobalParams.whitelistedClusterNetwork));

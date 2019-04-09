@@ -32,7 +32,6 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/stringutils.h"
 #include <string>
 
 namespace mongo {

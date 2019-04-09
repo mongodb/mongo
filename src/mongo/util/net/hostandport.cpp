@@ -40,7 +40,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -175,7 +174,7 @@ Status HostAndPort::initialize(StringData s) {
     if (hostPart.empty()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Empty host component parsing HostAndPort from \""
-                                    << escape(s.toString())
+                                    << str::escape(s.toString())
                                     << "\"");
     }
 
@@ -190,7 +189,7 @@ Status HostAndPort::initialize(StringData s) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Port number " << port
                                         << " out of range parsing HostAndPort from \""
-                                        << escape(s.toString())
+                                        << str::escape(s.toString())
                                         << "\"");
         }
     } else {

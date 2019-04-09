@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace document_path_support {
@@ -81,7 +81,7 @@ void visitAllValuesAtPathHelper(Document doc,
     // positional specifications, if applicable. For example, it will consume "0" and "1" from the
     // path "a.0.1.b" if the value at "a" is an array with arrays inside it.
     while (fieldPathIndex < path.getPathLength() && nextValue.isArray()) {
-        if (auto index = parseUnsignedBase10Integer(path.getFieldName(fieldPathIndex))) {
+        if (auto index = str::parseUnsignedBase10Integer(path.getFieldName(fieldPathIndex))) {
             nextValue = nextValue[*index];
             ++fieldPathIndex;
         } else {

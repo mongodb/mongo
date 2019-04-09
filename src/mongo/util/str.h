@@ -35,8 +35,12 @@
  * TODO: De-inline.
  */
 
+#include <boost/optional.hpp>
+#include <ctype.h>
+#include <memory>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
@@ -285,5 +289,59 @@ inline int caseInsensitiveCompare(const char* s1, const char* s2) {
     return strcasecmp(s1, s2);
 #endif
 }
+
+void splitStringDelim(const std::string& str, std::vector<std::string>* res, char delim);
+
+void joinStringDelim(const std::vector<std::string>& strs, std::string* res, char delim);
+
+inline std::string toLower(StringData input) {
+    std::string::size_type sz = input.size();
+
+    std::unique_ptr<char[]> line(new char[sz + 1]);
+    char* copy = line.get();
+
+    for (std::string::size_type i = 0; i < sz; i++) {
+        char c = input[i];
+        copy[i] = (char)tolower((int)c);
+    }
+    copy[sz] = 0;
+    return copy;
+}
+
+/** Functor for combining lexical and numeric comparisons. */
+class LexNumCmp {
+public:
+    /** @param lexOnly - compare all characters lexically, including digits. */
+    LexNumCmp(bool lexOnly);
+    /**
+     * Non numeric characters are compared lexicographically; numeric substrings
+     * are compared numerically; dots separate ordered comparable subunits.
+     * For convenience, character 255 is greater than anything else.
+     * @param lexOnly - compare all characters lexically, including digits.
+     */
+    static int cmp(StringData s1, StringData s2, bool lexOnly);
+    int cmp(StringData s1, StringData s2) const;
+    bool operator()(StringData s1, StringData s2) const;
+
+private:
+    bool _lexOnly;
+};
+
+// TODO: Sane-ify core std::string functionality
+// For now, this needs to be near the LexNumCmp or else
+int versionCmp(StringData rhs, StringData lhs);
+
+/**
+ * A method to escape whitespace and control characters in strings. For example, the string "\t"
+ * goes to "\\t". If `escape_slash` is true, then "/" goes to "\\/".
+ */
+std::string escape(StringData s, bool escape_slash = false);
+
+/**
+ * Converts 'integer' from a base-10 string to a size_t value or returns boost::none if 'integer'
+ * is not a valid base-10 string. A valid string is not allowed to have anything but decimal
+ * numerals, not even a +/- prefix or leading/trailing whitespace.
+ */
+boost::optional<size_t> parseUnsignedBase10Integer(StringData integer);
 
 }  // namespace mongo::str

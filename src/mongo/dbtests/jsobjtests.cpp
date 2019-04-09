@@ -50,7 +50,7 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -126,7 +126,9 @@ BSONObj nested2dotted(const BSONObj& obj) {
     return b.obj();
 }
 
-FieldCompareResult compareDottedFieldNames(const string& l, const string& r, const LexNumCmp& cmp) {
+FieldCompareResult compareDottedFieldNames(const string& l,
+                                           const string& r,
+                                           const str::LexNumCmp& cmp) {
     static int maxLoops = 1024 * 1024;
 
     size_t lstart = 0;
@@ -783,7 +785,7 @@ public:
 
         BSONObj obj = BSON("str" << input);
         const string output = obj.firstElement().String();
-        ASSERT_EQUALS(escape(output), escape(input));  // for better failure output
+        ASSERT_EQUALS(str::escape(output), str::escape(input));  // for better failure output
         ASSERT_EQUALS(output, input);
     }
 };
@@ -1550,7 +1552,7 @@ public:
 class CompareDottedFieldNamesTest {
 public:
     void t(FieldCompareResult res, const string& l, const string& r) {
-        LexNumCmp cmp(true);
+        str::LexNumCmp cmp(true);
         ASSERT_EQUALS(res, compareDottedFieldNames(l, r, cmp));
         ASSERT_EQUALS(-1 * res, compareDottedFieldNames(r, l, cmp));
     }
@@ -1571,7 +1573,7 @@ public:
 class CompareDottedArrayFieldNamesTest {
 public:
     void t(FieldCompareResult res, const string& l, const string& r) {
-        LexNumCmp cmp(false);  // Specify numeric comparison for array field names.
+        str::LexNumCmp cmp(false);  // Specify numeric comparison for array field names.
         ASSERT_EQUALS(res, compareDottedFieldNames(l, r, cmp));
         ASSERT_EQUALS(-1 * res, compareDottedFieldNames(r, l, cmp));
     }

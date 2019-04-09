@@ -50,7 +50,6 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -169,7 +168,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
     if (str::startsWith(osName, "Oracle Solaris")) {
         std::vector<std::string> versionComponents;
-        splitStringDelim(osVersion, &versionComponents, '.');
+        str::splitStringDelim(osVersion, &versionComponents, '.');
 
         if (versionComponents.size() > 1) {
             unsigned majorInt, minorInt;

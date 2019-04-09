@@ -130,7 +130,7 @@ env.Library(
         'util/stacktrace.cpp',
         'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
         'util/startup_test.cpp',
-        'util/stringutils.cpp',
+        'util/str.cpp',
         'util/system_clock_source.cpp',
         'util/system_tick_source.cpp',
         'util/text.cpp',

@@ -31,7 +31,6 @@
 
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -41,9 +40,6 @@ namespace fts {
 // This file contains functionality specific to indexing documents from TEXT_INDEX_VERSION_1
 // text indexes.
 //
-
-using std::map;
-using std::string;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -81,7 +77,7 @@ void FTSSpec::_scoreStringV1(const Tools& tools,
         if (t.type != Token::TEXT)
             continue;
 
-        string term = tolowerString(t.data);
+        std::string term = str::toLower(t.data);
         if (tools.stopwords->isStopWord(term))
             continue;
         term = tools.stemmer->stem(term).toString();
@@ -99,7 +95,7 @@ void FTSSpec::_scoreStringV1(const Tools& tools,
     }
 
     for (ScoreHelperMap::const_iterator i = terms.begin(); i != terms.end(); ++i) {
-        const string& term = i->first;
+        const std::string& term = i->first;
         const ScoreHelperStruct& data = i->second;
 
         // in order to adjust weights as a function of term count as it
@@ -195,7 +191,7 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
 }
 
 StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
-    map<string, int> m;
+    std::map<std::string, int> m;
 
     BSONObj keyPattern;
     {
@@ -240,24 +236,24 @@ StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
     BSONObj weights;
     {
         BSONObjBuilder b;
-        for (map<string, int>::iterator i = m.begin(); i != m.end(); ++i) {
-            if (i->second <= 0 || i->second >= MAX_WORD_WEIGHT) {
+        for (const auto& kv : m) {
+            if (kv.second <= 0 || kv.second >= MAX_WORD_WEIGHT) {
                 return {ErrorCodes::CannotCreateIndex,
                         str::stream() << "text index weight must be in the exclusive interval (0,"
                                       << MAX_WORD_WEIGHT
                                       << ") but found: "
-                                      << i->second};
+                                      << kv.second};
             }
-            b.append(i->first, i->second);
+            b.append(kv.first, kv.second);
         }
         weights = b.obj();
     }
 
-    string default_language(spec.getStringField("default_language"));
+    std::string default_language(spec.getStringField("default_language"));
     if (default_language.empty())
         default_language = "english";
 
-    string language_override(spec.getStringField("language_override"));
+    std::string language_override(spec.getStringField("language_override"));
     if (language_override.empty())
         language_override = "language";
 

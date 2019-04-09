@@ -36,7 +36,6 @@
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 

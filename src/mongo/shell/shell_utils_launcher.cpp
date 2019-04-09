@@ -71,7 +71,7 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_win32.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
 #ifndef _WIN32
@@ -525,7 +525,7 @@ boost::filesystem::path ProgramRunner::findProgram(const string& prog) {
 
     // PATH entries are separated by colons. Per POSIX 2013, there is no way to escape a colon in
     // an entry.
-    splitStringDelim(path, &pathEntries, ':');
+    str::splitStringDelim(path, &pathEntries, ':');
 
     for (const std::string& pathEntry : pathEntries) {
         boost::filesystem::path potentialBinary = boost::filesystem::path(pathEntry) / p;

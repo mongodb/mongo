@@ -39,7 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

@@ -31,23 +31,19 @@
 
 #include <cctype>
 
-#include "mongo/util/stringutils.h"
-
 #include "mongo/base/parse_number.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/str.h"
 
-namespace mongo {
+namespace mongo::str {
 
-using std::string;
-using std::vector;
-
-void splitStringDelim(const string& str, vector<string>* res, char delim) {
+void splitStringDelim(const std::string& str, std::vector<std::string>* res, char delim) {
     if (str.empty())
         return;
 
     size_t beg = 0;
     size_t pos = str.find(delim);
-    while (pos != string::npos) {
+    while (pos != str.npos) {
         res->push_back(str.substr(beg, pos - beg));
         beg = ++pos;
         pos = str.find(delim, beg);
@@ -55,8 +51,8 @@ void splitStringDelim(const string& str, vector<string>* res, char delim) {
     res->push_back(str.substr(beg));
 }
 
-void joinStringDelim(const vector<string>& strs, string* res, char delim) {
-    for (vector<string>::const_iterator it = strs.begin(); it != strs.end(); ++it) {
+void joinStringDelim(const std::vector<std::string>& strs, std::string* res, char delim) {
+    for (auto it = strs.begin(); it != strs.end(); ++it) {
         if (it != strs.begin())
             res->push_back(delim);
         res->append(*it);
@@ -240,4 +236,4 @@ boost::optional<size_t> parseUnsignedBase10Integer(StringData fieldName) {
     return boost::none;
 }
 
-}  // namespace mongo
+}  // namespace mongo::str

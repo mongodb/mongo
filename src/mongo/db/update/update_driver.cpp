@@ -46,7 +46,6 @@
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 

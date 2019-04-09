@@ -38,7 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

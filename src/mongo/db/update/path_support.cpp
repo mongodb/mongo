@@ -35,7 +35,6 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 namespace pathsupport {
@@ -99,7 +98,7 @@ Status findLongestPrefix(const FieldRef& prefix,
                 break;
 
             case Array:
-                numericPart = parseUnsignedBase10Integer(prefixPart);
+                numericPart = str::parseUnsignedBase10Integer(prefixPart);
                 if (!numericPart) {
                     viable = false;
                 } else {
@@ -172,7 +171,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
     size_t i = idxFound;
     bool inArray = false;
     if (elemFound.getType() == mongo::Array) {
-        boost::optional<size_t> newIdx = parseUnsignedBase10Integer(prefix.getPart(idxFound));
+        boost::optional<size_t> newIdx = str::parseUnsignedBase10Integer(prefix.getPart(idxFound));
         if (!newIdx) {
             return Status(ErrorCodes::PathNotViable,
                           str::stream() << "Cannot create field '" << prefix.getPart(idxFound)

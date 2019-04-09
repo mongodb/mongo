@@ -46,7 +46,6 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/stringutils.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -69,11 +68,11 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
                                    int pretty,
                                    std::stringstream& s) const {
     if (includeFieldNames)
-        s << '"' << escape(fieldName()) << "\" : ";
+        s << '"' << str::escape(fieldName()) << "\" : ";
     switch (type()) {
         case mongo::String:
         case Symbol:
-            s << '"' << escape(string(valuestr(), valuestrsize() - 1)) << '"';
+            s << '"' << str::escape(string(valuestr(), valuestrsize() - 1)) << '"';
             break;
         case NumberLong:
             if (format == TenGen) {
@@ -271,10 +270,10 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
             break;
         case RegEx:
             if (format == Strict) {
-                s << "{ \"$regex\" : \"" << escape(regex());
+                s << "{ \"$regex\" : \"" << str::escape(regex());
                 s << "\", \"$options\" : \"" << regexFlags() << "\" }";
             } else {
-                s << "/" << escape(regex(), true) << "/";
+                s << "/" << str::escape(regex(), true) << "/";
                 // FIXME Worry about alpha order?
                 for (const char* f = regexFlags(); *f; ++f) {
                     switch (*f) {
@@ -292,14 +291,14 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
         case CodeWScope: {
             BSONObj scope = codeWScopeObject();
             if (!scope.isEmpty()) {
-                s << "{ \"$code\" : \"" << escape(_asCode()) << "\" , "
+                s << "{ \"$code\" : \"" << str::escape(_asCode()) << "\" , "
                   << "\"$scope\" : " << scope.jsonString() << " }";
                 break;
             }
         }
 
         case Code:
-            s << "\"" << escape(_asCode()) << "\"";
+            s << "\"" << str::escape(_asCode()) << "\"";
             break;
 
         case bsonTimestamp:

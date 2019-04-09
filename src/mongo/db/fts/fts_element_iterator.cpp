@@ -31,7 +31,6 @@
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 #include <stack>
 

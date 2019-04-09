@@ -57,7 +57,7 @@ namespace {
 std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
     // Check if field contains an array index.
     std::vector<std::string> res;
-    mongo::splitStringDelim(field, &res, '.');
+    str::splitStringDelim(field, &res, '.');
 
     // Since we could exit early from the loop,
     // we should check _id here and set '*isIDOut' accordingly.
@@ -78,7 +78,7 @@ std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
                 // string
                 // to the end of projectedField.
                 std::string projectedField;
-                mongo::joinStringDelim(prefixStrings, &projectedField, '.');
+                str::joinStringDelim(prefixStrings, &projectedField, '.');
                 return projectedField;
             }
         }

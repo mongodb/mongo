@@ -31,7 +31,7 @@
 
 #include "mongo/s/catalog/mongo_version_range.h"
 
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -92,7 +92,7 @@ bool MongoVersionRange::parseBSONElement(const BSONElement& el, string* errMsg) 
             return false;
         }
 
-        if (versionCmp(minVersion, maxVersion) > 0) {
+        if (str::versionCmp(minVersion, maxVersion) > 0) {
             string swap = minVersion;
             minVersion = maxVersion;
             maxVersion = swap;
@@ -131,7 +131,8 @@ bool MongoVersionRange::isInRange(StringData version) const {
             return true;
         if (version.find(maxVersion) == 0)
             return true;
-        if (versionCmp(minVersion, version) <= 0 && versionCmp(maxVersion, version) >= 0) {
+        if (str::versionCmp(minVersion, version) <= 0 &&
+            str::versionCmp(maxVersion, version) >= 0) {
             return true;
         }
     }
@@ -140,8 +141,8 @@ bool MongoVersionRange::isInRange(StringData version) const {
 }
 
 bool isInMongoVersionRanges(StringData version, const vector<MongoVersionRange>& ranges) {
-    for (vector<MongoVersionRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        if (it->isInRange(version))
+    for (const auto& r : ranges) {
+        if (r.isInRange(version))
             return true;
     }
 

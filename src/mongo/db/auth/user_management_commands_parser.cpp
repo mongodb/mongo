@@ -49,7 +49,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 namespace auth {
@@ -513,7 +512,7 @@ Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
         }
         if (unrecognizedActions.size()) {
             std::string unrecognizedActionsString;
-            joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
+            str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Unrecognized action privilege strings: "
                                         << unrecognizedActionsString);

@@ -45,7 +45,7 @@
 #include "mongo/idl/server_parameter.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
@@ -81,7 +81,7 @@ template <>
 inline StatusWith<std::vector<std::string>> coerceFromString<std::vector<std::string>>(
     StringData str) {
     std::vector<std::string> v;
-    splitStringDelim(str.toString(), &v, ',');
+    str::splitStringDelim(str.toString(), &v, ',');
     return v;
 }
 

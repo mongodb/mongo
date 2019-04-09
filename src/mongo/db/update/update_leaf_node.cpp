@@ -31,7 +31,7 @@
 
 #include "mongo/db/update/update_leaf_node.h"
 
-#include "mongo/util/stringutils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -44,7 +44,7 @@ void UpdateLeafNode::checkViability(mutablebson::Element element,
         // 'pathTaken' leads to an object, so we know it will be possible to create 'pathToCreate'
         // at that path.
     } else if (element.getType() == BSONType::Array &&
-               parseUnsignedBase10Integer(pathToCreate.getPart(0))) {
+               str::parseUnsignedBase10Integer(pathToCreate.getPart(0))) {
         // 'pathTaken' leads to an array, so we know we can add elements at that path so long as the
         // next component is a valid array index. We don't check, but we expect that the index will
         // be out of bounds. (Otherwise it would be part of 'pathTaken' and we wouldn't need to

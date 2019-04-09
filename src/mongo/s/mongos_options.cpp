@@ -49,7 +49,6 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -145,10 +144,10 @@ Status storeMongosOptions(const moe::Environment& params) {
     if (!resolvedSomeSeedSever) {
         if (!hostbyname(configdbConnectionString.getValue().getSetName().c_str()).empty()) {
             warning() << "The replica set name \""
-                      << escape(configdbConnectionString.getValue().getSetName())
+                      << str::escape(configdbConnectionString.getValue().getSetName())
                       << "\" resolves as a host name, but none of the servers in the seed list do. "
                          "Did you reverse the replica set name and the seed list in "
-                      << escape(configdbConnectionString.getValue().toString()) << "?";
+                      << str::escape(configdbConnectionString.getValue().toString()) << "?";
         }
     }
 
