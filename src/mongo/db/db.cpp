@@ -106,6 +106,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -879,7 +880,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         try {
-            replCoord->stepDown(opCtx, false /* force */, Seconds(10), Seconds(120));
+            // For faster tests, we allow a short wait time with setParameter.
+            auto waitTime = repl::waitForStepDownOnNonCommandShutdown.load()
+                ? Milliseconds(Seconds(10))
+                : Milliseconds(100);
+
+            replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
         } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
             // ignore not master errors
         } catch (const DBException& e) {

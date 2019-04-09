@@ -46,6 +46,16 @@ server_parameters:
         cpp_varname: enableElectionHandoff
         default: true
 
+    waitForStepDownOnNonCommandShutdown:
+        description: <-
+            Whether the primary waits to complete a stepdown and to hand off
+            its duties to a secondary before shutting down in response to
+            SIGTERM. If false, the primary shuts down more abruptly.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: waitForStepDownOnNonCommandShutdown
+        default: true
+
     periodicNoopIntervalSecs:
         description: <-
             Number of seconds between noop writer writes.

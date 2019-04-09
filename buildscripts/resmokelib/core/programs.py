@@ -107,6 +107,11 @@ def mongod_program(  # pylint: disable=too-many-branches
     if "replSet" in kwargs and "writePeriodicNoops" not in suite_set_parameters:
         suite_set_parameters["writePeriodicNoops"] = False
 
+    # By default the primary waits up to 10 sec to complete a stepdown and to hand off its duties to
+    # a secondary before shutting down in response to SIGTERM. Make it shut down more abruptly.
+    if "replSet" in kwargs and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters:
+        suite_set_parameters["waitForStepDownOnNonCommandShutdown"] = False
+
     _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {
