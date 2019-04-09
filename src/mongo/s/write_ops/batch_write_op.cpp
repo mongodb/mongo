@@ -212,11 +212,6 @@ BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest&
     }
 }
 
-BatchWriteOp::~BatchWriteOp() {
-    // Caller's responsibility to dispose of TargetedBatches
-    invariant(_targeted.empty());
-}
-
 Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
                                  bool recordTargetErrors,
                                  std::map<ShardId, TargetedWriteBatch*>* targetedBatches) {
