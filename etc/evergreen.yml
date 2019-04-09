@@ -1520,6 +1520,8 @@ functions:
         fi
 
         ${activate_virtualenv}
+        python -m pip install -r etc/pip/compile-requirements.txt
+
         # shared scons cache testing
         # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
         # 'scons_cache_scope' is set on a per variant basis
@@ -1940,6 +1942,7 @@ functions:
         set -o verbose
 
         ${activate_virtualenv}
+        python -m pip install -r etc/pip/core-requirements.txt
 
         rm -rf /data/install /data/multiversion
         $python buildscripts/setup_multiversion_mongodb.py   \
