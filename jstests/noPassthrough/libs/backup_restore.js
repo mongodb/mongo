@@ -345,7 +345,14 @@ var BackupRestoreTest = function(options) {
         assert(fsmStatus.alive,
                testName + ' FSM client was not running at end of test and exited with code: ' +
                    fsmStatus.exitCode);
-        stopMongoProgramByPid(fsmPid);
+
+        const kSIGINT = 2;
+        const exitCode = stopMongoProgramByPid(fsmPid, kSIGINT);
+        if (!_isWindows()) {
+            // The mongo shell calls TerminateProcess() on Windows rather than more gracefully
+            // interrupting resmoke.py test execution.
+            assert.eq(130, exitCode, 'expected resmoke.py to exit due to being interrupted');
+        }
 
         // Make sure the databases are not in a drop-pending state. This can happen if we
         // killed the FSM client while it was in the middle of dropping them.
