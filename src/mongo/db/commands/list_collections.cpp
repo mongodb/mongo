@@ -337,6 +337,12 @@ public:
                         filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
                 if (!skipViews) {
                     db->getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) {
+                        if (authorizedCollections &&
+                            !as->isAuthorizedForAnyActionOnResource(
+                                ResourcePattern::forExactNamespace(view.name()))) {
+                            return;
+                        }
+
                         BSONObj viewBson = buildViewBson(view, nameOnly);
                         if (!viewBson.isEmpty()) {
                             _addWorkingSetMember(
