@@ -13,6 +13,10 @@
         var db = conn.getDB("admin");
         var externalDB = conn.getDB("$external");
 
+        assert.commandWorked(db.runCommand(
+            {createUser: "userAdmin", pwd: "userAdmin", roles: ["userAdminAnyDatabase"]}));
+        db.auth("userAdmin", "userAdmin");
+
         // Check that unknown users do not interrupt isMaster
         let res =
             assert.commandWorked(db.runCommand({isMaster: 1, saslSupportedMechs: "test.bogus"}));
@@ -48,16 +52,23 @@
         checkMechs("admin.IX", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
         assert.commandWorked(db.runCommand({createUser: "\u2168", pwd: "pwd", roles: []}));
         checkMechs("admin.\u2168", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
+
+        // __system's mechanisms can be queried on local and admin if the server is in test mode
+        checkMechs("local.__system", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
+        checkMechs("admin.__system", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
     }
 
     // Test standalone.
-    var m = MongoRunner.runMongod(
-        {setParameter: "authenticationMechanisms=SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"});
+    var m = MongoRunner.runMongod({
+        keyFile: 'jstests/libs/key1',
+        setParameter: "authenticationMechanisms=SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"
+    });
     runTest(m);
     MongoRunner.stopMongod(m);
 
     // Test mongos.
     var st = new ShardingTest({
+        keyFile: 'jstests/libs/key1',
         shards: 0,
         other: {
             mongosOptions:

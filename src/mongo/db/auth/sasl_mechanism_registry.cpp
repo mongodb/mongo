@@ -90,7 +90,16 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     BSONElement saslSupportedMechs = isMasterCmd["saslSupportedMechs"];
     if (saslSupportedMechs.type() == BSONType::String) {
 
-        const auto userName = uassertStatusOK(UserName::parse(saslSupportedMechs.String()));
+        UserName userName = uassertStatusOK(UserName::parse(saslSupportedMechs.String()));
+
+
+        // Authenticating the __system@local user to the admin database on mongos is required
+        // by the auth passthrough test suite.
+        if (getTestCommandsEnabled() &&
+            userName.getUser() == internalSecurity.user->getName().getUser() &&
+            userName.getDB() == "admin") {
+            userName = internalSecurity.user->getName();
+        }
 
         AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
