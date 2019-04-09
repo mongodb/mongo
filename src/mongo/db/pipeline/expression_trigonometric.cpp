@@ -60,6 +60,10 @@ namespace mongo {
         const char* getOpName() const final {                                                      \
             return "$" #funcName;                                                                  \
         }                                                                                          \
+                                                                                                   \
+        void acceptVisitor(ExpressionVisitor* visitor) final {                                     \
+            return visitor->visit(this);                                                           \
+        }                                                                                          \
     };                                                                                             \
     REGISTER_EXPRESSION(funcName, Expression##className::parse);
 
@@ -120,6 +124,10 @@ CREATE_BOUNDED_TRIGONOMETRIC_CLASS(Tangent,
         const char* getOpName() const final {                                                 \
             return "$" #funcName;                                                             \
         }                                                                                     \
+                                                                                              \
+        void acceptVisitor(ExpressionVisitor* visitor) final {                                \
+            return visitor->visit(this);                                                      \
+        }                                                                                     \
     };                                                                                        \
     REGISTER_EXPRESSION(funcName, Expression##className::parse);
 
@@ -163,6 +171,10 @@ public:
     const char* getOpName() const final {
         return "$atan2";
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 REGISTER_EXPRESSION(atan2, ExpressionArcTangent2::parse);
 
@@ -197,6 +209,10 @@ public:
     const char* getOpName() const final {
         return "$degreesToRadians";
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 REGISTER_EXPRESSION(degreesToRadians, ExpressionDegreesToRadians::parse);
@@ -213,6 +229,10 @@ public:
 
     const char* getOpName() const final {
         return "$radiansToDegrees";
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
     }
 };
 

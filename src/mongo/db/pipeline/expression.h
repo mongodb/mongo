@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/variables.h"
@@ -175,6 +176,12 @@ public:
                                            Variables::Id renamingVar = Variables::kRootId) const {
         return {{exprFieldPath}, {}};
     }
+
+    /**
+     * This allows an arbitrary class to implement logic which gets dispatched to at runtime
+     * depending on the type of the Expression.
+     */
+    virtual void acceptVisitor(ExpressionVisitor* visitor) = 0;
 
     /**
      * Parses a BSON Object that could represent an object literal or a functional expression like
@@ -420,6 +427,10 @@ public:
     const char* getOpName() const final {
         return Accumulator(this->getExpressionContext()).getOpName();
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 /**
@@ -538,6 +549,10 @@ public:
      */
     Value getValue() const {
         return _value;
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
     }
 
 protected:
@@ -702,6 +717,10 @@ public:
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
@@ -719,6 +738,10 @@ public:
     bool isCommutative() const final {
         return true;
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -729,6 +752,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -748,6 +775,10 @@ public:
     bool isCommutative() const final {
         return true;
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -758,6 +789,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -770,6 +805,10 @@ public:
     Value serialize(bool explain) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -780,6 +819,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionObjectToArray final : public ExpressionFixedArity<ExpressionObjectToArray, 1> {
@@ -789,6 +832,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionArrayToObject final : public ExpressionFixedArity<ExpressionArrayToObject, 1> {
@@ -798,6 +845,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionCeil final : public ExpressionSingleNumericArg<ExpressionCeil> {
@@ -807,6 +858,10 @@ public:
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -819,6 +874,10 @@ public:
     static boost::intrusive_ptr<ExpressionCoerceToBool> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& pExpression);
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -869,6 +928,10 @@ public:
         const boost::intrusive_ptr<Expression>& exprLeft,
         const boost::intrusive_ptr<Expression>& exprRight);
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 private:
     CmpOp cmpOp;
 };
@@ -885,6 +948,10 @@ public:
     bool isAssociative() const final {
         return true;
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -898,6 +965,10 @@ public:
 
     bool isAssociative() const final {
         return true;
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
     }
 };
 
@@ -914,6 +985,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vps);
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 private:
     typedef ExpressionFixedArity<ExpressionCond, 3> Base;
 };
@@ -928,6 +1003,10 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -957,6 +1036,10 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -1017,6 +1100,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vps);
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1047,6 +1134,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vps);
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1071,6 +1162,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).dayOfMonth);
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1081,6 +1176,10 @@ public:
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dayOfWeek(date));
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
     }
 };
 
@@ -1093,6 +1192,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dayOfYear(date));
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1103,6 +1206,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1113,6 +1220,10 @@ public:
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1161,6 +1272,10 @@ public:
     ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                    Variables::Id renamingVar) const final;
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1203,6 +1318,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vps);
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1231,6 +1350,10 @@ public:
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1242,6 +1365,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).hour);
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1252,6 +1379,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1262,6 +1393,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1274,6 +1409,10 @@ public:
     Value evaluate(const Document& root) const;
     boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     struct Arguments {
@@ -1308,6 +1447,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1321,6 +1464,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1346,6 +1493,10 @@ public:
 
     typedef std::map<Variables::Id, NameAndExpression> VariableMap;
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1365,6 +1516,10 @@ public:
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionLog final : public ExpressionFixedArity<ExpressionLog, 2> {
@@ -1374,6 +1529,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionLog10 final : public ExpressionSingleNumericArg<ExpressionLog10> {
@@ -1383,6 +1542,10 @@ public:
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionMap final : public Expression {
@@ -1398,6 +1561,10 @@ public:
 
     ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                    Variables::Id renamingVar) const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -1426,6 +1593,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vps);
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1448,6 +1619,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).millisecond);
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1459,6 +1634,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).minute);
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1469,6 +1648,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1487,6 +1670,10 @@ public:
     bool isCommutative() const final {
         return true;
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1498,6 +1685,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).month);
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1508,6 +1699,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1548,6 +1743,10 @@ public:
     ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                    Variables::Id renamingVar) const final;
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1578,6 +1777,10 @@ public:
     bool isCommutative() const final {
         return true;
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionPow final : public ExpressionFixedArity<ExpressionPow, 2> {
@@ -1587,6 +1790,10 @@ public:
 
     static boost::intrusive_ptr<Expression> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Value base, Value exp);
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 private:
     Value evaluate(const Document& root) const final;
@@ -1601,6 +1808,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1616,6 +1827,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -1638,6 +1853,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).second);
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1648,6 +1867,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1659,6 +1882,10 @@ public:
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
     void validateArguments(const ExpressionVector& args) const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1677,6 +1904,10 @@ public:
     bool isCommutative() const final {
         return true;
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1689,6 +1920,10 @@ public:
     boost::intrusive_ptr<Expression> optimize() override;
     Value evaluate(const Document& root) const override;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 private:
     class Optimized;
@@ -1710,6 +1945,10 @@ public:
     bool isCommutative() const final {
         return true;
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1720,6 +1959,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1730,6 +1973,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1740,6 +1987,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1750,6 +2001,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionRound final : public ExpressionRangedArity<ExpressionRound, 1, 2> {
@@ -1759,6 +2014,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionSplit final : public ExpressionFixedArity<ExpressionSplit, 2> {
@@ -1768,6 +2027,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1778,6 +2041,10 @@ public:
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1788,16 +2055,24 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
-class ExpressionSubstrBytes : public ExpressionFixedArity<ExpressionSubstrBytes, 3> {
+class ExpressionSubstrBytes final : public ExpressionFixedArity<ExpressionSubstrBytes, 3> {
 public:
     explicit ExpressionSubstrBytes(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx) {}
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1808,6 +2083,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1818,6 +2097,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1828,6 +2111,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1838,6 +2125,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1853,6 +2144,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -1873,6 +2168,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1883,6 +2182,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1916,6 +2219,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -1961,6 +2268,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1971,6 +2282,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1982,6 +2297,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.week(date));
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -1992,6 +2311,10 @@ public:
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.isoYear(date));
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
     }
 };
 
@@ -2005,6 +2328,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.isoDayOfWeek(date));
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -2016,6 +2343,10 @@ public:
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.isoWeek(date));
     }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 
@@ -2026,6 +2357,10 @@ public:
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).year);
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
     }
 };
 
@@ -2042,6 +2377,10 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -2073,6 +2412,10 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -2097,6 +2440,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionRegexFindAll final : public ExpressionFixedArity<ExpressionRegexFindAll, 1> {
@@ -2106,6 +2453,9 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionRegexMatch final : public ExpressionFixedArity<ExpressionRegexMatch, 1> {
@@ -2115,5 +2465,9 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
 };
 }
