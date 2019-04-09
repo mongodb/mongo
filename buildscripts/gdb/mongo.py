@@ -244,7 +244,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
         """Initialize DumpMongoDSessionCatalog."""
         RegisterMongoCommand.register(self, "mongod-dump-sessions", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches
+    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches,too-many-statements
         """Invoke DumpMongoDSessionCatalog."""
         # See if a particular session id was specified.
         argarr = args.split(" ")
@@ -294,7 +294,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             # the session is easily identifiable.
             print("Session (" + str(session.address) + "):")
             print("SessionId", "=", lsid_str)
-            session_fields_to_print = ['_sessionId', '_checkoutOpCtx', '_killsRequested']
+            session_fields_to_print = ['_checkoutOpCtx', '_killsRequested']
             for field in session_fields_to_print:
                 # Skip fields that aren't found on the object.
                 if field in get_field_names(session):
@@ -306,30 +306,37 @@ class DumpMongoDSessionCatalog(gdb.Command):
             # we just print the session's id and nothing else.
             txn_part_dec = get_decoration(session, "TransactionParticipant")
             if txn_part_dec:
-                # Only print the most interesting fields for debugging transactions issues.
+                # Only print the most interesting fields for debugging transactions issues. The
+                # TransactionParticipant class encapsulates internal state in two distinct
+                # structures: a 'PrivateState' type (stored in private field '_p') and an
+                # 'ObservableState' type (stored in private field '_o'). The information we care
+                # about here is all contained inside the 'ObservableState', so we extract fields
+                # from that object. If, in the future, we want to print fields from the
+                # 'PrivateState' object, we can inspect the TransactionParticipant's '_p' field.
                 txn_part = txn_part_dec[1]
-                fields_to_print = ['_txnState', '_activeTxnNumber']
+                txn_part_observable_state = txn_part['_o']
+                fields_to_print = ['txnState', 'activeTxnNumber']
                 print("TransactionParticipant (" + str(txn_part.address) + "):")
                 for field in fields_to_print:
                     # Skip fields that aren't found on the object.
-                    if field in get_field_names(txn_part):
-                        print(field, "=", txn_part[field])
+                    if field in get_field_names(txn_part_observable_state):
+                        print(field, "=", txn_part_observable_state[field])
                     else:
                         print("Could not find field '%s' on the TransactionParticipant" % field)
 
-                # The '_txnResourceStash' field is a boost::optional so we unpack it
-                # manually if it is non-empty. We are only interested in its Locker object for now.
-                # TODO: Load the boost pretty printers so the object will be printed clearly
-                # by default, without the need for special unpacking.
-                val = get_boost_optional(txn_part['_txnResourceStash'])
+                # The 'txnResourceStash' field is a boost::optional so we unpack it manually if it
+                # is non-empty. We are only interested in its Locker object for now. TODO: Load the
+                # boost pretty printers so the object will be printed clearly by default, without
+                # the need for special unpacking.
+                val = get_boost_optional(txn_part_observable_state['txnResourceStash'])
                 if val:
-                    locker_addr = val["_locker"]["_M_t"]['_M_head_impl']
+                    locker_addr = get_unique_ptr(val["_locker"])  # pylint: disable=undefined-variable
                     locker_obj = locker_addr.dereference().cast(
                         gdb.lookup_type("mongo::LockerImpl"))
-                    print('_txnResourceStash._locker', "@", locker_addr)
-                    print("_txnResourceStash._locker._id", "=", locker_obj["_id"])
+                    print('txnResourceStash._locker', "@", locker_addr)
+                    print("txnResourceStash._locker._id", "=", locker_obj["_id"])
                 else:
-                    print('_txnResourceStash', "=", None)
+                    print('txnResourceStash', "=", None)
             # Separate sessions by a newline.
             print("")
 
