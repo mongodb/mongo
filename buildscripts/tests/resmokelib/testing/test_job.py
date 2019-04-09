@@ -1,7 +1,6 @@
 """Unit tests for the resmokelib.testing.executor module."""
 
 import logging
-import time
 import unittest
 
 import mock
@@ -59,8 +58,8 @@ class TestJob(unittest.TestCase):
         mock_time = MockTime(1)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatNum, suite_options)
-        with mock.patch("time.time", side_effect=mock_time.time):
-            job_object._run(queue, self.mock_interrupt_flag())
+        job_object._get_time = mock_time.time
+        job_object._run(queue, self.mock_interrupt_flag())
         self.assertEqual(job_object.total_test_num, num_repeat_tests * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], num_repeat_tests)
@@ -74,8 +73,8 @@ class TestJob(unittest.TestCase):
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
-        with mock.patch("time.time", side_effect=mock_time.time):
-            job_object._run(queue, self.mock_interrupt_flag())
+        job_object._get_time = mock_time.time
+        job_object._run(queue, self.mock_interrupt_flag())
         self.assertEqual(job_object.total_test_num, expected_tests_run * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], expected_tests_run)
@@ -86,12 +85,13 @@ class TestJob(unittest.TestCase):
         num_repeat_tests_max = 100
         expected_tests_run = self.expected_run_num(time_repeat_tests_secs, increment)
         queue = _queue.Queue()
-        suite_options = self.get_suite_options(time_repeat_tests_secs=time_repeat_tests_secs)
+        suite_options = self.get_suite_options(time_repeat_tests_secs=time_repeat_tests_secs,
+                                               num_repeat_tests_max=num_repeat_tests_max)
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
-        with mock.patch("time.time", side_effect=mock_time.time):
-            job_object._run(queue, self.mock_interrupt_flag())
+        job_object._get_time = mock_time.time
+        job_object._run(queue, self.mock_interrupt_flag())
         self.assertLess(job_object.total_test_num, num_repeat_tests_max * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], expected_tests_run)
@@ -107,8 +107,8 @@ class TestJob(unittest.TestCase):
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
-        with mock.patch("time.time", side_effect=mock_time.time):
-            job_object._run(queue, self.mock_interrupt_flag())
+        job_object._get_time = mock_time.time
+        job_object._run(queue, self.mock_interrupt_flag())
         self.assertGreater(job_object.total_test_num, num_repeat_tests_min * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], expected_tests_run)
@@ -126,8 +126,8 @@ class TestJob(unittest.TestCase):
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
-        with mock.patch("time.time", side_effect=mock_time.time):
-            job_object._run(queue, self.mock_interrupt_flag())
+        job_object._get_time = mock_time.time
+        job_object._run(queue, self.mock_interrupt_flag())
         self.assertGreater(job_object.total_test_num, num_repeat_tests_min * len(self.TESTS))
         self.assertLess(job_object.total_test_num, num_repeat_tests_max * len(self.TESTS))
         for test in self.TESTS:
@@ -145,8 +145,8 @@ class TestJob(unittest.TestCase):
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
-        with mock.patch("time.time", side_effect=mock_time.time):
-            job_object._run(queue, self.mock_interrupt_flag())
+        job_object._get_time = mock_time.time
+        job_object._run(queue, self.mock_interrupt_flag())
         self.assertEqual(job_object.total_test_num, num_repeat_tests_min * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], num_repeat_tests_min)
@@ -164,8 +164,8 @@ class TestJob(unittest.TestCase):
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
-        with mock.patch("time.time", side_effect=mock_time.time):
-            job_object._run(queue, self.mock_interrupt_flag())
+        job_object._get_time = mock_time.time
+        job_object._run(queue, self.mock_interrupt_flag())
         self.assertEqual(job_object.total_test_num, num_repeat_tests_max * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], num_repeat_tests_max)

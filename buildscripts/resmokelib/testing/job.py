@@ -102,6 +102,11 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         if teardown_flag is not None and not self.teardown_fixture():
             teardown_flag.set()
 
+    @staticmethod
+    def _get_time():
+        """Convenience method to get current time to aid in the unit testing of the _run method."""
+        return time.time()
+
     def _run(self, queue, interrupt_flag):
         """Call the before/after suite hooks and continuously execute tests from 'queue'."""
 
@@ -110,12 +115,12 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
 
         while not queue.empty() and not interrupt_flag.is_set():
             queue_elem = queue.get_nowait()
-            test_time_start = time.time()
+            test_time_start = self._get_time()
             try:
                 test = queue_elem.testcase
                 self._execute_test(test)
             finally:
-                queue_elem.job_completed(time.time() - test_time_start)
+                queue_elem.job_completed(self._get_time() - test_time_start)
                 queue.task_done()
 
             self._requeue_test(queue, queue_elem, interrupt_flag)
