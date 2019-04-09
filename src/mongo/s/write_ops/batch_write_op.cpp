@@ -323,8 +323,10 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
             if (TransactionRouter::get(_opCtx)) {
                 writeOp.setOpError(targetError);
                 ++numTargetErrors;
-                // Abandon the rest of the batch when in transaction since we are going to
-                // abort the entire transaction.
+
+                // Cleanup all the writes we have targetted in this call so far since we are going
+                // to abort the entire transaction.
+                _cancelBatches(targetError, std::move(batchMap));
 
                 return targetStatus;
             } else if (!recordTargetErrors) {
