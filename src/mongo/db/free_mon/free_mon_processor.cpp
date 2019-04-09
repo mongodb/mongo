@@ -156,7 +156,7 @@ void FreeMonProcessor::turnCrankForTest(size_t countMessagesToIgnore) {
 void FreeMonProcessor::run() {
     try {
 
-        Client::initThread("free_mon");
+        Client::initThread("FreeMonProcessor");
         Client* client = &cc();
 
         while (true) {

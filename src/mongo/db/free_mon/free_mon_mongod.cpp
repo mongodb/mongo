@@ -76,13 +76,13 @@ constexpr Seconds kDefaultMetricsGatherInterval(60);
 
 auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
     ThreadPool::Options tpOptions;
-    tpOptions.poolName = "freemon";
+    tpOptions.poolName = "FreeMonHTTP";
     tpOptions.maxThreads = 2;
     tpOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
     };
     return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface("FreeMon"));
+        std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface("FreeMonNet"));
 }
 
 class FreeMonNetworkHttp : public FreeMonNetworkInterface {
