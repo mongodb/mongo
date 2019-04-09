@@ -32,6 +32,7 @@
 #include <climits>  // For UINT_MAX
 #include <vector>
 
+#include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/operation_context.h"
@@ -464,6 +465,21 @@ public:
     bool shouldAcquireTicket() const {
         return _shouldAcquireTicket;
     }
+
+    /**
+     * Acquire a flow control admission ticket into the system. Flow control is used as a
+     * backpressure mechanism to limit replication majority point lag.
+     */
+    virtual void getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {}
+
+    /**
+     * If tracked by an implementation, returns statistics on effort spent acquiring a flow control
+     * ticket.
+     */
+    virtual FlowControlTicketholder::CurOp getFlowControlStats() const {
+        return FlowControlTicketholder::CurOp();
+    }
+
     /**
      * This function is for unit testing only.
      */

@@ -573,6 +573,9 @@ BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
                 CurOp::get(*clientOpCtx)->getLockStatsBase())) {
             fillLockerInfo(*lockerInfo, builder);
         }
+
+        auto flowControlStats = clientOpCtx->lockState()->getFlowControlStats();
+        flowControlStats.writeToBuilder(builder);
     }
 
     return builder.obj();

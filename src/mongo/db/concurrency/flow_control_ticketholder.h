@@ -29,36 +29,68 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
+
+class OperationContext;
+class ServiceContext;
 
 /**
  * This class is fundamentally a semaphore, but allows a caller to increment by X in constant time.
  *
- * It's expected usage maybe differs from a classic resource management protocol. Typically a client
+ * Its expected usage maybe differs from a classic resource management protocol. Typically a client
  * would acquire a ticket when it begins an operation and release the ticket to the pool when the
  * operation is completed.
  *
  * In the context of flow control, clients take a ticket and do not return them to the pool. There
- * is an external client that calculates the maximum number of tickets that should be allotted for
- * the next second. The consumers will call `getTicket` and the producer will call `refreshTo`.
+ * is an external service that calculates the maximum number of tickets that should be allotted for
+ * the next time period (one second). The consumers will call `getTicket` and the producer will call
+ * `refreshTo`.
  */
 class FlowControlTicketholder {
 public:
-    FlowControlTicketholder(int startTickets) : _tickets(startTickets) {}
+    /**
+     * A structure to accommodate curop reporting.
+     */
+    struct CurOp {
+        bool waiting = false;
+        long long ticketsAcquired = 0;
+        long long acquireWaitCount = 0;
+        long long timeAcquiringMicros = 0;
+
+        /**
+         * Create a sub-object "flowControlStats" on the input builder and write in the structure's
+         * fields.
+         */
+        void writeToBuilder(BSONObjBuilder& infoBuilder);
+    };
+
+    FlowControlTicketholder(int startTickets) : _tickets(startTickets) {
+        _totalTimeAcquiringMicros.store(0);
+    }
 
     static FlowControlTicketholder* get(ServiceContext* service);
     static FlowControlTicketholder* get(ServiceContext& service);
-    static FlowControlTicketholder* get(OperationContext* ctx);
+    static FlowControlTicketholder* get(OperationContext* opCtx);
 
     static void set(ServiceContext* service, std::unique_ptr<FlowControlTicketholder> flowControl);
 
     void refreshTo(int numTickets);
 
-    void getTicket(OperationContext* opCtx);
+    void getTicket(OperationContext* opCtx, FlowControlTicketholder::CurOp* stats);
+
+    std::int64_t totalTimeAcquiringMicros() const {
+        return _totalTimeAcquiringMicros.load();
+    }
 
 private:
+    // Use an int64_t as this is serialized to bson which does not support unsigned 64-bit numbers.
+    AtomicWord<std::int64_t> _totalTimeAcquiringMicros;
+
     stdx::mutex _mutex;
     stdx::condition_variable _cv;
     int _tickets;

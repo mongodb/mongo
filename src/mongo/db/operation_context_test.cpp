@@ -957,6 +957,44 @@ TEST_F(ThreadedOperationDeadlineTests, SleepForWithExpiredForDoesNotBlock) {
     ASSERT_FALSE(waiterResult.get());
 }
 
+TEST(OperationContextTest, TestWaitForConditionOrInterruptNoAssertUntilAPI) {
+    // `waitForConditionOrInterruptNoAssertUntil` can have three outcomes:
+    //
+    // 1) The condition is satisfied before any timeouts.
+    // 2) The explicit `deadline` function argument is triggered.
+    // 3) The operation context implicitly times out, or is interrupted from a killOp command or
+    //    shutdown, etc.
+    //
+    // Case (1) must return a Status::OK with a value of `cv_status::no_timeout`. Case (2) must also
+    // return a Status::OK with a value of `cv_status::timeout`. Case (3) must return an error
+    // status. The error status returned is otherwise configurable.
+    //
+    // Case (1) is the hardest to test. The condition variable must be notified by a second thread
+    // when the client is waiting on it. Case (1) is also the least in need of having the API
+    // tested, thus it's omitted from being tested here.
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+    stdx::unique_lock<stdx::mutex> lk(mutex);
+
+    // Case (2). Expect a Status::OK with a cv_status::timeout.
+    Date_t deadline = Date_t::now() + Milliseconds(500);
+    StatusWith<stdx::cv_status> ret =
+        opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, deadline);
+    ASSERT_OK(ret.getStatus());
+    ASSERT(ret.getValue() == stdx::cv_status::timeout);
+
+    // Case (3). Expect an error of `MaxTimeMSExpired`.
+    opCtx->setDeadlineByDate(Date_t::now(), ErrorCodes::MaxTimeMSExpired);
+    deadline = Date_t::now() + Seconds(500);
+    ret = opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, deadline);
+    ASSERT_FALSE(ret.isOK());
+    ASSERT_EQUALS(ErrorCodes::MaxTimeMSExpired, ret.getStatus().code());
+}
+
 }  // namespace
 
 }  // namespace mongo

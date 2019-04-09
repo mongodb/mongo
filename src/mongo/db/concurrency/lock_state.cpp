@@ -711,11 +711,8 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     invariant(!inAWriteUnitOfWork());
     invariant(_modeForTicket == MODE_NONE);
 
-    if (opCtx && (state.globalMode == LockMode::MODE_IX)) {
-        auto ticketholder = FlowControlTicketholder::get(opCtx);
-        if (ticketholder) {
-            ticketholder->getTicket(opCtx);
-        }
+    if (opCtx) {
+        getFlowControlTicket(opCtx, state.globalMode);
     }
 
     std::vector<OneLock>::const_iterator it = state.locks.begin();
@@ -897,6 +894,19 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
 
     invariant(result == LOCK_OK);
     unlockOnErrorGuard.dismiss();
+}
+
+void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {
+    auto ticketholder = FlowControlTicketholder::get(opCtx);
+    if (ticketholder && lockMode == LockMode::MODE_IX) {
+        // FlowControl only acts when a MODE_IX global lock is being taken. The clientState
+        // necessarily should only swap to being a queued writer followed by becoming an active
+        // writer. This will report clients waiting on flow control inside serverStatus'
+        // `currentQueue` metrics.
+        _clientState.store(kQueuedWriter);
+        ticketholder->getTicket(opCtx, &_flowControlStats);
+        _clientState.store(kActiveWriter);
+    }
 }
 
 LockResult LockerImpl::lockRSTLBegin(OperationContext* opCtx, LockMode mode) {

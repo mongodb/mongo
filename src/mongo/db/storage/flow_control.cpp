@@ -127,7 +127,8 @@ BSONObj FlowControl::generateSection(OperationContext* opCtx,
 
     BSONObjBuilder bob;
     bob.append("targetRateLimit", _lastTargetTicketsPermitted.load());
-    bob.append("timeAcquiringMicros", 0);
+    bob.append("timeAcquiringMicros",
+               FlowControlTicketholder::get(opCtx)->totalTimeAcquiringMicros());
     bob.append("locksPerOp", _lastLocksPerOp.load());
     bob.append("sustainerRate", _lastSustainerAppliedCount.load());
     bob.append("isLagged", lagSecs >= gFlowControlTargetLagSeconds.load());

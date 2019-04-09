@@ -249,6 +249,12 @@ public:
         lockComplete(nullptr, resId, mode, deadline);
     }
 
+    void getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) override;
+
+    FlowControlTicketholder::CurOp getFlowControlStats() const override {
+        return _flowControlStats;
+    }
+
     /**
      * This function is for unit testing only.
      */
@@ -347,6 +353,9 @@ private:
     // for example, lock attempts will time out immediately if the lock is not immediately
     // available. Note this will be ineffective if uninterruptible lock guard is set.
     boost::optional<Milliseconds> _maxLockTimeout;
+
+    // A structure for accumulating time spent getting flow control tickets.
+    FlowControlTicketholder::CurOp _flowControlStats;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //

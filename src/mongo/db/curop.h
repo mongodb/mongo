@@ -122,7 +122,8 @@ public:
 
     std::string report(Client* client,
                        const CurOp& curop,
-                       const SingleThreadedLockStats* lockStats) const;
+                       const SingleThreadedLockStats* lockStats,
+                       FlowControlTicketholder::CurOp flowControlStats) const;
 
     /**
      * Appends information about the current operation to "builder"
@@ -132,12 +133,18 @@ public:
      */
     void append(const CurOp& curop,
                 const SingleThreadedLockStats& lockStats,
+                FlowControlTicketholder::CurOp flowControlStats,
                 BSONObjBuilder& builder) const;
 
     /**
      * Copies relevant plan summary metrics to this OpDebug instance.
      */
     void setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats);
+
+    /**
+     * The resulting object has zeros omitted. As is typical in this file.
+     */
+    BSONObj makeFlowControlObject(FlowControlTicketholder::CurOp flowControlStats) const;
 
     // -------------------
 
@@ -196,6 +203,8 @@ public:
 
     // Stores storage statistics.
     std::shared_ptr<StorageStats> storageStats;
+
+    bool waitingForFlowControl{false};
 };
 
 /**

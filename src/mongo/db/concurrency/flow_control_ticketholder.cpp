@@ -33,16 +33,32 @@
 
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
-
 namespace {
 const auto getFlowControlTicketholder =
     ServiceContext::declareDecoration<std::unique_ptr<FlowControlTicketholder>>();
 }  // namespace
+
+void FlowControlTicketholder::CurOp::writeToBuilder(BSONObjBuilder& infoBuilder) {
+    infoBuilder.append("waitingForFlowControl", waiting);
+    BSONObjBuilder flowControl(infoBuilder.subobjStart("flowControlStats"));
+    if (ticketsAcquired > 0) {
+        flowControl.append("acquireCount", ticketsAcquired);
+    }
+
+    if (acquireWaitCount) {
+        flowControl.append("acquireWaitCount", acquireWaitCount);
+    }
+
+    if (timeAcquiringMicros) {
+        flowControl.append("timeAcquiringMicros", timeAcquiringMicros);
+    }
+    flowControl.done();
+}
 
 FlowControlTicketholder* FlowControlTicketholder::get(ServiceContext* service) {
     return getFlowControlTicketholder(service).get();
@@ -52,8 +68,8 @@ FlowControlTicketholder* FlowControlTicketholder::get(ServiceContext& service) {
     return getFlowControlTicketholder(service).get();
 }
 
-FlowControlTicketholder* FlowControlTicketholder::get(OperationContext* ctx) {
-    return get(ctx->getClient()->getServiceContext());
+FlowControlTicketholder* FlowControlTicketholder::get(OperationContext* opCtx) {
+    return get(opCtx->getClient()->getServiceContext());
 }
 
 void FlowControlTicketholder::set(ServiceContext* service,
@@ -70,14 +86,39 @@ void FlowControlTicketholder::refreshTo(int numTickets) {
     _cv.notify_all();
 }
 
-void FlowControlTicketholder::getTicket(OperationContext* opCtx) {
+void FlowControlTicketholder::getTicket(OperationContext* opCtx,
+                                        FlowControlTicketholder::CurOp* stats) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     LOG(4) << "Taking ticket. Available: " << _tickets;
-    while (_tickets == 0) {
-        auto code = uassertStatusOK(
-            opCtx->waitForConditionOrInterruptNoAssertUntil(_cv, lk, Date_t::max()));
-        invariant(code != stdx::cv_status::timeout);
+    if (_tickets == 0) {
+        ++stats->acquireWaitCount;
     }
+
+    while (_tickets == 0) {
+        stats->waiting = true;
+        const std::uint64_t startWaitTime = curTimeMicros64();
+
+        // This method will wait forever for a ticket. However, it will wake up every so often to
+        // update the time spent waiting on the ticket.
+        auto waitDeadline = Date_t::now() + Milliseconds(500);
+        StatusWith<stdx::cv_status> swCondStatus =
+            opCtx->waitForConditionOrInterruptNoAssertUntil(_cv, lk, waitDeadline);
+
+        auto waitTime = curTimeMicros64() - startWaitTime;
+        _totalTimeAcquiringMicros.fetchAndAddRelaxed(waitTime);
+        stats->timeAcquiringMicros += waitTime;
+
+        // If the operation context state interrupted this wait, the StatusWith result will contain
+        // the error. If the `waitDeadline` expired, the Status variable will be OK, and the
+        // `cv_status` value will be `cv_status::timeout`. In either case where Status::OK is
+        // returned, the loop must re-check the predicate. If the operation context is interrupted
+        // (and an error status is returned), the intended behavior is to bubble an exception up to
+        // the user.
+        uassertStatusOK(swCondStatus);
+    }
+    stats->waiting = false;
+    ++stats->ticketsAcquired;
+
     --_tickets;
 }
 

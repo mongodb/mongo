@@ -433,7 +433,10 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                     << "Interrupted while trying to gather storage statistics for a slow operation";
             }
         }
-        log(component) << _debug.report(client, *this, (lockerInfo ? &lockerInfo->stats : nullptr));
+        log(component) << _debug.report(client,
+                                        *this,
+                                        (lockerInfo ? &lockerInfo->stats : nullptr),
+                                        opCtx->lockState()->getFlowControlStats());
     }
 
     // Return 'true' if this operation should also be added to the profiler.
@@ -598,7 +601,8 @@ StringData getProtoString(int op) {
 
 string OpDebug::report(Client* client,
                        const CurOp& curop,
-                       const SingleThreadedLockStats* lockStats) const {
+                       const SingleThreadedLockStats* lockStats,
+                       FlowControlTicketholder::CurOp flowControlStats) const {
     StringBuilder s;
     if (iscommand)
         s << "command ";
@@ -699,6 +703,11 @@ string OpDebug::report(Client* client,
         s << " locks:" << locks.obj().toString();
     }
 
+    BSONObj flowControlObj = makeFlowControlObject(flowControlStats);
+    if (flowControlObj.nFields() > 0) {
+        s << " flowControl:" << flowControlObj.toString();
+    }
+
     if (storageStats) {
         s << " storage:" << storageStats->toBSON().toString();
     }
@@ -724,6 +733,7 @@ string OpDebug::report(Client* client,
 
 void OpDebug::append(const CurOp& curop,
                      const SingleThreadedLockStats& lockStats,
+                     FlowControlTicketholder::CurOp flowControlStats,
                      BSONObjBuilder& b) const {
     const size_t maxElementSize = 50 * 1024;
 
@@ -776,6 +786,12 @@ void OpDebug::append(const CurOp& curop,
         lockStats.report(&locks);
     }
 
+    {
+        BSONObj flowControlMetrics = makeFlowControlObject(flowControlStats);
+        BSONObjBuilder flowControlBuilder(b.subobjStart("flowControl"));
+        flowControlBuilder.appendElements(flowControlMetrics);
+    }
+
     if (storageStats) {
         b.append("storage", storageStats->toBSON());
     }
@@ -812,6 +828,24 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
     replanned = planSummaryStats.replanned;
 }
+
+BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) const {
+    BSONObjBuilder builder;
+    if (stats.ticketsAcquired > 0) {
+        builder.append("acquireCount", stats.ticketsAcquired);
+    }
+
+    if (stats.acquireWaitCount > 0) {
+        builder.append("acquireWaitCount", stats.acquireWaitCount);
+    }
+
+    if (stats.timeAcquiringMicros > 0) {
+        builder.append("timeAcquiringMicros", stats.timeAcquiringMicros);
+    }
+
+    return builder.obj();
+}
+
 
 namespace {
 
