@@ -4,11 +4,11 @@ selector:
   roots:
   - jstests/replsets/*.js
   exclude_files:
-  # Unblacklist these tests when recovery and initial sync is supported for large transactions.
-  - jstests/replsets/*recover*.js
+  # Unblacklist these tests when rollback and initial sync are supported for large transactions.
+  - jstests/replsets/commit_transaction_rollback_recovery_data_already_applied.js
+  - jstests/replsets/recover_prepared_transaction_state.js
   - jstests/replsets/*initial_sync*.js
   - jstests/replsets/rollback_aborted_prepared_transaction.js
-  - jstests/replsets/rollover_preserves_active_txns.js
 
 executor:
   config:

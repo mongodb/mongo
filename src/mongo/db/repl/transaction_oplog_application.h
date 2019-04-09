@@ -66,4 +66,10 @@ Status applyPrepareTransaction(OperationContext* opCtx,
                                const repl::OplogEntry& entry,
                                repl::OplogApplication::Mode mode);
 
+/**
+ * Apply a prepared transaction during recovery.  The OplogEntry must be an 'applyOps' with
+ * 'prepare' set or a prepareTransaction command.
+ */
+Status applyRecoveredPrepareTransaction(OperationContext* opCtx, const repl::OplogEntry& entry);
+
 }  // namespace mongo

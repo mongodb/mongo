@@ -37,6 +37,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -108,10 +109,6 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         }
     }
 
-    if (prepareCmd.isEmpty()) {
-        return _applyOperationsForTransaction(opCtx, ops, mode);
-    }
-
     const auto dbName = entry.getNss().db().toString();
     Status status = Status::OK();
 
@@ -122,7 +119,11 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
 
         BSONObjBuilder resultWeDontCareAbout;
-        status = applyOps(opCtx, dbName, prepareCmd, mode, &resultWeDontCareAbout);
+        if (prepareCmd.isEmpty()) {
+            status = _applyOperationsForTransaction(opCtx, ops, mode);
+        } else {
+            status = applyOps(opCtx, dbName, prepareCmd, mode, &resultWeDontCareAbout);
+        }
         if (status.isOK()) {
             opCtx->recoveryUnit()->setPrepareTimestamp(commitTimestamp);
             wunit.prepare();
@@ -269,6 +270,66 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     return ops;
 }
 
+namespace {
+/**
+ * This is the part of applyPrepareTransaction which is common to steady state and recovery
+ * oplog application.
+ */
+Status _applyPrepareTransaction(OperationContext* opCtx,
+                                const OplogEntry& entry,
+                                repl::OplogApplication::Mode oplogApplicationMode) {
+    auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
+
+    if (oplogApplicationMode == repl::OplogApplication::Mode::kRecovering) {
+        // We might replay a prepared transaction behind oldest timestamp.  Note that since this is
+        // scoped to the storage transaction, and readTransactionOperationsFromOplogChain implicitly
+        // abandons the storage transaction when it releases the global lock, this must be done
+        // after readTransactionOperationsFromOplogChain.
+        opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
+    }
+
+    // Block application of prepare oplog entry on secondaries when a concurrent background index
+    // build is running.
+    // This will prevent hybrid index builds from corrupting an index on secondary nodes if a
+    // prepared transaction becomes prepared during a build but commits after the index build
+    // commits.
+    for (const auto& op : ops) {
+        auto ns = op.getNss();
+        auto uuid = *op.getUuid();
+        BackgroundOperation::awaitNoBgOpInProgForNs(ns);
+        IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(uuid);
+    }
+
+    // Transaction operations are in their own batch, so we can modify their opCtx.
+    invariant(entry.getSessionId());
+    invariant(entry.getTxnNumber());
+    opCtx->setLogicalSessionId(*entry.getSessionId());
+    opCtx->setTxnNumber(*entry.getTxnNumber());
+    // The write on transaction table may be applied concurrently, so refreshing state
+    // from disk may read that write, causing starting a new transaction on an existing
+    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+
+    auto transaction = TransactionParticipant::get(opCtx);
+    transaction.unstashTransactionResources(opCtx, "prepareTransaction");
+
+    auto status = _applyOperationsForTransaction(opCtx, ops, oplogApplicationMode);
+    if (!status.isOK())
+        return status;
+
+    if (MONGO_FAIL_POINT(applyPrepareCommandHangBeforePreparingTransaction)) {
+        LOG(0) << "Hit applyPrepareCommandHangBeforePreparingTransaction failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+            opCtx, applyPrepareCommandHangBeforePreparingTransaction);
+    }
+
+    transaction.prepareTransaction(opCtx, entry.getOpTime());
+    transaction.stashTransactionResources(opCtx);
+
+    return Status::OK();
+}
+}  // namespace
+
 /**
  * Make sure that if we are in replication recovery or initial sync, we don't apply the prepare
  * transaction oplog entry until we either see a commit transaction oplog entry or are at the very
@@ -303,48 +364,18 @@ Status applyPrepareTransaction(OperationContext* opCtx,
             oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
 
     invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
+    return _applyPrepareTransaction(opCtx, entry, oplogApplicationMode);
+}
 
-    auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
-
-    // Block application of prepare oplog entry on secondaries when a concurrent background index
-    // build is running.
-    // This will prevent hybrid index builds from corrupting an index on secondary nodes if a
-    // prepared transaction becomes prepared during a build but commits after the index build
-    // commits.
-    for (const auto& op : ops) {
-        auto ns = op.getNss();
-        if (BackgroundOperation::inProgForNs(ns)) {
-            BackgroundOperation::awaitNoBgOpInProgForNs(ns);
-        }
+Status applyRecoveredPrepareTransaction(OperationContext* opCtx, const OplogEntry& entry) {
+    // Snapshot transactions never conflict with the PBWM lock.
+    invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
+    if (entry.getCommandType() == OplogEntry::CommandType::kPrepareTransaction) {
+        return _applyPrepareTransaction(opCtx, entry, repl::OplogApplication::Mode::kRecovering);
+    } else {
+        // This is an applyOps with prepare.
+        return applyRecoveredPrepareApplyOpsOplogEntry(opCtx, entry);
     }
-
-    // Transaction operations are in their own batch, so we can modify their opCtx.
-    invariant(entry.getSessionId());
-    invariant(entry.getTxnNumber());
-    opCtx->setLogicalSessionId(*entry.getSessionId());
-    opCtx->setTxnNumber(*entry.getTxnNumber());
-    // The write on transaction table may be applied concurrently, so refreshing state
-    // from disk may read that write, causing starting a new transaction on an existing
-    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
-
-    auto transaction = TransactionParticipant::get(opCtx);
-    transaction.unstashTransactionResources(opCtx, "prepareTransaction");
-
-    auto status = _applyOperationsForTransaction(opCtx, ops, oplogApplicationMode);
-    if (!status.isOK())
-        return status;
-
-    if (MONGO_FAIL_POINT(applyPrepareCommandHangBeforePreparingTransaction)) {
-        LOG(0) << "Hit applyPrepareCommandHangBeforePreparingTransaction failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-            opCtx, applyPrepareCommandHangBeforePreparingTransaction);
-    }
-
-    transaction.prepareTransaction(opCtx, entry.getOpTime());
-    transaction.stashTransactionResources(opCtx);
-
-    return Status::OK();
 }
 
 }  // namespace mongo

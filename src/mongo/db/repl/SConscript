@@ -350,6 +350,7 @@ env.Library(
     LIBDEPS=[
     ],
     LIBDEPS_PRIVATE=[
+        'oplog',
         'oplog_application',
         '$BUILD_DIR/mongo/base',
     ],

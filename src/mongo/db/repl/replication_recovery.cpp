@@ -44,6 +44,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session.h"
 #include "mongo/db/transaction_history_iterator.h"
@@ -306,6 +307,7 @@ void ReplicationRecoveryImpl::_reconstructPreparedTransactions(OperationContext*
                 opCtx->getServiceContext()->makeClient("reconstruct-prepared-transactions");
             AlternativeClientRegion acr(newClient);
             const auto newOpCtx = cc().makeOperationContext();
+            repl::UnreplicatedWritesBlock uwb(newOpCtx.get());
 
             // Snapshot transaction can never conflict with the PBWM lock.
             newOpCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
