@@ -47,6 +47,7 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/logger/logger.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/barrier.h"
@@ -3364,6 +3365,54 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
 
     std::string expectedTransactionInfo = "transaction parameters";
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+}
+
+TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityInfo) {
+    auto sessionCheckout = checkOutSession();
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Set a high slow operation threshold to avoid the transaction being logged as slow.
+    serverGlobalParams.slowMS = 10000;
+
+    // Set verbosity level of transaction components to info.
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
+                                                        logger::LogSeverity::Info());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    startCapturingLogMessages();
+    txnParticipant.commitUnpreparedTransaction(opCtx());
+    stopCapturingLogMessages();
+
+    // Test that the transaction is not logged.
+    ASSERT_EQUALS(0, countLogLinesContaining("transaction parameters"));
+}
+
+TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityDebug) {
+    auto sessionCheckout = checkOutSession();
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Set a high slow operation threshold to avoid the transaction being logged as slow.
+    serverGlobalParams.slowMS = 10000;
+
+    // Set verbosity level of transaction components to debug.
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
+                                                        logger::LogSeverity::Debug(1));
+
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    startCapturingLogMessages();
+    txnParticipant.commitUnpreparedTransaction(opCtx());
+    stopCapturingLogMessages();
+
+    // Reset verbosity level of transaction components.
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
+                                                        logger::LogSeverity::Info());
+
+    // Test that the transaction is still logged.
+    ASSERT_EQUALS(1, countLogLinesContaining("transaction parameters"));
 }
 
 TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {

@@ -1805,8 +1805,10 @@ void TransactionParticipant::Participant::_logSlowTransaction(
     // Only log multi-document transactions.
     if (!o().txnState.isInRetryableWriteMode()) {
         const auto tickSource = opCtx->getServiceContext()->getTickSource();
-        // Log the transaction if its duration is longer than the slowMS command threshold.
-        if (o().transactionMetricsObserver.getSingleTransactionStats().getDuration(
+        // Log the transaction if log message verbosity for transaction component is >= 1 or its
+        // duration is longer than the slowMS command threshold.
+        if (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||
+            o().transactionMetricsObserver.getSingleTransactionStats().getDuration(
                 tickSource, tickSource->getTicks()) > Milliseconds(serverGlobalParams.slowMS)) {
             log(logger::LogComponent::kTransaction)
                 << "transaction "
