@@ -192,6 +192,8 @@ namespace {
 const NamespaceString startupLogCollectionName("local.startup_log");
 const NamespaceString kSystemReplSetCollection("local.system.replset");
 
+MONGO_EXPORT_SERVER_PARAMETER(waitForStepDownOnNonCommandShutdown, bool, true);
+
 #ifdef _WIN32
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoDB", L"MongoDB", L"MongoDB Server"};
@@ -889,8 +891,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             }
 
             try {
+                // For faster tests, we allow a short wait time with setParameter.
+                auto waitTime = waitForStepDownOnNonCommandShutdown.load()
+                    ? Milliseconds(Seconds(10))
+                    : Milliseconds(100);
+
                 uassertStatusOK(
-                    replCoord->stepDown(opCtx, false /* force */, Seconds(10), Seconds(120)));
+                    replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120)));
             } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
                 // ignore not master errors
             } catch (const DBException& e) {

@@ -2468,6 +2468,24 @@ var ReplSetTest = function(opts) {
             }
         }
 
+        // Make shutdown faster in tests, especially when election handoff has no viable candidate.
+        // Ignore errors from setParameter, perhaps mongod is too old for this parameter.
+        if (_callIsMaster()) {
+            asCluster(this._liveNodes, () => {
+                for (let node of this._liveNodes) {
+                    try {
+                        assert.commandWorked(node.adminCommand({
+                            setParameter: 1,
+                            waitForStepDownOnNonCommandShutdown: false,
+                        }));
+                    } catch (e) {
+                        print("Error in setParameter for waitForStepDownOnNonCommandShutdown:");
+                        print(e);
+                    }
+                }
+            });
+        }
+
         for (var i = 0; i < this.ports.length; i++) {
             this.stop(i, signal, opts);
         }
