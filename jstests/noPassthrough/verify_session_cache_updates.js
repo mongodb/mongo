@@ -68,6 +68,8 @@
 
     {
         var st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+        st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+
         runTest(st.s0);
         st.stop();
     }

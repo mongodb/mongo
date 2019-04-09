@@ -155,6 +155,11 @@ public:
                                 const BSONObj& doc,
                                 const WriteConcernOptions& writeConcern) override;
 
+    void insertConfigDocumentsAsRetryableWrite(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               std::vector<BSONObj> docs,
+                                               const WriteConcernOptions& writeConcern) override;
+
     StatusWith<bool> updateConfigDocument(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const BSONObj& query,

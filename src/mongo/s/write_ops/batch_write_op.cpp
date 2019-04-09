@@ -316,8 +316,9 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
 
         // Account the array overhead once for the actual updates array and once for the statement
         // ids array, if retryable writes are used
-        const int writeSizeBytes = getWriteSizeBytes(writeOp) + kBSONArrayPerElementOverheadBytes +
-            (_batchTxnNum ? kBSONArrayPerElementOverheadBytes + 4 : 0);
+        const int writeSizeBytes = getWriteSizeBytes(writeOp) +
+            write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
+            (_batchTxnNum ? write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 4 : 0);
 
         if (wouldMakeBatchesTooBig(writes, writeSizeBytes, batchMap)) {
             invariant(!batchMap.empty());

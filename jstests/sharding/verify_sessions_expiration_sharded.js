@@ -27,9 +27,11 @@
     const startSession = {startSession: 1};
     const failPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
 
-    function refreshSessionsAndVerifyCount(config, expectedCount) {
-        config.runCommand(refresh);
-        assert.eq(config.system.sessions.count(), expectedCount);
+    function refreshSessionsAndVerifyCount(mongosConfig, shardConfig, expectedCount) {
+        mongosConfig.runCommand(refresh);
+        shardConfig.runCommand(refresh);
+
+        assert.eq(mongosConfig.system.sessions.count(), expectedCount);
     }
 
     function verifyOpenCursorCount(db, expectedCount) {
@@ -49,18 +51,19 @@
 
     let mongos = shardingTest.s;
     let db = mongos.getDB(dbName);
-    let config = mongos.getDB("config");
+    let mongosConfig = mongos.getDB("config");
+    let shardConfig = shardingTest.rs0.getPrimary().getDB("config");
 
     // 1. Verify that sessions expire from config.system.sessions after the timeout has passed.
     for (let i = 0; i < 5; i++) {
         let res = db.runCommand(startSession);
         assert.commandWorked(res, "unable to start session");
     }
-    refreshSessionsAndVerifyCount(config, 5);
+    refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 5);
 
     // Manually delete entries in config.system.sessions to simulate TTL expiration.
-    assert.commandWorked(config.system.sessions.remove({}));
-    refreshSessionsAndVerifyCount(config, 0);
+    assert.commandWorked(mongosConfig.system.sessions.remove({}));
+    refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 0);
 
     // 2. Verify that getMores after finds will update the 'lastUse' field on documents in the
     // config.system.sessions collection.
@@ -77,8 +80,8 @@
         assert(cursors[i].hasNext());
     }
 
-    refreshSessionsAndVerifyCount(config, 5);
-    verifyOpenCursorCount(config, 5);
+    refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 5);
+    verifyOpenCursorCount(mongosConfig, 5);
 
     let sessionsCollectionArray;
     let lastUseValues = [];
@@ -87,10 +90,10 @@
             cursors[j].next();
         }
 
-        refreshSessionsAndVerifyCount(config, 5);
-        verifyOpenCursorCount(config, 5);
+        refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 5);
+        verifyOpenCursorCount(mongosConfig, 5);
 
-        sessionsCollectionArray = getSessions(config);
+        sessionsCollectionArray = getSessions(mongosConfig);
 
         if (i == 0) {
             for (let j = 0; j < sessionsCollectionArray.length; j++) {
@@ -106,10 +109,10 @@
 
     // 3. Verify that letting sessions expire (simulated by manual deletion) will kill their
     // cursors.
-    assert.commandWorked(config.system.sessions.remove({}));
+    assert.commandWorked(mongosConfig.system.sessions.remove({}));
 
-    refreshSessionsAndVerifyCount(config, 0);
-    verifyOpenCursorCount(config, 0);
+    refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 0);
+    verifyOpenCursorCount(mongosConfig, 0);
 
     for (let i = 0; i < cursors.length; i++) {
         assert.commandFailedWithCode(
@@ -128,10 +131,10 @@
         sessionId: pinnedCursorSession,
         db: pinnedCursorDB,
         assertFunction: (cursorId, coll) => {
-            assert.commandWorked(config.system.sessions.remove({}));
+            assert.commandWorked(mongosConfig.system.sessions.remove({}));
+            verifyOpenCursorCount(mongosConfig, 1);
 
-            verifyOpenCursorCount(config, 1);
-            refreshSessionsAndVerifyCount(config, 1);
+            refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 1);
 
             let db = coll.getDB();
             assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));

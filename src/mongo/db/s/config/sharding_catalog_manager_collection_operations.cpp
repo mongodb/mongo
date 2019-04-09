@@ -128,6 +128,17 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
     return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
 }
 
+void writeFirstChunksForShardCollection(
+    OperationContext* opCtx, const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
+    for (const auto& chunk : initialChunks.chunks) {
+        uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
+            opCtx,
+            ChunkType::ConfigNS,
+            chunk.toConfigBSON(),
+            ShardingCatalogClient::kMajorityWriteConcern));
+    }
+}
+
 }  // namespace
 
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
@@ -417,7 +428,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                                                      treatAsNoZonesDefined,
                                                                      treatAsEmpty);
 
-    InitialSplitPolicy::writeFirstChunksToConfig(opCtx, initialChunks);
+    writeFirstChunksForShardCollection(opCtx, initialChunks);
 
     {
         CollectionType coll;

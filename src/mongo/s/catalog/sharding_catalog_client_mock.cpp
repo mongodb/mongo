@@ -179,6 +179,12 @@ Status ShardingCatalogClientMock::insertConfigDocument(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+void ShardingCatalogClientMock::insertConfigDocumentsAsRetryableWrite(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::vector<BSONObj> docs,
+    const WriteConcernOptions& writeConcern) {}
+
 StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
     OperationContext* opCtx,
     const NamespaceString& nss,

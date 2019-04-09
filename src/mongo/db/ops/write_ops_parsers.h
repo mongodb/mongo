@@ -37,6 +37,11 @@
 namespace mongo {
 namespace write_ops {
 
+// Conservative per array element overhead. This value was calculated as 1 byte (element type) + 5
+// bytes (max string encoding of the array index encoded as string and the maximum key is 99999) + 1
+// byte (zero terminator) = 7 bytes
+constexpr int kWriteCommandBSONArrayPerElementOverheadBytes = 7;
+
 /**
  * Parses the 'limit' property of a delete entry, which has inverted meaning from the 'multi'
  * property of an update.
