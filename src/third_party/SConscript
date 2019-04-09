@@ -33,14 +33,8 @@ thirdPartyEnvironmentModifications = {
 }
 
 if not use_system_version_of_library('tcmalloc'):
-    # Only gperftools-2.5 is covered here. gperftools-2.7 does something different further
-    # down in the file. Its SConscript internally calculates a CPPPATH for its consumers.
-    if gperftoolsSuffix == '-2.5':
-        thirdPartyEnvironmentModifications['gperftools'] = {
-            'CPPPATH' : ['#/src/third_party/gperftools-2.5/src']
-        }
-    else:
-        thirdPartyEnvironmentModifications['gperftools'] = {}
+    # GPerftools does this slightly differently than the others.
+    thirdPartyEnvironmentModifications['gperftools'] = {}
 
 if not use_system_version_of_library('pcre'):
     thirdPartyEnvironmentModifications['pcre'] = {
