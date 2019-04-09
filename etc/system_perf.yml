@@ -390,6 +390,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: cursor_manager
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "cursor_manager"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: mixed_workloads
   priority: 5
   commands:
@@ -731,6 +741,7 @@ buildvariants:
   tasks: &standalonetasks
     - name: industry_benchmarks
     - name: crud_workloads
+    - name: cursor_manager
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
