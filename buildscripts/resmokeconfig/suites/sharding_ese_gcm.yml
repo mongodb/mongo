@@ -1,0 +1,20 @@
+# Section that is ignored by resmoke.py.
+config_variables:
+- &keyFile src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/sharding/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      global_vars:
+        TestData:
+          enableEncryption: ''
+          encryptionKeyFile: *keyFile
+          encryptionCipherMode: 'AES256-GCM'
+      readMode: commands

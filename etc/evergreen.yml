@@ -5301,6 +5301,16 @@ tasks:
       resmoke_args: --suites=aggregation_ese --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: aggregation_ese_gcm
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_ese_gcm --storageEngine=wiredTiger
+
+- <<: *task_template
   name: aggregation_auth
   depends_on:
   - name: aggregation
@@ -5707,6 +5717,16 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_ese --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: jsCore_ese_gcm
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_ese_gcm --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_compatibility
@@ -6391,6 +6411,15 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
 
+- name: replica_sets_ese_gcm_gen
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: replica_sets_ese_gcm
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 7
+
 - name: replica_sets_auth_gen
   commands:
   - func: "generate resmoke tasks"
@@ -6440,6 +6469,15 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       task: sharding_ese
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 21
+
+- name: sharding_ese_gcm_gen
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: sharding_ese_gcm
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 21
@@ -8679,6 +8717,7 @@ buildvariants:
     - ubuntu1604-zseries-large
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
@@ -8713,6 +8752,7 @@ buildvariants:
     - ubuntu1604-zseries-large
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
@@ -8736,6 +8776,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_gen
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -8746,6 +8787,7 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
@@ -8843,6 +8885,7 @@ buildvariants:
     - ubuntu1804-zseries-build
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
@@ -8877,6 +8920,7 @@ buildvariants:
     - ubuntu1804-zseries-build
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
@@ -8900,6 +8944,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_gen
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -8910,6 +8955,7 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
@@ -8972,6 +9018,7 @@ buildvariants:
   - name: fle
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_decimal
   - name: jsCore_txns
@@ -8992,12 +9039,14 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_jscore_passthrough
   - name: powercycle
   - name: sasl
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: slow1_gen
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough_gen
@@ -9165,6 +9214,7 @@ buildvariants:
   - name: fle
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_decimal
   - name: jsCore_txns
@@ -9185,11 +9235,13 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: slow1_gen
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough_gen
@@ -10629,6 +10681,7 @@ buildvariants:
   - name: rollback_fuzzer_unclean_shutdowns_gen
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
   - name: aggregation_mongos_passthrough
@@ -10705,6 +10758,7 @@ buildvariants:
     - rhel62-large
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -10768,6 +10822,7 @@ buildvariants:
     - rhel62-large
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
     distros:
@@ -10816,6 +10871,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
@@ -10882,6 +10938,7 @@ buildvariants:
   - name: rollback_fuzzer_unclean_shutdowns_gen
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
   - name: aggregation_mongos_passthrough
@@ -10944,6 +11001,7 @@ buildvariants:
     - rhel62-large
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -10990,6 +11048,7 @@ buildvariants:
     - rhel62-large
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_jscore_passthrough
     distros:
     - rhel62-large
@@ -11019,6 +11078,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
@@ -11096,6 +11156,7 @@ buildvariants:
   - name: rollback_fuzzer_unclean_shutdowns_gen
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_mongos_passthrough
   - name: aggregation_one_shard_sharded_collections
@@ -11149,6 +11210,7 @@ buildvariants:
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -11175,6 +11237,7 @@ buildvariants:
   - name: read_only_sharded
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
@@ -11199,6 +11262,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
@@ -11623,6 +11687,7 @@ buildvariants:
     - rhel71-power8-build
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
@@ -11657,6 +11722,7 @@ buildvariants:
     - rhel71-power8-build
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
@@ -11682,6 +11748,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_gen
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -11692,6 +11759,7 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
@@ -11752,6 +11820,7 @@ buildvariants:
     - rhel72-zseries-build
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
@@ -11786,6 +11855,7 @@ buildvariants:
     - rhel72-zseries-build
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
@@ -11809,6 +11879,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_gen
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -11819,6 +11890,7 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
@@ -11875,6 +11947,7 @@ buildvariants:
     - rhel67-zseries-build
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
@@ -11906,6 +11979,7 @@ buildvariants:
     - rhel67-zseries-build
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -11925,6 +11999,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_gen
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -11935,6 +12010,7 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
@@ -12256,6 +12332,7 @@ buildvariants:
     - suse12-zseries-build
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
@@ -12290,6 +12367,7 @@ buildvariants:
     - suse12-zseries-build
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
@@ -12313,6 +12391,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_gen
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -12323,6 +12402,7 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
@@ -13605,6 +13685,7 @@ buildvariants:
   - name: rollback_fuzzer_unclean_shutdowns_gen
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
   - name: aggregation_mongos_passthrough
@@ -13662,6 +13743,7 @@ buildvariants:
   - name: integration_tests_sharded
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -13697,6 +13779,7 @@ buildvariants:
   - name: read_only_sharded
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
@@ -13720,6 +13803,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
@@ -13812,6 +13896,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: rollback_fuzzer_gen
   - name: rollback_fuzzer_clean_shutdowns_gen
   - name: rollback_fuzzer_unclean_shutdowns_gen
@@ -13874,6 +13959,7 @@ buildvariants:
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -13900,6 +13986,7 @@ buildvariants:
   - name: read_only_sharded
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
@@ -13923,6 +14010,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
@@ -14007,6 +14095,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_ese
+  - name: aggregation_ese_gcm
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
   - name: aggregation_read_concern_majority_passthrough
@@ -14040,6 +14129,7 @@ buildvariants:
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_ese
+  - name: jsCore_ese_gcm
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -14063,6 +14153,7 @@ buildvariants:
   - name: read_only_sharded
   - name: replica_sets
   - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
@@ -14077,6 +14168,7 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_gen
   - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
