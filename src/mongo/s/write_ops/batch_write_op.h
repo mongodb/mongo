@@ -125,7 +125,7 @@ class BatchWriteOp {
 
 public:
     BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest);
-    ~BatchWriteOp();
+    ~BatchWriteOp() = default;
 
     /**
      * Targets one or more of the next write ops in this batch op using a NSTargeter.  The
