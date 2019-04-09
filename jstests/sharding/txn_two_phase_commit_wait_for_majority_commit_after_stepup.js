@@ -5,6 +5,10 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
+// The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
+// test causes failovers on a shard, so the cached connection is not usable.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
 
@@ -15,29 +19,16 @@
     const collName = "foo";
     const ns = dbName + "." + collName;
 
-    let numCoordinatorNodes = 2;
     let st = new ShardingTest({
-        shards: 3,                    // number of *regular shards*
-        config: numCoordinatorNodes,  // number of replica set *nodes* in *config shard*
+        shards: 3,
+        rs0: {nodes: 2},
         causallyConsistent: true,
         other: {
-            mongosOptions: {
-                // This failpoint is needed because it is not yet possible to step down a node
-                // with a prepared transaction.
-                setParameter:
-                    {"failpoint.sendCoordinateCommitToConfigServer": "{'mode': 'alwaysOn'}"},
-                verbose: 3
-            },
-            configOptions: {
-                // This failpoint is needed because of the other failpoint: the config server
-                // will not have a local participant, so coordinateCommitTransaction cannot fall
-                // back to recovering the decision from the local participant.
-                setParameter: {"failpoint.doNotForgetCoordinator": "{'mode': 'alwaysOn'}"},
-            }
+            mongosOptions: {verbose: 3},
         }
     });
 
-    let coordinatorReplSetTest = st.configRS;
+    let coordinatorReplSetTest = st.rs0;
     let participant0 = st.shard0;
     let participant1 = st.shard1;
     let participant2 = st.shard2;
@@ -63,10 +54,12 @@
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+        // TODO (SERVER-40594): Remove _waitForDelete once the range deleter doesn't block step down
+        // if it enters a prepare conflict retry loop.
+        assert.commandWorked(st.s.adminCommand(
+            {moveChunk: ns, find: {_id: 0}, to: participant1.shardName, _waitForDelete: true}));
+        assert.commandWorked(st.s.adminCommand(
+            {moveChunk: ns, find: {_id: 10}, to: participant2.shardName, _waitForDelete: true}));
 
         // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
         // from the shards starting, aborting, and restarting the transaction due to needing to
