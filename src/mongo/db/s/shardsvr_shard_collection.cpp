@@ -415,6 +415,22 @@ void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss)
             numChunks == 0);
 }
 
+void writeFirstChunksToConfig(OperationContext* opCtx,
+                              const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
+
+    std::vector<BSONObj> chunkObjs;
+    chunkObjs.reserve(initialChunks.chunks.size());
+    for (const auto& chunk : initialChunks.chunks) {
+        chunkObjs.push_back(chunk.toConfigBSON());
+    }
+
+    Grid::get(opCtx)->catalogClient()->insertConfigDocumentsAsRetryableWrite(
+        opCtx,
+        ChunkType::ConfigNS,
+        std::move(chunkObjs),
+        ShardingCatalogClient::kMajorityWriteConcern);
+}
+
 void shardCollection(OperationContext* opCtx,
                      const NamespaceString& nss,
                      const boost::optional<UUID> uuid,
@@ -522,7 +538,7 @@ void shardCollection(OperationContext* opCtx,
     }
 
     // Insert chunk documents to config.chunks on the config server.
-    InitialSplitPolicy::writeFirstChunksToConfig(opCtx, initialChunks);
+    writeFirstChunksToConfig(opCtx, initialChunks);
 
     {
         CollectionType coll;

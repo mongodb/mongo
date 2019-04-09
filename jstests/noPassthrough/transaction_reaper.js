@@ -50,7 +50,10 @@
         this.st.s0.getDB("admin").runCommand({shardCollection: "test.test", key: {_id: 1}});
 
         // Ensure that the sessions collection exists.
-        this.st.c0.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+        assert.commandWorked(
+            this.st.c0.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+        assert.commandWorked(
+            this.st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
     }
 
     Sharding.prototype.stop = function() {

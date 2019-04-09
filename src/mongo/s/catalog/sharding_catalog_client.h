@@ -322,6 +322,19 @@ public:
                                         const WriteConcernOptions& writeConcern) = 0;
 
     /**
+     * Directly inserts documents in the specified namespace on the config server. Inserts said
+     * documents using a retryable write. Underneath, a session is created and destroyed -- this
+     * ad-hoc session creation strategy should never be used outside of specific, non-performant
+     * code paths.
+     *
+     * Must only be used for insertions in the 'config' database.
+     */
+    virtual void insertConfigDocumentsAsRetryableWrite(OperationContext* opCtx,
+                                                       const NamespaceString& nss,
+                                                       std::vector<BSONObj> docs,
+                                                       const WriteConcernOptions& writeConcern) = 0;
+
+    /**
      * Updates a single document in the specified namespace on the config server. The document must
      * have an _id index. Must only be used for updates to the 'config' database.
      *

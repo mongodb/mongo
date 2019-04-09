@@ -40,7 +40,7 @@ namespace write_ops {
 // Conservative per array element overhead. This value was calculated as 1 byte (element type) + 5
 // bytes (max string encoding of the array index encoded as string and the maximum key is 99999) + 1
 // byte (zero terminator) = 7 bytes
-constexpr int kBSONArrayPerElementOverheadBytes = 7;
+constexpr int kWriteCommandBSONArrayPerElementOverheadBytes = 7;
 
 /**
  * Parses the 'limit' property of a delete entry, which has inverted meaning from the 'multi'
@@ -90,10 +90,10 @@ public:
 
         int size = 0;
         std::for_each(_pipeline->begin(), _pipeline->end(), [&size](const BSONObj& obj) {
-            size += obj.objsize() + kBSONArrayPerElementOverheadBytes;
+            size += obj.objsize() + kWriteCommandBSONArrayPerElementOverheadBytes;
         });
 
-        return size + kBSONArrayPerElementOverheadBytes;
+        return size + kWriteCommandBSONArrayPerElementOverheadBytes;
     }
 
     Type type() const {

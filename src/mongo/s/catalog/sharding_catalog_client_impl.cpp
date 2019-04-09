@@ -42,6 +42,8 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -64,6 +66,7 @@
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -87,17 +90,76 @@ using str::stream;
 
 namespace {
 
+class AlternativeSessionRegion {
+public:
+    AlternativeSessionRegion(OperationContext* opCtx)
+        : _alternateClient(opCtx->getServiceContext()->makeClient("alternative-session-region")),
+          _acr(_alternateClient),
+          _newOpCtx(cc().makeOperationContext()),
+          _lsid(makeLogicalSessionId(opCtx)) {
+        _newOpCtx->setLogicalSessionId(_lsid);
+    }
+
+    ~AlternativeSessionRegion() {
+        LogicalSessionCache::get(opCtx())->endSessions({_lsid});
+    }
+
+    OperationContext* opCtx() {
+        return &*_newOpCtx;
+    }
+
+private:
+    ServiceContext::UniqueClient _alternateClient;
+    AlternativeClientRegion _acr;
+    ServiceContext::UniqueOperationContext _newOpCtx;
+    LogicalSessionId _lsid;
+};
+
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
 
+const int kRetryableBatchWriteBSONSizeOverhead = kWriteCommandBSONArrayPerElementOverheadBytes * 2;
+
 const NamespaceString kSettingsNamespace("config", "settings");
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
     response->setStatus(status);
+}
+
+void sendRetryableWriteBatchRequestToConfig(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            std::vector<BSONObj>& docs,
+                                            TxnNumber txnNumber,
+                                            const WriteConcernOptions& writeConcern) {
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setDocuments(docs);
+        return insertOp;
+    }());
+    request.setWriteConcern(writeConcern.toBSON());
+
+    BSONObj cmdObj = request.toBSON();
+    BSONObjBuilder bob(cmdObj);
+    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
+
+    BatchedCommandResponse batchResponse;
+    auto response = configShard->runCommand(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            nss.db().toString(),
+                                            bob.obj(),
+                                            Shard::kDefaultConfigCommandTimeout,
+                                            Shard::RetryPolicy::kIdempotent);
+
+    auto writeStatus = Shard::CommandResponse::processBatchWriteResponse(response, &batchResponse);
+
+    uassertStatusOK(batchResponse.toStatus());
+    uassertStatusOK(writeStatus);
 }
 
 }  // namespace
@@ -811,6 +873,50 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
     }
 
     MONGO_UNREACHABLE;
+}
+
+void ShardingCatalogClientImpl::insertConfigDocumentsAsRetryableWrite(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::vector<BSONObj> docs,
+    const WriteConcernOptions& writeConcern) {
+    invariant(nss.db() == NamespaceString::kAdminDb || nss.db() == NamespaceString::kConfigDb);
+
+    AlternativeSessionRegion asr(opCtx);
+    TxnNumber currentTxnNumber = 0;
+
+    std::vector<BSONObj> workingBatch;
+    size_t workingBatchItemSize = 0;
+
+    int workingBatchDocSize = kRetryableBatchWriteBSONSizeOverhead;
+
+    while (!docs.empty()) {
+        BSONObj toAdd = docs.back();
+        docs.pop_back();
+
+        int docSize = toAdd.objsize();
+        bool batchAtSizeLimit = (workingBatchItemSize + 1 > write_ops::kMaxWriteBatchSize) ||
+            (workingBatchDocSize + docSize > BSONObjMaxUserSize);
+
+        if (batchAtSizeLimit) {
+            sendRetryableWriteBatchRequestToConfig(
+                asr.opCtx(), nss, workingBatch, currentTxnNumber, writeConcern);
+            ++currentTxnNumber;
+
+            workingBatch.clear();
+            workingBatchItemSize = 0;
+            workingBatchDocSize = kRetryableBatchWriteBSONSizeOverhead;
+        }
+
+        workingBatch.push_back(toAdd);
+        ++workingBatchItemSize;
+        workingBatchDocSize += docSize;
+    }
+
+    if (!workingBatch.empty()) {
+        sendRetryableWriteBatchRequestToConfig(
+            asr.opCtx(), nss, workingBatch, currentTxnNumber, writeConcern);
+    }
 }
 
 StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(

@@ -84,6 +84,9 @@ env.Library(
         'dist_lock_manager',
         'sharding_catalog_client',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/logical_session_id_helpers'
+    ]
 )
 
 env.Library(

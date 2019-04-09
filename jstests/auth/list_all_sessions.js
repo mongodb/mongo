@@ -56,16 +56,12 @@
     runListAllSessionsTest(mongod);
     MongoRunner.stopMongod(mongod);
 
-    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-    const st = new ShardingTest({
-        shards: 1,
-        mongos: 1,
-        config: 1,
-        other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
-    });
+    const st =
+        new ShardingTest({shards: 1, mongos: 1, config: 1, other: {keyFile: 'jstests/libs/key1'}});
 
     // Ensure that the sessions collection exists.
     st.c0.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+    st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
 
     runListAllSessionsTest(st.s0);
     st.stop();

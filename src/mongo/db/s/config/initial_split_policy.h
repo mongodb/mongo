@@ -136,16 +136,10 @@ public:
                                                    int numContiguousChunksPerShard = 1);
 
     /**
-     * Writes to the config server the first chunks for a newly sharded collection.
-     */
-    static void writeFirstChunksToConfig(
-        OperationContext* opCtx, const InitialSplitPolicy::ShardCollectionConfig& initialChunks);
-
-    /**
      * Throws an exception if the collection is already sharded with different options.
      *
-     * If the collection is already sharded with the same options, returns the existing collection's
-     * full spec, else returns boost::none.
+     * If the collection is already sharded with the same options, returns the existing
+     * collection's full spec, else returns boost::none.
      */
     static boost::optional<CollectionType> checkIfCollectionAlreadyShardedWithSameOptions(
         OperationContext* opCtx,

@@ -382,17 +382,6 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
     return initialChunks;
 }
 
-void InitialSplitPolicy::writeFirstChunksToConfig(
-    OperationContext* opCtx, const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
-    for (const auto& chunk : initialChunks.chunks) {
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
-            opCtx,
-            ChunkType::ConfigNS,
-            chunk.toConfigBSON(),
-            ShardingCatalogClient::kMajorityWriteConcern));
-    }
-}
-
 boost::optional<CollectionType> InitialSplitPolicy::checkIfCollectionAlreadyShardedWithSameOptions(
     OperationContext* opCtx,
     const NamespaceString& nss,

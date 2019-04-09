@@ -116,7 +116,10 @@ load('jstests/libs/sessions_collection.js');
 
         validateSessionsCollection(shard, true, true);
 
-        assert.eq(shardConfig.system.sessions.count(), 1, "did not flush config's sessions");
+        // We will have two sessions because of the session used in the shardCollection's retryable
+        // write to shard the sessions collection. It will disappear after we run the refresh
+        // function on the shard.
+        assert.eq(shardConfig.system.sessions.count(), 2, "did not flush config's sessions");
 
         // Now, if we do refreshes on the other servers, their in-mem records will
         // be written to the collection.
