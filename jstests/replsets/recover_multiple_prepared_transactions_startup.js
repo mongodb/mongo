@@ -42,11 +42,11 @@
 
     session.startTransaction();
     assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
-    let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+    let prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
 
     session2.startTransaction();
     assert.commandWorked(sessionColl2.update({_id: 2}, {_id: 2, a: 1}));
-    let prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
+    let prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2, {w: 1});
 
     const lsid = session.getSessionId();
     const txnNumber = session.getTxnNumber_forTesting();

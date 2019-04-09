@@ -54,7 +54,8 @@
         lsid: lsid,
         txnNumber: NumberLong(0),
         stmtId: NumberInt(1),
-        autocommit: false
+        autocommit: false,
+        writeConcern: {w: "majority"}
     }),
                                  ErrorCodes.Unauthorized);
 
@@ -65,7 +66,8 @@
                                      lsid: lsid,
                                      txnNumber: NumberLong(0),
                                      stmtId: NumberInt(1),
-                                     autocommit: false
+                                     autocommit: false,
+                                     writeConcern: {w: "majority"}
                                  }))
                                  .prepareTimestamp;
     const commitTimestamp = Timestamp(prepareTimestamp.getTime(), prepareTimestamp.getInc() + 1);
@@ -105,7 +107,8 @@
         lsid: lsid,
         txnNumber: NumberLong(1),
         stmtId: NumberInt(1),
-        autocommit: false
+        autocommit: false,
+        writeConcern: {w: "majority"}
     }),
                                  ErrorCodes.Unauthorized);
 
@@ -115,7 +118,8 @@
         lsid: lsid,
         txnNumber: NumberLong(1),
         stmtId: NumberInt(1),
-        autocommit: false
+        autocommit: false,
+        writeConcern: {w: "majority"}
     }),
                                  ErrorCodes.Unauthorized);
 
@@ -165,7 +169,8 @@
         lsid: lsid,
         txnNumber: NumberLong(2),
         stmtId: NumberInt(0),
-        autocommit: false
+        autocommit: false,
+        writeConcern: {w: "majority"}
     }),
                                  ErrorCodes.Unauthorized);
 
@@ -175,7 +180,8 @@
         lsid: lsid,
         txnNumber: NumberLong(2),
         stmtId: NumberInt(0),
-        autocommit: false
+        autocommit: false,
+        writeConcern: {w: "majority"}
     }),
                                  ErrorCodes.Unauthorized);
 

@@ -1,14 +1,16 @@
 /**
- * Test that rollback can successfully recover a prepared transaction that was in
- * prepare between the stable timestamp and the common point.
+ * 1. Test that rollback can successfully recover an aborted prepared transaction that was
+ * rolled-back but was in prepare between the stable timestamp and the common point.
+ * 2. Test that rollback can successfully recover a committed prepared transaction that was
+ * rolled-back but was in prepare before the stable timestamp.
  *
  * This test holds back the stable timestamp and starts two prepared transactions
  * before transitioning to rollback operations, where the branches of history on
  * the rollback node and sync source will diverge. This ensures that we prepare
  * the transactions in between the stable timestamp and the common point.
  *
- * After a rollback, we should correctly reconstruct the two prepared transactions
- * and be able to commit/abort them.
+ * After a rollback of commit/abort, we should correctly reconstruct the two prepared transactions
+ * and be able to commit/abort them again.
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
@@ -51,6 +53,13 @@
     assert.commandWorked(sessionColl1.insert({_id: 2}));
 
     rollbackTest.awaitLastOpCommitted();
+
+    // Prepare a transaction on the first session whose commit will be rolled-back.
+    session1.startTransaction();
+    assert.commandWorked(sessionColl1.insert({_id: 3}));
+    assert.commandWorked(sessionColl1.update({_id: 1}, {$set: {a: 1}}));
+    const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
+
     // Prevent the stable timestamp from moving beyond the following prepared transactions so
     // that when we replay the oplog from the stable timestamp, we correctly recover them.
     assert.commandWorked(
@@ -59,18 +68,11 @@
     // The following transactions will be prepared before the common point, so they must be in
     // prepare after rollback recovery.
 
-    // Prepare a transaction on the first session.
-    session1.startTransaction();
-    assert.commandWorked(sessionColl1.insert({_id: 3}));
-    assert.commandWorked(sessionColl1.update({_id: 1}, {$set: {a: 1}}));
-    const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
-
-    // Prepare another transaction on the second session.
+    // Prepare another transaction on the second session whose abort will be rolled-back.
     session2.startTransaction();
-
     assert.commandWorked(sessionColl2.insert({_id: 4}));
     assert.commandWorked(sessionColl2.update({_id: 2}, {$set: {b: 2}}));
-    const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
+    const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2, {w: 1});
 
     // Check that we have two transactions in the transactions table.
     assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);

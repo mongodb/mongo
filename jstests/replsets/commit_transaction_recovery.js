@@ -28,18 +28,16 @@
     let sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
 
-    jsTestLog("Disable snapshotting on all nodes");
-
-    // Disable snapshotting so that future operations do not enter the majority snapshot.
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
-
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: 1}));
     let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    jsTestLog("Committing the transaction");
+    jsTestLog("Disable snapshotting on all nodes");
+    // Disable snapshotting so that future operations do not enter the majority snapshot.
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
 
+    jsTestLog("Committing the transaction");
     // Since the commitTimestamp is after the last snapshot, this oplog entry will be replayed
     // during replication recovery during restart.
     assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));

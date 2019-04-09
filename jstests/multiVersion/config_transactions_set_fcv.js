@@ -43,8 +43,11 @@
         }
 
         if (prepare) {
-            const prepareRes = testDB.adminCommand(
-                {prepareTransaction: 1, txnNumber: NumberLong(txnNumber), lsid, autocommit});
+            const prepareRes = testDB.adminCommand({
+                prepareTransaction: 1,
+                txnNumber: NumberLong(txnNumber), lsid, autocommit,
+                writeConcern: {w: "majority"}
+            });
             if (!prepareRes.ok) {
                 return prepareRes;
             }

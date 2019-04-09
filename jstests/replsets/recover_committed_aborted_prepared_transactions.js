@@ -1,6 +1,8 @@
 /**
- * Test that rollback can successfully recover committed and aborted prepared transactions
- * that were prepared and committed/aborted between the stable timestamp and the common point.
+ * 1. Test that rollback can successfully recover committed prepared transactions that were prepared
+ * before the stable timestamp and committed between the stable timestamp and the common point.
+ * 2. Test that rollback can successfully recover aborted prepared transactions that were prepared
+ * and aborted between the stable timestamp and the common point.
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
@@ -37,6 +39,12 @@
     assert.commandWorked(sessionColl1.insert({id: 1}));
 
     rollbackTest.awaitLastOpCommitted();
+
+    // Prepare a transaction on the first session which will be committed eventually.
+    session1.startTransaction();
+    assert.commandWorked(sessionColl1.insert({id: 2}));
+    const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
+
     // Prevent the stable timestamp from moving beyond the following prepared transactions so
     // that when we replay the oplog from the stable timestamp, we correctly recover them.
     assert.commandWorked(
@@ -45,15 +53,10 @@
     // The following transactions will be prepared before the common point, so they must be in
     // prepare after rollback recovery.
 
-    // Prepare a transaction on the first session.
-    session1.startTransaction();
-    assert.commandWorked(sessionColl1.insert({id: 2}));
-    const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
-
-    // Prepare another transaction on the second session.
+    // Prepare another transaction on the second session which will be aborted.
     session2.startTransaction();
     assert.commandWorked(sessionColl2.insert({id: 3}));
-    const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
+    const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2, {w: 1});
 
     // Commit the first transaction.
     assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp));

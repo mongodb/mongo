@@ -54,8 +54,9 @@
     jsTestLog("Test committing an unprepared transaction with a 'commitTimestamp'.");
     session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc));
-    assert.commandFailedWithCode(PrepareHelpers.commitTransaction(session, Timestamp(3, 3)),
-                                 ErrorCodes.InvalidOptions);
+    let res = assert.commandFailedWithCode(
+        PrepareHelpers.commitTransaction(session, Timestamp(3, 3)), ErrorCodes.InvalidOptions);
+    assert(res.errmsg.includes("cannot provide commitTimestamp to unprepared transaction"), res);
 
     jsTestLog("Test committing an unprepared transaction with a null 'commitTimestamp'.");
     session.startTransaction();

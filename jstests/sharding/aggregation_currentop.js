@@ -759,8 +759,12 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         0);
 
     // Prepare the transaction and ensure the prepareTimestamp is valid.
-    const prepareRes = assert.commandWorked(sessionDB.adminCommand(
-        {prepareTransaction: 1, txnNumber: NumberLong(0), autocommit: false}));
+    const prepareRes = assert.commandWorked(sessionDB.adminCommand({
+        prepareTransaction: 1,
+        txnNumber: NumberLong(0),
+        autocommit: false,
+        writeConcern: {w: "majority"}
+    }));
     assert(prepareRes.prepareTimestamp,
            "prepareTransaction did not return a 'prepareTimestamp': " + tojson(prepareRes));
     assert(prepareRes.prepareTimestamp instanceof Timestamp,

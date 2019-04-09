@@ -31,26 +31,25 @@ TestData.skipCheckDBHashes = true;
     config.settings = {chainingAllowed: false};
     rst.initiate(config);
 
-    const rollbackTest = new RollbackTest(collName, rst);
+    const primaryNode = rst.getPrimary();
 
     // Create collection that exists on the sync source and rollback node.
-    assert.commandWorked(rollbackTest.getPrimary().getDB(dbName).runCommand(
-        {create: collName, writeConcern: {w: 2}}));
-
-    // Stop replication from the current primary ("rollbackNode").
-    const rollbackNode = rollbackTest.transitionToRollbackOperations();
+    assert.commandWorked(
+        primaryNode.getDB(dbName).runCommand({create: collName, writeConcern: {w: 2}}));
 
     // Issue a 'prepareTransaction' command just to the current primary.
-    const session = rollbackNode.getDB(dbName).getMongo().startSession({causalConsistency: false});
+    const session = primaryNode.getDB(dbName).getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({"prepare": "entry"}));
-    const result = assert.commandWorked(
-        session.getDatabase('admin').adminCommand({prepareTransaction: 1, writeConcern: {w: 1}}));
-    assert(result.prepareTimestamp,
-           "prepareTransaction did not return a 'prepareTimestamp': " + tojson(result));
-    PrepareHelpers.commitTransaction(session, result.prepareTimestamp);
+    const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+
+    const rollbackTest = new RollbackTest(collName, rst);
+    // Stop replication from the current primary ("rollbackNode").
+    const rollbackNode = rollbackTest.transitionToRollbackOperations();
+
+    PrepareHelpers.commitTransaction(session, prepareTimestamp);
 
     // Step down current primary and elect a node that lacks the commit.
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
@@ -76,5 +75,6 @@ TestData.skipCheckDBHashes = true;
         return rawMongoProgramOutput().match(msg);
     }, "Node did not fail to roll back entry.");
 
-    rst.stopSet();
+    // Transaction is still in prepared state and validation will be blocked, so skip it.
+    rst.stopSet(undefined, undefined, {skipValidation: true});
 }());

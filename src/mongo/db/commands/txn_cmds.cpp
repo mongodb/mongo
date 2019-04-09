@@ -116,6 +116,12 @@ public:
 
         auto optionalCommitTimestamp = cmd.getCommitTimestamp();
         if (optionalCommitTimestamp) {
+            const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            uassert(ErrorCodes::InvalidOptions,
+                    "commitTransaction for a prepared transaction cannot be run before its prepare "
+                    "oplog entry has been majority committed",
+                    replCoord->getLastCommittedOpTime().getTimestamp() >=
+                        txnParticipant.getPrepareOpTime().getTimestamp());
             // commitPreparedTransaction will throw if the transaction is not prepared.
             txnParticipant.commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
         } else {
