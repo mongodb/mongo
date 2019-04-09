@@ -373,10 +373,10 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
             auto doc = record.get().data.toBson();
             auto txnRecord = SessionTxnRecord::parse(
                 IDLParserErrorContext("parse oldest active txn record"), doc);
-            if (txnRecord.getState() != DurableTxnStateEnum::kPrepared) {
+            if (txnRecord.getState() != DurableTxnStateEnum::kPrepared &&
+                txnRecord.getState() != DurableTxnStateEnum::kInProgress) {
                 continue;
             }
-
             // A prepared transaction must have a start timestamp.
             // TODO(SERVER-40013): Handle entries with state "prepared" and no "startTimestamp".
             invariant(txnRecord.getStartOpTime());

@@ -2880,6 +2880,15 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, true);
 
+            // Check that the oldestActiveTxnTimestamp properly accounts for in-progress
+            // transactions.
+            assertOldestActiveTxnTimestampEquals(boost::none, presentTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, beforeTxnTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, firstOplogEntryTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, secondOplogEntryTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, commitEntryTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, nullTs);
+
             // first oplog entry should exist at firstOplogEntryTs and after it.
             const auto firstOplogEntryFilter = BSON("ts" << firstOplogEntryTs << "op"
                                                          << "i"
@@ -2978,6 +2987,12 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, prepareEntryTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, false);
+
+            assertOldestActiveTxnTimestampEquals(boost::none, presentTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, beforeTxnTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, prepareEntryTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, commitEntryTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, nullTs);
         }
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
@@ -3024,6 +3039,15 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, prepareEntryTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, false);
+
+            assertOldestActiveTxnTimestampEquals(boost::none, presentTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, beforeTxnTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, firstOplogEntryTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, secondOplogEntryTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, prepareEntryTs);
+            // The transaction has not been committed yet and is still considered active.
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, commitEntryTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, nullTs);
         }
 
         txnParticipant.unstashTransactionResources(_opCtx, "commitTransaction");
@@ -3083,6 +3107,15 @@ public:
             assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, prepareEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, commitEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, nullTs, true);
+
+            assertOldestActiveTxnTimestampEquals(boost::none, presentTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, beforeTxnTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, firstOplogEntryTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, secondOplogEntryTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, prepareEntryTs);
+            // The transaction is no longer considered active after being committed.
+            assertOldestActiveTxnTimestampEquals(boost::none, commitEntryTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, nullTs);
 
             // The session state should go to inProgress at firstOplogEntryTs, then to prepared at
             // prepareEntryTs, and then finally to committed at commitEntryTs.
@@ -3190,6 +3223,13 @@ public:
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, prepareEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, abortEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, nullTs, true);
+
+            assertOldestActiveTxnTimestampEquals(boost::none, presentTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, beforeTxnTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, firstOplogEntryTs);
+            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, prepareEntryTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, abortEntryTs);
+            assertOldestActiveTxnTimestampEquals(boost::none, nullTs);
 
             // The session state should be "aborted" at abortEntryTs.
             auto sessionInfo = getSessionTxnInfoAtTimestamp(abortEntryTs, true);
