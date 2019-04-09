@@ -10,10 +10,6 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/txns/**/*.js
-  exclude_with_any_tags:
-  # Exclude prepared transactions until they are supported with the new multiple transactions oplog
-  # entry format.
-  - uses_prepare_transaction
 executor:
   archive:
     hooks:
