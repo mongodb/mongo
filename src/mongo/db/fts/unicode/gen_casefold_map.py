@@ -23,10 +23,9 @@ def generate(unicode_casefold_file, target):
 
     case_mappings = {}
 
-    cf_file = open(unicode_casefold_file, 'rb')
+    cf_file = open(unicode_casefold_file, 'r')
 
     for line in cf_file:
-        line = line.decode('utf-8')
         # Filter out blank lines and lines that start with #
         data = line[:line.find('#')]
         if(data == ""):
