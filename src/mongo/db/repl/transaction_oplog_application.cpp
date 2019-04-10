@@ -105,6 +105,9 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         } else {
             invariant(prepareOplogEntry.getCommandType() ==
                       OplogEntry::CommandType::kPrepareTransaction);
+            // The operations here are reconstructed at their prepare time.  However, that time will
+            // be ignored because there is an outer write unit of work during their application.
+            // Both the prepare time and the commit time are set explicitly below.
             ops = readTransactionOperationsFromOplogChain(opCtx, prepareOplogEntry, {});
         }
     }
@@ -219,6 +222,24 @@ Status applyAbortTransaction(OperationContext* opCtx,
     return Status::OK();
 }
 
+namespace {
+// Reconstruct the entry "as if" it were at the time given in topLevelObj, with the session
+// information also from "topLevelObj", and remove the "partialTxn" indicator.
+// TODO(SERVER-40763): Remove "inTxn" entirely.  We can replace this helper with a direct call to
+// repl::ApplyOps::extractOperationsTo.
+void _reconstructPartialTxnEntryAtGivenTime(const OplogEntry& operationEntry,
+                                            const BSONObj& topLevelObj,
+                                            repl::MultiApplier::Operations* operations) {
+    if (operationEntry.getInTxn()) {
+        BSONObjBuilder builder(operationEntry.getDurableReplOperation().toBSON());
+        builder.appendElementsUnique(topLevelObj);
+        operations->emplace_back(builder.obj());
+    } else {
+        repl::ApplyOps::extractOperationsTo(operationEntry, topLevelObj, operations);
+    }
+}
+}  // namespace
+
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const OplogEntry& commitOrPrepare,
@@ -249,11 +270,15 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     // order.
     while (iter.hasNext()) {
         const auto& operationEntry = iter.next(opCtx);
-        invariant(operationEntry.isInPendingTransaction());
-        // Now reconstruct the entry "as if" it were at the commit or prepare time.
-        BSONObjBuilder builder(operationEntry.getDurableReplOperation().toBSON());
-        builder.appendElementsUnique(commitOrPrepareObj);
-        ops.emplace_back(builder.obj());
+        invariant(operationEntry.isPartialTransaction());
+        auto prevOpsEnd = ops.size();
+        _reconstructPartialTxnEntryAtGivenTime(operationEntry, commitOrPrepareObj, &ops);
+        // Because BSONArrays do not have fast way of determining size without iterating through
+        // them, and we also have no way of knowing how many oplog entries are in a transaction
+        // without iterating, reversing each applyOps and then reversing the whole array is
+        // about as good as we can do to get the entire thing in chronological order.  Fortunately
+        // STL arrays of BSON objects should be fast to reverse (just pointer copies).
+        std::reverse(ops.begin() + prevOpsEnd, ops.end());
     }
     std::reverse(ops.begin(), ops.end());
 
@@ -261,11 +286,8 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     // order.
     for (auto* cachedOp : cachedOps) {
         const auto& operationEntry = *cachedOp;
-        invariant(operationEntry.isInPendingTransaction());
-        // Now reconstruct the entry "as if" it were at the commit or prepare time.
-        BSONObjBuilder builder(operationEntry.getDurableReplOperation().toBSON());
-        builder.appendElementsUnique(commitOrPrepareObj);
-        ops.emplace_back(builder.obj());
+        invariant(operationEntry.isPartialTransaction());
+        _reconstructPartialTxnEntryAtGivenTime(operationEntry, commitOrPrepareObj, &ops);
     }
     return ops;
 }
@@ -279,6 +301,9 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                                 const OplogEntry& entry,
                                 repl::OplogApplication::Mode oplogApplicationMode) {
 
+    // The operations here are reconstructed at their prepare time.  However, that time will
+    // be ignored because there is an outer write unit of work during their application.
+    // The prepare time of the transaction is set explicitly below.
     auto ops = [&] {
         ReadSourceScope readSourceScope(opCtx);
         return readTransactionOperationsFromOplogChain(opCtx, entry, {});

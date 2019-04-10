@@ -843,9 +843,11 @@ inline bool isUnpreparedCommit(const OplogEntry& entry) {
 }
 
 // Returns whether an oplog entry represents an applyOps which is a self-contained atomic operation,
-// as opposed to part of a prepared transaction.
-inline bool isUnpreparedApplyOps(const OplogEntry& entry) {
-    return entry.getCommandType() == OplogEntry::CommandType::kApplyOps && !entry.shouldPrepare();
+// or the last applyOps of an unprepared transaction, as opposed to part of a prepared transaction
+// or a non-final applyOps in an transaction.
+inline bool isCommitApplyOps(const OplogEntry& entry) {
+    return entry.getCommandType() == OplogEntry::CommandType::kApplyOps && !entry.shouldPrepare() &&
+        !entry.isPartialTransaction();
 }
 
 void SyncTail::shutdown() {
@@ -1122,7 +1124,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
     const uint32_t numWriters = writerVectors->size();
 
     CachedCollectionProperties collPropertiesCache;
-    LogicalSessionIdMap<std::vector<OplogEntry*>> pendingTxnOps;
+    LogicalSessionIdMap<std::vector<OplogEntry*>> partialTxnOps;
 
     for (auto&& op : *ops) {
         // If the operation's optime is before or the same as the beginApplyingOpTime we don't want
@@ -1149,14 +1151,15 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
         // If this entry is part of a multi-oplog-entry transaction, ignore it until the commit.
         // We must save it here because we are not guaranteed it has been written to the oplog
         // yet.
-        if (op.isInPendingTransaction()) {
-            auto& pendingList = pendingTxnOps[*op.getSessionId()];
-            if (!pendingList.empty() && pendingList.front()->getTxnNumber() != op.getTxnNumber()) {
+        if (op.isPartialTransaction()) {
+            auto& partialTxnList = partialTxnOps[*op.getSessionId()];
+            if (!partialTxnList.empty() &&
+                partialTxnList.front()->getTxnNumber() != op.getTxnNumber()) {
                 // TODO: When abortTransaction is implemented, this should invariant and
                 // the list should be cleared on abort.
-                pendingList.clear();
+                partialTxnList.clear();
             }
-            pendingList.push_back(&op);
+            partialTxnList.push_back(&op);
             continue;
         }
 
@@ -1185,7 +1188,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
 
         // Extract applyOps operations and fill writers with extracted operations using this
         // function.
-        if (isUnpreparedApplyOps(op)) {
+        if (isCommitApplyOps(op)) {
             try {
                 derivedOps->emplace_back(ApplyOps::extractOperations(op));
 
@@ -1204,23 +1207,15 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
             // fill writers with those operations.
             try {
                 invariant(derivedOps);
-                auto& pendingList = pendingTxnOps[*op.getSessionId()];
+                auto& partialTxnList = partialTxnOps[*op.getSessionId()];
                 {
-                    // We need to create an alternate opCtx to avoid the reads of the transaction
-                    // messing up the state of the main opCtx.  In particular we do not want to
-                    // set the ReadSource to kLastApplied for the main opCtx.
-                    // TODO(SERVER-40053): This should be no longer necessary after
-                    //                     SERVER-40053 makes the transaction history iterator
-                    //                     avoid changing the read source.
-                    auto newClient =
-                        opCtx->getServiceContext()->makeClient("read-pending-transactions");
-                    AlternativeClientRegion acr(newClient);
-                    auto newOpCtx = cc().makeOperationContext();
-                    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                        newOpCtx->lockState());
+                    // We need to use a ReadSourceScope avoid the reads of the transaction messing
+                    // up the state of the opCtx.  In particular we do not want to set the
+                    // ReadSource to kLastApplied.
+                    ReadSourceScope readSourceScope(opCtx);
                     derivedOps->emplace_back(
-                        readTransactionOperationsFromOplogChain(newOpCtx.get(), op, pendingList));
-                    pendingList.clear();
+                        readTransactionOperationsFromOplogChain(opCtx, op, partialTxnList));
+                    partialTxnList.clear();
                 }
                 // Transaction entries cannot have different session updates.
                 _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);

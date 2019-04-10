@@ -116,7 +116,7 @@ bool isTransactionEntry(OplogEntry entry) {
         return false;
     }
 
-    return entry.isInPendingTransaction() ||
+    return entry.isPartialTransaction() ||
         entry.getCommandType() == repl::OplogEntry::CommandType::kPrepareTransaction ||
         entry.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction ||
         entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
@@ -250,7 +250,7 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
     auto sessionInfo = entry.getOperationSessionInfo();
 
     // We only update the transaction table on the first inTxn operation.
-    if (entry.isInPendingTransaction() && !entry.getPrevWriteOpTimeInTransaction()->isNull()) {
+    if (entry.isPartialTransaction() && !entry.getPrevWriteOpTimeInTransaction()->isNull()) {
         return boost::none;
     }
     invariant(sessionInfo.getSessionId());
@@ -269,7 +269,7 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
             return newTxnRecord.toBSON();
         }
 
-        if (entry.isInPendingTransaction()) {
+        if (entry.isPartialTransaction()) {
             invariant(entry.getPrevWriteOpTimeInTransaction()->isNull());
             newTxnRecord.setState(DurableTxnStateEnum::kInProgress);
             newTxnRecord.setStartOpTime(entry.getOpTime());

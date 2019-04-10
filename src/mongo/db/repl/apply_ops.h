@@ -51,6 +51,15 @@ public:
      * Throws UserException on error.
      */
     static MultiApplier::Operations extractOperations(const OplogEntry& applyOpsOplogEntry);
+
+    /**
+     * This variant allows optimization for extracting multiple applyOps operations.  The entry for
+     * the non-DurableReplOperation fields of the extracted operation must be specified as
+     * 'topLevelDoc', and need not be any of the applyOps operations.
+     */
+    static void extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
+                                    const BSONObj& topLevelDoc,
+                                    MultiApplier::Operations* operations);
 };
 
 /**

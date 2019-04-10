@@ -498,6 +498,7 @@ Status applyOps(OperationContext* opCtx,
 
     uassert(
         ErrorCodes::BadValue, "applyOps command can't have 'prepare' field", !info.getPrepare());
+    uassert(31056, "applyOps command can't have 'partialTxn' field.", !info.getPartialTxn());
 
     // There's only one case where we are allowed to take the database lock instead of the global
     // lock - no preconditions; only CRUD ops; and non-atomic mode.
@@ -611,6 +612,14 @@ Status applyOps(OperationContext* opCtx,
 
 // static
 MultiApplier::Operations ApplyOps::extractOperations(const OplogEntry& applyOpsOplogEntry) {
+    MultiApplier::Operations result;
+    extractOperationsTo(applyOpsOplogEntry, applyOpsOplogEntry.toBSON(), &result);
+    return result;
+}
+
+void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
+                                   const BSONObj& topLevelDoc,
+                                   MultiApplier::Operations* operations) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "ApplyOps::extractOperations(): not a command: "
                           << redact(applyOpsOplogEntry.toBSON()),
@@ -625,21 +634,16 @@ MultiApplier::Operations ApplyOps::extractOperations(const OplogEntry& applyOpsO
     auto operationDocs = cmdObj.firstElement().Obj();
 
     if (operationDocs.isEmpty()) {
-        return {};
+        return;
     }
 
-    MultiApplier::Operations operations;
-
-    auto topLevelDoc = applyOpsOplogEntry.toBSON();
     for (const auto& elem : operationDocs) {
         auto operationDoc = elem.Obj();
         BSONObjBuilder builder(operationDoc);
         builder.appendElementsUnique(topLevelDoc);
         auto operation = builder.obj();
-        operations.emplace_back(operation);
+        operations->emplace_back(operation);
     }
-
-    return operations;
 }
 
 }  // namespace repl

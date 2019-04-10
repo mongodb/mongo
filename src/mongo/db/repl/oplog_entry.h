@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 
@@ -144,10 +145,14 @@ public:
 
     /**
      * Returns if the oplog entry is part of a transaction that has not yet been prepared or
-     * committed.  The actual "prepare" or "commit" oplog entries do not have an inTxn field
+     * committed.  The actual "prepare" or "commit" oplog entries do not have a "partialTxn" field
      * and so this method will always return false for them.
      */
-    bool isInPendingTransaction() const {
+    bool isPartialTransaction() const {
+        if (getCommandType() == CommandType::kApplyOps) {
+            return getObject()[ApplyOpsCommandInfoBase::kPartialTxnFieldName].booleanSafe();
+        }
+        // TODO(SERVER-40763): Remove "inTxn" entirely and return false here.
         return getInTxn() && *getInTxn();
     }
 

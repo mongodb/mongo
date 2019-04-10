@@ -1324,6 +1324,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         mode == repl::OplogApplication::Mode::kApplyOpsCmd || opCtx->writesAreReplicated();
     OpCounters* opCounters = shouldUseGlobalOpCounters ? &globalOpCounters : &replOpCounters;
 
+    // TODO(SERVER-40763): Remove "inTxn" entirely.
     std::array<StringData, 9> names = {"ts", "t", "o", "ui", "ns", "op", "b", "o2", "inTxn"};
     std::array<BSONElement, 9> fields;
     op.getFields(names, &fields);

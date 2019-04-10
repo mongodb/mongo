@@ -60,7 +60,6 @@ structs:
                 description: "Affects update operations. Set 'alwaysUpsert' to false in the command
                               object to never insert a new document if no document matches the query
                               criteria in an update operation."
-
             preCondition:
                 cpp_name: preCondition
                 type: array<object>
@@ -73,3 +72,9 @@ structs:
                 type: bool
                 optional: true
                 description: "Specifies that this operation should be put into a 'prepare' state"
+
+            partialTxn:
+                type: bool
+                optional: true
+                description: "Specifies that this applyOps command is part of a multi-statement
+                              transaction that has not yet been committed or prepared."
