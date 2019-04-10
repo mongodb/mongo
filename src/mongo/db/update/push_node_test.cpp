@@ -1024,5 +1024,25 @@ TEST_F(PushNodeTest, ApplyMultipleElementsPushWithNegativePosition) {
     ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
+TEST_F(PushNodeTest, PushWithMinIntAsPosition) {
+    auto update =
+        BSON("$push" << BSON("a" << BSON("$each" << BSON_ARRAY(5) << "$position"
+                                                 << std::numeric_limits<long long>::min())));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    PushNode node;
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
+
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: [5, 0, 1, 2, 3, 4]}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: [5, 0, 1, 2, 3, 4]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
+}
+
 }  // namespace
 }  // namespace mongo

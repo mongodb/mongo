@@ -82,6 +82,16 @@ Status checkSortClause(const BSONObj& sortObject) {
     return Status::OK();
 }
 
+/**
+ * std::abs(LLONG_MIN) results in undefined behavior on 2's complement systems because the
+ * absolute value of LLONG_MIN cannot be represented in a 'long long'.
+ *
+ * If the input is LLONG_MIN, will return std::abs(LLONG_MIN + 1).
+ */
+long long safeApproximateAbs(long long val) {
+    return val == std::numeric_limits<decltype(val)>::min() ? std::abs(val + 1) : std::abs(val);
+}
+
 }  // namespace
 
 Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -246,8 +256,8 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
         auto insertAfter = getNthChild(*array, position.get() - 1);
         invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
-    } else if (position.get() < 0 && -position.get() < arraySize) {
-        auto insertAfter = getNthChild(*array, arraySize - (-position.get()) - 1);
+    } else if (position.get() < 0 && safeApproximateAbs(position.get()) < arraySize) {
+        auto insertAfter = getNthChild(*array, arraySize - safeApproximateAbs(position.get()) - 1);
         invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
     } else {
@@ -297,12 +307,7 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
     }
 
     if (_slice) {
-        // std::abs(LLONG_MIN) results in undefined behavior on 2's complement systems because the
-        // absolute value of LLONG_MIN cannot be represented in a 'long long'.
-        const auto sliceAbs =
-            _slice.get() == std::numeric_limits<decltype(_slice)::value_type>::min()
-            ? std::abs(_slice.get() + 1)
-            : std::abs(_slice.get());
+        const auto sliceAbs = safeApproximateAbs(_slice.get());
 
         while (static_cast<long long>(countChildren(*element)) > sliceAbs) {
             result = ModifyResult::kNormalUpdate;
