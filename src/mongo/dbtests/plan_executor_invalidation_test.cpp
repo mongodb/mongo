@@ -389,6 +389,12 @@ TEST_F(PlanExecutorInvalidationTest, IxscanDiesOnCollectionRenameWithinDatabase)
 }
 
 TEST_F(PlanExecutorInvalidationTest, CollScanDiesOnRestartCatalog) {
+    // TODO: SERVER-40588. Avoid restarting the catalog on the Biggie storage engine as it
+    // currently does not support this feature.
+    if (storageGlobalParams.engine == "biggie") {
+        return;
+    }
+
     auto exec = getCollscan();
 
     // Partially scan the collection.
