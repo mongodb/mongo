@@ -200,6 +200,17 @@
             msg.indexOf("InterruptedDueToStepDown") >= 0;
     }
 
+    // Returns true if the given response could have come from shardCollection being interrupted by
+    // a failover.
+    function isRetryableShardCollectionResponse(res) {
+        // shardCollection can bury the original error code in the error message.
+        return RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
+            // shardCollection creates collections on each shard that will receive a chunk using
+            // _cloneCollectionsOptionsFromPrimaryShard, which may fail with either of the following
+            // codes if interupted by a failover.
+            res.code === ErrorCodes.CallbackCanceled || res.code === 17405;
+    }
+
     function hasError(res) {
         return res.ok !== 1 || res.writeErrors;
     }
@@ -711,12 +722,35 @@
         return res;
     }
 
+    // Returns true if any error code in a response's "raw" field is retryable.
+    function rawResponseHasRetryableError(rawRes, cmdName, logError) {
+        for (let shard in rawRes) {
+            const shardRes = rawRes[shard];
+
+            const logShardError = (msg) => {
+                const msgWithShardPrefix = `Processing raw response from shard: ${shard} :: ${msg}`;
+                logError(msgWithShardPrefix);
+            };
+
+            // Don't override the responses from each shard because only the top-level code in a
+            // response is used to determine if a command succeeded or not.
+            const networkRetryShardRes = shouldRetryWithNetworkErrorOverride(
+                shardRes, cmdName, logShardError, false /* shouldOverrideAcceptableError */);
+            if (networkRetryShardRes === kContinue) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     const kContinue = Object.create(null);
 
     // Processes the command response if we are configured for network error retries. Returns the
     // provided response if we should not retry in this override. Returns kContinue if we should
-    // retry the current command without subtracting from our retry allocation.
-    function shouldRetryWithNetworkErrorOverride(res, cmdName, logError) {
+    // retry the current command without subtracting from our retry allocation. By default sets ok=1
+    // for failures with acceptable error codes, unless shouldOverrideAcceptableError is false.
+    function shouldRetryWithNetworkErrorOverride(
+        res, cmdName, logError, shouldOverrideAcceptableError = true) {
         assert(configuredForNetworkRetry());
 
         if (RetryableWritesUtil.isRetryableWriteCmdName(cmdName)) {
@@ -790,7 +824,30 @@
                 return kContinue;
             }
 
-            if (!isAcceptableRetryFailedResponse(cmdName, res)) {
+            // Some sharding commands return raw responses from all contacted shards and there won't
+            // be a top level code if shards returned more than one error code, in which case retry
+            // if any error is retryable.
+            if (res.hasOwnProperty("raw") && !res.hasOwnProperty("code") &&
+                rawResponseHasRetryableError(res.raw, cmdName, logError)) {
+                logError("Retrying because of retryable code in raw response");
+                return kContinue;
+            }
+
+            // Check for the retryable error codes from an interrupted shardCollection.
+            if (cmdName === "shardCollection" && isRetryableShardCollectionResponse(res)) {
+                logError("Retrying interrupted shardCollection");
+                return kContinue;
+            }
+
+            // In a sharded cluster, drop may bury the original error code in the error message if
+            // interrupted.
+            if (cmdName === "drop" &&
+                RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg)) {
+                logError("Retrying interrupted drop");
+                return kContinue;
+            }
+
+            if (!shouldOverrideAcceptableError || !isAcceptableRetryFailedResponse(cmdName, res)) {
                 // Pass up unretryable errors.
                 return res;
             }

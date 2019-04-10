@@ -14,6 +14,19 @@ var RetryableWritesUtil = (function() {
             ErrorCodes.isInterruption(code);
     }
 
+    // The names of all codes that return true in isRetryableCode() above. Can be used where the
+    // original error code is buried in a response's error message.
+    const kRetryableCodeNames = Object.keys(ErrorCodes).filter((codeName) => {
+        return isRetryableCode(ErrorCodes[codeName]);
+    });
+
+    // Returns true if the error message contains a retryable code name.
+    function errmsgContainsRetryableCodeName(errmsg) {
+        return typeof errmsg !== "undefined" && kRetryableCodeNames.some(codeName => {
+            return errmsg.indexOf(codeName) > 0;
+        });
+    }
+
     const kRetryableWriteCommands =
         new Set(["delete", "findandmodify", "findAndModify", "insert", "update"]);
 
@@ -62,6 +75,7 @@ var RetryableWritesUtil = (function() {
 
     return {
         isRetryableCode,
+        errmsgContainsRetryableCodeName,
         isRetryableWriteCmdName,
         storageEngineSupportsRetryableWrites,
         checkTransactionTable,

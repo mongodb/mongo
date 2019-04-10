@@ -459,8 +459,6 @@ executor:
             retryOnNetworkErrors: true
             wrapCRUDinTransactions: true
           overrideRetryAttempts: 3
-          # TODO: SERVER-39702 remove once it's allowed to stepdown with prepare.
-          skipCheckingCatalogCacheConsistencyWithShardingCatalog: true
           sessionOptions:
             # Read your own writes is not guaranteed without causal consistency if all nodes are
             # electable.
@@ -475,10 +473,9 @@ executor:
   # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
   # too many network errors occur when re-running a transaction we will run out of retries.
   - class: ContinuousStepdown
+    config_stepdown: false
     kill: true
     stepdown_interval_ms: 15000
-    # TODO: SERVER-39702 change to shard_stepdown true once it's allowed to stepdown with prepare.
-    shard_stepdown: false
 
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
@@ -497,9 +494,6 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        # TODO: SERVER-39702 remove after stepdown with prepare works
-        "failpoint.sendCoordinateCommitToConfigServer":
-          mode: alwaysOn
     mongod_options:
       syncdelay: 5
       oplogSize: 1024
@@ -521,18 +515,9 @@ executor:
     num_shards: 2
     num_rs_nodes_per_shard: 3
     configsvr_options:
-      num_nodes: 3 # TODO: SERVER-39702 change to 1 node when we no longer make configsvr coordinator
-      all_nodes_electable: true
-      replset_config_options:
-        settings:
-          catchUpTimeoutMillis: 0
-      voting_secondaries: true
       mongod_options:
         set_parameters:
           enableTestCommands: 1
-          # TODO: SERVER-39702 remove after stepdown with prepare works
-          "failpoint.doNotForgetCoordinator":
-            mode: alwaysOn
     shard_options:
       all_nodes_electable: true
       replset_config_options:

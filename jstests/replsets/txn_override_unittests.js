@@ -85,6 +85,16 @@
     }
 
     /**
+     * Sets that the given command should return the given response. The command will not actually
+     * be run.
+     */
+    function setCommandMockResponse(cmdName, mockResponse) {
+        assert(!runCommandOverrideBlacklistedCommands.includes(cmdName));
+
+        cmdResponseOverrides[cmdName] = {responseObj: mockResponse};
+    }
+
+    /**
      * Sets that the given command should fail with ok:1 and the given write concern error.
      * The command will not actually be run.
      */
@@ -728,7 +738,195 @@
 
               assert.eq(coll1.find().itcount(), 0);
           }
-        }
+        },
+        {
+          name: "raw response w/ one retryable error",
+          test: function() {
+              setCommandMockResponse("createIndexes", {
+                  ok: 0,
+                  raw: {
+                      shardOne: {code: ErrorCodes.NotMaster, errmsg: "dummy"},
+                      shardTwo: {code: ErrorCodes.InternalError, errmsg: "dummy"}
+                  }
+              });
+
+              assert.commandWorked(testDB.createCollection(collName1));
+
+              // The first attempt should fail, but the retry succeeds.
+              assert.commandWorked(coll1.createIndex({x: 1}));
+
+              // The index should exist.
+              const indexes = coll1.getIndexes();
+              assert.eq(2, indexes.length, tojson(indexes));
+              assert(indexes.some(idx => idx.name === "x_1"), tojson(indexes));
+          }
+        },
+        {
+          name: "raw response w/ one retryable error and one success",
+          test: function() {
+              setCommandMockResponse("createIndexes", {
+                  ok: 0,
+                  raw: {
+                      // Raw responses only omit a top-level code if more than one error was
+                      // returned from a shard, so a third shard is needed.
+                      shardOne: {code: ErrorCodes.NotMaster, errmsg: "dummy"},
+                      shardTwo: {ok: 1},
+                      shardThree: {code: ErrorCodes.InternalError, errmsg: "dummy"},
+                  }
+              });
+
+              assert.commandWorked(testDB.createCollection(collName1));
+
+              // The first attempt should fail, but the retry succeeds.
+              assert.commandWorked(coll1.createIndex({x: 1}));
+
+              // The index should exist.
+              const indexes = coll1.getIndexes();
+              assert.eq(2, indexes.length, tojson(indexes));
+              assert(indexes.some(idx => idx.name === "x_1"), tojson(indexes));
+          }
+        },
+        {
+          name: "raw response w/ one network error",
+          test: function() {
+              setCommandMockResponse("createIndexes", {
+                  ok: 0,
+                  raw: {
+                      shardOne: {code: ErrorCodes.InternalError, errmsg: "dummy"},
+                      shardTwo: {code: ErrorCodes.HostUnreachable, errmsg: "dummy"}
+                  }
+              });
+
+              assert.commandWorked(testDB.createCollection(collName1));
+
+              // The first attempt should fail, but the retry succeeds.
+              assert.commandWorked(coll1.createIndex({x: 1}));
+
+              // The index should exist.
+              const indexes = coll1.getIndexes();
+              assert.eq(2, indexes.length, tojson(indexes));
+              assert(indexes.some(idx => idx.name === "x_1"), tojson(indexes));
+          }
+        },
+        {
+          name: "raw response ok:1 w/ retryable write concern error",
+          test: function() {
+              // The first encountered write concern error from a shard is attached as the top-level
+              // write concern error.
+              setCommandMockResponse("createIndexes", {
+                  ok: 1,
+                  raw: {
+                      shardOne: {
+                          ok: 1,
+                          writeConcernError: {
+                              code: ErrorCodes.PrimarySteppedDown,
+                              codeName: "PrimarySteppedDown",
+                              errmsg: "dummy"
+                          }
+                      },
+                      shardTwo: {ok: 1}
+                  },
+                  writeConcernError: {
+                      code: ErrorCodes.PrimarySteppedDown,
+                      codeName: "PrimarySteppedDown",
+                      errmsg: "dummy"
+                  }
+              });
+
+              assert.commandWorked(testDB.createCollection(collName1));
+
+              // The first attempt should fail, but the retry succeeds.
+              assert.commandWorked(coll1.createIndex({x: 1}));
+
+              // The index should exist.
+              const indexes = coll1.getIndexes();
+              assert.eq(2, indexes.length, tojson(indexes));
+              assert(indexes.some(idx => idx.name === "x_1"), tojson(indexes));
+          }
+        },
+        {
+          name: "raw response w/ no retryable error",
+          test: function() {
+              setCommandMockResponse("createIndexes", {
+                  ok: 0,
+                  raw: {
+                      shardOne: {code: ErrorCodes.InvalidOptions, errmsg: "dummy"},
+                      shardTwo: {code: ErrorCodes.InternalError, errmsg: "dummy"}
+                  }
+              });
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandFailed(coll1.createIndex({x: 1}));
+          }
+        },
+        {
+          name: "raw response w/ only acceptable errors",
+          test: function() {
+              setCommandMockResponse("createIndexes", {
+                  ok: 0,
+                  code: ErrorCodes.IndexAlreadyExists,
+                  raw: {
+                      shardOne: {code: ErrorCodes.IndexAlreadyExists, errmsg: "dummy"},
+                      shardTwo: {ok: 1},
+                      shardThree: {code: ErrorCodes.IndexAlreadyExists, errmsg: "dummy"}
+                  }
+              });
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandWorked(coll1.createIndex({x: 1}));
+          }
+        },
+        {
+          name: "raw response w/ acceptable error and non-acceptable, non-retryable error",
+          test: function() {
+              setCommandMockResponse("createIndexes", {
+                  ok: 0,
+                  raw: {
+                      shardOne: {code: ErrorCodes.IndexAlreadyExists, errmsg: "dummy"},
+                      shardTwo: {code: ErrorCodes.InternalError, errmsg: "dummy"}
+                  }
+              });
+
+              // "Acceptable" errors are not overridden inside raw reponses.
+              assert.commandWorked(testDB.createCollection(collName1));
+              const res = assert.commandFailed(coll1.createIndex({x: 1}));
+              assert(!res.raw.shardOne.ok, tojson(res));
+          }
+        },
+        {
+          name: "shardCollection retryable code buried in error message",
+          test: function() {
+              setCommandMockResponse("shardCollection", {
+                  ok: 0,
+                  code: ErrorCodes.OperationFailed,
+                  errmsg: "Sharding collection failed :: caused by InterruptedDueToStepdown",
+              });
+
+              // Mock a successful response for the retry, since sharding isn't enabled on the
+              // underlying replica set.
+              attachPostCmdFunction("shardCollection", function() {
+                  setCommandMockResponse("shardCollection", {
+                      ok: 1,
+                  });
+              });
+
+              assert.commandWorked(
+                  testDB.runCommand({shardCollection: "dummy_namespace", key: {_id: 1}}));
+          }
+        },
+        {
+          name: "drop retryable code buried in error message",
+          test: function() {
+              setCommandMockResponse("drop", {
+                  ok: 0,
+                  code: ErrorCodes.OperationFailed,
+                  errmsg: "Dropping collection failed :: caused by ShutdownInProgress",
+              });
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandWorked(testDB.runCommand({drop: collName1}));
+          }
+        },
     ];
 
     // These tests only retry on TransientTransactionErrors. All other errors are expected to cause
