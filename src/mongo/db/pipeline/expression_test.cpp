@@ -222,6 +222,10 @@ public:
         return _isCommutative;
     }
 
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
     static intrusive_ptr<Testable> create(bool associative, bool commutative) {
         return new Testable(associative, commutative);
     }

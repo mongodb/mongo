@@ -31,6 +31,10 @@
 
 #include "mongo/platform/basic.h"
 
+namespace ExpressionTests {
+class Testable;
+}  // namespace ExpressionTests
+
 namespace mongo {
 
 class ExpressionConstant;
@@ -268,6 +272,7 @@ public:
     virtual void visit(ExpressionFromAccumulator<AccumulatorStdDevSamp>*) = 0;
     virtual void visit(ExpressionFromAccumulator<AccumulatorSum>*) = 0;
     virtual void visit(ExpressionFromAccumulator<AccumulatorMergeObjects>*) = 0;
+    virtual void visit(ExpressionTests::Testable*) = 0;
 };
 
 }  // namespace mongo
