@@ -270,10 +270,6 @@ public:
     Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
-    double perc_val;
-    double digest_size;
-    double chunk_size;
-    void _add_to_tdigest(std::vector<double>&);
 
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -291,10 +287,7 @@ public:
     Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
-    double perc_val;
-    double digest_size;
-    double chunk_size;
-    void _add_to_tdigest(std::vector<double>&);
+
 
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -313,7 +306,6 @@ private:
 };
 
 
-
 // Adding a new accumulator as 'percentile'
 class AccumulatorPercentile final : public Accumulator {
 public:
@@ -323,6 +315,11 @@ public:
     Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
+    
+    double perc_val;
+    double digest_size = 0;
+    double chunk_size;
+    void _add_to_tdigest(std::vector<double>&);
 
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -346,7 +343,6 @@ private:
     Decimal128 _decimalTotal;
     long long _count;
 };
-
 
 
 
@@ -390,10 +386,6 @@ public:
     Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
-    double perc_val;
-    double digest_size = 0;
-    double chunk_size;
-    void _add_to_tdigest(std::vector<double>&);
 
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
