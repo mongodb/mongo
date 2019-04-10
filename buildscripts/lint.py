@@ -103,10 +103,6 @@ def run_lint(paths, nudge_on=False):  # pylint: disable=too-many-statements
     # pylint: disable=protected-access
     cpplint._IsTestFilename = _our_is_test_filename
 
-    # Change stderr to write with replacement characters so we don't die
-    # if we try to print something containing non-ASCII characters.
-    sys.stderr = codecs.StreamReaderWriter(sys.stderr, codecs.getreader('utf8'),
-                                           codecs.getwriter('utf8'), 'replace')
     cpplint._cpplint_state.ResetErrorCounts()
     for filename in filenames:
         config_h_check_obj = CheckForConfigH()

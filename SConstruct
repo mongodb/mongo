@@ -3658,14 +3658,13 @@ def doLint( env , target , source ):
     import buildscripts.pylinters
     buildscripts.pylinters.lint_all(None, {}, [])
 
-    env.Command(
-        target="#run_lint",
-        source=["buildscripts/lint.py", "src/mongo"],
-        action="$PYTHON $SOURCES[0] $SOURCES[1]",
-    )
+run_lint = env.Command(
+    target="#run_lint",
+    source=["buildscripts/lint.py", "src/mongo"],
+    action="$PYTHON ${SOURCES[0]} ${SOURCES[1]}",
+)
 
-
-env.Alias( "lint" , [] , [ doLint ] )
+env.Alias( "lint" , [ run_lint ] , [ doLint ] )
 env.AlwaysBuild( "lint" )
 
 
