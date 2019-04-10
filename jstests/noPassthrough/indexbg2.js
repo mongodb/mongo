@@ -1,5 +1,5 @@
 // Test background index creation w/ constraints
-// @tags: [requires_document_locking]
+// @tags: [SERVER-40561, requires_document_locking]
 
 (function() {
     "use strict";

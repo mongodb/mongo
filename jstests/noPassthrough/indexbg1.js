@@ -1,4 +1,5 @@
 // Test background index creation
+// @tags: [SERVER-40561]
 
 (function() {
     "use strict";
