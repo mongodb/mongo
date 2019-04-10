@@ -29,22 +29,27 @@
 
 #include "mongo/base/data_type.h"
 
+#include <fmt/format.h>
+
 #include "mongo/util/str.h"
 
 namespace mongo {
 
+namespace {
+auto makeOverflowStatus(StringData action, size_t sizeOfT, size_t length, size_t debug_offset) {
+    using namespace fmt::literals;
+    return Status(ErrorCodes::Overflow,
+                  "buffer size too small to {} ({}) bytes out of buffer[{}] at offset: {}"_format(
+                      action, sizeOfT, length, debug_offset));
+}
+}  // namespace
+
 Status DataType::makeTrivialLoadStatus(size_t sizeOfT, size_t length, size_t debug_offset) {
-    str::stream ss;
-    ss << "buffer size too small to read (" << sizeOfT << ") bytes out of buffer[" << length
-       << "] at offset: " << debug_offset;
-    return Status(ErrorCodes::Overflow, ss);
+    return makeOverflowStatus("read", sizeOfT, length, debug_offset);
 }
 
 Status DataType::makeTrivialStoreStatus(size_t sizeOfT, size_t length, size_t debug_offset) {
-    str::stream ss;
-    ss << "buffer size too small to write (" << sizeOfT << ") bytes into buffer[" << length
-       << "] at offset: " << debug_offset;
-    return Status(ErrorCodes::Overflow, ss);
+    return makeOverflowStatus("write", sizeOfT, length, debug_offset);
 }
 
 }  // namespace mongo
