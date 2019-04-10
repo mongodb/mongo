@@ -1600,8 +1600,15 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     appendOpTime(&optimes, "appliedOpTime", lastOpApplied);
     appendOpTime(&optimes, "durableOpTime", lastOpDurable);
-    optimes.appendDate("lastAppliedWallTime", lastOpAppliedWall);
-    optimes.appendDate("lastDurableWallTime", lastOpDurableWall);
+
+    // SERVER-40565 The python driver cannot parse Date_t::min() as a valid date. These dates should
+    // only be equal to Date_t::min() if their corresponding optimes are null.
+    if (lastOpAppliedWall.isFormattable()) {
+        optimes.appendDate("lastAppliedWallTime", lastOpAppliedWall);
+    }
+    if (lastOpDurableWall.isFormattable()) {
+        optimes.appendDate("lastDurableWallTime", lastOpDurableWall);
+    }
 
     response->append("optimes", optimes.obj());
     if (lastStableRecoveryTimestamp) {
