@@ -267,6 +267,7 @@ selector:
   # op3 will still be using the snapshot from op1, and not see op2 at all.
   - jstests/core/cursora.js
   - jstests/core/bench_test1.js
+  - jstests/core/benchrun_pipeline_updates.js
 
   # Does not support tojson of command objects.
   - jstests/core/SERVER-23626.js

@@ -36,6 +36,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -116,7 +117,7 @@ struct BenchRunOp {
     bool showResult = false;
     std::string target;
     bool throwGLE = false;
-    BSONObj update;
+    write_ops::UpdateModification update;
     bool upsert = false;
     bool useCheck = false;
     bool useReadCmd = false;
