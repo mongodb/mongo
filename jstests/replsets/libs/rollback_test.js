@@ -156,7 +156,8 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         return replSet;
     }
 
-    function checkDataConsistency() {
+    function checkDataConsistency(
+        {skipCheckCollectionCounts: skipCheckCollectionCounts = false} = {}) {
         assert.eq(curState,
                   State.kSteadyStateOps,
                   "Not in kSteadyStateOps state, cannot check data consistency");
@@ -168,7 +169,8 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         const name = rst.name;
         // We must check counts before we validate since validate fixes counts. We cannot check
         // counts if unclean shutdowns occur.
-        if (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns) {
+        if ((!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns) &&
+            !skipCheckCollectionCounts) {
             rst.checkCollectionCounts(name);
         }
         rst.checkOplogs(name);
@@ -372,10 +374,10 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         return curPrimary;
     };
 
-    this.stop = function() {
+    this.stop = function(checkDataConsistencyOptions) {
         restartServerReplication(tiebreakerNode);
         rst.awaitReplication();
-        checkDataConsistency();
+        checkDataConsistency(checkDataConsistencyOptions);
         transitionIfAllowed(State.kStopped);
         return rst.stopSet();
     };

@@ -25,7 +25,7 @@
     const collName = "recover_prepared_transaction_state_after_rollback";
 
     const rollbackTest =
-        new RollbackTest(dbName, undefined, true /* expect transaction after rollback */);
+        new RollbackTest(dbName, undefined, true /* expect prepared transaction after rollback */);
     let primary = rollbackTest.getPrimary();
 
     // Create collection we're using beforehand.
