@@ -838,6 +838,19 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
         "-D", "dynamic_version " + spec.pversion(distro), "-D",
         "dynamic_release " + spec.prelease(), "-D", "_topdir " + topdir
     ])
+
+    # Versions of RPM after 4.4 ignore our BuildRoot tag so we need to
+    # specify it on the command line args to rpmbuild
+    #
+    # Current versions of RHEL at the time of this writing (RHEL < 8) patch in
+    # the old behavior so that our BuildRoot tag still works on these versions.
+    #
+    # Probably need to add RHEL 8 to this when we start building for it
+    if distro.name() == "suse" and distro.repo_os_version(build_os) == "15":
+        flags.extend([
+            "--buildroot", os.path.join(topdir, "BUILDROOT"),
+        ])
+
     sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags +
               ["%s/SPECS/mongodb%s.spec" % (topdir, suffix)])
     repo_dir = distro.repodir(arch, build_os, spec)
