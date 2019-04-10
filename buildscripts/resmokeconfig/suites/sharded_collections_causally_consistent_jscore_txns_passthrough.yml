@@ -33,9 +33,6 @@ selector:
   # Uses hangAfterCollectionInserts failpoint not available on mongos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
-  # Cannot shard a capped collection.
-  - jstests/core/txns/ban_tailable_cursor.js
-
   # View tests aren't expected to work when collections are implicitly sharded.
   - jstests/core/txns/view_reads_in_transaction.js
 
@@ -50,6 +47,8 @@ selector:
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
+  # Transactions are not allowed to operate on capped collections on shard servers.
+  - requires_capped
   # Prepare is not a command on mongos.
   - uses_prepare_transaction
 executor:

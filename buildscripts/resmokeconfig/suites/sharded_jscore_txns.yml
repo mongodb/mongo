@@ -38,6 +38,8 @@ selector:
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
   exclude_with_any_tags:
+  # Transactions are not allowed to operate on capped collections on shard servers.
+  - requires_capped
   # Prepare is not a command on mongos.
   - uses_prepare_transaction
 executor:

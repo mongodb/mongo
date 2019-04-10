@@ -12,10 +12,6 @@ selector:
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
   - jstests/core/apitest_db_profile_level.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
-  - jstests/core/capped6.js  # captrunc.
-  - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
-  - jstests/core/capped_empty.js  # emptycapped.
-  - jstests/core/capped_update.js # uses godinsert and can't run under replication.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
   - jstests/core/collection_truncate.js  # emptycapped.
   - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
@@ -70,7 +66,6 @@ selector:
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/bulk_legacy_enforce_gle.js
-  - jstests/core/capped5.js
   - jstests/core/commands_with_uuid.js
   - jstests/core/dbcase.js
   - jstests/core/dbcase2.js
@@ -197,7 +192,6 @@ selector:
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/bulk_legacy_enforce_gle.js
-  - jstests/core/cappeda.js
   - jstests/core/doc_validation.js
   - jstests/core/doc_validation_options.js
   - jstests/core/geo_multinest0.js
@@ -243,15 +237,6 @@ selector:
   - jstests/core/getmore_cmd_maxtimems.js
   - jstests/core/tailable_cursor_invalidation.js
   - jstests/core/tailable_getmore_batch_size.js
-
-  # SERVER-34918 The "max" option of a capped collection can be exceeded until the next insert.
-  # The reason is that we don't update the count of a collection until a transaction commits,
-  # by which point it is too late to complain that "max" has been exceeded.
-  - jstests/core/capped_max1.js
-
-  # The "max" option of a capped collection can be temporarily exceeded before a
-  # txn is committed.
-  - jstests/core/bulk_insert_capped.js
 
   # Wrong count for top info (WriteLock)
   - jstests/core/top.js
@@ -331,6 +316,8 @@ selector:
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
   - assumes_against_mongod_not_mongos
+  # Transactions are not allowed to operate on capped collections on shard servers.
+  - requires_capped
 
 executor:
   config:

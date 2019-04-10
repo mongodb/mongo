@@ -1,5 +1,10 @@
 // Check that opening a tailable cursor within a transaction is not allowed.
-// @tags: [uses_transactions]
+//
+// This test cannot run on shards because transactions are not allowed to operate on a capped
+// collection on a shard.
+//
+// @tags: [requires_capped, uses_transactions]
+
 (function() {
     const dbName = 'test';
     const collName = 'tailable-cursor-ban';

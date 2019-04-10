@@ -1,7 +1,7 @@
 /**
  * Test that write errors in transactions are reported in the writeErrors array, except for
  * TransientTransactionErrors.
- * @tags: [uses_transactions]
+ * @tags: [requires_capped, uses_transactions]
  */
 (function() {
     "use strict";
@@ -18,9 +18,6 @@
 
     assert.commandWorked(testDB.createCollection(testColl.getName()));
     assert.commandWorked(testDB.createCollection(cappedCollName, {capped: true, size: 1000}));
-
-    assert.commandWorked(testColl.insertOne({_id: 0, x: "string"}));
-    assert.commandWorked(cappedColl.insertOne({_id: 0, x: "string"}));
 
     // Assert that "cmd" fails with error "code" after "nExpected" operations, or fail with "msg"
     function runInTxn({cmd, msg, code, nExpected, expectedErrorIndex}) {
@@ -151,17 +148,20 @@
         }
     }
 
+    // Set up a document so we can get a DuplicateKey error trying to insert it again.
+    assert.commandWorked(testColl.insert({_id: 5}));
     exerciseWriteInTxn({
-        collNames: [testCollName, cappedCollName],
+        collNames: [testCollName],
         cmdName: "insert",
         goodOp: {},
-        badOp: {_id: 0},
+        badOp: {_id: 5},
         code: ErrorCodes.DuplicateKey
     });
 
-    // The good op updates "string" to "STRING", preserving doc size, required in capped collection
+    // Set up a document with a string field so we can update it but fail to increment it.
+    assert.commandWorked(testColl.insertOne({_id: 0, x: "string"}));
     exerciseWriteInTxn({
-        collNames: [testCollName, cappedCollName],
+        collNames: [testCollName],
         cmdName: "update",
         goodOp: {q: {_id: 0}, u: {$set: {x: "STRING"}}},
         badOp: {q: {_id: 0}, u: {$inc: {x: 1}}},
@@ -169,7 +169,7 @@
     });
 
     // Give the good delete operation some documents to delete
-    testColl.insertMany([{}, {}, {}, {}]);
+    assert.commandWorked(testColl.insertMany([{}, {}, {}, {}]));
     exerciseWriteInTxn({
         collNames: [testCollName],
         cmdName: "delete",

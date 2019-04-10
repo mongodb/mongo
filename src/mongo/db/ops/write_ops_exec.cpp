@@ -321,6 +321,28 @@ void insertDocuments(OperationContext* opCtx,
 }
 
 /**
+ * Returns a OperationNotSupportedInTransaction error Status if we are in a transaction and
+ * operating on a capped collection on a shard.
+ *
+ * The behavior of an operation against a capped collection may differ across replica set members,
+ * where it can succeed on one member and fail on another, crashing the failing member. Prepared
+ * transactions are not allowed to fail, so capped collections will not be allowed on shards.
+ * Furthermore, capped collections only allow one operation at a time because they enforce
+ * sequential insertion order with a MODE_X collection lock, which we cannot hold in transactions.
+ */
+Status checkIfTransactionOnCappedCollOnShard(OperationContext* opCtx, Collection* collection) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (txnParticipant && txnParticipant.inMultiDocumentTransaction() && collection->isCapped() &&
+        serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        return {ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Collection '" << collection->ns()
+                              << "' is a capped collection. Transactions are not allowed on capped "
+                                 "collections on shards."};
+    }
+    return Status::OK();
+}
+
+/**
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.
  */
 bool insertBatchAndHandleErrors(OperationContext* opCtx,
@@ -334,26 +356,25 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
     auto& curOp = *CurOp::get(opCtx);
 
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangDuringBatchInsert,
+        opCtx,
+        "hangDuringBatchInsert",
+        [&wholeOp]() {
+            log() << "batch insert - hangDuringBatchInsert fail point enabled for namespace "
+                  << wholeOp.getNamespace() << ". Blocking "
+                                               "until fail point is disabled.";
+        },
+        true,  // Check for interrupt periodically.
+        wholeOp.getNamespace());
+
+    if (MONGO_FAIL_POINT(failAllInserts)) {
+        uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
+    }
+
     boost::optional<AutoGetCollection> collection;
     auto acquireCollection = [&] {
         while (true) {
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &hangDuringBatchInsert,
-                opCtx,
-                "hangDuringBatchInsert",
-                [&wholeOp]() {
-                    log()
-                        << "batch insert - hangDuringBatchInsert fail point enabled for namespace "
-                        << wholeOp.getNamespace() << ". Blocking "
-                                                     "until fail point is disabled.";
-                },
-                true,  // Check for interrupt periodically.
-                wholeOp.getNamespace());
-
-            if (MONGO_FAIL_POINT(failAllInserts)) {
-                uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
-            }
-
             collection.emplace(
                 opCtx,
                 wholeOp.getNamespace(),
@@ -410,6 +431,9 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 try {
                     if (!collection)
                         acquireCollection();
+                    // Transactions are not allowed to operate on capped collections on shards.
+                    uassertStatusOK(
+                        checkIfTransactionOnCappedCollOnShard(opCtx, collection->getCollection()));
                     lastOpFixer->startingOp();
                     insertDocuments(opCtx, collection->getCollection(), it, it + 1, fromMigrate);
                     lastOpFixer->finishedOpSuccessfully();
@@ -565,34 +589,38 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     ParsedUpdate parsedUpdate(opCtx, &updateRequest);
     uassertStatusOK(parsedUpdate.parseRequest());
 
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangDuringBatchUpdate,
+        opCtx,
+        "hangDuringBatchUpdate",
+        [&ns]() {
+            log() << "batch update - hangDuringBatchUpdate fail point enabled for nss " << ns
+                  << ". Blocking until "
+                     "fail point is disabled.";
+        },
+        false /*checkForInterrupt*/,
+        ns);
+
+    if (MONGO_FAIL_POINT(failAllUpdates)) {
+        uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
+    }
+
     boost::optional<AutoGetCollection> collection;
     while (true) {
-        const auto checkForInterrupt = false;
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangDuringBatchUpdate,
-            opCtx,
-            "hangDuringBatchUpdate",
-            [&ns]() {
-                log() << "batch update - hangDuringBatchUpdate fail point enabled for nss " << ns
-                      << ". Blocking until "
-                         "fail point is disabled.";
-            },
-            checkForInterrupt,
-            ns);
+        collection.emplace(opCtx, ns, MODE_IX, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
-        if (MONGO_FAIL_POINT(failAllUpdates)) {
-            uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
-        }
-
-        collection.emplace(opCtx,
-                           ns,
-                           MODE_IX,  // DB is always IX, even if collection is X.
-                           fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+        // If this is an upsert, which is an insert, we must have a collection.
+        // An update on a non-existant collection is okay and handled later.
         if (collection->getCollection() || !updateRequest.isUpsert())
             break;
 
         collection.reset();  // unlock.
         makeCollection(opCtx, ns);
+    }
+
+    if (auto coll = collection->getCollection()) {
+        // Transactions are not allowed to operate on capped collections on shards.
+        uassertStatusOK(checkIfTransactionOnCappedCollOnShard(opCtx, coll));
     }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -838,10 +866,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
 
-    AutoGetCollection collection(opCtx,
-                                 ns,
-                                 MODE_IX,  // DB is always IX, even if collection is X.
-                                 fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+    AutoGetCollection collection(
+        opCtx, ns, MODE_IX, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+
     if (collection.getDb()) {
         curOp.raiseDbProfileLevel(collection.getDb()->getProfilingLevel());
     }
