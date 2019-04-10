@@ -168,5 +168,11 @@ TEST(JSONPointerTest, ToStringParsesToSamePointer) {
     ASSERT_EQ(reclaimedString, "/top/fi~0eld");
 }
 
+TEST(JSONPointerTest, ToFieldRefBuildsCorrectRef) {
+    JSONPointer pointer{"/first/second"};
+    FieldRef ref{"first.second"};
+    ASSERT_EQ(pointer.toFieldRef(), ref);
+}
+
 }  // namespace
 }  // namespace mongo

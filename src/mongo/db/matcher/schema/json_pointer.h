@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/field_ref.h"
 
 namespace mongo {
 /**
@@ -63,6 +64,14 @@ public:
 
     const std::string& toString() const {
         return _original;
+    }
+
+    FieldRef toFieldRef() const {
+        FieldRef ref;
+        for (auto&& part : _parsed) {
+            ref.appendPart(part);
+        }
+        return ref;
     }
 
     bool operator==(const JSONPointer& other) const {
