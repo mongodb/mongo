@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Helper script for constructing an archive (zip or tar) from a list of files.
 
 The output format (tar, tgz, zip) is determined from the file name, unless the user specifies

@@ -72,7 +72,7 @@ def _find_linter(linter, config_dict):
     python_dir = os.path.dirname(sys.executable)
     if sys.platform == "win32":
         # On Windows, these scripts are installed in %PYTHONDIR%\scripts like
-        # 'C:\Python27\scripts', and have .exe extensions.
+        # 'C:\Python37\scripts', and have .exe extensions.
         python_dir = os.path.join(python_dir, "scripts")
 
         cmd_str = os.path.join(python_dir, linter.cmd_name)
@@ -132,12 +132,11 @@ def find_linters(linter_list, config_dict):
 Could not find the correct version of linter '%s', expected '%s'. Check your
 PATH environment variable or re-run with --verbose for more information.
 
-To fix, install the needed python modules for both Python 2.7, and Python 3.x:
-   sudo pip2 install -r etc/pip/lint-requirements.txt
+To fix, install the needed python modules for Python 3.x:
    sudo pip3 install -r etc/pip/lint-requirements.txt
 
 These commands are typically available via packages with names like python-pip,
-python2-pip, and python3-pip. See your OS documentation for help.
+or python3-pip. See your OS documentation for help.
 """, linter.cmd_name, linter.required_version)
             return None
 

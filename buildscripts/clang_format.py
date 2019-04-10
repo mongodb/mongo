@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Clang format script that provides the following.
 
 1. Ability to grab binaries where possible from LLVM.

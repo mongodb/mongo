@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """ESLint module.
 
 Will download a prebuilt ESLint binary if necessary (i.e. it isn't installed, isn't in the current

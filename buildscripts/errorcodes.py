@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Produce a report of all assertions in the MongoDB server codebase.
 
 Parses .cpp files for assertions and verifies assertion codes are distinct.
@@ -24,7 +24,7 @@ from buildscripts import utils  # pylint: disable=wrong-import-position
 try:
     import regex as re
 except ImportError:
-    print("*** Run 'pip2 install --user regex' to speed up error code checking")
+    print("*** Run 'pip3 install --user regex' to speed up error code checking")
     import re  # type: ignore
 
 ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]

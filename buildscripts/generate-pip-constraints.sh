@@ -14,8 +14,8 @@ USAGE:
     -h, --help      Show this message
     -o CON_FILE     Write constraints.txt to CON_FILE
 
-This command passes all unrecognized arguments to two pip invocations,
-one for a python2 virtual environment and one for a python3 virtual environment.
+This command passes all unrecognized arguments to the pip invocation.
+
 It then forms a unified multi-version constraints file at constraints.txt in its working directory.
 
 This script's working directory currently defaults to '${DEFAULT_WORKING_DIR}'.

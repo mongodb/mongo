@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Unit tests for the resmokelib.testing.hooks.combine_benchrun_embedded_results module."""
 
 import datetime

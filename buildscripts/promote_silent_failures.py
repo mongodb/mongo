@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Convert silent test failures into non-silent failures.
 
 Any test files with at least 2 executions in the report.json file that have a "silentfail" status,

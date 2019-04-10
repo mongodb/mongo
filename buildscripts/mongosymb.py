@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Script and library for symbolizing MongoDB stack traces.
 
 To use as a script, paste the JSON object on the line after ----- BEGIN BACKTRACE ----- into the

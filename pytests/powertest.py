@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Powercycle test.
 
 Tests robustness of mongod to survive multiple powercycle events.

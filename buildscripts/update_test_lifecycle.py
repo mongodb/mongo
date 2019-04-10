@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Test Failures module.
 
 Update etc/test_lifecycle.yml to tag unreliable tests based on historic failure rates.

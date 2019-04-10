@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Script to gather information about how tags are used in evergreen tasks."""
 
 from __future__ import absolute_import

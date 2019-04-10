@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Retrieve the etc/test_lifecycle.yml tag file from the metadata repository.
 
 This is performed for the current repository.

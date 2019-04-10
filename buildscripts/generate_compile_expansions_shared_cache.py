@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Generate the compile expansions file used by Evergreen as part of the push/release process.
 

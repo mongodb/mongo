@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Setup an Android device to run the benchrun_embedded test suite."""
 
 import glob

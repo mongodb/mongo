@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Packager module.
 
 This program makes Debian and RPM repositories for MongoDB, by

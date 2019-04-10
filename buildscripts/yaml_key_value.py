@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Utility to return YAML value from key in YAML file."""
 
 import optparse

@@ -2305,7 +2305,7 @@ functions:
           cmds="$cmds; virtualenv --python \$python_loc --system-site-packages ${virtualenv_dir|venv}"
           cmds="$cmds; activate=\$(find ${virtualenv_dir|venv} -name 'activate')"
           cmds="$cmds; . \$activate"
-          cmds="$cmds; pip2 install -r \$remote_dir/etc/pip/powercycle-requirements.txt"
+          cmds="$cmds; pip3 install -r \$remote_dir/etc/pip/powercycle-requirements.txt"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \

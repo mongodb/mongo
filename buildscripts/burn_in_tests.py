@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Command line utility for determining what jstests have been added or modified."""
 
 

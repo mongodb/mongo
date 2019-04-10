@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Collect system resource information on processes running in Evergreen on a given interval."""
 
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Determine the number of resmoke jobs to run."""
 
 import argparse
