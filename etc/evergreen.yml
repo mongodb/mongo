@@ -9960,7 +9960,7 @@ buildvariants:
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 1
+    resmoke_jobs_max: 4
     tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
@@ -10075,7 +10075,7 @@ buildvariants:
   run_on:
   - macos-1014
   expansions:
-    resmoke_jobs_max: 1
+    resmoke_jobs_max: 4
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     tooltags: ""
@@ -10119,7 +10119,7 @@ buildvariants:
     push_arch: x86_64-enterprise
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 1
+    resmoke_jobs_max: 4
     tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
@@ -10169,7 +10169,7 @@ buildvariants:
     tooltags: "ssl sasl"
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include" --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 1
+    resmoke_jobs_max: 4
     build_mongoreplay: true
     build_openssl: true
     openssl_config_flags: "-mmacosx-version-min=10.12"
@@ -13315,7 +13315,7 @@ buildvariants:
       --release
       CPPPATH=/opt/mongodbtoolchain/v3/include
       --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 1
+    resmoke_jobs_max: 4
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
   display_tasks:
