@@ -23,7 +23,7 @@ def generate(unicode_casefold_file, target):
 
     case_mappings = {}
 
-    cf_file = open(unicode_casefold_file, 'r')
+    cf_file = open(unicode_casefold_file, 'r', encoding='utf-8')
 
     for line in cf_file:
         # Filter out blank lines and lines that start with #
