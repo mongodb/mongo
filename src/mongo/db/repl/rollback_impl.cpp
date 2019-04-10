@@ -226,17 +226,6 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _rollbackStats.rollbackId = _replicationProcess->getRollbackID();
 
-    if (shouldCreateDataFiles()) {
-        // Write a rollback file for each namespace that has documents that would be deleted by
-        // rollback.
-        status = _writeRollbackFiles(opCtx);
-        if (!status.isOK()) {
-            return status;
-        }
-    } else {
-        log() << "Not writing rollback files. 'createRollbackDataFiles' set to false.";
-    }
-
     // Before computing record store counts, abort all active transactions. This ensures that the
     // count adjustments are based on correct values where no prepared transactions are active and
     // all in-memory counts have been rolled-back.
@@ -254,6 +243,20 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     status = _findRecordStoreCounts(opCtx);
     if (!status.isOK()) {
         return status;
+    }
+
+    if (shouldCreateDataFiles()) {
+        // Write a rollback file for each namespace that has documents that would be deleted by
+        // rollback. We need to do this after aborting prepared transactions. Otherwise, we risk
+        // unecessary prepare conflicts when trying to read documents that were modified by those
+        // prepared transactions, which we know we will abort anyway.
+        // TODO (SERVER-40614): This error should be fatal.
+        status = _writeRollbackFiles(opCtx);
+        if (!status.isOK()) {
+            return status;
+        }
+    } else {
+        log() << "Not writing rollback files. 'createRollbackDataFiles' set to false.";
     }
 
     // If there were rolled back operations on any session, invalidate all sessions.
@@ -1029,6 +1032,7 @@ Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
         _writeRollbackFileForNamespace(opCtx, uuid, nss, entry.second);
     }
 
+    // TODO (SERVER-40614): This interrupt point should be removed.
     if (_isInShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "rollback shutting down"};
     }

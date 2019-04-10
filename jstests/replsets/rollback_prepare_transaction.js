@@ -44,11 +44,6 @@
     arrayEq([{_id: 1}, {_id: 2}], testColl.find().toArray());
 
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-
-    // TODO: Workaround for SERVER-40322
-    assert.commandWorked(
-        rollbackNode.adminCommand({setParameter: 1, createRollbackDataFiles: false}));
-
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     rollbackTest.transitionToSteadyStateOperations();
 
