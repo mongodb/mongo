@@ -6820,6 +6820,8 @@ tasks:
         if command -V cygpath; then
             echo "Installing core requirements into Python at '${python}'"
             "$(cygpath "${python}")" -mpip install -r etc/pip/core-requirements.txt
+        else
+            $python -m pip install -r etc/pip/core-requirements.txt
         fi
   - func: "run tests"
     vars:
