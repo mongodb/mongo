@@ -315,7 +315,11 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
                 if (isFCV42 && metadata->isSharded()) {
-                    assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(metadata, oldObj);
+                    bool changesShardKeyOnSameNode =
+                        checkUpdateChangesShardKeyFields(metadata, oldObj);
+                    if (changesShardKeyOnSameNode && !args.preImageDoc) {
+                        args.preImageDoc = oldObj.value().getOwned();
+                    }
                 }
 
                 WriteUnitOfWork wunit(getOpCtx());
@@ -339,7 +343,11 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
             if (!request->isExplain()) {
                 if (isFCV42 && metadata->isSharded()) {
-                    assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(metadata, oldObj);
+                    bool changesShardKeyOnSameNode =
+                        checkUpdateChangesShardKeyFields(metadata, oldObj);
+                    if (changesShardKeyOnSameNode && !args.preImageDoc) {
+                        args.preImageDoc = oldObj.value().getOwned();
+                    }
                 }
 
                 WriteUnitOfWork wunit(getOpCtx());
@@ -888,8 +896,8 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     return NEED_YIELD;
 }
 
-void UpdateStage::assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
-    ScopedCollectionMetadata metadata, const Snapshotted<BSONObj>& oldObj) {
+bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata metadata,
+                                                   const Snapshotted<BSONObj>& oldObj) {
     auto newObj = _doc.getObject();
     auto oldShardKey = metadata->extractDocumentKey(oldObj.value());
     auto newShardKey = metadata->extractDocumentKey(newObj);
@@ -897,7 +905,7 @@ void UpdateStage::assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
     // If the shard key fields remain unchanged by this update or if this document is an orphan and
     // so does not belong to this shard, we can skip the rest of the checks.
     if ((newShardKey.woCompare(oldShardKey) == 0) || !metadata->keyBelongsToMe(oldShardKey)) {
-        return;
+        return false;
     }
 
     // Assert that the updated doc has all shard key fields and none are arrays or array
@@ -930,6 +938,10 @@ void UpdateStage::assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
         uasserted(WouldChangeOwningShardInfo(oldObj.value(), newObj),
                   str::stream() << "This update would cause the doc to change owning shards");
     }
+
+    // We passed all checks, so we will return that this update changes the shard key field, and
+    // the updated document will remain on the same node.
+    return true;
 }
 
 }  // namespace mongo

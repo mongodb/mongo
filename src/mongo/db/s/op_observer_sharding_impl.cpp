@@ -119,7 +119,8 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
 
 void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
-                                                  const BSONObj& updatedDoc,
+                                                  boost::optional<BSONObj> preImageDoc,
+                                                  const BSONObj& postImageDoc,
                                                   const repl::OpTime& opTime,
                                                   const repl::OpTime& prePostImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
@@ -127,14 +128,14 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     csr->checkShardVersionOrThrow(opCtx);
 
     if (inMultiDocumentTransaction) {
-        assertIntersectingChunkHasNotMoved(opCtx, csr, updatedDoc);
+        assertIntersectingChunkHasNotMoved(opCtx, csr, postImageDoc);
         return;
     }
 
     auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);
     if (msm) {
-        msm->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
+        msm->getCloner()->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime, prePostImageOpTime);
     }
 }
 
@@ -182,7 +183,8 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
             msm->getCloner()->onInsertOp(opCtx, stmt.getObject(), {});
         } else if (opType == repl::OpTypeEnum::kUpdate) {
             if (auto updateDoc = stmt.getObject2()) {
-                msm->getCloner()->onUpdateOp(opCtx, *updateDoc, {}, {});
+                msm->getCloner()->onUpdateOp(
+                    opCtx, stmt.getPreImageDocumentKey(), *updateDoc, {}, {});
             }
         } else if (opType == repl::OpTypeEnum::kDelete) {
             if (isMigratingWithCSRLock(csr, csrLock, stmt.getObject())) {

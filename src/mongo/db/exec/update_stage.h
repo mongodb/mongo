@@ -205,9 +205,12 @@ private:
      * doc no longer belongs to this shard, this means that one or more shard key field values have
      * been updated to a value belonging to a chunk that is not owned by this shard. We cannot apply
      * this update atomically.
+     *
+     * If the update changes shard key fields but the new shard key remains on the same node,
+     * returns true. If the update does not change shard key fields, returns false.
      */
-    void assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
-        ScopedCollectionMetadata metadata, const Snapshotted<BSONObj>& oldObj);
+    bool checkUpdateChangesShardKeyFields(ScopedCollectionMetadata metadata,
+                                          const Snapshotted<BSONObj>& oldObj);
 
     UpdateStageParams _params;
 

@@ -81,7 +81,8 @@ public:
                     const repl::OpTime& opTime) override;
 
     void onUpdateOp(OperationContext* opCtx,
-                    const BSONObj& updatedDoc,
+                    boost::optional<BSONObj> preImageDoc,
+                    const BSONObj& postImageDoc,
                     const repl::OpTime& opTime,
                     const repl::OpTime& prePostImageOpTime) override;
 

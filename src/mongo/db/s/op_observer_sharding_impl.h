@@ -54,6 +54,7 @@ protected:
                               const bool inMultiDocumentTransaction) override;
     void shardObserveUpdateOp(OperationContext* opCtx,
                               const NamespaceString nss,
+                              boost::optional<BSONObj> preImageDoc,
                               const BSONObj& updatedDoc,
                               const repl::OpTime& opTime,
                               const repl::OpTime& prePostImageOpTime,

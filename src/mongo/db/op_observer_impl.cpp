@@ -605,6 +605,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         if (!args.updateArgs.fromMigrate) {
             shardObserveUpdateOp(opCtx,
                                  args.nss,
+                                 args.updateArgs.preImageDoc,
                                  args.updateArgs.updatedDoc,
                                  opTime.writeOpTime,
                                  opTime.prePostImageOpTime,

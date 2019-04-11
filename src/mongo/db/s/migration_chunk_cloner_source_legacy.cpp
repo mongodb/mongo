@@ -377,19 +377,28 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
 }
 
 void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
-                                                  const BSONObj& updatedDoc,
+                                                  boost::optional<BSONObj> preImageDoc,
+                                                  const BSONObj& postImageDoc,
                                                   const repl::OpTime& opTime,
                                                   const repl::OpTime& prePostImageOpTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss(), MODE_IX));
 
-    BSONElement idElement = updatedDoc["_id"];
+    BSONElement idElement = postImageDoc["_id"];
     if (idElement.eoo()) {
         warning() << "logUpdateOp got a document with no _id field, ignoring updatedDoc: "
-                  << redact(updatedDoc);
+                  << redact(postImageDoc);
         return;
     }
 
-    if (!isInRange(updatedDoc, _args.getMinKey(), _args.getMaxKey(), _shardKeyPattern)) {
+    if (!isInRange(postImageDoc, _args.getMinKey(), _args.getMaxKey(), _shardKeyPattern)) {
+        // If the preImageDoc is not in range but the postImageDoc was, we know that the document
+        // has changed shard keys and no longer belongs in the chunk being cloned. We will model
+        // the deletion of the preImage document so that the destination chunk does not receive an
+        // outdated version of this document.
+        if (preImageDoc &&
+            isInRange(*preImageDoc, _args.getMinKey(), _args.getMaxKey(), _shardKeyPattern)) {
+            onDeleteOp(opCtx, *preImageDoc, opTime, prePostImageOpTime);
+        }
         return;
     }
 

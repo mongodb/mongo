@@ -169,7 +169,8 @@ private:
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveUpdateOp(OperationContext* opCtx,
                                       const NamespaceString nss,
-                                      const BSONObj& updatedDoc,
+                                      boost::optional<BSONObj> preImageDoc,
+                                      const BSONObj& postImageDoc,
                                       const repl::OpTime& opTime,
                                       const repl::OpTime& prePostImageOpTime,
                                       const bool inMultiDocumentTransaction) {}
