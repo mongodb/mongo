@@ -1674,14 +1674,14 @@ Status OptionsParser::runConfigFile(
     const std::string& config,
     const std::map<std::string, std::string>& env,  // Unused, interface consistent with run()
     Environment* configEnvironment) {
-    // Add the default values to our resulting environment
-    Status ret = addDefaultValues(options, configEnvironment);
+    // Add values from the provided config file
+    Status ret = parseConfigFile(options, config, configEnvironment, ConfigExpand());
     if (!ret.isOK()) {
         return ret;
     }
 
-    // Add values from the provided config file
-    ret = parseConfigFile(options, config, configEnvironment, ConfigExpand());
+    // Add the default values to our resulting environment
+    ret = addDefaultValues(options, configEnvironment);
     if (!ret.isOK()) {
         return ret;
     }

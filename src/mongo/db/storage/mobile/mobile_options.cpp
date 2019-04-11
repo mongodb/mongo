@@ -27,25 +27,14 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/util/options_parser/environment.h"
+#include "mongo/db/storage/mobile/mobile_options.h"
 
 namespace mongo {
+namespace embedded {
 
-class MobileGlobalOptions {
-public:
-    std::uint32_t mobileDurabilityLevel = 1;
-    std::uint32_t mobileCacheSizeKB = 10240;
-    std::uint32_t mobileMmapSizeKB = 51200;
-    std::uint32_t mobileJournalSizeLimitKB = 5120;
+MobileOptions mobileGlobalOptions;
 
-    Status store(const optionenvironment::Environment& params);
-};
-
-extern MobileGlobalOptions mobileGlobalOptions;
-
+}  // namespace embedded
 }  // namespace mongo

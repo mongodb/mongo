@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,27 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/db/storage/mobile/mobile_options_gen.h"
 #include "mongo/util/options_parser/startup_option_init.h"
-
-#include <iostream>
-
-#include "mongo/db/storage/mobile/mobile_global_options.h"
-#include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/startup_options.h"
 
-namespace moe = mongo::optionenvironment;
-
+// When the mobile storage engine is used in embedded we don't need to do this. But when mongod we
+// need to inject the mobile specific options.
 namespace mongo {
-
-MONGO_STARTUP_OPTIONS_STORE(MobileOptions)(InitializerContext* context) {
-    Status ret = mobileGlobalOptions.store(moe::startupOptionsParsed);
-    if (!ret.isOK()) {
-        std::cerr << ret.toString() << std::endl;
-        std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
-        ::_exit(EXIT_BADOPTIONS);
-    }
-    return Status::OK();
+MONGO_MODULE_STARTUP_OPTIONS_REGISTER(mobile_options_mongod_register)(InitializerContext*) {
+    return addMobileStorageOptionDefinitions(&optionenvironment::startupOptions);
+}
+MONGO_STARTUP_OPTIONS_STORE(mobile_options_mongod_store)(InitializerContext*) {
+    return storeMobileStorageOptionDefinitions(optionenvironment::startupOptionsParsed);
 }
 }  // namespace mongo

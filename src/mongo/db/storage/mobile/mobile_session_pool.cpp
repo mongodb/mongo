@@ -95,8 +95,10 @@ bool MobileDelayedOpQueue::isEmpty() {
     return (_isEmpty.load());
 }
 
-MobileSessionPool::MobileSessionPool(const std::string& path, std::uint64_t maxPoolSize)
-    : _path(path), _maxPoolSize(maxPoolSize) {}
+MobileSessionPool::MobileSessionPool(const std::string& path,
+                                     const embedded::MobileOptions& options,
+                                     std::uint64_t maxPoolSize)
+    : _path(path), _options(options), _maxPoolSize(maxPoolSize) {}
 
 MobileSessionPool::~MobileSessionPool() {
     shutDown();
@@ -120,7 +122,7 @@ std::unique_ptr<MobileSession> MobileSessionPool::getSession(OperationContext* o
         sqlite3* session;
         int status = sqlite3_open(_path.c_str(), &session);
         embedded::checkStatus(status, SQLITE_OK, "sqlite3_open");
-        embedded::configureSession(session);
+        embedded::configureSession(session, _options);
         _curPoolSize++;
         return stdx::make_unique<MobileSession>(session, this);
     }

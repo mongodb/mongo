@@ -34,7 +34,7 @@
 
 #include <sqlite3.h>
 
-#include "mongo/db/storage/mobile/mobile_global_options.h"
+#include "mongo/db/storage/mobile/mobile_options.h"
 #include "mongo/db/storage/mobile/mobile_recovery_unit.h"
 #include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
 #include "mongo/db/storage/mobile/mobile_util.h"
@@ -159,7 +159,7 @@ void doValidate(OperationContext* opCtx, ValidateResults* results) {
         int status;
         // By default, the integrity check returns the first 100 errors found.
         while ((status = validateStmt.step()) == SQLITE_ROW) {
-            std::string errMsg(reinterpret_cast<const char*>(validateStmt.getColText(0)));
+            std::string errMsg(validateStmt.getColText(0));
 
             if (errMsg == "ok") {
                 // If the first message returned is "ok", the integrity check passed without
@@ -182,7 +182,7 @@ void doValidate(OperationContext* opCtx, ValidateResults* results) {
     }
 }
 
-void configureSession(sqlite3* session) {
+void configureSession(sqlite3* session, const MobileOptions& options) {
     auto executePragma = [session](auto pragma, auto value) {
         SqliteStatement::execQuery(session, "PRAGMA ", pragma, " = ", value, ";");
         LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE session configuration: " << pragma << " = " << value;
@@ -195,7 +195,7 @@ void configureSession(sqlite3* session) {
     executePragma("journal_mode"_sd, "WAL"_sd);
 
     // synchronous = NORMAL(1) is recommended with WAL, but we allow it to be overriden
-    executePragma("synchronous"_sd, std::to_string(mobileGlobalOptions.mobileDurabilityLevel));
+    executePragma("synchronous"_sd, std::to_string(options.durabilityLevel));
 
     // Set full fsync on OSX (only supported there) to ensure durability
     executePragma("fullfsync"_sd, "1"_sd);
@@ -206,11 +206,9 @@ void configureSession(sqlite3* session) {
     // Set some additional internal sizes for this session
     // Cache size described as KB should be set as negative number
     // https://sqlite.org/pragma.html#pragma_cache_size
-    executePragma("cache_size"_sd,
-                  std::to_string(-static_cast<int32_t>(mobileGlobalOptions.mobileCacheSizeKB)));
-    executePragma("mmap_size"_sd, std::to_string(mobileGlobalOptions.mobileMmapSizeKB * 1024));
-    executePragma("journal_size_limit"_sd,
-                  std::to_string(mobileGlobalOptions.mobileJournalSizeLimitKB * 1024));
+    executePragma("cache_size"_sd, std::to_string(-static_cast<int32_t>(options.cacheSizeKB)));
+    executePragma("mmap_size"_sd, std::to_string(options.mmapSizeKB * 1024));
+    executePragma("journal_size_limit"_sd, std::to_string(options.journalSizeLimitKB * 1024));
 }
 
 }  // namespace embedded

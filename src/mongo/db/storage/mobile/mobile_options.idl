@@ -29,12 +29,13 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/storage/mobile/mobile_global_options.h"
+        - "mongo/db/storage/mobile/mobile_options.h"
     configs:
         section: 'Mobile Storage Engine options'
         source: [ cli, ini, yaml ]
         initializer:
             register: addMobileStorageOptionDefinitions
+            store: storeMobileStorageOptionDefinitions
 
 configs:
     # Mobile storage engine options
@@ -49,32 +50,56 @@ configs:
             performance, set this to 2 or 3. Conversely, if you are fine with
             somewhat ephemeral local data then you can set this to 0.
         arg_vartype: Int
-        cpp_varname: 'mobileGlobalOptions.mobileDurabilityLevel'
+        cpp_varname: 'embedded::mobileGlobalOptions.durabilityLevel'
         short_name: mobileDurabilityLevel
         default: 1
         validator: {gte: 0, lte: 3}
 
     "storage.mobile.cacheSizeKB":
-        description: 'The size of the cache in kilobytes.'
+        description: 'Maximum size in kilobytes of the database to be cached in memory.'
         arg_vartype: Int
-        cpp_varname: 'mobileGlobalOptions.mobileCacheSizeKB'
+        cpp_varname: 'embedded::mobileGlobalOptions.cacheSizeKB'
         short_name: mobileCacheSizeKB
         default: 10240
-        validator: {gte: 0}
+        validator: {gte: 0, lte: {expr: 'std::numeric_limits<int>::max()'}}
 
     "storage.mobile.mmapSizeKB":
-        description: 'How much of the data can we memory map in kilobytes.'
+        description: 'Maximum size in kilobytes that can be used for memory mapped I/O.'
         arg_vartype: Int
-        cpp_varname: 'mobileGlobalOptions.mobileMmapSizeKB'
+        cpp_varname: 'embedded::mobileGlobalOptions.mmapSizeKB'
         short_name: mobileMmapSizeKB
         default: 51200
         validator: {gte: 0}
 
     "storage.mobile.journalSizeLimitKB":
-        description: 'Limit the size of the WAL to this amount in kilobytes.'
+        description: 'Maximum size of the rollback journal in kilobytes that is stored on the file system.'
         arg_vartype: Int
-        cpp_varname: 'mobileGlobalOptions.mobileJournalSizeLimitKB'
+        cpp_varname: 'embedded::mobileGlobalOptions.journalSizeLimitKB'
         short_name: mobileJournalSizeLimitKB
         default: 5120
         validator: {gte: 0}
+
+    "storage.mobile.vacuumFreePageRatio":
+        description: 'Ratio of free pages to total pages that triggers vacuuming, if above, of the database files on the file system.'
+        arg_vartype: Double
+        cpp_varname: 'embedded::mobileGlobalOptions.vacuumFreePageRatio'
+        short_name: mobileVacuumFreePageRatio
+        default: 0.25
+        validator: {gt: 0.0, lte: 1.0}
+
+    "storage.mobile.vacuumFreeSizeMB":
+        description: 'Number of megabytes of free space in the database files that trigger vaccuming.'
+        arg_vartype: Int
+        cpp_varname: 'embedded::mobileGlobalOptions.vacuumFreeSizeMB'
+        short_name: mobileVacuumFreeSizeMB
+        default: 50
+        validator: {gt: 0}
+
+    "storage.mobile.vacuumCheckIntervalMinutes":
+        description: 'Interval in minutes to check if vacuum needs to be triggered.'
+        arg_vartype: Int
+        cpp_varname: 'embedded::mobileGlobalOptions.vacuumCheckIntervalMinutes'
+        short_name: mobileVacuumCheckIntervalMinutes
+        default: 10
+        validator: {gt: 0}
 

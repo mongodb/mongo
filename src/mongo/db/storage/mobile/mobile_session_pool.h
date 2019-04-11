@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/mobile/mobile_options.h"
 #include "mongo/db/storage/mobile/mobile_session.h"
 #include "mongo/stdx/mutex.h"
 
@@ -69,7 +70,9 @@ class MobileSessionPool final {
     MobileSessionPool& operator=(const MobileSessionPool&) = delete;
 
 public:
-    MobileSessionPool(const std::string& path, std::uint64_t maxPoolSize = 80);
+    MobileSessionPool(const std::string& path,
+                      const embedded::MobileOptions& options,
+                      std::uint64_t maxPoolSize = 80);
 
     ~MobileSessionPool();
 
@@ -92,10 +95,15 @@ public:
     // Failed drops get queued here and get re-tried periodically
     MobileDelayedOpQueue failedDropsQueue;
 
+    // Returns the mobile options associated with this storage engine instance
+    const embedded::MobileOptions& getOptions() const {
+        return _options;
+    }
+
 private:
     /**
-     * Gets the front element from _sessions and then pops it off the queue.
-     */
+        * Gets the front element from _sessions and then pops it off the queue.
+        */
     sqlite3* _popSession_inlock();
 
     // This is used to lock the _sessions vector.
@@ -103,6 +111,7 @@ private:
     stdx::condition_variable _releasedSessionNotifier;
 
     std::string _path;
+    const embedded::MobileOptions& _options;
 
     /**
      * PoolSize is the number of open sessions associated with the session pool.

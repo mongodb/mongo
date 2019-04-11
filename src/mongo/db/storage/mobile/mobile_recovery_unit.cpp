@@ -36,7 +36,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/mobile/mobile_global_options.h"
+#include "mongo/db/storage/mobile/mobile_options.h"
 #include "mongo/db/storage/mobile/mobile_recovery_unit.h"
 #include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
 #include "mongo/db/storage/mobile/mobile_util.h"
@@ -135,7 +135,7 @@ bool MobileRecoveryUnit::waitUntilDurable() {
     // before going down but our powercycle test bench require it. Therefore make sure embedded does
     // not call this (by disabling writeConcern j:true) but allow it when this is used inside
     // mongod.
-    if (mobileGlobalOptions.mobileDurabilityLevel < 2) {
+    if (_sessionPool->getOptions().durabilityLevel < 2) {
         OperationContext* opCtx = Client::getCurrent()->getOperationContext();
         _ensureSession(opCtx);
         RECOVERY_UNIT_TRACE() << "waitUntilDurable called, attempting to perform a checkpoint";

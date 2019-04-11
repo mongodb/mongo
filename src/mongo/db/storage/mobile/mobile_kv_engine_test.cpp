@@ -31,30 +31,38 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 #include "mongo/db/storage/mobile/mobile_kv_engine.h"
+#include "mongo/db/storage/mobile/mobile_options_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
 namespace {
 
 class MobileKVHarnessHelper : public KVHarnessHelper {
 public:
-    MobileKVHarnessHelper()
-        : _dbPath("mobile_kv_engine_harness"),
-          _mobileDurabilityLevel(1),
-          _cacheSizeKB(10240),
-          _mmapSizeKB(51200),
-          _journalSizeLimitKB(5120) {
+    MobileKVHarnessHelper() : _dbPath("mobile_kv_engine_harness") {
+        addMobileStorageOptionDefinitions(&optionenvironment::startupOptions).ignore();
+        optionenvironment::OptionsParser parser;
+        std::vector<std::string> args;
+        std::map<std::string, std::string> env;
+        parser
+            .run(optionenvironment::startupOptions,
+                 args,
+                 env,
+                 &optionenvironment::startupOptionsParsed)
+            .ignore();
+        storeMobileStorageOptionDefinitions(optionenvironment::startupOptionsParsed).ignore();
+
+        embedded::mobileGlobalOptions.disableVacuumJob = true;
         _engine = stdx::make_unique<MobileKVEngine>(
-            _dbPath.path(), _mobileDurabilityLevel, _cacheSizeKB, _mmapSizeKB, _journalSizeLimitKB);
+            _dbPath.path(), embedded::mobileGlobalOptions, nullptr);
     }
 
     virtual KVEngine* restartEngine() {
-        _engine.reset(new MobileKVEngine(_dbPath.path(),
-                                         _mobileDurabilityLevel,
-                                         _cacheSizeKB,
-                                         _mmapSizeKB,
-                                         _journalSizeLimitKB));
+        _engine.reset(new MobileKVEngine(
+            _dbPath.path(), embedded::mobileGlobalOptions, _serviceContext.get()));
         return _engine.get();
     }
 
@@ -63,12 +71,9 @@ public:
     }
 
 private:
-    std::unique_ptr<MobileKVEngine> _engine;
     unittest::TempDir _dbPath;
-    std::uint32_t _mobileDurabilityLevel;
-    std::uint32_t _cacheSizeKB;
-    std::uint32_t _mmapSizeKB;
-    std::uint32_t _journalSizeLimitKB;
+    std::unique_ptr<MobileKVEngine> _engine;
+    ServiceContext::UniqueServiceContext _serviceContext;
 };
 
 std::unique_ptr<KVHarnessHelper> makeHelper() {

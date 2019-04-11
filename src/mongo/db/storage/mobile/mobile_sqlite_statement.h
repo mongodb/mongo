@@ -98,7 +98,7 @@ public:
      *
      * @param colIndex - zero-based index of a column retrieved from a query row.
      */
-    const void* getColText(int colIndex);
+    const char* getColText(int colIndex);
 
     /**
      * Resets the statement to the first of the query result rows.

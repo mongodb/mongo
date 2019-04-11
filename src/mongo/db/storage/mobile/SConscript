@@ -16,9 +16,8 @@ env.Library(
         'mobile_session_pool.cpp',
         'mobile_sqlite_statement.cpp',
         'mobile_util.cpp',
-        'mobile_global_options.cpp',
-        'mobile_options_init.cpp',
-        env.Idlc('mobile_global_options.idl')[0],
+        'mobile_options.cpp',
+        env.Idlc('mobile_options.idl')[0],
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -46,6 +45,19 @@ if mobile_se:
         '$BUILD_DIR/mongo/mongod',
         '$BUILD_DIR/mongo/dbtests/dbtest',
         ]
+        
+    env.Library(
+        target='mobile_options_mongod',
+        source=[
+            'mobile_options_mongod.cpp',
+            ],
+        PROGDEPS_DEPENDENTS=serveronlyProgDepsDependents,
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/util/options_parser/options_parser',
+            ],
+        LIBDEPS_PRIVATE=[
+        ],
+    )
 
 env.Library(
     target='storage_mobile',
@@ -84,6 +96,7 @@ env.CppUnitTest(
         'storage_mobile_core',
         '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ]
 )
 

@@ -33,7 +33,7 @@
 
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
-#include "mongo/db/storage/mobile/mobile_global_options_gen.h"
+#include "mongo/db/storage/mobile/mobile_options_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/embedded/embedded_options_gen.h"
 
@@ -84,7 +84,7 @@ Status storeOptions(const moe::Environment& params) {
         storageGlobalParams.dbpath = params["storage.dbPath"].as<string>();
     }
 
-    ret = mobileGlobalOptions.store(params);
+    ret = storeMobileStorageOptionDefinitions(params);
     if (!ret.isOK()) {
         return ret;
     }
@@ -113,6 +113,7 @@ Status storeOptions(const moe::Environment& params) {
 
 void resetOptions() {
     storageGlobalParams.reset();
+    mobileGlobalOptions = MobileOptions();
 }
 
 std::string storageDBPathDescription() {

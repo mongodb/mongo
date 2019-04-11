@@ -143,8 +143,8 @@ int64_t SqliteStatement::getColBytes(int colIndex) {
     return sqlite3_column_bytes(_stmt, colIndex);
 }
 
-const void* SqliteStatement::getColText(int colIndex) {
-    return sqlite3_column_text(_stmt, colIndex);
+const char* SqliteStatement::getColText(int colIndex) {
+    return reinterpret_cast<const char*>(sqlite3_column_text(_stmt, colIndex));
 }
 
 void SqliteStatement::_execQuery(sqlite3* session, const char* query) {

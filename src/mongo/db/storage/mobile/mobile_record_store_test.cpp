@@ -35,6 +35,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/storage/mobile/mobile_options_gen.h"
 #include "mongo/db/storage/mobile/mobile_record_store.h"
 #include "mongo/db/storage/mobile/mobile_recovery_unit.h"
 #include "mongo/db/storage/mobile/mobile_session.h"
@@ -45,6 +46,8 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 
 namespace mongo {
@@ -85,7 +88,20 @@ public:
         }
 
         _fullPath = fullPath.string();
-        _sessionPool.reset(new MobileSessionPool(_fullPath));
+
+        addMobileStorageOptionDefinitions(&optionenvironment::startupOptions).ignore();
+        optionenvironment::OptionsParser parser;
+        std::vector<std::string> args;
+        std::map<std::string, std::string> env;
+        parser
+            .run(optionenvironment::startupOptions,
+                 args,
+                 env,
+                 &optionenvironment::startupOptionsParsed)
+            .ignore();
+        storeMobileStorageOptionDefinitions(optionenvironment::startupOptionsParsed).ignore();
+
+        _sessionPool.reset(new MobileSessionPool(_fullPath, embedded::mobileGlobalOptions));
     }
 
     std::unique_ptr<RecordStore> newNonCappedRecordStore() override {

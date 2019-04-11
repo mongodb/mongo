@@ -33,8 +33,10 @@
 
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/mobile/mobile_options.h"
 #include "mongo/db/storage/mobile/mobile_session_pool.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -44,10 +46,8 @@ class JournalListener;
 class MobileKVEngine : public KVEngine {
 public:
     MobileKVEngine(const std::string& path,
-                   std::uint32_t durabilityLevel,
-                   std::uint32_t cacheSizeKB,
-                   std::uint32_t mmapSizeKB,
-                   std::uint32_t journalSizeLimitKB);
+                   const embedded::MobileOptions& options,
+                   ServiceContext* serviceContext);
 
     RecoveryUnit* newRecoveryUnit() override;
 
@@ -117,7 +117,7 @@ public:
         return Status::OK();
     }
 
-    void cleanShutdown() override{};
+    void cleanShutdown() override;
 
     bool hasIdent(OperationContext* opCtx, StringData ident) const override;
 
@@ -137,6 +137,8 @@ public:
     }
 
 private:
+    void maybeVacuum(Client* client, Date_t deadline);
+
     mutable stdx::mutex _mutex;
     void _initDBPath(const std::string& path);
     std::int32_t _setSQLitePragma(const std::string& pragma, sqlite3* session);
@@ -147,6 +149,9 @@ private:
     JournalListener* _journalListener = &NoOpJournalListener::instance;
 
     std::string _path;
+    embedded::MobileOptions _options;
+
+    std::unique_ptr<PeriodicRunner::PeriodicJobHandle> _vacuumJob;
 };
 
 }  // namespace mongo

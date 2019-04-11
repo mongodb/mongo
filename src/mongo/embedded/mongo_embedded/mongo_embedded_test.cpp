@@ -39,6 +39,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/json.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/mobile/mobile_options.h"
 #include "mongo/embedded/mongo_embedded/mongo_embedded_test_gen.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
@@ -108,6 +109,9 @@ protected:
         params.log_callback = nullptr;
         params.log_user_data = nullptr;
 
+        // Set a parameter that lives in mobileGlobalOptions to verify it can be set using YAML.
+        uint32_t vacuumCheckIntervalMinutes = 1;
+
         YAML::Emitter yaml;
         yaml << YAML::BeginMap;
 
@@ -115,6 +119,10 @@ protected:
         yaml << YAML::Value << YAML::BeginMap;
         yaml << YAML::Key << "dbPath";
         yaml << YAML::Value << globalTempDir->path();
+        yaml << YAML::Key << "mobile" << YAML::BeginMap;
+        yaml << YAML::Key << "vacuumCheckIntervalMinutes" << YAML::Value
+             << vacuumCheckIntervalMinutes;
+        yaml << YAML::EndMap;  // mobile
         yaml << YAML::EndMap;  // storage
 
         yaml << YAML::EndMap;
@@ -126,6 +134,8 @@ protected:
 
         db = mongo_embedded_v1_instance_create(lib, yaml.c_str(), status);
         ASSERT(db != nullptr) << mongo_embedded_v1_status_get_explanation(status);
+        ASSERT(mongo::embedded::mobileGlobalOptions.vacuumCheckIntervalMinutes ==
+               vacuumCheckIntervalMinutes);
     }
 
     void tearDown() {

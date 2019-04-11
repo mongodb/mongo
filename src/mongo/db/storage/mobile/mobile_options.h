@@ -27,38 +27,33 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <string>
 
-#include "mongo/db/storage/mobile/mobile_global_options.h"
-
-#include "mongo/util/log.h"
-
-namespace moe = mongo::optionenvironment;
+#include "mongo/base/status.h"
+#include "mongo/util/options_parser/environment.h"
 
 namespace mongo {
+namespace embedded {
 
-MobileGlobalOptions mobileGlobalOptions;
+struct MobileOptions {
+    // Initialize to broken nonsense defaults, the real ones are in IDL
+    uint32_t durabilityLevel = 0;
+    uint32_t cacheSizeKB = 0;
+    uint32_t mmapSizeKB = 0;
+    uint32_t journalSizeLimitKB = 0;
 
-Status MobileGlobalOptions::store(const moe::Environment& params) {
-    // Mobile storage engine options
-    if (params.count("storage.mobile.durabilityLevel")) {
-        mobileGlobalOptions.mobileDurabilityLevel =
-            params["storage.mobile.durabilityLevel"].as<int>();
-    }
-    if (params.count("storage.mobile.cacheSizeKB")) {
-        mobileGlobalOptions.mobileCacheSizeKB = params["storage.mobile.cacheSizeKB"].as<int>();
-    }
-    if (params.count("storage.mobile.mmapSizeKB")) {
-        mobileGlobalOptions.mobileMmapSizeKB = params["storage.mobile.mmapSizeKB"].as<int>();
-    }
-    if (params.count("storage.mobile.journalSizeLimitKB")) {
-        mobileGlobalOptions.mobileJournalSizeLimitKB =
-            params["storage.mobile.journalSizeLimitKB"].as<int>();
-    }
+    double vacuumFreePageRatio = 0.0;
+    uint32_t vacuumFreeSizeMB = 0;
+    uint32_t vacuumCheckIntervalMinutes = 0;
 
-    return Status::OK();
-}
+    // This setting is not available for users to configure. Just meant to be able to disable this
+    // feature in certain unit tests.
+    bool disableVacuumJob = false;
+};
 
+extern MobileOptions mobileGlobalOptions;
+
+}  // namespace embedded
 }  // namespace mongo
