@@ -664,6 +664,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     if (!_readOnly && !_ephemeral) {
         if (!_recoveryTimestamp.isNull()) {
             setInitialDataTimestamp(_recoveryTimestamp);
+            setOldestTimestamp(_recoveryTimestamp, false);
             setStableTimestamp(_recoveryTimestamp, false);
         }
 
@@ -1647,16 +1648,6 @@ void WiredTigerKVEngine::setOldestTimestampFromStable() {
     Timestamp newOldestTimestamp = _calculateHistoryLagFromStableTimestamp(stableTimestamp);
     if (newOldestTimestamp.isNull()) {
         return;
-    }
-
-    const auto oplogReadTimestamp = Timestamp(_oplogManager->getOplogReadTimestamp());
-    if (!oplogReadTimestamp.isNull() && newOldestTimestamp > oplogReadTimestamp) {
-        // Oplog visibility is updated asynchronously from replication updating the commit point.
-        // When force is not set, lag the `oldest_timestamp` to the possibly stale oplog read
-        // timestamp value. This guarantees an oplog reader's `read_timestamp` can always
-        // be serviced. When force is set, we respect the caller's request and do not lag the
-        // oldest timestamp.
-        newOldestTimestamp = oplogReadTimestamp;
     }
 
     setOldestTimestamp(newOldestTimestamp, false);
