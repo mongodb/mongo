@@ -150,6 +150,10 @@ selector:
   # failing the workload.
   - jstests/concurrency/fsm_workloads/agg_out.js
 
+  # TODO SERVER-38569: Unblacklist this workload once the performance of sharded transactions has
+  # improved to avoid timeouts on slow variants.
+  - jstests/concurrency/fsm_workloads/remove_and_bulk_insert.js
+
   exclude_with_any_tags:
   - requires_replication
   # The touch command does not exist on mongos, which is enforced before session information is
