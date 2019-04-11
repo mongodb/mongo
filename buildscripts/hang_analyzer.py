@@ -60,7 +60,7 @@ def callo(args, logger):
     """Call subprocess on args string."""
     logger.info("%s", str(args))
 
-    return subprocess.check_output(args).decode('utf-8')
+    return subprocess.check_output(args).decode('utf-8', 'replace')
 
 
 def find_program(prog, paths):
