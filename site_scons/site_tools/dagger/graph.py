@@ -158,8 +158,8 @@ class Graph(object):
                                                     "index": node_index[node]},
                                       "to_node": to_nodes_dicts})
 
-        with open(filename, 'w') as outfile:
-            json.dump(data, outfile, indent=4, encoding="ascii")
+        with open(filename, 'w', encoding="ascii") as outfile:
+            json.dump(data, outfile, indent=4)
 
     def __str__(self):
         return ("<Number of Nodes : {0}, Number of Edges : {1}, "
