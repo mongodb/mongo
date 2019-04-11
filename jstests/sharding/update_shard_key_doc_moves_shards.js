@@ -96,7 +96,7 @@
             } else {
                 assert.commandWorked(sessionDB.foo.update({"x": 300}, {"$set": {"x": 30}}));
             }
-            session.abortTransaction();
+            session.abortTransaction_forTesting();
             assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 300}).itcount());
             assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 30}).itcount());
         }
@@ -214,12 +214,36 @@
         changeShardKeyWhenFailpointsSet(session, sessionDB, runInTxn, isFindAndModify);
     });
 
-    // ----Assert that updating the shard key in a batch with size > 1 fails----
-
     let session = st.s.startSession({retryWrites: true});
     let sessionDB = session.getDatabase(kDbName);
 
     let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
+
+    // ----Assert correct error when changing a doc shard key conflicts with an orphan----
+
+    shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
+    // TODO: Remove once SERVER-37677 is done. Read so mongos doesn't get ssv causing shard to abort
+    // txn
+    mongos.getDB(kDbName).foo.insert({"x": 505});
+
+    let res = sessionDB.foo.update({"x": 500}, {"$set": {"x": 20}});
+    assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+    assert(res.getWriteError().errmsg.includes(
+        "There is either an orphan for this document or _id for this collection is not globally unique."));
+
+    session = st.s.startSession({retryWrites: true});
+    sessionDB = session.getDatabase(kDbName);
+
+    session.startTransaction();
+    res = sessionDB.foo.update({"x": 500}, {"$set": {"x": 20}});
+    assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+    assert(res.errmsg.includes(
+        "There is either an orphan for this document or _id for this collection is not globally unique."));
+    session.abortTransaction_forTesting();
+
+    mongos.getDB(kDbName).foo.drop();
+
+    // ----Assert that updating the shard key in a batch with size > 1 fails----
 
     assertCannotUpdateInBulkOpWhenDocsMoveShards(st, kDbName, ns, session, sessionDB, false, true);
     assertCannotUpdateInBulkOpWhenDocsMoveShards(st, kDbName, ns, session, sessionDB, false, false);
@@ -244,7 +268,7 @@
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
     assert.commandWorked(sessionDB.foo.update({"x": 30}, {"$set": {"x": 600}}));
     assert.commandWorked(sessionDB.foo.update({"x": 4}, {"$set": {"x": 50}}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).itcount());
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 30}).itcount());
@@ -268,7 +292,7 @@
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).itcount());
     assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 30}).itcount());
@@ -290,7 +314,7 @@
     assert.commandWorked(sessionDB.foo.insert({"x": 1, "a": 1}));
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
     sessionDB.foo.findAndModify({query: {"x": 500}, update: {$set: {"x": 20}}});
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).toArray().length);
     assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 20}).toArray().length);

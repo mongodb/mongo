@@ -7,7 +7,7 @@ function shardCollectionMoveChunks(
     assert.eq(st.s.getDB('config').collections.count({_id: ns, dropped: false}), 0);
 
     for (let i = 0; i < docsToInsert.length; i++) {
-        assert.writeOK(st.s.getDB(kDbName).foo.insert(docsToInsert[i]));
+        assert.commandWorked(st.s.getDB(kDbName).foo.insert(docsToInsert[i]));
     }
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
@@ -49,11 +49,11 @@ function runUpdateCmdSuccess(st, kDbName, session, sessionDB, inTxn, queries, up
         if (inTxn) {
             session.startTransaction();
             res = sessionDB.foo.update(queries[i], updates[i], {"upsert": upsert});
-            assert.writeOK(res);
-            session.commitTransaction();
+            assert.commandWorked(res);
+            assert.commandWorked(session.commitTransaction_forTesting());
         } else {
             res = sessionDB.foo.update(queries[i], updates[i], {"upsert": upsert});
-            assert.writeOK(res);
+            assert.commandWorked(res);
         }
 
         let updatedVal = updates[i]["$set"] ? updates[i]["$set"] : updates[i];
@@ -84,7 +84,7 @@ function runFindAndModifyCmdSuccess(
             session.startTransaction();
             res = sessionDB.foo.findAndModify(
                 {query: queries[i], update: updates[i], "upsert": upsert, "new": returnNew});
-            session.commitTransaction();
+            assert.commandWorked(session.commitTransaction_forTesting());
         } else {
             res = sessionDB.foo.findAndModify(
                 {query: queries[i], update: updates[i], "upsert": upsert, "new": returnNew});
@@ -116,7 +116,7 @@ function runUpdateCmdFail(
         if (errorCode) {
             assert.commandFailedWithCode(res, errorCode);
         }
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     } else {
         res = sessionDB.foo.update(query, update, {multi: multiParamSet});
         assert.writeError(res);
@@ -138,7 +138,7 @@ function runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, 
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: query, update: update, "upsert": upsert});
         });
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     } else {
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: query, update: update, "upsert": upsert});
@@ -161,7 +161,7 @@ function assertCanUpdatePrimitiveShardKey(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"x": 505}));
+    assert.commandWorked(sessionDB.foo.insert({"x": 505}));
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
@@ -173,7 +173,7 @@ function assertCanUpdatePrimitiveShardKey(
         cleanupOrphanedDocs(st, ns);
         // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort
         // txn
-        assert.writeOK(sessionDB.foo.insert({"x": 505}));
+        assert.commandWorked(sessionDB.foo.insert({"x": 505}));
         runFindAndModifyCmdSuccess(
             st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
     } else {
@@ -199,7 +199,7 @@ function assertCanUpdateDottedPath(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"x": {"a": 505}}));
+    assert.commandWorked(sessionDB.foo.insert({"x": {"a": 505}}));
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
@@ -213,7 +213,7 @@ function assertCanUpdateDottedPath(
 
         // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort
         // txn
-        assert.writeOK(sessionDB.foo.insert({"x": {"a": 505}}));
+        assert.commandWorked(sessionDB.foo.insert({"x": {"a": 505}}));
         runFindAndModifyCmdSuccess(
             st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
     } else {
@@ -235,7 +235,7 @@ function assertCanUpdatePartialShardKey(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"x": 505, "y": 90}));
+    assert.commandWorked(sessionDB.foo.insert({"x": 505, "y": 90}));
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
@@ -254,7 +254,7 @@ function assertCanUpdatePartialShardKey(
 
         // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort
         // txn
-        assert.writeOK(sessionDB.foo.insert({"x": 505, "y": 90}));
+        assert.commandWorked(sessionDB.foo.insert({"x": 505, "y": 90}));
         runFindAndModifyCmdSuccess(
             st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
     } else {
@@ -273,7 +273,7 @@ function assertCannotUpdate_id(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"_id": 505}));
+    assert.commandWorked(sessionDB.foo.insert({"_id": 505}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -296,7 +296,7 @@ function assertCannotUpdate_idDottedPath(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"_id": {"a": 505}}));
+    assert.commandWorked(sessionDB.foo.insert({"_id": {"a": 505}}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -315,7 +315,7 @@ function assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"x": 505, "y": 90}));
+    assert.commandWorked(sessionDB.foo.insert({"x": 505, "y": 90}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -332,7 +332,7 @@ function assertCannotUpdateWithMultiTrue(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"x": 505}));
+    assert.commandWorked(sessionDB.foo.insert({"x": 505}));
     runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, true);
 
     sessionDB.foo.drop();
@@ -345,7 +345,7 @@ function assertCannotUpdateSKToArray(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"x": 505}));
+    assert.commandWorked(sessionDB.foo.insert({"x": 505}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -363,7 +363,7 @@ function assertCannotUnsetSKField(
     cleanupOrphanedDocs(st, ns);
 
     // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.writeOK(sessionDB.foo.insert({"x": 505}));
+    assert.commandWorked(sessionDB.foo.insert({"x": 505}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -398,7 +398,7 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     bulkRes = bulkOp.execute();
     assert.commandWorked(bulkRes);
     if (inTxn) {
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
     assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 300}).itcount());
     assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 600}).itcount());
@@ -431,7 +431,7 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     bulkRes = bulkOp.execute();
     assert.commandWorked(bulkRes);
     if (inTxn) {
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
     assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 500}).itcount());
     assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 400}).itcount());
@@ -466,7 +466,7 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     bulkRes = bulkOp.execute();
     assert.commandWorked(bulkRes);
     if (inTxn) {
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
     assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 500}).itcount());
     assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 400}).itcount());
@@ -508,7 +508,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp.execute();
     });
     if (inTxn) {
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     }
 
     if (!ordered && !inTxn) {
@@ -560,7 +560,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp.execute();
     });
     if (inTxn) {
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     }
 
     if (!inTxn) {
@@ -606,7 +606,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp.execute();
     });
     if (inTxn) {
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     }
 
     // The batch will fail on the first write and the second will not be attempted.
@@ -642,7 +642,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp.execute();
     });
     if (inTxn) {
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     }
 
     assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 300}).itcount());
