@@ -440,7 +440,7 @@ def get_resmoke_repeat_options(options):
 def _set_resmoke_cmd(options, args):
     """Build the resmoke command, if a resmoke.py command wasn't passed in."""
 
-    new_args = copy.deepcopy(args) if args else ["python", "buildscripts/resmoke.py"]
+    new_args = copy.deepcopy(args) if args else [sys.executable, "buildscripts/resmoke.py"]
     new_args += get_resmoke_repeat_options(options).split()
 
     return new_args

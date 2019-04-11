@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import collections
 import os
+import sys
 import subprocess
 import unittest
 
@@ -424,7 +425,7 @@ class TestSetResmokeArgs(unittest.TestCase):
 class TestSetResmokeCmd(unittest.TestCase):
     def test__set_resmoke_cmd_no_opts_no_args(self):
         with patch(BURN_IN + ".get_resmoke_repeat_options", return_value=""):
-            self.assertListEqual(["python", "buildscripts/resmoke.py"],
+            self.assertListEqual([sys.executable, "buildscripts/resmoke.py"],
                                  burn_in._set_resmoke_cmd(None, None))
 
     def test__set_resmoke_cmd_no_opts(self):
