@@ -647,13 +647,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     invariant(!options.isView());
     NamespaceString nss(ns);
 
-    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
-    // be no longer a special case.
-    if (nss.coll().startsWith("system.views")) {
-        invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
-    } else {
-        invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
-    }
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
 
     uassert(CannotImplicitlyCreateCollectionInfo(nss),
             "request doesn't allow collection to be created implicitly",
@@ -673,8 +667,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                             << " without a UUID";
             severe() << msg;
             uasserted(ErrorCodes::InvalidOptions, msg);
-        }
-        if (canAcceptWrites) {
+        } else {
             optionsWithUUID.uuid.emplace(CollectionUUID::gen());
             generatedUUID = true;
         }
@@ -694,25 +687,19 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     audit::logCreateCollection(&cc(), ns);
 
-    if (optionsWithUUID.uuid) {
-        log() << "createCollection: " << ns << " with "
-              << (generatedUUID ? "generated" : "provided")
-              << " UUID: " << optionsWithUUID.uuid.get();
-    } else {
-        log() << "createCollection: " << ns << " with no UUID.";
-    }
+    log() << "createCollection: " << ns << " with " << (generatedUUID ? "generated" : "provided")
+          << " UUID: " << optionsWithUUID.uuid.get();
 
+    // Create CollectionCatalogEntry
     auto storageEngine =
         checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
     massertStatusOK(storageEngine->getCatalog()->createCollection(
         opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
 
+    // Create Collection object
     auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    invariant(!uuidCatalog.lookupCollectionByNamespace(nss));
-
     auto ownedCollection = _createCollectionInstance(opCtx, nss);
     Collection* collection = ownedCollection.get();
-    invariant(collection);
     uuidCatalog.onCreateCollection(opCtx, std::move(ownedCollection), *(collection->uuid()));
     opCtx->recoveryUnit()->onCommit([collection](auto commitTime) {
         // Ban reading from this collection on committed reads on snapshots before now.

@@ -98,7 +98,8 @@ Status _createCollection(OperationContext* opCtx,
                          const CollectionOptions& collectionOptions,
                          const BSONObj& idIndex) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
-        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
+        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
 
         AutoStatsTracker statsTracker(opCtx,
                                       nss,

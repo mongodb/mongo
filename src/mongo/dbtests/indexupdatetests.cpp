@@ -267,7 +267,11 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            db->dropCollection(&_opCtx, _ns).transitional_ignore();
+            {
+                // TODO SERVER-39520: Remove this DBLock
+                Lock::DBLock lock(&_opCtx, db->name(), MODE_X);
+                db->dropCollection(&_opCtx, _ns).transitional_ignore();
+            }
             CollectionOptions options;
             options.capped = true;
             options.cappedSize = 10 * 1024;

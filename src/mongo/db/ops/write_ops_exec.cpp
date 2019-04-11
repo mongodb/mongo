@@ -208,7 +208,9 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
             !inTransaction);
 
     writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
-        AutoGetOrCreateDb db(opCtx, ns.db(), MODE_X);
+        AutoGetOrCreateDb db(opCtx, ns.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, ns, MODE_X);
+
         assertCanWrite_inlock(opCtx, ns);
         if (!db.getDb()->getCollection(opCtx, ns)) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));

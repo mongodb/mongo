@@ -418,13 +418,7 @@ Status KVCatalog::_addEntry(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionOptions& options,
                             KVPrefix prefix) {
-    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
-    // be no longer a special case.
-    if (nss.coll().startsWith("system.views")) {
-        invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
-    } else {
-        invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-    }
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
     const string ident = _newUniqueIdent(nss.ns(), "collection");
 
@@ -744,14 +738,7 @@ Status KVCatalog::createCollection(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const CollectionOptions& options,
                                    bool allocateDefaultSpace) {
-    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
-    // be no longer a special case.
-    if (nss.coll().startsWith("system.views")) {
-        invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
-    } else {
-        invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-    }
-
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     invariant(nss.coll().size() > 0);
 
     if (UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss)) {

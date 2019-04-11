@@ -48,7 +48,6 @@
      */
 
     // Collection names for DDL ops that will fail.
-    const collToCreate = "create_collection_to_fail";
     const collToDrop = collName;
     const collToRenameFrom = collName;
     const collToRenameTo = "rename_collection_to_fail";
@@ -56,11 +55,6 @@
     const indexToDrop = indexName;
 
     let testDDLOps = () => {
-        // While that transaction is prepared, attempt to create a collection on the same db.
-        assert.commandFailedWithCode(testDB.getCollection(collToCreate).insert({_id: "shouldFail"}),
-                                     ErrorCodes.LockTimeout);
-        assert.eq(0, testDB.getCollection(collToCreate).find().count());
-
         // Also attempt to delete our original collection (it is in conflict anyway, but should
         // fail to acquire the db lock in the first place).
         assert.throws(function() {
