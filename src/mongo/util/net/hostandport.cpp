@@ -110,16 +110,28 @@ std::string HostAndPort::toString() const {
     return ss.str();
 }
 
-void HostAndPort::append(StringBuilder& ss) const {
+template <typename SinkFunc>
+static void appendGeneric(const HostAndPort& hp, const SinkFunc& write) {
     // wrap ipv6 addresses in []s for roundtrip-ability
-    if (host().find(':') != std::string::npos) {
-        ss << '[' << host() << ']';
+    if (hp.host().find(':') != std::string::npos) {
+        write("[");
+        write(hp.host());
+        write("]");
     } else {
-        ss << host();
+        write(hp.host());
     }
-    if (host().find('/') == std::string::npos) {
-        ss << ':' << port();
+    if (hp.host().find('/') == std::string::npos) {
+        write(":");
+        write(hp.port());
     }
+}
+
+void HostAndPort::append(StringBuilder& sink) const {
+    appendGeneric(*this, [&sink](const auto& v) { sink << v; });
+}
+
+void HostAndPort::append(fmt::writer& sink) const {
+    appendGeneric(*this, [&sink](const auto& v) { sink.write(v); });
 }
 
 bool HostAndPort::empty() const {

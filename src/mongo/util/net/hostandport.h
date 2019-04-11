@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <fmt/format.h>
 #include <iosfwd>
 #include <string>
 
@@ -126,9 +127,10 @@ struct HostAndPort {
     std::string toString() const;
 
     /**
-     * Like toString(), above, but writes to "ss", instead.
+     * Like toString(), but writes to various `sink` instead.
      */
-    void append(StringBuilder& ss) const;
+    void append(StringBuilder& sink) const;
+    void append(fmt::writer& sink) const;
 
     /**
      * Returns true if this object represents no valid HostAndPort.
@@ -169,3 +171,18 @@ template <typename Allocator>
 StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, const HostAndPort& hp);
 
 }  // namespace mongo
+
+template <>
+struct fmt::formatter<mongo::HostAndPort> {
+    template <typename ParseContext>
+    auto parse(ParseContext& ctx) -> decltype(ctx.begin()) {
+        return ctx.begin();
+    }
+
+    template <typename FormatContext>
+    auto format(const mongo::HostAndPort& hp, FormatContext& ctx) -> decltype(ctx.out()) {
+        fmt::writer w(ctx.out());
+        hp.append(w);
+        return ctx.out();
+    }
+};
