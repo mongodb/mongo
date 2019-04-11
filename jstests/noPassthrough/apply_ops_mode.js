@@ -85,7 +85,6 @@
         db.adminCommand({applyOps: [collModOp], oplogApplicationMode: "ApplyOps"}));
 
     // Test default succeeds.
-    collModOp.o.usePowerOf2Sizes = true;
     assert.commandWorked(db.adminCommand({
         applyOps: [collModOp],
     }));

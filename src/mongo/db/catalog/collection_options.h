@@ -117,14 +117,6 @@ struct CollectionOptions {
         NO        // do not create _id index
     } autoIndexId = DEFAULT;
 
-    // user flags
-    enum UserFlags {
-        Flag_UsePowerOf2Sizes = 1 << 0,
-        Flag_NoPadding = 1 << 1,
-    };
-    int flags = Flag_UsePowerOf2Sizes;  // a bitvector of UserFlags
-    bool flagsSet = false;
-
     bool temp = false;
 
     // Storage engine collection options. Always owned or empty.

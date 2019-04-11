@@ -206,12 +206,6 @@ public:
     virtual void updateIndexMetadata(OperationContext* opCtx, const IndexDescriptor* desc) {}
 
     /**
-     * Sets the flags field of CollectionOptions to newValue.
-     * Subsequent calls to getCollectionOptions should have flags==newValue and flagsSet==true.
-     */
-    virtual void updateFlags(OperationContext* opCtx, int newValue) = 0;
-
-    /**
      * Updates the validator for this collection.
      *
      * An empty validator removes all validation.

@@ -278,9 +278,9 @@ private:
  * 'remoteCollOptionsObj': the collection options object that the sync source will respond with to
  * the rollback node when it fetches collection metadata.
  *
- * If no command is provided, a collMod operation with a 'noPadding' argument is used to trigger a
- * collection metadata resync, since the rollback of collMod operations does not take into account
- * the actual command object. It simply re-syncs all the collection options.
+ * If no command is provided, a collMod operation with a 'validationLevel' argument is used to
+ * trigger a collection metadata resync, since the rollback of collMod operations does not take into
+ * account the actual command object. It simply re-syncs all the collection options.
  */
 class RollbackResyncsCollectionOptionsTest : public RollbackTest {
 

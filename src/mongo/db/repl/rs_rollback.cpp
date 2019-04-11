@@ -498,8 +498,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                     }
 
                     if (modification == "validator" || modification == "validationAction" ||
-                        modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
-                        modification == "noPadding") {
+                        modification == "validationLevel") {
                         fixUpInfo.collectionsToResyncMetadata.insert(*uuid);
                         continue;
                     }
@@ -1207,11 +1206,6 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
             // Set collection to whatever temp status is on the sync source.
             cce->setIsTemp(opCtx, options.temp);
-
-            // Resets collection user flags such as noPadding and usePowerOf2Sizes.
-            if (options.flagsSet || cce->getCollectionOptions(opCtx).flagsSet) {
-                cce->updateFlags(opCtx, options.flags);
-            }
 
             // Set any document validation options. We update the validator fields without
             // parsing/validation, since we fetched the options object directly from the sync

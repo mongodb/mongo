@@ -255,8 +255,6 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     CollectionOptions oldCollOpts;
     oldCollOpts.validationLevel = "strict";
     oldCollOpts.validationAction = "error";
-    oldCollOpts.flags = 2;
-    oldCollOpts.flagsSet = true;
 
     TTLCollModInfo ttlInfo;
     ttlInfo.expireAfterSeconds = Seconds(10);
@@ -288,12 +286,11 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     // Ensure that the old collection metadata was saved.
     auto o2 = oplogEntry.getObjectField("o2");
     auto o2Expected =
-        BSON("collectionOptions_old" << BSON("flags" << oldCollOpts.flags << "validationLevel"
-                                                     << oldCollOpts.validationLevel
-                                                     << "validationAction"
-                                                     << oldCollOpts.validationAction)
-                                     << "expireAfterSeconds_old"
-                                     << durationCount<Seconds>(ttlInfo.oldExpireAfterSeconds));
+        BSON("collectionOptions_old"
+             << BSON("validationLevel" << oldCollOpts.validationLevel << "validationAction"
+                                       << oldCollOpts.validationAction)
+             << "expireAfterSeconds_old"
+             << durationCount<Seconds>(ttlInfo.oldExpireAfterSeconds));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }

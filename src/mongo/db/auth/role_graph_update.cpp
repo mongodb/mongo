@@ -327,22 +327,9 @@ Status handleOplogCommand(RoleGraph* roleGraph, const BSONObj& cmdObj) {
         }
     }
 
-    if (cmdName == "collMod") {
+    if (cmdName == "collMod" && cmdObj.nFields() == 1) {
         // We don't care about empty modifications, even if they are on roles collection.
-        if (cmdObj.nFields() == 1) {
-            return Status::OK();
-        }
-
-        // Some arguments are known to be no-ops.
-        auto isNoOpArgument = [](const BSONElement& elem) {
-            return elem.fieldNameStringData() == "usePowerOf2Sizes";
-        };
-
-        // If all arguments are known to be no-ops, we don't care about the operation.
-        auto argument = std::find_if_not(++cmdObj.begin(), cmdObj.end(), isNoOpArgument);
-        if (argument == cmdObj.end()) {
-            return Status::OK();
-        }
+        return Status::OK();
     }
 
     //  No other commands expected.  Warn.

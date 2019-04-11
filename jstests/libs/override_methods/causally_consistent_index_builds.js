@@ -24,9 +24,7 @@
             return res;
         }
 
-        // The 'usePowerOf2Sizes' option is ignored by the server so no actual collection
-        // modification takes place.
-        let collModCmd = {collMod: commandObj[commandName], usePowerOf2Sizes: true};
+        let collModCmd = {collMod: commandObj[commandName]};
         let collModRes = func.apply(conn, makeFuncArgs(collModCmd));
 
         // If a follow-up collMod fails, another command was likely able to execute after the

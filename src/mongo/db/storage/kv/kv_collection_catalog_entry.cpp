@@ -378,13 +378,6 @@ bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
     return md.options.uuid && md.options.uuid == uuid;
 }
 
-void KVCollectionCatalogEntry::updateFlags(OperationContext* opCtx, int newValue) {
-    MetaData md = _getMetaData(opCtx);
-    md.options.flags = newValue;
-    md.options.flagsSet = true;
-    _catalog->putMetaData(opCtx, ns().toString(), md);
-}
-
 void KVCollectionCatalogEntry::updateValidator(OperationContext* opCtx,
                                                const BSONObj& validator,
                                                StringData validationLevel,

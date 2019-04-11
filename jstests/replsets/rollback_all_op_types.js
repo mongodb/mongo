@@ -176,8 +176,6 @@
               op: (db, collName) => {
                   assert.commandWorked(db.runCommand({
                       collMod: collName,
-                      usePowerOf2Sizes: false,
-                      noPadding: true,
                       validator: {a: 1},
                       validationLevel: "moderate",
                       validationAction: "warn"

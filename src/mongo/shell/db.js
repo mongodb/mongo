@@ -297,7 +297,6 @@ var DB;
             capped: if true, this is a capped collection (where old data rolls out).
         </li>
         <li> max: maximum number of objects if capped (optional).</li>
-        <li> usePowerOf2Sizes: if true, set usePowerOf2Sizes allocation for the collection.</li>
         <li>
             storageEngine: BSON document containing storage engine specific options. Format:
                            {
@@ -319,41 +318,10 @@ var DB;
 
      * @param {String} name Name of new collection to create
      * @param {Object} options Object with options for call.  Options are listed above.
-     * @return SOMETHING_FIXME
+     * @return {Object} returned has member ok set to true if operation succeeds, false otherwise.
     */
     DB.prototype.createCollection = function(name, opt) {
         var options = opt || {};
-
-        // We have special handling for the 'flags' field, and provide sugar for specific flags. If
-        // the user specifies any flags we send the field in the command. Otherwise, we leave it
-        // blank and use the server's defaults.
-        var sendFlags = false;
-        var flags = 0;
-        if (options.usePowerOf2Sizes != undefined) {
-            print(
-                "WARNING: The 'usePowerOf2Sizes' flag is ignored in 3.0 and higher as all MMAPv1 " +
-                "collections use fixed allocation sizes unless the 'noPadding' flag is specified");
-
-            sendFlags = true;
-            if (options.usePowerOf2Sizes) {
-                flags |= 1;  // Flag_UsePowerOf2Sizes
-            }
-            delete options.usePowerOf2Sizes;
-        }
-        if (options.noPadding != undefined) {
-            sendFlags = true;
-            if (options.noPadding) {
-                flags |= 2;  // Flag_NoPadding
-            }
-            delete options.noPadding;
-        }
-
-        // New flags must be added above here.
-        if (sendFlags) {
-            if (options.flags != undefined)
-                throw Error("Can't set 'flags' with either 'usePowerOf2Sizes' or 'noPadding'");
-            options.flags = flags;
-        }
 
         var cmd = {create: name};
         Object.extend(cmd, options);

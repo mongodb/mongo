@@ -2087,7 +2087,7 @@ var authCommandsLib = {
         },
         {
           testname: "collMod",
-          command: {collMod: "foo", usePowerOf2Sizes: true},
+          command: {collMod: "foo"},
           setup: function(db) {
               db.foo.save({});
           },

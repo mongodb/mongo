@@ -54,7 +54,6 @@ TEST(CollectionOptions, SimpleRoundTrip) {
     checkRoundTrip(options);
 
     options.setNoIdIndex();
-    options.flags = 5;
     checkRoundTrip(options);
 }
 

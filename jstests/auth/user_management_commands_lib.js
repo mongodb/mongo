@@ -114,8 +114,7 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
     (function testGrantRolesToUser() {
         jsTestLog("Testing grantRolesToUser");
 
-        assert.commandFailedWithCode(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}),
-                                     ErrorCodes.Unauthorized);
+        assert.commandFailedWithCode(db.runCommand({collMod: 'foo'}), ErrorCodes.Unauthorized);
 
         testUserAdmin.grantRolesToUser('spencer',
                                        [
@@ -127,7 +126,7 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
                                        ],
                                        writeConcern);
 
-        assert.commandWorked(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}));
+        assert.commandWorked(db.runCommand({collMod: 'foo'}));
         assert.writeOK(db.foo.update({}, {$inc: {a: 1}}));
         assert.eq(3, db.foo.findOne().a);
         assert.eq(1, db.foo.count());
@@ -149,7 +148,7 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
             ],
             writeConcern);
 
-        assert.commandWorked(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}));
+        assert.commandWorked(db.runCommand({collMod: 'foo'}));
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}));
         assert.throws(function() {
             db.foo.findOne();

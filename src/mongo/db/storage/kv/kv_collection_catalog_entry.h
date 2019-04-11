@@ -98,8 +98,6 @@ public:
                           StringData idxName,
                           long long newExpireSeconds) final;
 
-    void updateFlags(OperationContext* opCtx, int newValue) final;
-
     void updateIndexMetadata(OperationContext* opCtx, const IndexDescriptor* desc) final;
 
     void updateValidator(OperationContext* opCtx,

@@ -606,7 +606,7 @@ public:
     }
     std::string help() const override {
         return "Sets collection options.\n"
-               "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
+               "Example: { collMod: 'foo', viewOn: 'bar'} "
                "Example: { collMod: 'foo', index: {keyPattern: {a: 1}, expireAfterSeconds: 600} "
                "Example: { collMod: 'foo', index: {name: 'bar', expireAfterSeconds: 600} }\n";
     }

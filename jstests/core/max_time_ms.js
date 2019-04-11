@@ -417,7 +417,7 @@ assert(res.ok == 1,
        "expected aggregate with maxtime to succeed, ok=" + res.ok + ", code=" + res.code);
 
 // "collMod" command.
-res = t.runCommand("collMod", {usePowerOf2Sizes: true, maxTimeMS: 60 * 1000});
+res = t.runCommand("collMod", {maxTimeMS: 60 * 1000});
 assert(res.ok == 1,
        "expected collmod with maxtime to succeed, ok=" + res.ok + ", code=" + res.code);
 

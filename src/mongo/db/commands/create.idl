@@ -113,5 +113,5 @@ commands:
                 optional: true
             flags:
                 description: "DEPRECATED"
-                type: int
+                type: safeInt32
                 optional: true

@@ -276,8 +276,8 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
                                 remoteCollOptionsObj,
                                 BSON("collMod"
                                      << "coll"
-                                     << "noPadding"
-                                     << false),
+                                     << "validationLevel"
+                                     << "strict"),
                                 "coll");
 }
 void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(

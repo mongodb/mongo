@@ -1779,8 +1779,8 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
 
     BSONObj collModCmd = BSON("collMod"
                               << "t"
-                              << "noPadding"
-                              << false);
+                              << "validationLevel"
+                              << "strict");
     auto collectionModificationOperation =
         makeCommandOp(Timestamp(Seconds(2), 0), coll->uuid().get(), "test.t", collModCmd, 2);
 
@@ -1942,8 +1942,8 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
 
     BSONObj collModCmd = BSON("collMod"
                               << "t"
-                              << "noPadding"
-                              << false);
+                              << "validationLevel"
+                              << "strict");
     auto collectionModificationOperation =
         makeCommandOp(Timestamp(Seconds(2), 0), coll->uuid().get(), "test.t", collModCmd, 2);
 

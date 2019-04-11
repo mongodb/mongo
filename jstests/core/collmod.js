@@ -1,6 +1,6 @@
 /**
  * Basic js tests for the collMod command.
- * Test setting the usePowerOf2Sizes flag, and modifying TTL indexes.
+ * Test modifying TTL indexes.
  *
  * @tags: [
  *  # Cannot implicitly shard accessed collections because of collection existing when none
@@ -104,35 +104,13 @@ var res =
 debug(res);
 assert.eq(0, res.ok, "shouldn't be able to modify faulty index spec");
 
-// try with new index, this time set both expireAfterSeconds and the usePowerOf2Sizes flag
+// try with new index, this time set expireAfterSeconds
 t.dropIndex({a: 1});
 t.ensureIndex({a: 1}, {"expireAfterSeconds": 50});
-var res = db.runCommand({
-    "collMod": coll,
-    "usePowerOf2Sizes": true,
-    "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}
-});
+var res =
+    db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
 debug(res);
 assert(findTTL({a: 1}, 100), "TTL index should be 100 now");
-
-// Clear usePowerOf2Sizes and enable noPadding. Make sure collection options.flags is updated.
-var res = db.runCommand({"collMod": coll, "usePowerOf2Sizes": false, "noPadding": true});
-debug(res);
-assert.commandWorked(res);
-var info = findCollectionInfo();
-assert.eq(info.options.flags, 2, tojson(info));  // 2 is CollectionOptions::Flag_NoPadding
-
-// Clear noPadding and check results object and options.flags.
-var res = db.runCommand({"collMod": coll, "noPadding": false});
-debug(res);
-assert.commandWorked(res);
-if (!isMongos) {
-    // don't check this for sharding passthrough since mongos has a different output format.
-    assert.eq(res.noPadding_old, true, tojson(res));
-    assert.eq(res.noPadding_new, false, tojson(res));
-}
-var info = findCollectionInfo();
-assert.eq(info.options.flags, 0, tojson(info));
 
 // Tests for collmod over multiple indexes with the same key pattern.
 t.drop();

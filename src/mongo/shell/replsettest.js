@@ -1494,8 +1494,7 @@ var ReplSetTest = function(opts) {
         // Run a no-op command and wait for it to be applied on secondaries. Due to the asynchronous
         // completion nature of indexes on secondaries, we can guarantee an index build is complete
         // on all secondaries once all secondaries have applied this collMod command.
-        assert.commandWorked(this.getPrimary().getDB(dbName).runCommand(
-            {collMod: collName, usePowerOf2Sizes: true}));
+        assert.commandWorked(this.getPrimary().getDB(dbName).runCommand({collMod: collName}));
         this.awaitReplication();
     };
 
@@ -1699,16 +1698,11 @@ var ReplSetTest = function(opts) {
                     // filter to take advantage of the fact that a simple 'collection' filter will
                     // skip view evaluation, and therefore won't fail on an invalid view.
                     if (!collInfo.name.startsWith('system.')) {
-                        // 'usePowerOf2Sizes' is ignored by the server so no actual collection
-                        // modification takes place. We intentionally await replication without
-                        // doing any I/O to avoid any overhead from allocating or deleting data
-                        // files when using the MMAPv1 storage engine. We call awaitReplication()
-                        // later on to ensure the collMod is replicated to all nodes.
+                        // We intentionally await replication without doing any I/O to avoid any
+                        // overhead. We call awaitReplication() later on to ensure the collMod
+                        // is replicated to all nodes.
                         try {
-                            assert.commandWorked(dbHandle.runCommand({
-                                collMod: collInfo.name,
-                                usePowerOf2Sizes: true,
-                            }));
+                            assert.commandWorked(dbHandle.runCommand({collMod: collInfo.name}));
                         } catch (e) {
                             // Ignore NamespaceNotFound errors because a background thread could
                             // have dropped the collection after getCollectionInfos but before
@@ -1954,6 +1948,11 @@ var ReplSetTest = function(opts) {
                                     primaryInfo.info.uuid = null;
                                     secondaryInfo.info.uuid = null;
                                 }
+
+                                // Ignore the 'flags' collection option as it was removed in 4.2
+                                primaryInfo.options.flags = null;
+                                secondaryInfo.options.flags = null;
+
                                 if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
                                     print(msgPrefix +
                                           ', the primary and secondary have different ' +

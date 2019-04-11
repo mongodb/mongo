@@ -277,7 +277,6 @@ function runTest(conn) {
 
 jsTest.log('Test standalone');
 var conn = MongoRunner.runMongod({auth: ''});
-conn.getDB('admin').runCommand({setParameter: 1, newCollectionsUsePowerOf2Sizes: false});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 

@@ -73,7 +73,7 @@
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
             },
-            command: {collMod: collName, noPadding: false},
+            command: {collMod: collName},
             cleanUp: function(mongosConn) {
                 assert(mongosConn.getDB(dbName).getCollection(collName).drop());
             }
