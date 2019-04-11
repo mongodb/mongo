@@ -406,8 +406,8 @@ void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(Operati
         p().autoCommit = boost::none;
     } else {
         // Retrying a retryable write.
-        uassert(ErrorCodes::InvalidOptions,
-                "Must specify autocommit=false on all operations of a multi-statement transaction.",
+        uassert(ErrorCodes::IncompleteTransactionHistory,
+                "Cannot retry a retryable write that has been converted into a transaction",
                 o().txnState.isInRetryableWriteMode());
         invariant(p().autoCommit == boost::none);
     }

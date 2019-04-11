@@ -219,7 +219,7 @@
         documents: [{_id: txnNumber + "_2"}],
         txnNumber: NumberLong(txnNumber),
     }),
-                                 ErrorCodes.InvalidOptions);
+                                 ErrorCodes.IncompleteTransactionHistory);
 
     // Committing the transaction should succeed.
     assert.commandWorked(sessionDb.adminCommand({
@@ -262,12 +262,24 @@
     }));
 
     // Committing the transaction should fail if 'autocommit' is omitted.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        writeConcern: {w: "majority"}
-    }),
-                                 ErrorCodes.InvalidOptions);
+    {
+        // On mongos the router will fail with InvalidOptions, but on a shard
+        // it will return IncompleteTransactionHistory.
+        const expectedErrorCode = (() => {
+            if (FixtureHelpers.isMongos(sessionDb)) {
+                return ErrorCodes.InvalidOptions;
+            } else {
+                return ErrorCodes.IncompleteTransactionHistory;
+            }
+        })();
+
+        assert.commandFailedWithCode(sessionDb.adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            writeConcern: {w: "majority"}
+        }),
+                                     expectedErrorCode);
+    }
 
     // Committing the transaction should fail if autocommit=true.
     assert.commandFailedWithCode(sessionDb.adminCommand({
@@ -300,9 +312,21 @@
     }));
 
     // Aborting the transaction should fail if 'autocommit' is omitted.
-    assert.commandFailedWithCode(
-        sessionDb.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber)}),
-        ErrorCodes.InvalidOptions);
+    {
+        // On mongos the router will fail with InvalidOptions, but on a shard
+        // it will return IncompleteTransactionHistory.
+        const expectedErrorCode = (() => {
+            if (FixtureHelpers.isMongos(sessionDb)) {
+                return ErrorCodes.InvalidOptions;
+            } else {
+                return ErrorCodes.IncompleteTransactionHistory;
+            }
+        })();
+
+        assert.commandFailedWithCode(
+            sessionDb.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber)}),
+            expectedErrorCode);
+    }
 
     // Aborting the transaction should fail if autocommit=true.
     assert.commandFailedWithCode(
@@ -313,5 +337,4 @@
     // Aborting the transaction should succeed.
     assert.commandWorked(sessionDb.adminCommand(
         {abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
-
 }());

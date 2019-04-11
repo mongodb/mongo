@@ -41,7 +41,7 @@
               "providing autocommit to prepareTransaction.");
     assert.commandFailedWithCode(
         sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber}),
-        ErrorCodes.InvalidOptions);
+        ErrorCodes.IncompleteTransactionHistory);
 
     jsTestLog("Test the error precedence when calling prepare on a committed transaction and " +
               "providing startTransaction to prepareTransaction.");

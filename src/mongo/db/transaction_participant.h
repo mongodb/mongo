@@ -395,11 +395,15 @@ public:
          * the caller has performed the necessary customer input validations.
          *
          * Exceptions of note, which can be thrown are:
-         *   - TransactionTooOld - if attempt is made to start a transaction older than the
+         *   - TransactionTooOld - if an attempt is made to start a transaction older than the
          * currently active one or the last one which committed
          *   - PreparedTransactionInProgress - if the transaction is in the prepared state and a new
          * transaction or retryable write is attempted
          *   - NotMaster - if the node is not a primary when this method is called.
+         *   - IncompleteTransactionHistory - if an attempt is made to begin a retryable write for a
+         * TransactionParticipant that is not in retryable write mode. This is expected behavior if
+         * a retryable write has been upgraded to a transaction by the server, which can happen e.g.
+         * when updating the shard key.
          */
         void beginOrContinue(OperationContext* opCtx,
                              TxnNumber txnNumber,

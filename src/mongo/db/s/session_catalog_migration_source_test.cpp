@@ -443,8 +443,10 @@ TEST_F(SessionCatalogMigrationSourceTest, SessionDumpWithMultipleNewWrites) {
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
     ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
 
-    migrationSource.notifyNewWriteOpTime(entry2.getOpTime());
-    migrationSource.notifyNewWriteOpTime(entry3.getOpTime());
+    migrationSource.notifyNewWriteOpTime(
+        entry2.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
+    migrationSource.notifyNewWriteOpTime(
+        entry3.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
 
     {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
@@ -478,7 +480,9 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldAssertIfOplogCannotBeFound) {
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
 
-    migrationSource.notifyNewWriteOpTime(repl::OpTime(Timestamp(100, 3), 1));
+    migrationSource.notifyNewWriteOpTime(
+        repl::OpTime(Timestamp(100, 3), 1),
+        SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
     ASSERT_TRUE(migrationSource.hasMoreOplog());
     ASSERT_THROWS(migrationSource.fetchNextOplog(opCtx()), AssertionException);
 }
@@ -498,7 +502,8 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
             repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
         insertOplogEntry(entry);
 
-        migrationSource.notifyNewWriteOpTime(entry.getOpTime());
+        migrationSource.notifyNewWriteOpTime(
+            entry.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
 
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
@@ -522,7 +527,8 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
             repl::OpTime(Timestamp(0, 0), 0));   // optime of previous write within same transaction
         insertOplogEntry(entry);
 
-        migrationSource.notifyNewWriteOpTime(entry.getOpTime());
+        migrationSource.notifyNewWriteOpTime(
+            entry.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
 
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
@@ -545,7 +551,8 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
             repl::OpTime(Timestamp(0, 0), 0));   // optime of previous write within same transaction
         insertOplogEntry(entry);
 
-        migrationSource.notifyNewWriteOpTime(entry.getOpTime());
+        migrationSource.notifyNewWriteOpTime(
+            entry.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
 
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
@@ -655,7 +662,95 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldAssertWhenRollbackDetected) {
     ASSERT_TRUE(migrationSource.hasMoreOplog());
 }
 
-TEST_F(SessionCatalogMigrationSourceTest, TransactionEntriesShouldBeIgnored) {
+TEST_F(SessionCatalogMigrationSourceTest,
+       CommitTransactionEntriesShouldBeConvertedToDeadEndSentinel) {
+    SessionTxnRecord txnRecord;
+    txnRecord.setSessionId(makeLogicalSessionIdForTest());
+    txnRecord.setTxnNum(20);
+    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(12, 34), 5));
+    txnRecord.setLastWriteDate(Date_t::now());
+    txnRecord.setState(DurableTxnStateEnum::kCommitted);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), txnRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
+
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+
+    auto nextOplogResult = migrationSource.getLastFetchedOplog();
+    ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+    // Cannot compare directly because of SERVER-31356
+    ASSERT_BSONOBJ_EQ(TransactionParticipant::kDeadEndSentinel,
+                      *nextOplogResult.oplog->getObject2());
+
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       PrepareTransactionEntriesShouldBeConvertedToDeadEndSentinel) {
+    SessionTxnRecord txnRecord;
+    txnRecord.setSessionId(makeLogicalSessionIdForTest());
+    txnRecord.setTxnNum(20);
+    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(12, 34), 5));
+    txnRecord.setLastWriteDate(Date_t::now());
+    txnRecord.setState(DurableTxnStateEnum::kPrepared);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), txnRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
+
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+
+    auto nextOplogResult = migrationSource.getLastFetchedOplog();
+    ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+    // Cannot compare directly because of SERVER-31356
+    ASSERT_BSONOBJ_EQ(TransactionParticipant::kDeadEndSentinel,
+                      *nextOplogResult.oplog->getObject2());
+
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, InProgressTransactionEntriesShouldBeIgnored) {
+    SessionTxnRecord txnRecord;
+    txnRecord.setSessionId(makeLogicalSessionIdForTest());
+    txnRecord.setTxnNum(20);
+    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(12, 34), 5));
+    txnRecord.setLastWriteDate(Date_t::now());
+    txnRecord.setState(DurableTxnStateEnum::kInProgress);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), txnRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
+
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_FALSE(migrationSource.hasMoreOplog());
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, AbortedTransactionEntriesShouldBeIgnored) {
+    SessionTxnRecord txnRecord;
+    txnRecord.setSessionId(makeLogicalSessionIdForTest());
+    txnRecord.setTxnNum(20);
+    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(12, 34), 5));
+    txnRecord.setLastWriteDate(Date_t::now());
+    txnRecord.setState(DurableTxnStateEnum::kAborted);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), txnRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
+
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_FALSE(migrationSource.hasMoreOplog());
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       MixedTransactionEntriesAndRetryableWritesEntriesReturnCorrectResults) {
+    // Create an entry corresponding to a retryable write.
     auto insertOplog = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
@@ -665,37 +760,68 @@ TEST_F(SessionCatalogMigrationSourceTest, TransactionEntriesShouldBeIgnored) {
         0,                                    // statement id
         repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
 
+    // Create a config.transaction entry pointing to the insert oplog entry.
     SessionTxnRecord retryableWriteRecord;
     retryableWriteRecord.setSessionId(makeLogicalSessionIdForTest());
     retryableWriteRecord.setTxnNum(1);
     retryableWriteRecord.setLastWriteOpTime(insertOplog.getOpTime());
     retryableWriteRecord.setLastWriteDate(*insertOplog.getWallClockTime());
 
-    DBDirectClient client(opCtx());
-    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                  retryableWriteRecord.toBSON());
-
+    // Create a config.transaction entry pointing to an imaginary commitTransaction entry.
     SessionTxnRecord txnRecord;
     txnRecord.setSessionId(makeLogicalSessionIdForTest());
-    txnRecord.setTxnNum(20);
-    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(12, 34), 5));
+    txnRecord.setTxnNum(1);
+    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(12, 34), 2));
     txnRecord.setLastWriteDate(Date_t::now());
     txnRecord.setState(DurableTxnStateEnum::kCommitted);
 
+    // Insert both entries into the config.transactions table.
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                  retryableWriteRecord.toBSON());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), txnRecord.toBSON());
 
+    // Insert the 'insert' oplog entry into the oplog.
     insertOplogEntry(insertOplog);
 
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
-    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
 
-    ASSERT_TRUE(migrationSource.hasMoreOplog());
-    auto nextOplogResult = migrationSource.getLastFetchedOplog();
-    ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
-    // Cannot compare directly because of SERVER-31356
-    ASSERT_BSONOBJ_EQ(insertOplog.toBSON(), nextOplogResult.oplog->toBSON());
+    // Function to verify the oplog entry corresponding to the retryable write.
+    auto checkRetryableWriteEntry = [&] {
+        ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+        ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+        // Cannot compare directly because of SERVER-31356
+        ASSERT_BSONOBJ_EQ(insertOplog.toBSON(), nextOplogResult.oplog->toBSON());
+    };
+
+    // Function to verify the oplog entry corresponding to the transaction.
+    auto checkTxnEntry = [&] {
+        ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+        ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+        // Cannot compare directly because of SERVER-31356
+        ASSERT_BSONOBJ_EQ(TransactionParticipant::kDeadEndSentinel,
+                          *nextOplogResult.oplog->getObject2());
+    };
+
+    // Logical session ids are generated randomly and the migration source queries in order of
+    // logical session id, so we need to change the order of the checks depending on the ordering of
+    // the lsids between the retryable write record and the transaction record.
+    if (retryableWriteRecord.getSessionId().toBSON().woCompare(txnRecord.getSessionId().toBSON()) <
+        0) {
+        checkTxnEntry();
+        checkRetryableWriteEntry();
+    } else {
+        checkRetryableWriteEntry();
+        checkTxnEntry();
+    }
+
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
 }
-
 }  // namespace
 }  // namespace mongo

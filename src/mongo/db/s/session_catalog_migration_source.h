@@ -73,6 +73,8 @@ class SessionCatalogMigrationSource {
     SessionCatalogMigrationSource& operator=(const SessionCatalogMigrationSource&) = delete;
 
 public:
+    enum class EntryAtOpTimeType { kTransaction, kRetryableWrite };
+
     struct OplogResult {
         OplogResult(boost::optional<repl::OplogEntry> _oplog, bool _shouldWaitForMajority)
             : oplog(std::move(_oplog)), shouldWaitForMajority(_shouldWaitForMajority) {}
@@ -120,7 +122,7 @@ public:
     /**
      * Remembers the oplog timestamp of a new write that just occurred.
      */
-    void notifyNewWriteOpTime(repl::OpTime opTimestamp);
+    void notifyNewWriteOpTime(repl::OpTime opTimestamp, EntryAtOpTimeType entryAtOpTimeType);
 
     /**
      * Returns the rollback ID recorded at the beginning of session migration.
@@ -150,17 +152,17 @@ private:
         SessionOplogIterator(SessionTxnRecord txnRecord, int expectedRollbackId);
 
         /**
-          * Returns true if there are more oplog entries to fetch for this session.
-          */
-        bool hasNext() const;
-
-        /**
-         * Returns the next oplog write that happened in this session. If the oplog is lost
-         * because the oplog rolled over, this will return a sentinel oplog entry instead with
-         * type 'n' and o2 field set to Session::kDeadEndSentinel. This will also mean that
-         * next subsequent calls to hasNext will return false.
+         * Returns the next oplog write that happened in this session, or boost::none if there
+         * are no remaining entries for this session.
+         *
+         * If either:
+         *     a) the oplog is lost because the oplog rolled over, or
+         *     b) if the oplog entry is a prepare or commitTransaction entry,
+         * this will return a sentinel oplog entry instead with type 'n' and o2 field set to
+         * Session::kDeadEndSentinel.  This will also mean that next subsequent calls to getNext
+         * will return boost::none.
          */
-        repl::OplogEntry getNext(OperationContext* opCtx);
+        boost::optional<repl::OplogEntry> getNext(OperationContext* opCtx);
 
         BSONObj toBSON() const {
             return _record.toBSON();
@@ -240,8 +242,9 @@ private:
     // Protects _newWriteTsList, _lastFetchedNewWriteOplog, _state, _newOplogNotification
     stdx::mutex _newOplogMutex;
 
+
     // Stores oplog opTime of new writes that are coming in.
-    std::list<repl::OpTime> _newWriteOpTimeList;
+    std::list<std::pair<repl::OpTime, EntryAtOpTimeType>> _newWriteOpTimeList;
 
     // Used to store the last fetched oplog from _newWriteTsList.
     boost::optional<repl::OplogEntry> _lastFetchedNewWriteOplog;

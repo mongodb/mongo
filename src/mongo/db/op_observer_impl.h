@@ -181,7 +181,9 @@ private:
                                       const repl::OpTime& preImageOpTime,
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveTransactionPrepareOrUnpreparedCommit(
-        OperationContext* opCtx, const std::vector<repl::ReplOperation>& stmts) {}
+        OperationContext* opCtx,
+        const std::vector<repl::ReplOperation>& stmts,
+        const repl::OpTime& prepareOrCommitOptime) {}
 };
 
 }  // namespace mongo

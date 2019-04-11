@@ -162,12 +162,17 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
 }
 
 void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
-    OperationContext* opCtx, const std::vector<repl::ReplOperation>& stmts) {
+    OperationContext* opCtx,
+    const std::vector<repl::ReplOperation>& stmts,
+    const repl::OpTime& prepareOrCommitOptime) {
 
-    for (const auto stmt : stmts) {
-        auto const nss = stmt.getNss();
+    std::set<NamespaceString> namespacesTouchedByTransaction;
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+    for (const auto& stmt : stmts) {
+        const auto& nss = stmt.getNss();
+
+        invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
+
         auto csr = CollectionShardingRuntime::get(opCtx, nss);
         auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
         auto msm = MigrationSourceManager::get(csr, csrLock);
@@ -175,7 +180,13 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
             continue;
         }
 
-        auto const opType = stmt.getOpType();
+        if (namespacesTouchedByTransaction.find(nss) == namespacesTouchedByTransaction.end()) {
+            msm->getCloner()->onTransactionPrepareOrUnpreparedCommit(opCtx, prepareOrCommitOptime);
+            namespacesTouchedByTransaction.insert(nss);
+        }
+
+
+        const auto& opType = stmt.getOpType();
 
         // We pass an empty opTime to observers because retryable write history doesn't care about
         // writes in transactions.

@@ -418,7 +418,7 @@ TEST_F(TxnParticipantTest, AutocommitRequiredOnEveryTxnOp) {
     // Omitting 'autocommit' after the first statement of a transaction should throw an error.
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(), txnNum, boost::none, boost::none),
                        AssertionException,
-                       ErrorCodes::InvalidOptions);
+                       ErrorCodes::IncompleteTransactionHistory);
 
     // Including autocommit=false should succeed.
     txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, boost::none);

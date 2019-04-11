@@ -252,9 +252,9 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
     opCtx->setTxnNumber(result.txnNum);
     MongoDOperationContextSession ocs(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.beginOrContinue(opCtx, result.txnNum, boost::none, boost::none);
 
     try {
+        txnParticipant.beginOrContinue(opCtx, result.txnNum, boost::none, boost::none);
         if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
             // Skip the incoming statement because it has already been logged locally
             return lastResult;

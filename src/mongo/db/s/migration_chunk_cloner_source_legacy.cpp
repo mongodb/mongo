@@ -126,6 +126,7 @@ public:
     void commit(boost::optional<Timestamp>) override {
         _cloner->_consumeOperationTrackRequestAndAddToTransferModsQueue(
             _idObj, _op, _opTime, _prePostImageOpTime);
+        _cloner->_decrementOutstandingOperationTrackRequests();
     }
 
     void rollback() override {
@@ -138,6 +139,31 @@ private:
     const char _op;
     const repl::OpTime _opTime;
     const repl::OpTime _prePostImageOpTime;
+};
+
+/**
+ * Used to keep track of new transactions that involve documents in any chunk
+ * with an ongoing migration.
+ */
+class LogPrepareOrCommitOpForShardingHandler final : public RecoveryUnit::Change {
+public:
+    LogPrepareOrCommitOpForShardingHandler(MigrationChunkClonerSourceLegacy* cloner,
+                                           const repl::OpTime& opTime)
+        : _cloner(cloner), _opTime(opTime) {}
+
+    void commit(boost::optional<Timestamp>) override {
+        _cloner->_addToSessionMigrationOptimeQueue(
+            _opTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
+        _cloner->_decrementOutstandingOperationTrackRequests();
+    }
+
+    void rollback() override {
+        _cloner->_decrementOutstandingOperationTrackRequests();
+    }
+
+private:
+    MigrationChunkClonerSourceLegacy* const _cloner;
+    const repl::OpTime _opTime;
 };
 
 MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(MoveChunkRequest request,
@@ -441,6 +467,28 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
     }
 }
 
+void MigrationChunkClonerSourceLegacy::onTransactionPrepareOrUnpreparedCommit(
+    OperationContext* opCtx, const repl::OpTime& opTime) {
+
+    invariant(opCtx->getTxnNumber());
+
+    if (!_addedOperationToOutstandingOperationTrackRequests()) {
+        return;
+    }
+
+    opCtx->recoveryUnit()->registerChange(new LogPrepareOrCommitOpForShardingHandler(this, opTime));
+}
+
+void MigrationChunkClonerSourceLegacy::_addToSessionMigrationOptimeQueue(
+    const repl::OpTime& opTime,
+    SessionCatalogMigrationSource::EntryAtOpTimeType entryAtOpTimeType) {
+    if (auto sessionSource = _sessionCatalogSource.get()) {
+        if (!opTime.isNull()) {
+            sessionSource->notifyNewWriteOpTime(opTime, entryAtOpTimeType);
+        }
+    }
+}
+
 void MigrationChunkClonerSourceLegacy::_consumeOperationTrackRequestAndAddToTransferModsQueue(
     const BSONObj& idObj,
     const char op,
@@ -464,17 +512,10 @@ void MigrationChunkClonerSourceLegacy::_consumeOperationTrackRequestAndAddToTran
             MONGO_UNREACHABLE;
     }
 
-    if (auto sessionSource = _sessionCatalogSource.get()) {
-        if (!prePostImageOpTime.isNull()) {
-            sessionSource->notifyNewWriteOpTime(prePostImageOpTime);
-        }
-
-        if (!opTime.isNull()) {
-            sessionSource->notifyNewWriteOpTime(opTime);
-        }
-    }
-
-    _decrementOutstandingOperationTrackRequests();
+    _addToSessionMigrationOptimeQueue(
+        prePostImageOpTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
+    _addToSessionMigrationOptimeQueue(
+        opTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
 }
 
 bool MigrationChunkClonerSourceLegacy::_addedOperationToOutstandingOperationTrackRequests() {
