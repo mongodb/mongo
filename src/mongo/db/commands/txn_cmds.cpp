@@ -50,6 +50,7 @@ MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForAbortAfterExecutingAbort
 MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCommitingTxn);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingTxn);
+MONGO_FAIL_POINT_DEFINE(skipCommitTxnCheckPrepareMajorityCommitted);
 
 class CmdCommitTxn : public BasicCommand {
 public:
@@ -121,7 +122,8 @@ public:
                     "commitTransaction for a prepared transaction cannot be run before its prepare "
                     "oplog entry has been majority committed",
                     replCoord->getLastCommittedOpTime().getTimestamp() >=
-                        txnParticipant.getPrepareOpTime().getTimestamp());
+                            txnParticipant.getPrepareOpTime().getTimestamp() ||
+                        MONGO_FAIL_POINT(skipCommitTxnCheckPrepareMajorityCommitted));
             // commitPreparedTransaction will throw if the transaction is not prepared.
             txnParticipant.commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
         } else {
