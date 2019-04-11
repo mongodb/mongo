@@ -33,6 +33,8 @@
 #include <initializer_list>
 
 namespace mongo {
+class TransactionHistoryIteratorBase;
+
 namespace repl {
 
 /**
@@ -51,6 +53,8 @@ public:
     void setOperations(const Operations& operations);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
+    std::unique_ptr<TransactionHistoryIteratorBase> makeTransactionHistoryIterator(
+        const OpTime& startOpTime) const override;
     HostAndPort hostAndPort() const override;
 
 private:

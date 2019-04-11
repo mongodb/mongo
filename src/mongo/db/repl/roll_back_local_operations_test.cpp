@@ -72,6 +72,10 @@ TEST(RollBackLocalOperationsTest, InvalidLocalOplogIterator) {
         std::unique_ptr<Iterator> makeIterator() const override {
             return std::unique_ptr<Iterator>();
         }
+        std::unique_ptr<TransactionHistoryIteratorBase> makeTransactionHistoryIterator(
+            const OpTime& startingOpTime) const override {
+            MONGO_UNREACHABLE;
+        };
         HostAndPort hostAndPort() const override {
             return {};
         }

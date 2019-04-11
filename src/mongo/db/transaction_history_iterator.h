@@ -39,17 +39,14 @@ class OperationContext;
  * An iterator class that can traverse through the oplog entries that are linked via the prevTs
  * field.
  */
-class TransactionHistoryIterator {
+class TransactionHistoryIteratorBase {
 public:
-    /**
-     * Creates a new iterator starting with an oplog entry with the given start opTime.
-     */
-    TransactionHistoryIterator(repl::OpTime startingOpTime);
+    virtual ~TransactionHistoryIteratorBase() = default;
 
     /**
      * Returns false if there are no more entries to iterate.
      */
-    bool hasNext() const;
+    virtual bool hasNext() const = 0;
 
     /**
      * Returns the next oplog entry.
@@ -57,6 +54,18 @@ public:
      * Throws if next oplog entry is in a unrecognized format or if it can't find the next oplog
      * entry.
      */
+    virtual repl::OplogEntry next(OperationContext* opCtx) = 0;
+};
+
+class TransactionHistoryIterator : public TransactionHistoryIteratorBase {
+public:
+    /**
+     * Creates a new iterator starting with an oplog entry with the given start opTime.
+     */
+    TransactionHistoryIterator(repl::OpTime startingOpTime);
+    virtual ~TransactionHistoryIterator() = default;
+
+    bool hasNext() const override;
     repl::OplogEntry next(OperationContext* opCtx);
 
 private:

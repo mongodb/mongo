@@ -100,6 +100,11 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() co
     return std::unique_ptr<OplogInterface::Iterator>(new OplogIteratorLocal(_opCtx));
 }
 
+std::unique_ptr<TransactionHistoryIteratorBase> OplogInterfaceLocal::makeTransactionHistoryIterator(
+    const OpTime& startingOpTime) const {
+    return std::make_unique<TransactionHistoryIterator>(startingOpTime);
+}
+
 HostAndPort OplogInterfaceLocal::hostAndPort() const {
     return {getHostNameCached(), serverGlobalParams.port};
 }

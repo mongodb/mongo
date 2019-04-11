@@ -46,6 +46,8 @@ public:
     OplogInterfaceLocal(OperationContext* opCtx);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
+    std::unique_ptr<TransactionHistoryIteratorBase> makeTransactionHistoryIterator(
+        const OpTime& startingOpTime) const override;
     HostAndPort hostAndPort() const override;
 
 private:

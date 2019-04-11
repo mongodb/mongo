@@ -513,6 +513,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/transaction',
     ],
 )
 
@@ -522,6 +523,7 @@ env.Library(
         'oplog_interface_mock.cpp',
     ],
     LIBDEPS=[
+        'oplog_entry',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/net/network',
     ],

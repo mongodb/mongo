@@ -87,6 +87,12 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() c
             NamespaceString(_collectionName), query, 0, 0, &fields, 0, _batchSize)));
 }
 
+std::unique_ptr<TransactionHistoryIteratorBase>
+OplogInterfaceRemote::makeTransactionHistoryIterator(const OpTime&) const {
+    // Should never ask for remote transaction history.
+    MONGO_UNREACHABLE;
+}
+
 HostAndPort OplogInterfaceRemote::hostAndPort() const {
     return _hostAndPort;
 }

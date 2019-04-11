@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/oplog_interface_mock.h"
+#include "mongo/db/transaction_history_iterator.h"
 
 namespace mongo {
 namespace repl {
@@ -58,6 +59,55 @@ StatusWith<OplogInterface::Iterator::Value> OplogIteratorMock::next() {
     return *(_iterator++);
 }
 
+class TransactionHistoryIteratorMock : public TransactionHistoryIteratorBase {
+public:
+    TransactionHistoryIteratorMock(const OpTime& startOpTime,
+                                   std::unique_ptr<OplogInterface::Iterator> iter)
+        : _nextOpTime(startOpTime), _iter(std::move(iter)) {}
+
+    repl::OplogEntry next(OperationContext*) override {
+        invariant(hasNext());
+        auto operation = _iter->next();
+        while (operation.isOK()) {
+            auto& oplogBSON = operation.getValue().first;
+            auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
+            if (oplogEntry.getOpTime() == _nextOpTime) {
+                const auto& oplogPrevTsOption = oplogEntry.getPrevWriteOpTimeInTransaction();
+                uassert(
+                    ErrorCodes::FailedToParse,
+                    str::stream()
+                        << "Missing prevTs field on oplog entry of previous write in transaction: "
+                        << oplogBSON,
+                    oplogPrevTsOption);
+
+                _nextOpTime = oplogPrevTsOption.value();
+                return oplogEntry;
+            }
+            operation = _iter->next();
+        }
+        if (operation.getStatus().code() == ErrorCodes::NoSuchKey) {
+            uasserted(ErrorCodes::IncompleteTransactionHistory,
+                      str::stream()
+                          << "oplog no longer contains the complete write history of this "
+                             "transaction, log with opTime "
+                          << _nextOpTime.toBSON()
+                          << " cannot be found");
+        }
+        // We shouldn't get any other error.
+        MONGO_UNREACHABLE;
+    }
+
+    virtual ~TransactionHistoryIteratorMock() {}
+
+    bool hasNext() const override {
+        return !_nextOpTime.isNull();
+    }
+
+private:
+    repl::OpTime _nextOpTime;
+    std::unique_ptr<OplogInterface::Iterator> _iter;
+};
+
 }  // namespace
 
 OplogInterfaceMock::OplogInterfaceMock(std::initializer_list<Operation> operations)
@@ -76,6 +126,11 @@ std::string OplogInterfaceMock::toString() const {
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceMock::makeIterator() const {
     return std::unique_ptr<OplogInterface::Iterator>(
         new OplogIteratorMock(_operations.begin(), _operations.end()));
+}
+
+std::unique_ptr<TransactionHistoryIteratorBase> OplogInterfaceMock::makeTransactionHistoryIterator(
+    const OpTime& startOpTime) const {
+    return std::make_unique<TransactionHistoryIteratorMock>(startOpTime, makeIterator());
 }
 
 HostAndPort OplogInterfaceMock::hostAndPort() const {

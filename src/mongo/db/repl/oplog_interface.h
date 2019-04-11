@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/transaction_history_iterator.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -59,6 +60,13 @@ public:
      * Produces an iterator over oplog collection in reverse natural order.
      */
     virtual std::unique_ptr<Iterator> makeIterator() const = 0;
+
+    /**
+     * Produces an iterator that returns operations within a transaction.  Valid only for local
+     * oplogs.
+     */
+    virtual std::unique_ptr<TransactionHistoryIteratorBase> makeTransactionHistoryIterator(
+        const OpTime& startingOpTime) const = 0;
 
     /**
      * The host and port of the server.
