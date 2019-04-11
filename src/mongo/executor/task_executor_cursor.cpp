@@ -119,7 +119,7 @@ void TaskExecutorCursor::_runRemoteCommand(const RemoteCommandRequest& rcr) {
                 } else {
                     p.push(args.response.status);
                 }
-            } catch (const DBException& ex) {
+            } catch (const DBException&) {
                 // If anything goes wrong, make sure we close the pipe to wake the caller of
                 // getNext()
                 p.close();
