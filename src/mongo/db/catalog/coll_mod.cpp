@@ -61,10 +61,7 @@ namespace mongo {
 
 namespace {
 
-// Causes the server to hang when it attempts to assign UUIDs to the provided database (or all
-// databases if none are provided).
-MONGO_FAIL_POINT_DEFINE(hangBeforeDatabaseUpgrade);
-
+MONGO_FAIL_POINT_DEFINE(hangAfterDatabaseLock);
 MONGO_FAIL_POINT_DEFINE(assertAfterIndexUpdate);
 
 struct CollModRequest {
@@ -306,6 +303,8 @@ Status _collModInternal(OperationContext* opCtx,
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     Database* const db = autoDb.getDb();
     Collection* coll = db ? db->getCollection(opCtx, nss) : nullptr;
+
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterDatabaseLock);
 
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;
