@@ -90,6 +90,8 @@ using std::pair;
 
 namespace repl {
 
+MONGO_FAIL_POINT_DEFINE(rollbackExitEarlyAfterCollectionDrop);
+
 using namespace rollback_internal;
 
 bool DocID::operator<(const DocID& other) const {
@@ -950,6 +952,15 @@ Status _syncRollback(OperationContext* opCtx,
             fassert(40497, status);
         });
         syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
+
+        if (MONGO_FAIL_POINT(rollbackExitEarlyAfterCollectionDrop)) {
+            log() << "rollbackExitEarlyAfterCollectionDrop fail point enabled. Returning early "
+                     "until fail point is disabled.";
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Failing rollback because "
+                                           "rollbackExitEarlyAfterCollectionDrop fail point "
+                                           "enabled.");
+        }
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
     }
@@ -1090,15 +1101,25 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         invariant(!fixUpInfo.collectionsToResyncMetadata.count(uuid));
 
         NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
-        log() << "Dropping collection: " << nss << ", UUID: " << uuid;
-        AutoGetDb dbLock(opCtx, nss.db(), MODE_X);
+        // Do not attempt to acquire the database lock with an empty namespace. We should survive
+        // an attempt to drop a non-existent collection.
+        if (nss.isEmpty()) {
+            log() << "This collection does not exist, UUID: " << uuid;
+        } else {
+            log() << "Dropping collection: " << nss << ", UUID: " << uuid;
+            AutoGetDb dbLock(opCtx, nss.db(), MODE_X);
 
-        Database* db = dbLock.getDb();
-        if (db) {
-            Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
-            dropCollection(opCtx, nss, collection, db);
-            LOG(1) << "Dropped collection: " << nss << ", UUID: " << uuid;
+            Database* db = dbLock.getDb();
+            if (db) {
+                Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+                dropCollection(opCtx, nss, collection, db);
+                LOG(1) << "Dropped collection: " << nss << ", UUID: " << uuid;
+            }
         }
+    }
+
+    if (MONGO_FAIL_POINT(rollbackExitEarlyAfterCollectionDrop)) {
+        return;
     }
 
     // Rolling back renameCollection commands.
