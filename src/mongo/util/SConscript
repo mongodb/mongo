@@ -702,17 +702,6 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='keyed_executor_test',
-    source=[
-        'keyed_executor_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-    ],
-)
-
-env.CppUnitTest(
     target='strong_weak_finish_line_test',
     source=[
         'strong_weak_finish_line_test.cpp'
