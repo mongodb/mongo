@@ -228,7 +228,7 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
                        ErrorCodes::ExceededTimeLimit);
 
     // We can pick up after that interruption though
-    ASSERT_BSONOBJ_EQ(BSON("getMore" << long(1) << "collection"
+    ASSERT_BSONOBJ_EQ(BSON("getMore" << (long long)(1) << "collection"
                                      << "test"
                                      << "batchSize"
                                      << 3),
@@ -281,7 +281,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
     ASSERT_EQUALS(tec->getNext(opCtx.get()).get()["x"].Int(), 1);
 
     // lsid in the getmore
-    ASSERT_BSONOBJ_EQ(BSON("getMore" << long(1) << "collection"
+    ASSERT_BSONOBJ_EQ(BSON("getMore" << (long long)(1) << "collection"
                                      << "test"
                                      << "batchSize"
                                      << 1
