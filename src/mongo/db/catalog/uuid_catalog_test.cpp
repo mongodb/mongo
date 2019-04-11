@@ -467,6 +467,50 @@ TEST_F(UUIDCatalogIterationTest, InvalidateLastEntryInMapAndDereference) {
     ASSERT(*it == nullptr);
 }
 
+TEST_F(UUIDCatalogIterationTest, BeginSkipsOverEmptyCollectionObject) {
+    NamespaceString a1("a", "coll1");
+    NamespaceString a2("a", "coll2");
+
+    auto a1Uuid = CollectionUUID::gen();
+    auto a1CatalogEntry = std::make_unique<CollectionCatalogEntryMock>(a1.ns());
+
+    auto a2Uuid = CollectionUUID::gen();
+    if (a2Uuid < a1Uuid)
+        std::swap(a1Uuid, a2Uuid);
+    auto a2Coll = std::make_unique<CollectionMock>(a2);
+    auto a2CatalogEntry = std::make_unique<CollectionCatalogEntryMock>(a2.ns());
+
+    catalog.registerCatalogEntry(a1Uuid, std::move(a1CatalogEntry));
+    catalog.registerCatalogEntry(a2Uuid, std::move(a2CatalogEntry));
+    catalog.onCreateCollection(&opCtx, std::move(a2Coll), a2Uuid);
+
+    auto it = catalog.begin("a");
+    ASSERT(it != catalog.end());
+    auto coll = *it;
+    // Skips a.coll1 due to empty collection object.
+    ASSERT(coll->ns().ns() == a2.ns());
+}
+
+TEST_F(UUIDCatalogIterationTest, BeginSkipsOverEmptyCollectionObjectButStopsAtDbBoundary) {
+    NamespaceString a("a", "coll1");
+    NamespaceString b("b", "coll1");
+
+    auto aUuid = CollectionUUID::gen();
+    auto aCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(a.ns());
+
+    auto bUuid = CollectionUUID::gen();
+
+    auto bColl = std::make_unique<CollectionMock>(b);
+    auto bCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(b.ns());
+
+    catalog.registerCatalogEntry(aUuid, std::move(aCatalogEntry));
+    catalog.registerCatalogEntry(bUuid, std::move(bCatalogEntry));
+    catalog.onCreateCollection(&opCtx, std::move(bColl), bUuid);
+
+    auto it = catalog.begin("a");
+    ASSERT(it == catalog.end());
+}
+
 TEST_F(UUIDCatalogTest, OnCreateCollection) {
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == col);
 }

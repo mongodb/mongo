@@ -112,6 +112,10 @@ UUIDCatalog::iterator::iterator(StringData dbName, uint64_t genNum, const UUIDCa
 
     // The entry _mapIter points to is valid if it's not at the end of _orderedCollections and
     // the entry's database is the same as dbName.
+    while (_mapIter != _uuidCatalog->_orderedCollections.end() &&
+           _mapIter->first.first == _dbName && _mapIter->second->collectionPtr == nullptr) {
+        _mapIter++;
+    }
     if (_mapIter != _uuidCatalog->_orderedCollections.end() && _mapIter->first.first == _dbName) {
         _uuid = _mapIter->first.second;
     }
