@@ -740,17 +740,6 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target='keyed_executor_test',
-    source=[
-        'keyed_executor_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-    ],
-)
-
 env.Benchmark(
     target='decimal_counter_bm',
     source=[
