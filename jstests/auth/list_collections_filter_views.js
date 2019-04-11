@@ -50,7 +50,7 @@
         shards: 1,
         mongos: 1,
         config: 1,
-        other: {keyFile: 'jstests/libs/key1'},
+        other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false},
     });
     runTestOnConnection(st.s0);
     st.stop();
