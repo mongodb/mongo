@@ -49,6 +49,9 @@ namespace mongo {
 class CollatorInterface;
 class FieldRef;
 
+using ApplyParams = UpdateExecutor::ApplyParams;
+using ApplyResult = UpdateExecutor::ApplyResult;
+
 /**
  * Update modifier expressions are stored as a prefix tree of UpdateNodes, where two modifiers that
  * share a field path prefix share a path prefix in the tree. The prefix tree is used to enforce
@@ -64,7 +67,7 @@ class FieldRef;
  *               b /    \ c
  * SetNode: _val = 5    IncNode: _val = 1
  */
-class UpdateNode : public UpdateExecutor {
+class UpdateNode {
 public:
     enum class Context { kAll, kInsertOnly };
     enum class Type { Object, Array, Leaf, Replacement };
@@ -86,11 +89,6 @@ public:
     virtual ~UpdateNode() = default;
 
     virtual std::unique_ptr<UpdateNode> clone() const = 0;
-
-    ApplyResult applyUpdate(ApplyParams applyParams) const final {
-        UpdateNodeApplyParams updateNodeApplyParams;
-        return apply(applyParams, updateNodeApplyParams);
-    }
 
     virtual ApplyResult apply(ApplyParams applyParams,
                               UpdateNodeApplyParams updateNodeApplyParams) const = 0;
@@ -119,6 +117,21 @@ public:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const = 0;
+
+    /**
+     * Set the collation. This is a noop if the UpdateExecutor subclass does not require a collator.
+     * If setCollator() is called, it is required that the current collator is the simple collator
+     * (nullptr). The collator must outlive the modifier interface. This is used to override the
+     * collation after obtaining a collection lock if the update did not specify a collation and the
+     * collection has a non-simple default collation.
+     */
+    virtual void setCollator(const CollatorInterface* collator) = 0;
+
+    /**
+     * This allows an arbitrary class to implement logic which gets dispatched to at runtime
+     * depending on the type of the UpdateExecutor.
+     */
+    virtual void acceptVisitor(UpdateNodeVisitor* visitor) = 0;
 
 public:
     const Context context;

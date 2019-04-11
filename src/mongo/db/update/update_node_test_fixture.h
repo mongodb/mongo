@@ -45,7 +45,7 @@ protected:
     void setUp() override {
         resetApplyParams();
 
-        // Set up the logical clock needed by CurrentDateNode and ObjectReplaceNode.
+        // Set up the logical clock needed by CurrentDateNode and ObjectReplaceExecutor.
         auto service = mongo::getGlobalServiceContext();
         auto logicalClock = mongo::stdx::make_unique<mongo::LogicalClock>(service);
         mongo::LogicalClock::set(service, std::move(logicalClock));

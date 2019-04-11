@@ -29,57 +29,41 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/update/update_executor.h"
-#include "mongo/stdx/memory.h"
+
+#include "mongo/db/update/update_node.h"
+#include "mongo/db/update/update_object_node.h"
 
 namespace mongo {
 
-/**
- * An UpdateExecutor representing a pipeline-style update.
- */
-class PipelineExecutor : public UpdateExecutor {
-
+class UpdateTreeExecutor : public UpdateExecutor {
 public:
-    /**
-     * Initializes the node with an aggregation pipeline definition.
-     */
-    explicit PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              const std::vector<BSONObj>& pipeline);
+    explicit UpdateTreeExecutor(std::unique_ptr<UpdateObjectNode> node)
+        : _updateTree(std::move(node)) {}
+
+    ApplyResult applyUpdate(ApplyParams applyParams) const final {
+        UpdateNode::UpdateNodeApplyParams updateNodeApplyParams;
+        return _updateTree->apply(applyParams, updateNodeApplyParams);
+    }
+
+    UpdateNode* getUpdateTree() {
+        return static_cast<UpdateNode*>(_updateTree.get());
+    }
 
     /**
-     * Replaces the document that 'applyParams.element' belongs to with 'val'. If 'val' does not
-     * contain an _id, the _id from the original document is preserved. 'applyParams.element' must
-     * be the root of the document. Always returns a result stating that indexes are affected when
-     * the replacement is not a noop.
+     * Gather all update operators in the subtree rooted from '_updateTree' into a BSONObj in the
+     * format of the update command's update parameter.
      */
-    ApplyResult applyUpdate(ApplyParams applyParams) const final;
-
     Value serialize() const final {
-        std::vector<Value> valueArray;
-        for (const auto& stage : _pipeline->getSources()) {
-            // TODO SERVER-40539: Consider subclassing DocumentSourceQueue with a class that is
-            // explicitly skipped when serializing. With that change call Pipeline::serialize()
-            // directly.
-            if (stage->getSourceName() == "mock"_sd) {
-                continue;
-            }
+        return Value(_updateTree->serialize());
+    }
 
-            stage->serializeToArray(valueArray);
-        }
-
-        return Value(valueArray);
+    void setCollator(const CollatorInterface* collator) final {
+        _updateTree->setCollator(collator);
     }
 
 private:
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<UpdateObjectNode> _updateTree;
 };
 
 }  // namespace mongo

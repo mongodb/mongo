@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/update/object_replace_node.h"
+#include "mongo/db/update/object_replace_executor.h"
 
 #include "mongo/base/data_view.h"
 #include "mongo/db/bson/dotted_path_support.h"
@@ -44,10 +44,11 @@ namespace {
 constexpr StringData kIdFieldName = "_id"_sd;
 }  // namespace
 
-ObjectReplaceNode::ObjectReplaceNode(BSONObj value) : val(value.getOwned()), _containsId(false) {
+ObjectReplaceExecutor::ObjectReplaceExecutor(BSONObj replacement)
+    : _replacementDoc(replacement.getOwned()), _containsId(false) {
 
     // Replace all zero-valued timestamps with the current time and check for the existence of _id.
-    for (auto&& elem : val) {
+    for (auto&& elem : _replacementDoc) {
 
         // Do not change the _id field.
         if (elem.fieldNameStringData() == kIdFieldName) {
@@ -69,7 +70,7 @@ ObjectReplaceNode::ObjectReplaceNode(BSONObj value) : val(value.getOwned()), _co
     }
 }
 
-UpdateExecutor::ApplyResult ObjectReplaceNode::applyReplacementUpdate(
+UpdateExecutor::ApplyResult ObjectReplaceExecutor::applyReplacementUpdate(
     ApplyParams applyParams, const BSONObj& replacementDoc, bool replacementDocContainsIdField) {
     auto originalDoc = applyParams.element.getDocument().getObject();
 
@@ -153,8 +154,8 @@ UpdateExecutor::ApplyResult ObjectReplaceNode::applyReplacementUpdate(
     return ApplyResult();
 }
 
-UpdateExecutor::ApplyResult ObjectReplaceNode::applyUpdate(ApplyParams applyParams) const {
-    return applyReplacementUpdate(applyParams, val, _containsId);
+UpdateExecutor::ApplyResult ObjectReplaceExecutor::applyUpdate(ApplyParams applyParams) const {
+    return applyReplacementUpdate(applyParams, _replacementDoc, _containsId);
 }
 
 }  // namespace mongo

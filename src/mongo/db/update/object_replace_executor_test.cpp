@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/update/object_replace_node.h"
+#include "mongo/db/update/object_replace_executor.h"
 
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
@@ -41,13 +41,13 @@
 namespace mongo {
 namespace {
 
-using ObjectReplaceNodeTest = UpdateNodeTest;
+using ObjectReplaceExecutorTest = UpdateNodeTest;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
-TEST_F(ObjectReplaceNodeTest, Noop) {
+TEST_F(ObjectReplaceExecutorTest, Noop) {
     auto obj = fromjson("{a: 1, b: 2}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{a: 1, b: 2}"));
     auto result = node.applyUpdate(getApplyParams(doc.root()));
@@ -58,9 +58,9 @@ TEST_F(ObjectReplaceNodeTest, Noop) {
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
+TEST_F(ObjectReplaceExecutorTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
     auto obj = fromjson("{a: 1, b: 2}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{c: 1, d: 2}"));
     auto result = node.applyUpdate(getApplyParams(doc.root()));
@@ -71,9 +71,9 @@ TEST_F(ObjectReplaceNodeTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
     ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, ShouldPreserveIdOfExistingDocumentIfIdNotSpecified) {
+TEST_F(ObjectReplaceExecutorTest, ShouldPreserveIdOfExistingDocumentIfIdNotSpecified) {
     auto obj = fromjson("{a: 1, b: 2}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0, c: 1, d: 2}"));
     auto result = node.applyUpdate(getApplyParams(doc.root()));
@@ -84,9 +84,9 @@ TEST_F(ObjectReplaceNodeTest, ShouldPreserveIdOfExistingDocumentIfIdNotSpecified
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, ShouldSucceedWhenImmutableIdIsNotModified) {
+TEST_F(ObjectReplaceExecutorTest, ShouldSucceedWhenImmutableIdIsNotModified) {
     auto obj = fromjson("{_id: 0, a: 1, b: 2}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0, c: 1, d: 2}"));
     addImmutablePath("_id");
@@ -98,9 +98,9 @@ TEST_F(ObjectReplaceNodeTest, ShouldSucceedWhenImmutableIdIsNotModified) {
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, IdTimestampNotModified) {
+TEST_F(ObjectReplaceExecutorTest, IdTimestampNotModified) {
     auto obj = fromjson("{_id: Timestamp(0,0)}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{}"));
     auto result = node.applyUpdate(getApplyParams(doc.root()));
@@ -111,9 +111,9 @@ TEST_F(ObjectReplaceNodeTest, IdTimestampNotModified) {
     ASSERT_EQUALS(fromjson("{_id: Timestamp(0,0)}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, NonIdTimestampsModified) {
+TEST_F(ObjectReplaceExecutorTest, NonIdTimestampsModified) {
     auto obj = fromjson("{a: Timestamp(0,0), b: Timestamp(0,0)}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{}"));
     auto result = node.applyUpdate(getApplyParams(doc.root()));
@@ -138,9 +138,9 @@ TEST_F(ObjectReplaceNodeTest, NonIdTimestampsModified) {
     ASSERT_EQUALS(doc, getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, ComplexDoc) {
+TEST_F(ObjectReplaceExecutorTest, ComplexDoc) {
     auto obj = fromjson("{a: 1, b: [0, 1, 2], c: {d: 1}}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{a: 1, b: [0, 2, 2], e: []}"));
     auto result = node.applyUpdate(getApplyParams(doc.root()));
@@ -151,9 +151,9 @@ TEST_F(ObjectReplaceNodeTest, ComplexDoc) {
     ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], c: {d: 1}}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, CannotRemoveImmutablePath) {
+TEST_F(ObjectReplaceExecutorTest, CannotRemoveImmutablePath) {
     auto obj = fromjson("{_id: 0, c: 1}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
@@ -164,9 +164,9 @@ TEST_F(ObjectReplaceNodeTest, CannotRemoveImmutablePath) {
                                 "field was found to have been removed --{ _id: 0, a: { b: 1 } }");
 }
 
-TEST_F(ObjectReplaceNodeTest, IdFieldIsNotRemoved) {
+TEST_F(ObjectReplaceExecutorTest, IdFieldIsNotRemoved) {
     auto obj = fromjson("{a: 1}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0, b: 1}"));
     addImmutablePath("_id");
@@ -178,9 +178,9 @@ TEST_F(ObjectReplaceNodeTest, IdFieldIsNotRemoved) {
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, CannotReplaceImmutablePathWithArrayField) {
+TEST_F(ObjectReplaceExecutorTest, CannotReplaceImmutablePathWithArrayField) {
     auto obj = fromjson("{_id: 0, a: [{b: 1}]}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
@@ -191,9 +191,9 @@ TEST_F(ObjectReplaceNodeTest, CannotReplaceImmutablePathWithArrayField) {
                                 "'a.b' was found to be an array or array descendant.");
 }
 
-TEST_F(ObjectReplaceNodeTest, CannotMakeImmutablePathArrayDescendant) {
+TEST_F(ObjectReplaceExecutorTest, CannotMakeImmutablePathArrayDescendant) {
     auto obj = fromjson("{_id: 0, a: [1]}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0, a: {'0': 1}}"));
     addImmutablePath("a.0");
@@ -204,9 +204,9 @@ TEST_F(ObjectReplaceNodeTest, CannotMakeImmutablePathArrayDescendant) {
                                 "'a.0' was found to be an array or array descendant.");
 }
 
-TEST_F(ObjectReplaceNodeTest, CannotModifyImmutablePath) {
+TEST_F(ObjectReplaceExecutorTest, CannotModifyImmutablePath) {
     auto obj = fromjson("{_id: 0, a: {b: 2}}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
@@ -217,9 +217,9 @@ TEST_F(ObjectReplaceNodeTest, CannotModifyImmutablePath) {
                                 "to have been altered to b: 2");
 }
 
-TEST_F(ObjectReplaceNodeTest, CannotModifyImmutableId) {
+TEST_F(ObjectReplaceExecutorTest, CannotModifyImmutableId) {
     auto obj = fromjson("{_id: 1}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0}"));
     addImmutablePath("_id");
@@ -230,9 +230,9 @@ TEST_F(ObjectReplaceNodeTest, CannotModifyImmutableId) {
                                 "to have been altered to _id: 1");
 }
 
-TEST_F(ObjectReplaceNodeTest, CanAddImmutableField) {
+TEST_F(ObjectReplaceExecutorTest, CanAddImmutableField) {
     auto obj = fromjson("{a: {b: 1}}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{c: 1}"));
     addImmutablePath("a.b");
@@ -244,9 +244,9 @@ TEST_F(ObjectReplaceNodeTest, CanAddImmutableField) {
     ASSERT_EQUALS(fromjson("{a: {b: 1}}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, CanAddImmutableId) {
+TEST_F(ObjectReplaceExecutorTest, CanAddImmutableId) {
     auto obj = fromjson("{_id: 0}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{c: 1}"));
     addImmutablePath("_id");
@@ -258,9 +258,9 @@ TEST_F(ObjectReplaceNodeTest, CanAddImmutableId) {
     ASSERT_EQUALS(fromjson("{_id: 0}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, CannotCreateDollarPrefixedNameWhenValidateForStorageIsTrue) {
+TEST_F(ObjectReplaceExecutorTest, CannotCreateDollarPrefixedNameWhenValidateForStorageIsTrue) {
     auto obj = fromjson("{a: {b: 1, $bad: 1}}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{}"));
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -270,9 +270,9 @@ TEST_F(ObjectReplaceNodeTest, CannotCreateDollarPrefixedNameWhenValidateForStora
         "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
 }
 
-TEST_F(ObjectReplaceNodeTest, CanCreateDollarPrefixedNameWhenValidateForStorageIsFalse) {
+TEST_F(ObjectReplaceExecutorTest, CanCreateDollarPrefixedNameWhenValidateForStorageIsFalse) {
     auto obj = fromjson("{a: {b: 1, $bad: 1}}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{}"));
     setValidateForStorage(false);
@@ -284,9 +284,9 @@ TEST_F(ObjectReplaceNodeTest, CanCreateDollarPrefixedNameWhenValidateForStorageI
     ASSERT_EQUALS(fromjson("{a: {b: 1, $bad: 1}}"), getLogDoc());
 }
 
-TEST_F(ObjectReplaceNodeTest, NoLogBuilder) {
+TEST_F(ObjectReplaceExecutorTest, NoLogBuilder) {
     auto obj = fromjson("{a: 1}");
-    ObjectReplaceNode node(obj);
+    ObjectReplaceExecutor node(obj);
 
     mutablebson::Document doc(fromjson("{b: 1}"));
     setLogBuilderToNull();

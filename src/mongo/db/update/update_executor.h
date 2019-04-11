@@ -31,6 +31,7 @@
 
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref_set.h"
+#include "mongo/db/pipeline/value.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
@@ -102,27 +103,15 @@ public:
     UpdateExecutor() = default;
     virtual ~UpdateExecutor() = default;
 
-    /**
-     * Set the collation. This is a noop if the UpdateExecutor subclass does not require a collator.
-     * If setCollator() is called, it is required that the current collator is the simple collator
-     * (nullptr). The collator must outlive the modifier interface. This is used to override the
-     * collation after obtaining a collection lock if the update did not specify a collation and the
-     * collection has a non-simple default collation.
-     */
-    virtual void setCollator(const CollatorInterface* collator) = 0;
+    virtual Value serialize() const = 0;
 
+    virtual void setCollator(const CollatorInterface* collator){};
 
     /**
      * Applies the update to 'applyParams.element'. Returns an ApplyResult specifying whether the
      * operation was a no-op and whether indexes are affected.
      */
     virtual ApplyResult applyUpdate(ApplyParams applyParams) const = 0;
-
-    /**
-     * This allows an arbitrary class to implement logic which gets dispatched to at runtime
-     * depending on the type of the UpdateExecutor.
-     */
-    virtual void acceptVisitor(UpdateNodeVisitor* visitor) = 0;
 };
 
 }  // namespace mongo

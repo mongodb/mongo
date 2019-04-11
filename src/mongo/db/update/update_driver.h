@@ -42,10 +42,11 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/update/modifier_table.h"
-#include "mongo/db/update/object_replace_node.h"
+#include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/pipeline_executor.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update/update_object_node.h"
+#include "mongo/db/update/update_tree_executor.h"
 #include "mongo/db/update_index_data.h"
 
 namespace mongo {
@@ -127,7 +128,17 @@ public:
      * implementing methods that operate on the nodes of the tree.
      */
     void visitRoot(UpdateNodeVisitor* visitor) {
-        _updateExecutor->acceptVisitor(visitor);
+        if (_updateType == UpdateType::kOperator) {
+            UpdateTreeExecutor* exec = static_cast<UpdateTreeExecutor*>(_updateExecutor.get());
+            invariant(exec);
+            return exec->getUpdateTree()->acceptVisitor(visitor);
+        }
+
+        MONGO_UNREACHABLE;
+    }
+
+    UpdateExecutor* getUpdateExecutor() {
+        return _updateExecutor.get();
     }
 
     //
@@ -178,16 +189,7 @@ public:
      * produce a logically equivalent update expression.
      */
     Value serialize() const {
-        switch (_updateType) {
-            case UpdateType::kReplacement:
-                return Value(static_cast<ObjectReplaceNode*>(_updateExecutor.get())->serialize());
-            case UpdateType::kPipeline:
-                return static_cast<PipelineExecutor*>(_updateExecutor.get())->serialize();
-            case UpdateType::kOperator:
-                return Value(static_cast<UpdateObjectNode*>(_updateExecutor.get())->serialize());
-            default:
-                MONGO_UNREACHABLE;
-        }
+        return _updateExecutor->serialize();
     }
 
     /**

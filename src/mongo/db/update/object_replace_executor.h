@@ -42,7 +42,7 @@ namespace mongo {
 /**
  * An UpdateExecutor representing a replacement-style update.
  */
-class ObjectReplaceNode : public UpdateExecutor {
+class ObjectReplaceExecutor : public UpdateExecutor {
 
 public:
     // Applies a replacement style update to 'applyParams.element'. If
@@ -56,9 +56,7 @@ public:
      * Initializes the node with the document to replace with. Any zero-valued timestamps (except
      * for the _id) are updated to the current time.
      */
-    explicit ObjectReplaceNode(BSONObj value);
-
-    void setCollator(const CollatorInterface* collator) final {}
+    explicit ObjectReplaceExecutor(BSONObj replacement);
 
     /**
      * Replaces the document that 'applyParams.element' belongs to with 'val'. If 'val' does not
@@ -68,19 +66,22 @@ public:
      */
     ApplyResult applyUpdate(ApplyParams applyParams) const final;
 
-    BSONObj serialize() const {
-        return val;
+    Value serialize() const final {
+        return Value(_replacementDoc);
     }
 
-    void acceptVisitor(UpdateNodeVisitor* visitor) final {
-        visitor->visit(this);
+    const BSONObj& getReplacement() const {
+        return _replacementDoc;
     }
 
-    // Object to replace with.
-    BSONObj val;
+    void setReplacement(BSONObj doc) {
+        _replacementDoc = std::move(doc);
+    }
 
 private:
-    // True if val contains an _id.
+    BSONObj _replacementDoc;
+
+    // True if '_replacementDoc' contains an _id.
     bool _containsId;
 };
 

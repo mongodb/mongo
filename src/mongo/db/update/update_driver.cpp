@@ -41,7 +41,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/db/update/modifier_table.h"
-#include "mongo/db/update/object_replace_node.h"
+#include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/util/embedded_builder.h"
@@ -165,9 +165,11 @@ void UpdateDriver::parse(
 
     // Check if the update expression is a full object replacement.
     if (isDocReplacement(updateMod)) {
-        uassert(ErrorCodes::FailedToParse, "multi update only works with $ operators", !multi);
+        uassert(ErrorCodes::FailedToParse,
+                "multi update is not supported for replacement-style update",
+                !multi);
 
-        _updateExecutor = stdx::make_unique<ObjectReplaceNode>(updateMod.getUpdateClassic());
+        _updateExecutor = stdx::make_unique<ObjectReplaceExecutor>(updateMod.getUpdateClassic());
 
         // Register the fact that this driver will only do full object replacements.
         _updateType = UpdateType::kReplacement;
@@ -192,7 +194,7 @@ void UpdateDriver::parse(
 
     auto root = stdx::make_unique<UpdateObjectNode>();
     _positional = parseUpdateExpression(updateExpr, root.get(), _expCtx, arrayFilters);
-    _updateExecutor = std::move(root);
+    _updateExecutor = stdx::make_unique<UpdateTreeExecutor>(std::move(root));
 }
 
 Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
@@ -261,7 +263,7 @@ Status UpdateDriver::update(StringData matchedField,
     _logDoc.reset();
     LogBuilder logBuilder(_logDoc.root());
 
-    UpdateNode::ApplyParams applyParams(doc->root(), immutablePaths);
+    UpdateExecutor::ApplyParams applyParams(doc->root(), immutablePaths);
     applyParams.matchedField = matchedField;
     applyParams.insert = isInsert;
     applyParams.fromOplogApplication = _fromOplogApplication;
@@ -305,11 +307,11 @@ Status UpdateDriver::update(StringData matchedField,
 }
 
 void UpdateDriver::setCollator(const CollatorInterface* collator) {
+    _expCtx->setCollator(collator);
+
     if (_updateExecutor) {
         _updateExecutor->setCollator(collator);
     }
-
-    _expCtx->setCollator(collator);
 }
 
 bool UpdateDriver::isDocReplacement(const write_ops::UpdateModification& updateMod) {

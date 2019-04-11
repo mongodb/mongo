@@ -34,7 +34,7 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/update/object_replace_node.h"
+#include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/storage_validation.h"
 
 namespace mongo {
@@ -80,7 +80,7 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
     auto transformedDoc = _pipeline->getNext()->toBson();
     auto transformedDocHasIdField = transformedDoc.hasField(kIdFieldName);
 
-    return ObjectReplaceNode::applyReplacementUpdate(
+    return ObjectReplaceExecutor::applyReplacementUpdate(
         applyParams, transformedDoc, transformedDocHasIdField);
 }
 
