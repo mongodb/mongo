@@ -39,3 +39,8 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        # We have historically had deadlocks occur due to lock acquisition issues involving the
+        # system running out of WiredTiger write tickets. We intentionally lower the number of
+        # WiredTiger write tickets available to below the maximum number of database clients to
+        # trigger this situation at least some of the time.
+        wiredTigerConcurrentWriteTransactions: 64
