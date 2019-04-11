@@ -90,10 +90,6 @@ public:
         return _indexPath;
     }
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
 private:
     DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          const FieldPath& fieldPath,

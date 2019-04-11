@@ -63,10 +63,6 @@ public:
         return DocumentSourceChangeStream::kStageName.rawData();
     }
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
 private:
     // This constructor is private, callers should use the 'create()' method above.
     DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>&,

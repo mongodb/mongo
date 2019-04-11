@@ -82,10 +82,6 @@ public:
         return MergingLogic{nullptr, this, change_stream_constants::kSortSpec};
     }
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
 private:
     /**
      * Use the create static method to create a DocumentSourceCloseCursor.

@@ -97,10 +97,6 @@ public:
         return boost::none;
     }
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
     // Return documents from front of queue.
     std::deque<GetNextResult> queue;
 

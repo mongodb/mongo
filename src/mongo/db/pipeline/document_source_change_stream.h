@@ -230,10 +230,6 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
 private:
     DocumentSourceOplogMatch(BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 };

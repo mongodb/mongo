@@ -96,10 +96,6 @@ public:
         _nToSkip = newSkip;
     }
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
 private:
     explicit DocumentSourceSkip(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                 long long nToSkip);

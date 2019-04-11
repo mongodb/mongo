@@ -162,10 +162,6 @@ public:
         return boost::none;
     }
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) {
-        visitor->visit(this);
-    }
-
 protected:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);

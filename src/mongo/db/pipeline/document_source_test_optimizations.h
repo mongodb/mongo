@@ -63,10 +63,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual void acceptVisitor(DocumentSourceVisitor* visitor) override {
-        visitor->visit(this);
-    }
-
 private:
     virtual Value serialize(boost::optional<ExplainOptions::Verbosity>) const override {
         MONGO_UNREACHABLE;

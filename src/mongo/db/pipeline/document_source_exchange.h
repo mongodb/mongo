@@ -247,10 +247,6 @@ public:
         return _consumerId;
     }
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
 private:
     boost::intrusive_ptr<Exchange> _exchange;
 

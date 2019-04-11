@@ -68,10 +68,6 @@ public:
 
     GetNextResult getNext() final;
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
 private:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 };

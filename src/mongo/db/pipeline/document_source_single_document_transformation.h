@@ -84,10 +84,6 @@ public:
         return _parsedTransform->isSubsetOfProjection(proj);
     }
 
-    void acceptVisitor(DocumentSourceVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
 protected:
     void doDispose() final;
 
