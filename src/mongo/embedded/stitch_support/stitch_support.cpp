@@ -619,11 +619,14 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
 uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update* const update,
                                                         stitch_support_v1_status* status) {
     return enterCXX(mongo::getStatusImpl(status), [=] {
-        mongo::FieldRefSet immutablePaths;  //  Empty set
         bool docWasModified = false;
 
         mongo::mutablebson::Document mutableDoc(mongo::BSONObj(),
                                                 mongo::mutablebson::Document::kInPlaceDisabled);
+
+        const mongo::FieldRef idFieldRef("_id");
+        mongo::FieldRefSet immutablePaths;
+        invariant(immutablePaths.insert(&idFieldRef));
 
         if (update->matcher) {
             uassertStatusOK(update->updateDriver.populateDocumentWithQueryFields(

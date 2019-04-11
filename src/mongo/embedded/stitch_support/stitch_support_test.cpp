@@ -474,6 +474,10 @@ TEST_F(StitchSupportTest, TestReplacementStyleUpdateReportsNoModifiedPaths) {
     ASSERT_EQ("[]", getModifiedPaths());
 }
 
+TEST_F(StitchSupportTest, TestReplacementStyleUpdatePreservesId) {
+    ASSERT_EQ("{ \"_id\" : 123, \"b\" : 789 }", checkUpdate("{b: 789}", "{_id: 123, a: 456}"));
+}
+
 TEST_F(StitchSupportTest, TestUpdateArrayElement) {
     ASSERT_EQ("{ \"a\" : [ 2, 2 ] }", checkUpdate("{$set: {'a.0': 2}}", "{a: [1, 2]}"));
     ASSERT_EQ("[a.0]", getModifiedPaths());
@@ -578,6 +582,14 @@ TEST_F(StitchSupportTest, TestUpsertEmptyMatcher) {
     ASSERT_EQ("{ \"b\" : 1 }", checkUpsert("{$inc: {b: 1}}", "{}"));
     ASSERT_EQ("{ \"a\" : 1 }", checkUpsert("{a: 1}", "{}"));
     ASSERT_EQ("{ \"a\" : [ { \"b\" : 2 }, false ] }", checkUpsert("{a: [{b: 2}, false]}", "{}"));
+}
+
+TEST_F(StitchSupportTest, TestUpsertWithReplacementUpdate) {
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : 2 }", checkUpsert("{a: 2}", "{_id: 1}"));
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : 2 }", checkUpsert("{a: 2}", "{$and: [{_id: 1}]}"));
+
+    // Upsert with replacement update ues the '_id' field from the query but not any other fields.
+    ASSERT_EQ("{ \"_id\" : 1, \"b\" : 4 }", checkUpsert("{b: 4}", "{_id: 1, a: 2, b: 3}"));
 }
 
 TEST_F(StitchSupportTest, TestUpsertProducesProperStatus) {
