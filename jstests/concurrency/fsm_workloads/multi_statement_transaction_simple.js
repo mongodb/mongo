@@ -19,13 +19,13 @@ var $config = (function() {
 
     var states = (function() {
 
-        function getAllDocuments(session, collection, numDocs) {
+        function getAllDocuments(session, collection, numDocs, txnHelperOptions) {
             let documents;
             withTxnAndAutoRetry(session, () => {
                 documents = collection.find().toArray();
 
                 assertWhenOwnColl.eq(numDocs, documents.length, () => tojson(documents));
-            });
+            }, txnHelperOptions);
             return documents;
         }
 
@@ -35,7 +35,9 @@ var $config = (function() {
 
         function checkMoneyBalance(db, collName) {
             const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-            const documents = getAllDocuments(this.session, collection, this.numAccounts);
+            const documents = getAllDocuments(this.session, collection, this.numAccounts, {
+                retryOnKilledSession: this.retryOnKilledSession
+            });
             assertWhenOwnColl.eq(this.numAccounts * this.initialValue,
                                  computeTotalOfAllBalances(documents),
                                  () => tojson(documents));
@@ -69,7 +71,7 @@ var $config = (function() {
                 assertAlways.commandWorked(res);
                 assertWhenOwnColl.eq(res.n, 1, () => tojson(res));
                 assertWhenOwnColl.eq(res.nModified, 1, () => tojson(res));
-            });
+            }, {retryOnKilledSession: this.retryOnKilledSession});
         }
 
         return {init: init, transferMoney: transferMoney, checkMoneyBalance: checkMoneyBalance};
@@ -113,7 +115,7 @@ var $config = (function() {
         startState: 'init',
         states: states,
         transitions: transitions,
-        data: {numAccounts: 20, initialValue: 2000},
+        data: {numAccounts: 20, initialValue: 2000, retryOnKilledSession: false},
         setup: setup,
         teardown: teardown
     };

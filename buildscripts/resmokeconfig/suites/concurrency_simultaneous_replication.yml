@@ -27,6 +27,7 @@ selector:
   # This workload kills random sessions and a different FSM workload wouldn't be able to handle
   # the error response from the op being killed.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_simple_kill_sessions.js
 
   # This workload may restart running transactions on a different client, causing deadlock if
   # there is a concurrent dropDatabase waiting for the global X lock.
