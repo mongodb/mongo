@@ -156,7 +156,7 @@ class Process(object):
                     # ERROR_INVALID_HANDLE (winerror=6)
                     # One of the above errors is received if the process has
                     # already died.
-                    if err[0] not in (2, 5, 6):
+                    if err.winerror not in (2, 5, 6):
                         raise
                 finally:
                     win32api.CloseHandle(mongo_signal_handle)
