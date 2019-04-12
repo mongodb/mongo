@@ -155,7 +155,7 @@ Status _applyOps(OperationContext* opCtx,
             // implicitly created on upserts. We detect both cases here and fail early with
             // NamespaceNotFound.
             // Additionally for inserts, we fail early on non-existent collections.
-            Lock::CollectionLock collectionLock(opCtx->lockState(), nss.ns(), MODE_IX);
+            Lock::CollectionLock collectionLock(opCtx, nss.ns(), MODE_IX);
             auto collection = db->getCollection(opCtx, nss);
             if (!collection && (*opType == 'i' || *opType == 'u')) {
                 uasserted(

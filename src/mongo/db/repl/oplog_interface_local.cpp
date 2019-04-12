@@ -58,7 +58,7 @@ private:
 
 OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx, const std::string& collectionName)
     : _dbLock(opCtx, nsToDatabase(collectionName), MODE_IS),
-      _collectionLock(opCtx->lockState(), collectionName, MODE_S),
+      _collectionLock(opCtx, collectionName, MODE_S),
       _ctx(opCtx, collectionName),
       _exec(InternalPlanner::collectionScan(opCtx,
                                             collectionName,

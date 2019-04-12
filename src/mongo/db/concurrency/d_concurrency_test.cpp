@@ -1177,7 +1177,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
     Lock::DBLock dbLock(opCtx.get(), "db1", MODE_IS);
 
     {
-        Lock::CollectionLock collLock(lockState, ns.ns(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx.get(), ns.ns(), MODE_IS);
 
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
         ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_IX));
@@ -1189,7 +1189,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
     }
 
     {
-        Lock::CollectionLock collLock(lockState, ns.ns(), MODE_S);
+        Lock::CollectionLock collLock(opCtx.get(), ns.ns(), MODE_S);
 
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
         ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_IX));
@@ -1208,7 +1208,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
     Lock::DBLock dbLock(opCtx.get(), "db1", MODE_IX);
 
     {
-        Lock::CollectionLock collLock(lockState, ns.ns(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx.get(), ns.ns(), MODE_IX);
 
         // TODO: This is TRUE because Lock::CollectionLock converts IX lock to X
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
@@ -1219,7 +1219,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
     }
 
     {
-        Lock::CollectionLock collLock(lockState, ns.ns(), MODE_X);
+        Lock::CollectionLock collLock(opCtx.get(), ns.ns(), MODE_X);
 
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IX));
@@ -1741,6 +1741,51 @@ TEST_F(DConcurrencyTestFixture, DBLockTimeoutDueToGlobalLock) {
     ASSERT_GTE(t2 - t1, Milliseconds(timeoutMillis));
 }
 
+TEST_F(DConcurrencyTestFixture, CollectionLockInInterruptedContextThrowsEvenWhenUncontested) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+
+    Lock::DBLock dbLock(opCtx, "db", MODE_IX);
+    opCtx->markKilled();
+
+    {
+        boost::optional<Lock::CollectionLock> collLock;
+        ASSERT_THROWS_CODE(collLock.emplace(opCtx, "db.coll", MODE_IX),
+                           AssertionException,
+                           ErrorCodes::Interrupted);
+    }
+}
+
+TEST_F(DConcurrencyTestFixture,
+       CollectionLockInInterruptedContextThrowsEvenWhenAcquiringRecursively) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+
+    Lock::DBLock dbLock(opCtx, "db", MODE_IX);
+    Lock::CollectionLock collLock(opCtx, "db.coll", MODE_IX);
+
+    opCtx->markKilled();
+
+    {
+        boost::optional<Lock::CollectionLock> recursiveCollLock;
+        ASSERT_THROWS_CODE(recursiveCollLock.emplace(opCtx, "db.coll", MODE_X),
+                           AssertionException,
+                           ErrorCodes::Interrupted);
+    }
+}
+
+TEST_F(DConcurrencyTestFixture, CollectionLockInInterruptedContextRespectsUninterruptibleGuard) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+
+    Lock::DBLock dbLock(opCtx, "db", MODE_IX);
+
+    opCtx->markKilled();
+
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    Lock::CollectionLock collLock(opCtx, "db.coll", MODE_IX);  // Does not throw.
+}
+
 TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
     auto clientOpctxPairs = makeKClientsWithLockers(2);
     auto opctx1 = clientOpctxPairs[0].second.get();
@@ -1750,15 +1795,14 @@ TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
 
     Lock::DBLock DBL1(opctx1, "testdb"_sd, MODE_IX, Date_t::max());
     ASSERT(opctx1->lockState()->isDbLockedForMode("testdb"_sd, MODE_IX));
-    Lock::CollectionLock CL1(opctx1->lockState(), "testdb.test"_sd, MODE_X, Date_t::max());
+    Lock::CollectionLock CL1(opctx1, "testdb.test"_sd, MODE_X, Date_t::max());
     ASSERT(opctx1->lockState()->isCollectionLockedForMode(NamespaceString("testdb.test"), MODE_X));
 
     Date_t t1 = Date_t::now();
     Lock::DBLock DBL2(opctx2, "testdb"_sd, MODE_IX, Date_t::max());
     ASSERT(opctx2->lockState()->isDbLockedForMode("testdb"_sd, MODE_IX));
     ASSERT_THROWS_CODE(
-        Lock::CollectionLock(
-            opctx2->lockState(), "testdb.test"_sd, MODE_X, Date_t::now() + timeoutMillis),
+        Lock::CollectionLock(opctx2, "testdb.test"_sd, MODE_X, Date_t::now() + timeoutMillis),
         AssertionException,
         ErrorCodes::LockTimeout);
     Date_t t2 = Date_t::now();

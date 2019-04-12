@@ -276,34 +276,30 @@ void Lock::DBLock::relockWithMode(LockMode newMode) {
 }
 
 
-Lock::CollectionLock::CollectionLock(Locker* lockState,
+Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
                                      StringData ns,
                                      LockMode mode,
                                      Date_t deadline)
-    : _id(RESOURCE_COLLECTION, ns), _result(LOCK_INVALID), _lockState(lockState) {
+    : _id(RESOURCE_COLLECTION, ns), _opCtx(opCtx) {
     massert(28538, "need a non-empty collection name", nsIsFull(ns));
 
-    dassert(_lockState->isDbLockedForMode(nsToDatabaseSubstring(ns),
-                                          isSharedLockMode(mode) ? MODE_IS : MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns),
+                                                  isSharedLockMode(mode) ? MODE_IS : MODE_IX));
     LockMode actualLockMode = mode;
     if (!supportsDocLocking()) {
         actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
     }
-
-    _lockState->lock(_id, actualLockMode, deadline);
-    _result = LOCK_OK;
+    _opCtx->lockState()->lock(_opCtx, _id, actualLockMode, deadline);
 }
 
 Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)
-    : _id(otherLock._id), _result(otherLock._result), _lockState(otherLock._lockState) {
-    otherLock._lockState = nullptr;
-    otherLock._result = LOCK_INVALID;
+    : _id(otherLock._id), _opCtx(otherLock._opCtx) {
+    otherLock._opCtx = nullptr;
 }
 
 Lock::CollectionLock::~CollectionLock() {
-    if (isLocked()) {
-        _lockState->unlock(_id);
-    }
+    if (_opCtx)
+        _opCtx->lockState()->unlock(_id);
 }
 
 namespace {

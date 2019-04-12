@@ -341,7 +341,7 @@ int _testRollbackDelete(OperationContext* opCtx,
     ASSERT_TRUE(rollbackSource.called);
 
     Lock::DBLock dbLock(opCtx, "test", MODE_S);
-    Lock::CollectionLock collLock(opCtx->lockState(), "test.t", MODE_S);
+    Lock::CollectionLock collLock(opCtx, "test.t", MODE_S);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, "test");
     ASSERT_TRUE(db);

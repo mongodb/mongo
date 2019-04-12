@@ -123,7 +123,7 @@ public:
         }
 
         AutoGetDb ctx(opCtx, nss.db(), MODE_IX);
-        auto collLk = stdx::make_unique<Lock::CollectionLock>(opCtx->lockState(), nss.ns(), MODE_X);
+        auto collLk = stdx::make_unique<Lock::CollectionLock>(opCtx, nss.ns(), MODE_X);
         Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : NULL;
         if (!collection) {
             if (ctx.getDb() && ViewCatalog::get(ctx.getDb())->lookup(opCtx, nss.ns())) {

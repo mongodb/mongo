@@ -401,7 +401,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Collection scan and insert into index, followed by a drain of writes received in the
     // background.
     {
-        Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IX);
+        Lock::CollectionLock colLock(opCtx, ns.ns(), MODE_IX);
         uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
     }
 
@@ -413,7 +413,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Perform the first drain while holding an intent lock.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IS);
+        Lock::CollectionLock colLock(opCtx, ns.ns(), MODE_IS);
 
         // Read at a point in time so that the drain, which will timestamp writes at lastApplied,
         // can never commit writes earlier than its read timestamp.
@@ -428,7 +428,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
+        Lock::CollectionLock colLock(opCtx, ns.ns(), MODE_S);
 
         uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
     }

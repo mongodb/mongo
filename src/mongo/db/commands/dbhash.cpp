@@ -279,7 +279,7 @@ private:
             // reading from the consistent snapshot doesn't overlap with any catalog operations on
             // the collection.
             invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IS));
-            collLock.emplace(opCtx->lockState(), fullCollectionName, MODE_IS);
+            collLock.emplace(opCtx, fullCollectionName, MODE_IS);
 
             auto minSnapshot = collection->getMinimumVisibleSnapshot();
             auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();

@@ -232,7 +232,7 @@ void insertDoc(OperationContext* optCtx, const NamespaceString nss, StringData i
     auto storageInterface = repl::StorageInterface::get(optCtx);
 
     Lock::DBLock dblk(optCtx, nss.db(), MODE_IS);
-    Lock::CollectionLock lk(optCtx->lockState(), nss.ns(), MODE_IS);
+    Lock::CollectionLock lk(optCtx, nss.ns(), MODE_IS);
 
     BSONObj fakeDoc = BSON("_id" << id);
     BSONElement elementKey = fakeDoc.firstElement();

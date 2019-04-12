@@ -140,7 +140,7 @@ Status _doTxn(OperationContext* opCtx,
                     str::stream() << "cannot find collection uuid " << uuidStatus.getValue(),
                     !nss.isEmpty());
         }
-        Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss.ns(), MODE_IX);
         auto collection = db->getCollection(opCtx, nss);
 
         // When processing an update on a non-existent collection, applyOperation_inlock()

@@ -358,21 +358,16 @@ public:
         CollectionLock& operator=(const CollectionLock&) = delete;
 
     public:
-        CollectionLock(Locker* lockState,
+        CollectionLock(OperationContext* opCtx,
                        StringData ns,
                        LockMode mode,
                        Date_t deadline = Date_t::max());
         CollectionLock(CollectionLock&&);
         ~CollectionLock();
 
-        bool isLocked() const {
-            return _result == LOCK_OK;
-        }
-
     private:
         const ResourceId _id;
-        LockResult _result;
-        Locker* _lockState;
+        OperationContext* _opCtx;
     };
 
     /**

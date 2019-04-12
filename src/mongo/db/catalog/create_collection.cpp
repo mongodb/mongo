@@ -58,10 +58,10 @@ Status _createView(OperationContext* opCtx,
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock systemViewsLock(
-            opCtx->lockState(),
+            opCtx,
             NamespaceString(nss.db(), NamespaceString::kSystemDotViewsCollectionName).toString(),
             MODE_X);
-        Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss.ns(), MODE_IX);
 
         Database* db = autoDb.getDb();
 

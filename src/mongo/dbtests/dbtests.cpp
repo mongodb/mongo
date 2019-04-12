@@ -132,7 +132,7 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     : _opCtx(opCtx), _nss(ns) {
     // Lock the database and collection
     _autoCreateDb.emplace(opCtx, _nss.db(), MODE_IX);
-    _collLock.emplace(opCtx->lockState(), _nss.ns(), MODE_IX);
+    _collLock.emplace(opCtx, _nss.ns(), MODE_IX);
 
     const bool doShardVersionCheck = false;
 

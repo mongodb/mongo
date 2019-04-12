@@ -153,7 +153,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                 break;
             }
 
-            Lock::CollectionLock collLock(opCtx->lockState(), db->getProfilingNS(), MODE_IX);
+            Lock::CollectionLock collLock(opCtx, db->getProfilingNS(), MODE_IX);
 
             Collection* const coll = db->getCollection(opCtx, db->getProfilingNS());
             if (coll) {

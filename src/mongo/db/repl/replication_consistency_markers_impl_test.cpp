@@ -69,7 +69,7 @@ NamespaceString makeNamespace(const T& t, const std::string& suffix = "") {
 BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minValidNss) {
     return writeConflictRetry(opCtx, "getMinValidDocument", minValidNss.ns(), [opCtx, minValidNss] {
         Lock::DBLock dblk(opCtx, minValidNss.db(), MODE_IS);
-        Lock::CollectionLock lk(opCtx->lockState(), minValidNss.ns(), MODE_IS);
+        Lock::CollectionLock lk(opCtx, minValidNss.ns(), MODE_IS);
         BSONObj mv;
         if (Helpers::getSingleton(opCtx, minValidNss.ns().c_str(), mv)) {
             return mv;
@@ -89,7 +89,7 @@ BSONObj getOplogTruncateAfterPointDocument(OperationContext* opCtx,
         oplogTruncateAfterPointNss.ns(),
         [opCtx, oplogTruncateAfterPointNss] {
             Lock::DBLock dblk(opCtx, oplogTruncateAfterPointNss.db(), MODE_IS);
-            Lock::CollectionLock lk(opCtx->lockState(), oplogTruncateAfterPointNss.ns(), MODE_IS);
+            Lock::CollectionLock lk(opCtx, oplogTruncateAfterPointNss.ns(), MODE_IS);
             BSONObj mv;
             if (Helpers::getSingleton(opCtx, oplogTruncateAfterPointNss.ns().c_str(), mv)) {
                 return mv;

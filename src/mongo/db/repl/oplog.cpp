@@ -600,7 +600,7 @@ OpTime logOp(OperationContext* opCtx,
     boost::optional<Lock::CollectionLock> collWriteLock;
     if (!opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
         dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, MODE_IX);
-        collWriteLock.emplace(opCtx->lockState(), oplogInfo.oplogName, MODE_IX);
+        collWriteLock.emplace(opCtx, oplogInfo.oplogName, MODE_IX);
     }
 
     auto const oplog = oplogInfo.oplog;
@@ -661,7 +661,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     boost::optional<Lock::CollectionLock> collWriteLock;
     if (!opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
         dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, MODE_IX);
-        collWriteLock.emplace(opCtx->lockState(), oplogInfo.oplogName, MODE_IX);
+        collWriteLock.emplace(opCtx, oplogInfo.oplogName, MODE_IX);
     }
 
     auto oplog = oplogInfo.oplog;

@@ -66,8 +66,8 @@ Status _dropView(OperationContext* opCtx,
     if (!view) {
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
-    Lock::CollectionLock systemViewsLock(opCtx->lockState(), db->getSystemViewsName(), MODE_X);
-    Lock::CollectionLock collLock(opCtx->lockState(), collectionName.ns(), MODE_IX);
+    Lock::CollectionLock systemViewsLock(opCtx, db->getSystemViewsName(), MODE_X);
+    Lock::CollectionLock collLock(opCtx, collectionName.ns(), MODE_IX);
 
     if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
         log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "

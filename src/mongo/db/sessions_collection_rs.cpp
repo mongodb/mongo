@@ -89,8 +89,7 @@ auto runIfStandaloneOrPrimary(const NamespaceString& ns, OperationContext* opCtx
     bool isStandaloneOrPrimary;
     {
         Lock::DBLock lk(opCtx, ns.db(), MODE_IS);
-        Lock::CollectionLock lock(
-            opCtx->lockState(), NamespaceString::kLogicalSessionsNamespace.ns(), MODE_IS);
+        Lock::CollectionLock lock(opCtx, NamespaceString::kLogicalSessionsNamespace.ns(), MODE_IS);
 
         auto coord = mongo::repl::ReplicationCoordinator::get(opCtx);
 

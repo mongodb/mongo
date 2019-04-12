@@ -86,7 +86,7 @@ protected:
         lockDb(MODE_IX);
         invariant(_opCtx.lockState()->isDbLockedForMode(_nss.db(), MODE_IX));
         std::unique_ptr<Lock::CollectionLock> lock =
-            stdx::make_unique<Lock::CollectionLock>(_opCtx.lockState(), _nss.ns(), MODE_X);
+            stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss.ns(), MODE_X);
         invariant(_opCtx.lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
         Database* db = _autoDb.get()->getDb();

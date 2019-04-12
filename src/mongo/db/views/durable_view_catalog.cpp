@@ -77,7 +77,7 @@ Status DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callbac
     if (!systemViews)
         return Status::OK();
 
-    Lock::CollectionLock lk(opCtx->lockState(), _db->getSystemViewsName(), MODE_IS);
+    Lock::CollectionLock lk(opCtx, _db->getSystemViewsName(), MODE_IS);
     auto cursor = systemViews->getCursor(opCtx);
     while (auto record = cursor->next()) {
         RecordData& data = record->data;

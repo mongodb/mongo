@@ -85,7 +85,7 @@ public:
             uassert(50962,
                     "lockTarget is not a valid namespace",
                     NamespaceString::validCollectionComponent(ns));
-            Lock::CollectionLock lk(opCtx->lockState(), ns, mode, Date_t::max());
+            Lock::CollectionLock lk(opCtx, ns, mode, Date_t::max());
             opCtx->sleepFor(Milliseconds(millis));
         }
     }

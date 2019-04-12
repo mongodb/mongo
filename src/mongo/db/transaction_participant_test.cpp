@@ -1390,7 +1390,7 @@ TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
         // Simulate the locking of an insert.
         {
             Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
-            Lock::CollectionLock collLock(opCtx()->lockState(), "test.foo", MODE_IX);
+            Lock::CollectionLock collLock(opCtx(), "test.foo", MODE_IX);
         }
         txnParticipant.prepareTransaction(opCtx(), repl::OpTime({1, 1}, 1));
         txnParticipant.stashTransactionResources(opCtx());

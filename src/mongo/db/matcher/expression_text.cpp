@@ -57,7 +57,7 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
     {
         // Find text index.
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
-        Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx, nss.ns(), MODE_IS);
         Database* db = autoDb.getDb();
 
         uassert(ErrorCodes::IndexNotFound,
