@@ -21,6 +21,8 @@ except Exception as e:
     print("Failed to load the libstdc++ pretty printers: " + str(e))
 # pylint: enable=invalid-name,wildcard-import
 
+if sys.version_info[0] < 3:
+    raise gdb.GdbError("MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
 
 def get_process_name():
     """Return the main binary we are attached to."""

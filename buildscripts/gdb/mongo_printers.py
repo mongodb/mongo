@@ -17,6 +17,9 @@ except ImportError as err:
     print("Check with the pip command if pymongo 3.x is installed.")
     bson = None
 
+if sys.version_info[0] < 3:
+    raise gdb.GdbError("MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
+
 
 def get_unique_ptr(obj):
     """Read the value of a libstdc++ std::unique_ptr."""
