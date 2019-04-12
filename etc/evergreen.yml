@@ -11441,6 +11441,7 @@ buildvariants:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl --use-cpu-profiler MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
     has_packages: false
+    mh_target: ""
   tasks:
   - name: compile_all_run_unittests_TG
   - name: jsCore
