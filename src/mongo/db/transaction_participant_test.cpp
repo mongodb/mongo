@@ -2263,8 +2263,8 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponS
     CurOp::get(opCtx())->debug().additiveMetrics.keysDeleted = 0;
     txnParticipant.getSingleTransactionStatsForTest()
         .getOpDebug()
-        ->additiveMetrics.prepareReadConflicts = 5;
-    CurOp::get(opCtx())->debug().additiveMetrics.prepareReadConflicts = 4;
+        ->additiveMetrics.prepareReadConflicts.store(5);
+    CurOp::get(opCtx())->debug().additiveMetrics.prepareReadConflicts.store(4);
 
     auto additiveMetricsToCompare =
         txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics;
@@ -2301,11 +2301,12 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponC
     CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
     txnParticipant.getSingleTransactionStatsForTest()
         .getOpDebug()
-        ->additiveMetrics.prepareReadConflicts = 0;
-    CurOp::get(opCtx())->debug().additiveMetrics.prepareReadConflicts = 0;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.writeConflicts =
-        6;
-    CurOp::get(opCtx())->debug().additiveMetrics.writeConflicts = 3;
+        ->additiveMetrics.prepareReadConflicts.store(0);
+    CurOp::get(opCtx())->debug().additiveMetrics.prepareReadConflicts.store(0);
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->additiveMetrics.writeConflicts.store(6);
+    CurOp::get(opCtx())->debug().additiveMetrics.writeConflicts.store(3);
 
     auto additiveMetricsToCompare =
         txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics;
@@ -2340,9 +2341,10 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponA
     CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
     txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysDeleted = 6;
     CurOp::get(opCtx())->debug().additiveMetrics.keysDeleted = 0;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.writeConflicts =
-        3;
-    CurOp::get(opCtx())->debug().additiveMetrics.writeConflicts = 3;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->additiveMetrics.writeConflicts.store(3);
+    CurOp::get(opCtx())->debug().additiveMetrics.writeConflicts.store(3);
 
     auto additiveMetricsToCompare =
         txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics;
@@ -2770,8 +2772,8 @@ void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
     CurOp::get(opCtx)->debug().additiveMetrics.ndeleted = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.keysInserted = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.keysDeleted = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.prepareReadConflicts = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.writeConflicts = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.prepareReadConflicts.store(metricValue);
+    CurOp::get(opCtx)->debug().additiveMetrics.writeConflicts.store(metricValue);
 }
 
 /*

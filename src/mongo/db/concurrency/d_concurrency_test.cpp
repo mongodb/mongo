@@ -134,14 +134,14 @@ TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflict
     auto opCtx = makeOperationContext();
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
     auto&& opDebug = CurOp::get(opCtx.get())->debug();
-    ASSERT_EQUALS(boost::none, opDebug.additiveMetrics.writeConflicts);
+    ASSERT_EQUALS(0, opDebug.additiveMetrics.writeConflicts.load());
     ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", "", [&opDebug] {
-                      if (!opDebug.additiveMetrics.writeConflicts) {
+                      if (0 == opDebug.additiveMetrics.writeConflicts.load()) {
                           throw WriteConflictException();
                       }
                       return 100;
                   }));
-    ASSERT_EQUALS(1LL, *opDebug.additiveMetrics.writeConflicts);
+    ASSERT_EQUALS(1LL, opDebug.additiveMetrics.writeConflicts.load());
 }
 
 TEST_F(DConcurrencyTestFixture, WriteConflictRetryPropagatesNonWriteConflictException) {
