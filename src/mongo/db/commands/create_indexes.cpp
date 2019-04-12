@@ -203,17 +203,17 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
 
 /**
  * Returns a vector of index specs with the filled in collection default options and removes any
- * indexes that already exist on the collection. If the returned vector is empty after returning, no
- * new indexes need to be built. Throws on error.
+ * indexes that already exist on the collection -- both ready indexes and in-progress builds. If the
+ * returned vector is empty after returning, no new indexes need to be built. Throws on error.
  */
 std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* opCtx,
                                                              const Collection* collection,
-                                                             std::vector<BSONObj> validatedSpecs) {
-    auto swDefaults = collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, validatedSpecs);
+                                                             std::vector<BSONObj> indexSpecs) {
+    auto swDefaults = collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs);
     uassertStatusOK(swDefaults.getStatus());
 
     auto indexCatalog = collection->getIndexCatalog();
-    return indexCatalog->removeExistingIndexes(opCtx, swDefaults.getValue(), /*throwOnError=*/true);
+    return indexCatalog->removeExistingIndexes(opCtx, swDefaults.getValue());
 }
 
 void checkUniqueIndexConstraints(OperationContext* opCtx,

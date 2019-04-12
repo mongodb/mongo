@@ -351,21 +351,41 @@ public:
     virtual StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* const opCtx,
                                                              const BSONObj spec) = 0;
 
+    /**
+     * Checks the spec 'original' to make sure nothing is incorrectly set and cleans up any legacy
+     * fields. Lastly, checks whether the spec conflicts with ready and in-progress indexes.
+     *
+     * Returns an error Status or the cleaned up version of the non-conflicting spec. Returns
+     * IndexAlreadyExists if the index either already exists or is already being built.
+     */
     virtual StatusWith<BSONObj> prepareSpecForCreate(OperationContext* const opCtx,
                                                      const BSONObj& original) const = 0;
 
     /**
-     * Returns a copy of 'indexSpecsToBuild' that does not contain index specifications already
-     * existing in this index catalog. If this isn't done, an index build using 'indexSpecsToBuild'
-     * may fail with error code IndexAlreadyExists.
+     * Returns a copy of 'indexSpecsToBuild' that does not contain index specifications that already
+     * exist or are already being built. If this is not done, an index build using
+     * 'indexSpecsToBuild' may fail with error code IndexAlreadyExists. If {buildIndexes:false} is
+     * set in the replica set config, also filters non-_id index specs out of the results.
      *
-     * If 'throwOnErrors' is set to true, any validation errors on a non-duplicate index
-     * will result in this function throwing an exception.
+     * Additionally verifies the specs are valid and corrects any legacy fields. Throws on any spec
+     * validation errors or conflicts other than IndexAlreadyExists, which indicates that the index
+     * spec either already exists or is already being built and is what this function filters out.
      */
     virtual std::vector<BSONObj> removeExistingIndexes(
-        OperationContext* const opCtx,
-        const std::vector<BSONObj>& indexSpecsToBuild,
-        bool throwOnErrors = false) const = 0;
+        OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const = 0;
+
+    /**
+     * Filters out ready and in-progress indexes that already exist and returns the remaining
+     * indexes. Additionally filters out non-_id indexes if the replica set member config has
+     * {buildIndexes:false} set.
+     *
+     * Does no correctness verification of the provided specs, nor modifications for legacy reasons.
+     *
+     * This should only be used when we are confident in the specs, such as when specs are received
+     * via replica set cloning or chunk migrations.
+     */
+    virtual std::vector<BSONObj> removeExistingIndexesNoChecks(
+        OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const = 0;
 
     /**
      * Drops all indexes in the index catalog, optionally dropping the id index depending on the

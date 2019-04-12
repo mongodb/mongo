@@ -147,9 +147,15 @@ public:
         return original;
     }
 
-    std::vector<BSONObj> removeExistingIndexes(OperationContext* const opCtx,
-                                               const std::vector<BSONObj>& indexSpecsToBuild,
-                                               bool throwOnErrors) const override {
+    std::vector<BSONObj> removeExistingIndexes(
+        OperationContext* const opCtx,
+        const std::vector<BSONObj>& indexSpecsToBuild) const override {
+        return {};
+    }
+
+    std::vector<BSONObj> removeExistingIndexesNoChecks(
+        OperationContext* const opCtx,
+        const std::vector<BSONObj>& indexSpecsToBuild) const override {
         return {};
     }
 

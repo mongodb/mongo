@@ -619,7 +619,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
         // possible).
         auto checkEmptyOrGetMissingIndexesFromDonor = [&](Collection* collection) {
             auto indexCatalog = collection->getIndexCatalog();
-            auto indexSpecs = indexCatalog->removeExistingIndexes(opCtx, donorIndexSpecs);
+            auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(opCtx, donorIndexSpecs);
             if (!indexSpecs.empty()) {
                 // Only allow indexes to be copied if the collection does not have any documents.
                 uassert(ErrorCodes::CannotCreateCollection,

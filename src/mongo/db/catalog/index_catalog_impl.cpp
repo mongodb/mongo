@@ -149,7 +149,7 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
     bool initFromDisk,
     bool isReadyIndex) {
     Status status = _isSpecOk(opCtx, descriptor->infoObj());
-    if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
+    if (!status.isOK()) {
         severe() << "Found an invalid index " << descriptor->infoObj() << " on the "
                  << _collection->ns() << " collection: " << redact(status);
         fassertFailedNoTrace(28782);
@@ -284,43 +284,98 @@ string IndexCatalogImpl::_getAccessMethodName(const BSONObj& keyPattern) const {
 
 // ---------------------------
 
-StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opCtx,
-                                                           const BSONObj& original) const {
+StatusWith<BSONObj> IndexCatalogImpl::_validateAndFixIndexSpec(OperationContext* opCtx,
+                                                               const BSONObj& original) const {
     Status status = _isSpecOk(opCtx, original);
-    if (!status.isOK())
-        return StatusWith<BSONObj>(status);
+    if (!status.isOK()) {
+        return status;
+    }
 
-    auto fixed = _fixIndexSpec(opCtx, _collection, original);
-    if (!fixed.isOK()) {
-        return fixed;
+    auto swFixed = _fixIndexSpec(opCtx, _collection, original);
+    if (!swFixed.isOK()) {
+        return swFixed;
     }
 
     // we double check with new index spec
-    status = _isSpecOk(opCtx, fixed.getValue());
-    if (!status.isOK())
-        return StatusWith<BSONObj>(status);
+    status = _isSpecOk(opCtx, swFixed.getValue());
+    if (!status.isOK()) {
+        return status;
+    }
 
-    status = _doesSpecConflictWithExisting(opCtx, fixed.getValue());
-    if (!status.isOK())
-        return StatusWith<BSONObj>(status);
+    return swFixed;
+}
 
-    return fixed;
+Status IndexCatalogImpl::_isNonIDIndexAndNotAllowedToBuild(OperationContext* opCtx,
+                                                           const BSONObj& spec) const {
+    const BSONObj key = spec.getObjectField("key");
+    invariant(!key.isEmpty());
+    if (!IndexDescriptor::isIdIndexPattern(key)) {
+        // Check whether the replica set member's config has {buildIndexes:false} set, which means
+        // we are not allowed to build non-_id indexes on this server.
+        if (!repl::ReplicationCoordinator::get(opCtx)->buildsIndexes()) {
+            // We return an IndexAlreadyExists error so that the caller can catch it and silently
+            // skip building it.
+            return Status(ErrorCodes::IndexAlreadyExists,
+                          "this replica set member's 'buildIndexes' setting is set to false");
+        }
+    }
+
+    return Status::OK();
+}
+
+StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opCtx,
+                                                           const BSONObj& original) const {
+    auto swValidatedAndFixed = _validateAndFixIndexSpec(opCtx, original);
+    if (!swValidatedAndFixed.isOK()) {
+        return swValidatedAndFixed.getStatus();
+    }
+
+    // Check whether this is a non-_id index and there are any settings disallowing this server
+    // from building non-_id indexes.
+    Status status = _isNonIDIndexAndNotAllowedToBuild(opCtx, swValidatedAndFixed.getValue());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = _doesSpecConflictWithExisting(opCtx, swValidatedAndFixed.getValue());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return swValidatedAndFixed.getValue();
+}
+
+std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
+    OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const {
+    std::vector<BSONObj> result;
+    // Filter out ready and in-progress index builds, and any non-_id indexes if 'buildIndexes' is
+    // set to false in the replica set's config.
+    for (const auto& spec : indexSpecsToBuild) {
+        // returned to be built by the caller.
+        if (ErrorCodes::OK != _isNonIDIndexAndNotAllowedToBuild(opCtx, spec)) {
+            continue;
+        }
+
+        // _doesSpecConflictWithExisting currently does more work than we require here: we are only
+        // interested in the index already exists error.
+        if (ErrorCodes::IndexAlreadyExists == _doesSpecConflictWithExisting(opCtx, spec)) {
+            continue;
+        }
+
+        result.push_back(spec);
+    }
+    return result;
 }
 
 std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexes(
-    OperationContext* const opCtx,
-    const std::vector<BSONObj>& indexSpecsToBuild,
-    bool throwOnErrors) const {
+    OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const {
     std::vector<BSONObj> result;
     for (const auto& spec : indexSpecsToBuild) {
         auto prepareResult = prepareSpecForCreate(opCtx, spec);
         if (prepareResult == ErrorCodes::IndexAlreadyExists) {
             continue;
         }
-        // Intentionally ignoring other error codes unless 'throwOnErrors' is true.
-        if (throwOnErrors) {
-            uassertStatusOK(prepareResult);
-        }
+        uassertStatusOK(prepareResult);
         result.push_back(spec);
     }
     return result;
@@ -446,11 +501,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 
     if (nss.isOplog())
         return Status(ErrorCodes::CannotCreateIndex, "cannot have an index on the oplog");
-
-    if (nss.coll() == "$freelist") {
-        // this isn't really proper, but we never want it and its not an error per se
-        return Status(ErrorCodes::IndexAlreadyExists, "cannot index freelist");
-    }
 
     const BSONElement specNamespace = spec["ns"];
     if (specNamespace.type() != String)
@@ -621,13 +671,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
             return Status(ErrorCodes::CannotCreateIndex,
                           "_id index must have the collection default collation");
         }
-    } else {
-        // for non _id indexes, we check to see if replication has turned off all indexes
-        // we _always_ created _id index
-        if (!repl::ReplicationCoordinator::get(opCtx)->buildsIndexes()) {
-            // this is not exactly the right error code, but I think will make the most sense
-            return Status(ErrorCodes::IndexAlreadyExists, "no indexes per repl");
-        }
     }
 
     // --- only storage engine checks allowed below this ----
@@ -666,8 +709,8 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     const BSONObj collation = spec.getObjectField("collation");
 
     {
-        // Check both existing and in-progress indexes (2nd param = true)
-        const IndexDescriptor* desc = findIndexByName(opCtx, name, true);
+        const IndexDescriptor* desc =
+            findIndexByName(opCtx, name, true /*includeUnfinishedIndexes*/);
         if (desc) {
             // index already exists with same name
 
@@ -711,10 +754,8 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     }
 
     {
-        // Check both existing and in-progress indexes.
-        const bool findInProgressIndexes = true;
-        const IndexDescriptor* desc =
-            findIndexByKeyPatternAndCollationSpec(opCtx, key, collation, findInProgressIndexes);
+        const IndexDescriptor* desc = findIndexByKeyPatternAndCollationSpec(
+            opCtx, key, collation, true /*includeUnfinishedIndexes*/);
         if (desc) {
             LOG(2) << "Index already exists with a different name: " << name << " pattern: " << key
                    << " collation: " << collation;

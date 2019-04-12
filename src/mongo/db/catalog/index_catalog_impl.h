@@ -191,9 +191,13 @@ public:
     StatusWith<BSONObj> prepareSpecForCreate(OperationContext* opCtx,
                                              const BSONObj& original) const override;
 
-    std::vector<BSONObj> removeExistingIndexes(OperationContext* const opCtx,
-                                               const std::vector<BSONObj>& indexSpecsToBuild,
-                                               bool throwOnErrors) const override;
+    std::vector<BSONObj> removeExistingIndexes(
+        OperationContext* const opCtx,
+        const std::vector<BSONObj>& indexSpecsToBuild) const override;
+
+    std::vector<BSONObj> removeExistingIndexesNoChecks(
+        OperationContext* const opCtx,
+        const std::vector<BSONObj>& indexSpecsToBuild) const override;
 
     /**
      * Drops all indexes in the index catalog, optionally dropping the id index depending on the
@@ -420,17 +424,38 @@ private:
                                                 bool initFromDisk,
                                                 bool isReadyIndex);
 
-    // Apply a set of transformations to the user-provided index object 'spec' to make it
-    // conform to the standard for insertion.  This function adds the 'v' field if it didn't
-    // exist, removes the '_id' field if it exists, applies plugin-level transformations if
-    // appropriate, etc.
+    /**
+     * Applies a set of transformations to the user-provided index object 'spec' to make it
+     * conform to the standard for insertion.  Removes the '_id' field if it exists, applies
+     * plugin-level transformations if appropriate, etc.
+     */
     StatusWith<BSONObj> _fixIndexSpec(OperationContext* opCtx,
                                       Collection* collection,
                                       const BSONObj& spec) const;
 
     Status _isSpecOk(OperationContext* opCtx, const BSONObj& spec) const;
 
+    /**
+     * Validates the 'original' index specification, alters any legacy fields and does plugin-level
+     * transformations for text and geo indexes. Returns a clean spec ready to be built, or an
+     * error.
+     */
+    StatusWith<BSONObj> _validateAndFixIndexSpec(OperationContext* opCtx,
+                                                 const BSONObj& original) const;
+
+    /**
+     * Checks whether there are any spec conflicts with existing ready indexes or in-progress index
+     * builds. Also checks whether any limits set on this server would be exceeded by building the
+     * index.
+     */
     Status _doesSpecConflictWithExisting(OperationContext* opCtx, const BSONObj& spec) const;
+
+    /**
+     * Returns true if the replica set member's config has {buildIndexes:false} set, which means
+     * we are not allowed to build non-_id indexes on this server, AND this index spec is for a
+     * non-_id index.
+     */
+    Status _isNonIDIndexAndNotAllowedToBuild(OperationContext* opCtx, const BSONObj& spec) const;
 
     int _magic;
     Collection* const _collection;

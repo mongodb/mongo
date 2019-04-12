@@ -1130,8 +1130,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::_addDefaultsAndFilterExistingIndexe
         uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs));
 
     auto indexCatalog = collection->getIndexCatalog();
-    auto filteredSpecs = indexCatalog->removeExistingIndexes(
-        opCtx, specsWithCollationDefaults, /*throwOnError=*/true);
+    auto filteredSpecs = indexCatalog->removeExistingIndexes(opCtx, specsWithCollationDefaults);
 
     for (const BSONObj& spec : filteredSpecs) {
         if (spec[kUniqueFieldName].trueValue()) {

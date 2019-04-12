@@ -394,7 +394,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     }
 
     auto indexCatalog = collection->getIndexCatalog();
-    auto prunedIndexesToBuild = indexCatalog->removeExistingIndexes(opCtx, indexesToBuild);
+    auto prunedIndexesToBuild = indexCatalog->removeExistingIndexesNoChecks(opCtx, indexesToBuild);
     if (prunedIndexesToBuild.empty()) {
         return;
     }
