@@ -200,6 +200,40 @@
     thread.join();
     assert.commandWorked(thread.returnData());
 
+    // Re-create the collection for later test cases.
+    assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
+
+    jsTest.log("Network errors for in-progress statements should be transient");
+    session.startTransaction();
+    assert.commandWorked(testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.HostUnreachable, failCommands: ["aggregate"]}
+    }));
+    res = sessionDb.runCommand({aggregate: collName, pipeline: [{$match: {}}], cursor: {}});
+    assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
+    session.abortTransaction_forTesting();
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+
+    jsTest.log("Network errors for commit should not be transient");
+    session.startTransaction();
+    assert.commandWorked(sessionColl.insert({_id: "commitTransaction-network-error"}));
+    assert.commandWorked(testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.HostUnreachable, failCommands: ["commitTransaction"]}
+    }));
+    res = sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(session.getTxnNumber_forTesting()),
+        autocommit: false
+    });
+    assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
+    assert(!res.hasOwnProperty("errorLabels"), tojson(res));
+    session.abortTransaction_forTesting();
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+
     session.endSession();
 
     st.stop();

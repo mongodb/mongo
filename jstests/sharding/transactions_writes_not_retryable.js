@@ -54,19 +54,11 @@
             "expected write in transaction not to be retried on closed connection, cmd: " +
                 tojson(writeCmd) + ", sharded: " + isSharded);
 
-        let confirmIsNetworkError = function(response) {
-            if (response.hasOwnProperty('writeErrors')) {
-                assert.neq(null, res.writeErrors[0]);
-                assert(ErrorCodes.isNetworkError(res.writeErrors[0].code),
-                       "expected network error, got: " + tojson(res.code));
-            } else {
-                assert.eq('findAndModify', writeCmdName);
-                assert(ErrorCodes.isNetworkError(res.code),
-                       "expected network error, got: " + tojson(res.code));
-            }
-        };
-
-        confirmIsNetworkError(res);
+        // Network errors during sharded transactions are transient transaction errors, so they're
+        // returned as top level codes for all commands, including batch writes.
+        assert(ErrorCodes.isNetworkError(res.code),
+               "expected network error, got: " + tojson(res.code));
+        assert.eq(res.errorLabels, ["TransientTransactionError"]);
         assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
 

@@ -49,6 +49,7 @@ env.CppUnitTest('base_test',
                  'status_test.cpp',
                  'status_with_test.cpp',
                  'string_data_test.cpp',
+                 'transaction_error_test.cpp',
                  'uuid_test.cpp',
                 ])
 

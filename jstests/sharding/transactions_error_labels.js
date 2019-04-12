@@ -9,12 +9,13 @@
     const collName = "foo";
     const ns = dbName + "." + collName;
 
-    const failCommandWithError = function(rst, commandToFail, errorCode) {
+    const failCommandWithError = function(rst, {commandToFail, errorCode, closeConnection}) {
         rst.nodes.forEach(function(node) {
             assert.commandWorked(node.getDB("admin").runCommand({
                 configureFailPoint: "failCommand",
                 mode: "alwaysOn",
                 data: {
+                    closeConnection: closeConnection,
                     errorCode: errorCode,
                     failCommands: [commandToFail],
                     failInternalCommands: true  // mongod sees mongos as an internal client
@@ -127,6 +128,18 @@
         res = mongosSession.commitTransaction_forTesting();
         checkMongosResponse(res, ErrorCodes.NoSuchTransaction, null, true);
         turnOffFailCommand(st.rs0);
+
+        jsTest.log("No error label for network error if " + commandSentToShard +
+                   " returns network error");
+        assert.commandWorked(startTransaction(mongosSession, dbName, collName));
+        failCommandWithError(st.rs0, {
+            commandToFail: commandSentToShard,
+            errorCode: ErrorCodes.InternalError,
+            closeConnection: true
+        });
+        res = mongosSession.commitTransaction_forTesting();
+        checkMongosResponse(res, ErrorCodes.HostUnreachable, false /* expectedErrorLabel */, null);
+        turnOffFailCommand(st.rs0);
     };
 
     let st = new ShardingTest({shards: 2, config: 1, mongosOptions: {verbose: 3}});
@@ -153,9 +166,20 @@
     // write statement
     jsTest.log(
         "'TransientTransactionError' label is attached if write statement returns WriteConflict");
-    failCommandWithError(st.rs0, "insert", ErrorCodes.WriteConflict);
+    failCommandWithError(
+        st.rs0,
+        {commandToFail: "insert", errorCode: ErrorCodes.WriteConflict, closeConnection: false});
     res = startTransaction(mongosSession, dbName, collName);
     checkMongosResponse(res, ErrorCodes.WriteConflict, "TransientTransactionError", null);
+    turnOffFailCommand(st.rs0);
+    mongosSession.abortTransaction();
+
+    // statements prior to commit network error
+    failCommandWithError(
+        st.rs0,
+        {commandToFail: "insert", errorCode: ErrorCodes.InternalError, closeConnection: true});
+    res = startTransaction(mongosSession, dbName, collName);
+    checkMongosResponse(res, ErrorCodes.HostUnreachable, "TransientTransactionError", null);
     turnOffFailCommand(st.rs0);
     mongosSession.abortTransaction();
 

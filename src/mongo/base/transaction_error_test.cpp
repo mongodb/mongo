@@ -27,40 +27,25 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/transaction_error.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-bool isTransientTransactionError(ErrorCodes::Error code,
-                                 bool hasWriteConcernError,
-                                 bool isCommitTransaction) {
-    bool isTransient;
-    switch (code) {
-        case ErrorCodes::WriteConflict:
-        case ErrorCodes::LockTimeout:
-        case ErrorCodes::PreparedTransactionInProgress:
-            isTransient = true;
-            break;
-        default:
-            isTransient = false;
-            break;
-    }
-
-    isTransient |= ErrorCodes::isSnapshotError(code) || ErrorCodes::isNeedRetargettingError(code) ||
-        code == ErrorCodes::StaleDbVersion;
-
-    if (isCommitTransaction) {
-        // On NoSuchTransaction it's safe to retry the whole transaction only if the data cannot be
-        // rolled back.
-        isTransient |= code == ErrorCodes::NoSuchTransaction && !hasWriteConcernError;
-    } else {
-        // For commands other than "commitTransaction", we know there's no side-effect for these
-        // errors, but it's not true for "commitTransaction" if a failover happens.
-        isTransient |= ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code) ||
-            ErrorCodes::isNetworkError(code) || code == ErrorCodes::NoSuchTransaction;
-    }
-
-    return isTransient;
+TEST(IsTransientTransactionErrorTest, NetworkErrorsAreTransientBeforeCommit) {
+    ASSERT(isTransientTransactionError(ErrorCodes::HostUnreachable,
+                                       false /* hasWriteConcernError */,
+                                       false /* isCommitTransaction */));
 }
 
+TEST(IsTransientTransactionErrorTest, NetworkErrorsAreNotTransientOnCommit) {
+    ASSERT(!isTransientTransactionError(ErrorCodes::HostUnreachable,
+                                        false /* hasWriteConcernError */,
+                                        true /* isCommitTransaction */));
+}
+
+}  // namespace
 }  // namespace mongo
