@@ -85,7 +85,7 @@
                 const ns = dbName + '.' + shardedCollName;
 
                 assert.commandWorked(st.splitAt(ns, {_id: 4}));
-                assert.commandWorked(st.splitAt(ns, {_id: 8}));
+                assert.commandWorked(st.splitAt(ns, {_id: 7}));
 
                 assert.commandWorked(
                     mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
