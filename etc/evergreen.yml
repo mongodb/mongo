@@ -11113,9 +11113,6 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
     distros:
     - rhel62-large
-  - name: replica_sets_multi_oplog_txns_gen
-    distros:
-    - rhel62-large
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel62-large
