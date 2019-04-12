@@ -43,7 +43,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/stub_mongo_process_interface_lookup_single_document.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -51,6 +51,8 @@ namespace {
 using boost::intrusive_ptr;
 using std::deque;
 using std::vector;
+
+using MockMongoInterface = StubMongoProcessInterfaceLookupSingleDocument;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 class DocumentSourceLookupChangePostImageTest : public AggregationContextFixture {
@@ -74,79 +76,6 @@ public:
         return ResumeToken(ResumeTokenData(ts, 0, 0, testUuid(), Value(Document{{"_id", id}})))
             .toDocument();
     }
-};
-
-/**
- * A mock MongoProcessInterface which allows mocking a foreign pipeline.
- */
-class MockMongoInterface final : public StubMongoProcessInterface {
-public:
-    MockMongoInterface(deque<DocumentSource::GetNextResult> mockResults)
-        : _mockResults(std::move(mockResults)) {}
-
-    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
-        return false;
-    }
-
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions opts = MakePipelineOptions{}) final {
-        auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
-
-        if (opts.optimize) {
-            pipeline->optimizePipeline();
-        }
-
-        if (opts.attachCursorSource) {
-            pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release());
-        }
-
-        return pipeline;
-    }
-
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) final {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                            PipelineDeleter(expCtx->opCtx));
-        pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
-        return pipeline;
-    }
-
-    boost::optional<Document> lookupSingleDocument(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss,
-        UUID collectionUUID,
-        const Document& documentKey,
-        boost::optional<BSONObj> readConcern,
-        bool allowSpeculativeMajorityRead) {
-        // The namespace 'nss' may be different than the namespace on the ExpressionContext in the
-        // case of a change stream on a whole database so we need to make a copy of the
-        // ExpressionContext with the new namespace.
-        auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID, boost::none);
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
-        try {
-            pipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
-        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            return boost::none;
-        }
-
-        auto lookedUpDocument = pipeline->getNext();
-        if (auto next = pipeline->getNext()) {
-            uasserted(ErrorCodes::TooManyMatchingDocuments,
-                      str::stream() << "found more than one document matching "
-                                    << documentKey.toString()
-                                    << " ["
-                                    << lookedUpDocument->toString()
-                                    << ", "
-                                    << next->toString()
-                                    << "]");
-        }
-        return lookedUpDocument;
-    }
-
-private:
-    deque<DocumentSource::GetNextResult> _mockResults;
 };
 
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyOnUpdate) {

@@ -188,6 +188,7 @@ env.Library(
     target='document_source_mock',
     source=[
         'document_source_mock.cpp',
+        'stub_mongo_process_interface_lookup_single_document.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
