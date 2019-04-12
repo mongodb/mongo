@@ -50,17 +50,6 @@ class LinterBase(object, metaclass=ABCMeta):
         """
         return False
 
-    def ignore_interpreter(self):
-        # type: () -> bool
-        # pylint: disable=no-self-use
-        """
-        Check if we should ignore the interpreter when searching for the linter to run.
-
-        This applies to mypy specifically since the pylinters are executed under Python 2 but mypy
-        is executed by python 3.
-        """
-        return False
-
 
 class LinterInstance(object):
     """A pair of a Linter and the full path of the linter cmd to run."""

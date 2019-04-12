@@ -30,14 +30,3 @@ class MypyLinter(base.LinterBase):
         if 'idl' in file_name or 'linter' in file_name:
             return [file_name]
         return []
-
-    def ignore_interpreter(self):
-        # type: () -> bool
-        # pylint: disable=no-self-use
-        """
-        Check if we should ignore the interpreter when searching for the linter to run.
-
-        This applies to mypy specifically since the pylinters are executed under Python 2 but mypy
-        is executed by python 3.
-        """
-        return True

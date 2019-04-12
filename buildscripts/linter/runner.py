@@ -86,17 +86,7 @@ def _find_linter(linter, config_dict):
         # On Linux, these scripts are installed in %PYTHONDIR%\bin like
         # '/opt/mongodbtoolchain/v3/bin', but they may point to the wrong interpreter.
         cmd_str = os.path.join(python_dir, linter.cmd_name)
-
-        if linter.ignore_interpreter():
-            # Some linters use a different interpreter then the current interpreter.
-            # If the linter cmd_location is specified then use that location.
-            if linter.cmd_location:
-                cmd_str = linter.cmd_location
-            else:
-                cmd_str = os.path.join('/opt/mongodbtoolchain/v3/bin', linter.cmd_name)
-            cmd = [cmd_str]
-        else:
-            cmd = [sys.executable, cmd_str]
+        cmd = [sys.executable, cmd_str]
 
     # Check 1: interpreter location or for linters that ignore current interpreter.
     if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
