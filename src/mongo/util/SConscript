@@ -742,6 +742,15 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="concepts_test",
+    source=[
+        "concepts_test.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
 env.Benchmark(
     target='decimal_counter_bm',
     source=[

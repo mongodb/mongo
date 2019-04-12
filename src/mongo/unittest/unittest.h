@@ -35,6 +35,7 @@
 
 #pragma once
 
+#include <boost/preprocessor/cat.hpp>
 #include <cmath>
 #include <sstream>
 #include <string>
@@ -168,6 +169,34 @@
                                  ASSERT_EQ(::mongo::StringData(ex.what()),                   \
                                            ::mongo::StringData(EXPECTED_WHAT));              \
                              }))
+
+
+/**
+ * Compiles if expr doesn't compile.
+ *
+ * This only works for compile errors in the "immediate context" of the expression, which matches
+ * the rules for SFINAE. The first argument is a defaulted template parameter that is used in the
+ * expression to make it dependent. This only works with expressions, not statements, although you
+ * can separate multiple expressions with a comma.
+ *
+ * This should be used at namespace scope, not inside a TEST function.
+ *
+ * Examples that pass:
+ *     ASSERT_DOES_NOT_COMPILE(typename Char = char, *std::declval<Char>());
+ *     ASSERT_DOES_NOT_COMPILE(bool B = false, std::enable_if_t<B, int>{});
+ *
+ * Examples that fail:
+ *     ASSERT_DOES_NOT_COMPILE(typename Char = char, *std::declval<Char*>());
+ *     ASSERT_DOES_NOT_COMPILE(bool B = true, std::enable_if_t<B, int>{});
+ *
+ */
+#define ASSERT_DOES_NOT_COMPILE(Alias, /*expr*/...)                          \
+    static auto BOOST_PP_CAT(compileCheck_, __LINE__)(...)->std::true_type;  \
+    template <Alias>                                                         \
+    static auto BOOST_PP_CAT(compileCheck_, __LINE__)(int)                   \
+        ->std::conditional_t<true, std::false_type, decltype(__VA_ARGS__)>;  \
+    static_assert(decltype(BOOST_PP_CAT(compileCheck_, __LINE__)(0))::value, \
+                  "Expression '" #__VA_ARGS__ "' [with " #Alias "] shouldn't compile.");
 
 /**
  * This internal helper is used to ignore warnings about unused results.  Some unit tests which test

@@ -269,4 +269,13 @@ TEST(UnitTestSelfTest, StackTraceForAssertion) {
     ASSERT_STRING_CONTAINS(stacktrace, "printStackTrace");
 }
 
+ASSERT_DOES_NOT_COMPILE(typename Char = char, *std::declval<Char>());
+ASSERT_DOES_NOT_COMPILE(bool B = false, std::enable_if_t<B, int>{});
+
+// Uncomment to check that it fails when it is supposed to. Unfortunately we can't check in a test
+// that this fails when it is supposed to, only that it passes when it should.
+//
+// ASSERT_DOES_NOT_COMPILE(typename Char = char, *std::declval<Char*>());
+// ASSERT_DOES_NOT_COMPILE(bool B = true, std::enable_if_t<B, int>{});
+
 }  // namespace
