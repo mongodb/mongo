@@ -90,6 +90,7 @@ selector:
   # Parallel shell is not causally consistent
   - jstests/core/cursora.js
   - jstests/core/find_and_modify_concurrent_update.js
+  - jstests/core/removec.js
   - jstests/core/shellstartparallel.js
   # TODO SERVER-30466
   - jstests/core/explain_multi_plan.js
