@@ -575,9 +575,10 @@ void WiredTigerRecoveryUnit::_txnOpen() {
 }
 
 Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllCommittedTimestamp(WT_SESSION* session) {
-    WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared, _roundUpPreparedTimestamps);
+    WiredTigerBeginTxnBlock txnOpen(
+        session, _ignorePrepared, _roundUpPreparedTimestamps, RoundUpReadTimestamp::kRound);
     Timestamp txnTimestamp = Timestamp(_oplogManager->fetchAllCommittedValue(session->connection));
-    auto status = txnOpen.setReadSnapshot(txnTimestamp, RoundReadUpToOldest::kRound);
+    auto status = txnOpen.setReadSnapshot(txnTimestamp);
     fassert(50948, status);
 
     // Since this is not in a critical section, we might have rounded to oldest between
@@ -619,8 +620,9 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
     // should read afterward.
     Timestamp readTimestamp = (lastApplied) ? std::min(*lastApplied, allCommitted) : allCommitted;
 
-    WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared, _roundUpPreparedTimestamps);
-    auto status = txnOpen.setReadSnapshot(readTimestamp, RoundReadUpToOldest::kRound);
+    WiredTigerBeginTxnBlock txnOpen(
+        session, _ignorePrepared, _roundUpPreparedTimestamps, RoundUpReadTimestamp::kRound);
+    auto status = txnOpen.setReadSnapshot(readTimestamp);
     fassert(51066, status);
 
     // We might have rounded to oldest between calling getAllCommitted and setReadSnapshot. We need

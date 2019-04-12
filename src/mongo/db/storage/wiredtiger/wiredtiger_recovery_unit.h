@@ -50,7 +50,7 @@ namespace mongo {
 
 using IgnorePrepared = WiredTigerBeginTxnBlock::IgnorePrepared;
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
-using RoundReadUpToOldest = WiredTigerBeginTxnBlock::RoundReadUpToOldest;
+using RoundUpReadTimestamp = WiredTigerBeginTxnBlock::RoundUpReadTimestamp;
 
 class BSONObjBuilder;
 

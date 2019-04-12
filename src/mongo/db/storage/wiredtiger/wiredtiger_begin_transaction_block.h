@@ -52,7 +52,7 @@ public:
     };
 
     // Whether or not to round up to the oldest timestamp when the read timestamp is behind it.
-    enum class RoundReadUpToOldest {
+    enum class RoundUpReadTimestamp {
         kNoRound,  // Do not round to the oldest timestamp. BadValue error may be returned.
         kRound     // Round the read timestamp up to the oldest timestamp when it is behind.
     };
@@ -64,17 +64,18 @@ public:
     // earlier.
     enum class RoundUpPreparedTimestamps { kNoRound, kRound };
 
-    WiredTigerBeginTxnBlock(WT_SESSION* session,
-                            IgnorePrepared ignorePrepared,
-                            RoundUpPreparedTimestamps roundUpPreparedTimestamps);
+    WiredTigerBeginTxnBlock(
+        WT_SESSION* session,
+        IgnorePrepared ignorePrepared,
+        RoundUpPreparedTimestamps roundUpPreparedTimestamps,
+        RoundUpReadTimestamp roundUpReadTimestamp = RoundUpReadTimestamp::kNoRound);
     WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config);
     ~WiredTigerBeginTxnBlock();
 
     /**
      * Sets the read timestamp on the opened transaction. Cannot be called after a call to done().
      */
-    Status setReadSnapshot(Timestamp,
-                           RoundReadUpToOldest roundReadUpToOldest = RoundReadUpToOldest::kNoRound);
+    Status setReadSnapshot(Timestamp);
 
     /**
      * End the begin transaction block. Must be called to ensure the opened transaction
