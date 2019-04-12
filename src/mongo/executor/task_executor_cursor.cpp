@@ -44,7 +44,7 @@ namespace executor {
 TaskExecutorCursor::TaskExecutorCursor(executor::TaskExecutor* executor,
                                        const RemoteCommandRequest& rcr,
                                        Options&& options)
-    : _executor(executor), _rcr(rcr), _options(std::move(options)) {
+    : _executor(executor), _rcr(rcr), _options(std::move(options)), _batchIter(_batch.end()) {
 
     if (rcr.opCtx) {
         _lsid = rcr.opCtx->getLogicalSessionId();
