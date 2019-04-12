@@ -61,5 +61,6 @@ if [[ -d $DEST_DIR/dist ]]; then
     exit 1
 fi
 
+rm $DIST_DIR/libtool
 mv $DIST_DIR $DEST_DIR/dist
 popd

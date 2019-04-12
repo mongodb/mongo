@@ -1,8 +1,14 @@
-commit f402f44778d29ba1b532044278329b94589c2a0c (HEAD -> 2.7-mongodb,
-origin/2.7-mongodb_labs-patches/cherrypick-62c4eca6e7ec9dc78333dc6b499f90eef9849378,
-origin/2.7-mongodb)
+commit 05c07409ae777669aad8f972f54de6b6a18347ae
+Author: Henrik Edin <henrik.edin@mongodb.com>
+Date:   Fri Apr 12 14:16:17 2019 -0400
+
+    SERVER-40544 Disable injection of on_process_term() at process exit
+
+M	src/windows/port.cc
+
+commit f402f44778d29ba1b532044278329b94589c2a0c
 Author: obones <obones@free.fr>
-Date:   Fri Jul 20 11:07:02 2018 +0200
+Date:	Fri Jul 20 11:07:02 2018 +0200
 
     Under x64, the PE loader looks for callbacks in constant sections
 
@@ -12,8 +18,7 @@ Date:   Fri Jul 20 11:07:02 2018 +0200
 
 M	src/windows/port.cc
 
-commit b1478737e978b698a2fa881cb06e2f40215ff782 (tag:
-2.7-mongodb-exported)
+commit b1478737e978b698a2fa881cb06e2f40215ff782
 Author: Billy Donahue <BillyDonahue@users.noreply.github.com>
 Date:	Wed Feb 27 15:49:55 2019 -0500
 
@@ -135,7 +140,7 @@ M	src/libc_override.h
 M	src/tests/tcmalloc_unittest.cc
 M	src/windows/config.h
 
-commit 9608fa3bcf8020d35f59fbf70cd3cbe4b015b972 (tag: gperftools-2.7)
+commit 9608fa3bcf8020d35f59fbf70cd3cbe4b015b972
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sun Apr 29 16:55:59 2018 -0700
 
@@ -396,7 +401,7 @@ Date:	Sat Mar 24 18:29:06 2018 -0700
 
 M	src/tcmalloc.cc
 
-commit 34f78a2dcd8160b483d86474702785337bbeb7ac (tag: gperftools-2.6.90)
+commit 34f78a2dcd8160b483d86474702785337bbeb7ac
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sun Mar 18 16:39:06 2018 -0700
 
@@ -517,7 +522,7 @@ Date:	Tue Jan 9 01:33:13 2018 +0530
 
 M	docs/tcmalloc.html
 
-commit 71bf09aabe93dbe390ebb54c57d3c5b3d627c142 (tag: gperftools-2.6.3)
+commit 71bf09aabe93dbe390ebb54c57d3c5b3d627c142
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sat Dec 9 09:58:31 2017 -0800
 
@@ -560,7 +565,7 @@ Date:	Tue Dec 5 09:31:38 2017 -0800
 
 M	configure.ac
 
-commit 6a4b0799975576c2722daa75b35f6f65220d22b6 (tag: gperftools-2.6.2)
+commit 6a4b0799975576c2722daa75b35f6f65220d22b6
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Thu Nov 30 18:19:17 2017 +0000
 
@@ -932,7 +937,7 @@ Date:	Sat Jul 1 13:21:21 2017 -0700
 
 M	src/stacktrace_powerpc-linux-inl.h
 
-commit bf840dec0495e17f5c8403e68e10b9d6bf05c559 (tag: gperftools-2.6.1)
+commit bf840dec0495e17f5c8403e68e10b9d6bf05c559
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sun Jul 9 14:55:33 2017 -0700
 
@@ -1039,7 +1044,7 @@ Date:	Tue Jul 4 21:02:34 2017 -0700
 
 M	NEWS
 
-commit 4be05e43a1adab9ceea9bdaaae546fb938f0a86c (tag: gperftools-2.6)
+commit 4be05e43a1adab9ceea9bdaaae546fb938f0a86c
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Tue Jul 4 20:35:25 2017 -0700
 
@@ -1104,7 +1109,7 @@ M	Makefile.am
 A	benchmark/getcontext_light.cc
 A	benchmark/unwind_bench.cc
 
-commit c571ae2fc9433e958f29b3c3525d34c22a9cb884 (tag: gperftools-2.5.93)
+commit c571ae2fc9433e958f29b3c3525d34c22a9cb884
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Mon May 22 19:04:20 2017 -0700
 
@@ -1136,7 +1141,7 @@ Date:	Mon May 22 18:58:15 2017 -0700
 
 M	configure.ac
 
-commit 6426c0cc8049dd50a681dc337ac9962577d5fa14 (tag: gperftools-2.5.92)
+commit 6426c0cc8049dd50a681dc337ac9962577d5fa14
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sun May 21 22:55:29 2017 -0700
 
@@ -1242,7 +1247,7 @@ Date:	Sun May 21 22:18:01 2017 -0700
 
 M	src/sampler.cc
 
-commit 50125d8f70007fb2aa4d1c87df6a3092a3371edf (tag: gperftools-2.5.91)
+commit 50125d8f70007fb2aa4d1c87df6a3092a3371edf
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Mon May 15 00:02:43 2017 -0700
 
@@ -1278,7 +1283,7 @@ Date:	Wed Apr 26 06:46:43 2017 -0300
 
 M	src/stacktrace_powerpc-linux-inl.h
 
-commit b48403a4b065830129e238feffe022abd93af807 (tag: gperftools-2.5.90)
+commit b48403a4b065830129e238feffe022abd93af807
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sun Apr 16 21:45:51 2017 -0700
 
@@ -2394,7 +2399,7 @@ Date:	Tue Mar 8 15:58:02 2016 -0500
 M	src/base/elfcore.h
 M	src/base/linuxthreads.h
 
-commit 632de2975e63f89613af9ab99bc1603a4a6332aa (tag: gperftools-2.5)
+commit 632de2975e63f89613af9ab99bc1603a4a6332aa
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sat Mar 12 11:48:20 2016 -0800
 
@@ -2418,7 +2423,7 @@ Date:	Sat Mar 12 10:54:05 2016 -0800
 
 M	src/profile-handler.cc
 
-commit 6ff86ff6a783a277956e45db68c6a2b729f27000 (tag: gperftools-2.4.91)
+commit 6ff86ff6a783a277956e45db68c6a2b729f27000
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sat Mar 5 16:17:28 2016 -0800
 
@@ -2521,7 +2526,7 @@ Date:	Mon Feb 29 20:09:39 2016 -0800
 
 M	README
 
-commit 2804b7cfee8d49d5ab98340cbf3050c0a5f57b98 (tag: gperftools-2.4.90)
+commit 2804b7cfee8d49d5ab98340cbf3050c0a5f57b98
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
 Date:	Sun Feb 21 20:27:48 2016 -0800
 
@@ -3795,7 +3800,7 @@ Date:	Sat Jan 10 14:35:54 2015 -0800
 
 M	doc/heapprofile.html
 
-commit 689e4a5bb4b2a8afecb85e83b8e4f294f80b6124 (tag: gperftools-2.4)
+commit 689e4a5bb4b2a8afecb85e83b8e4f294f80b6124
 Author: Aliaksey Kandratsenka <alk@tut.by>
 Date:	Sat Jan 10 12:26:51 2015 -0800
 
@@ -3806,7 +3811,7 @@ M	configure.ac
 M	src/windows/config.h
 M	src/windows/gperftools/tcmalloc.h
 
-commit 3f5f1bba0c2cb4862c38b0c9050f1cede8a5c344 (tag: gperftools-2.3.90)
+commit 3f5f1bba0c2cb4862c38b0c9050f1cede8a5c344
 Author: Aliaksey Kandratsenka <alk@tut.by>
 Date:	Sun Dec 28 18:18:27 2014 -0800
 
@@ -4127,7 +4132,7 @@ Date:	Sun Dec 7 13:33:40 2014 -0800
 
 M	NEWS
 
-commit 463a619408219fff8955d47a71de1aab31ebd129 (tag: gperftools-2.3)
+commit 463a619408219fff8955d47a71de1aab31ebd129
 Author: Aliaksey Kandratsenka <alk@tut.by>
 Date:	Sun Dec 7 12:53:35 2014 -0800
 
@@ -4177,7 +4182,7 @@ Date:	Thu Nov 27 10:43:11 2014 -0800
 
 M	src/symbolize.cc
 
-commit e7d5e512b068fb76f5eeed7985bebd9c0d14e226 (tag: gperftools-2.2.90)
+commit e7d5e512b068fb76f5eeed7985bebd9c0d14e226
 Author: Aliaksey Kandratsenka <alk@tut.by>
 Date:	Sun Nov 2 20:02:12 2014 -0800
 
@@ -4491,7 +4496,7 @@ Date:	Sat Jun 28 13:05:12 2014 -0700
 
 M	src/debugallocation.cc
 
-commit 2e90b6fd72fec33aedf547d1977bdee6b77645b9 (tag: gperftools-2.2.1)
+commit 2e90b6fd72fec33aedf547d1977bdee6b77645b9
 Author: Aliaksey Kandratsenka <alk@tut.by>
 Date:	Sat Jun 21 15:45:44 2014 -0700
 
@@ -4531,7 +4536,7 @@ Date:	Sun Jun 15 12:53:14 2014 -0700
 
 M	Makefile.am
 
-commit 81d99f21ede78ab8d5fec15d0055416ac1b581f3 (origin/master-issue_626)
+commit 81d99f21ede78ab8d5fec15d0055416ac1b581f3
 Author: Adhemerval Zanella <azanella@linux.vnet.ibm.com>
 Date:	Tue Jun 3 07:50:56 2014 -0500
 
@@ -4544,7 +4549,7 @@ Date:	Tue Jun 3 07:50:56 2014 -0500
 
 M	src/static_vars.cc
 
-commit 846b775dfadb77901202ae7ddbac30ad1de7df01 (tag: gperftools-2.2)
+commit 846b775dfadb77901202ae7ddbac30ad1de7df01
 Author: Aliaksey Kandratsenka <alk@tut.by>
 Date:	Sat May 3 17:50:11 2014 -0700
 
@@ -4589,7 +4594,7 @@ M	configure.ac
 M	src/windows/config.h
 M	src/windows/gperftools/tcmalloc.h
 
-commit e8e082af25952e9bd10c37c3f028c91fcbbd1cbd (tag: gperftools-2.1.90)
+commit e8e082af25952e9bd10c37c3f028c91fcbbd1cbd
 Author: Aliaksey Kandratsenka <alk@tut.by>
 Date:	Sat Apr 19 13:16:02 2014 -0700
 

@@ -102,11 +102,15 @@ extern "C" PERFTOOLS_DLL_DECL void WriteToStderr(const char* buf, int len) {
 #if defined(_M_IX86)
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_p_thread_callback_tcmalloc")
+#if TCMALLOC_ENABLE_LIBC_OVERRIDE
 #pragma comment(linker, "/INCLUDE:_p_process_term_tcmalloc")
+#endif  // TCMALLOC_ENABLE_LIBC_OVERRIDE
 #elif defined(_M_X64)
 #pragma comment(linker, "/INCLUDE:_tls_used")
 #pragma comment(linker, "/INCLUDE:p_thread_callback_tcmalloc")
+#if TCMALLOC_ENABLE_LIBC_OVERRIDE
 #pragma comment(linker, "/INCLUDE:p_process_term_tcmalloc")
+#endif  // TCMALLOC_ENABLE_LIBC_OVERRIDE
 #endif
 #endif
 
@@ -157,8 +161,10 @@ extern "C" {
 #pragma data_seg(".CRT$XLB")
 void (NTAPI *p_thread_callback_tcmalloc)(
     HINSTANCE h, DWORD dwReason, PVOID pv) = on_tls_callback;
+#if TCMALLOC_ENABLE_LIBC_OVERRIDE
 #pragma data_seg(".CRT$XTU")
 int (*p_process_term_tcmalloc)(void) = on_process_term;
+#endif // TCMALLOC_ENABLE_LIBC_OVERRIDE
 #pragma data_seg(pop, old_seg)
 }  // extern "C"
 #elif defined(_M_X64)
@@ -166,9 +172,11 @@ int (*p_process_term_tcmalloc)(void) = on_process_term;
 #pragma const_seg(push, oldseg)
 #pragma const_seg(".CRT$XLB")
 extern "C" void (NTAPI * const p_thread_callback_tcmalloc)(
-	HINSTANCE h, DWORD dwReason, PVOID pv) = on_tls_callback;
+       HINSTANCE h, DWORD dwReason, PVOID pv) = on_tls_callback;
+#if TCMALLOC_ENABLE_LIBC_OVERRIDE
 #pragma const_seg(".CRT$XTU")
 extern "C" int (NTAPI * const p_process_term_tcmalloc)(void) = on_process_term;
+#endif // TCMALLOC_ENABLE_LIBC_OVERRIDE
 #pragma const_seg(pop, oldseg)
 #endif
 
