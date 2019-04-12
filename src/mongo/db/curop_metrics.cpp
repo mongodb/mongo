@@ -78,8 +78,8 @@ void recordCurOpMetrics(OperationContext* opCtx) {
 
     if (debug.hasSortStage)
         scanAndOrderCounter.increment();
-    if (debug.additiveMetrics.writeConflicts)
-        writeConflictsCounter.increment(*debug.additiveMetrics.writeConflicts);
+    if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0)
+        writeConflictsCounter.increment(n);
 }
 
 }  // namespace mongo

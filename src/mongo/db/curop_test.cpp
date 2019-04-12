@@ -39,6 +39,22 @@
 namespace mongo {
 namespace {
 
+TEST(CurOpTest, CopyConstructors) {
+    OpDebug::AdditiveMetrics a, b;
+    a.keysExamined = 1;
+    b.keysExamined = 2;
+    a.prepareReadConflicts.store(1);
+    b.prepareReadConflicts.store(2);
+    // Test copy constructor.
+    OpDebug::AdditiveMetrics c = a;
+    ASSERT_EQ(a.keysExamined, c.keysExamined);
+    ASSERT_EQ(a.prepareReadConflicts.load(), c.prepareReadConflicts.load());
+    // Test copy assignment.
+    a = b;
+    ASSERT_EQ(a.keysExamined, b.keysExamined);
+    ASSERT_EQ(a.prepareReadConflicts.load(), b.prepareReadConflicts.load());
+}
+
 TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     OpDebug::AdditiveMetrics currentAdditiveMetrics = OpDebug::AdditiveMetrics();
     OpDebug::AdditiveMetrics additiveMetricsToAdd = OpDebug::AdditiveMetrics();
@@ -60,13 +76,14 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.keysInserted = 5;
     currentAdditiveMetrics.keysDeleted = 4;
     additiveMetricsToAdd.keysDeleted = 2;
-    currentAdditiveMetrics.prepareReadConflicts = 1;
-    additiveMetricsToAdd.prepareReadConflicts = 5;
-    currentAdditiveMetrics.writeConflicts = 7;
-    additiveMetricsToAdd.writeConflicts = 0;
+    currentAdditiveMetrics.prepareReadConflicts.store(1);
+    additiveMetricsToAdd.prepareReadConflicts.store(5);
+    currentAdditiveMetrics.writeConflicts.store(7);
+    additiveMetricsToAdd.writeConflicts.store(0);
 
     // Save the current AdditiveMetrics object before adding.
-    OpDebug::AdditiveMetrics additiveMetricsBeforeAdd = currentAdditiveMetrics;
+    OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
+    additiveMetricsBeforeAdd.add(currentAdditiveMetrics);
     currentAdditiveMetrics.add(additiveMetricsToAdd);
 
     // The following field values should have changed after adding.
@@ -86,11 +103,12 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysDeleted,
               *additiveMetricsBeforeAdd.keysDeleted + *additiveMetricsToAdd.keysDeleted);
-    ASSERT_EQ(*currentAdditiveMetrics.prepareReadConflicts,
-              *additiveMetricsBeforeAdd.prepareReadConflicts +
-                  *additiveMetricsToAdd.prepareReadConflicts);
-    ASSERT_EQ(*currentAdditiveMetrics.writeConflicts,
-              *additiveMetricsBeforeAdd.writeConflicts + *additiveMetricsToAdd.writeConflicts);
+    ASSERT_EQ(currentAdditiveMetrics.prepareReadConflicts.load(),
+              additiveMetricsBeforeAdd.prepareReadConflicts.load() +
+                  additiveMetricsToAdd.prepareReadConflicts.load());
+    ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
+              additiveMetricsBeforeAdd.writeConflicts.load() +
+                  additiveMetricsToAdd.writeConflicts.load());
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -106,13 +124,14 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.keysInserted = 5;
     currentAdditiveMetrics.keysDeleted = 4;
     additiveMetricsToAdd.keysDeleted = 2;
-    currentAdditiveMetrics.prepareReadConflicts = 1;
-    additiveMetricsToAdd.prepareReadConflicts = 5;
-    currentAdditiveMetrics.writeConflicts = 7;
-    additiveMetricsToAdd.writeConflicts = 0;
+    currentAdditiveMetrics.prepareReadConflicts.store(1);
+    additiveMetricsToAdd.prepareReadConflicts.store(5);
+    currentAdditiveMetrics.writeConflicts.store(7);
+    additiveMetricsToAdd.writeConflicts.store(0);
 
     // Save the current AdditiveMetrics object before adding.
-    OpDebug::AdditiveMetrics additiveMetricsBeforeAdd = currentAdditiveMetrics;
+    OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
+    additiveMetricsBeforeAdd.add(currentAdditiveMetrics);
     currentAdditiveMetrics.add(additiveMetricsToAdd);
 
     // The 'keysExamined' field for the current AdditiveMetrics object was not initialized, so it
@@ -132,20 +151,21 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysDeleted,
               *additiveMetricsBeforeAdd.keysDeleted + *additiveMetricsToAdd.keysDeleted);
-    ASSERT_EQ(*currentAdditiveMetrics.prepareReadConflicts,
-              *additiveMetricsBeforeAdd.prepareReadConflicts +
-                  *additiveMetricsToAdd.prepareReadConflicts);
-    ASSERT_EQ(*currentAdditiveMetrics.writeConflicts,
-              *additiveMetricsBeforeAdd.writeConflicts + *additiveMetricsToAdd.writeConflicts);
+    ASSERT_EQ(currentAdditiveMetrics.prepareReadConflicts.load(),
+              additiveMetricsBeforeAdd.prepareReadConflicts.load() +
+                  additiveMetricsToAdd.prepareReadConflicts.load());
+    ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
+              additiveMetricsBeforeAdd.writeConflicts.load() +
+                  additiveMetricsToAdd.writeConflicts.load());
 }
 
 TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     OpDebug::AdditiveMetrics additiveMetrics = OpDebug::AdditiveMetrics();
 
     // Initialize field values.
-    additiveMetrics.writeConflicts = 1;
+    additiveMetrics.writeConflicts.store(1);
     additiveMetrics.keysInserted = 2;
-    additiveMetrics.prepareReadConflicts = 6;
+    additiveMetrics.prepareReadConflicts.store(6);
 
     // Increment the fields.
     additiveMetrics.incrementWriteConflicts(1);
@@ -154,11 +174,11 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     additiveMetrics.incrementNinserted(3);
     additiveMetrics.incrementPrepareReadConflicts(2);
 
-    ASSERT_EQ(*additiveMetrics.writeConflicts, 2);
+    ASSERT_EQ(additiveMetrics.writeConflicts.load(), 2);
     ASSERT_EQ(*additiveMetrics.keysInserted, 7);
     ASSERT_EQ(*additiveMetrics.keysDeleted, 0);
     ASSERT_EQ(*additiveMetrics.ninserted, 3);
-    ASSERT_EQ(*additiveMetrics.prepareReadConflicts, 8);
+    ASSERT_EQ(additiveMetrics.prepareReadConflicts.load(), 8);
 }
 
 TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {

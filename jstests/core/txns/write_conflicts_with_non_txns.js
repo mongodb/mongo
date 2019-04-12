@@ -52,7 +52,8 @@
     // Returns true if a single document insert has started running on the server.
     function writeStarted() {
         return testDB.currentOp().inprog.some(op => {
-            return op.active && (op.ns === testColl.getFullName()) && (op.op === "insert");
+            return op.active && (op.ns === testColl.getFullName()) && (op.op === "insert") &&
+                (op.writeConflicts > 0);
         });
     }
 
