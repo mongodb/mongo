@@ -2070,7 +2070,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 if opt.redact:
                     self._writer.write_line('.redact()')
                 for requires in opt.requires:
-                    self._writer.write_line('.requires(%s)' % (_encaps(requires)))
+                    self._writer.write_line('.requiresOption(%s)' % (_encaps(requires)))
                 for conflicts in opt.conflicts:
                     self._writer.write_line('.incompatibleWith(%s)' % (_encaps(conflicts)))
                 if opt.default:

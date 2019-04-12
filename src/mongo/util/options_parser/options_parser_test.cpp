@@ -3506,7 +3506,7 @@ TEST(Constraints, RequiresOtherConstraint) {
     moe::OptionSection testOpts;
     testOpts
         .addOptionChaining("option1", "option1", moe::Switch, "Option1", {}, {}, OptionParserTest)
-        .requires("section.option2");
+        .requiresOption("section.option2");
     testOpts.addOptionChaining(
         "section.option2", "option2", moe::Switch, "Option2", {}, {}, OptionParserTest);
 

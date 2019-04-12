@@ -190,7 +190,7 @@ public:
      * provided must be the dottedName, which is the name used to access the option in the
      * result Environment.
      */
-    OptionDescription& requires(const std::string& otherDottedName);
+    OptionDescription& requiresOption(const std::string& otherDottedName);
 
     /**
      * Specifies that this option should be canonicalized immediately after initial parse.
