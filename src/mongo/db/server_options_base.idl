@@ -102,7 +102,6 @@ configs:
         source: [ cli, ini ]
         arg_vartype: String
         conflicts: syslog
-        hidden: true
     'systemLog.path':
         description: 'Log file to send write to instead of stdout - has to be a file, not directory'
         source: yaml
