@@ -201,6 +201,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
 
+    if (parsedDistinct.getKey().find('\0') != std::string::npos) {
+        return Status(ErrorCodes::Error(31032), "Key field cannot contain an embedded null byte");
+    }
+
     // Create a projection on the fields needed by the distinct command, so that the query planner
     // will produce a covered plan if possible.
     qr->setProj(getDistinctProjection(std::string(parsedDistinct.getKey())));
