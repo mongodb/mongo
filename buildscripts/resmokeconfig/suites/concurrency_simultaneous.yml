@@ -12,6 +12,10 @@ selector:
   # These workloads uses >100MB of data, which can overwhelm test hosts.
   - jstests/concurrency/fsm_workloads/agg_group_external.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
+
+  # SERVER-30644 These tests create/drop/modify views which can deadlock on the ViewCatalog mutex if
+  # there's a concurrent operation which acquires a MODE_X lock.
+  - jstests/concurrency/fsm_workloads/view_catalog*.js
   exclude_with_any_tags:
   - uses_transactions
   - requires_replication
