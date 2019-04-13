@@ -1,7 +1,5 @@
-# This file is specifically intended to pull in *all* of our requirements besides the platform
-# specific options in components/platform.req. The motivation for this structure is that pip
-# (including pip freeze) discards platform constraints. Thus generate-pip-constraints.sh always adds
-# platform.req to the end of any constraints.txt files it makes.
+# This file is specifically intended to pull in *all* of our
+# requirements.
 
 -r components/core.req
 
@@ -13,3 +11,5 @@
 
 -r components/aws.req
 -r components/jiraclient.req
+
+-r components/platform.req

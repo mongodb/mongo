@@ -246,14 +246,14 @@ variables:
   setup_group:
   - func: "kill processes"
   - func: "cleanup environment"
-  # The python virtual environment is installed in ${workdir}, which is created in
-  # "set up virtualenv".
-  - func: "set up virtualenv"
-  - func: "set task expansion macros"
   - func: "clear OOM messages"
   - command: manifest.load
   - func: "git get project"
   - func: "get modified patch files"
+  - func: "set task expansion macros"
+  # The python virtual environment is installed in ${workdir}, which is created in
+  # "set up virtualenv".
+  - func: "set up virtualenv"
   # NOTE: To disable the compile bypass feature, comment out the next line.
   #
   - func: "bypass compile and fetch binaries"
@@ -262,7 +262,6 @@ variables:
   - func: "set up credentials"
   - func: "fetch and build OpenSSL"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-  - func: "install pip requirements"
   - func: "generate compile expansions"
   teardown_group:
   - func: "scons cache pruning"
@@ -292,7 +291,7 @@ variables:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python36/python.exe'
+    python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     use_scons_cache: true
     multiversion_platform: windows
@@ -367,12 +366,11 @@ variables:
   setup_group:
     - func: "kill processes"
     - func: "cleanup environment"
-    - func: "set up virtualenv"
     - command: manifest.load
-    - func: "set task expansion macros"
     - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
     - func: "get buildnumber"
-    - func: "install pip requirements"
     - func: "generate compile expansions"
   teardown_group:
     - func: "scons cache pruning"
@@ -525,7 +523,6 @@ functions:
           exit 0
         fi
         ${activate_virtualenv}
-        $python -m pip install -r etc/pip/evgtest-requirements.txt
         bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
         # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
         mongo_ver=$($mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
@@ -1058,18 +1055,6 @@ functions:
           fi
         fi
 
-  "install pip requirements": &install_pip_requirements
-    command: shell.exec
-    params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-        set -o errexit
-
-        ${activate_virtualenv}
-        python -m pip install -r etc/pip/evgtest-requirements.txt
-
   "determine resmoke jobs": &determine_resmoke_jobs
     command: shell.exec
     params:
@@ -1139,7 +1124,6 @@ functions:
         # For patch builds determine if we can bypass compile.
         if [[ "${is_patch}" = "true" && "${task_name}" = "compile" ]]; then
           ${activate_virtualenv}
-          $python -m pip install -r etc/pip/constraints.txt
           $python buildscripts/bypass_compile_and_fetch_binaries.py            \
             --project ${project}                                               \
             --buildVariant ${build_variant}                                    \
@@ -1149,39 +1133,76 @@ functions:
             --jsonArtifact artifacts.json
         fi
 
-  "send benchmark results":
-    command: json.send
+  ### Set expansion macros used in each task ###
+  "set task expansion macros": &set_task_expansion_macros
+    command: expansions.update
     params:
-      name: perf
-      file: src/perf.json
+      updates:
+      - key: activate_virtualenv
+        value: |
+          # check if virtualenv is set up
+          if [ -d "${workdir}/venv" ]; then
+            if [ "Windows_NT" = "$OS" ]; then
+              # Need to quote the path on Windows to preserve the separator.
+              . "${workdir}/venv/Scripts/activate" 2> /tmp/activate_error.log
+            else
+              . ${workdir}/venv/bin/activate 2> /tmp/activate_error.log
+            fi
+            if [ $? -ne 0 ]; then
+              echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+            fi
+            python=python
+          else
+            python=${python|/opt/mongodbtoolchain/v3/bin/python3}
+          fi
 
-  "do setup":
-  - *fetch_artifacts
-  - *update_bypass_expansions
-  - *fetch_binaries
-  - *extract_binaries
-  - *check_binary_version
-  - *get_buildnumber
-  - *set_up_credentials
-  - *run_diskstats
-  - *monitor_process_threads
-  - *collect_system_resource_info
+          if [ "Windows_NT" = "$OS" ]; then
+            export PYTHONPATH="$PYTHONPATH;$(cygpath -w ${workdir}/src)"
+          else
+            export PYTHONPATH="$PYTHONPATH:${workdir}/src"
+          fi
 
-  "do benchmark setup":
-  - *git_get_project
-  - *update_bypass_expansions
-  - *get_buildnumber
-  - *set_up_credentials
-  - *fetch_benchmarks
+          echo "python set to $(which $python)"
+      - key: posix_workdir
+        value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
+      # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
+      # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
+      - key: ssh_connection_options
+        value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ConnectionAttempts=20
+      - key: ssh_retries
+        value: "10"
+      - key: set_sudo
+        value: |
+          set -o > /tmp/settings.log
+          set +o errexit
+          grep errexit /tmp/settings.log | grep on
+          errexit_on=$?
+          # Set errexit "off".
+          set +o errexit
+          sudo=
+          # Use sudo, if it is supported.
+          sudo date > /dev/null 2>&1
+          if [ $? -eq 0 ]; then
+            sudo=sudo
+          fi
+          # Set errexit "on", if previously enabled.
+          if [ $errexit_on -eq 0 ]; then
+            set -o errexit
+          fi
+      - key: mongo_binaries
+        value: ${project}/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+      - key: mongo_cryptd
+        value: ${project}/${build_variant}/${revision}/binaries/mongo-cryptd-${build_id}.${ext|tgz}
+      - key: mh_archive
+        value: ${project}/${build_variant}/${revision}/binaries/mh-${build_id}.${ext|tgz}
+      - key: mongo_debugsymbols
+        value: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+      - key: mongo_shell
+        value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
+      - key: skip_tests
+        value: skip_test-${build_id}
 
-  "do benchmark embedded setup":
-  - *git_get_project
-  - *fetch_artifacts
-  - *get_buildnumber
-  - *set_up_credentials
-  - *fetch_benchrun_embedded_files
-
-  "set up virtualenv":
+  "set up virtualenv": &set_up_virtualenv
     command: shell.exec
     type: test
     params:
@@ -1206,6 +1227,58 @@ functions:
           "$virtualenv_loc" --python "$python_loc" --system-site-packages "$venv_dir"
 
           export VIRTUAL_ENV_DISABLE_PROMPT=yes
+
+          # Not all git get project calls clone into ${workdir}/src so we allow
+          # callers to tell us where the pip requirements files are.
+          pip_dir="${pip_dir}"
+          if [[ -z $pip_dir ]]; then
+            # Default to most common location
+            pip_dir="${workdir}/src/etc/pip"
+          fi
+
+          # Same as above we have to use quotes to preserve the
+          # Windows path separator
+          toolchain_txt="$pip_dir/toolchain-requirements.txt"
+          ${activate_virtualenv}
+          python -m pip install -r "$toolchain_txt"
+
+  "send benchmark results":
+    command: json.send
+    params:
+      name: perf
+      file: src/perf.json
+
+  "do setup":
+  - *fetch_artifacts
+  - *update_bypass_expansions
+  - *fetch_binaries
+  - *extract_binaries
+  - *set_task_expansion_macros
+  - *set_up_virtualenv
+  - *check_binary_version
+  - *get_buildnumber
+  - *set_up_credentials
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
+
+  "do benchmark setup":
+  - command: manifest.load
+  - *git_get_project
+  - *set_task_expansion_macros
+  - *set_up_virtualenv
+  - *update_bypass_expansions
+  - *get_buildnumber
+  - *set_up_credentials
+  - *fetch_benchmarks
+
+  "do benchmark embedded setup":
+  - command: manifest.load
+  - *git_get_project
+  - *fetch_artifacts
+  - *get_buildnumber
+  - *set_up_credentials
+  - *fetch_benchrun_embedded_files
 
   "execute resmoke tests": &execute_resmoke_tests
     command: shell.exec
@@ -1371,7 +1444,10 @@ functions:
         tar xzf generate_tasks_config.tgz
 
   "generate resmoke tasks":
+    - command: manifest.load
     - *git_get_project
+    - *set_task_expansion_macros
+    - *set_up_virtualenv
     - *configure_evergreen_api_credentials
     - command: expansions.write
       params:
@@ -1385,7 +1461,6 @@ functions:
           set -o verbose
 
           ${activate_virtualenv}
-          $python -m pip install -r etc/pip/evgtest-requirements.txt
           $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml --verbose
 
     - command: archive.targz_pack
@@ -1412,7 +1487,6 @@ functions:
           - src/generated_resmoke_config/${task}.json
 
   "run generated tests":
-  - *install_pip_requirements
   - *retrieve_generated_test_configuration
   - *extract_generated_test_configuration
   - command: expansions.update
@@ -1442,7 +1516,6 @@ functions:
         fi
 
   "run tests":
-    - *install_pip_requirements
     - *determine_task_timeout
     - *update_task_timeout_expansions
     - *update_task_timeout
@@ -1499,7 +1572,6 @@ functions:
 
         ${activate_virtualenv}
 
-        python -m pip install -r ./etc/pip/compile-requirements.txt
         ${compile_env|} $python ./buildscripts/scons.py                                     \
             ${compile_flags|} ${task_compile_flags|} ${task_compile_flags_extra|}           \
             ${scons_cache_args|} $extra_args                                                \
@@ -1531,7 +1603,6 @@ functions:
         fi
 
         ${activate_virtualenv}
-        python -m pip install -r etc/pip/compile-requirements.txt
 
         # shared scons cache testing
         # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
@@ -1692,7 +1763,10 @@ functions:
           fi
 
   "generate fuzzer tasks":
+    - command: manifest.load
     - *git_get_project
+    - *set_task_expansion_macros
+    - *set_up_virtualenv
 
     - command: expansions.write
       params:
@@ -1706,7 +1780,6 @@ functions:
           set -o verbose
 
           ${activate_virtualenv}
-          $python -m pip install -r etc/pip/evgtest-requirements.txt
           $python buildscripts/evergreen_gen_fuzzer_tests.py --expansion-file expansions.yml
 
     - command: archive.targz_pack
@@ -1818,7 +1891,6 @@ functions:
           set -o errexit
 
           ${activate_virtualenv}
-          $python -m pip install -r etc/pip/evgtest-requirements.txt
           $python buildscripts/idl/run_tests.py
 
   "run powercycle test":
@@ -1953,7 +2025,6 @@ functions:
         set -o verbose
 
         ${activate_virtualenv}
-        python -m pip install -r etc/pip/core-requirements.txt
 
         rm -rf /data/install /data/multiversion
         $python buildscripts/setup_multiversion_mongodb.py   \
@@ -2158,7 +2229,6 @@ functions:
 
           set -o errexit
           ${activate_virtualenv}
-          python -m pip install -r etc/pip/powercycle-requirements.txt
 
           if [ ! -z "${subnet_id}" ]; then
             subnet_id="-n ${subnet_id}"
@@ -2753,75 +2823,6 @@ functions:
     - *tar_local_client_logs
     - *archive_local_client_logs
 
-  ### Set expansion macros used in each task ###
-  "set task expansion macros":
-    command: expansions.update
-    params:
-      updates:
-      - key: activate_virtualenv
-        value: |
-          # check if virtualenv is set up
-          if [ -d "${workdir}/venv" ]; then
-            if [ "Windows_NT" = "$OS" ]; then
-              # Need to quote the path on Windows to preserve the separator.
-              . "${workdir}/venv/Scripts/activate" 2> /tmp/activate_error.log
-            else
-              . ${workdir}/venv/bin/activate 2> /tmp/activate_error.log
-            fi
-            if [ $? -ne 0 ]; then
-              echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
-            fi
-            python=python
-          else
-            python=${python|/opt/mongodbtoolchain/v3/bin/python3}
-          fi
-
-          if [ "Windows_NT" = "$OS" ]; then
-            export PYTHONPATH="$PYTHONPATH;$(cygpath -w ${workdir}/src)"
-          else
-            export PYTHONPATH="$PYTHONPATH:${workdir}/src"
-          fi
-
-          echo "python set to $(which $python)"
-      - key: posix_workdir
-        value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
-      # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
-      # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
-      - key: ssh_connection_options
-        value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ConnectionAttempts=20
-      - key: ssh_retries
-        value: "10"
-      - key: set_sudo
-        value: |
-          set -o > /tmp/settings.log
-          set +o errexit
-          grep errexit /tmp/settings.log | grep on
-          errexit_on=$?
-          # Set errexit "off".
-          set +o errexit
-          sudo=
-          # Use sudo, if it is supported.
-          sudo date > /dev/null 2>&1
-          if [ $? -eq 0 ]; then
-            sudo=sudo
-          fi
-          # Set errexit "on", if previously enabled.
-          if [ $errexit_on -eq 0 ]; then
-            set -o errexit
-          fi
-      - key: mongo_binaries
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
-      - key: mongo_cryptd
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-cryptd-${build_id}.${ext|tgz}
-      - key: mh_archive
-        value: ${project}/${build_variant}/${revision}/binaries/mh-${build_id}.${ext|tgz}
-      - key: mongo_debugsymbols
-        value: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
-      - key: mongo_shell
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
-      - key: skip_tests
-        value: skip_test-${build_id}
-
   ### Clear and print OOM messages ###
   "clear OOM messages":
       command: shell.exec
@@ -3311,9 +3312,6 @@ functions:
 pre:
   - func: "kill processes"
   - func: "cleanup environment"
-  # The python virtual environment is installed in ${workdir}, which is created in
-  # "set up virtualenv".
-  - func: "set up virtualenv"
   - func: "set task expansion macros"
   - func: "clear OOM messages"
 
@@ -3949,7 +3947,6 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
-    - func: "install pip requirements"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
     - command: s3.get
@@ -4033,7 +4030,6 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
-    - func: "install pip requirements"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
     - command: s3.get
@@ -4122,7 +4118,6 @@ tasks:
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
-    - func: "install pip requirements"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
 
@@ -4547,10 +4542,11 @@ tasks:
   commands:
     - command: manifest.load
     - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-    - func: "install pip requirements"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
     - func: "apply compile expansions"
@@ -4584,6 +4580,8 @@ tasks:
   commands:
     - command: manifest.load
     - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
     - command: shell.exec
       type: test
       params:
@@ -4593,7 +4591,6 @@ tasks:
           set -o verbose
 
           ${activate_virtualenv}
-          python -m pip install -I -r etc/pip/lint-requirements.txt
           export MYPY="$(
             if command -V cygpath 2>/dev/null; then
                 PATH+=":$(cypath "${workdir}")/venv_3/Scripts"
@@ -4611,6 +4608,8 @@ tasks:
   commands:
   - command: manifest.load
   - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "set up virtualenv"
   - command: shell.exec
     type: test
     params:
@@ -4620,42 +4619,7 @@ tasks:
         set -o verbose
 
         ${activate_virtualenv}
-        python -m pip install -I -r etc/pip/lint-requirements.txt
         find buildscripts etc jstests -name '*.y*ml' -exec yamllint -c etc/yamllint_config.yml {} +
-
-- name: verify_pip
-  depends_on: []
-  commands:
-  - command: manifest.load
-  - func: "git get project"
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        # Note: One pleasant side effect of this task is that it should pre warm pip's cache.
-        # For every pypa project that is part of our current toolchain, this will do nothing.
-        # For every pypa project that we are missing, the .whl file will be added to the pip cache.
-        # (See https://pip.pypa.io/en/latest/reference/pip_install/#caching)
-
-        ${activate_virtualenv}
-        # This installs the explicit project versions which would be installed in the toolchain
-        # from this patch
-        python -m pip install -I -r etc/pip/constraints.txt
-
-        python -m pip freeze >requirements.txt.python3.old
-
-        # This installs any requirements which are unsatisfied by the constraints.txt above
-        python -m pip install -r etc/pip/toolchain-requirements.txt
-
-        python -m pip freeze >requirements.txt.python3.new
-
-        # Compare the old freezes to the new freezes.
-        # They should be the same if our constraints satisfy our toolchain requirements
-        diff -w requirements.txt.python3.old requirements.txt.python3.new
 
 ### This task is deprecated, but left in here in case of need to run burn_in_tests
 ### instead of the generated task:
@@ -4666,6 +4630,7 @@ tasks:
   depends_on:
   - name: compile
   commands:
+  - command: manifest.load
   - func: "git get project"
     # The repository is cloned in a directory distinct from src for the modified test detection
     # because the extraction of the artifacts performed in the 'do setup' causes
@@ -4686,7 +4651,6 @@ tasks:
         fi
         pushd ../src
         ${activate_virtualenv}
-        $python -m pip install -r etc/pip/evgtest-requirements.txt
         popd
         # Capture a list of new and modified tests.
         build_variant=${build_variant}
@@ -4707,12 +4671,17 @@ tasks:
 
 - name: burn_in_tests_gen
   commands:
+  - command: manifest.load
   - func: "git get project"
     # The repository is cloned in a directory distinct from src for the modified test detection
     # because the extraction of the artifacts performed in the 'do setup' causes
     # 'git diff --name-only' to see all tests as modified on Windows (git 1.9.5). See SERVER-30634.
     vars:
       git_project_directory: burn_in_tests_clonedir
+  - func: "set task expansion macros"
+  - func: "set up virtualenv"
+    vars:
+      pip_dir: ${workdir}/burn_in_tests_clonedir/etc/pip
   - command: shell.exec
     params:
       working_dir: burn_in_tests_clonedir
@@ -4722,7 +4691,6 @@ tasks:
         set -o verbose
         mkdir ../src
         ${activate_virtualenv}
-        $python -m pip install -r etc/pip/evgtest-requirements.txt
         # If this is a scheduled build, we check for changes against the last scheduled commit.
         if [ "${is_patch}" != "true" ]; then
           burn_in_args="--checkEvergreen"
@@ -4782,6 +4750,7 @@ tasks:
 - <<: *task_template
   name: generate_benchrun_embedded_files
   commands:
+  - command: manifest.load
   - func: "git get project"
   - func: "fetch binaries"
   - func: "extract binaries"
@@ -5624,6 +5593,7 @@ tasks:
 - <<: *task_template
   name: integration_tests_standalone
   commands:
+  - command: manifest.load
   - func: "git get project"
   - func: "do setup"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -5641,6 +5611,7 @@ tasks:
 - <<: *task_template
   name: integration_tests_standalone_audit
   commands:
+  - command: manifest.load
   - func: "git get project"
   - func: "do setup"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -5658,6 +5629,7 @@ tasks:
 - <<: *task_template
   name: integration_tests_replset
   commands:
+  - command: manifest.load
   - func: "git get project"
   - func: "do setup"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -5675,6 +5647,7 @@ tasks:
 - <<: *task_template
   name: integration_tests_sharded
   commands:
+  - command: manifest.load
   - func: "git get project"
   - func: "do setup"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -6838,25 +6811,6 @@ tasks:
   name: free_monitoring
   commands:
   - func: "do setup"
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        ${activate_virtualenv}
-        # Since the free monitoring tests use python 3 via C exec,
-        # they deliberately hit python3.6 on Windows and toolchain python otherwise.
-        # We happen to pre-seed the core requirements in the toolchain,
-        # but we have no way of doing so to Windows python3.6 installed via Chocolatey.
-        if command -V cygpath; then
-            echo "Installing core requirements into Python at '${python}'"
-            "$(cygpath "${python}")" -mpip install -r etc/pip/core-requirements.txt
-        else
-            $python -m pip install -r etc/pip/core-requirements.txt
-        fi
   - func: "run tests"
     vars:
       resmoke_args: --suites=free_monitoring --storageEngine=wiredTiger
@@ -7057,7 +7011,10 @@ tasks:
 - name: buildscripts_test
   depends_on: []
   commands:
+  - command: manifest.load
   - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "set up virtualenv"
   - func: "get buildnumber"
   - func: "set up credentials"
   - func: "run tests"
@@ -7678,6 +7635,7 @@ tasks:
 - name: fetch_test_lifecycle
   depends_on: []
   commands:
+  - command: manifest.load
   - func: "git get project"
   - func: "fetch test_lifecycle.yml"
     vars:
@@ -7689,6 +7647,7 @@ tasks:
   exec_timeout_secs: 21600 # 6 hour timeout for the task overall
   depends_on: []
   commands:
+  - command: manifest.load
   - func: "git get project"
   - func: "configure evergreen api credentials"
   - command: shell.exec
@@ -7719,7 +7678,6 @@ tasks:
         set -o verbose
 
         ${activate_virtualenv}
-        python -m pip install -r etc/pip/jira-requirements.txt
 
         # We use a small batch size to avoid hitting the load balancer timeout if the Evergreen
         # API query is not fast enough.
@@ -7739,6 +7697,7 @@ tasks:
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on: []
   commands:
+  - command: manifest.load
   - func: "git get project"
   - func: "shared scons cache pruning"
 
@@ -7774,7 +7733,6 @@ task_groups:
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "set up virtualenv"
     - func: "set task expansion macros"
-    - func: "install pip requirements"
     - func: "generate compile expansions"
   teardown_group:
     - func: "scons cache pruning"
@@ -9455,7 +9413,7 @@ buildvariants:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python36/python.exe'
+    python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     use_scons_cache: true
     multiversion_platform: windows
@@ -9471,11 +9429,9 @@ buildvariants:
     - name: compile_TG
       requires:
         - name: burn_in_tests_gen
-        - name: verify_pip
       distros:
         - windows-64-vs2017-compile
     - name: burn_in_tests_gen
-    - name: verify_pip
     - name: buildscripts_test
     - name: dbtest_TG
       distros:
@@ -9494,7 +9450,7 @@ buildvariants:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python36/python.exe'
+    python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     use_scons_cache: true
     multiversion_platform: windows
@@ -9683,14 +9639,12 @@ buildvariants:
   - name: compile_TG
     requires:
     - name: burn_in_tests_gen
-    - name: verify_pip
     distros:
     - windows-64-vs2017-compile
   - name: compile_benchmarks
     distros:
     - windows-64-vs2017-compile
   - name: burn_in_tests_gen
-  - name: verify_pip
   - name: audit
   - name: auth_audit_gen
   - name: benchmarks_orphaned
@@ -9793,7 +9747,7 @@ buildvariants:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python36/python.exe'
+    python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     use_scons_cache: true
     test_flags: |- # Use the ServiceExecutorAdaptive with a reasonable number of starting threads
@@ -9826,8 +9780,8 @@ buildvariants:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python36/python.exe'
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
+    python: '/cygdrive/c/python/python37/python.exe'
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     ext: zip
     use_scons_cache: true
     multiversion_platform: windows
@@ -9903,7 +9857,7 @@ buildvariants:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python36/python.exe'
+    python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     use_scons_cache: true
     tooltags: "ssl"
@@ -10023,7 +9977,7 @@ buildvariants:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python36/python.exe'
+    python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     use_scons_cache: true
     tooltags: "ssl sasl"
@@ -10761,7 +10715,6 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     requires:
     - name: burn_in_tests_gen
-    - name: verify_pip
     - name: lint
     distros:
     - rhel62-large
@@ -10773,7 +10726,6 @@ buildvariants:
   - name: burn_in_tests_gen
     distros:
     - rhel62-large
-  - name: verify_pip
   - name: rollback_fuzzer_gen
   - name: rollback_fuzzer_clean_shutdowns_gen
   - name: rollback_fuzzer_unclean_shutdowns_gen
