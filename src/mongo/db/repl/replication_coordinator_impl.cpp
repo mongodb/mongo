@@ -1518,16 +1518,17 @@ OpTime ReplicationCoordinatorImpl::_getMyLastDurableOpTime_inlock() const {
 
 Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer,
                                                                 long long memberId,
-                                                                const OpTime& opTime) {
+                                                                const OpTime& opTime,
+                                                                Date_t wallTime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(getReplicationMode() == modeReplSet);
 
-    const UpdatePositionArgs::UpdateInfo update(OpTime(),
-                                                Date_t::min(),
-                                                opTime,
-                                                Date_t::min() + Seconds(opTime.getSecs()),
-                                                cfgVer,
-                                                memberId);
+    if (wallTime == Date_t::min()) {
+        wallTime = Date_t() + Seconds(opTime.getSecs());
+    }
+
+    const UpdatePositionArgs::UpdateInfo update(
+        OpTime(), Date_t::min(), opTime, wallTime, cfgVer, memberId);
     long long configVersion;
     const auto status = _setLastOptime(lock, update, &configVersion);
     _updateLastCommittedOpTimeAndWallTime(lock);
@@ -1536,16 +1537,17 @@ Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer
 
 Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer,
                                                                 long long memberId,
-                                                                const OpTime& opTime) {
+                                                                const OpTime& opTime,
+                                                                Date_t wallTime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(getReplicationMode() == modeReplSet);
 
-    const UpdatePositionArgs::UpdateInfo update(opTime,
-                                                Date_t::min() + Seconds(opTime.getSecs()),
-                                                OpTime(),
-                                                Date_t::min(),
-                                                cfgVer,
-                                                memberId);
+    if (wallTime == Date_t::min()) {
+        wallTime = Date_t() + Seconds(opTime.getSecs());
+    }
+
+    const UpdatePositionArgs::UpdateInfo update(
+        opTime, wallTime, OpTime(), Date_t::min(), cfgVer, memberId);
     long long configVersion;
     const auto status = _setLastOptime(lock, update, &configVersion);
     _updateLastCommittedOpTimeAndWallTime(lock);

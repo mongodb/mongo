@@ -370,8 +370,14 @@ public:
     /**
      * Simple wrappers around _setLastOptime to make it easier to test.
      */
-    Status setLastAppliedOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
-    Status setLastDurableOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
+    Status setLastAppliedOptime_forTest(long long cfgVer,
+                                        long long memberId,
+                                        const OpTime& opTime,
+                                        Date_t wallTime = Date_t::min());
+    Status setLastDurableOptime_forTest(long long cfgVer,
+                                        long long memberId,
+                                        const OpTime& opTime,
+                                        Date_t wallTime = Date_t::min());
 
     /**
      * Simple test wrappers that expose private methods.

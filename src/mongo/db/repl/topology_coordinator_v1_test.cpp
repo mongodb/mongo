@@ -119,7 +119,7 @@ protected:
 
     void setMyOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getTopoCoord().setMyLastAppliedOpTimeAndWallTime({opTime, wallTime}, now(), false);
     }
@@ -129,7 +129,7 @@ protected:
                                          bool isRollbackAllowed,
                                          Date_t wallTime = Date_t::min()) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getTopoCoord().setMyLastAppliedOpTimeAndWallTime(
             {opTime, wallTime}, now, isRollbackAllowed);
@@ -140,7 +140,7 @@ protected:
                                          bool isRollbackAllowed,
                                          Date_t wallTime = Date_t::min()) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getTopoCoord().setMyLastDurableOpTimeAndWallTime(
             {opTime, wallTime}, now, isRollbackAllowed);
@@ -150,7 +150,7 @@ protected:
                                              Date_t wallTime = Date_t::min(),
                                              const bool fromSyncSource = false) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getTopoCoord().advanceLastCommittedOpTimeAndWallTime({opTime, wallTime}, fromSyncSource);
     }
@@ -286,10 +286,10 @@ private:
                                                     Date_t lastDurableWallTime = Date_t::min(),
                                                     Date_t lastAppliedWallTime = Date_t::min()) {
         if (lastDurableWallTime == Date_t::min()) {
-            lastDurableWallTime = lastDurableWallTime + Seconds(lastOpTimeSender.getSecs());
+            lastDurableWallTime = Date_t() + Seconds(lastOpTimeSender.getSecs());
         }
         if (lastAppliedWallTime == Date_t::min()) {
-            lastAppliedWallTime = lastAppliedWallTime + Seconds(lastOpTimeSender.getSecs());
+            lastAppliedWallTime = Date_t() + Seconds(lastOpTimeSender.getSecs());
         }
         ReplSetHeartbeatResponse hb;
         hb.setConfigVersion(1);
@@ -5239,6 +5239,79 @@ TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
         ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidModeWC,
                                                                      commitReadyMembersMajority));
     }
+}
+
+TEST_F(TopoCoordTest, AdvanceCommittedOpTimeDisregardsWallTimeOrder) {
+    // This test starts by configuring a TopologyCoordinator as a member of a 3 node replica
+    // set. The first and second nodes are secondaries, and the third is primary and corresponds
+    // to ourself.
+    Date_t startupTime = Date_t::fromMillisSinceEpoch(100);
+    Date_t heartbeatTime = Date_t::fromMillisSinceEpoch(5000);
+    Timestamp electionTime(1, 2);
+    OpTimeAndWallTime initialCommittedOpTimeAndWallTime = {OpTime(Timestamp(4, 1), 20),
+                                                           Date_t() + Seconds(5)};
+    // Chronologically, the OpTime of lastCommittedOpTimeAndWallTime is more recent than that of
+    // initialCommittedOpTimeAndWallTime, even though the former's wall time is less recent than
+    // that of the latter.
+    OpTimeAndWallTime lastCommittedOpTimeAndWallTime = {OpTime(Timestamp(5, 1), 20),
+                                                        Date_t() + Seconds(3)};
+    std::string setName = "mySet";
+
+    ReplSetHeartbeatResponse hb;
+    hb.setConfigVersion(1);
+    hb.setState(MemberState::RS_SECONDARY);
+    hb.setElectionTime(electionTime);
+    hb.setDurableOpTimeAndWallTime(initialCommittedOpTimeAndWallTime);
+    hb.setAppliedOpTimeAndWallTime(initialCommittedOpTimeAndWallTime);
+    StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
+
+    updateConfig(BSON("_id" << setName << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test0:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test1:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test2:1234"))),
+                 2,
+                 startupTime + Milliseconds(1));
+
+    // Advance the commit point to initialCommittedOpTimeAndWallTime.
+    HostAndPort memberOne = HostAndPort("test0:1234");
+    getTopoCoord().prepareHeartbeatRequestV1(startupTime + Milliseconds(1), setName, memberOne);
+    getTopoCoord().processHeartbeatResponse(
+        startupTime + Milliseconds(2), Milliseconds(1), memberOne, hbResponseGood);
+
+    HostAndPort memberTwo = HostAndPort("test1:1234");
+    getTopoCoord().prepareHeartbeatRequestV1(startupTime + Milliseconds(2), setName, memberTwo);
+    getTopoCoord().processHeartbeatResponse(
+        heartbeatTime, Milliseconds(1), memberTwo, hbResponseGood);
+
+    makeSelfPrimary(electionTime);
+    getTopoCoord().setMyLastAppliedOpTimeAndWallTime(
+        initialCommittedOpTimeAndWallTime, startupTime, false);
+    getTopoCoord().setMyLastDurableOpTimeAndWallTime(
+        initialCommittedOpTimeAndWallTime, startupTime, false);
+    getTopoCoord().advanceLastCommittedOpTimeAndWallTime(initialCommittedOpTimeAndWallTime, false);
+    ASSERT_EQ(getTopoCoord().getLastCommittedOpTimeAndWallTime(),
+              initialCommittedOpTimeAndWallTime);
+
+    // memberOne's lastApplied and lastDurable OpTimeAndWallTimes are equal to
+    // lastCommittedOpTimeAndWallTime, but memberTwo's are equal to
+    // initialCommittedOpTimeAndWallTime. Only the ordering of OpTimes should influence advancing
+    // the commit point.
+    hb.setAppliedOpTimeAndWallTime(lastCommittedOpTimeAndWallTime);
+    hb.setDurableOpTimeAndWallTime(lastCommittedOpTimeAndWallTime);
+    StatusWith<ReplSetHeartbeatResponse> hbResponseGoodUpdated =
+        StatusWith<ReplSetHeartbeatResponse>(hb);
+    getTopoCoord().prepareHeartbeatRequestV1(heartbeatTime + Milliseconds(3), setName, memberOne);
+    getTopoCoord().processHeartbeatResponse(
+        heartbeatTime + Milliseconds(4), Milliseconds(1), memberOne, hbResponseGoodUpdated);
+    getTopoCoord().setMyLastAppliedOpTimeAndWallTime(
+        lastCommittedOpTimeAndWallTime, startupTime, false);
+    getTopoCoord().setMyLastDurableOpTimeAndWallTime(
+        lastCommittedOpTimeAndWallTime, startupTime, false);
+    getTopoCoord().updateLastCommittedOpTimeAndWallTime();
+    ASSERT_EQ(getTopoCoord().getLastCommittedOpTimeAndWallTime(), lastCommittedOpTimeAndWallTime);
 }
 
 TEST_F(HeartbeatResponseTestV1,

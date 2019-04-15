@@ -1393,7 +1393,7 @@ protected:
         auto config = getReplCoord()->getConfig();
         auto heartbeatInterval = config.getHeartbeatInterval();
         if (desiredWallTime == Date_t::min() && !desiredOpTime.isNull()) {
-            desiredWallTime = Date_t::min() + Seconds(desiredOpTime.getSecs());
+            desiredWallTime = Date_t() + Seconds(desiredOpTime.getSecs());
         }
 
         enterNetwork();
@@ -1454,6 +1454,89 @@ TEST_F(ReplCoordTest, NodeReturnsBadValueWhenUpdateTermIsRunAgainstANonReplNode)
     auto opCtx = makeOperationContext();
 
     ASSERT_EQUALS(ErrorCodes::BadValue, getReplCoord()->updateTerm(opCtx.get(), 0).code());
+}
+
+TEST_F(ReplCoordTest, UpdatePositionArgsAdvancesWallTimes) {
+    init("mySet/test1:1234,test2:1234,test3:1234");
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test2:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test3:1234"))),
+                       HostAndPort("test1", 1234));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    const auto repl = getReplCoord();
+    OpTimeWithTermOne opTime1(100, 1);
+    OpTimeWithTermOne opTime2(200, 1);
+
+    repl->setMyLastAppliedOpTimeAndWallTime({opTime2, Date_t() + Seconds(1)});
+    repl->setMyLastAppliedOpTimeAndWallTime({opTime2, Date_t() + Seconds(2)});
+
+    // Secondaries not caught up yet.
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 1, opTime1, Date_t()));
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, opTime1, Date_t()));
+
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(repl->getMemberState().primary());
+
+    // Catch up the secondaries using only replSetUpdatePosition.
+    long long configVersion = repl->getConfig().getConfigVersion();
+    UpdatePositionArgs updatePositionArgs;
+
+    Date_t memberOneAppliedWallTime = Date_t() + Seconds(3);
+    Date_t memberOneDurableWallTime = Date_t() + Seconds(4);
+    Date_t memberTwoAppliedWallTime = Date_t() + Seconds(5);
+    Date_t memberTwoDurableWallTime = Date_t() + Seconds(6);
+
+    ASSERT_OK(updatePositionArgsInitialize(
+        updatePositionArgs,
+        BSON(UpdatePositionArgs::kCommandFieldName
+             << 1
+             << UpdatePositionArgs::kUpdateArrayFieldName
+             << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
+                                << configVersion
+                                << UpdatePositionArgs::kMemberIdFieldName
+                                << 1
+                                << UpdatePositionArgs::kAppliedOpTimeFieldName
+                                << opTime2.asOpTime().toBSON()
+                                << UpdatePositionArgs::kAppliedWallTimeFieldName
+                                << memberOneAppliedWallTime
+                                << UpdatePositionArgs::kDurableOpTimeFieldName
+                                << opTime2.asOpTime().toBSON()
+                                << UpdatePositionArgs::kDurableWallTimeFieldName
+                                << memberOneDurableWallTime)
+                           << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                                   << configVersion
+                                   << UpdatePositionArgs::kMemberIdFieldName
+                                   << 2
+                                   << UpdatePositionArgs::kAppliedOpTimeFieldName
+                                   << opTime2.asOpTime().toBSON()
+                                   << UpdatePositionArgs::kAppliedWallTimeFieldName
+                                   << memberTwoAppliedWallTime
+                                   << UpdatePositionArgs::kDurableOpTimeFieldName
+                                   << opTime2.asOpTime().toBSON()
+                                   << UpdatePositionArgs::kDurableWallTimeFieldName
+                                   << memberTwoDurableWallTime)))));
+
+    ASSERT_OK(repl->processReplSetUpdatePosition(updatePositionArgs, &configVersion));
+
+    // Make sure wall times are propagated through processReplSetUpdatePosition
+    auto memberDataVector = repl->getMemberData();
+    for (auto member : memberDataVector) {
+        if (member.getMemberId() == 1) {
+            ASSERT_EQ(member.getLastAppliedWallTime(), memberOneAppliedWallTime);
+            ASSERT_EQ(member.getLastDurableWallTime(), memberOneDurableWallTime);
+        } else if (member.getMemberId() == 2) {
+            ASSERT_EQ(member.getLastAppliedWallTime(), memberTwoAppliedWallTime);
+            ASSERT_EQ(member.getLastDurableWallTime(), memberTwoDurableWallTime);
+        }
+    }
 }
 
 TEST_F(ReplCoordTest, ElectionIdTracksTermInPV1) {
@@ -1992,10 +2075,10 @@ protected:
                                     Date_t wallTimeLagged = Date_t::min()) {
         int hbNum = 1;
         if (wallTimePrimary == Date_t::min()) {
-            wallTimePrimary = wallTimePrimary + Seconds(optimePrimary.getSecs());
+            wallTimePrimary = Date_t() + Seconds(optimePrimary.getSecs());
         }
         if (wallTimeLagged == Date_t::min()) {
-            wallTimeLagged = wallTimeLagged + Seconds(optimeLagged.getSecs());
+            wallTimeLagged = Date_t() + Seconds(optimeLagged.getSecs());
         }
         while (getNet()->hasReadyRequests()) {
             NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();

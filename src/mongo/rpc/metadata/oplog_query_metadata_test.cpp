@@ -46,6 +46,7 @@ TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     OplogQueryMetadata metadata({opTime1, committedWall}, opTime2, 6, 12, -1);
 
     ASSERT_EQ(opTime1, metadata.getLastOpCommitted().opTime);
+    ASSERT_EQ(committedWall, metadata.getLastOpCommitted().wallTime);
     ASSERT_EQ(opTime2, metadata.getLastOpApplied());
 
     BSONObjBuilder builder;

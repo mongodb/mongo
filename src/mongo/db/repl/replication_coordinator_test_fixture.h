@@ -119,7 +119,7 @@ protected:
 
     void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
     }
@@ -128,14 +128,14 @@ protected:
                                                 ReplicationCoordinator::DataConsistency consistency,
                                                 Date_t wallTime = Date_t::min()) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward({opTime, wallTime}, consistency);
     }
 
     void replCoordSetMyLastDurableOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->setMyLastDurableOpTimeAndWallTime({opTime, wallTime});
     }
@@ -143,7 +143,7 @@ protected:
     void replCoordSetMyLastDurableOpTimeForward(const OpTime& opTime,
                                                 Date_t wallTime = Date_t::min()) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward({opTime, wallTime});
     }
@@ -152,7 +152,7 @@ protected:
                                      Date_t wallTime = Date_t::min(),
                                      bool fromSyncSource = false) {
         if (wallTime == Date_t::min()) {
-            wallTime = wallTime + Seconds(opTime.getSecs());
+            wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->advanceCommitPoint({opTime, wallTime}, fromSyncSource);
     }
