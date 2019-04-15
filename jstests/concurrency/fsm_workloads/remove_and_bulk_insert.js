@@ -14,7 +14,7 @@ var $config = (function() {
     var states = {
         insert: function insert(db, collName) {
             var bulk = db[collName].initializeUnorderedBulkOp();
-            for (var i = 0; i < 1000; ++i) {
+            for (var i = 0; i < 100; ++i) {
                 bulk.insert({});
             }
             assert.writeOK(bulk.execute());
