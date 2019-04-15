@@ -2,7 +2,7 @@
 
 import unittest
 
-import util.time as time_utils
+from buildscripts.util import time as time_utils
 
 #pylint: disable=missing-docstring
 
