@@ -187,6 +187,9 @@ bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool 
         if (!pin.isOK()) {
             // Either the cursor doesn't exist, or it was killed during the last time it was being
             // used, and was cleaned up after this call. Either way, we cannot kill it.
+            if (checkAuth) {
+                audit::logKillCursorsAuthzCheck(opCtx->getClient(), {}, id, pin.getStatus().code());
+            }
             return false;
         }
         nss = pin.getValue().getCursor()->nss();
@@ -196,6 +199,10 @@ bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool 
         IdToNssMap::const_iterator it = _idToNss.find(nsid);
         if (it == _idToNss.end()) {
             // No namespace corresponding to this cursor id prefix.
+            if (checkAuth) {
+                audit::logKillCursorsAuthzCheck(
+                    opCtx->getClient(), {}, id, ErrorCodes::NamespaceNotFound);
+            }
             return false;
         }
         nss = it->second;
