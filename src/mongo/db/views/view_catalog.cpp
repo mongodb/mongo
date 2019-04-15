@@ -134,7 +134,7 @@ Status ViewCatalog::_reloadIfNeeded(WithLock lk, OperationContext* opCtx) {
 
 void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _requireValidCatalog(lk, opCtx);
+    uassertStatusOK(_reloadIfNeeded(lk, opCtx));
     for (auto&& view : _viewMap) {
         callback(*view.second);
     }
