@@ -1392,7 +1392,14 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
             if (!waitStatus.isOK()) {
                 return waitStatus;
             }
-            LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
+            if (!_currentCommittedSnapshot) {
+                // It is possible for the thread to be awoken due to a spurious wakeup, meaning
+                // the condition variable was never set.
+                LOG(3) << "waitUntilOpTime: awoken but current committed snapshot is null."
+                       << " Continuing to wait for new snapshot.";
+            } else {
+                LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
+            }
             continue;
         }
 
