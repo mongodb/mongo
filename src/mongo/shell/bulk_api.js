@@ -118,6 +118,9 @@ var _bulk_api_module = (function() {
         defineReadOnlyProperty(this, "nMatched", bulkResult.nMatched);
         defineReadOnlyProperty(this, "nModified", bulkResult.nModified);
         defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
+        if (bulkResult.upserted.length > 0) {
+            defineReadOnlyProperty(this, "_id", bulkResult.upserted[bulkResult.upserted.length - 1]._id);
+        }
 
         //
         // Define access methods
