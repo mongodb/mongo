@@ -126,8 +126,14 @@ static void appendGeneric(const HostAndPort& hp, const SinkFunc& write) {
     }
 }
 
+template <typename Stream>
+static Stream& appendToStream(const HostAndPort& hp, Stream& sink) {
+    appendGeneric(hp, [&sink](const auto& v) { sink << v; });
+    return sink;
+}
+
 void HostAndPort::append(StringBuilder& sink) const {
-    appendGeneric(*this, [&sink](const auto& v) { sink << v; });
+    appendToStream(*this, sink);
 }
 
 void HostAndPort::append(fmt::writer& sink) const {
@@ -213,17 +219,15 @@ Status HostAndPort::initialize(StringData s) {
 }
 
 std::ostream& operator<<(std::ostream& os, const HostAndPort& hp) {
-    return os << hp.toString();
+    return appendToStream(hp, os);
 }
 
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, const HostAndPort& hp) {
-    return os << hp.toString();
+StringBuilder& operator<<(StringBuilder& os, const HostAndPort& hp) {
+    return appendToStream(hp, os);
 }
 
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
-                                                       const HostAndPort&);
-template StringBuilderImpl<SharedBufferAllocator>& operator<<(
-    StringBuilderImpl<SharedBufferAllocator>&, const HostAndPort&);
+StackStringBuilder& operator<<(StackStringBuilder& os, const HostAndPort& hp) {
+    return appendToStream(hp, os);
+}
 
 }  // namespace mongo
