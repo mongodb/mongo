@@ -49,11 +49,6 @@
 
 namespace mongo {
 
-namespace {
-
-const auto inUserManagementCommandsFlag = OperationContext::declareDecoration<bool>();
-}
-
 using std::vector;
 
 Status AuthzManagerExternalStateLocal::initialize(OperationContext* opCtx) {
@@ -545,17 +540,15 @@ public:
           _op(op),
           _nss(nss),
           _o(o.getOwned()),
-          _o2(o2 ? boost::optional<BSONObj>(o2->getOwned()) : boost::none),
-          _refreshedPinnedUsers(_invalidateRelevantCacheData()) {}
+          _o2(o2 ? boost::optional<BSONObj>(o2->getOwned()) : boost::none) {
 
-    void commit(boost::optional<Timestamp>) final {
+        _invalidateRelevantCacheData();
+    }
+
+    void commit(boost::optional<Timestamp> timestamp) final {
         if (_nss == AuthorizationManager::rolesCollectionNamespace ||
             _nss == AuthorizationManager::adminCommandNamespace) {
             _refreshRoleGraph();
-        }
-
-        if (_refreshedPinnedUsers) {
-            _authzManager->setPinnedUsers(std::move(*_refreshedPinnedUsers));
         }
     }
 
@@ -612,18 +605,11 @@ private:
         }
     }
 
-    boost::optional<std::vector<UserHandle>> _invalidateRelevantCacheData() {
-        // When we're doing a user management command we lock the admin DB for the duration
-        // of the command and invalidate the cache at the end of the command, so we don't need
-        // to invalidate it based on calls to logOp().
-        if (inUserManagementCommandsFlag(_opCtx)) {
-            LOG(1) << "Skipping cache invalidation in opObserver because of active user command";
-            return boost::none;
-        }
-
+    void _invalidateRelevantCacheData() {
         if (_nss == AuthorizationManager::rolesCollectionNamespace ||
             _nss == AuthorizationManager::versionCollectionNamespace) {
-            return _authzManager->invalidateUserCacheNoPin(_opCtx);
+            _authzManager->invalidateUserCache(_opCtx);
+            return;
         }
 
         if (_op == "i" || _op == "d" || _op == "u") {
@@ -639,11 +625,12 @@ private:
                 warning() << "Invalidating user cache based on user being updated failed, will "
                              "invalidate the entire cache instead: "
                           << userName.getStatus();
-                return _authzManager->invalidateUserCacheNoPin(_opCtx);
+                _authzManager->invalidateUserCache(_opCtx);
+                return;
             }
-            return _authzManager->invalidateUserByNameNoPin(_opCtx, userName.getValue());
+            _authzManager->invalidateUserByName(_opCtx, userName.getValue());
         } else {
-            return _authzManager->invalidateUserCacheNoPin(_opCtx);
+            _authzManager->invalidateUserCache(_opCtx);
         }
     }
 
@@ -655,8 +642,6 @@ private:
     const NamespaceString _nss;
     const BSONObj _o;
     const boost::optional<BSONObj> _o2;
-
-    boost::optional<std::vector<UserHandle>> _refreshedPinnedUsers;
 };
 
 void AuthzManagerExternalStateLocal::logOp(OperationContext* opCtx,
@@ -679,10 +664,6 @@ void AuthzManagerExternalStateLocal::logOp(OperationContext* opCtx,
 
         wuow.commit();
     }
-}
-
-void AuthzManagerExternalStateLocal::setInUserManagementCommand(OperationContext* opCtx, bool val) {
-    inUserManagementCommandsFlag(opCtx) = val;
 }
 
 }  // namespace mongo

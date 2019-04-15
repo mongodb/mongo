@@ -53,10 +53,6 @@ public:
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) override;
 
-    std::unique_ptr<StateLock> lock(OperationContext* opCtx) final;
-
-    bool needsLockForUserName(OperationContext* opCtx, const UserName& name) final;
-
     virtual Status findOne(OperationContext* opCtx,
                            const NamespaceString& collectionName,
                            const BSONObj& query,

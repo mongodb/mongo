@@ -110,9 +110,6 @@ public:
                const BSONObj& o,
                const BSONObj* o2) final;
 
-
-    void setInUserManagementCommand(OperationContext* opCtx, bool val) final;
-
     /**
      * Takes a user document, and processes it with the RoleGraph, in order to recursively
      * resolve roles and add the 'inheritedRoles', 'inheritedPrivileges',

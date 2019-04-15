@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "mongo/base/secure_allocator.h"
@@ -125,12 +126,6 @@ public:
      * Invalidate a user, and repin it if necessary.
      */
     void invalidateUserByName(OperationContext* opCtx, const UserName& user) override;
-    /**
-     * Invalidate a user, and return a full set of pinned users to be later attached to
-     * the AuthorizationManager.
-     */
-    std::vector<UserHandle> invalidateUserByNameNoPin(OperationContext* opCtx,
-                                                      const UserName& user);
 
     void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) override;
 
@@ -141,17 +136,7 @@ public:
      */
     void invalidateUserCache(OperationContext* opCtx) override;
 
-    /**
-     * Invalidate the user cache, without repinning users. Instead return the set
-     * of users which should be later pinned.
-     */
-    std::vector<UserHandle> invalidateUserCacheNoPin(OperationContext* opCtx);
-
-    /**
-     * Attach a set of previously acquired Users to the AuthorizationManager
-     * as pinned users.
-     */
-    void setPinnedUsers(std::vector<UserHandle>);
+    void updatePinnedUsersList(std::vector<UserName> names) override;
 
     Status _initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc) override;
 
@@ -163,20 +148,12 @@ public:
 
     std::vector<CachedUserInfo> getUserCacheInfo() const override;
 
-    void setInUserManagementCommand(OperationContext* opCtx, bool val) override;
-
 private:
     /**
      * Type used to guard accesses and updates to the user cache.
      */
     class CacheGuard;
     friend class AuthorizationManagerImpl::CacheGuard;
-
-    /**
-     * Attach a set of previously acquired Users to the AuthorizationManager
-     * as pinned users, under the protection of an existing CacheGuard.
-     */
-    void setPinnedUsers_inlock(const CacheGuard&, std::vector<UserHandle>);
 
     /**
      * Invalidates all User objects in the cache and removes them from the cache.
@@ -200,12 +177,7 @@ private:
      */
     void _updateCacheGeneration_inlock(const CacheGuard&);
 
-
-    std::vector<UserHandle> _fetchPinnedUsers(CacheGuard& guard, OperationContext* opCtx);
-
-    StatusWith<UserHandle> _acquireUserSlowPath(CacheGuard& guard,
-                                                OperationContext* opCtx,
-                                                const UserName& userName);
+    void _pinnedUsersThreadRoutine() noexcept;
 
     /**
      * Fetches user information from a v2-schema user document for the named user,
@@ -259,7 +231,11 @@ private:
     };
 
     InvalidatingLRUCache<UserName, User, UserCacheInvalidator> _userCache;
-    std::vector<UserHandle> _pinnedUsers;
+
+    stdx::mutex _pinnedUsersMutex;
+    stdx::condition_variable _pinnedUsersCond;
+    std::once_flag _pinnedThreadTrackerStarted;
+    boost::optional<std::vector<UserName>> _usersToPin;
 
     /**
      * Protects _cacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
@@ -279,15 +255,13 @@ private:
      *
      * Manipulated via CacheGuard.
      */
-    bool _isFetchPhaseBusy;
+    bool _isFetchPhaseBusy = false;
 
     /**
      * Condition used to signal that it is OK for another CacheGuard to enter a fetch phase.
      * Manipulated via CacheGuard.
      */
     stdx::condition_variable _fetchPhaseIsReady;
-
-    AtomicWord<bool> _inUserManagementCommand{false};
 };
 
 extern int authorizationManagerCacheSize;

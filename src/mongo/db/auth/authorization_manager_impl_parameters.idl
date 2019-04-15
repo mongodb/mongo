@@ -51,3 +51,12 @@ server_parameters:
     cpp_class:
       name: AuthorizationManagerPinnedUsersServerParameter
       override_set: true
+
+  authorizationManagerPinnedUsersRefreshIntervalMillis:
+    description: The number of milliseconds between refreshing pinned users.
+    set_at:
+      - startup
+      - runtime
+    cpp_vartype: AtomicWord<long long>
+    cpp_varname: authorizationManagerPinnedUsersRefreshIntervalMillis
+    default: 1000

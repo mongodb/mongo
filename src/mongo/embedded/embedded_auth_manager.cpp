@@ -139,7 +139,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void setInUserManagementCommand(OperationContext*, bool) override {
+    void updatePinnedUsersList(std::vector<UserName>) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

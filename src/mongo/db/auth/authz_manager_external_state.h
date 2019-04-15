@@ -167,35 +167,6 @@ public:
                        const NamespaceString& ns,
                        const BSONObj& o,
                        const BSONObj* o2) {}
-    /**
-     * Represents a lock_guard on the storage for this implementation of the external state.
-     */
-    class StateLock {
-        StateLock(StateLock&) = delete;
-        StateLock& operator=(StateLock&) = delete;
-
-    public:
-        StateLock() = default;
-        virtual ~StateLock() = default;
-    };
-
-    /**
-     * Returns a Lock on the external state for the given operation context.
-     *
-     * By default this returns an empty/noop StateLock.
-     */
-    virtual std::unique_ptr<StateLock> lock(OperationContext* opCtx) {
-        return std::make_unique<StateLock>();
-    };
-
-    /**
-     * Returns true if you must acquire a StateLock before fetching a user description.
-     *
-     * By default this returns false since only mongod actually needs to do locking at this level.
-     */
-    virtual bool needsLockForUserName(OperationContext* opCtx, const UserName& user) {
-        return false;
-    }
 
     virtual void setInUserManagementCommand(OperationContext* opCtx, bool val) {}
 
