@@ -1193,18 +1193,28 @@ var ReplSetTest = function(opts) {
      * of the oplog on *all* secondaries.
      * Returns last oplog entry.
      */
-    this.awaitLastOpCommitted = function(timeout) {
+    this.awaitLastOpCommitted = function(timeout, members) {
         var rst = this;
         var master = rst.getPrimary();
         var masterOpTime = _getLastOpTime(master);
 
-        print("Waiting for op with OpTime " + tojson(masterOpTime) +
-              " to be committed on all secondaries");
+        let membersToCheck;
+        if (members !== undefined) {
+            print("Waiting for op with OpTime " + tojson(masterOpTime) + " to be committed on " +
+                  members.map(s => s.host));
+
+            membersToCheck = members;
+        } else {
+            print("Waiting for op with OpTime " + tojson(masterOpTime) +
+                  " to be committed on all secondaries");
+
+            membersToCheck = rst.nodes;
+        }
 
         assert.soonNoExcept(
             function() {
-                for (var i = 0; i < rst.nodes.length; i++) {
-                    var node = rst.nodes[i];
+                for (var i = 0; i < membersToCheck.length; i++) {
+                    var node = membersToCheck[i];
 
                     // Continue if we're connected to an arbiter
                     var res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));

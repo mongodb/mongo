@@ -250,10 +250,10 @@ public:
     bool updateLastCommittedOpTime();
 
     /**
-     * Updates _lastCommittedOpTime to be "committedOpTime" if it is more recent than the
-     * current last committed OpTime.  Returns true if _lastCommittedOpTime is changed.
+     * Updates _lastCommittedOpTime to min(committedOpTime, lastApplied) if it is more recent than
+     * the current last committed OpTime.  Returns true if _lastCommittedOpTime is changed.
      */
-    bool advanceLastCommittedOpTime(const OpTime& committedOpTime);
+    bool advanceLastCommittedOpTime(OpTime committedOpTime);
 
     /**
      * Returns the OpTime of the latest majority-committed op known to this server.
