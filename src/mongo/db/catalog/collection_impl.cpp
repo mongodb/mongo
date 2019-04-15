@@ -677,8 +677,8 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
 
     args->preImageDoc = oldDoc.value().getOwned();
 
-    Status updateStatus =
-        _recordStore->updateRecord(opCtx, oldLocation, newDoc.objdata(), newDoc.objsize());
+    uassertStatusOK(
+        _recordStore->updateRecord(opCtx, oldLocation, newDoc.objdata(), newDoc.objsize()));
 
     if (indexesAffected) {
         int64_t keysInserted, keysDeleted;
