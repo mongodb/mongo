@@ -806,6 +806,7 @@ void ConnectionPool::SpecificPool::triggerShutdown(const Status& status) {
     processFailure(status);
 
     _droppedProcessingPool.clear();
+    _eventTimer->cancelTimeout();
 }
 
 // Drop connections and fail all requests
