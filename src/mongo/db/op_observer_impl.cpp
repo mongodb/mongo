@@ -1165,7 +1165,9 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
 
     StmtId stmtId(1);
-    if (gUseMultipleOplogEntryFormatForTransactions) {
+    if (gUseMultipleOplogEntryFormatForTransactions &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         stmtId = txnParticipant.retrieveCompletedTransactionOperations(opCtx).size() + 1;
     }
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
@@ -1276,7 +1278,9 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         return;
 
     repl::OpTime commitOpTime;
-    if (!gUseMultipleOplogEntryFormatForTransactions) {
+    if (!gUseMultipleOplogEntryFormatForTransactions ||
+        serverGlobalParams.featureCompatibility.getVersion() <
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         commitOpTime = logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
     } else {
         // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
@@ -1312,7 +1316,9 @@ void OpObserverImpl::onPreparedTransactionCommit(
 
     CommitTransactionOplogObject cmdObj;
     cmdObj.setCommitTimestamp(commitTimestamp);
-    if (gUseMultipleOplogEntryFormatForTransactions) {
+    if (gUseMultipleOplogEntryFormatForTransactions &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         cmdObj.setPrepared(true);
     }
     logCommitOrAbortForPreparedTransaction(
@@ -1375,7 +1381,9 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
         return;
     }
 
-    if (!gUseMultipleOplogEntryFormatForTransactions) {
+    if (!gUseMultipleOplogEntryFormatForTransactions ||
+        serverGlobalParams.featureCompatibility.getVersion() <
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         // We write the oplog entry in a side transaction so that we do not commit the now-prepared
         // transaction.
         // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp

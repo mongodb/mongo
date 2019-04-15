@@ -1029,7 +1029,9 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         // being prepared. When the OplogSlotReserver goes out of scope and is destroyed, the
         // storage-transaction it uses to keep the hole open will abort and the slot (and
         // corresponding oplog hole) will vanish.
-        if (!gUseMultipleOplogEntryFormatForTransactions) {
+        if (!gUseMultipleOplogEntryFormatForTransactions ||
+            serverGlobalParams.featureCompatibility.getVersion() <
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
             oplogSlotReserver.emplace(opCtx);
         } else {
             const auto numSlotsToReserve = retrieveCompletedTransactionOperations(opCtx).size();
@@ -1105,6 +1107,10 @@ void TransactionParticipant::Participant::addTransactionOperation(
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     p().transactionOperations.push_back(operation);
     p().transactionOperationBytes += repl::OplogEntry::getDurableReplOperationSize(operation);
+
+    // Creating transactions larger than 16MB requires a new oplog format only available in FCV 4.2.
+    const auto isFCV42 = serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
     // _transactionOperationBytes is based on the in-memory size of the operation.  With overhead,
     // we expect the BSON size of the operation to be larger, so it's possible to make a transaction
     // just a bit too large and have it fail only in the commit.  It's still useful to fail early
@@ -1112,9 +1118,9 @@ void TransactionParticipant::Participant::addTransactionOperation(
     uassert(ErrorCodes::TransactionTooLarge,
             str::stream() << "Total size of all transaction operations must be less than "
                           << BSONObjMaxInternalSize
-                          << ". Actual size is "
+                          << " when using featureCompatibilityVersion < 4.2. Actual size is "
                           << p().transactionOperationBytes,
-            gUseMultipleOplogEntryFormatForTransactions ||
+            (gUseMultipleOplogEntryFormatForTransactions && isFCV42) ||
                 p().transactionOperationBytes <= BSONObjMaxInternalSize);
 }
 
@@ -2065,7 +2071,10 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
         newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
         newTxnRecord.setLastWriteDate(newLastWriteDate);
         newTxnRecord.setState(newState);
-        if (gUseMultipleOplogEntryFormatForTransactions && startOpTime) {
+        if (gUseMultipleOplogEntryFormatForTransactions &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
+            startOpTime) {
             // The startOpTime should only be set when transitioning the txn to in-progress or
             // prepared.
             invariant(newState == DurableTxnStateEnum::kInProgress ||
