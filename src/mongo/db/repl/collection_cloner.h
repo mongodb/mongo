@@ -216,7 +216,8 @@ private:
      * For each batch returned by the upstream node, _handleNextBatch will be called with the data.
      * This method will return when the entire query is finished or failed.
      */
-    void _runQuery(const executor::TaskExecutor::CallbackArgs& callbackData);
+    void _runQuery(const executor::TaskExecutor::CallbackArgs& callbackData,
+                   std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Put all results from a query batch into a buffer to be inserted, and schedule

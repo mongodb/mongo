@@ -479,15 +479,20 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
     // schedule work on that thread while still running.
     auto runQueryCallback =
         _executor->scheduleWork([this](const executor::TaskExecutor::CallbackArgs& callbackData) {
-            ON_BLOCK_EXIT([this] {
+            // This completion guard invokes _finishCallback on destruction.
+            auto cancelRemainingWorkInLock = [this]() { _cancelRemainingWork_inlock(); };
+            auto finishCallbackFn = [this](const Status& status) {
                 {
                     stdx::lock_guard<stdx::mutex> lock(_mutex);
                     _queryState = QueryState::kFinished;
                     _clientConnection.reset();
                 }
                 _condition.notify_all();
-            });
-            _runQuery(callbackData);
+                _finishCallback(status);
+            };
+            auto onCompletionGuard =
+                std::make_shared<OnCompletionGuard>(cancelRemainingWorkInLock, finishCallbackFn);
+            _runQuery(callbackData, onCompletionGuard);
         });
     if (!runQueryCallback.isOK()) {
         _finishCallback(runQueryCallback.getStatus());
@@ -495,9 +500,11 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
     }
 }
 
-void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& callbackData) {
+void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& callbackData,
+                                 std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     if (!callbackData.status.isOK()) {
-        _finishCallback(callbackData.status);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, callbackData.status);
         return;
     }
     bool queryStateOK = false;
@@ -507,13 +514,11 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
         if (queryStateOK) {
             _queryState = QueryState::kRunning;
             _clientConnection = _createClientFn();
+        } else {
+            onCompletionGuard->setResultAndCancelRemainingWork_inlock(
+                lock, {ErrorCodes::CallbackCanceled, "Collection cloning cancelled."});
+            return;
         }
-    }
-    if (!queryStateOK) {
-        // _finishCallback must not called with _mutex locked.  If the queryState changes
-        // after the mutex is released, we will do the query and cancel after the first batch.
-        _finishCallback({ErrorCodes::CallbackCanceled, "Collection cloning cancelled."});
-        return;
     }
 
     MONGO_FAIL_POINT_BLOCK(initialSyncHangBeforeCollectionClone, options) {
@@ -529,20 +534,18 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
 
     Status clientConnectionStatus = _clientConnection->connect(_source, StringData());
     if (!clientConnectionStatus.isOK()) {
-        _finishCallback(clientConnectionStatus);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, clientConnectionStatus);
         return;
     }
     if (!replAuthenticate(_clientConnection.get())) {
-        _finishCallback({ErrorCodes::AuthenticationFailed,
-                         str::stream() << "Failed to authenticate to " << _source});
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(
+            lock,
+            {ErrorCodes::AuthenticationFailed,
+             str::stream() << "Failed to authenticate to " << _source});
         return;
     }
-
-    // This completion guard invokes _finishCallback on destruction.
-    auto cancelRemainingWorkInLock = [this]() { _cancelRemainingWork_inlock(); };
-    auto finishCallbackFn = [this](const Status& status) { _finishCallback(status); };
-    auto onCompletionGuard =
-        std::make_shared<OnCompletionGuard>(cancelRemainingWorkInLock, finishCallbackFn);
 
     // readOnce is available on 4.2 sync sources only.  Initially we don't know FCV, so
     // we won't use the readOnce feature, but once the admin database is cloned we will use it.
