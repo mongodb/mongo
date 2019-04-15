@@ -42,17 +42,17 @@ namespace mongo {
 namespace {
 
 // Helper methods
-long long hashIt(const BSONObj& object, int seed) {
+long long hashIt(const BSONObj& object, HashSeed seed) {
     return BSONElementHasher::hash64(object.firstElement(), seed);
 }
 long long hashIt(const BSONObj& object) {
-    int seed = 0;
+    HashSeed seed = 0;
     return hashIt(object, seed);
 }
 
 // Test different oids hash to different things
 TEST(BSONElementHasher, DifferentOidsAreDifferentHashes) {
-    int seed = 0;
+    HashSeed seed = 0;
 
     long long int oidHash =
         BSONElementHasher::hash64(BSONObjBuilder().genOID().obj().firstElement(), seed);
@@ -124,7 +124,7 @@ TEST(BSONElementHasher, SubDocumentGroupingHashesDiffer) {
 
 // Testing codeWscope scope squashing
 TEST(BSONElementHasher, CodeWithScopeSquashesScopeIntsAndDoubles) {
-    int seed = 0;
+    HashSeed seed = 0;
 
     BSONObjBuilder b1;
     b1.appendCodeWScope("a", "print('this is some stupid code')", BSON("a" << 3));
@@ -358,6 +358,18 @@ TEST(BSONElementHasher, HashCode) {
 TEST(BSONElementHasher, HashCodeWScope) {
     BSONObj o = BSON("check" << BSONCodeWScope("func f() { return 1; }", BSON("c" << true)));
     ASSERT_EQUALS(hashIt(o), 501342939894575968LL);
+}
+
+TEST(BSONElementHasher, HashWithNonZeroSeed) {
+    HashSeed seed = 40513;
+
+    BSONObj o = BSON("check" << 42);
+    ASSERT_EQUALS(hashIt(o, seed), 4302929669663179197LL);
+
+    o = BSON("check" << BSON_ARRAY("sunflower"
+                                   << "sesame"
+                                   << "mustard"));
+    ASSERT_EQUALS(hashIt(o, seed), -9222615859251096151LL);
 }
 
 }  // namespace

@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-typedef int HashSeed;
+typedef int32_t HashSeed;
 
 class BSONElementHasher {
     BSONElementHasher(const BSONElementHasher&) = delete;
@@ -52,7 +52,7 @@ public:
      * WARNING: do not change the hash see value. Hash-based sharding clusters will
      * expect that value to be zero.
      */
-    static const int DEFAULT_HASH_SEED = 0;
+    static constexpr HashSeed const DEFAULT_HASH_SEED = 0;
 
     /* This computes a 64-bit hash of the value part of BSONElement "e",
      * preceded by the seed "seed".  Squashes element (and any sub-elements)
