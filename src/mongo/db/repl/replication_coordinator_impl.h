@@ -960,8 +960,8 @@ private:
         stdx::unique_lock<stdx::mutex> lock);
 
     /**
-     * Updates the last committed OpTime to be "committedOpTime" if it is more recent than the
-     * current last committed OpTime.
+     * Updates the last committed OpTime to be min(committedOpTime, lastApplied) if it is more
+     * recent than the current last committed OpTime.
      */
     void _advanceCommitPoint_inlock(const OpTime& committedOpTime);
 

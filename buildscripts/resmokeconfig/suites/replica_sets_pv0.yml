@@ -42,6 +42,9 @@ selector:
   - jstests/replsets/election_handoff*.js
   # replSetGetStatus doesn't return read concern majority optime in PV0.
   - jstests/replsets/awaitdata_getmore_new_last_committed_optime.js
+  # These tests require terms.
+  - jstests/replsets/do_not_advance_commit_point_beyond_last_applied_term.js
+  - jstests/replsets/update_commit_point_from_sync_source_ignores_term.js
 
 
 executor:

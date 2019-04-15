@@ -51,6 +51,7 @@ namespace repl {
 Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
 
 MONGO_FP_DECLARE(stopReplProducer);
+MONGO_FP_DECLARE(stopReplProducerOnDocument);
 
 namespace {
 
@@ -398,6 +399,18 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
     // error out. The FailPointEnabled error will be caught by the AbstractOplogFetcher.
     if (MONGO_FAIL_POINT(stopReplProducer)) {
         return Status(ErrorCodes::FailPointEnabled, "stopReplProducer fail point is enabled");
+    }
+
+    // Stop fetching and return when we reach a particular document. This failpoint should be used
+    // with the setParameter bgSyncOplogFetcherBatchSize=1, so that documents are fetched one at a
+    // time.
+    MONGO_FAIL_POINT_BLOCK(stopReplProducerOnDocument, fp) {
+        if (!queryResponse.documents.empty() &&
+            SimpleBSONObjComparator::kInstance.evaluate(
+                fp.getData()["document"].Obj() == queryResponse.documents.front()["o"].Obj())) {
+            return Status(ErrorCodes::FailPointEnabled,
+                          "stopReplProducerOnDocument fail point is enabled");
+        }
     }
 
     const auto& documents = queryResponse.documents;

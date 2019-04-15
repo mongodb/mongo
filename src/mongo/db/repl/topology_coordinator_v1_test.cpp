@@ -1577,10 +1577,10 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     Seconds uptimeSecs(10);
     Date_t curTime = heartbeatTime + uptimeSecs;
     Timestamp electionTime(1, 2);
-    OpTime oplogProgress(Timestamp(3, 4), 2);
-    OpTime oplogDurable(Timestamp(3, 4), 1);
-    OpTime lastCommittedOpTime(Timestamp(2, 3), 6);
-    OpTime readConcernMajorityOpTime(Timestamp(4, 5), 7);
+    OpTime oplogProgress(Timestamp(3, 1), 20);
+    OpTime oplogDurable(Timestamp(1, 1), 19);
+    OpTime lastCommittedOpTime(Timestamp(5, 1), 20);
+    OpTime readConcernMajorityOpTime(Timestamp(4, 1), 20);
     BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
     std::string setName = "mySet";
 
