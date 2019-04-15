@@ -99,7 +99,9 @@ TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
                                    << "/pointer");
     IDLParserErrorContext ctxt("encrypt");
     auto encryptInfo = EncryptionInfo::parse(ctxt, encryptInfoBSON);
-    ASSERT_EQ(encryptInfo.getBsonType().get(), "int");
+    MatcherTypeSet resultMatcherSet;
+    resultMatcherSet.bsonTypes.insert(BSONType::NumberInt);
+    ASSERT_TRUE(encryptInfo.getBsonType() == BSONTypeSet(resultMatcherSet));
     ASSERT_TRUE(encryptInfo.getAlgorithm().get() == FleAlgorithmEnum::kDeterministic);
     EncryptSchemaKeyId keyid = encryptInfo.getKeyId().get();
     ASSERT_TRUE(keyid.type() == EncryptSchemaKeyId::Type::kJSONPointer);
