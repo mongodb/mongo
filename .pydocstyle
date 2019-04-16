@@ -11,4 +11,4 @@ inherit = false
 # D301 - Use r""" if any backslashes in a docstring
 ignore = D105,D202,D203,D212,D213,D301
 # Do not run on buildscripts/tests/
-match = ^((?!buildscripts\/tests\/).)*$
+match = ^((?!buildscripts[\\\/]tests[\\\/]).)*$
