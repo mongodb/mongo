@@ -278,7 +278,11 @@ namespace {
 Status _applyPrepareTransaction(OperationContext* opCtx,
                                 const OplogEntry& entry,
                                 repl::OplogApplication::Mode oplogApplicationMode) {
-    auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
+
+    auto ops = [&] {
+        ReadSourceScope readSourceScope(opCtx);
+        return readTransactionOperationsFromOplogChain(opCtx, entry, {});
+    }();
 
     if (oplogApplicationMode == repl::OplogApplication::Mode::kRecovering) {
         // We might replay a prepared transaction behind oldest timestamp.  Note that since this is
