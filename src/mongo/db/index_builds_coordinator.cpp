@@ -846,7 +846,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     // Collection scan and insert into index, followed by a drain of writes received in the
     // background.
     {
-        Lock::CollectionLock colLock(opCtx, nss.ns(), MODE_IX);
+        Lock::CollectionLock colLock(opCtx, nss, MODE_IX);
         uassertStatusOK(
             _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
     }
@@ -859,7 +859,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     // Perform the first drain while holding an intent lock.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx, nss.ns(), MODE_IS);
+        Lock::CollectionLock colLock(opCtx, nss, MODE_IS);
 
         // Read at a point in time so that the drain, which will timestamp writes at lastApplied,
         // can never commit writes earlier than its read timestamp.
@@ -875,7 +875,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx, nss.ns(), MODE_S);
+        Lock::CollectionLock colLock(opCtx, nss, MODE_S);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
@@ -904,7 +904,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                   str::stream() << "Database not found after relocking. Index build: "
                                 << replState->buildUUID
                                 << ": "
-                                << nss.ns()
+                                << nss
                                 << " ("
                                 << replState->collectionUUID
                                 << ")");
@@ -912,7 +912,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                   str::stream() << "Collection not found after relocking. Index build: "
                                 << replState->buildUUID
                                 << ": "
-                                << nss.ns()
+                                << nss
                                 << " ("
                                 << replState->collectionUUID
                                 << ")");
@@ -1106,7 +1106,7 @@ int IndexBuildsCoordinator::_getNumIndexesTotal(OperationContext* opCtx, Collect
                             << nss);
 
     auto indexCatalog = collection->getIndexCatalog();
-    invariant(indexCatalog, str::stream() << "Collection is missing index catalog: " << nss.ns());
+    invariant(indexCatalog, str::stream() << "Collection is missing index catalog: " << nss);
 
     return indexCatalog->numIndexesTotal(opCtx);
 }

@@ -67,7 +67,7 @@ void CollectionTest::makeUncapped(NamespaceString nss) {
 void CollectionTest::checkValidate(
     Collection* coll, bool valid, int records, int invalid, int errors) {
     auto opCtx = operationContext();
-    auto collLock = std::make_unique<Lock::CollectionLock>(opCtx, coll->ns().ns(), MODE_X);
+    auto collLock = std::make_unique<Lock::CollectionLock>(opCtx, coll->ns(), MODE_X);
 
     for (auto level : levels) {
         ValidateResults results;

@@ -301,7 +301,7 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     opCtx->recoveryUnit()->abandonSnapshot();
     boost::optional<Lock::CollectionLock> exclusiveCollectionLock(
-        boost::in_place_init, opCtx, ns.ns(), MODE_X);
+        boost::in_place_init, opCtx, ns, MODE_X);
 
     // Allow the strong lock acquisition above to be interrupted, but from this point forward do
     // not allow locks or re-locks to be interrupted.
@@ -362,7 +362,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     ON_BLOCK_EXIT([&] {
         if (!exclusiveCollectionLock) {
             opCtx->recoveryUnit()->abandonSnapshot();
-            exclusiveCollectionLock.emplace(opCtx, ns.ns(), MODE_X);
+            exclusiveCollectionLock.emplace(opCtx, ns, MODE_X);
         }
         if (MONGO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
             // Set a flag to leave the persisted index build state intact when cleanUpAfterBuild()
@@ -397,7 +397,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Collection scan and insert into index, followed by a drain of writes received in the
     // background.
     {
-        Lock::CollectionLock colLock(opCtx, ns.ns(), MODE_IS);
+        Lock::CollectionLock colLock(opCtx, ns, MODE_IS);
         uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
     }
 
@@ -409,7 +409,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Perform the first drain while holding an intent lock.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx, ns.ns(), MODE_IS);
+        Lock::CollectionLock colLock(opCtx, ns, MODE_IS);
 
         // Read at a point in time so that the drain, which will timestamp writes at lastApplied,
         // can never commit writes earlier than its read timestamp.
@@ -424,7 +424,8 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx, ns.ns(), MODE_S);
+        Lock::CollectionLock colLock(opCtx, ns, MODE_S);
+
         uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
     }
 
@@ -436,7 +437,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Need to get exclusive collection lock back to complete the index build.
     if (indexer.isBackgroundBuilding()) {
         opCtx->recoveryUnit()->abandonSnapshot();
-        exclusiveCollectionLock.emplace(opCtx, ns.ns(), MODE_X);
+        exclusiveCollectionLock.emplace(opCtx, ns, MODE_X);
     }
 
     db = databaseHolder->getDb(opCtx, ns.db());

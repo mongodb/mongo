@@ -75,7 +75,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
               modeDB,
               deadline),
       _resolvedNss(resolveNamespaceStringOrUUID(opCtx, nsOrUUID)) {
-    _collLock.emplace(opCtx, _resolvedNss.ns(), modeColl, deadline);
+    _collLock.emplace(opCtx, _resolvedNss, modeColl, deadline);
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
         const BSONObj& data = customWait.getData();

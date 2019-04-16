@@ -93,7 +93,7 @@ MongoInterfaceShardServer::collectDocumentKeyFieldsForHostedCollection(Operation
 
     const auto metadata = [opCtx, &nss]() -> ScopedCollectionMetadata {
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-        Lock::CollectionLock collLock(opCtx, nss.ns(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
         return CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
     }();
 

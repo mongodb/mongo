@@ -259,7 +259,7 @@ public:
                 Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
                 invariant(dbLock.isLocked(),
                           "Expected lock acquisition to succeed due to UninterruptibleLockGuard");
-                Lock::CollectionLock collLock(opCtx, nss.ns(), MODE_IS);
+                Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
                 exec.reset();
             });
 

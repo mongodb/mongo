@@ -172,7 +172,7 @@ repl::OplogEntry MongoInterfaceStandalone::lookUpOplogEntryByOpTime(OperationCon
 
 bool MongoInterfaceStandalone::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-    Lock::CollectionLock collLock(opCtx, nss.ns(), MODE_IS);
+    Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
     const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
     return metadata->isSharded();
 }
@@ -536,7 +536,7 @@ bool MongoInterfaceStandalone::uniqueKeyIsSupportedByIndex(
     // db version or do anything else. We simply want to protect against concurrent modifications to
     // the catalog.
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-    Lock::CollectionLock collLock(opCtx, nss.ns(), MODE_IS);
+    Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, nss.db());
     auto collection = db ? db->getCollection(opCtx, nss) : nullptr;

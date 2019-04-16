@@ -318,7 +318,7 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
 
     {
         Lock::DBLock dbLock(opCtx, "local", MODE_IX);
-        Lock::CollectionLock collectionLock(opCtx, "local.oplog.rs", MODE_IX);
+        Lock::CollectionLock collectionLock(opCtx, NamespaceString("local.oplog.rs"), MODE_IX);
 
         uassert(ErrorCodes::NotMaster,
                 "Not primary when performing noop write for NoSuchTransaction error",
@@ -347,7 +347,7 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
         auto nss = NamespaceString::kSessionTransactionsTableNamespace;
         auto deadline = Date_t::now() + Milliseconds(100);
         Lock::DBLock dbLock(opCtx.get(), nss.db(), MODE_IS, deadline);
-        Lock::CollectionLock collLock(opCtx.get(), nss.toString(), MODE_IS, deadline);
+        Lock::CollectionLock collLock(opCtx.get(), nss, MODE_IS, deadline);
 
         auto databaseHolder = DatabaseHolder::get(opCtx.get());
         auto db = databaseHolder->getDb(opCtx.get(), nss.db());

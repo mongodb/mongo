@@ -1471,7 +1471,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     {
         const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
         Lock::DBLock oplogDbLock(opCtx, oplogNss.db(), MODE_IX);
-        Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss.ns(), MODE_X);
+        Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
         OldClientContext ctx(opCtx, oplogNss.ns());
         Collection* oplogCollection = ctx.db()->getCollection(opCtx, oplogNss);
         if (!oplogCollection) {

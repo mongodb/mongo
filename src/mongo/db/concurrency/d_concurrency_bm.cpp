@@ -100,7 +100,8 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentSharedLock)(benchmark::S
 
     for (auto keepRunning : state) {
         Lock::DBLock dlk(clients[state.thread_index].second.get(), "test", MODE_IS);
-        Lock::CollectionLock clk(clients[state.thread_index].second.get(), "test.coll", MODE_IS);
+        Lock::CollectionLock clk(
+            clients[state.thread_index].second.get(), NamespaceString("test.coll"), MODE_IS);
     }
 
     if (state.thread_index == 0) {
@@ -118,7 +119,8 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)(benchmark
 
     for (auto keepRunning : state) {
         Lock::DBLock dlk(clients[state.thread_index].second.get(), "test", MODE_IX);
-        Lock::CollectionLock clk(clients[state.thread_index].second.get(), "test.coll", MODE_IX);
+        Lock::CollectionLock clk(
+            clients[state.thread_index].second.get(), NamespaceString("test.coll"), MODE_IX);
     }
 
     if (state.thread_index == 0) {
@@ -136,7 +138,8 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_MMAPv1CollectionSharedLock)(benchmark::S
 
     for (auto keepRunning : state) {
         Lock::DBLock dlk(clients[state.thread_index].second.get(), "test", MODE_IS);
-        Lock::CollectionLock clk(clients[state.thread_index].second.get(), "test.coll", MODE_S);
+        Lock::CollectionLock clk(
+            clients[state.thread_index].second.get(), NamespaceString("test.coll"), MODE_S);
     }
 
     if (state.thread_index == 0) {
@@ -154,7 +157,8 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_MMAPv1CollectionExclusiveLock)(benchmark
 
     for (auto keepRunning : state) {
         Lock::DBLock dlk(clients[state.thread_index].second.get(), "test", MODE_IX);
-        Lock::CollectionLock clk(clients[state.thread_index].second.get(), "test.coll", MODE_X);
+        Lock::CollectionLock clk(
+            clients[state.thread_index].second.get(), NamespaceString("test.coll"), MODE_X);
     }
 
     if (state.thread_index == 0) {

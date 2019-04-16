@@ -99,7 +99,7 @@ public:
 
     virtual int getProfilingLevel() const = 0;
 
-    virtual const char* getProfilingNS() const = 0;
+    virtual const NamespaceString& getProfilingNS() const = 0;
 
     /**
      * Sets the 'drop-pending' state of this Database.
@@ -164,7 +164,7 @@ public:
                                     const StringData toNS,
                                     const bool stayTemp) const = 0;
 
-    virtual const std::string& getSystemViewsName() const = 0;
+    virtual const NamespaceString& getSystemViewsName() const = 0;
 
     /**
      * Generates a collection namespace suitable for creating a temporary collection.

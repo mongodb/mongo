@@ -357,7 +357,7 @@ public:
 
     public:
         CollectionLock(OperationContext* opCtx,
-                       StringData ns,
+                       const NamespaceString& nss,
                        LockMode mode,
                        Date_t deadline = Date_t::max());
         CollectionLock(CollectionLock&&);

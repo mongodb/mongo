@@ -97,8 +97,8 @@ public:
             auto databaseHolder = DatabaseHolder::get(opCtx);
             auto db = databaseHolder->getDb(opCtx, _ns.db());
             if (db) {
-                Lock::CollectionLock collLock(opCtx, _ns.ns(), MODE_IS);
-                if (db->getCollection(opCtx, _ns.ns())) {
+                Lock::CollectionLock collLock(opCtx, _ns, MODE_IS);
+                if (db->getCollection(opCtx, _ns)) {
                     // Collection already created, no more work needs to be done.
                     return Status::OK();
                 }

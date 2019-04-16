@@ -163,7 +163,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     }
 
     {
-        Lock::CollectionLock collLock(opCtx, ns.ns(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, ns, MODE_IX);
         // WriteConflict exceptions and statuses are not expected to escape this method.
         status = indexer.insertAllDocumentsInCollection(opCtx, coll);
     }

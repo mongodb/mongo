@@ -186,7 +186,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
         return b.obj();
     }
 
-    Lock::CollectionLock clk(opCtx, nss.ns(), MODE_IS);
+    Lock::CollectionLock clk(opCtx, nss, MODE_IS);
     CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
 
     // While the UUID is stored as a collection option, from the user's perspective it is an

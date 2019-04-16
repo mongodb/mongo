@@ -277,13 +277,12 @@ void Lock::DBLock::relockWithMode(LockMode newMode) {
 
 
 Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
-                                     StringData ns,
+                                     const NamespaceString& nss,
                                      LockMode mode,
                                      Date_t deadline)
-    : _id(RESOURCE_COLLECTION, ns), _opCtx(opCtx) {
-    massert(28538, "need a non-empty collection name", nsIsFull(ns));
-
-    dassert(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns),
+    : _id(RESOURCE_COLLECTION, nss.ns()), _opCtx(opCtx) {
+    invariant(nss.coll().size(), str::stream() << "expected non-empty collection name:" << nss);
+    dassert(opCtx->lockState()->isDbLockedForMode(nss.db(),
                                                   isSharedLockMode(mode) ? MODE_IS : MODE_IX));
     LockMode actualLockMode = mode;
     if (!supportsDocLocking()) {

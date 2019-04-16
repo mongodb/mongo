@@ -127,7 +127,7 @@ struct LocalOplogInfo {
     LocalOplogInfo() = default;
 
     // Name of the oplog collection.
-    std::string oplogName;
+    NamespaceString oplogName;
 
     // The "oplog" pointer is always valid (or null) because an operation must take the global
     // exclusive lock to set the pointer to null when the Collection instance is destroyed. See
@@ -259,7 +259,7 @@ bool shouldBuildInForeground(OperationContext* opCtx,
 void setOplogCollectionName(ServiceContext* service) {
     switch (ReplicationCoordinator::get(service)->getReplicationMode()) {
         case ReplicationCoordinator::modeReplSet:
-            localOplogInfo(service).oplogName = NamespaceString::kRsOplogNamespace.ns();
+            localOplogInfo(service).oplogName = NamespaceString::kRsOplogNamespace;
             break;
         case ReplicationCoordinator::modeNone:
             // leave empty.
@@ -837,7 +837,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
 void createOplog(OperationContext* opCtx) {
     const auto isReplSet = ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
         ReplicationCoordinator::modeReplSet;
-    createOplog(opCtx, localOplogInfo(opCtx->getServiceContext()).oplogName, isReplSet);
+    createOplog(opCtx, localOplogInfo(opCtx->getServiceContext()).oplogName.ns(), isReplSet);
 }
 
 OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx) {
@@ -2102,8 +2102,8 @@ void clearLocalOplogPtr() {
 
 void acquireOplogCollectionForLogging(OperationContext* opCtx) {
     auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());
-    if (!oplogInfo.oplogName.empty()) {
-        AutoGetCollection autoColl(opCtx, NamespaceString(oplogInfo.oplogName), MODE_IX);
+    if (!oplogInfo.oplogName.isEmpty()) {
+        AutoGetCollection autoColl(opCtx, oplogInfo.oplogName, MODE_IX);
         oplogInfo.oplog = autoColl.getCollection();
     }
 }

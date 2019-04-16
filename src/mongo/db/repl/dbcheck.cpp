@@ -374,7 +374,7 @@ AutoGetDbForDbCheck::AutoGetDbForDbCheck(OperationContext* opCtx, const Namespac
 AutoGetCollectionForDbCheck::AutoGetCollectionForDbCheck(OperationContext* opCtx,
                                                          const NamespaceString& nss,
                                                          const OplogEntriesEnum& type)
-    : _agd(opCtx, nss), _collLock(opCtx, nss.ns(), MODE_S) {
+    : _agd(opCtx, nss), _collLock(opCtx, nss, MODE_S) {
     std::string msg;
 
     _collection = _agd.getDb() ? _agd.getDb()->getCollection(opCtx, nss) : nullptr;

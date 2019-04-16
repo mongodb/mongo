@@ -229,7 +229,7 @@ public:
             }
 
             boost::optional<Lock::CollectionLock> collLock;
-            collLock.emplace(opCtx, nss.ns(), MODE_IS);
+            collLock.emplace(opCtx, nss, MODE_IS);
 
             auto* const css = CollectionShardingState::get(opCtx, nss);
             const ChunkVersion collectionShardVersion = [&] {

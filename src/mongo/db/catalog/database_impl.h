@@ -62,8 +62,8 @@ public:
     int getProfilingLevel() const final {
         return _profile.load();
     }
-    const char* getProfilingNS() const final {
-        return _profileName.c_str();
+    const NamespaceString& getProfilingNS() const final {
+        return _profileName;
     }
 
     void setDropPending(OperationContext* opCtx, bool dropPending) final;
@@ -132,7 +132,7 @@ public:
 
     static Status validateDBName(StringData dbname);
 
-    const std::string& getSystemViewsName() const final {
+    const NamespaceString& getSystemViewsName() const final {
         return _viewsName;
     }
 
@@ -182,8 +182,8 @@ private:
 
     const uint64_t _epoch;
 
-    const std::string _profileName;  // "dbname.system.profile"
-    const std::string _viewsName;    // "dbname.system.views"
+    const NamespaceString _profileName;  // "dbname.system.profile"
+    const NamespaceString _viewsName;    // "dbname.system.views"
 
     AtomicWord<int> _profile{0};  // 0=off
 

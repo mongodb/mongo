@@ -279,8 +279,8 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
 
     for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(_name)) {
-        Lock::CollectionLock colLock(opCtx, nss.ns(), MODE_IS);
-        Collection* collection = getCollection(opCtx, nss.ns());
+        Lock::CollectionLock colLock(opCtx, nss, MODE_IS);
+        Collection* collection = getCollection(opCtx, nss);
 
         if (!collection)
             continue;

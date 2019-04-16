@@ -381,7 +381,7 @@ MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
 
     {
         Lock::DBLock lk(opCtx, "local", MODE_IX);
-        Lock::CollectionLock lock(opCtx, "local.oplog.rs", MODE_IX);
+        Lock::CollectionLock lock(opCtx, NamespaceString("local.oplog.rs"), MODE_IX);
 
         if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
             return {ErrorCodes::NotMaster,
