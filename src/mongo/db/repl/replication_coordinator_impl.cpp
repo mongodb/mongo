@@ -1300,7 +1300,10 @@ Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
 
     if (readConcern.getArgsAtClusterTime() && !serverGlobalParams.enableMajorityReadConcern) {
         return {ErrorCodes::InvalidOptions,
-                "'atClusterTime' is not supported when enableMajorityReadConcern=false"};
+                "readConcern level 'snapshot' is not supported in sharded clusters when "
+                "enableMajorityReadConcern=false. See "
+                "https://dochub.mongodb.org/core/"
+                "disabled-read-concern-majority-snapshot-restrictions."};
     }
 
     return Status::OK();
