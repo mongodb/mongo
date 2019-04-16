@@ -22,9 +22,6 @@ selector:
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
   - jstests/core/set_param1.js
-  # TODO SERVER-35217: Attempting to kill a session while multiple transactions have been started on
-  # the server may lead to deadlock.
-  - jstests/core/txns/kill_sessions_kills_transaction.js
 
 executor:
   archive:
