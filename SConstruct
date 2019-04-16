@@ -1781,6 +1781,9 @@ elif env.TargetOSIs('windows'):
     # Treat volatile according to the ISO standard and do not guarantee acquire/release semantics.
     env.Append( CCFLAGS=["/volatile:iso"] )
 
+    # Tell CL to produce more useful error messages.
+    env.Append( CCFLAGS=["/diagnostics:caret"] )
+
     # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds.
     env.Append( LINKFLAGS=["/LARGEADDRESSAWARE"] )
 
