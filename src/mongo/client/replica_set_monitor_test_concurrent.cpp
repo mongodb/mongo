@@ -133,10 +133,15 @@ protected:
         ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly,
                               TagSet(BSON_ARRAY(BSON("nonexistent"
                                                      << "tag"))));
+    ReplicaSetChangeNotifier& getNotifier() {
+        return _notifier;
+    }
 
 private:
     std::map<HostAndPort, int> _numChecks;
     Date_t _startTime;
+
+    ReplicaSetChangeNotifier _notifier;
 };
 
 // If one node is unresponsive and the available node doesn't satisfy our read preference, the
@@ -155,7 +160,8 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
     MockReplicaSet replSet("test", 2, false /* hasPrimary */, false /* dollarPrefixHosts */);
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
-    auto state = std::make_shared<ReplicaSetMonitor::SetState>(replSet.getURI(), &getExecutor());
+    auto state = std::make_shared<ReplicaSetMonitor::SetState>(
+        replSet.getURI(), &getNotifier(), &getExecutor());
     auto monitor = std::make_shared<ReplicaSetMonitor>(state);
 
     // Node 1 is unresponsive.
@@ -222,7 +228,8 @@ TEST_F(ReplicaSetMonitorConcurrentTest, StepdownAndElection) {
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
     const auto node2 = HostAndPort(replSet.getSecondaries()[2]);
-    auto state = std::make_shared<ReplicaSetMonitor::SetState>(replSet.getURI(), &getExecutor());
+    auto state = std::make_shared<ReplicaSetMonitor::SetState>(
+        replSet.getURI(), &getNotifier(), &getExecutor());
     auto monitor = std::make_shared<ReplicaSetMonitor>(state);
 
     // Node 2 is unresponsive.

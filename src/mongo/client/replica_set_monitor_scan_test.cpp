@@ -1734,9 +1734,12 @@ public:
         // Verify that the listener received the right data
         if (gen != listener().lastState.generation) {
             // Our State is what the notifier thinks it should be
-            ASSERT_EQUALS(listener().lastState.connStr, listener().getCurrentState().connStr);
-            ASSERT_EQUALS(listener().lastState.primary, listener().getCurrentState().primary);
-            ASSERT_EQUALS(listener().lastState.generation, listener().getCurrentState().generation);
+            ASSERT_EQUALS(listener().lastState.connStr,
+                          listener().getCurrentState(kSetName.toString()).connStr);
+            ASSERT_EQUALS(listener().lastState.primary,
+                          listener().getCurrentState(kSetName.toString()).primary);
+            ASSERT_EQUALS(listener().lastState.generation,
+                          listener().getCurrentState(kSetName.toString()).generation);
 
             // Our State is what we'd expect
             ASSERT_EQUALS(listener().lastState.connStr.getSetName(), kSetName);
