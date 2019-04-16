@@ -34,8 +34,8 @@
 namespace mongo {
 const std::vector<HostAndPort> ReplicaSetMonitorTest::basicSeeds = {
     HostAndPort("a"), HostAndPort("b"), HostAndPort("c")};
-const std::set<HostAndPort> ReplicaSetMonitorTest::basicSeedsSet =
-    std::set(std::begin(basicSeeds), std::end(basicSeeds));
+const std::set<HostAndPort> ReplicaSetMonitorTest::basicSeedsSet = {std::begin(basicSeeds),
+                                                                    std::end(basicSeeds)};
 const MongoURI ReplicaSetMonitorTest::basicUri(ConnectionString::forReplicaSet(kSetName,
                                                                                basicSeeds));
 }  // namespace mongo
