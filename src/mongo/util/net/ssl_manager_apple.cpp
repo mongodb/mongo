@@ -1598,8 +1598,9 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
             }
             certErr << san << " ";
         }
+    }
 
-    } else {
+    if (!sanMatch) {
         auto swCN = peerSubjectName.getOID(kOID_CommonName);
         if (swCN.isOK()) {
             auto commonName = std::move(swCN.getValue());
@@ -1611,8 +1612,13 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
             } else if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
                 cnMatch = true;
             }
-            certErr << "CN: " << commonName;
-        } else {
+
+            if (cnMatch && !sans.empty()) {
+                // SANs override CN for matching purposes.
+                cnMatch = false;
+                certErr << "CN: " << commonName << " would have matched, but was overridden by SAN";
+            }
+        } else if (sans.empty()) {
             certErr << "No Common Name (CN) or Subject Alternate Names (SAN) found";
         }
     }

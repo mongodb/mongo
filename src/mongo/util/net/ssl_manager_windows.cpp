@@ -1675,13 +1675,21 @@ Status validatePeerCertificate(const std::string& remoteHost,
 
             // Give the user a hint why the certificate validation failed.
             StringBuilder certificateNames;
+            bool hasSAN = false;
             if (swAltNames.isOK() && !swAltNames.getValue().empty()) {
+                hasSAN = true;
                 for (auto& name : swAltNames.getValue()) {
                     certificateNames << name << " ";
                 }
             };
 
             certificateNames << ", Subject Name: " << *peerSubjectName;
+
+            auto swCN = peerSubjectName->getOID(kOID_CommonName);
+            if (hasSAN && swCN.isOK() &&
+                hostNameMatchForX509Certificates(remoteHost, swCN.getValue())) {
+                certificateNames << " would have matched, but was overridden by SAN";
+            }
 
             str::stream msg;
             msg << "The server certificate does not match the host name. Hostname: " << remoteHost
