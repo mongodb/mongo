@@ -1210,7 +1210,7 @@ functions:
 
           ${activate_virtualenv}
           $python -m pip install -r buildscripts/requirements.txt
-          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml
+          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml --verbose
 
     - command: archive.targz_pack
       params:
@@ -7867,6 +7867,7 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
+    use_default_timeouts: true
   display_tasks:
   - *dbtest
   - *unittests

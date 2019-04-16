@@ -341,6 +341,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options.variant = "buildvariant"
         options.suite = "suite"
         options.task = "suite"
+        options.use_default_timeouts = False
         options.use_large_distro = None
         options.use_multiversion = False
         options.is_patch = True
@@ -467,6 +468,18 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options = self.generate_mock_options()
         suites = self.generate_mock_suites(3)
         suites[suite_without_timing_info].should_overwrite_timeout.return_value = False
+
+        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+
+        timeout_cmd = config["tasks"][suite_without_timing_info]["commands"][0]
+        self.assertNotIn("command", timeout_cmd)
+        self.assertEqual("do setup", timeout_cmd["func"])
+
+    def test_timeout_info_not_included_if_use_default_timeouts_set(self):
+        suite_without_timing_info = 1
+        options = self.generate_mock_options()
+        suites = self.generate_mock_suites(3)
+        options.use_default_timeouts = True
 
         config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
 
