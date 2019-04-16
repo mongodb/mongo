@@ -5,7 +5,7 @@ selector:
   - jstests/replsets/*.js
   exclude_files:
   # Unblacklist these tests when rollback and initial sync are supported for large transactions.
-  - jstests/replsets/commit_transaction_rollback_recovery_data_already_applied.js
+  - jstests/replsets/rollback_recovery_commit_transaction_before_stable_timestamp.js
   - jstests/replsets/recover_prepared_transaction_state.js
   - jstests/replsets/*initial_sync*.js
   - jstests/replsets/rollback_aborted_prepared_transaction.js
