@@ -611,28 +611,31 @@ public:
 
     template <typename Func>
         auto then(Func&& func) && noexcept {
-        return mongo::ExecutorFuture(std::move(_exec),
-                                     std::move(this->_impl).then(wrapCB(std::forward<Func>(func))));
+        return mongo::ExecutorFuture(
+            std::move(_exec), std::move(this->_impl).then(wrapCB<T>(std::forward<Func>(func))));
     }
 
     template <typename Func>
         auto onCompletion(Func&& func) && noexcept {
         return mongo::ExecutorFuture(
             std::move(_exec),
-            std::move(this->_impl).onCompletion(wrapCB(std::forward<Func>(func))));
+            std::move(this->_impl)
+                .onCompletion(wrapCB<StatusOrStatusWith<T>>(std::forward<Func>(func))));
     }
 
     template <typename Func>
         ExecutorFuture<T> onError(Func&& func) && noexcept {
         return mongo::ExecutorFuture(
-            std::move(_exec), std::move(this->_impl).onError(wrapCB(std::forward<Func>(func))));
+            std::move(_exec),
+            std::move(this->_impl).onError(wrapCB<Status>(std::forward<Func>(func))));
     }
 
     template <ErrorCodes::Error code, typename Func>
         ExecutorFuture<T> onError(Func&& func) && noexcept {
         return mongo::ExecutorFuture(
             std::move(_exec),
-            std::move(this->_impl).template onError<code>(wrapCB(std::forward<Func>(func))));
+            std::move(this->_impl)
+                .template onError<code>(wrapCB<Status>(std::forward<Func>(func))));
     }
 
     template <ErrorCategory category, typename Func>
@@ -640,7 +643,7 @@ public:
         return mongo::ExecutorFuture(
             std::move(_exec),
             std::move(this->_impl)
-                .template onErrorCategory<category>(wrapCB(std::forward<Func>(func))));
+                .template onErrorCategory<category>(wrapCB<Status>(std::forward<Func>(func))));
     }
 
 private:
@@ -654,8 +657,23 @@ private:
      * Future<U>, then schedules a task on _exec to complete the associated promise with the result
      * of calling func with that argument.
      */
-    template <typename Func>
-    auto wrapCB(Func&& func);
+    template <typename RawArg, typename Func>
+    auto wrapCB(Func&& func) {
+        // Have to take care to never put void in argument position, since that is a hard error.
+        using Result = typename std::conditional_t<std::is_void_v<RawArg>,
+                                                   std::invoke_result<Func>,
+                                                   std::invoke_result<Func, RawArg>>::type;
+        using DummyArg = std::conditional_t<std::is_void_v<RawArg>,  //
+                                            future_details::FakeVoid,
+                                            RawArg>;
+        using Sig = std::conditional_t<std::is_void_v<RawArg>,  //
+                                       Result(),
+                                       Result(DummyArg)>;
+        return wrapCBHelper(unique_function<Sig>(std::forward<Func>(func)));
+    }
+
+    template <typename Sig>
+    NOINLINE_DECL auto wrapCBHelper(unique_function<Sig>&& func);
 
     using SemiFuture<T>::unsafeToInlineFuture;
 
@@ -1088,11 +1106,11 @@ using FutureContinuationResult =
 //
 
 template <typename T>
-template <typename Func>
-auto ExecutorFuture<T>::wrapCB(Func&& func) {
+template <typename Sig>
+NOINLINE_DECL auto ExecutorFuture<T>::wrapCBHelper(unique_function<Sig>&& func) {
     using namespace future_details;
     return [
-        func = std::forward<Func>(func),
+        func = std::move(func),
         exec = _exec  // can't move this!
     ](auto&&... args) mutable noexcept
         ->Future<UnwrappedType<decltype(func(std::forward<decltype(args)>(args)...))>> {
