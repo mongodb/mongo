@@ -65,6 +65,7 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "suite",
     "target_resmoke_time",
     "task",
+    "use_default_timeouts",
     "use_large_distro",
     "use_multiversion",
     "variant",
@@ -121,6 +122,8 @@ def get_config_options(cmd_line_options, config_file):
     suite = read_config.get_config_value("suite", cmd_line_options, config_file_data, default=task)
     variant = read_config.get_config_value("build_variant", cmd_line_options, config_file_data,
                                            required=True)
+    use_default_timeouts = read_config.get_config_value("use_default_timeouts", cmd_line_options,
+                                                        config_file_data, default=False)
     use_large_distro = read_config.get_config_value("use_large_distro", cmd_line_options,
                                                     config_file_data, default=False)
     large_distro_name = read_config.get_config_value("large_distro_name", cmd_line_options,
@@ -139,8 +142,8 @@ def get_config_options(cmd_line_options, config_file):
 
     return ConfigOptions(build_id, depends_on, fallback_num_sub_suites, is_patch, large_distro_name,
                          max_sub_suites, project, repeat_suites, resmoke_args, resmoke_jobs_max,
-                         run_multiple_jobs, suite, target_resmoke_time, task, use_large_distro,
-                         use_multiversion, variant)
+                         run_multiple_jobs, suite, target_resmoke_time, task, use_default_timeouts,
+                         use_large_distro, use_multiversion, variant)
 
 
 def divide_remaining_tests_among_suites(remaining_tests_runtimes, suites):
@@ -310,6 +313,13 @@ class EvergreenConfigGenerator(object):
         return variables
 
     def _add_timeout_command(self, commands, max_test_runtime, expected_suite_runtime):
+        """
+        Add an evergreen command to override the default timeouts to the list of commands.
+
+        :param commands: List of commands to add timeout command to.
+        :param max_test_runtime: Maximum runtime of any test in the sub-suite.
+        :param expected_suite_runtime: Expected runtime of the entire sub-suite.
+        """
         repeat_factor = self.options.repeat_suites
         if max_test_runtime or expected_suite_runtime:
             cmd_timeout = CmdTimeoutUpdate()
@@ -320,8 +330,8 @@ class EvergreenConfigGenerator(object):
                 cmd_timeout.timeout(timeout)
             if expected_suite_runtime:
                 exec_timeout = calculate_timeout(expected_suite_runtime, 3) * repeat_factor
-                LOGGER.debug("Setting exec_timeout to: %d (runtime=%d, repeat=%d)", exec_timeout,
-                             expected_suite_runtime, repeat_factor)
+                LOGGER.debug("Setting exec_timeout to: %d (runtime=%d, repeat=%d)",
+                             exec_timeout, expected_suite_runtime, repeat_factor)
                 cmd_timeout.exec_timeout(exec_timeout)
             commands.append(cmd_timeout.validate().resolve())
 
@@ -362,7 +372,8 @@ class EvergreenConfigGenerator(object):
         run_tests_vars = self._get_run_tests_vars(target_suite_file)
 
         commands = []
-        self._add_timeout_command(commands, max_test_runtime, expected_suite_runtime)
+        if not self.options.use_default_timeouts:
+            self._add_timeout_command(commands, max_test_runtime, expected_suite_runtime)
         commands.append(CommandDefinition().function("do setup"))
         if self.options.use_multiversion:
             commands.append(CommandDefinition().function("do multiversion setup"))
@@ -556,6 +567,8 @@ class Main(object):
                             help="Should subtasks use large distros.")
         parser.add_argument("--large-distro-name", dest="large_distro_name",
                             help="Name of large distro.")
+        parser.add_argument("--use-default_timeouts", dest="use_default_timeouts",
+                            help="When specified, do not override timeouts based on test history.")
         parser.add_argument("--use-multiversion", dest="use_multiversion",
                             help="Task path suffix for multiversion generated tasks.")
         parser.add_argument("--is-patch", dest="is_patch", help="Is this part of a patch build.")
@@ -648,6 +661,7 @@ class Main(object):
             enable_logging()
 
         LOGGER.debug("Starting execution for options %s", options)
+        LOGGER.debug("config options %s", self.config_options)
         end_date = datetime.datetime.utcnow().replace(microsecond=0)
         start_date = end_date - datetime.timedelta(days=options.duration_days)
 
