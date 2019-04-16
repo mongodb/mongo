@@ -54,6 +54,12 @@
         "data": {"timestamp": recoveryTimestamp}
     }));
 
+    // Enable fail point "WTSetOldestTSToStableTS" to prevent lag between stable timestamp and
+    // oldest timestamp during rollback recovery. We avoid this lag to test if we can prepare
+    // and commit a transaction older than oldest timestamp.
+    assert.commandWorked(
+        testDB.adminCommand({"configureFailPoint": 'WTSetOldestTSToStableTS', "mode": 'alwaysOn'}));
+
     jsTestLog("Committing the transaction");
 
     // Since this transaction is committed after the last snapshot, this commit oplog entry will be
