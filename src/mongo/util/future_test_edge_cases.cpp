@@ -104,6 +104,19 @@ static_assert(std::is_same_v<  //
               decltype(Future<int>().then(std::function<ExecutorFuture<int>(int)>())),
               SemiFuture<int>>);
 
+static_assert(std::is_same_v<  //
+              decltype(Future<void>().then(std::function<SharedSemiFuture<void>()>())),
+              SemiFuture<void>>);
+static_assert(std::is_same_v<  //
+              decltype(Future<int>().then(std::function<SharedSemiFuture<void>(int)>())),
+              SemiFuture<void>>);
+static_assert(std::is_same_v<  //
+              decltype(Future<void>().then(std::function<SharedSemiFuture<int>()>())),
+              SemiFuture<int>>);
+static_assert(std::is_same_v<  //
+              decltype(Future<int>().then(std::function<SharedSemiFuture<int>(int)>())),
+              SemiFuture<int>>);
+
 
 // Check deduction guides:
 static_assert(std::is_same_v<decltype(SemiFuture(0)), SemiFuture<int>>);
@@ -175,36 +188,6 @@ TEST(Future_EdgeCases, looping_onError_with_then) {
     };
     ASSERT_EQ(read().then([](int x) { return x + 0.5; }).get(), 0.5);
 }
-
-class DummyInterruptable final : public Interruptible {
-    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
-        stdx::condition_variable& cv,
-        stdx::unique_lock<stdx::mutex>& m,
-        Date_t deadline) noexcept override {
-        return Status(ErrorCodes::Interrupted, "");
-    }
-    Date_t getDeadline() const override {
-        MONGO_UNREACHABLE;
-    }
-    Status checkForInterruptNoAssert() noexcept override {
-        MONGO_UNREACHABLE;
-    }
-    IgnoreInterruptsState pushIgnoreInterrupts() override {
-        MONGO_UNREACHABLE;
-    }
-    void popIgnoreInterrupts(IgnoreInterruptsState iis) override {
-        MONGO_UNREACHABLE;
-    }
-    DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
-        MONGO_UNREACHABLE;
-    }
-    void popArtificialDeadline(DeadlineState) override {
-        MONGO_UNREACHABLE;
-    }
-    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override {
-        MONGO_UNREACHABLE;
-    }
-};
 
 TEST(Future_EdgeCases, interrupted_wait_then_get) {
     DummyInterruptable dummyInterruptable;
@@ -284,13 +267,13 @@ TEST(Future_EdgeCases, Racing_SharePromise_getFuture_and_emplaceValue) {
         futs.push_back(async([&] { sp.getFuture().get(); }));
     }
 
-    sleepUnlessInTsan();
+    sleepIfShould();
 
     for (int i = 0; i < 10; i++) {
         futs.push_back(async([&] { sp.getFuture().get(); }));
     }
 
-    sleepUnlessInTsan();
+    sleepIfShould();
 
     sp.emplaceValue();
 
@@ -319,13 +302,13 @@ TEST(Future_EdgeCases, Racing_SharePromise_getFuture_and_setError) {
         futs.push_back(async([&] { sp.getFuture().get(); }));
     }
 
-    sleepUnlessInTsan();
+    sleepIfShould();
 
     for (int i = 0; i < 10; i++) {
         futs.push_back(async([&] { sp.getFuture().get(); }));
     }
 
-    sleepUnlessInTsan();
+    sleepIfShould();
 
     sp.setError(failStatus());
 

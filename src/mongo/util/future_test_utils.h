@@ -53,15 +53,17 @@ enum DoExecutorFuture : bool {
 class InlineCountingExecutor final : public OutOfLineExecutor {
 public:
     void schedule(Task task) noexcept override {
+        // Relaxed to avoid adding synchronization where there otherwise wouldn't be. That would
+        // cause a false negative from TSAN.
+        tasksRun.fetch_add(1, std::memory_order_relaxed);
         task(Status::OK());
-        tasksRun.fetchAndAdd(1);
     }
 
     static auto make() {
         return std::make_shared<InlineCountingExecutor>();
     }
 
-    AtomicWord<int32_t> tasksRun{0};
+    std::atomic<int32_t> tasksRun{0};  // NOLINT
 };
 
 class RejectingExecutor final : public OutOfLineExecutor {
@@ -72,6 +74,36 @@ public:
 
     static auto make() {
         return std::make_shared<RejectingExecutor>();
+    }
+};
+
+class DummyInterruptable final : public Interruptible {
+    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
+        stdx::condition_variable& cv,
+        stdx::unique_lock<stdx::mutex>& m,
+        Date_t deadline) noexcept override {
+        return Status(ErrorCodes::Interrupted, "");
+    }
+    Date_t getDeadline() const override {
+        MONGO_UNREACHABLE;
+    }
+    Status checkForInterruptNoAssert() noexcept override {
+        MONGO_UNREACHABLE;
+    }
+    IgnoreInterruptsState pushIgnoreInterrupts() override {
+        MONGO_UNREACHABLE;
+    }
+    void popIgnoreInterrupts(IgnoreInterruptsState iis) override {
+        MONGO_UNREACHABLE;
+    }
+    DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
+        MONGO_UNREACHABLE;
+    }
+    void popArtificialDeadline(DeadlineState) override {
+        MONGO_UNREACHABLE;
+    }
+    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override {
+        MONGO_UNREACHABLE;
     }
 };
 
@@ -86,10 +118,12 @@ void completePromise(Promise<void>* promise, Func&& func) {
     promise->emplaceValue();
 }
 
-inline void sleepUnlessInTsan() {
+inline void sleepIfShould() {
 #if !__has_feature(thread_sanitizer)
-    // TSAN works better without this sleep, but it is useful for testing correctness.
-    sleepmillis(100);  // Try to wait until after the Future has been handled.
+    // TSAN and rr work better without this sleep, but it is useful for testing correctness.
+    static const bool runningUnderRR = getenv("RUNNING_UNDER_RR") != nullptr;
+    if (!runningUnderRR)
+        sleepmillis(100);  // Try to wait until after the Future has been handled.
 #endif
 }
 
@@ -98,7 +132,7 @@ Future<Result> async(Func&& func) {
     auto pf = makePromiseFuture<Result>();
 
     stdx::thread([ promise = std::move(pf.promise), func = std::forward<Func>(func) ]() mutable {
-        sleepUnlessInTsan();
+        sleepIfShould();
         try {
             completePromise(&promise, func);
         } catch (const DBException& ex) {

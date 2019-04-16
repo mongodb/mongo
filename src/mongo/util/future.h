@@ -258,6 +258,8 @@ private:
     friend class ExecutorFuture;
     template <typename>
     friend class future_details::FutureImpl;
+    template <typename>
+    friend class SharedSemiFuture;
 
     Future<T> unsafeToInlineFuture() && noexcept;
 
@@ -662,6 +664,8 @@ private:
     template <typename>
     friend class SemiFuture;
     template <typename>
+    friend class SharedSemiFuture;
+    template <typename>
     friend class future_details::FutureImpl;
 
     ExecutorPtr _exec;
@@ -853,6 +857,11 @@ public:
     static_assert(!std::is_const<T>::value, "SharedSemiFuture<const T> is banned.");
     static_assert(!std::is_array<T>::value, "SharedSemiFuture<T[]> is banned.");
 
+    static_assert(std::is_void_v<T> || std::is_copy_constructible_v<T>,
+                  "SharedSemiFuture currently requires copyable types. Let us know if this is a "
+                  "problem. Supporting this for blocking use cases is easy, but it will require "
+                  "more work for async usage.");
+
     using value_type = T;
 
     SharedSemiFuture() = default;
@@ -894,12 +903,36 @@ public:
         return _shared.getNoThrow(interruptible);
     }
 
+    ExecutorFuture<T> thenRunOn(ExecutorPtr exec) const noexcept {
+        return ExecutorFuture<T>(std::move(exec), toFutureImpl());
+    }
+
 private:
     template <typename>
     friend class SharedPromise;
     template <typename>
     friend class future_details::FutureImpl;
     friend class SharedSemiFuture<void>;
+    template <typename>
+    friend class ExecutorFuture;
+
+    future_details::FutureImpl<T> toFutureImpl() const noexcept {
+        static_assert(std::is_void_v<T> || std::is_copy_constructible_v<T>);
+        return future_details::FutureImpl<T>(_shared.addChild());
+    }
+
+    // These are needed to support chaining where a SharedSemiFuture is returned from a
+    // continuation.
+    explicit operator future_details::FutureImpl<T>() const noexcept {
+        return toFutureImpl();
+    }
+    template <typename U>
+    void propagateResultTo(U&& arg) const noexcept {
+        toFutureImpl().propagateResultTo(std::forward<U>(arg));
+    }
+    Future<T> unsafeToInlineFuture() const noexcept {
+        return Future<T>(toFutureImpl());
+    }
 
     explicit SharedSemiFuture(boost::intrusive_ptr<future_details::SharedState<T>> ptr)
         : _shared(std::move(ptr)) {}

@@ -34,7 +34,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-
 #include "mongo/util/future_test_utils.h"
 
 namespace mongo {
@@ -75,18 +74,6 @@ TEST(Future, Success_semi_get) {
     FUTURE_SUCCESS_TEST(
         [] { return 1; },
         [](/*Future<int>*/ auto&& fut) { ASSERT_EQ(std::move(fut).semi().get(), 1); });
-}
-
-TEST(Future, Success_shared_get) {
-    FUTURE_SUCCESS_TEST(
-        [] { return 1; },
-        [](/*Future<int>*/ auto&& fut) { ASSERT_EQ(std::move(fut).share().get(), 1); });
-}
-
-TEST(Future, Success_shared_getNothrow) {
-    FUTURE_SUCCESS_TEST(
-        [] { return 1; },
-        [](/*Future<int>*/ auto&& fut) { ASSERT_EQ(std::move(fut).share().getNoThrow(), 1); });
 }
 
 TEST(Future, Success_getAsync) {
@@ -134,17 +121,6 @@ TEST(Future, Fail_getNothrowRvalue) {
 TEST(Future, Fail_semi_get) {
     FUTURE_FAIL_TEST<int>(
         [](/*Future<int>*/ auto&& fut) { ASSERT_THROWS_failStatus(std::move(fut).semi().get()); });
-}
-
-TEST(Future, Fail_shared_get) {
-    FUTURE_FAIL_TEST<int>(
-        [](/*Future<int>*/ auto&& fut) { ASSERT_THROWS_failStatus(std::move(fut).share().get()); });
-}
-
-TEST(Future, Fail_shared_getNothrow) {
-    FUTURE_FAIL_TEST<int>([](/*Future<int>*/ auto&& fut) {
-        ASSERT_EQ(std::move(fut).share().getNoThrow(), failStatus());
-    });
 }
 
 TEST(Future, Fail_getAsync) {
@@ -221,20 +197,6 @@ TEST(Future, isReady_TSAN_OK) {
         done = true;
         return 1;
     });
-    //(void)*const_cast<volatile bool*>(&done);  // Data Race! Uncomment to make sure TSAN works.
-    while (!fut.isReady()) {
-    }
-    ASSERT(done);
-    (void)fut.get();
-    ASSERT(done);
-}
-
-TEST(Future, isReady_shared_TSAN_OK) {
-    bool done = false;
-    auto fut = async([&] {
-                   done = true;
-                   return 1;
-               }).share();
     //(void)*const_cast<volatile bool*>(&done);  // Data Race! Uncomment to make sure TSAN works.
     while (!fut.isReady()) {
     }

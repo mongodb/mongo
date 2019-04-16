@@ -95,13 +95,13 @@ TEST(Future_MoveOnly, Success_semi_get) {
         [](/*Future<Widget>*/ auto&& fut) { ASSERT_EQ(std::move(fut).semi().get(), 1); });
 }
 
+#if 0  // Needs copy
 TEST(Future_MoveOnly, Success_shared_get) {
     FUTURE_SUCCESS_TEST(
         [] { return Widget(1); },
         [](/*Future<Widget>*/ auto&& fut) { ASSERT_EQ(std::move(fut).share().get(), 1); });
 }
 
-#if 0  // Needs copy
 TEST(Future_MoveOnly, Success_getNothrowLvalue) {
     FUTURE_SUCCESS_TEST([] { return Widget(1); },
                         [](/*Future<Widget>*/ auto&& fut) { ASSERT_EQ(fut.getNoThrow(), 1); });
@@ -160,13 +160,13 @@ TEST(Future_MoveOnly, Fail_semi_get) {
     });
 }
 
+#if 0  // Needs copy
 TEST(Future_MoveOnly, Fail_shared_get) {
     FUTURE_FAIL_TEST<Widget>([](/*Future<Widget>*/ auto&& fut) {
         ASSERT_THROWS_failStatus(std::move(fut).share().get());
     });
 }
 
-#if 0  // Needs copy
 TEST(Future_MoveOnly, Fail_getNothrowLvalue) {
     FUTURE_FAIL_TEST<Widget>([](/*Future<Widget>*/ auto&& fut) { ASSERT_EQ(fut.getNoThrow(), failStatus); });
 }

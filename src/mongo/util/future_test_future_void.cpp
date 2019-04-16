@@ -72,17 +72,6 @@ TEST(Future_Void, Success_semi_get) {
     FUTURE_SUCCESS_TEST([] {}, [](/*Future<void>*/ auto&& fut) { std::move(fut).semi().get(); });
 }
 
-TEST(Future_Void, Success_shared_get) {
-    FUTURE_SUCCESS_TEST([] {}, [](/*Future<void>*/ auto&& fut) { std::move(fut).share().get(); });
-}
-
-TEST(Future_Void, Success_shared_getNothrow) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut).share().getNoThrow(), Status::OK());
-                        });
-}
-
 TEST(Future_Void, Success_getAsync) {
     FUTURE_SUCCESS_TEST(
         [] {},
@@ -131,18 +120,6 @@ TEST(Future_Void, Fail_semi_get) {
         [](/*Future<void>*/ auto&& fut) { ASSERT_THROWS_failStatus(std::move(fut).semi().get()); });
 }
 
-TEST(Future_Void, Fail_share_getRvalue) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
-        ASSERT_THROWS_failStatus(std::move(fut).share().get());
-    });
-}
-
-TEST(Future_Void, Fail_share_getNothrow) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
-        ASSERT_EQ(std::move(fut).share().getNoThrow(), failStatus());
-    });
-}
-
 TEST(Future_Void, Fail_getAsync) {
     FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
         auto pf = makePromiseFuture<void>();
@@ -184,17 +161,6 @@ TEST(Future_Void, Fail_isReady) {
 TEST(Future_Void, isReady_TSAN_OK) {
     bool done = false;
     auto fut = async([&] { done = true; });
-    //(void)*const_cast<volatile bool*>(&done);  // Data Race! Uncomment to make sure TSAN works.
-    while (!fut.isReady()) {
-    }
-    ASSERT(done);
-    fut.get();
-    ASSERT(done);
-}
-
-TEST(Future_Void, isReady_share_TSAN_OK) {
-    bool done = false;
-    auto fut = async([&] { done = true; }).share();
     //(void)*const_cast<volatile bool*>(&done);  // Data Race! Uncomment to make sure TSAN works.
     while (!fut.isReady()) {
     }

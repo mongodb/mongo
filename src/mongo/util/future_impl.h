@@ -44,6 +44,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/if_constexpr.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
@@ -73,16 +74,6 @@ template <typename T>
 class FutureImpl;
 template <>
 class FutureImpl<void>;
-
-// TODO: delete this and just use isFutureLike once SharedSemiFuture is chainable.
-template <typename T>
-inline constexpr bool isChainable = false;
-template <typename T>
-inline constexpr bool isChainable<Future<T>> = true;
-template <typename T>
-inline constexpr bool isChainable<SemiFuture<T>> = true;
-template <typename T>
-inline constexpr bool isChainable<ExecutorFuture<T>> = true;
 
 template <typename T>
 inline constexpr bool isFutureLike = false;
@@ -156,7 +147,10 @@ struct FutureContinuationKindImpl<ExecutorFuture<T>> {
     using type = SemiFuture<U>;
 };
 template <typename T>
-struct FutureContinuationKindImpl<SharedSemiFuture<T>>;  // Temporarily disabled.
+struct FutureContinuationKindImpl<SharedSemiFuture<T>> {
+    template <typename U>
+    using type = SemiFuture<U>;  // It will generate a child continuation.
+};
 template <typename T, typename U>
 using FutureContinuationKind = typename FutureContinuationKindImpl<T>::template type<U>;
 
@@ -339,14 +333,14 @@ using SharedState = SharedStateImpl<VoidToFakeVoid<T>>;
  * SSB is SharedStateBase, and this is its current state.
  *
  * Legal transitions on future side:
- *      kInit -> kWaiting
- *      kInit -> kHaveContinuation
- *      kWaiting -> kHaveContinuation
+ *      kInit -> kWaitingOrHaveChildren
+ *      kInit -> kHaveCallback
+ *      kWaitingOrHaveChildren -> kHaveCallback
  *
  * Legal transitions on promise side:
  *      kInit -> kFinished
- *      kWaiting -> kFinished
- *      kHaveContinuation -> kFinished
+ *      kWaitingOrHaveChildren -> kFinished
+ *      kHaveCallback -> kFinished
  *
  * Note that all and only downward transitions are legal.
  *
@@ -358,16 +352,17 @@ enum class SSBState : uint8_t {
     // Initial state: Promise hasn't been completed and has nothing to do when it is.
     kInit,
 
-    // Promise hasn't been completed. Someone has constructed the condvar and may be waiting on it.
-    // We do not transition back to kInit if they give up on waiting. There is also no continuation
-    // registered in this state.
-    kWaiting,
+    // Promise hasn't been completed. Either someone has constructed the condvar and may be waiting
+    // on it, or children is non-empty. Either way, the completer of the promise must acquire the
+    // mutex inside transitionToFinished() to determine what needs to be done. We do not transition
+    // back to kInit if they give up on waiting. There is also no callback directly registered in
+    // this state, although callbacks may be registered on children.
+    kWaitingOrHaveChildren,
 
     // Promise hasn't been completed. Someone has registered a callback to be run when it is.
-    //
-    // There is no-one currently waiting on the condvar. TODO This assumption will need to change
-    // when we add continuation support to SharedSemiFuture.
-    kHaveContinuation,
+    // There is no-one currently waiting on the condvar, and there are no children. Once a future is
+    // shared, its state can never transition to this.
+    kHaveCallback,
 
     // The promise has been completed with a value or error. This is the terminal state. This should
     // stay last since we have code like assert(state < kFinished).
@@ -376,6 +371,8 @@ enum class SSBState : uint8_t {
 
 class SharedStateBase : public RefCountable {
 public:
+    using Children = std::forward_list<boost::intrusive_ptr<SharedStateBase>>;
+
     SharedStateBase(const SharedStateBase&) = delete;
     SharedStateBase(SharedStateBase&&) = delete;
     SharedStateBase& operator=(const SharedStateBase&) = delete;
@@ -394,11 +391,16 @@ public:
             cv.emplace();
 
             auto oldState = SSBState::kInit;
+            // We don't need release (or acq_rel) here because the cv construction will be released
+            // and acquired via the mutex.
             if (MONGO_unlikely(!state.compare_exchange_strong(
-                    oldState, SSBState::kWaiting, std::memory_order_acq_rel))) {
-                // transitionToFinished() transitioned after we did our initial check.
-                dassert(oldState == SSBState::kFinished);
-                return;
+                    oldState, SSBState::kWaitingOrHaveChildren, std::memory_order_acquire))) {
+                if (oldState == SSBState::kFinished) {
+                    // transitionToFinished() transitioned after we did our initial check.
+                    return;
+                }
+                // Someone else did this transition.
+                invariant(oldState == SSBState::kWaitingOrHaveChildren);
             }
         } else {
             // Someone has already created the cv and put us in the waiting state. The promise may
@@ -420,7 +422,8 @@ public:
         if (oldState == SSBState::kInit)
             return;
 
-        dassert(oldState == SSBState::kWaiting || oldState == SSBState::kHaveContinuation);
+        dassert(oldState == SSBState::kWaitingOrHaveChildren ||
+                oldState == SSBState::kHaveCallback);
 
         DEV {
             // If you hit this limit one of two things has probably happened
@@ -434,7 +437,7 @@ public:
 
             size_t depth = 0;
             for (auto ssb = continuation.get(); ssb;
-                 ssb = ssb->state.load(std::memory_order_acquire) == SSBState::kHaveContinuation
+                 ssb = ssb->state.load(std::memory_order_acquire) == SSBState::kHaveCallback
                      ? ssb->continuation.get()
                      : nullptr) {
                 depth++;
@@ -443,15 +446,29 @@ public:
             }
         }
 
-        if (oldState == SSBState::kHaveContinuation) {
-            invariant(callback);
+        if (oldState == SSBState::kHaveCallback) {
+            dassert(children.empty());
             callback(this);
-        } else if (cv) {
+        } else {
+            invariant(!callback);
+
+            Children localChildren;
+
             stdx::unique_lock<stdx::mutex> lk(mx);
-            // This must be done inside the lock to correctly synchronize with wait().
-            cv->notify_all();
+            localChildren.swap(children);
+            if (cv) {
+                // This must be done inside the lock to correctly synchronize with wait().
+                cv->notify_all();
+            }
+            lk.unlock();
+
+            if (!localChildren.empty()) {
+                fillChildren(localChildren);
+            }
         }
     }
+
+    virtual void fillChildren(const Children&) const = 0;
 
     void setError(Status statusArg) noexcept {
         invariant(!statusArg.isOK());
@@ -466,9 +483,9 @@ public:
     // representing the propagating data are owned by Promise, while members representing what
     // to do with the data are owned by Future. The owner may freely modify the members it owns
     // until it releases them by doing a release-store to state of kFinished from Promise or
-    // kWaiting from Future. Promise can acquire access to all members by doing an acquire-load of
-    // state and seeing kWaiting (or Future with kFinished). Transitions should be done via
-    // acquire-release exchanges to combine both actions.
+    // kWaitingOrHaveChildren from Future. Promise can acquire access to all members by doing an
+    // acquire-load of state and seeing kWaitingOrHaveChildren (or Future with kFinished).
+    // Transitions should be done via acquire-release exchanges to combine both actions.
     //
     // Future::propagateResults uses an alternative mechanism to transfer ownership of the
     // continuation member. The logical Future-side does a release-store of true to
@@ -488,28 +505,79 @@ public:
     // Takes this as argument and usually writes to continuation.
     unique_function<void(SharedStateBase* input)> callback;  // F
 
-
     // These are only used to signal completion to blocking waiters. Benchmarks showed that it was
     // worth deferring the construction of cv, so it can be avoided when it isn't necessary.
     stdx::mutex mx;                                // F (not that it matters)
-    boost::optional<stdx::condition_variable> cv;  // F
+    boost::optional<stdx::condition_variable> cv;  // F (but guarded by mutex)
+
+    // This holds the children created from a SharedSemiFuture. When this SharedState is completed,
+    // the result will be copied in to each of the children. This allows their continuations to have
+    // their own mutable copy, rather than tracking mutability for each callback.
+    Children children;  // F (but guarded by mutex)
 
     Status status = Status::OK();  // P
-
 protected:
     SharedStateBase() = default;
 };
 
 template <typename T>
 struct SharedStateImpl final : SharedStateBase {
-    MONGO_STATIC_ASSERT(!std::is_void<T>::value);
+    static_assert(!std::is_void<T>::value);
+
+    // Initial methods only called from future side.
+
+    boost::intrusive_ptr<SharedState<T>> addChild() {
+        static_assert(std::is_copy_constructible_v<T>);  // T has been through VoidToFakeVoid.
+        invariant(!callback);
+
+        auto out = make_intrusive<SharedState<T>>();
+        if (state.load(std::memory_order_acquire) == SSBState::kFinished) {
+            out->fillFromConst(*this);
+            return out;
+        }
+
+        auto lk = stdx::unique_lock(mx);
+        auto oldState = state.load(std::memory_order_acquire);
+        if (oldState == SSBState::kFinished) {
+            lk.unlock();
+            out->fillFromConst(*this);
+            return out;
+        }
+
+        if (oldState == SSBState::kInit) {
+            // memory ordering can be relaxed because that will be handled by the mutex.
+            state.compare_exchange_strong(
+                oldState, SSBState::kWaitingOrHaveChildren, std::memory_order_relaxed);
+        }
+        dassert(oldState != SSBState::kHaveCallback);
+
+        // If oldState became kFinished after we checked (and therefore after we acquired the lock),
+        // the returned continuation will be completed by the promise side once it acquires the lock
+        // since we are adding ourself to the chain here.
+
+        children.emplace_front(out.get(), /*add ref*/ false);
+        out->threadUnsafeIncRefCountTo(2);
+        return out;
+    }
 
     // Remaining methods only called by promise side.
-    void fillFrom(SharedState<T>&& other) {
+
+    // fillFromConst and fillFromMove are identical other than using as_const() vs move().
+    void fillFromConst(const SharedState<T>& other) {
         dassert(state.load() < SSBState::kFinished);
         dassert(other.state.load() == SSBState::kFinished);
         if (other.status.isOK()) {
-            data = std::move(other.data);
+            data.emplace(std::as_const(*other.data));
+        } else {
+            status = std::as_const(other.status);
+        }
+        transitionToFinished();
+    }
+    void fillFromMove(SharedState<T>&& other) {
+        dassert(state.load() < SSBState::kFinished);
+        dassert(other.state.load() == SSBState::kFinished);
+        if (other.status.isOK()) {
+            data.emplace(std::move(*other.data));
         } else {
             status = std::move(other.status);
         }
@@ -532,6 +600,17 @@ struct SharedStateImpl final : SharedStateBase {
             emplaceValue(std::move(sw.getValue()));
         } else {
             setError(std::move(sw.getStatus()));
+        }
+    }
+
+    void fillChildren(const Children& children) const override {
+        IF_CONSTEXPR(std::is_copy_constructible_v<T>) {  // T has been through VoidToFakeVoid.
+            for (auto&& child : children) {
+                checked_cast<SharedState<T>*>(child.get())->fillFromConst(*this);
+            }
+        }
+        else {
+            invariant(false, "should never call fillChildren with non-copyable T");
         }
     }
 
@@ -632,6 +711,10 @@ public:
         return _shared.operator->();
     }
 
+    SharedStateHolder<VoidToFakeVoid<T>> addChild() const {
+        return SharedStateHolder<VoidToFakeVoid<T>>(_shared->addChild());
+    }
+
 private:
     boost::intrusive_ptr<SharedState<T>> _shared;
 };
@@ -689,6 +772,10 @@ public:
     }
     Status getNoThrow(Interruptible* interruptible) const& noexcept {
         return _inner.getNoThrow(interruptible).getStatus();
+    }
+
+    SharedStateHolder<VoidToFakeVoid<void>> addChild() const {
+        return _inner.addChild();
     }
 
 private:
@@ -797,7 +884,7 @@ public:
 
     template <typename Func,
               typename Result = NormalizedCallResult<Func, T>,
-              typename = std::enable_if_t<!isChainable<Result>>>
+              typename = std::enable_if_t<!isFutureLike<Result>>>
         FutureImpl<Result> then(Func&& func) && noexcept {
         return generalImpl(
             // on ready success:
@@ -820,7 +907,7 @@ public:
 
     template <typename Func,
               typename RawResult = NormalizedCallResult<Func, T>,
-              typename = std::enable_if_t<isChainable<RawResult>>,
+              typename = std::enable_if_t<isFutureLike<RawResult>>,
               typename UnwrappedResult = typename RawResult::value_type>
         FutureImpl<UnwrappedResult> then(Func&& func) && noexcept {
         return generalImpl(
@@ -855,7 +942,7 @@ public:
 
     template <typename Func,
               typename Result = NormalizedCallResult<Func, StatusOrStatusWith<T>>,
-              typename = std::enable_if_t<!isChainable<Result>>>
+              typename = std::enable_if_t<!isFutureLike<Result>>>
         FutureImpl<Result> onCompletion(Func&& func) && noexcept {
         using Wrapper = StatusOrStatusWith<T>;
 
@@ -885,7 +972,7 @@ public:
 
     template <typename Func,
               typename RawResult = NormalizedCallResult<Func, StatusOrStatusWith<T>>,
-              typename = std::enable_if_t<isChainable<RawResult>>,
+              typename = std::enable_if_t<isFutureLike<RawResult>>,
               typename UnwrappedResult = typename RawResult::value_type>
         FutureImpl<UnwrappedResult> onCompletion(Func&& func) && noexcept {
         using Wrapper = StatusOrStatusWith<T>;
@@ -936,7 +1023,7 @@ public:
 
     template <typename Func,
               typename Result = RawNormalizedCallResult<Func, Status>,
-              typename = std::enable_if_t<!isChainable<Result>>>
+              typename = std::enable_if_t<!isFutureLike<Result>>>
         FutureImpl<FakeVoidToVoid<T>> onError(Func&& func) && noexcept {
         static_assert(
             std::is_same<Result, T>::value,
@@ -963,7 +1050,7 @@ public:
 
     template <typename Func,
               typename Result = RawNormalizedCallResult<Func, Status>,
-              typename = std::enable_if_t<isChainable<Result>>,
+              typename = std::enable_if_t<isFutureLike<Result>>,
               typename = void>
         FutureImpl<FakeVoidToVoid<T>> onError(Func&& func) && noexcept {
         static_assert(
@@ -1094,7 +1181,7 @@ public:
                 _shared->callback = [](SharedStateBase * ssb) noexcept {
                     const auto input = checked_cast<SharedState<T>*>(ssb);
                     const auto output = checked_cast<SharedState<T>*>(ssb->continuation.get());
-                    output->fillFrom(std::move(*input));
+                    output->fillFromMove(std::move(*input));
                 };
             });
     }
@@ -1115,7 +1202,7 @@ private:
         }
 
         auto oldState = _shared->state.load(std::memory_order_acquire);
-        dassert(oldState != SSBState::kHaveContinuation);
+        dassert(oldState != SSBState::kHaveCallback);
         if (oldState == SSBState::kFinished) {
             if (_shared->status.isOK()) {
                 return success(std::move(*_shared->data));
@@ -1128,10 +1215,11 @@ private:
         // support both void- and value-returning notReady implementations since we can't assign
         // void to a variable.
         ON_BLOCK_EXIT([&] {
-            // oldState could be either kInit or kWaiting, depending on whether we've failed a call
-            // to wait().
+            dassert(_shared->children.empty());
+            // oldState could be either kInit or kWaitingOrHaveChildren, depending on whether we've
+            // failed a call to wait().
             if (MONGO_unlikely(!_shared->state.compare_exchange_strong(
-                    oldState, SSBState::kHaveContinuation, std::memory_order_acq_rel))) {
+                    oldState, SSBState::kHaveCallback, std::memory_order_acq_rel))) {
                 dassert(oldState == SSBState::kFinished);
                 _shared->callback(_shared.getPtr());
             }
@@ -1167,7 +1255,7 @@ private:
                         fail(std::forward<Callback>(cb), stdx::as_const(input->status));
                     }
 
-                    output->fillFrom(std::move(*input));
+                    output->fillFromMove(std::move(*input));
                 });
             });
     }

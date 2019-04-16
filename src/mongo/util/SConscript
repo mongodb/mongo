@@ -732,6 +732,7 @@ env.CppUnitTest(
         'future_test_future_int.cpp',
         'future_test_future_move_only.cpp',
         'future_test_executor_future.cpp',
+        'future_test_shared_future.cpp',
         'future_test_edge_cases.cpp',
         'future_test_promise_int.cpp',
         'future_test_promise_void.cpp',
