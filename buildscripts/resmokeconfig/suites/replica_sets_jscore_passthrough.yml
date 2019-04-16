@@ -25,6 +25,7 @@ selector:
 executor:
   archive:
     hooks:
+      - CheckReplDBHashInBackground
       - CheckReplDBHash
       - CheckReplOplogs
       - ValidateCollections
@@ -36,7 +37,7 @@ executor:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
-  # TODO SERVER-39321: Re-enable and archive the CheckReplDBHashInBackground hook.
+  - class: CheckReplDBHashInBackground
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
@@ -47,11 +48,4 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        # TODO SERVER-39321: Remove the following block now that SERVER-35377 has been resolved.
-        #
-        # When running tests that intentionally trigger a DuplicateKeyError, we somehow end up
-        # performing an atClusterTime read in the CheckReplDBHashInBackground hook based on an
-        # operationTime that is greater than anything in the oplog. The periodic no-op writer must
-        # be enabled to ensure that we eventually reach the clusterTime we are waiting for.
-        writePeriodicNoops: 1
     num_nodes: 2

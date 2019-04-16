@@ -181,11 +181,18 @@ public:
         // We lock the entire database in S-mode in order to ensure that the contents will not
         // change for the snapshot.
         auto lockMode = LockMode::MODE_S;
+        boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> shouldNotConflictBlock;
         if (opCtx->recoveryUnit()->getTimestampReadSource() ==
             RecoveryUnit::ReadSource::kProvided) {
             // However, if we are performing a read at a timestamp, then we only need to lock the
             // database in intent mode to ensure that none of the collections get dropped.
             lockMode = LockMode::MODE_IS;
+
+            // Additionally, if we are performing a read at a timestamp, then we allow oplog
+            // application to proceed concurrently with the dbHash command. This is done
+            // to ensure a prepare conflict is able to eventually be resolved by processing a
+            // later commitTransaction or abortTransaction oplog entry.
+            shouldNotConflictBlock.emplace(opCtx->lockState());
         }
         AutoGetDb autoDb(opCtx, ns, lockMode);
         Database* db = autoDb.getDb();

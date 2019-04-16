@@ -251,7 +251,9 @@
     for (let dbName of dbNames) {
         let result;
         let clusterTime;
+        let previousClusterTime;
         let hasTransientError;
+        let performNoopWrite;
 
         // The isTransientError() function is responsible for setting hasTransientError to true.
         const isTransientError = (e) => {
@@ -265,18 +267,36 @@
             // ReplSetTest#getCollectionDiffUsingSessions() upon detecting a dbHash mismatch. It is
             // presumed to still useful to know that a bug exists even if we cannot get more
             // diagnostics for it.
-            if (e.code === ErrorCodes.Interrupted || e.code === ErrorCodes.SnapshotUnavailable) {
+            if (e.code === ErrorCodes.Interrupted) {
                 hasTransientError = true;
-                return true;
             }
 
-            return false;
+            // Perform a no-op write to the primary if the clusterTime between each call remain
+            // the same and if we encounter the SnapshotUnavailable error as the secondaries minimum
+            // timestamp can be greater than the primaries minimum timestamp.
+            if (e.code === ErrorCodes.SnapshotUnavailable) {
+                if (bsonBinaryEqual(clusterTime, previousClusterTime)) {
+                    performNoopWrite = true;
+                }
+                hasTransientError = true;
+            }
+
+            // InvalidOptions can be returned when $_internalReadAtClusterTime is greater than the
+            // all-committed timestamp. As the dbHash command is running in the background at
+            // varying times, it's possible that we may run dbHash while a prepared transactions
+            // has yet to commit or abort.
+            if (e.code === ErrorCodes.InvalidOptions) {
+                hasTransientError = true;
+            }
+
+            return hasTransientError;
         };
 
         do {
             // SERVER-38928: Due to races around advancing last applied, there's technically no
             // guarantee that a primary will report a later operation time than its
             // secondaries. Perform the snapshot read at the latest reported operation time.
+            previousClusterTime = clusterTime;
             clusterTime = sessions[0].getOperationTime();
             let signedClusterTime = sessions[0].getClusterTime();
             for (let sess of sessions.slice(1)) {
@@ -297,12 +317,19 @@
             }
 
             hasTransientError = false;
+            performNoopWrite = false;
 
             try {
                 result = checkCollectionHashesForDB(dbName, clusterTime);
             } catch (e) {
                 if (isTransientError(e)) {
-                    debugInfo.push({"transientError": e});
+                    if (performNoopWrite) {
+                        const primarySession = sessions[0];
+                        assert.commandWorked(primarySession.getDatabase(dbName).adminCommand(
+                            {appendOplogNote: 1, data: {}}));
+                    }
+
+                    debugInfo.push({"transientError": e, "performNoopWrite": performNoopWrite});
                     continue;
                 }
 
