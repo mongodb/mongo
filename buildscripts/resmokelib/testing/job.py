@@ -104,7 +104,7 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
 
     @staticmethod
     def _get_time():
-        """Convenience method to get current time to aid in the unit testing of the _run method."""
+        """Get current time to aid in the unit testing of the _run method."""
         return time.time()
 
     def _run(self, queue, interrupt_flag):

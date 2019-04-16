@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """Collect system resource information on processes running in Evergreen on a given interval."""
 
-
-
-
 from datetime import datetime
 import optparse
 import os

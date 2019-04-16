@@ -3,7 +3,7 @@
 import unittest
 import mock
 
-from buildscripts.util import read_config as read_config
+from buildscripts.util import read_config
 
 # pylint: disable=missing-docstring,protected-access
 

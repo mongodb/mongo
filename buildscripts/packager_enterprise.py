@@ -38,7 +38,7 @@ import time
 
 sys.path.append(os.getcwd())
 
-import packager
+import packager  # pylint: disable=wrong-import-position
 
 # The MongoDB names for the architectures we support.
 ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64"]
@@ -277,10 +277,10 @@ def make_deb_repo(repo, distro, build_os):
     oldpwd = os.getcwd()
     os.chdir(repo + "../../../../../../")
     try:
-        dirs = set([
+        dirs = {
             os.path.dirname(deb)[2:]
             for deb in packager.backtick(["find", ".", "-name", "*.deb"]).decode('utf-8').split()
-        ])
+        }
         for directory in dirs:
             st = packager.backtick(["dpkg-scanpackages", directory, "/dev/null"])
             with open(directory + "/Packages", "wb") as fh:

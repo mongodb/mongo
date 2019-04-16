@@ -2,7 +2,7 @@
 
 import unittest
 
-from buildscripts.util import taskname as taskname
+from buildscripts.util import taskname
 
 # pylint: disable=missing-docstring,protected-access
 

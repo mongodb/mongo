@@ -5,7 +5,7 @@ import re
 import yaml
 
 # TODO: use a more robust regular expression for matching tags
-_JSTEST_TAGS_RE = re.compile(b".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
+_JSTEST_TAGS_RE = re.compile(r".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
 
 
 def get_tags(pathname):
@@ -27,7 +27,7 @@ def get_tags(pathname):
       */
     """
 
-    with open(pathname, 'rb') as fp:
+    with open(pathname, 'r', encoding='utf-8') as fp:
         match = _JSTEST_TAGS_RE.match(fp.read())
         if match:
             try:
@@ -68,7 +68,7 @@ def _strip_jscomments(string):
 
     if isinstance(string, bytes):
         string = string.decode("utf-8")
-        
+
     for line in string.splitlines():
         # Remove leading whitespace and symbols that commonly appear in JS comments.
         line = line.lstrip("\t ").lstrip("*/")

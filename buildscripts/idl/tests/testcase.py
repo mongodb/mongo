@@ -40,7 +40,7 @@ else:
 
 
 def errors_to_str(errors):
-    # type: (idl.errors.ParserErrorCollection) -> unicode
+    # type: (idl.errors.ParserErrorCollection) -> str
     """Dump the list of errors as a multiline text string."""
     if errors is not None:
         return "\n".join(errors.to_list())

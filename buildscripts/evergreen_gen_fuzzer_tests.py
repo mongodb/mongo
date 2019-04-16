@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Generate fuzzer tests to run in evergreen in parallel."""
 
-
-
 import argparse
 import math
 import os

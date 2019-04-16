@@ -50,55 +50,55 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         self._enum = idl_enum
 
     def get_qualified_cpp_type_name(self):
-        # type: () -> unicode
+        # type: () -> str
         """Get the fully qualified C++ type name for an enum."""
         return common.qualify_cpp_name(self._enum.cpp_namespace, self.get_cpp_type_name())
 
     @abstractmethod
     def get_cpp_type_name(self):
-        # type: () -> unicode
+        # type: () -> str
         """Get the C++ type name for an enum."""
         pass
 
     @abstractmethod
     def get_bson_types(self):
-        # type: () -> List[unicode]
+        # type: () -> List[str]
         """Get the BSON type names for an enum."""
         pass
 
     def _get_enum_deserializer_name(self):
-        # type: () -> unicode
+        # type: () -> str
         """Return the name of deserializer function without prefix."""
         return common.template_args("${enum_name}_parse",
                                     enum_name=common.title_case(self._enum.name))
 
     def get_enum_deserializer_name(self):
-        # type: () -> unicode
+        # type: () -> str
         """Return the name of deserializer function with non-method prefix."""
         return "::" + common.qualify_cpp_name(self._enum.cpp_namespace,
                                               self._get_enum_deserializer_name())
 
     def _get_enum_serializer_name(self):
-        # type: () -> unicode
+        # type: () -> str
         """Return the name of serializer function without prefix."""
         return common.template_args("${enum_name}_serializer",
                                     enum_name=common.title_case(self._enum.name))
 
     def get_enum_serializer_name(self):
-        # type: () -> unicode
+        # type: () -> str
         """Return the name of serializer function with non-method prefix."""
         return "::" + common.qualify_cpp_name(self._enum.cpp_namespace,
                                               self._get_enum_serializer_name())
 
     @abstractmethod
     def get_cpp_value_assignment(self, enum_value):
-        # type: (ast.EnumValue) -> unicode
+        # type: (ast.EnumValue) -> str
         """Get the textual representation of the enum value, includes equal sign."""
         pass
 
     @abstractmethod
     def get_deserializer_declaration(self):
-        # type: () -> unicode
+        # type: () -> str
         """Get the deserializer function declaration minus trailing semicolon."""
         pass
 
@@ -125,19 +125,19 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
     """Type information for integer enumerations."""
 
     def get_cpp_type_name(self):
-        # type: () -> unicode
+        # type: () -> str
         return common.title_case(self._enum.name)
 
     def get_bson_types(self):
-        # type: () -> List[unicode]
+        # type: () -> List[str]
         return [self._enum.type]
 
     def get_cpp_value_assignment(self, enum_value):
-        # type: (ast.EnumValue) -> unicode
+        # type: (ast.EnumValue) -> str
         return " = %s" % (enum_value.value)
 
     def get_deserializer_declaration(self):
-        # type: () -> unicode
+        # type: () -> str
         return common.template_args(
             "${enum_name} ${function_name}(const IDLParserErrorContext& ctxt, std::int32_t value)",
             enum_name=self.get_cpp_type_name(), function_name=self._get_enum_deserializer_name())
@@ -188,7 +188,7 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
 
 
 def _get_constant_enum_name(idl_enum, enum_value):
-    # type: (Union[syntax.Enum,ast.Enum], Union[syntax.EnumValue,ast.EnumValue]) -> unicode
+    # type: (Union[syntax.Enum,ast.Enum], Union[syntax.EnumValue,ast.EnumValue]) -> str
     """Return the C++ name for a string constant of string enum value."""
     return common.template_args('k${enum_name}_${name}', enum_name=common.title_case(idl_enum.name),
                                 name=enum_value.name)
@@ -198,20 +198,20 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
     """Type information for string enumerations."""
 
     def get_cpp_type_name(self):
-        # type: () -> unicode
+        # type: () -> str
         return common.template_args("${enum_name}Enum",
                                     enum_name=common.title_case(self._enum.name))
 
     def get_bson_types(self):
-        # type: () -> List[unicode]
+        # type: () -> List[str]
         return [self._enum.type]
 
     def get_cpp_value_assignment(self, enum_value):
-        # type: (ast.EnumValue) -> unicode
+        # type: (ast.EnumValue) -> str
         return ''
 
     def get_deserializer_declaration(self):
-        # type: () -> unicode
+        # type: () -> str
         return common.template_args(
             "${enum_name} ${function_name}(const IDLParserErrorContext& ctxt, StringData value)",
             enum_name=self.get_cpp_type_name(), function_name=self._get_enum_deserializer_name())

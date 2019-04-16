@@ -1089,8 +1089,8 @@ class TestJiraIssueCreator(unittest.TestCase):
 
         desc += "a"
         self.assertTrue(
-            len(utl.JiraIssueCreator._truncate_description(desc)) <= utl.JiraIssueCreator.
-            _MAX_DESCRIPTION_SIZE)
+            len(utl.JiraIssueCreator._truncate_description(desc)) <=
+            utl.JiraIssueCreator._MAX_DESCRIPTION_SIZE)
 
 
 class TestTagsConfigWithChangelog(unittest.TestCase):

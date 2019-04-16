@@ -679,7 +679,7 @@ class FindLastActivated(unittest.TestCase):
 
     REVISION_BUILDS = {
         "rev1": {
-            "not_mongodb_mongo_master_variant1_build1": {"activated": False},
+            "not_mongodb_mongo_master_variant1_build1": {"activated": False},  # force line break
             "mongodb_mongo_unmaster_variant_build1": {"activated": True},
             "mongodb_mongo_master_variant1_build1": {"activated": True},
             "mongodb_mongo_master_variant2_build1": {"activated": False},
@@ -700,7 +700,7 @@ class FindLastActivated(unittest.TestCase):
         "rev4": {
             "not_mongodb_mongo_master_variant1_build1": {"activated": True},
             "mongodb_mongo_unmaster_variant_build1": {"activated": True},
-            "mongodb_mongo_master_variant1_build1": {"activated": True},
+            "mongodb_mongo_master_variant1_build1": {"activated": True},  # force line break
             "mongodb_mongo_master_variant2_build1": {"activated": False},
             "mongodb_mongo_master_variant3_build1": {"activated": True}
         },

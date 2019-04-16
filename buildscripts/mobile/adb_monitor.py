@@ -429,6 +429,7 @@ class AdbContinuousResourceMonitor(AdbResourceMonitor):
 
 def monitor_device(adb_control, files_mtime):
     """Run monitoring on device and collect results.
+
     param adb_control: AdbControl object.
     param files_mtime: Dict of files with their modified time.
     """

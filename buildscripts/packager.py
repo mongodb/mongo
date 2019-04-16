@@ -606,10 +606,10 @@ def make_deb_repo(repo, distro, build_os):
     oldpwd = os.getcwd()
     os.chdir(repo + "../../../../../../")
     try:
-        dirs = set([
+        dirs = {
             os.path.dirname(deb)[2:]
             for deb in backtick(["find", ".", "-name", "*.deb"]).decode('utf-8').split()
-        ])
+        }
         for directory in dirs:
             st = backtick(["dpkg-scanpackages", directory, "/dev/null"])
             with open(directory + "/Packages", "wb") as fh:

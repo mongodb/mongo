@@ -8,7 +8,6 @@
 5. Supports validating and updating a set of files to the right coding style.
 """
 
-
 import difflib
 import glob
 import os
@@ -20,7 +19,10 @@ import sys
 import tarfile
 import tempfile
 import threading
-import urllib.request, urllib.error, urllib.parse
+import urllib.error
+import urllib.parse
+import urllib.request
+
 from distutils import spawn  # pylint: disable=no-name-in-module
 from optparse import OptionParser
 from multiprocessing import cpu_count

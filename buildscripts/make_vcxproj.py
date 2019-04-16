@@ -17,7 +17,6 @@ import io
 import json
 import os
 import re
-import io
 import sys
 import uuid
 import xml.etree.ElementTree as ET
@@ -150,7 +149,10 @@ class ProjFileGenerator(object):  # pylint: disable=too-many-instance-attributes
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.vcxproj = open(self.vcxproj_file_name, "w",  )
+        self.vcxproj = open(
+            self.vcxproj_file_name,
+            "w",
+        )
 
         with open('buildscripts/vcxproj.header', 'r') as header_file:
             header_str = header_file.read()

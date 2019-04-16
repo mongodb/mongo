@@ -6,8 +6,6 @@ Analyze the evergreen history for tests run under the given task and create new 
 to attempt to keep the task runtime under a specified amount.
 """
 
-
-
 import argparse
 import datetime
 import logging

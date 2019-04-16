@@ -83,17 +83,15 @@ class ArchivalFileTests(ArchivalTestCase):
         input_files = "no_file"
         s3_path = self.s3_path("unittest/no_file.tgz", False)
         self.assertRaises(
-            OSError,
-            lambda: self.archive.archive_files_to_s3(display_name, input_files, self.bucket, s3_path)
-        )
+            OSError, lambda: self.archive.archive_files_to_s3(display_name, input_files, self.
+                                                              bucket, s3_path))
 
         # Invalid input_files in a list
         input_files = ["no_file", "no_file2"]
         s3_path = self.s3_path("unittest/no_files.tgz", False)
         self.assertRaises(
-            OSError,
-            lambda: self.archive.archive_files_to_s3(display_name, input_files, self.bucket, s3_path)
-        )
+            OSError, lambda: self.archive.archive_files_to_s3(display_name, input_files, self.
+                                                              bucket, s3_path))
 
         # No files
         display_name = "Unittest no files"

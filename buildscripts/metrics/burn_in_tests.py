@@ -278,8 +278,6 @@ class Report(object):
                          patch_builds[0]["version"], total_failures)
             self.report["tasks_failed_only_burn_in"] += 1
 
-        return
-
     def _update_report_status(self, build):
         """Update task status of report.
 

@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """Bypass compile and fetch binaries."""
 
-
-
-
 import argparse
 import json
 import os
 import re
 import sys
 import tarfile
+import urllib.error
+import urllib.parse
+import urllib.request
 
-import urllib.request, urllib.parse, urllib.error
 # pylint: disable=ungrouped-imports
 try:
     from urllib.parse import urlparse

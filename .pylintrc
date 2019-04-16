@@ -29,8 +29,9 @@ variable-rgx=[a-z_][a-z0-9_]{1,50}$
 # R1720 - no-else-raise - See PM-1380
 # W0122 - exec-used - See PM-1380
 # R0801 - duplicate-code - See PM-1380
+# E0611 - no-name-in-module
 
-disable=bad-continuation,fixme,import-error,line-too-long,no-member,locally-disabled,no-else-return,redefined-variable-type,too-few-public-methods,unused-import,useless-object-inheritance,deprecated-module,unnecessary-pass,duplicate-code,no-else-raise,deprecated-method,exec-used
+disable=bad-continuation,fixme,import-error,line-too-long,no-member,locally-disabled,no-else-return,redefined-variable-type,too-few-public-methods,unused-import,useless-object-inheritance,deprecated-module,unnecessary-pass,duplicate-code,no-else-raise,deprecated-method,exec-used,no-name-in-module
 
 [IMPORTS]
 known-third-party=boto3,botocore,psutil,yaml,xmlrunner

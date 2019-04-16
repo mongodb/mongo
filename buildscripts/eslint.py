@@ -10,8 +10,6 @@ There is also a -d mode that assumes you only want to run one copy of ESLint per
 parameter supplied. This lets ESLint search for candidate files to lint.
 """
 
-
-
 import os
 import shutil
 import string
@@ -20,7 +18,10 @@ import sys
 import tarfile
 import tempfile
 import threading
-import urllib.request, urllib.parse, urllib.error
+import urllib.error
+import urllib.parse
+import urllib.request
+
 from distutils import spawn  # pylint: disable=no-name-in-module
 from optparse import OptionParser
 

@@ -15,7 +15,7 @@ def parallel_process(items, func):
     except NotImplementedError:
         cpus = 1
 
-    task_queue = queue.Queue()  # type: Queue.Queue
+    task_queue = queue.Queue()  # type: queue.Queue
 
     # Use a list so that worker function will capture this variable
     pp_event = threading.Event()

@@ -1,15 +1,10 @@
 """Module to access and modify tag configuration files used by resmoke."""
 
-
-
-
 import collections
 import copy
-import textwrap
-
-import yaml
-
 from functools import cmp_to_key
+import textwrap
+import yaml
 
 
 # Setup to preserve order in yaml.dump, see https://stackoverflow.com/a/8661021

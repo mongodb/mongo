@@ -23,46 +23,43 @@ _BM_REPORT_INSERT_1 = {
 }
 
 _BM_REPORT_INSERT_2 = {
-    "note": "values per second", "errCount": {"$numberLong": "0"},
-    "trapped": "error: not implemented", "insertLatencyAverageMicros": 2563.095938304905,
-    "totalOps": {"$numberLong": "7404"}, "totalOps/s": 2409.05, "findOne": 0, "insert": 2409.05,
-    "delete": 0, "update": 0, "query": 0, "command": 0, "findOnes": {"$numberLong": "0"},
-    "inserts": {"$numberLong": "7404"}, "deletes": {"$numberLong": "0"}, "updates": {
-        "$numberLong": "0"
-    }, "queries": {"$numberLong": "0"}, "commands": {"$numberLong": "0"}
+    "note": "values per second", "errCount": {"$numberLong": "0"}, "trapped":
+        "error: not implemented", "insertLatencyAverageMicros": 2563.095938304905, "totalOps": {
+            "$numberLong": "7404"
+        }, "totalOps/s": 2409.05, "findOne": 0, "insert": 2409.05, "delete": 0, "update": 0,
+    "query": 0, "command": 0, "findOnes": {"$numberLong": "0"}, "inserts": {"$numberLong": "7404"},
+    "deletes": {"$numberLong": "0"}, "updates": {"$numberLong": "0"},
+    "queries": {"$numberLong": "0"}, "commands": {"$numberLong": "0"}
 }
 
 _BM_REPORT_DELETE = {
     "note": "values per second", "errCount": {"$numberLong": "0"},
     "trapped": "error: not implemented", "insertLatencyAverageMicros": "1234.56", "totalOps": {
         "$numberLong": "2345"
-    }, "totalOps/s": 1234.56, "findOne": 0, "insert": 0, "delete": 1234.56, "update": 0, "query": 0,
-    "command": 0, "findOnes": {"$numberLong": "0"}, "inserts": {"$numberLong": "0"}, "deletes": {
-        "$numberLong": "2345"
-    }, "updates": {"$numberLong": "0"}, "queries": {"$numberLong": "0"},
-    "commands": {"$numberLong": "0"}
+    }, "totalOps/s": 1234.56, "findOne": 0, "insert": 0, "delete": 1234.56, "update": 0, "query":
+        0, "command": 0, "findOnes": {"$numberLong": "0"}, "inserts": {"$numberLong": "0"},
+    "deletes": {"$numberLong": "2345"}, "updates": {"$numberLong": "0"},
+    "queries": {"$numberLong": "0"}, "commands": {"$numberLong": "0"}
 }
 
 _BM_REPORT_UPDATE = {
     "note": "values per second", "errCount": {"$numberLong": "0"},
     "trapped": "error: not implemented", "insertLatencyAverageMicros": 654.321, "totalOps": {
         "$numberLong": "4521"
-    }, "totalOps/s": 4521.00, "findOne": 0, "insert": 0, "delete": 0, "update": 4521.00, "query": 0,
-    "command": 0, "findOnes": {"$numberLong": "0"}, "inserts": {"$numberLong": "0"}, "deletes": {
-        "$numberLong": "0"
-    }, "updates": {"$numberLong": "4521"}, "queries": {"$numberLong": "0"},
-    "commands": {"$numberLong": "0"}
+    }, "totalOps/s": 4521.00, "findOne": 0, "insert": 0, "delete": 0, "update": 4521.00, "query":
+        0, "command": 0, "findOnes": {"$numberLong": "0"}, "inserts": {"$numberLong": "0"},
+    "deletes": {"$numberLong": "0"}, "updates": {"$numberLong": "4521"},
+    "queries": {"$numberLong": "0"}, "commands": {"$numberLong": "0"}
 }
 
 _BM_REPORT_MULTI = {
-    "note": "values per second", "errCount": {"$numberLong": "0"},
-    "trapped": "error: not implemented", "insertLatencyAverageMicros": 111.111, "totalOps": {
-        "$numberLong": "11532"
-    }, "totalOps/s": 5766.00, "findOne": 0, "insert": 2490.00, "delete": 0, "update": 9042.00,
-    "query": 0, "command": 0, "findOnes": {"$numberLong": "0"}, "inserts": {
-        "$numberLong": "2490.00"
-    }, "deletes": {"$numberLong": "0"}, "updates": {"$numberLong": "9042"},
-    "queries": {"$numberLong": "0"}, "commands": {"$numberLong": "0"}
+    "note": "values per second", "errCount": {"$numberLong": "0"}, "trapped":
+        "error: not implemented", "insertLatencyAverageMicros": 111.111,
+    "totalOps": {"$numberLong": "11532"}, "totalOps/s": 5766.00, "findOne": 0, "insert": 2490.00,
+    "delete": 0, "update": 9042.00, "query": 0, "command": 0, "findOnes": {"$numberLong": "0"},
+    "inserts": {"$numberLong": "2490.00"}, "deletes": {"$numberLong": "0"}, "updates": {
+        "$numberLong": "9042"
+    }, "queries": {"$numberLong": "0"}, "commands": {"$numberLong": "0"}
 }
 
 _BM_ALL_REPORTS = [

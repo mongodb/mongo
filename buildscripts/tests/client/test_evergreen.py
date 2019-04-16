@@ -561,8 +561,8 @@ class TestEvergreenApiV2ProjectPatchesGen(unittest.TestCase):
 
     def test_project_patches_gen_days_limit(self):
         limit = 1
-        json_list = [[{"create_time": "2016-01-01",
-                       "data": "mydata1"}, {"create_time": "2017-12-01", "data": "mydata2"},
+        json_list = [[{"create_time": "2016-01-01", "data": "mydata1"},
+                      {"create_time": "2017-12-01", "data": "mydata2"},
                       {"create_time": "2018-01-01", "data": "mydata3"}]]
         paginate = MockPaginate(json_list)
         mock_evgapiv2 = MockEvgApiV2()

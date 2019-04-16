@@ -1,4 +1,5 @@
 """ Unit tests for adb_monitor. """
+# pylint: disable=protected-access,no-self-use,missing-docstring,too-many-public-methods
 
 import os
 import unittest
@@ -11,6 +12,8 @@ ADB_MONITOR = "buildscripts.mobile.adb_monitor"
 
 
 def ns(module):
+    """Get the namespace."""
+    # pylint: disable=invalid-name
     return f"{ADB_MONITOR}.{module}"
 
 
@@ -73,6 +76,7 @@ class TestParseCommandLine(unittest.TestCase):
 class TestMonitorDevice(unittest.TestCase):
     @patch(ns("fileops"), return_value=False)
     def test_monitor_device(self, mock_fileops):
+        """Basic test monitor device."""
         files_mtime = {"file1": 0, "file2": 0}
         mock_fileops.getmtime.return_value = 10
         mock_adb_control = MagicMock()
@@ -129,6 +133,7 @@ class TestOutputFilesMtime(unittest.TestCase):
 
     @patch(ns("fileops.getmtime"))
     def test_output_files_mtime_no_files(self, mock_getmtime):
+        # pylint: disable=unused-argument
         m_files = adb_monitor.create_files_mtime([])
         self.assertEqual(len(m_files), 0)
 
@@ -150,6 +155,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os.path.isfile"), return_value=True)
     @patch(ns("find_executable"), side_effect=lambda x: x)
     def test___init__(self, mock_find_executable, mock_isfile):
+        # pylint: disable=unused-argument
         os_path = os.environ["PATH"]
         adb = adb_monitor.Adb()
         self.assertTrue(adb.systrace_script.startswith(os.path.join("systrace", "systrace.py")))
@@ -161,6 +167,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("find_executable"), side_effect=lambda x: x)
     def test___init__adb_binary(self, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         adb_dir = os.path.join("/root", "adb_dir")
         adb_path = os.path.join(adb_dir, "adb")
         mock_os.environ = {"PATH": os.environ["PATH"]}
@@ -174,6 +181,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os.path.isfile"), return_value=True)
     @patch(ns("find_executable"), side_effect=lambda x: x)
     def test___init__python27_binary(self, mock_find_executable, mock_isfile, mock_os_environ):
+        # pylint: disable=unused-argument
         python_dir = os.path.join("/root", "python27_dir")
         python27_path = os.path.join(python_dir, "python2")
         adb = adb_monitor.Adb(python27=python27_path)
@@ -183,14 +191,14 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os.path.isfile"), return_value=False)
     @patch(ns("find_executable"), side_effect=lambda x: x)
     def test___init__bad_systrace(self, mock_find_executable, mock_isfile, mock_os_environ):
-        adb_dir = os.path.join("/root", "adb_dir")
-        adb_path = os.path.join(adb_dir, "adb")
+        # pylint: disable=unused-argument
         with self.assertRaises(EnvironmentError):
             adb_monitor.Adb()
 
     @patch(ns("os"))
     @patch(ns("runcommand"))
     def test_adb_cmd_output(self, mock_runcmd, mock_os):
+        # pylint: disable=unused-argument
         adb_result = adb_monitor.Adb.adb_cmd("mycmd")
         self.assertEqual(adb_result, mock_runcmd.RunCommand().execute_with_output())
         self.assertNotEqual(adb_result, mock_runcmd.RunCommand().execute_save_output())
@@ -198,6 +206,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("runcommand"))
     def test_adb_cmd_output_string(self, mock_runcmd, mock_os):
+        # pylint: disable=unused-argument
         adb_result = adb_monitor.Adb.adb_cmd("mycmd", output_string=True)
         self.assertEqual(adb_result, mock_runcmd.RunCommand().execute_with_output())
         self.assertNotEqual(adb_result, mock_runcmd.RunCommand().execute_save_output())
@@ -205,6 +214,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("runcommand"))
     def test_adb_cmd_save_output(self, mock_runcmd, mock_os):
+        # pylint: disable=unused-argument
         adb_result = adb_monitor.Adb.adb_cmd("mycmd", output_file="myfile")
         self.assertEqual(adb_result, mock_runcmd.RunCommand().execute_save_output())
         self.assertNotEqual(adb_result, mock_runcmd.RunCommand().execute_with_output())
@@ -212,6 +222,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("runcommand"))
     def test_adb_cmd_all_params(self, mock_runcmd, mock_os):
+        # pylint: disable=unused-argument
         adb_result = adb_monitor.Adb.adb_cmd("mycmd", output_file="myfile", append_file=True,
                                              output_string=True)
         self.assertNotEqual(adb_result, mock_runcmd.RunCommand().execute_save_output())
@@ -220,12 +231,14 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("runcommand"))
     def test_shell(self, mock_runcmd, mock_os):
+        # pylint: disable=unused-argument
         cmd_output = adb_monitor.Adb.shell("mycmd")
         self.assertEqual(cmd_output, mock_runcmd.RunCommand().execute_with_output())
 
     @patch(ns("os"))
     @patch(ns("runcommand"))
     def test_shell_stripped(self, mock_runcmd, mock_os):
+        # pylint: disable=unused-argument
         output = "output from shell"
         mock_runcmd.RunCommand().execute_with_output.return_value = output + "__EXIT__:0\n"
         cmd_output = adb_monitor.Adb.shell("mycmd")
@@ -234,6 +247,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("runcommand"))
     def test_shell_error(self, mock_runcmd, mock_os):
+        # pylint: disable=unused-argument
         output = "output from shell"
         mock_runcmd.RunCommand().execute_with_output.return_value = output + "__EXIT__:1\n"
         with self.assertRaises(RuntimeError):
@@ -243,6 +257,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_devices(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         mock_os.path.dirname.return_value = "adb_dir"
         adb = adb_monitor.Adb()
         adb.devices()
@@ -253,6 +268,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_device_available(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         mock_os.path.dirname.return_value = "adb_dir"
         adb = adb_monitor.Adb()
         adb.device_available()
@@ -263,6 +279,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_push(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         files = "myfile"
         remote_dir = "/remotedir"
         mock_os.path.dirname.return_value = "adb_dir"
@@ -277,6 +294,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_push_list(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         files = ["myfile", "file2"]
         remote_dir = "/remotedir"
         mock_os.path.dirname.return_value = "adb_dir"
@@ -291,6 +309,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_push_sync(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         files = ["myfile", "file2"]
         remote_dir = "/remotedir"
         mock_os.path.dirname.return_value = "adb_dir"
@@ -306,6 +325,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_pull(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         files = "myfile"
         local_dir = "/localdir"
         mock_os.path.dirname.return_value = "adb_dir"
@@ -320,6 +340,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_pull_files(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         files = ["myfile", "file2"]
         local_dir = "/localdir"
         mock_os.path.dirname.return_value = "adb_dir"
@@ -335,6 +356,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test__battery_cmd(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         option = "myopt"
         battery_cmd = "shell dumpsys batterystats " + option
         mock_os.path.dirname.return_value = "adb_dir"
@@ -347,6 +369,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test__battery_cmd_save_output(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         option = "myopt"
         battery_cmd = "shell dumpsys batterystats " + option
         mock_os.path.dirname.return_value = "adb_dir"
@@ -359,6 +382,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_battery(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         mock_os.path.dirname.return_value = "adb_dir"
         adb = adb_monitor.Adb()
         adb.battery("myfile")
@@ -370,6 +394,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_battery_reset(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         mock_os.path.dirname.return_value = "adb_dir"
         adb = adb_monitor.Adb()
         adb.battery("myfile", reset=True, append_file=True)
@@ -382,6 +407,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_memory(self, mock_runcmd, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         memory_cmd = "shell dumpsys meminfo -c -d"
         mock_os.path.dirname.return_value = "adb_dir"
         adb = adb_monitor.Adb()
@@ -394,12 +420,12 @@ class TestAdb(unittest.TestCase):
     @patch(ns("find_executable"), side_effect=lambda x: x)
     @patch(ns("runcommand"))
     def test_systrace_start(self, mock_runcmd, mock_find_executable, mock_os, mock_tempfile):
+        # pylint: disable=unused-argument
         mock_os.path.dirname.return_value = "adb_dir"
         systrace_script = "systrace.py"
         mock_os.path.join.return_value = systrace_script
         adb = adb_monitor.Adb()
         adb.systrace_start()
-        call_args = mock_runcmd.RunCommand.call_args_list[0]
         mock_runcmd.RunCommand.assert_called_once_with(output_file=mock_tempfile().name,
                                                        propagate_signals=False)
         self.assertEqual(adb.systrace_script, systrace_script)
@@ -418,13 +444,13 @@ class TestAdb(unittest.TestCase):
     @patch(ns("runcommand"))
     def test_systrace_start_output_file(self, mock_runcmd, mock_find_executable, mock_os,
                                         mock_tempfile):
+        # pylint: disable=unused-argument
         output_file = "myfile"
         mock_os.path.dirname.return_value = "adb_dir"
         systrace_script = "systrace.py"
         mock_os.path.join.return_value = systrace_script
         adb = adb_monitor.Adb()
         adb.systrace_start(output_file)
-        call_args = mock_runcmd.RunCommand.call_args_list[0]
         mock_runcmd.RunCommand.assert_called_once_with(output_file=mock_tempfile().name,
                                                        propagate_signals=False)
         self.assertEqual(adb.systrace_script, systrace_script)
@@ -441,6 +467,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("find_executable"), side_effect=lambda x: x)
     def test_systrace_stop(self, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         mock_os.path.dirname.return_value = "adb_dir"
         systrace_script = "systrace.py"
         systrace_output = "Systrace: Wrote trace"
@@ -455,6 +482,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("find_executable"), side_effect=lambda x: x)
     def test_systrace_stop_output_file(self, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         mock_os.path.dirname.return_value = "adb_dir"
         systrace_script = "systrace.py"
         systrace_output = "Systrace: Wrote trace"
@@ -470,6 +498,7 @@ class TestAdb(unittest.TestCase):
     @patch(ns("os"))
     @patch(ns("find_executable"), side_effect=lambda x: x)
     def test_systrace_stop_no_trace(self, mock_find_executable, mock_os):
+        # pylint: disable=unused-argument
         mock_os.path.dirname.return_value = "adb_dir"
         systrace_script = "systrace.py"
         systrace_output = "Systrace: did not Write trace"
@@ -550,6 +579,7 @@ class TestAdbControl(unittest.TestCase):
 
     @patch(ns("fileops.create_empty"))
     def test___init___num_samples(self, mock_create_empty):
+        # pylint: disable=unused-argument
         mock_adb = MagicMock()
         battery_file = "mybattery"
         num_samples = 5
@@ -576,8 +606,8 @@ class TestAdbControl(unittest.TestCase):
         sample_interval_ms = 25
         adb_control = adb_monitor.AdbControl(
             mock_adb, logger=mock_logger, battery_file=battery_file, memory_file=memory_file,
-            cpu_file=cpu_file, append_file=True, num_samples=num_samples, collection_time_secs=10,
-            sample_interval_ms=sample_interval_ms)
+            cpu_file=cpu_file, append_file=True, num_samples=num_samples,
+            collection_time_secs=collection_time_secs, sample_interval_ms=sample_interval_ms)
         adb_control.start()
         self.assertEqual(len(adb_control._all_threads), 3)
         self.assertEqual(len(adb_control._sample_based_threads), 2)
@@ -599,7 +629,8 @@ class TestAdbControl(unittest.TestCase):
         cpu_file = "mycpu"
         collection_time_secs = 10
         adb_control = adb_monitor.AdbControl(mock_adb, logger=mock_logger, cpu_file=cpu_file,
-                                             append_file=True, collection_time_secs=10)
+                                             append_file=True,
+                                             collection_time_secs=collection_time_secs)
         adb_control.start()
         self.assertEqual(len(adb_control._all_threads), 1)
         self.assertEqual(len(adb_control._sample_based_threads), 0)
@@ -747,6 +778,7 @@ class TestAdbControl(unittest.TestCase):
 class TestAdbResourceMonitor(unittest.TestCase):
     @patch(ns("threading"))
     def test_run(self, mock_threading):
+        # pylint: disable=unused-argument
         output_file = "myfile"
         should_stop = MagicMock()
         arm = adb_monitor.AdbResourceMonitor(output_file, should_stop)
@@ -759,6 +791,7 @@ class TestAdbResourceMonitor(unittest.TestCase):
 
     @patch(ns("threading"))
     def test_run_exception(self, mock_threading):
+        # pylint: disable=unused-argument
         output_file = "myfile"
         should_stop = MagicMock()
         exception = RuntimeError()
@@ -774,6 +807,7 @@ class TestAdbResourceMonitor(unittest.TestCase):
 class TestAdbSampleBasedResourceMonitor(unittest.TestCase):
     @patch(ns("threading"))
     def test__do_monitoring(self, mock_threading):
+        # pylint: disable=unused-argument
         output_file = "myfile"
         mock_should_stop = MagicMock()
         mock_should_stop.is_set.return_value = False
@@ -795,10 +829,11 @@ class TestAdbSampleBasedResourceMonitor(unittest.TestCase):
 
     @patch(ns("threading"))
     def test__do_monitoring_no_samples(self, mock_threading):
+        # pylint: disable=unused-argument
         output_file = "myfile"
         mock_should_stop = MagicMock()
-        self.num_collected = 0
-        self.num_samples = 5
+        self.num_collected = 0  # pylint: disable=attribute-defined-outside-init
+        self.num_samples = 5  # pylint: disable=attribute-defined-outside-init
         mock_should_stop.is_set = self._is_set
         mock_adb_cmd = MagicMock()
         num_samples = 0
@@ -812,10 +847,11 @@ class TestAdbSampleBasedResourceMonitor(unittest.TestCase):
 
     @patch(ns("threading"))
     def test__take_sample(self, mock_threading):
+        # pylint: disable=unused-argument
         output_file = "myfile"
         mock_should_stop = MagicMock()
-        self.num_collected = 0
-        self.num_samples = 5
+        self.num_collected = 0  # pylint: disable=attribute-defined-outside-init
+        self.num_samples = 5  # pylint: disable=attribute-defined-outside-init
         mock_should_stop.is_set = self._is_set
         mock_adb_cmd = MagicMock()
         arm = adb_monitor.AdbSampleBasedResourceMonitor(output_file, mock_should_stop, mock_adb_cmd,
@@ -827,6 +863,7 @@ class TestAdbSampleBasedResourceMonitor(unittest.TestCase):
 class TestAdbContinuousResourceMonitor(unittest.TestCase):
     @patch(ns("threading"))
     def test__do_monitoring(self, mock_threading):
+        # pylint: disable=unused-argument
         output_file = "myfile"
         mock_should_stop = MagicMock()
         mock_adb_start_cmd = MagicMock()

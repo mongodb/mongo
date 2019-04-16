@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Command line utility for determining what jstests have been added or modified."""
 
-
 import collections
 import copy
 import json
@@ -67,17 +66,20 @@ def parse_command_line():
     parser.add_option("--baseCommit", dest="base_commit", default=None,
                       help="The base commit to compare to for determining changes.")
 
-    parser.add_option("--buildVariant", dest="buildvariant", default=None,
-                      help=("The buildvariant to select the tasks. Required when"
-                            " generating the JSON file with test executor information"))
+    parser.add_option(
+        "--buildVariant", dest="buildvariant", default=None,
+        help=("The buildvariant to select the tasks. Required when"
+              " generating the JSON file with test executor information"))
 
-    parser.add_option("--runBuildVariant", dest="run_buildvariant", default=None,
-                      help=("The buildvariant the tasks will execute on. If not specied then tasks"
-                            " will execute on the the buildvariant specied in --buildVariant."))
+    parser.add_option(
+        "--runBuildVariant", dest="run_buildvariant", default=None,
+        help=("The buildvariant the tasks will execute on. If not specied then tasks"
+              " will execute on the the buildvariant specied in --buildVariant."))
 
-    parser.add_option("--distro", dest="distro", default=None,
-                      help=("The distro the tasks will execute on. Can only be specified"
-                            " with --generateTasksFile."))
+    parser.add_option(
+        "--distro", dest="distro", default=None,
+        help=("The distro the tasks will execute on. Can only be specified"
+              " with --generateTasksFile."))
 
     parser.add_option(
         "--checkEvergreen", dest="check_evergreen", default=False, action="store_true",
