@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define LOG_FOR_RECOVERY(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
 
 #include "mongo/platform/basic.h"
 
@@ -172,7 +174,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
     for (auto&& dbName : databasesToOpen) {
-        LOG(1) << "openCatalog: dbholder reopening database " << dbName;
+        LOG_FOR_RECOVERY(1) << "openCatalog: dbholder reopening database " << dbName;
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
         for (auto&& collNss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(dbName)) {
@@ -200,7 +202,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     // Opening UUID Catalog: The UUID catalog is now in sync with the storage engine catalog. Clear
     // the pre-closing state.
     UUIDCatalog::get(opCtx).onOpenCatalog(opCtx);
-    LOG(1) << "openCatalog: finished reloading UUID catalog";
+    log() << "openCatalog: finished reloading UUID catalog";
 }
 }  // namespace catalog
 }  // namespace mongo

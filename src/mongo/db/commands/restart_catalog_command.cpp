@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -88,6 +89,7 @@ public:
              const std::string& dbNameUnused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_X);
         Lock::GlobalLock global(opCtx, MODE_X);
 
         // This command will fail without modifying the catalog if there are any databases that are
