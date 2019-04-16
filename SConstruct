@@ -1772,11 +1772,16 @@ elif env.TargetOSIs('windows'):
     # file contains invalid UTF-8.
     env.Append( CCFLAGS=["/utf-8" ])
 
-    # Enforce type conversion rules for rvalue reference types as a result of a cast operation.
-    env.Append( CCFLAGS=["/Zc:rvalueCast"] )
+    # Specify standards conformance mode to the compiler.
+    env.Append( CCFLAGS=["/permissive-"] )
 
-    # Disable string literal type conversion, instead const_cast must be explicitly specified.
-    env.Append( CCFLAGS=["/Zc:strictStrings"] )
+    # Enables the __cplusplus preprocessor macro to report an updated value for recent C++ language
+    # standards support.
+    env.Append( CCFLAGS=["/Zc:__cplusplus"] )
+
+    # Tells the compiler to preferentially call global operator delete or operator delete[]
+    # functions that have a second parameter of type size_t when the size of the object is available.
+    env.Append( CCFLAGS=["/Zc:sizedDealloc"] )
 
     # Treat volatile according to the ISO standard and do not guarantee acquire/release semantics.
     env.Append( CCFLAGS=["/volatile:iso"] )
@@ -2279,6 +2284,8 @@ def doConfigure(myenv):
         # exceptionToStatus(). See https://bugs.llvm.org/show_bug.cgi?id=34804
         AddToCCFLAGSIfSupported(myenv, "-Wno-exceptions")
 
+        # Enable sized deallocation support.
+        AddToCXXFLAGSIfSupported(myenv, '-fsized-deallocation')
 
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
@@ -2406,7 +2413,6 @@ def doConfigure(myenv):
         conf.Finish()
 
     if myenv.ToolchainIs('msvc'):
-        myenv.AppendUnique(CCFLAGS=['/Zc:__cplusplus', '/permissive-'])
         if get_option('cxx-std') == "17":
             myenv.AppendUnique(CCFLAGS=['/std:c++17'])
     else:
