@@ -51,6 +51,14 @@ namespace mongo {
 
 namespace {
 thread_local ServiceContext::UniqueClient currentClient;
+
+void invariantNoCurrentClient() {
+    invariant(!haveClient(),
+              str::stream() << "Already have client on this thread: "  //
+                            << '"'
+                            << Client::getCurrent()->desc()
+                            << '"');
+}
 }  // namespace
 
 void Client::initThread(StringData desc, transport::SessionHandle session) {
@@ -60,7 +68,7 @@ void Client::initThread(StringData desc, transport::SessionHandle session) {
 void Client::initThread(StringData desc,
                         ServiceContext* service,
                         transport::SessionHandle session) {
-    invariant(!haveClient());
+    invariantNoCurrentClient();
 
     std::string fullDesc;
     if (session) {
@@ -147,7 +155,7 @@ ServiceContext::UniqueClient Client::releaseCurrent() {
 }
 
 void Client::setCurrent(ServiceContext::UniqueClient client) {
-    invariant(!haveClient());
+    invariantNoCurrentClient();
     currentClient = std::move(client);
 }
 
@@ -157,7 +165,7 @@ ThreadClient::ThreadClient(ServiceContext* serviceContext)
 ThreadClient::ThreadClient(StringData desc,
                            ServiceContext* serviceContext,
                            transport::SessionHandle session) {
-    invariant(!currentClient);
+    invariantNoCurrentClient();
     Client::initThread(desc, serviceContext, std::move(session));
 }
 
