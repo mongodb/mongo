@@ -303,29 +303,6 @@ Lock::CollectionLock::~CollectionLock() {
         _opCtx->lockState()->unlock(_id);
 }
 
-namespace {
-stdx::mutex oplogSerialization;  // for OplogIntentWriteLock
-}  // namespace
-
-Lock::OplogIntentWriteLock::OplogIntentWriteLock(Locker* lockState)
-    : _lockState(lockState), _serialized(false) {
-    _lockState->lock(resourceIdOplog, MODE_IX);
-}
-
-Lock::OplogIntentWriteLock::~OplogIntentWriteLock() {
-    if (_serialized) {
-        oplogSerialization.unlock();
-    }
-    _lockState->unlock(resourceIdOplog);
-}
-
-void Lock::OplogIntentWriteLock::serializeIfNeeded() {
-    if (!supportsDocLocking() && !_serialized) {
-        oplogSerialization.lock();
-        _serialized = true;
-    }
-}
-
 Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
     : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X),
       _shouldNotConflictBlock(lockState) {}

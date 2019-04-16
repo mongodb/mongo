@@ -371,26 +371,6 @@ public:
     };
 
     /**
-     * Like the CollectionLock, but optimized for the local oplog. Always locks in MODE_IX,
-     * must call serializeIfNeeded() before doing any concurrent operations in order to
-     * support storage engines without document level locking. It is an error, checked with a
-     * dassert(), to not have a suitable database lock when taking this lock.
-     */
-    class OplogIntentWriteLock {
-        OplogIntentWriteLock(const OplogIntentWriteLock&) = delete;
-        OplogIntentWriteLock& operator=(const OplogIntentWriteLock&) = delete;
-
-    public:
-        explicit OplogIntentWriteLock(Locker* lockState);
-        ~OplogIntentWriteLock();
-        void serializeIfNeeded();
-
-    private:
-        Locker* const _lockState;
-        bool _serialized;
-    };
-
-    /**
      * Turn on "parallel batch writer mode" by locking the global ParallelBatchWriterMode
      * resource in exclusive mode. This mode is off by default.
      * Note that only one thread creates a ParallelBatchWriterMode object; the other batch
