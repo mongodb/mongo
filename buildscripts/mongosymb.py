@@ -102,7 +102,7 @@ def symbolize_frames(  # pylint: disable=too-many-locals
     for frame in frames:
         if frame["path"] is None:
             continue
-        symbolizer_process.stdin.write("CODE %(path)s 0x%(addr)X\n" % frame)
+        symbolizer_process.stdin.write("CODE {path:s} 0x{addr:X}\n".format(**frame).encode())
         symbolizer_process.stdin.flush()
         frame["symbinfo"] = extract_symbols(symbolizer_process.stdout)
     symbolizer_process.stdin.close()
