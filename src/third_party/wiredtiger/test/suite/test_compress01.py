@@ -66,12 +66,12 @@ class test_compress01(wttest.WiredTigerTestCase):
         params = 'key_format=S,value_format=S,leaf_page_max=4096'
         self.session.create(self.uri, params)
         cursor = self.session.open_cursor(self.uri, None)
-        for idx in xrange(1,self.nrecords):
-            cursor.set_key(`idx`)
-            if idx / 12 == 0:
-                cursor.set_value(`idx` + self.bigvalue)
+        for idx in range(1,self.nrecords):
+            cursor.set_key(repr(idx))
+            if idx // 12 == 0:
+                cursor.set_value(repr(idx) + self.bigvalue)
             else:
-                cursor.set_value(`idx` + "abcdefg")
+                cursor.set_value(repr(idx) + "abcdefg")
             cursor.insert()
         cursor.close()
 
@@ -79,13 +79,13 @@ class test_compress01(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         cursor = self.session.open_cursor(self.uri, None)
-        for idx in xrange(1,self.nrecords):
-            cursor.set_key(`idx`)
+        for idx in range(1,self.nrecords):
+            cursor.set_key(repr(idx))
             self.assertEqual(cursor.search(), 0)
-            if idx / 12 == 0:
-                self.assertEquals(cursor.get_value(), `idx` + self.bigvalue)
+            if idx // 12 == 0:
+                self.assertEqual(cursor.get_value(), repr(idx) + self.bigvalue)
             else:
-                self.assertEquals(cursor.get_value(), `idx` + "abcdefg")
+                self.assertEqual(cursor.get_value(), repr(idx) + "abcdefg")
         cursor.close()
 
 if __name__ == '__main__':

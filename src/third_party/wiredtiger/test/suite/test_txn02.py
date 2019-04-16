@@ -91,7 +91,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     # Each check_log() call takes a second, so we don't call it for
     # every scenario, we'll limit it to the value of checklog_calls.
     checklog_calls = 100 if wttest.islongtest() else 2
-    checklog_mod = (len(scenarios) / checklog_calls + 1)
+    checklog_mod = (len(scenarios) // checklog_calls + 1)
 
     _debug = False
     def debug(self, msg):
@@ -124,7 +124,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         c = session.open_cursor(self.uri, None)
         actual = dict((k, v) for k, v in c if v != 0)
         # Search for the expected items as well as iterating
-        for k, v in expected.iteritems():
+        for k, v in expected.items():
             self.assertEqual(c[k], v)
         c.close()
         if txn_config:

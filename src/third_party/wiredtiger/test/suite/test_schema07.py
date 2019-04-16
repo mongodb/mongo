@@ -40,7 +40,7 @@ class test_schema07(wttest.WiredTigerTestCase):
         s = self.session
         # We have a 10MB cache, metadata is (well) over 512B per table,
         # if we can create 20K tables, something must be cleaning up.
-        for i in xrange(20000):
+        for i in range(20000):
             uri = '%s-%06d' % (self.tablename, i)
             s.create(uri)
             c = s.open_cursor(uri)

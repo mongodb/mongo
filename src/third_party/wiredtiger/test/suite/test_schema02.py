@@ -182,7 +182,7 @@ class test_schema02(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor('table:main', None, None)
         # spot check via search
         n = self.nentries
-        for i in (n / 5, 0, n - 1, n - 2, 1):
+        for i in (n // 5, 0, n - 1, n - 2, 1):
             cursor.set_key(i, 'key' + str(i))
             square = i * i
             cube = square * i

@@ -264,7 +264,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 		    session, from_home, (WT_CELL *)ref_addr, &unpack);
 		WT_RET(__wt_calloc_one(session, &addr));
 		addr->oldest_start_ts = unpack.oldest_start_ts;
-		addr->newest_start_ts = unpack.newest_start_ts;
+		addr->newest_durable_ts = unpack.newest_durable_ts;
 		addr->newest_stop_ts = unpack.newest_stop_ts;
 		WT_ERR(__wt_memdup(
 		    session, unpack.data, unpack.size, &addr->addr));
@@ -1675,7 +1675,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		WT_RET(__wt_calloc_one(session, &addr));
 		ref->addr = addr;
 		addr->oldest_start_ts = multi->addr.oldest_start_ts;
-		addr->newest_start_ts = multi->addr.newest_start_ts;
+		addr->newest_durable_ts = multi->addr.newest_durable_ts;
 		addr->newest_stop_ts = multi->addr.newest_stop_ts;
 		WT_RET(__wt_memdup(session,
 		    multi->addr.addr, multi->addr.size, &addr->addr));

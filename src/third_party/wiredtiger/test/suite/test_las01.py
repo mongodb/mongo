@@ -49,7 +49,7 @@ class test_las01(wttest.WiredTigerTestCase):
                 session.begin_transaction()
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(value)
-            self.assertEquals(cursor.update(), 0)
+            self.assertEqual(cursor.update(), 0)
             if timestamp == True:
                 session.commit_transaction('commit_timestamp=' + timestamp_str(i + 1))
         cursor.close()
@@ -82,10 +82,10 @@ class test_las01(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(uri, None)
         # Skip the initial rows, which were not updated
         for i in range(0, nrows+1):
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.next(), 0)
         if (check_value != cursor.get_value()):
-            print "Check value : " + str(check_value)
-            print "value : " + str(cursor.get_value())
+            print("Check value : " + str(check_value))
+            print("value : " + str(cursor.get_value()))
         self.assertTrue(check_value == cursor.get_value())
         cursor.close()
         session.close()
@@ -97,20 +97,20 @@ class test_las01(wttest.WiredTigerTestCase):
         nrows = 100
         ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
         ds.populate()
-        bigvalue = "aaaaa" * 100
+        bigvalue = b"aaaaa" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(uri)
         for i in range(1, 10000):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(bigvalue)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
         cursor.close()
         self.session.checkpoint()
 
         # Scenario: 1
         # Check to see LAS working with old snapshot
-        bigvalue1 = "bbbbb" * 100
+        bigvalue1 = b"bbbbb" * 100
         self.session.snapshot("name=xxx")
         # Update the values in different session after snapshot
         self.large_updates(self.session, uri, bigvalue1, ds, nrows)
@@ -120,7 +120,7 @@ class test_las01(wttest.WiredTigerTestCase):
 
         # Scenario: 2
         # Check to see LAS working with old reader
-        bigvalue2 = "ccccc" * 100
+        bigvalue2 = b"ccccc" * 100
         session2 = self.conn.open_session()
         session2.begin_transaction('isolation=snapshot')
         self.large_updates(self.session, uri, bigvalue2, ds, nrows)
@@ -131,8 +131,8 @@ class test_las01(wttest.WiredTigerTestCase):
 
         # Scenario: 3
         # Check to see LAS working with modify operations
-        bigvalue3 = "ccccc" * 100
-        bigvalue3 = 'AA' + bigvalue3[2:]
+        bigvalue3 = b"ccccc" * 100
+        bigvalue3 = b'AA' + bigvalue3[2:]
         session2 = self.conn.open_session()
         session2.begin_transaction('isolation=snapshot')
         # Apply two modify operations - replacing the first two items with 'A'
@@ -147,7 +147,7 @@ class test_las01(wttest.WiredTigerTestCase):
 
         # Scenario: 4
         # Check to see LAS working with old timestamp
-        bigvalue4 = "ddddd" * 100
+        bigvalue4 = b"ddddd" * 100
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
         self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
         # Check to see data can be see only till the stable_timestamp

@@ -33,7 +33,7 @@ static int compare_cursors(
     WT_CURSOR *, const char *, WT_CURSOR *, const char *);
 static int diagnose_key_error(WT_CURSOR *, int, WT_CURSOR *, int);
 static int real_checkpointer(void);
-static int verify_checkpoint(WT_SESSION *);
+static int verify_consistency(WT_SESSION *, bool);
 
 /*
  * start_checkpoints --
@@ -105,6 +105,11 @@ real_checkpointer(void)
 	}
 
 	while (g.running) {
+		/* Check for consistency of online data */
+		if ((ret = verify_consistency(session, false)) != 0)
+			return (log_print_err(
+			    "verify_consistency (online)", ret, 1));
+
 		/* Execute a checkpoint */
 		if ((ret = session->checkpoint(
 		    session, checkpoint_config)) != 0)
@@ -115,8 +120,9 @@ real_checkpointer(void)
 			goto done;
 
 		/* Verify the content of the checkpoint. */
-		if ((ret = verify_checkpoint(session)) != 0)
-			return (log_print_err("verify_checkpoint", ret, 1));
+		if ((ret = verify_consistency(session, true)) != 0)
+			return (log_print_err(
+			    "verify_consistency (offline)", ret, 1));
 	}
 
 done:	if ((ret = session->close(session, NULL)) != 0)
@@ -126,40 +132,48 @@ done:	if ((ret = session->close(session, NULL)) != 0)
 }
 
 /*
- * verify_checkpoint --
+ * verify_consistency --
  *     Open a cursor on each table at the last checkpoint and walk through
  *     the tables in parallel. The key/values should match across all tables.
  */
 static int
-verify_checkpoint(WT_SESSION *session)
+verify_consistency(WT_SESSION *session, bool use_checkpoint)
 {
 	WT_CURSOR **cursors;
 	uint64_t key_count;
 	int i, ret, t_ret;
-	char ckpt[128], next_uri[128];
-	const char *type0, *typei;
+	const char *ckpt, *type0, *typei;
+	char ckpt_buf[128], next_uri[128];
 
 	ret = t_ret = 0;
 	key_count = 0;
-	testutil_check(__wt_snprintf(
-	    ckpt, sizeof(ckpt), "checkpoint=%s", g.checkpoint_name));
 	cursors = calloc((size_t)g.ntables, sizeof(*cursors));
 	if (cursors == NULL)
-		return (log_print_err("verify_checkpoint", ENOMEM, 1));
+		return (log_print_err("verify_consistency", ENOMEM, 1));
+
+	if (use_checkpoint) {
+		testutil_check(__wt_snprintf(ckpt_buf, sizeof(ckpt_buf),
+		    "checkpoint=%s", g.checkpoint_name));
+		ckpt = ckpt_buf;
+	} else {
+		ckpt = NULL;
+		testutil_check(session->begin_transaction(
+		    session, "isolation=snapshot"));
+	}
 
 	for (i = 0; i < g.ntables; i++) {
 		/*
 		 * TODO: LSM doesn't currently support reading from
 		 * checkpoints.
 		 */
-		if (g.cookies[i].type == LSM)
+		if (use_checkpoint && g.cookies[i].type == LSM)
 			continue;
 		testutil_check(__wt_snprintf(
 		    next_uri, sizeof(next_uri), "table:__wt%04d", i));
 		if ((ret = session->open_cursor(
 		    session, next_uri, NULL, ckpt, &cursors[i])) != 0) {
 			(void)log_print_err(
-			    "verify_checkpoint:session.open_cursor", ret, 1);
+			    "verify_consistency:session.open_cursor", ret, 1);
 			goto err;
 		}
 	}
@@ -199,7 +213,7 @@ verify_checkpoint(WT_SESSION *session)
 				continue;
 			else if (ret == WT_NOTFOUND || t_ret == WT_NOTFOUND) {
 				(void)log_print_err(
-				    "verify_checkpoint tables with different"
+				    "verify_consistency tables with different"
 				    " amount of data", EFAULT, 1);
 				goto err;
 			}
@@ -211,21 +225,24 @@ verify_checkpoint(WT_SESSION *session)
 				(void)diagnose_key_error(
 				    cursors[0], 0, cursors[i], i);
 				(void)log_print_err(
-				    "verify_checkpoint - mismatching data",
+				    "verify_consistency - mismatching data",
 				    EFAULT, 1);
 				goto err;
 			}
 		}
 	}
-	printf("Finished verifying a checkpoint with %d tables and %" PRIu64
-	    " keys\n", g.ntables, key_count);
+	printf("Finished verifying a %s with %d tables and %" PRIu64
+	    " keys\n", use_checkpoint ? "checkpoint" : "snapshot",
+	    g.ntables, key_count);
 
 err:	for (i = 0; i < g.ntables; i++) {
 		if (cursors[i] != NULL &&
 		    (ret = cursors[i]->close(cursors[i])) != 0)
 			(void)log_print_err(
-			    "verify_checkpoint:cursor close", ret, 1);
+			    "verify_consistency:cursor close", ret, 1);
 	}
+	if (!use_checkpoint)
+		testutil_check(session->commit_transaction(session, NULL));
 	free(cursors);
 	return (ret);
 }

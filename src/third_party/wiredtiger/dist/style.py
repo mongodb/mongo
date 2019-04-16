@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # Check the style of WiredTiger C code.
+from __future__ import print_function
 import re, sys
 from dist import source_files
 
@@ -16,9 +17,9 @@ def lines_could_join():
         for m in match_re.finditer(s):
             if len(m.group(1).expandtabs()) + \
                 len(m.group(2).expandtabs()) < 80:
-                    print f + ': lines may be combined: '
-                    print '\t' + m.group(1).lstrip() + m.group(2)
-                    print
+                    print(f + ': lines may be combined: ')
+                    print('\t' + m.group(1).lstrip() + m.group(2))
+                    print()
 
 # Don't display lines that could be joined by default; in some cases, the code
 # isn't maintained by WiredTiger, or the line splitting enhances readability.

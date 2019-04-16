@@ -191,7 +191,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # print "tables created"
 
         # Insert keys 1..nkeys each with timestamp=key, in some order.
-        orig_keys = range(1, self.nkeys+1)
+        orig_keys = list(range(1, self.nkeys+1))
         keys = orig_keys[:]
         random.shuffle(keys)
 

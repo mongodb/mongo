@@ -179,7 +179,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def stretch_content(self, s, sizes):
         result = s
         if sizes != None:
-            sha224 = hashlib.sha224(s)
+            sha224 = hashlib.sha224(s.encode())
             md5 = sha224.digest()
             low = sizes[0] - len(s)
             if low < 0:
@@ -188,7 +188,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             if high < 0:
                 high = 0
             diff = high - low
-            nextra = (ord(md5[4]) % (diff + 1)) + low
+            nextra = (self.ord_byte(md5[4]) % (diff + 1)) + low
             extra = sha224.hexdigest()
             while len(extra) < nextra:
                 extra = extra + extra
@@ -237,7 +237,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         # 64 bit key
         maj = ((bits >> 32) & 0xffffffff) + 1
         min = (bits >> 16) & 0xffff
-        return long((maj << 16) | min)
+        return self.recno((maj << 16) | min)
 
     def decode_key_col_or_fix(self, bits):
         maj = ((bits << 16) & 0xffffffff) - 1
@@ -296,7 +296,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
 
     def bitspos(self, bits):
         list = self.bitlist
-        return next(i for i in xrange(len(list)) if list[i] == bits)
+        return next(i for i in range(len(list)) if list[i] == bits)
 
     def cur_insert(self, cursor, major, minor):
         bits = self.triple_to_bits(major, minor, 0)
@@ -333,7 +333,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         cursor.remove()
 
     def cur_recno_search(self, cursor, recno):
-        wtkey = long(recno)
+        wtkey = self.recno(recno)
         self.traceapi('cursor.set_key(' + str(wtkey) + ')')
         cursor.set_key(wtkey)
         if recno > 0 and recno <= len(self.bitlist):

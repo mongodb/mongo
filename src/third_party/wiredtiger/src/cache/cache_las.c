@@ -1156,12 +1156,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			    (prepare_state != WT_PREPARE_INPROGRESS ||
 			    durable_timestamp == 0));
 
-			/*
-			 * FIXME Disable this assertion until fixed by WT-4598.
-			 * WT_ASSERT(session,
-			 *   (prepare_state == WT_PREPARE_INPROGRESS ||
-			 *   durable_timestamp >= las_timestamp));
-			 */
+			WT_ASSERT(session,
+			    (prepare_state == WT_PREPARE_INPROGRESS ||
+			    durable_timestamp >= las_timestamp));
 
 			/*
 			 * There are several conditions that need to be met

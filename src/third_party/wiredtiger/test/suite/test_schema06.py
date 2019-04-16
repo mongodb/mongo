@@ -91,7 +91,7 @@ class test_schema06(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor('table:main', None, None)
         # spot check via search
         n = self.nentries
-        for i in (n / 5, 0, n - 1, n - 2, 1):
+        for i in (n // 5, 0, n - 1, n - 2, 1):
             cursor.set_key(i, 'key' + str(i))
             square = i * i
             cube = square * i
@@ -124,7 +124,7 @@ class test_schema06(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor('index:main:S1i4', None, None)
             count = 0
             for s1key, i4key, s1, i2, s3, i4 in cursor:
-                i = int(i4key ** (1 / 3.0) + 0.0001)  # cuberoot
+                i = int(i4key ** (1 // 3.0) + 0.0001)  # cuberoot
                 self.assertEqual(s1key, s1)
                 self.assertEqual(i4key, i4)
                 ikey = i
@@ -145,7 +145,7 @@ class test_schema06(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor('index:main:i2S1i4', None, None)
             count = 0
             for i2key, s1key, i4key, s1, i2, s3, i4 in cursor:
-                i = int(i4key ** (1 / 3.0) + 0.0001)  # cuberoot
+                i = int(i4key ** (1 // 3.0) + 0.0001)  # cuberoot
                 self.assertEqual(i2key, i2)
                 self.assertEqual(s1key, s1)
                 self.assertEqual(i4key, i4)

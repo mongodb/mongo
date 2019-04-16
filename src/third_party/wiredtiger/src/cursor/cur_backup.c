@@ -265,10 +265,8 @@ __backup_start(WT_SESSION_IMPL *session,
 		 * operations will not see the backup file list until it is
 		 * complete and valid.
 		 */
-		__wt_writelock(session, &conn->hot_backup_lock);
-		conn->hot_backup = true;
-		conn->hot_backup_list = NULL;
-		__wt_writeunlock(session, &conn->hot_backup_lock);
+		WT_WITH_HOTBACKUP_WRITE_LOCK(session,
+		    WT_CONN_HOTBACKUP_START(conn));
 
 		/* We're the lock holder, we own cleanup. */
 		F_SET(cb, WT_CURBACKUP_LOCKER);
@@ -368,9 +366,8 @@ err:	/* Close the hot backup file. */
 		ret = __wt_sync_and_rename(session,
 		    &cb->bfs, WT_BACKUP_TMP, dest);
 	if (ret == 0) {
-		__wt_writelock(session, &conn->hot_backup_lock);
-		conn->hot_backup_list = cb->list;
-		__wt_writeunlock(session, &conn->hot_backup_lock);
+		WT_WITH_HOTBACKUP_WRITE_LOCK(session,
+		    conn->hot_backup_list = cb->list);
 		F_SET(session, WT_SESSION_BACKUP_CURSOR);
 	}
 	/*
@@ -399,18 +396,14 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_ASSERT(session, !F_ISSET(cb, WT_CURBACKUP_DUP));
 	/* If it's not a dup backup cursor, make sure one isn't open. */
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_BACKUP_DUP));
-	__wt_writelock(session, &conn->hot_backup_lock);
-	conn->hot_backup_list = NULL;
-	__wt_writeunlock(session, &conn->hot_backup_lock);
+	WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->hot_backup_list = NULL);
 	__backup_free(session, cb);
 
 	/* Remove any backup specific file. */
 	WT_TRET(__wt_backup_file_remove(session));
 
 	/* Checkpoint deletion and next hot backup can proceed. */
-	__wt_writelock(session, &conn->hot_backup_lock);
-	conn->hot_backup = false;
-	__wt_writeunlock(session, &conn->hot_backup_lock);
+	WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->hot_backup = false);
 	F_CLR(session, WT_SESSION_BACKUP_CURSOR);
 
 	return (ret);

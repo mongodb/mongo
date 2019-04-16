@@ -59,7 +59,7 @@ class test_index03(wttest.WiredTigerTestCase):
         c1 = session.open_cursor(uri, None)
         # Having cursors open across drops is not currently allowed.
         # On the drop side, we need to begin using the cursor
-        for i in xrange(100, 200):
+        for i in range(100, 200):
             c1[self.key(i)] = self.value(i)
 
         self.assertRaises(wiredtiger.WiredTigerError,

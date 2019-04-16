@@ -77,7 +77,7 @@ struct __wt_ckpt {
 	uint64_t write_gen;		/* Write generation */
 
 	wt_timestamp_t oldest_start_ts;	/* Aggregated timestamp information */
-	wt_timestamp_t newest_start_ts;
+	wt_timestamp_t newest_durable_ts;
 	wt_timestamp_t newest_stop_ts;
 
 	void	*bpriv;			/* Block manager private */

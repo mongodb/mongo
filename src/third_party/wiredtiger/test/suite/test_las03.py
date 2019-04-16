@@ -63,7 +63,7 @@ class test_las03(wttest.WiredTigerTestCase):
         nrows = 100
         ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
         ds.populate()
-        bigvalue = "aaaaa" * 100
+        bigvalue = b"aaaaa" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(uri)
@@ -73,7 +73,7 @@ class test_las03(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # Check to see LAS working with old timestamp
-        bigvalue2 = "ddddd" * 100
+        bigvalue2 = b"ddddd" * 100
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
         las_writes_start = self.get_stat(stat.conn.cache_write_lookaside)
         self.large_updates(self.session, uri, bigvalue2, ds, nrows, 10000)

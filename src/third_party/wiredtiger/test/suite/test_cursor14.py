@@ -53,7 +53,7 @@ class test_cursor14(wttest.WiredTigerTestCase):
         ds = self.dataset(self, uri, 100, key_format=self.keyfmt)
         ds.populate()
 
-        for i in xrange(66000):
+        for i in range(66000):
             cursor = self.session.open_cursor(uri, None, None)
 
 if __name__ == '__main__':

@@ -61,7 +61,7 @@ class test_encrypt07(test_salvage.test_salvage):
     # (to find a physical spot to damage) we'll need to search for
     # the rot13 encrypted string.
     def damage(self, tablename):
-        self.damage_inner(tablename, self.rot13(self.unique))
+        self.damage_inner(tablename, self.rot13(self.unique).encode())
 
 if __name__ == '__main__':
     wttest.run()

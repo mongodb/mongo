@@ -120,11 +120,11 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
             if str(-1000) in str(err):
                 self.got_forceerror = True
             raise
-        self.pr(`conn`)
+        self.pr(repr(conn))
         return conn
 
     def create_records(self, cursor, r, low, high):
-        for idx in xrange(low, high):
+        for idx in range(low, high):
             start = r.randint(0,9)
             key = self.bigvalue[start:r.randint(0,100)] + str(idx)
             val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
@@ -133,13 +133,13 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
             cursor.insert()
 
     def check_records(self, cursor, r, low, high):
-        for idx in xrange(low, high):
+        for idx in range(low, high):
             start = r.randint(0,9)
             key = self.bigvalue[start:r.randint(0,100)] + str(idx)
             val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
             cursor.set_key(key)
             self.assertEqual(cursor.search(), 0)
-            self.assertEquals(cursor.get_value(), val)
+            self.assertEqual(cursor.get_value(), val)
 
     # Evaluate expression, which either must succeed (if expect_okay)
     # or must fail (if !expect_okay).

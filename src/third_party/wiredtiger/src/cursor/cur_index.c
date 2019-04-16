@@ -544,8 +544,8 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
-		__wt_json_column_init(cursor, uri, table->key_format,
-		    &idx->colconf, &table->colconf);
+		WT_ERR(__wt_json_column_init(cursor, uri, table->key_format,
+		    &idx->colconf, &table->colconf));
 
 	if (0) {
 err:		WT_TRET(__curindex_close(cursor));

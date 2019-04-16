@@ -110,8 +110,9 @@ class test_encrypt06(wttest.WiredTigerTestCase):
             return (f.read().find(match) != -1)
 
     def match_string_in_rundir(self, match):
+        byte_match = match.encode()
         for fname in os.listdir('.'):
-            if self.match_string_in_file(fname, match):
+            if self.match_string_in_file(fname, byte_match):
                 return True
         return False
 
@@ -177,7 +178,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
         c0 = s.open_cursor(pfx + name0, None)
         c1 = s.open_cursor(pfx + name1, None)
-        for idx in xrange(1,self.nrecords):
+        for idx in range(1,self.nrecords):
             c0.set_key(str(idx) + txt0)
             c1.set_key(str(idx) + txt1)
             c0.set_value(txt0 * (idx % 97), txt0 * 3, txt0 * 5, txt0 * 7)

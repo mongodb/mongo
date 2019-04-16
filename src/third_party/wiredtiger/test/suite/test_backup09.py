@@ -73,11 +73,9 @@ class test_backup09(wttest.WiredTigerTestCase):
             cursor[doc_id] = doc_id
 
         last_doc_in_backup = doc_id
-        self.assertEqual(1, len(filter(lambda x:
-            x.startswith('WiredTigerLog.'), os.listdir('.'))))
+        self.assertEqual(1, len([x for x in os.listdir('.') if x.startswith('WiredTigerLog.')]))
         backup_cursor = self.session.open_cursor('backup:')
-        self.assertEqual(2, len(filter(lambda x:
-            x.startswith('WiredTigerLog.'), os.listdir('.'))))
+        self.assertEqual(2, len([x for x in os.listdir('.') if x.startswith('WiredTigerLog.')]))
 
         for i in range(10):
             doc_id += 1
@@ -91,7 +89,7 @@ class test_backup09(wttest.WiredTigerTestCase):
         os.mkdir(self.backup_dir)
         if self.all_log_files:
             helper.copy_wiredtiger_home('.', self.backup_dir)
-            log_files_copied = filter(lambda x: x.startswith('WiredTigerLog.'), os.listdir(self.backup_dir))
+            log_files_copied = [x for x in os.listdir(self.backup_dir) if x.startswith('WiredTigerLog.')]
             self.assertEqual(len(log_files_copied), 2)
         else:
             while True:

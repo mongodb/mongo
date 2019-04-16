@@ -237,7 +237,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 			 */
 			memset(&addr_unpack, 0, sizeof(addr_unpack));
 			addr_unpack.oldest_start_ts = ckpt->oldest_start_ts;
-			addr_unpack.newest_start_ts = ckpt->newest_start_ts;
+			addr_unpack.newest_durable_ts = ckpt->newest_durable_ts;
 			addr_unpack.newest_stop_ts = ckpt->newest_stop_ts;
 			addr_unpack.raw = WT_CELL_ADDR_INT;
 
@@ -331,14 +331,9 @@ __verify_addr_ts(WT_SESSION_IMPL *session,
 		    "internal page reference at %s has a newest stop "
 		    "timestamp of 0",
 		    __wt_page_addr_string(session, ref, vs->tmp1));
-	if (unpack->oldest_start_ts > unpack->newest_start_ts)
+	if (unpack->oldest_start_ts > unpack->newest_stop_ts)
 		WT_RET_MSG(session, WT_ERROR,
 		    "internal page reference at %s has an oldest start "
-		    "timestamp newer than its newest start timestamp",
-		    __wt_page_addr_string(session, ref, vs->tmp1));
-	if (unpack->newest_start_ts > unpack->newest_stop_ts)
-		WT_RET_MSG(session, WT_ERROR,
-		    "internal page reference at %s has a newest start "
 		    "timestamp newer than its newest stop timestamp",
 		    __wt_page_addr_string(session, ref, vs->tmp1));
 	return (0);
@@ -448,13 +443,11 @@ recno_chk:	if (recno != vs->record_total + 1)
 		break;
 	case WT_PAGE_COL_VAR:
 		recno = 0;
-		WT_COL_FOREACH(page, cip, i)
-			if ((cell = WT_COL_PTR(page, cip)) == NULL)
-				++recno;
-			else {
-				__wt_cell_unpack(session, page, cell, unpack);
-				recno += __wt_cell_rle(unpack);
-			}
+		WT_COL_FOREACH(page, cip, i) {
+			cell = WT_COL_PTR(page, cip);
+			__wt_cell_unpack(session, page, cell, unpack);
+			recno += __wt_cell_rle(unpack);
+		}
 		vs->record_total += recno;
 		break;
 	}
@@ -745,7 +738,7 @@ __verify_ts_addr_cmp(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t cell_num,
     bool gt, WT_VSTUFF *vs)
 {
 	const char *ts1_bp, *ts2_bp;
-	char ts1_buf[32], ts2_buf[32];
+	char ts_string[2][WT_TS_INT_STRING_SIZE];
 
 	if (gt && ts1 >= ts2)
 		return (0);
@@ -760,9 +753,8 @@ __verify_ts_addr_cmp(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t cell_num,
 		ts1_bp = "WT_TS_NONE";
 		break;
 	default:
-		WT_RET(
-		    __wt_snprintf(ts1_buf, sizeof(ts1_buf), "%" PRIu64, ts1));
-		ts1_bp = ts1_buf;
+		__wt_timestamp_to_string(ts1, ts_string[0]);
+		ts1_bp = ts_string[0];
 		break;
 	}
 	switch (ts2) {
@@ -773,14 +765,13 @@ __verify_ts_addr_cmp(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t cell_num,
 		ts2_bp = "WT_TS_NONE";
 		break;
 	default:
-		WT_RET(
-		    __wt_snprintf(ts2_buf, sizeof(ts2_buf), "%" PRIu64, ts2));
-		ts2_bp = ts2_buf;
+		__wt_timestamp_to_string(ts2, ts_string[1]);
+		ts2_bp = ts_string[1];
 		break;
 	}
 	WT_RET_MSG(session, WT_ERROR,
 	    "cell %" PRIu32 " on page at %s failed verification with %s "
-	    "time of %s, %s the parent's %s time of %s",
+	    "timestamp of %s, %s the parent's %s timestamp of %s",
 	    cell_num,
 	    __wt_page_addr_string(session, ref, vs->tmp1),
 	    ts1_name, ts1_bp,
@@ -801,6 +792,7 @@ __verify_page_cell(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	const WT_PAGE_HEADER *dsk;
 	uint32_t cell_num;
+	char ts_string[2][WT_TS_INT_STRING_SIZE];
 	bool found_ovfl;
 
 	/*
@@ -851,30 +843,27 @@ __verify_page_cell(WT_SESSION_IMPL *session,
 				    cell_num - 1,
 				    __wt_page_addr_string(
 				    session, ref, vs->tmp1));
-			if (unpack.oldest_start_ts > unpack.newest_start_ts)
+			if (unpack.oldest_start_ts > unpack.newest_stop_ts) {
+				__wt_timestamp_to_string(
+				    unpack.oldest_start_ts, ts_string[0]);
+				__wt_timestamp_to_string(
+				    unpack.newest_stop_ts, ts_string[1]);
 				WT_RET_MSG(session, WT_ERROR,
 				    "cell %" PRIu32 " on page at %s has an "
-				    "oldest start timestamp newer than its "
-				    "newest start timestamp",
+				    "oldest start timestamp %s newer than "
+				    "its newest stop timestamp %s",
 				    cell_num - 1,
-				    __wt_page_addr_string(
-				    session, ref, vs->tmp1));
-			if (unpack.newest_start_ts > unpack.newest_stop_ts)
-				WT_RET_MSG(session, WT_ERROR,
-				    "cell %" PRIu32 " on page at %s has a "
-				    "newest start timestamp newer than its "
-				    "newest stop timestamp",
-				    cell_num - 1,
-				    __wt_page_addr_string(
-				    session, ref, vs->tmp1));
+				    __wt_page_addr_string(session,
+				    ref, vs->tmp1), ts_string[0], ts_string[1]);
+			}
 
 			WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1,
 			    "oldest start", unpack.oldest_start_ts,
 			    "oldest start", addr_unpack->oldest_start_ts,
 			    true, vs));
 			WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1,
-			    "newest start", unpack.newest_start_ts,
-			    "newest start", addr_unpack->newest_start_ts,
+			    "newest durable", unpack.newest_durable_ts,
+			    "newest durable", addr_unpack->newest_durable_ts,
 			    false, vs));
 			WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1,
 			    "newest stop", unpack.newest_stop_ts,
@@ -893,23 +882,24 @@ __verify_page_cell(WT_SESSION_IMPL *session,
 				    cell_num - 1,
 				    __wt_page_addr_string(
 				    session, ref, vs->tmp1));
-			if (unpack.start_ts > unpack.stop_ts)
+			if (unpack.start_ts > unpack.stop_ts) {
+				__wt_timestamp_to_string(
+				    unpack.start_ts, ts_string[0]);
+				__wt_timestamp_to_string(
+				    unpack.stop_ts, ts_string[1]);
 				WT_RET_MSG(session, WT_ERROR,
 				    "cell %" PRIu32 " on page at %s has a "
-				    "start timestamp newer than its stop "
-				    "timestamp ",
+				    "start timestamp %s newer than its stop "
+				    "timestamp %s",
 				    cell_num - 1,
-				    __wt_page_addr_string(
-				    session, ref, vs->tmp1));
+				    __wt_page_addr_string(session,
+				    ref, vs->tmp1), ts_string[0], ts_string[1]);
+			}
 
 			WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1,
 			    "start", unpack.start_ts,
 			    "oldest start", addr_unpack->oldest_start_ts,
 			    true, vs));
-			WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1,
-			    "start", unpack.start_ts,
-			    "newest start", addr_unpack->newest_start_ts,
-			    false, vs));
 			WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1,
 			    "stop", unpack.stop_ts,
 			    "newest stop", addr_unpack->newest_stop_ts,

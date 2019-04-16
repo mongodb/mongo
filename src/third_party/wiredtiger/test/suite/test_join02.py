@@ -65,7 +65,7 @@ class test_join02(wttest.WiredTigerTestCase):
 
     def gen_values(self, i):
         s = str(i)
-        x = 'x' * i
+        x = b'x' * i
         rs = s[::-1]
         f = int(s[0:1])
         return [i, s, x, rs, f]
@@ -225,11 +225,11 @@ class test_join02(wttest.WiredTigerTestCase):
         c1b.eqmembers = self.mkmbr(lambda x: str(x) == '733')
         c1b.name = 'c1b'
 
-        c2a.low = [ 'x' * 321 ]
+        c2a.low = [ b'x' * 321 ]
         c2a.gtmembers = self.mkmbr(lambda x: x > 321)
         c2a.eqmembers = self.mkmbr(lambda x: x == 321)
         c2a.name = 'c2a'
-        c2b.high = [ 'x' * 765 ]
+        c2b.high = [ b'x' * 765 ]
         c2b.ltmembers = self.mkmbr(lambda x: x < 765)
         c2b.eqmembers = self.mkmbr(lambda x: x == 765)
         c2b.name = 'c2b'

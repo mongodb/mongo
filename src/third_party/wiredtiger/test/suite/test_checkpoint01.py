@@ -67,14 +67,14 @@ class test_checkpoint(wttest.WiredTigerTestCase):
     # checkpoint the object, and verify it (which verifies all underlying
     # checkpoints individually).
     def build_file_with_checkpoints(self):
-        for checkpoint_name, entry in self.checkpoints.iteritems():
+        for checkpoint_name, entry in self.checkpoints.items():
             self.add_records(checkpoint_name)
             self.session.checkpoint("name=" + checkpoint_name)
 
     # Create a dictionary of sorted records a checkpoint should include.
     def list_expected(self, name):
         records = {}
-        for checkpoint_name, entry in self.checkpoints.iteritems():
+        for checkpoint_name, entry in self.checkpoints.items():
             start, stop = entry[0]
             for i in range(start, stop+1):
                 records['%010d KEY------' % i] =\
@@ -98,7 +98,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Physically verify the file, including the individual checkpoints.
         self.session.verify(self.uri, None)
 
-        for checkpoint_name, entry in self.checkpoints.iteritems():
+        for checkpoint_name, entry in self.checkpoints.items():
             if entry[1] == 0:
                 self.assertRaises(wiredtiger.WiredTigerError,
                     lambda: self.session.open_cursor(
@@ -131,7 +131,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Drop remaining checkpoints, all subsequent checkpoint opens should
         # fail.
         self.session.checkpoint("drop=(from=all)")
-        for checkpoint_name, entry in self.checkpoints.iteritems():
+        for checkpoint_name, entry in self.checkpoints.items():
             self.checkpoints[checkpoint_name] =\
                 (self.checkpoints[checkpoint_name][0], 0)
         self.check()

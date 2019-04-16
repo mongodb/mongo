@@ -100,8 +100,8 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
         if self.dirchmod and os.name == 'posix':
             for f in os.listdir(self.home):
                 if os.path.isfile(f):
-                    os.chmod(f, 0444)
-            os.chmod(self.home, 0555)
+                    os.chmod(f, 0o444)
+            os.chmod(self.home, 0o555)
         self.conn = self.setUpConnectionOpen(self.home)
         self.session = self.setUpSessionOpen(self.conn)
 

@@ -993,13 +993,9 @@ __debug_page_col_var(WT_DBG *ds, WT_REF *ref)
 	recno = ref->ref_recno;
 
 	WT_COL_FOREACH(page, cip, i) {
-		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
-			unpack = NULL;
-			rle = 1;
-		} else {
-			__wt_cell_unpack(ds->session, page, cell, unpack);
-			rle = __wt_cell_rle(unpack);
-		}
+		cell = WT_COL_PTR(page, cip);
+		__wt_cell_unpack(ds->session, page, cell, unpack);
+		rle = __wt_cell_rle(unpack);
 		WT_RET(__wt_snprintf(
 		    tag, sizeof(tag), "%" PRIu64 " %" PRIu64, recno, rle));
 		WT_RET(
@@ -1339,7 +1335,8 @@ __debug_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	case WT_CELL_ADDR_LEAF:
 	case WT_CELL_ADDR_LEAF_NO:
 		__wt_timestamp_to_string(unpack->oldest_start_ts, ts_string[0]);
-		__wt_timestamp_to_string(unpack->newest_start_ts, ts_string[1]);
+		__wt_timestamp_to_string(
+		    unpack->newest_durable_ts, ts_string[1]);
 		__wt_timestamp_to_string(unpack->newest_stop_ts, ts_string[2]);
 		WT_RET(ds->f(ds,
 		    ", ts %s,%s,%s", ts_string[0], ts_string[1], ts_string[2]));

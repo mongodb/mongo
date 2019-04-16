@@ -28,6 +28,10 @@
 
 import wiredtiger, wttest
 from wtscenario import make_scenarios
+try:
+    xrange
+except NameError:  #python3
+    xrange = range
 
 # test_base05.py
 #    Cursor operations
@@ -127,7 +131,7 @@ class test_base05(wttest.WiredTigerTestCase):
     non_english_strings = [
         # This notation creates 'string' objects that have embedded unicode.
         '\u20320\u22909',
-        '\u1571\u1604\u1587\u1617\u1604\u1575\u1605\u32\u1593\u1604\u1610\u1603\u1605',
+        '\u1571\u1604\u1587\u1617\u1604\u1575\u1605\u0032\u1593\u1604\u1610\u1603\u1605',
         '\u1513\u1500\u1493\u1501',
         '\u20170\u26085\u12399',
         '\u50504\u45397\u54616\u49464\u50836',
@@ -146,7 +150,7 @@ class test_base05(wttest.WiredTigerTestCase):
         """
         nstrings = 2 << (n % 10)
         result = ''
-        for i in range(nstrings):
+        for i in xrange(nstrings):
             if (n + i) % 20 == 0:
                 reflist = self.non_english_strings
             else:
@@ -164,7 +168,7 @@ class test_base05(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1)
         numbers = {}
-        for i in range(0, self.nentries):
+        for i in xrange(0, self.nentries):
             numbers[i] = i
             key = self.mixed_string(i)
             value = self.mixed_string(i+1)
@@ -172,7 +176,7 @@ class test_base05(wttest.WiredTigerTestCase):
 
         # quick spot check to make sure searches work
         for divisor in [3, 5, 7]:
-            i = self.nentries / divisor
+            i = self.nentries // divisor
             key = self.mixed_string(i)
             value = self.mixed_string(i+1)
             cursor.set_key(key)
@@ -205,16 +209,16 @@ class test_base05(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1)
         strlist = self.non_english_strings
-        for i in range(0, len(strlist)):
+        for i in xrange(0, len(strlist)):
             if convert:
-                key = val = unicode(strlist[i])
+                key = val = str(strlist[i])
             else:
                 key = val = strlist[i]
             cursor[key] = val
 
-        for i in range(0, len(strlist)):
+        for i in xrange(0, len(strlist)):
             if convert:
-                key = val = unicode(strlist[i])
+                key = val = str(strlist[i])
             else:
                 key = val = strlist[i]
             cursor.set_key(key)

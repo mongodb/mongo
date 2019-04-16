@@ -1791,9 +1791,6 @@ struct __wt_session {
 	 * @config{read_timestamp, read using the specified timestamp.  The
 	 * supplied value must not be older than the current oldest timestamp.
 	 * See @ref transaction_timestamps., a string; default empty.}
-	 * @config{round_to_oldest, if read timestamp is earlier than oldest
-	 * timestamp\, read timestamp will be rounded to oldest timestamp., a
-	 * boolean flag; default \c false.}
 	 * @config{roundup_timestamps = (, round up timestamps of the
 	 * transaction.  This setting alters the visibility expected in a
 	 * transaction.  See @ref transaction_timestamps., a set of related
@@ -1929,9 +1926,6 @@ struct __wt_session {
 	 * supplied value must not be older than the current oldest timestamp.
 	 * This can only be set once for a transaction.  See @ref
 	 * transaction_timestamps., a string; default empty.}
-	 * @config{round_to_oldest, if read timestamp is earlier than oldest
-	 * timestamp\, read timestamp will be rounded to oldest timestamp., a
-	 * boolean flag; default \c false.}
 	 * @configend
 	 * @errors
 	 */
@@ -5805,17 +5799,24 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1383
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
+ * active read timestamp
+ */
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1384
+/*!
+ * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1384
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1385
+/*! transaction: transaction read timestamp of the oldest active reader */
+#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1386
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1385
+#define	WT_STAT_CONN_TXN_SYNC				1387
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1386
+#define	WT_STAT_CONN_TXN_COMMIT				1388
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1387
+#define	WT_STAT_CONN_TXN_ROLLBACK			1389
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1388
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1390
 
 /*!
  * @}

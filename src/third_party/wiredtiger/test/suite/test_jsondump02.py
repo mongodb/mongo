@@ -26,9 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
+import os, sys
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
+
+# In Python2, Unicode and strings are different types,
+# and need to be converted. In Python3, there is no separate
+# unicode type, unicode characters are just embedded as UTF-8
+# in strings.
+_python3 = (sys.version_info >= (3, 0, 0))
+def encode(s):
+    if _python3:
+        return s
+    else:
+        return s.encode('utf-8')
 
 # test_jsondump.py
 # Test dump output from json cursors.
@@ -117,13 +128,12 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
         self.set_kv(self.table_uri1, 'KEY001', '\'\"({[]})\"\'\\, etc. allowed')
         # \u03c0 is pi in Unicode, converted by Python to UTF-8: 0xcf 0x80.
         # Here's how UTF-8 might be used.
-        self.set_kv(self.table_uri1, 'KEY002', u'\u03c0'.encode('utf-8'))
-        # 0xf5-0xff are illegal in Unicode, but may occur legally in C strings.
-        self.set_kv(self.table_uri1, 'KEY003', '\xff\xfe')
+        self.set_kv(self.table_uri1, 'KEY002', encode(u'\u03c0'))
+        self.set_kv(self.table_uri1, 'KEY003', encode(u'\u0abc'))
         self.set_kv2(self.table_uri2, 'KEY000', 123, 'str0')
         self.set_kv2(self.table_uri2, 'KEY001', 234, 'str1')
-        self.set_kv(self.table_uri3, 1, '\x01\x02\x03')
-        self.set_kv(self.table_uri3, 2, '\x77\x88\x99\x00\xff\xfe')
+        self.set_kv(self.table_uri3, 1, b'\x01\x02\x03')
+        self.set_kv(self.table_uri3, 2, b'\x77\x88\x99\x00\x66\x55')
         self.populate_squarecube(self.table_uri4)
 
         table1_json =  (
@@ -131,7 +141,7 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
             ('"key0" : "KEY001"', '"value0" : ' +
              '"\'\\\"({[]})\\\"\'\\\\, etc. allowed"'),
             ('"key0" : "KEY002"', '"value0" : "\\u00cf\\u0080"'),
-            ('"key0" : "KEY003"', '"value0" : "\\u00ff\\u00fe"'))
+            ('"key0" : "KEY003"', '"value0" : "\\u00e0\\u00aa\\u00bc"'))
         self.check_json(self.table_uri1, table1_json)
 
         self.session.truncate(self.table_uri1, None, None, None)
@@ -156,7 +166,7 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
         # bad tokens
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.load_json(self.table_uri2,
-              (('"abc\u"', ''),)),
+              (('"abc\\u"', ''),)),
             '/invalid Unicode/')
 
         # bad tokens
@@ -222,7 +232,7 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
         table3_json =  (
             ('"key0" : 1', '"value0" : "\\u0001\\u0002\\u0003"'),
             ('"key0" : 2',
-             '"value0" : "\\u0077\\u0088\\u0099\\u0000\\u00ff\\u00fe"'))
+             '"value0" : "\\u0077\\u0088\\u0099\\u0000\\u0066\\u0055"'))
         self.check_json(self.table_uri3, table3_json)
         table4_json = (
                 ('"ikey" : 1,\n"Skey" : "key1"',
@@ -323,13 +333,24 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
     #    i==0  :  v:[0x00, 0x01, 0x02]
     #    i==1  :  v:[0x01, 0x02, 0x03]
     # etc.
-    # A null byte is disallowed in a string value, it is replaced by 'X'
+    # A null byte or any byte >= 0x7f is disallowed in a string value,
+    # it is replaced by 'X'
     def generate_value(self, i, v, isstring):
         for j in range(0, 3):
-            val = (i + j) % 256
-            if isstring and val == 0:
-                val = 88  # 'X'
+            val = i + j
+            if val >= 256 or (isstring and (val == 0 or val >= 128)):
+                val = ord('X')
             v[j] = val
+
+    # In Python3, we cannot simply shove random bytes with values >= 0x80
+    # into a string, as strings are unicode aware, so we test only up to 0x80.
+    # Real Unicode strings are tested elsewhere.
+    def bytes_to_str(self, barray):
+        mask = 0x7f
+        result = ''
+        for b in barray:
+            result += chr(b & mask)
+        return result
 
     def test_json_all_bytes(self):
         """
@@ -343,12 +364,15 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
         c6 = self.session.open_cursor(self.table_uri6, None, None)
         k = bytearray(b'\x00\x00')
         v = bytearray(b'\x00\x00\x00')
-        for i in range(0, 512):
+        for i in range(0, 256):
             self.generate_key(i, k)
             self.generate_value(i, v, False)
-            c5[str(k)] = str(v)
+            # A 'u' format requires a bytes type with Python3
+            c5[bytes(k)] = bytes(v)
             self.generate_value(i, v, True)   # no embedded nuls
-            c6[str(k)] = str(v)
+            kstr = self.bytes_to_str(k)
+            vstr = self.bytes_to_str(v)
+            c6[kstr] = vstr
         c5.close()
         c6.close()
 
@@ -381,10 +405,10 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
 
         table5_json = []
         table6_json = []
-        for i in range(0, 512):
+        for i in range(0, 256):
             self.generate_key(i, k)
             self.generate_value(i, v, False)
-            j = i if (i > 0 and i < 254) or (i > 256 and i < 510) else 88
+            j = i if (i > 0 and i < 126) else 88
             table5_json.append(('"key0" : "' + bin_unicode[k[0]] +
                                 bin_unicode[k[1]] + '"',
                                 '"value0" : "' + bin_unicode[v[0]] +

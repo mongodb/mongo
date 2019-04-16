@@ -111,11 +111,11 @@ class test_cursor_pin(wttest.WiredTigerTestCase):
         for i in range(self.nentries + 1000, self.nentries + 2001):
             c[ds.key(i)] = ds.value(i)
         self.forward(c, ds, self.nentries + 5000,
-            list(range(self.nentries + 1, self.nentries + 1000) +\
-                 range(self.nentries + 2001, self.nentries + 3000)))
+            list(list(range(self.nentries + 1, self.nentries + 1000)) +\
+                 list(range(self.nentries + 2001, self.nentries + 3000))))
         self.backward(c, ds, self.nentries + 5000,
-            list(range(self.nentries + 1, self.nentries + 1000) +\
-                 range(self.nentries + 2001, self.nentries + 3000)))
+            list(list(range(self.nentries + 1, self.nentries + 1000)) +\
+                 list(range(self.nentries + 2001, self.nentries + 3000))))
 
 if __name__ == '__main__':
     wttest.run()

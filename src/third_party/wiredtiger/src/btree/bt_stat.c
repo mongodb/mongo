@@ -160,21 +160,18 @@ __stat_page_col_var(
 	 * we see.
 	 */
 	WT_COL_FOREACH(page, cip, i) {
-		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
+		cell = WT_COL_PTR(page, cip);
+		__wt_cell_unpack(session, page, cell, unpack);
+		if (unpack->type == WT_CELL_DEL) {
 			orig_deleted = true;
-			++deleted_cnt;
+			deleted_cnt += __wt_cell_rle(unpack);
 		} else {
 			orig_deleted = false;
-			__wt_cell_unpack(session, page, cell, unpack);
-			if (unpack->type == WT_CELL_DEL)
-				orig_deleted = true;
-			else {
-				entry_cnt += __wt_cell_rle(unpack);
-				rle_cnt += __wt_cell_rle(unpack) - 1;
-			}
-			if (unpack->ovfl)
-				++ovfl_cnt;
+			entry_cnt += __wt_cell_rle(unpack);
 		}
+		rle_cnt += __wt_cell_rle(unpack) - 1;
+		if (unpack->ovfl)
+			++ovfl_cnt;
 
 		/*
 		 * Walk the insert list, checking for changes.  For each insert

@@ -81,7 +81,7 @@ class test_reconfig02(wttest.WiredTigerTestCase):
         #
         # Potentially loop a few times in case it is a very slow system.
         self.conn.reconfigure("log=(prealloc=true)")
-        for x in xrange(0, 100):
+        for x in range(0, 100):
             time.sleep(1)
             prep_logs = fnmatch.filter(os.listdir('.'), "*Prep*")
             if len(prep_logs) != 0:

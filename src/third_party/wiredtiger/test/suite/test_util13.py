@@ -100,11 +100,11 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
         # the actual configuration and they match.
         match = all(item in da.items() for item in dx.items())
         if match == False:
-            print "MISMATCH:"
-            print "Original dict: "
-            print da
-            print "Expected config: "
-            print dx
+            print("MISMATCH:")
+            print("Original dict: ")
+            print(da)
+            print("Expected config: ")
+            print(dx)
         return match
 
     def compare_files(self, expect_subset, dump_out):

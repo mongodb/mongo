@@ -49,7 +49,50 @@ Format  Python  Notes
   u     str     raw byte array
 """
 
-from intpacking import pack_int, unpack_int
+import sys
+
+# In the Python3 world, we pack into the bytes type, which like a list of ints.
+# In Python2, we pack into a string.  Create a set of constants and methods
+# to hide the differences from the main code.
+if sys.version_info[0] >= 3:
+    x00 = b'\x00'
+    xff = b'\xff'
+    empty_pack = b''
+    def _ord(b):
+        return b
+
+    def _chr(x, y=None):
+        a = [x]
+        if y != None:
+            a.append(y)
+        return bytes(a)
+
+    def _is_string(s):
+        return type(s) is str
+
+    def _string_result(s):
+        return s.decode()
+
+else:
+    x00 = '\x00'
+    xff = '\xff'
+    empty_pack = ''
+    def _ord(b):
+        return ord(b)
+
+    def _chr(x, y=None):
+        s = chr(x)
+        if y != None:
+            s += chr(y)
+        return s
+
+    def _is_string(s):
+        return type(s) is unicode
+
+    def _string_result(s):
+        return s
+
+from .intpacking import pack_int, unpack_int
 
 def __get_type(fmt):
     if not fmt:
@@ -92,36 +135,39 @@ def unpack(fmt, s):
                 if f == 's':
                     pass
                 elif f == 'S':
-                    size = s.find('\0')
+                    size = s.find(x00)
                 elif f == 'u' and offset == len(fmt) - 1:
                     # A WT_ITEM with a NULL data field will be appear as None.
                     if s == None:
-                        s = ''
+                        s = empty_pack
                     size = len(s)
                 else:
                     # Note: 'U' is used internally, and may be exposed to us.
                     # It indicates that the size is always stored unless there
                     # is a size in the format.
                     size, s = unpack_int(s)
-            result.append(s[:size])
-            if f == 'S' and not havesize:
-                size += 1
+            if f in 'Ss':
+                result.append(_string_result(s[:size]))
+                if f == 'S' and not havesize:
+                    size += 1
+            else:
+                result.append(s[:size])
             s = s[size:]
         elif f in 't':
             # bit type, size is number of bits
-            result.append(ord(s[0:1]))
+            result.append(_ord(s[0]))
             s = s[1:]
         elif f in 'Bb':
             # byte type
-            for i in xrange(size):
-                v = ord(s[0:1])
+            for i in range(size):
+                v = _ord(s[0])
                 if f != 'B':
                     v -= 0x80
                 result.append(v)
                 s = s[1:]
         else:
             # integral type
-            for j in xrange(size):
+            for j in range(size):
                 v, s = unpack_int(s)
                 result.append(v)
     return result
@@ -136,7 +182,7 @@ def __pack_iter_fmt(fmt, values):
             index += 1
         else:            # integral type
             size = size if havesize else 1
-            for i in xrange(size):
+            for i in range(size):
                 value = values[index]
                 yield offset, havesize, 1, char, value
                 index = index + 1
@@ -147,14 +193,14 @@ def pack(fmt, *values):
         return ()
     if tfmt != '.':
         raise ValueError('Only variable-length encoding is currently supported')
-    result = ''
+    result = empty_pack
     i = 0
     for offset, havesize, size, f, val in __pack_iter_fmt(fmt, values):
         if f == 'x':
             if not havesize:
-                result += '\0'
+                result += x00
             else:
-                result += '\0' * size
+                result += x00 * size
             # Note: no value, don't increment i
         elif f in 'SsUu':
             if f == 'S' and '\0' in val:
@@ -166,14 +212,14 @@ def pack(fmt, *values):
                     l = size
             elif (f == 'u' and offset != len(fmt) - 1) or f == 'U':
                 result += pack_int(l)
-            if type(val) is unicode and f in 'Ss':
-                result += str(val[:l])
+            if _is_string(val) and f in 'Ss':
+                result += str(val[:l]).encode()
             else:
                 result += val[:l]
             if f == 'S' and not havesize:
-                result += '\0'
+                result += x00
             elif size > l and havesize:
-                result += '\0' * (size - l)
+                result += x00 * (size - l)
         elif f in 't':
             # bit type, size is number of bits
             if not havesize:
@@ -183,12 +229,12 @@ def pack(fmt, *values):
             mask = (1 << size) - 1
             if (mask & val) != val:
                 raise ValueError("value out of range for 't' encoding")
-            result += chr(val)
+            result += _chr(val)
         elif f in 'Bb':
             # byte type
             if not havesize:
                 size = 1
-            for i in xrange(size):
+            for i in range(size):
                 if f == 'B':
                     v = val
                 else:
@@ -196,7 +242,7 @@ def pack(fmt, *values):
                     v = val + 0x80
                 if v > 255 or v < 0:
                     raise ValueError("value out of range for 'B' encoding")
-                result += chr(v)
+                result += _chr(v)
         else:
             # integral type
             result += pack_int(val)

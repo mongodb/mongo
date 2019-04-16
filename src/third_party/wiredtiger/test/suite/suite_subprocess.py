@@ -26,6 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import print_function
 import os, re, subprocess, sys
 from run import wt_builddir
 from wttest import WiredTigerTestCase
@@ -69,14 +70,14 @@ class suite_subprocess:
                         lines.pop(0)
                         hasPrevious = True
         if hasError:
-            print '**************** ' + match + ' in output file: ' + filename + ' ****************'
+            print('**************** ' + match + ' in output file: ' + filename + ' ****************')
             if hasPrevious:
-                print '...'
+                print('...')
             for line in lines:
-                print line,
+                print(line, end=' ')
             if hasNext:
-                print '...'
-            print '********************************'
+                print('...')
+            print('********************************')
             self.fail('ERROR found in output file: ' + filename)
 
     # If the string is of the form '/.../', then return just the embedded
@@ -133,8 +134,8 @@ class suite_subprocess:
         if filesize > 0:
             with open(filename, 'r') as f:
                 contents = f.read(1000)
-                print 'ERROR: ' + filename + ' expected to be empty, but contains:\n'
-                print contents + '...\n'
+                print('ERROR: ' + filename + ' expected to be empty, but contains:\n')
+                print(contents + '...\n')
         self.assertEqual(filesize, 0, filename + ': expected to be empty')
 
     def check_non_empty_file(self, filename):
@@ -143,7 +144,7 @@ class suite_subprocess:
         """
         filesize = os.path.getsize(filename)
         if filesize == 0:
-            print 'ERROR: ' + filename + ' should not be empty (this command expected error output)'
+            print('ERROR: ' + filename + ' should not be empty (this command expected error output)')
         self.assertNotEqual(filesize, 0, filename + ': expected to not be empty')
 
     def verbose_env(self, envvar):
@@ -202,23 +203,23 @@ class suite_subprocess:
                     infilepart = ""
                     if infilename != None:
                         infilepart = "<" + infilename + " "
-                    print str(procargs)
-                    print "*********************************************"
-                    print "**** Run 'wt' via: run " + \
+                    print(str(procargs))
+                    print("*********************************************")
+                    print("**** Run 'wt' via: run " + \
                         " ".join(procargs[3:]) + infilepart + \
-                        ">" + wtoutname + " 2>" + wterrname
-                    print "*********************************************"
+                        ">" + wtoutname + " 2>" + wterrname)
+                    print("*********************************************")
                     returncode = subprocess.call(procargs)
                 elif self._lldbSubprocess:
                     infilepart = ""
                     if infilename != None:
                         infilepart = "<" + infilename + " "
-                    print str(procargs)
-                    print "*********************************************"
-                    print "**** Run 'wt' via: run " + \
+                    print(str(procargs))
+                    print("*********************************************")
+                    print("**** Run 'wt' via: run " + \
                         " ".join(procargs[3:]) + infilepart + \
-                        ">" + wtoutname + " 2>" + wterrname
-                    print "*********************************************"
+                        ">" + wtoutname + " 2>" + wterrname)
+                    print("*********************************************")
                     returncode = subprocess.call(procargs)
                 elif infilename:
                     with open(infilename, "r") as wtin:

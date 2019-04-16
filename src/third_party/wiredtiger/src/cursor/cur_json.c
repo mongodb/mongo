@@ -309,6 +309,8 @@ __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	if ((json = (WT_CURSOR_JSON *)cursor->json_private) != NULL) {
 		__wt_free(session, json->key_buf);
 		__wt_free(session, json->value_buf);
+		__wt_free(session, json->key_names.str);
+		__wt_free(session, json->value_names.str);
 		__wt_free(session, json);
 	}
 }
@@ -373,21 +375,26 @@ __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
  *	Set json_key_names, json_value_names to comma separated lists
  *	of column names.
  */
-void
+int
 __wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
     const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
 {
 	WT_CURSOR_JSON *json;
+	WT_SESSION_IMPL *session;
+	size_t len;
 	uint32_t keycnt, nkeys;
 	const char *beginkey, *end, *lparen, *p;
 
 	json = (WT_CURSOR_JSON *)cursor->json_private;
+	session = (WT_SESSION_IMPL *)cursor->session;
 	beginkey = colconf->str;
 	end = beginkey + colconf->len;
 
 	if (idxconf != NULL) {
-		json->key_names.str = idxconf->str;
-		json->key_names.len = idxconf->len;
+		len = idxconf->len;
+		WT_RET(__wt_strndup(session, idxconf->str, len,
+		    &json->key_names.str));
+		json->key_names.len = len;
 	} else if (colconf->len > 0 && *beginkey == '(') {
 		beginkey++;
 		if (end[-1] == ')')
@@ -407,20 +414,25 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
 	}
 	if ((lparen = strchr(uri, '(')) != NULL) {
 		/* This cursor is a projection. */
-		json->value_names.str = lparen;
-		json->value_names.len = strlen(lparen) - 1;
-		WT_ASSERT((WT_SESSION_IMPL *)cursor->session,
-		    json->value_names.str[json->value_names.len] == ')');
+		len = strlen(lparen) - 1;
+		WT_ASSERT(session, lparen[len] == ')');
+		WT_RET(__wt_strndup(session, lparen, len,
+		    &json->value_names.str));
+		json->value_names.len = len;
 	} else {
-		json->value_names.str = p;
-		json->value_names.len = WT_PTRDIFF(end, p);
+		len = WT_PTRDIFF(end, p);
+		WT_RET(__wt_strndup(session, p, len, &json->value_names.str));
+		json->value_names.len = len;
 	}
 	if (idxconf == NULL) {
 		if (p > beginkey)
 			p--;
-		json->key_names.str = beginkey;
-		json->key_names.len = WT_PTRDIFF(p, beginkey);
+		len = WT_PTRDIFF(p, beginkey);
+		WT_RET(__wt_strndup(session, beginkey, len,
+		    &json->key_names.str));
+		json->key_names.len = len;
 	}
+	return (0);
 }
 
 #define	MATCH_KEYWORD(session, in, result, keyword, matchval) 	do {	\

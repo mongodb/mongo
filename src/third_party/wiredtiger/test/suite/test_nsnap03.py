@@ -65,9 +65,9 @@ class test_nsnap03(wttest.WiredTigerTestCase, suite_subprocess):
         # if there are more than 10 snapshots active, drop the first half
         snapshots = []
         c = self.session.open_cursor(self.uri)
-        for n in xrange(self.nrows / self.nrows_per_snap):
+        for n in range(self.nrows // self.nrows_per_snap):
             if len(snapshots) > self.nsnapshots:
-                middle = len(snapshots) / 2
+                middle = len(snapshots) // 2
                 dropcfg = ",drop=(to=%d)" % snapshots[middle][0]
                 snapshots = snapshots[middle + 1:]
             else:
@@ -81,10 +81,10 @@ class test_nsnap03(wttest.WiredTigerTestCase, suite_subprocess):
 
             self.session.snapshot("name=%d%s" % (n, dropcfg))
             snapshots.append((n, end - start))
-            for i in xrange(2 * self.nrows_per_snap):
+            for i in range(2 * self.nrows_per_snap):
                 c[end + i] = "some value"
             end += 2 * self.nrows_per_snap
-            for i in xrange(self.nrows_per_snap):
+            for i in range(self.nrows_per_snap):
                 del c[start + i]
             start += self.nrows_per_snap
 

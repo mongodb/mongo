@@ -658,6 +658,20 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test_wt4156_metadata_salvage 2>&1
 
+  - name: csuite-wt4699-json-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt4699_json 2>&1
+
   - name: csuite-rwlock-test
     depends_on:
       - name: compile
@@ -1171,6 +1185,7 @@ buildvariants:
     - name: csuite-wt4105-large-doc-small-upd-test
     - name: csuite-wt4117-checksum-test
     - name: csuite-wt4156-metadata-salvage-test
+    - name: csuite-wt4699-json-test
     - name: csuite-rwlock-test
     - name: csuite-wt2246-col-append-test
     - name: csuite-wt2323-join-visibility-test

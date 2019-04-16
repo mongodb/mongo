@@ -3,6 +3,7 @@
 # This program pulls the function names from wiredtiger.in and generates
 # an input file for Java SWIG that adds doxygen copydoc comments to functions.
 
+from __future__ import print_function
 import os, re, sys
 import api_data
 from dist import compare_srcfile

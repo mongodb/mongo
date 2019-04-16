@@ -123,7 +123,7 @@ class test_config03(test_base03.test_base03):
 
         self.verbose(3, 'wiredtiger_open with args: ' + args)
         conn = self.wiredtiger_open(dir, args)
-        self.pr(`conn`)
+        self.pr(repr(conn))
         return conn
 
 if __name__ == '__main__':

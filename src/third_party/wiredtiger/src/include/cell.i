@@ -147,7 +147,7 @@ struct __wt_cell_unpack {
 					/* Start/stop timestamps for a value */
 	wt_timestamp_t start_ts, stop_ts;
 					/* Aggregated timestamp information */
-	wt_timestamp_t oldest_start_ts, newest_start_ts, newest_stop_ts;
+	wt_timestamp_t oldest_start_ts, newest_durable_ts, newest_stop_ts;
 
 	/*
 	 * !!!
@@ -219,37 +219,50 @@ __cell_pack_timestamp_value(WT_SESSION_IMPL *session,
  */
 static inline void
 __wt_timestamp_addr_check(WT_SESSION_IMPL *session,
-    wt_timestamp_t oldest_start_ts,
-    wt_timestamp_t newest_start_ts, wt_timestamp_t newest_stop_ts)
+    wt_timestamp_t oldest_start_ts, wt_timestamp_t newest_stop_ts)
 {
-	WT_UNUSED(oldest_start_ts);
-	WT_UNUSED(newest_start_ts);
-	WT_UNUSED(newest_stop_ts);
+#ifdef HAVE_DIAGNOSTIC
+	char ts_string[2][WT_TS_INT_STRING_SIZE];
 
-	WT_ASSERT(session, newest_stop_ts != WT_TS_NONE);
-	WT_ASSERT(session, oldest_start_ts <= newest_start_ts);
-	WT_ASSERT(session, newest_start_ts <= newest_stop_ts);
+	if (newest_stop_ts == WT_TS_NONE) {
+		__wt_errx(session, "newest stop timestamp of 0");
+		WT_ASSERT(session, newest_stop_ts != WT_TS_NONE);
+	}
+	if (oldest_start_ts > newest_stop_ts) {
+		__wt_timestamp_to_string(oldest_start_ts, ts_string[0]);
+		__wt_timestamp_to_string(newest_stop_ts, ts_string[1]);
+		__wt_errx(session,
+		    "an oldest start timestamp %s newer than its newest "
+		    "stop timestamp %s",
+		    ts_string[0], ts_string[1]);
+		WT_ASSERT(session, oldest_start_ts <= newest_stop_ts);
+	}
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(oldest_start_ts);
+	WT_UNUSED(newest_stop_ts);
+#endif
 }
 
 /*
  * __cell_pack_timestamp_addr --
- *	Pack a oldest_start, newest_start, newest_stop timestamp triplet for an
- * address.
+ *	Pack a oldest_start, newest_durable_ts, newest_stop timestamp triplet
+ * for an address.
  */
 static inline void
 __cell_pack_timestamp_addr(WT_SESSION_IMPL *session,
     uint8_t **pp, wt_timestamp_t oldest_start_ts,
-    wt_timestamp_t newest_start_ts, wt_timestamp_t newest_stop_ts)
+    wt_timestamp_t newest_durable_ts, wt_timestamp_t newest_stop_ts)
 {
-	__wt_timestamp_addr_check(session,
-	    oldest_start_ts, newest_start_ts, newest_stop_ts);
+	__wt_timestamp_addr_check(session, oldest_start_ts, newest_stop_ts);
 
 	++*pp;
 	if (__wt_process.page_version_ts) {
 		/* Store differences, not absolutes. */
 		(void)__wt_vpack_uint(pp, 0, oldest_start_ts);
-		(void)__wt_vpack_uint(pp, 0, newest_start_ts - oldest_start_ts);
-		(void)__wt_vpack_uint(pp, 0, newest_stop_ts - newest_start_ts);
+		(void)__wt_vpack_uint(
+		    pp, 0, newest_durable_ts - oldest_start_ts);
+		(void)__wt_vpack_uint(pp, 0, newest_stop_ts - oldest_start_ts);
 	}
 }
 
@@ -260,8 +273,8 @@ __cell_pack_timestamp_addr(WT_SESSION_IMPL *session,
 static inline size_t
 __wt_cell_pack_addr(WT_SESSION_IMPL *session,
     WT_CELL *cell, u_int cell_type, uint64_t recno,
-    wt_timestamp_t oldest_start_ts,
-    wt_timestamp_t newest_start_ts, wt_timestamp_t newest_stop_ts, size_t size)
+    wt_timestamp_t oldest_start_ts, wt_timestamp_t newest_durable_ts,
+    wt_timestamp_t newest_stop_ts, size_t size)
 {
 	uint8_t *p;
 
@@ -270,7 +283,7 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session,
 	*p = '\0';
 
 	__cell_pack_timestamp_addr(session,
-	    &p, oldest_start_ts, newest_start_ts, newest_stop_ts);
+	    &p, oldest_start_ts, newest_durable_ts, newest_stop_ts);
 
 	if (recno == WT_RECNO_OOB)
 		cell->__chunk[0] = (uint8_t)cell_type;	/* Type */
@@ -728,10 +741,11 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk,
 	 * the copied cell must be available from unpack after we return, as our
 	 * caller has no way to find the copied cell).
 	 */
-	WT_CELL_LEN_CHK(cell, 0);
 	unpack->cell = cell;
 
 restart:
+	WT_CELL_LEN_CHK(cell, 0);
+
 	/*
 	 * This path is performance critical for read-only trees, we're parsing
 	 * on-page structures. For that reason we don't clear the unpacked cell
@@ -742,7 +756,7 @@ restart:
 	unpack->v = 0;
 	unpack->start_ts = WT_TS_NONE;
 	unpack->stop_ts = WT_TS_MAX;
-	unpack->oldest_start_ts = unpack->newest_start_ts = WT_TS_NONE;
+	unpack->oldest_start_ts = unpack->newest_durable_ts = WT_TS_NONE;
 	unpack->newest_stop_ts = WT_TS_MAX;
 	unpack->raw = (uint8_t)__wt_cell_type_raw(cell);
 	unpack->type = (uint8_t)__wt_cell_type(cell);
@@ -798,15 +812,14 @@ restart:
 		WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 :
 		    WT_PTRDIFF(end, p), &unpack->oldest_start_ts));
 		WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 :
-		    WT_PTRDIFF(end, p), &unpack->newest_start_ts));
-		unpack->newest_start_ts += unpack->oldest_start_ts;
+		    WT_PTRDIFF(end, p), &unpack->newest_durable_ts));
+		unpack->newest_durable_ts += unpack->oldest_start_ts;
 		WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 :
 		    WT_PTRDIFF(end, p), &unpack->newest_stop_ts));
-		unpack->newest_stop_ts += unpack->newest_start_ts;
+		unpack->newest_stop_ts += unpack->oldest_start_ts;
 
 		__wt_timestamp_addr_check(session,
-		    unpack->oldest_start_ts,
-		    unpack->newest_start_ts, unpack->newest_stop_ts);
+		    unpack->oldest_start_ts, unpack->newest_stop_ts);
 		break;
 	case WT_CELL_DEL:
 	case WT_CELL_VALUE:
@@ -950,7 +963,7 @@ __wt_cell_unpack_dsk(WT_SESSION_IMPL *session,
 		 * somewhere.
 		 *
 		unpack->oldest_start_ts
-		unpack->newest_start_ts
+		unpack->newest_durable_ts
 		unpack->newest_stop_ts
 		 */
 		unpack->data = "";

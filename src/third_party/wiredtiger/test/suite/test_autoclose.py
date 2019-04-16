@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest, exceptions
+import wiredtiger, wttest
 
 # test_autoclose
 class test_autoclose(wttest.WiredTigerTestCase):
@@ -57,7 +57,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         inscursor = self.open_cursor()
         inscursor['key1'] = 'value1'
         inscursor.close()
-        self.assertRaisesHavingMessage(exceptions.RuntimeError,
+        self.assertRaisesHavingMessage(RuntimeError,
                                        lambda: inscursor.next(),
                                        '/wt_cursor.* is None/')
         self.drop_table()
@@ -72,7 +72,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         inscursor = self.open_cursor()
         inscursor['key1'] = 'value1'
         self.session.close()
-        self.assertRaisesHavingMessage(exceptions.RuntimeError,
+        self.assertRaisesHavingMessage(RuntimeError,
                                        lambda: inscursor.next(),
                                        '/wt_cursor.* is None/')
         self.close_conn()
@@ -86,7 +86,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         inscursor = self.open_cursor()
         inscursor['key1'] = 'value1'
         self.close_conn()
-        self.assertRaisesHavingMessage(exceptions.RuntimeError,
+        self.assertRaisesHavingMessage(RuntimeError,
                                        lambda: inscursor.next(),
                                        '/wt_cursor.* is None/')
 
@@ -120,11 +120,11 @@ class test_autoclose(wttest.WiredTigerTestCase):
         # Note: SWIG generates a TypeError in this case.
         # A RuntimeError to match the other cases would be better.
         inscursor2.close()
-        self.assertRaises(exceptions.TypeError,
+        self.assertRaises(TypeError,
                           lambda: inscursor.compare(inscursor2))
 
         inscursor2 = None
-        self.assertRaisesHavingMessage(exceptions.RuntimeError,
+        self.assertRaisesHavingMessage(RuntimeError,
                                        lambda: inscursor.compare(inscursor2),
                                        '/wt_cursor.* is None/')
 
@@ -133,7 +133,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         Use a session handle after it is explicitly closed.
         """
         self.session.close()
-        self.assertRaisesHavingMessage(exceptions.RuntimeError,
+        self.assertRaisesHavingMessage(RuntimeError,
                                        lambda: self.create_table(),
                                        '/wt_session.* is None/')
         self.close_conn()
@@ -143,7 +143,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         Use a session handle after the connection is closed.
         """
         self.close_conn()
-        self.assertRaisesHavingMessage(exceptions.RuntimeError,
+        self.assertRaisesHavingMessage(RuntimeError,
                                        lambda: self.create_table(),
                                        '/wt_session.* is None/')
 
@@ -153,7 +153,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         """
         conn = self.conn
         self.close_conn()
-        self.assertRaisesHavingMessage(exceptions.RuntimeError,
+        self.assertRaisesHavingMessage(RuntimeError,
                                        lambda: conn.open_session(None),
                                        '/wt_connection.* is None/')
 

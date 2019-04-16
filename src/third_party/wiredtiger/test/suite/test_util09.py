@@ -39,7 +39,7 @@ class test_util09(wttest.WiredTigerTestCase, suite_subprocess):
 
     def populate_file(self, filename, low, high):
         """
-        Insert some simple key / value lines into the file
+        Insert some simple key // value lines into the file
         """
         keys = {}
         with open("loadtext.in", "w") as f:

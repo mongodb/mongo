@@ -79,7 +79,7 @@ class tabconfig:
             elif format == 'i':
                 keys.append(rev)
             elif format == 'r':
-                keys.append(long(i+1))
+                keys.append(self.recno(i+1))
         return keys
 
     def gen_values(self, i):
@@ -315,7 +315,7 @@ class test_schema03(wttest.WiredTigerTestCase):
         if self.SHOW_PYTHON:
             if self.SHOW_PYTHON_ONLY_TABLE == None or self.current_table in self.SHOW_PYTHON_ONLY_TABLE:
                 if self.SHOW_PYTHON_ONLY_SCEN == None or self.scenario_number in self.SHOW_PYTHON_ONLY_SCEN:
-                    print '        ' + s
+                    print('        ' + s)
 
     def join_names(self, sep, prefix, list):
         return sep.join([prefix + str(val) for val in list])
@@ -330,14 +330,14 @@ class test_schema03(wttest.WiredTigerTestCase):
 
     def finished_step(self, name):
         if self.s_restart == name:
-            print "  # Reopening connection at step: " + name
+            print("  # Reopening connection at step: " + name)
             self.reopen_conn()
 
     def test_schema(self):
         rand = suite_random.suite_random()
         if self.SHOW_PYTHON:
-            print '  ################################################'
-            print '  # Running scenario ' + str(self.scenario_number)
+            print('  ################################################')
+            print('  # Running scenario ' + str(self.scenario_number))
 
         ntables = self.s_ntable
 
@@ -431,8 +431,8 @@ class test_schema03(wttest.WiredTigerTestCase):
             self.show_python("self.session.create('table:" + tc.tablename + "', '" + config + "')")
             self.session.create("table:" + tc.tablename, config)
 
-            tc.columns_for_groups(range(tc.nkeys, tc.nkeys + tc.nvalues))
-            tc.columns_for_indices(range(0, tc.nkeys + tc.nvalues))
+            tc.columns_for_groups(list(range(tc.nkeys, tc.nkeys + tc.nvalues)))
+            tc.columns_for_indices(list(range(0, tc.nkeys + tc.nvalues)))
 
         self.finished_step('table')
 
@@ -461,7 +461,7 @@ class test_schema03(wttest.WiredTigerTestCase):
         for tc in tabconfigs:
             self.current_table = tc.tableidx
             max = rand.rand_range(0, self.nentries)
-            self.populate(tc, xrange(0, max))
+            self.populate(tc, list(range(0, max)))
 
         self.finished_step('populate0')
 
@@ -476,7 +476,7 @@ class test_schema03(wttest.WiredTigerTestCase):
         # populate second batch
         for tc in tabconfigs:
             self.current_table = tc.tableidx
-            self.populate(tc, xrange(tc.nentries, self.nentries))
+            self.populate(tc, list(range(tc.nentries, self.nentries)))
 
         self.finished_step('populate1')
 

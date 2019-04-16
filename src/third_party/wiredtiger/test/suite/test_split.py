@@ -49,7 +49,7 @@ class test_split(wttest.WiredTigerTestCase):
         # IF IT FAILS, IT MAY BE RECONCILIATION ISN'T CREATING THE SAME SIZE
         # PAGES AS BEFORE.
 
-        # Create a 4KB page (more than 3KB): 40 records w / 10 byte keys
+        # Create a 4KB page (more than 3KB): 40 records w // 10 byte keys
         # and 81 byte values.
         for i in range(35):
             cursor['%09d' % i] = 8 * ('%010d' % i)

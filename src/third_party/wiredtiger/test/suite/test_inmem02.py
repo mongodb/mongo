@@ -44,7 +44,8 @@ class test_inmem02(wttest.WiredTigerTestCase):
         # Create a new table that is allowed to exceed the cache size, do this
         # before filling the cache so that the create succeeds
         self.session.create(
-            self.uri + '_over', 'ignore_in_memory_cache_size=true')
+            self.uri + '_over',
+            'key_format=S,value_format=S,ignore_in_memory_cache_size=true')
 
         # Populate a table with enough data to fill the cache.
         msg = '/WT_CACHE_FULL.*/'

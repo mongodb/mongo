@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_prepare_lookaside02.py
-#   Prepare updates can be resolved for both commit / rollback operations.
+#   Prepare updates can be resolved for both commit // rollback operations.
 #
 
 from helper import copy_wiredtiger_home
@@ -63,7 +63,7 @@ class test_prepare_lookaside02(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(self.uri)
 
         # Insert keys 1..100 each with timestamp=key, in some order
-        orig_keys = range(1, 101)
+        orig_keys = list(range(1, 101))
         keys = orig_keys[:]
         random.shuffle(keys)
 

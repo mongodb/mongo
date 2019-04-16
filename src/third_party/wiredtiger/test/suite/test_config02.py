@@ -152,7 +152,7 @@ class test_config02(wttest.WiredTigerTestCase):
             self.skipTest('Unix specific test skipped on Windows')
         dir = 'subdir'
         os.mkdir(dir)
-        os.chmod(dir, 0555)
+        os.chmod(dir, 0o555)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open(dir, 'create'),
             '/Permission denied/')

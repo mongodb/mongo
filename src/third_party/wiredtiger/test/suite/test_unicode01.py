@@ -26,21 +26,27 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wtscenario, wttest
+import sys, wiredtiger, wtscenario, wttest
+_python3 = (sys.version_info >= (3, 0, 0))
 
 # test_unicode01.py
-#   Make sure UTF8 config can be passed to WT_SESSION::create
-#
-#   There are a couple of tricks here:
-#   1) we don't want to treat the whole file as UTF-8, because this would
-#      be the only one in our tree and that causes problems for some
-#      scripts; and
-#   2) we can't pass in a Unicode object directly because the
-#      SWIG-generated code expects a simple Python string.
+#   Make sure UTF8 config can be passed to WT_SESSION::create.
+# Python turns Unicode strings into UTF-8.
 class test_unicode01(wttest.WiredTigerTestCase):
     def test_unicode(self):
-        self.session.create('table:t',
-            u'app_metadata={"name" : "Employ\xe9s"}'.encode('utf-8'))
+        # We use valid Unicode characters that are examples in
+        # the Unicode standard.
+        metadata_unicode = u'app_metadata={"name" : "Employ\u222b\u67d2\ud4db"}'
+
+        # In Python2, Unicode and strings are different types,
+        # and need to be converted. In Python3, there is no separate
+        # unicode type, unicode characters are just embedded as UTF-8
+        # in strings.
+        if _python3:
+            metadata_string = metadata_unicode
+        else:
+            metadata_string = metadata_unicode.encode('utf-8')
+        self.session.create('table:t', metadata_string)
 
 if __name__ == '__main__':
     wttest.run()

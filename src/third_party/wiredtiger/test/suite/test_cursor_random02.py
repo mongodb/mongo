@@ -87,13 +87,13 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
         '''
         self.tty('differentKeys: ' + str(differentKeys) + ' of ' + \
             str(num_entries) + ', ' + \
-            str((int)((differentKeys * 100) / num_entries)) + '%')
+            str((int)((differentKeys * 100) // num_entries)) + '%')
         '''
         # Can't test for non-sequential data when there is 1 item in the table
         if num_entries > 1:
             self.assertGreater(num_entries - 1, sequentialKeys,
                 'cursor is returning sequential data')
-        self.assertGreater(differentKeys, num_entries / 4,
+        self.assertGreater(differentKeys, num_entries // 4,
             'next_random random distribution not adequate')
 
 if __name__ == '__main__':

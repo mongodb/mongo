@@ -629,68 +629,6 @@ err:	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 }
 
 /*
- * __log_zero --
- *	Zero a log file.
- */
-static int
-__log_zero(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t start_off, wt_off_t len)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_ITEM(zerobuf);
-	WT_DECL_RET;
-	WT_LOG *log;
-	uint32_t allocsize, bufsz, off, partial, wrlen;
-
-	conn = S2C(session);
-	log = conn->log;
-	allocsize = log->allocsize;
-	zerobuf = NULL;
-	if (allocsize < WT_MEGABYTE)
-		bufsz = WT_MEGABYTE;
-	else
-		bufsz = allocsize;
-	/*
-	 * If they're using smaller log files, cap it at the file size.
-	 */
-	if (conn->log_file_max < bufsz)
-		bufsz = (uint32_t)conn->log_file_max;
-	WT_RET(__wt_scr_alloc(session, bufsz, &zerobuf));
-	memset(zerobuf->mem, 0, zerobuf->memsize);
-	WT_STAT_CONN_INCR(session, log_zero_fills);
-
-	/*
-	 * Read in a chunk starting at the end of the file.  Keep going until
-	 * we reach the beginning or we find a chunk that contains any non-zero
-	 * bytes.  Compare against a known zero byte chunk.
-	 */
-	off = (uint32_t)start_off;
-	while (off < (uint32_t)len) {
-		/*
-		 * Typically we start to zero the file after the log header
-		 * and the bufsz is a sector-aligned size.  So we want to
-		 * align our writes when we can.
-		 */
-		partial = off % bufsz;
-		if (partial != 0)
-			wrlen = bufsz - partial;
-		else
-			wrlen = bufsz;
-		/*
-		 * Check if we're writing a partial amount at the end too.
-		 */
-		if ((uint32_t)len - off < bufsz)
-			wrlen = (uint32_t)len - off;
-		__wt_capacity_throttle(session, wrlen, WT_THROTTLE_LOG);
-		WT_ERR(__wt_write(session,
-		    fh, (wt_off_t)off, wrlen, zerobuf->mem));
-		off += wrlen;
-	}
-err:	__wt_scr_free(session, &zerobuf);
-	return (ret);
-}
-
-/*
  * __log_prealloc --
  *	Pre-allocate a log file.
  */
@@ -710,7 +648,7 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 	 * and zero the log file based on what is available.
 	 */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ZERO_FILL))
-		return (__log_zero(session, fh,
+		return (__wt_file_zero(session, fh,
 		    log->first_record, conn->log_file_max));
 
 	/* If configured to not extend the file, we're done. */
@@ -1235,7 +1173,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	WT_LOG *log;
 	WT_LSN end_lsn, logrec_lsn;
 	u_int yield_cnt;
-	bool create_log;
+	bool create_log, skipp;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -1284,13 +1222,11 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	 */
 	create_log = true;
 	if (conn->log_prealloc > 0 && !conn->hot_backup) {
-		__wt_readlock(session, &conn->hot_backup_lock);
-		if (conn->hot_backup)
-			__wt_readunlock(session, &conn->hot_backup_lock);
-		else {
-			ret = __log_alloc_prealloc(session, log->fileid);
-			__wt_readunlock(session, &conn->hot_backup_lock);
+		WT_WITH_HOTBACKUP_READ_LOCK(session,
+		    ret = __log_alloc_prealloc(session, log->fileid),
+		    &skipp);
 
+		if (!skipp) {
 			/*
 			 * If ret is 0 it means we found a pre-allocated file.
 			 * If ret is WT_NOTFOUND, create the new log file and
@@ -1517,24 +1453,23 @@ __log_truncate_file(WT_SESSION_IMPL *session, WT_FH *log_fh, wt_off_t offset)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
+	bool skipp;
 
 	conn = S2C(session);
 	log = conn->log;
 
 	if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP) && !conn->hot_backup) {
-		__wt_readlock(session, &conn->hot_backup_lock);
-		if (conn->hot_backup)
-			__wt_readunlock(session, &conn->hot_backup_lock);
-		else {
-			ret = __wt_ftruncate(session, log_fh, offset);
-			__wt_readunlock(session, &conn->hot_backup_lock);
+		WT_WITH_HOTBACKUP_READ_LOCK(session,
+		    ret = __wt_ftruncate(
+			session, log_fh, offset), &skipp);
+		if (!skipp) {
 			if (ret != ENOTSUP)
 				return (ret);
 			F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
 		}
 	}
 
-	return (__log_zero(session, log_fh, offset, conn->log_file_max));
+	return (__wt_file_zero(session, log_fh, offset, conn->log_file_max));
 }
 
 /*

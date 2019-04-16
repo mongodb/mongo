@@ -10,6 +10,7 @@ cd ..
 egrep '	' `find . -name '*.py'` |
     sed -e 's/:.*//' \
 	-e '/__init__.py/d' \
+	-e '/\/wiredtiger.py/d' \
 	-e '/src\/docs\/tools\/doxypy.py/d' |
     sort -u |
     sed 's/^/	/' > $t

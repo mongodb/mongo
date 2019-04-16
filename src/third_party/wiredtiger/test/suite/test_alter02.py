@@ -78,7 +78,7 @@ class test_alter02(wttest.WiredTigerTestCase):
         try:
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
         except wiredtiger.WiredTigerError as e:
-            print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
+            print("Failed conn at '%s' with config '%s'" % (dir, conn_params))
         self.session = self.conn.open_session()
 
     # Verify the metadata string for this URI and that its setting in the
@@ -116,12 +116,12 @@ class test_alter02(wttest.WiredTigerTestCase):
             keys = c.get_key()
             # txnid, rectype, optype, fileid, logrec_key, logrec_value
             values = c.get_value()
-            try:
-                if self.value in str(values[5]):     # logrec_value
+            # We are only looking for log records that that have a key/value
+            # pair.
+            if values[4] != b'':
+                if self.value.encode() in values[5]:     # logrec_value
                     count += 1
-                self.assertFalse(value2 in str(values[5]))
-            except:
-                pass
+                self.assertFalse(self.value2.encode() in values[5])
         c.close()
         self.assertEqual(count, expected_keys)
 

@@ -708,7 +708,9 @@ struct __wt_connection_stats {
 	int64_t txn_pinned_snapshot_range;
 	int64_t txn_pinned_timestamp;
 	int64_t txn_pinned_timestamp_checkpoint;
+	int64_t txn_pinned_timestamp_reader;
 	int64_t txn_pinned_timestamp_oldest;
+	int64_t txn_timestamp_oldest_active_read;
 	int64_t txn_sync;
 	int64_t txn_commit;
 	int64_t txn_rollback;

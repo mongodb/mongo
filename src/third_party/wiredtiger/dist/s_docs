@@ -146,7 +146,7 @@ EOF
 	}
 
 	# Add optional extras
-	EXTRAS="../lang/java/src/com/wiredtiger/db ../lang/python/wiredtiger.py"
+	EXTRAS="../lang/java/src/com/wiredtiger/db"
 	EXTRA_INPUT=""
 	for f in $EXTRAS ; do
 		[ -e "$f" ] && EXTRA_INPUT="$EXTRA_INPUT ../$f"

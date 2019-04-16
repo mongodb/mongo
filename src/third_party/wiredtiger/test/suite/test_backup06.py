@@ -95,8 +95,8 @@ class test_backup06(wttest.WiredTigerTestCase, suite_subprocess):
         dh_after = stat_cursor[stat.conn.dh_conn_handle_count][2]
         stat_cursor.close()
         if (dh_before != dh_after):
-            print "Dhandles open before backup open: " + str(dh_before)
-            print "Dhandles open after backup open: " + str(dh_after)
+            print("Dhandles open before backup open: " + str(dh_before))
+            print("Dhandles open after backup open: " + str(dh_after))
         self.assertEqual(dh_after == dh_before, True)
         cursor.close()
 

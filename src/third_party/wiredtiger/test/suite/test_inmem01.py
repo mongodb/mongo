@@ -102,7 +102,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         # Now that the database contains as much data as will fit into
         # the configured cache, verify removes succeed.
         cursor = self.session.open_cursor(self.uri, None)
-        for i in range(1, last_key / 4, 1):
+        for i in range(1, last_key // 4, 1):
             cursor.set_key(ds.key(i))
             cursor.remove()
 
@@ -125,7 +125,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
 
     # Custom "keep filling" helper
     def fill(self, cursor, ds, start, end):
-        for i in xrange(start + 1, end + 1):
+        for i in range(start + 1, end + 1):
             cursor[ds.key(i)] = ds.value(i)
 
     # Keep adding data to the cache until it becomes really full, make sure
@@ -163,7 +163,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         # many more records into the cache, so don't do as many passes through
         # the data.
         checks = 10 if self.valuefmt.endswith('t') else 100
-        for run in xrange(checks):
+        for run in range(checks):
             ds.check()
             self.pr('Finished check ' + str(run))
             sleep(1)

@@ -500,3 +500,53 @@ __wt_close_connection_close(WT_SESSION_IMPL *session)
 	} WT_TAILQ_SAFE_REMOVE_END
 	return (ret);
 }
+
+/*
+ * __wt_file_zero --
+ *	Zero out the file from offset for size bytes.
+ */
+int
+__wt_file_zero(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t start_off, wt_off_t size)
+{
+	WT_DECL_ITEM(zerobuf);
+	WT_DECL_RET;
+	WT_THROTTLE_TYPE type;
+	uint64_t bufsz, off, partial, wrlen;
+
+	zerobuf = NULL;
+	bufsz = WT_MIN((uint64_t)size, WT_MEGABYTE);
+	/*
+	 * For now logging is the only type and statistic. This needs
+	 * updating if block manager decides to use this function.
+	 */
+	type = WT_THROTTLE_LOG;
+	WT_STAT_CONN_INCR(session, log_zero_fills);
+	WT_RET(__wt_scr_alloc(session, bufsz, &zerobuf));
+	memset(zerobuf->mem, 0, zerobuf->memsize);
+	off = (uint64_t)start_off;
+	while (off < (uint64_t)size) {
+		/*
+		 * We benefit from aligning our writes when we can. Log files
+		 * will typically want to start to zero after the log header
+		 * and the bufsz is a sector-aligned size. So align when
+		 * we can.
+		 */
+		partial = off % bufsz;
+		if (partial != 0)
+			wrlen = bufsz - partial;
+		else
+			wrlen = bufsz;
+		/*
+		 * Check if we're writing a partial amount at the end too.
+		 */
+		if ((uint64_t)size - off < bufsz)
+			wrlen = (uint64_t)size - off;
+		__wt_capacity_throttle(session, wrlen, type);
+		WT_ERR(__wt_write(session,
+		    fh, (wt_off_t)off, (size_t)wrlen, zerobuf->mem));
+		off += wrlen;
+	}
+err:	__wt_scr_free(session, &zerobuf);
+	return (ret);
+}

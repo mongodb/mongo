@@ -47,7 +47,7 @@ class test_row_store_empty_values(wttest.WiredTigerTestCase):
         # Create the object, open the cursor, insert some records with zero-length values.
         self.session.create(uri, 'value_format=u,key_format=S')
         cursor = self.session.open_cursor(uri, None)
-        for i in xrange(1, nentries + 1):
+        for i in range(1, nentries + 1):
             cursor[simple_key(cursor, i)] = ""
         cursor.close()
 

@@ -375,11 +375,11 @@ class test_cursor13_big_base(test_cursor13_base):
     # create some number (self.deep) of cached cursors.
     def create_uri_map(self, baseuri):
         uri_map = {}
-        for i in xrange(0, self.nuris):
+        for i in range(0, self.nuris):
             uri = self.uriname(i)
             cursors = []
             self.session.create(uri, None)
-            for j in xrange(0, self.deep):
+            for j in range(0, self.deep):
                 cursors.append(self.session.open_cursor(uri, None))
             for c in cursors:
                 c.close()
@@ -478,8 +478,8 @@ class test_cursor13_sweep(test_cursor13_big_base):
                 # Close cursors in half of the range, and don't
                 # use them during this round, so they will be
                 # closed by sweep.
-                half = self.nuris / 2
-                potential_dead += self.close_uris(uri_map, xrange(0, half))
+                half = self.nuris // 2
+                potential_dead += self.close_uris(uri_map, list(range(0, half)))
                 bottom_range = half
                 # Let the dhandle sweep run and find the closed cursors.
                 time.sleep(3.0)
@@ -489,7 +489,7 @@ class test_cursor13_sweep(test_cursor13_big_base):
             # The session cursor sweep runs at most once a second and
             # traverses a fraction of the cached cursors.  We'll run for
             # ten seconds with pauses to make sure we see sweep activity.
-            pause_point = self.opens_per_round / 100
+            pause_point = self.opens_per_round // 100
             if pause_point == 0:
                 pause_point = 1
             pause_duration = 0.1
@@ -522,7 +522,7 @@ class test_cursor13_sweep(test_cursor13_big_base):
         # We'll pass the test if we see at least 20% of the 'potentially
         # dead' cursors swept.  There may be more, since the 1% per second
         # is a minimum.
-        min_swept = 2 * potential_dead / 10
+        min_swept = 2 * potential_dead // 10
         self.assertGreaterEqual(swept, min_swept)
 
         # No strict equality test for the reopen stats. When we've swept

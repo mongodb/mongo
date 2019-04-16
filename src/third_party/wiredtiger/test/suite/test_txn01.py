@@ -110,8 +110,8 @@ class test_txn01(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None)
         self.check(cursor, 0, 0)
         self.session.begin_transaction()
-        for i in xrange(self.nentries):
-            if i > 0 and i % (self.nentries / 37) == 0:
+        for i in range(self.nentries):
+            if i > 0 and i % (self.nentries // 37) == 0:
                 self.check(cursor, committed, i)
                 self.session.commit_transaction()
                 committed = i

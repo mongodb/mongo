@@ -114,7 +114,7 @@ class test_async02(wttest.WiredTigerTestCase, suite_subprocess):
     """
     table_name1 = 'test_async02'
     nentries = 100
-    async_ops = nentries / 2
+    async_ops = nentries // 2
     async_threads = 3
     current = {}
 
@@ -137,7 +137,7 @@ class test_async02(wttest.WiredTigerTestCase, suite_subprocess):
         if self.tablekind == 'row':
             return 'key' + str(i)
         else:
-            return long(i+1)
+            return self.recno(i+1)
 
     def genvalue(self, i):
         if self.tablekind == 'fix':
@@ -187,8 +187,8 @@ class test_async02(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.async_flush()
         self.pr('flushed')
 
-        k = self.genkey(self.nentries / 2)
-        v = self.genvalue(self.nentries / 2)
+        k = self.genkey(self.nentries // 2)
+        v = self.genvalue(self.nentries // 2)
         k1 = self.genkey(self.nentries + 1)
         v1 = self.genvalue(self.nentries + 1)
         self.current[k] = wiredtiger.WT_DUPLICATE_KEY

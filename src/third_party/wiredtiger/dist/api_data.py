@@ -23,8 +23,24 @@ class Config:
         self.subconfig = subconfig
         self.flags = flags
 
-    def __cmp__(self, other):
-        return cmp(self.name, other.name)
+    # Comparators for sorting.
+    def __eq__(self, other):
+        return self.name == other.name
+
+    def __ne__(self, other):
+        return self.name != other.name
+
+    def __lt__(self, other):
+        return self.name < other.name
+
+    def __le__(self, other):
+        return self.name <= other.name
+
+    def __gt__(self, other):
+        return self.name > other.name
+
+    def __ge__(self, other):
+        return self.name >= other.name
 
 common_runtime_config = [
     Config('app_metadata', '', r'''
@@ -1282,10 +1298,6 @@ methods = {
         read using the specified timestamp.  The supplied value must not be
         older than the current oldest timestamp.  See
         @ref transaction_timestamps'''),
-    Config('round_to_oldest', 'false', r'''
-        if read timestamp is earlier than oldest timestamp,
-        read timestamp will be rounded to oldest timestamp''',
-        type='boolean'),
     Config('roundup_timestamps', '', r'''
         round up timestamps of the transaction. This setting alters the
         visibility expected in a transaction. See @ref
@@ -1365,10 +1377,6 @@ methods = {
         read using the specified timestamp.  The supplied value must not be
         older than the current oldest timestamp.  This can only be set once
         for a transaction. See @ref transaction_timestamps'''),
-    Config('round_to_oldest', 'false', r'''
-        if read timestamp is earlier than oldest timestamp,
-        read timestamp will be rounded to oldest timestamp''',
-        type='boolean'),
 ]),
 
 'WT_SESSION.rollback_transaction' : Method([]),

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # wtperf_run.sh - run wtperf regression tests on the Jenkins platform.
 #

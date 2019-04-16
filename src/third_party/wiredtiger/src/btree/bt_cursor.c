@@ -328,8 +328,8 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *valid)
 		 * when read.
 		 */
 		cip = &page->pg_var[cbt->slot];
-		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
-		    __wt_cell_type(cell) == WT_CELL_DEL)
+		cell = WT_COL_PTR(page, cip);
+		if (__wt_cell_type(cell) == WT_CELL_DEL)
 			return (0);
 		break;
 	case BTREE_ROW:

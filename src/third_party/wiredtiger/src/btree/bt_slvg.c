@@ -75,7 +75,6 @@ struct __wt_track {
 #define	trk_addr		shared->addr.addr
 #define	trk_addr_size		shared->addr.size
 #define	trk_oldest_start_ts	shared->addr.oldest_start_ts
-#define	trk_newest_start_ts	shared->addr.newest_start_ts
 #define	trk_newest_stop_ts	shared->addr.newest_stop_ts
 #define	trk_gen			shared->gen
 #define	trk_ovfl_addr		shared->ovfl_addr
@@ -505,10 +504,9 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	trk->trk_addr_size = (uint8_t)addr_size;
 	trk->trk_size = dsk->mem_size;
 	trk->trk_oldest_start_ts = WT_TS_MAX;
-	trk->trk_newest_start_ts = trk->trk_newest_stop_ts = WT_TS_NONE;
+	trk->trk_newest_stop_ts = WT_TS_NONE;
 	if (!__wt_process.page_version_ts || dsk->type == WT_PAGE_COL_FIX) {
-		trk->trk_oldest_start_ts =
-		    trk->trk_newest_start_ts = WT_TS_NONE;
+		trk->trk_oldest_start_ts = WT_TS_NONE;
 		trk->trk_newest_stop_ts = WT_TS_MAX;
 	}
 	trk->trk_gen = dsk->write_gen;
@@ -665,8 +663,6 @@ __slvg_trk_leaf_ts(WT_TRACK *trk, WT_CELL_UNPACK *unpack)
 {
 	trk->trk_oldest_start_ts =
 	    WT_MIN(unpack->start_ts, trk->trk_oldest_start_ts);
-	trk->trk_newest_start_ts =
-	    WT_MAX(unpack->start_ts, trk->trk_newest_start_ts);
 	trk->trk_newest_stop_ts =
 	    WT_MAX(unpack->stop_ts, trk->trk_newest_stop_ts);
 }
@@ -1070,8 +1066,6 @@ merge:
 	 */
 	a_trk->trk_oldest_start_ts = b_trk->trk_oldest_start_ts =
 	    WT_MIN(a_trk->trk_oldest_start_ts, b_trk->trk_oldest_start_ts);
-	a_trk->trk_newest_start_ts = b_trk->trk_newest_start_ts =
-	    WT_MAX(a_trk->trk_newest_start_ts, b_trk->trk_newest_start_ts);
 	a_trk->trk_newest_stop_ts = b_trk->trk_newest_stop_ts =
 	    WT_MAX(a_trk->trk_newest_stop_ts, b_trk->trk_newest_stop_ts);
 	__wt_verbose(session, WT_VERB_SALVAGE,
@@ -1203,9 +1197,13 @@ __slvg_col_build_internal(
 		ref->home = page;
 		ref->page = NULL;
 
+		/*
+		 * Salvage doesn't read tree internal pages, so all pages are
+		 * immediately durable, regardless of the leaf page timestamps.
+		 */
 		WT_ERR(__wt_calloc_one(session, &addr));
 		addr->oldest_start_ts = trk->trk_oldest_start_ts;
-		addr->newest_start_ts = trk->trk_newest_start_ts;
+		addr->newest_durable_ts = WT_TS_NONE;
 		addr->newest_stop_ts = trk->trk_newest_stop_ts;
 		WT_ERR(__wt_memdup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
@@ -1726,8 +1724,6 @@ merge:
 	 */
 	a_trk->trk_oldest_start_ts = b_trk->trk_oldest_start_ts =
 	    WT_MIN(a_trk->trk_oldest_start_ts, b_trk->trk_oldest_start_ts);
-	a_trk->trk_newest_start_ts = b_trk->trk_newest_start_ts =
-	    WT_MAX(a_trk->trk_newest_start_ts, b_trk->trk_newest_start_ts);
 	a_trk->trk_newest_stop_ts = b_trk->trk_newest_stop_ts =
 	    WT_MAX(a_trk->trk_newest_stop_ts, b_trk->trk_newest_stop_ts);
 	__wt_verbose(session, WT_VERB_SALVAGE,
@@ -1875,9 +1871,13 @@ __slvg_row_build_internal(
 		ref->home = page;
 		ref->page = NULL;
 
+		/*
+		 * Salvage doesn't read tree internal pages, so all pages are
+		 * immediately durable, regardless of the leaf page timestamps.
+		 */
 		WT_ERR(__wt_calloc_one(session, &addr));
 		addr->oldest_start_ts = trk->trk_oldest_start_ts;
-		addr->newest_start_ts = trk->trk_newest_start_ts;
+		addr->newest_durable_ts = WT_TS_NONE;
 		addr->newest_stop_ts = trk->trk_newest_stop_ts;
 		WT_ERR(__wt_memdup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));

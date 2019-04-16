@@ -159,8 +159,8 @@ class test_truncate_cursor_end(wttest.WiredTigerTestCase):
         c2 = self.session.open_cursor(uri, None)
         c2.set_key(ds.key(2000))
         self.session.truncate(None, c1, c2, None)
-        self.assertEquals(c1.close(), 0)
-        self.assertEquals(c2.close(), 0)
+        self.assertEqual(c1.close(), 0)
+        self.assertEqual(c2.close(), 0)
         self.session.drop(uri)
 
         if self.type == "table:":
@@ -171,8 +171,8 @@ class test_truncate_cursor_end(wttest.WiredTigerTestCase):
             c2 = self.session.open_cursor(uri, None)
             c2.set_key(ds.key(2000))
             self.session.truncate(None, c1, c2, None)
-            self.assertEquals(c1.close(), 0)
-            self.assertEquals(c2.close(), 0)
+            self.assertEqual(c1.close(), 0)
+            self.assertEqual(c2.close(), 0)
             self.session.drop(uri)
 
 # Test truncation of empty objects.
@@ -199,14 +199,14 @@ class test_truncate_empty(wttest.WiredTigerTestCase):
         c1.set_key(simple_key(c1, 1000))
         c2 = self.session.open_cursor(uri, None)
         c2.set_key(simple_key(c2, 2000))
-        self.assertEquals(self.session.truncate(None, c1, c2, None), 0)
+        self.assertEqual(self.session.truncate(None, c1, c2, None), 0)
 
     # Test truncation of empty objects using a URI
     def test_truncate_empty_uri(self):
         uri = self.type + self.name
         self.session.create(uri,
             ',key_format=' + self.keyfmt + ',value_format=S')
-        self.assertEquals(self.session.truncate(uri, None, None, None), 0)
+        self.assertEqual(self.session.truncate(uri, None, None, None), 0)
 
 # Test session.truncate.
 class test_truncate_cursor(wttest.WiredTigerTestCase):
@@ -272,7 +272,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None)
         for i in range(begin, end + 1):
             expected[ds.key(i)] = [0]
-        for k, v in expected.iteritems():
+        for k, v in expected.items():
             cursor.set_key(k)
             if v == [0] and \
               cursor.key_format == 'r' and cursor.value_format == '8t':

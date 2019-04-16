@@ -65,7 +65,7 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
                 # The last char in a string is null anyway, so that's tested.
                 ret += chr(j%255 + 1)
         else:
-            for j in range(0, len / 3):
+            for j in range(0, len // 3):
                 k = i + j
                 # no internal nulls...
                 ret += chr(k%255 + 1) + chr((k*3)%255 + 1) + chr((k*7)%255 + 1)
@@ -75,7 +75,7 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
         if self.key_format == 'S':
             return ("%0.6d" % i) + ':' + self.get_string(i, 20)
         elif self.key_format == 'r':
-            return long(i + 1)
+            return self.recno(i + 1)
         else:
             return i + 1
 

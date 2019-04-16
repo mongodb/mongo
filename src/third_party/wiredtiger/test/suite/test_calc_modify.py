@@ -28,6 +28,7 @@
 
 import random, string
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 r = random.Random(42) # Make things repeatable
 
@@ -52,17 +53,27 @@ class test_calc_modify(wttest.WiredTigerTestCase):
     REMOVE = 2
     REPLACE = 3
 
+    valuefmt = [
+        ('item', dict(valuefmt='u')),
+        ('string', dict(valuefmt='S')),
+    ]
+    scenarios = make_scenarios(valuefmt)
+
     def mkstring(self, size, repeat_size=1):
-        pattern = ''.join(r.choice(string.ascii_letters + string.digits) for _ in xrange(repeat_size))
-        return (pattern * ((size + repeat_size - 1) / repeat_size))[:size]
+        choices = string.ascii_letters + string.digits
+        if self.valuefmt == 'S':
+            pattern = ''.join(r.choice(choices) for _ in range(repeat_size))
+        else:
+            pattern = b''.join(bytes([r.choice(choices.encode())]) for _ in range(repeat_size))
+        return (pattern * ((size + repeat_size - 1) // repeat_size))[:size]
 
     def one_test(self, c, k, oldsz, repeatsz, nmod, maxdiff):
         oldv = self.mkstring(oldsz, repeatsz)
 
-        offsets = sorted(r.sample(xrange(oldsz), nmod))
-        modsizes = sorted(r.sample(xrange(maxdiff), nmod + 1))
-        lengths = [modsizes[i+1] - modsizes[i] for i in xrange(nmod)]
-        modtypes = [r.choice((self.ADD, self.REMOVE, self.REPLACE)) for _ in xrange(nmod)]
+        offsets = sorted(r.sample(range(oldsz), nmod))
+        modsizes = sorted(r.sample(range(maxdiff), nmod + 1))
+        lengths = [modsizes[i+1] - modsizes[i] for i in range(nmod)]
+        modtypes = [r.choice((self.ADD, self.REMOVE, self.REPLACE)) for _ in range(nmod)]
 
         self.pr("offsets: %s" % offsets)
         self.pr("modsizes: %s" % modsizes)
@@ -70,8 +81,8 @@ class test_calc_modify(wttest.WiredTigerTestCase):
         self.pr("modtypes: %s" % modtypes)
 
         orig = oldv
-        newv = ''
-        for i in xrange(nmod):
+        newv = '' if self.valuefmt == 'S' else b''
+        for i in range(nmod):
             if i > 0 and offsets[i] - offsets[i - 1] < maxdiff:
                 continue
             newv += orig[:offsets[i]]
@@ -104,13 +115,13 @@ class test_calc_modify(wttest.WiredTigerTestCase):
         self.assertEqual(c[k], newv)
 
     def test_calc_modify(self):
-        self.session.create(self.uri, 'key_format=i,value_format=u')
+        self.session.create(self.uri, 'key_format=i,value_format=' + self.valuefmt)
         c = self.session.open_cursor(self.uri)
-        for k in xrange(1000):
+        for k in range(1000):
             size = r.randint(1000, 10000)
             repeats = r.randint(1, size)
             nmods = r.randint(1, 10)
-            maxdiff = r.randint(64, size / 10)
+            maxdiff = r.randint(64, size // 10)
             self.pr("size %s, repeats %s, nmods %s, maxdiff %s" % (size, repeats, nmods, maxdiff))
             self.one_test(c, k, size, repeats, nmods, maxdiff)
 

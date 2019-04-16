@@ -30,16 +30,11 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define	CKPT_DISTANCE 1
 #define	CORRUPT "file:zzz-corrupt.SS"
 #define	KEY	"key"
 #define	VALUE	"value,value,value"
 
-#define	DB0	"CKPT0"
-#define	DB1	"CKPT1"
-#define	DB2	"CKPT2"
 #define	SAVE	"SAVE"
-#define	TEST	"TEST"
 
 /*
  * NOTE: This assumes the default page size of 4096. If that changes these
@@ -47,7 +42,7 @@
  */
 #define	APP_MD_SIZE 	4096
 #define	APP_BUF_SIZE	(3 * 1024)
-#define	APP_STR		"long app metadata. "
+#define	APP_STR		"Long app metadata intended to force a page per entry. "
 
 static uint64_t data_val;
 static const char *home;
@@ -363,59 +358,6 @@ copy_database(const char *sfx)
 }
 
 /*
- * move_data_ahead --
- *	Update the tables with new data and take a checkpoint twice.
- *	WiredTiger keeps the previous checkpoint so we do it twice so that
- *	the old checkpoint address no longer exists.
- */
-static void
-move_data_ahead(TABLE_INFO *table_data)
-{
-	TABLE_INFO *t;
-	uint64_t i;
-
-	i = 0;
-	while (i < CKPT_DISTANCE) {
-		++data_val;
-		for (t = table_data; t->name != NULL; t++)
-			cursor_insert(t->name, data_val);
-		++i;
-		fprintf(stderr, "MOVE DATA: inserted %" PRIu64 ". CKPT.\n",
-		    data_val);
-		testutil_check(wt_session->checkpoint(wt_session, NULL));
-	}
-}
-
-/*
- * make_database_copies --
- *	Make copies of the database so that we can test various mix and match
- *	of turtle files and metadata files. We take some checkpoints and
- *	update the data too.
- */
-static void
-make_database_copies(TABLE_INFO *table_data)
-{
-	/*
-	 * If we're running an out-of-sync test, then we want to make copies
-	 * of the turtle and metadata file, then checkpoint and again save a
-	 * copy of the turtle file and the metadata file. Then we add more data
-	 * and checkpoint again at least twice. Using the original and current
-	 * files we can test various out of sync scenarios.
-	 */
-	/*
-	 * Take a checkpoint and make a copy.
-	 */
-	testutil_check(wt_session->checkpoint(wt_session, NULL));
-	copy_database(DB0);
-
-	move_data_ahead(table_data);
-	copy_database(DB1);
-
-	move_data_ahead(table_data);
-	copy_database(DB2);
-}
-
-/*
  * wt_open_corrupt --
  *	Call wiredtiger_open and expect a corruption error.
  */
@@ -534,125 +476,6 @@ run_all_verification(const char *sfx, TABLE_INFO *t)
 	open_normal(sfx, t);
 }
 
-static void
-setup_database(const char *src, const char *turtle_dir, const char *meta_dir)
-{
-	WT_DECL_RET;
-	char buf[1024];
-
-	/*
-	 * Remove the test home directory and copy the source to it.
-	 * Then copy the saved turtle and/or metadata file from the
-	 * given args.
-	 */
-	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "rm -rf ./%s.%s; mkdir ./%s.%s; "
-	    "cp -p %s.%s/* ./%s.%s",
-	    home, TEST, home, TEST, home, src, home, TEST));
-	printf("copy: %s\n", buf);
-	if ((ret = system(buf)) < 0)
-		testutil_die(ret, "system: %s", buf);
-
-	/* Copy turtle if given. */
-	if (turtle_dir != NULL) {
-		testutil_check(__wt_snprintf(buf, sizeof(buf),
-		    "cp -p %s.%s/%s.%s %s.%s/%s",
-		    home, turtle_dir, WT_METADATA_TURTLE, SAVE,
-		    home, TEST, WT_METADATA_TURTLE));
-		printf("copy: %s\n", buf);
-		if ((ret = system(buf)) < 0)
-			testutil_die(ret, "system: %s", buf);
-	}
-	/* Copy metadata if given. */
-	if (meta_dir != NULL) {
-		testutil_check(__wt_snprintf(buf, sizeof(buf),
-		    "cp -p %s.%s/%s.%s %s.%s/%s",
-		    home, meta_dir, WT_METAFILE, SAVE,
-		    home, TEST, WT_METAFILE));
-		printf("copy: %s\n", buf);
-		if ((ret = system(buf)) < 0)
-			testutil_die(ret, "system: %s", buf);
-	}
-}
-
-static void
-out_of_sync(TABLE_INFO *table_data)
-{
-	/*
-	 * We have five directories:
-	 * - The main database directory that we just corrupted/salvaged.
-	 * - A .SAVE copy of the main directory that is coherent prior to
-	 *   corrupting. Essentially a copy of the second checkpoint dir.
-	 * - A copy of the main directory before the first checkpoint. DB0
-	 * - A copy of the main directory after the first checkpoint. DB1
-	 * - A copy of the main directory after the second checkpoint. DB2
-	 *
-	 * We want to make a copy of a source directory and then copy a
-	 * turtle or metadata file from another directory. Then detect the
-	 * error, run with salvage and confirm.
-	 */
-	/*
-	 * Run in DB0, bring in future metadata from DB1.
-	 */
-	test_out_of_sync = true;
-	printf(
-	    "#\n# OUT OF SYNC: %s with future metadata from %s\n#\n", DB0, DB1);
-	setup_database(DB0, NULL, DB1);
-	run_all_verification(TEST, table_data);
-
-	/*
-	 * Run in DB0, bring in future turtle file from DB1.
-	 */
-	printf(
-	    "#\n# OUT OF SYNC: %s with future turtle from %s\n#\n", DB0, DB1);
-	setup_database(DB0, DB1, NULL);
-	run_all_verification(TEST, table_data);
-
-	/*
-	 * Run in DB1, bring in old metadata file from DB0.
-	 */
-	printf("#\n# OUT OF SYNC: %s with old metadata from %s\n#\n", DB1, DB0);
-	setup_database(DB1, NULL, DB0);
-	run_all_verification(TEST, table_data);
-
-	/*
-	 * Run in DB1, bring in old turtle file from DB0.
-	 */
-	printf("#\n# OUT OF SYNC: %s with old turtle from %s\n#\n", DB1, DB0);
-	setup_database(DB1, DB0, NULL);
-	run_all_verification(TEST, table_data);
-
-	/*
-	 * Run in DB1, bring in future metadata file from DB2.
-	 */
-	printf(
-	    "#\n# OUT OF SYNC: %s with future metadata from %s\n#\n", DB1, DB2);
-	setup_database(DB1, NULL, DB2);
-	run_all_verification(TEST, table_data);
-
-	/*
-	 * Run in DB1, bring in future turtle file from DB2.
-	 */
-	printf(
-	    "#\n# OUT OF SYNC: %s with future turtle from %s\n#\n", DB1, DB2);
-	setup_database(DB1, DB2, NULL);
-	run_all_verification(TEST, table_data);
-
-	/*
-	 * Run in DB2, bring in old metadata file from DB1.
-	 */
-	printf("#\n# OUT OF SYNC: %s with old metadata from %s\n#\n", DB2, DB1);
-	setup_database(DB2, NULL, DB1);
-	run_all_verification(TEST, table_data);
-
-	/*
-	 * Run in DB2, bring in old turtle file from DB1.
-	 */
-	printf("#\n# OUT OF SYNC: %s with old turtle from %s\n#\n", DB2, DB1);
-	setup_database(DB2, DB1, NULL);
-	run_all_verification(TEST, table_data);
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -700,10 +523,6 @@ main(int argc, char *argv[])
 	for (t = table_data; t->name != NULL; t++)
 		create_data(t);
 
-	/*
-	 * Take some checkpoints and add more data for out of sync testing.
-	 */
-	make_database_copies(table_data);
 	testutil_check(opts->conn->close(opts->conn, NULL));
 	opts->conn = NULL;
 
@@ -736,8 +555,6 @@ main(int argc, char *argv[])
 	if ((ret = system(buf)) < 0)
 		testutil_die(ret, "system: %s", buf);
 	run_all_verification(NULL, &table_data[0]);
-
-	out_of_sync(&table_data[0]);
 
 	/*
 	 * We need to set up the string before we clean up

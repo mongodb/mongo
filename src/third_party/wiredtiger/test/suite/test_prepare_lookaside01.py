@@ -58,7 +58,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
 
         # Commit some updates to get eviction and lookaside fired up
-        bigvalue1 = "bbbbb" * 100
+        bigvalue1 = b"bbbbb" * 100
         cursor = self.session.open_cursor(uri)
         for i in range(1, nsessions * nkeys):
             self.session.begin_transaction()
@@ -71,7 +71,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         # prepared updates to the lookaside
         sessions = [0] * nsessions
         cursors = [0] * nsessions
-        bigvalue2 = "ccccc" * 100
+        bigvalue2 = b"ccccc" * 100
         for j in range (0, nsessions):
             sessions[j] = self.conn.open_session()
             sessions[j].begin_transaction("isolation=snapshot")
@@ -88,7 +88,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         # Commit more regular updates. To do this, the pages that were just
         # evicted need to be read back. This ensures reading prepared updates
         # from the lookaside
-        bigvalue3 = "ddddd" * 100
+        bigvalue3 = b"ddddd" * 100
         cursor = self.session.open_cursor(uri)
         for i in range(1, nsessions * nkeys):
             self.session.begin_transaction()
@@ -110,7 +110,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         nrows = 100
         ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
         ds.populate()
-        bigvalue = "aaaaa" * 100
+        bigvalue = b"aaaaa" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(uri)

@@ -222,7 +222,7 @@ __verify_dsk_ts_addr_cmp(WT_SESSION_IMPL *session, uint32_t cell_num,
     bool gt, const char *tag)
 {
 	const char *ts1_bp, *ts2_bp;
-	char ts1_buf[32], ts2_buf[32];
+	char ts_string[2][WT_TS_INT_STRING_SIZE];
 
 	if (gt && ts1 >= ts2)
 		return (0);
@@ -237,9 +237,8 @@ __verify_dsk_ts_addr_cmp(WT_SESSION_IMPL *session, uint32_t cell_num,
 		ts1_bp = "WT_TS_NONE";
 		break;
 	default:
-		WT_RET(
-		    __wt_snprintf(ts1_buf, sizeof(ts1_buf), "%" PRIu64, ts1));
-		ts1_bp = ts1_buf;
+		__wt_timestamp_to_string(ts1, ts_string[0]);
+		ts1_bp = ts_string[0];
 		break;
 	}
 	switch (ts2) {
@@ -250,14 +249,13 @@ __verify_dsk_ts_addr_cmp(WT_SESSION_IMPL *session, uint32_t cell_num,
 		ts2_bp = "WT_TS_NONE";
 		break;
 	default:
-		WT_RET(
-		    __wt_snprintf(ts2_buf, sizeof(ts2_buf), "%" PRIu64, ts2));
-		ts2_bp = ts2_buf;
+		__wt_timestamp_to_string(ts2, ts_string[1]);
+		ts2_bp = ts_string[1];
 		break;
 	}
 	WT_RET_MSG(session, WT_ERROR,
 	    "cell %" PRIu32 " on page at %s failed verification with %s "
-	    "time of %s, %s the parent's %s time of %s",
+	    "timestamp of %s, %s the parent's %s timestamp of %s",
 	    cell_num, tag,
 	    ts1_name, ts1_bp,
 	    gt ? "less than" : "greater than",
@@ -272,6 +270,8 @@ static int
 __verify_dsk_ts(WT_SESSION_IMPL *session,
     WT_CELL_UNPACK *unpack, uint32_t cell_num, WT_ADDR *addr, const char *tag)
 {
+	char ts_string[2][WT_TS_INT_STRING_SIZE];
+
 	/*
 	 * Check timestamp order, and optionally, against a parent address.
 	 * Timestamps in the parent address aren't necessarily an exact match,
@@ -291,17 +291,17 @@ __verify_dsk_ts(WT_SESSION_IMPL *session,
 			    "cell %" PRIu32 " on page at %s has a newest stop "
 			    "timestamp of 0",
 			    cell_num - 1, tag);
-		if (unpack->oldest_start_ts > unpack->newest_start_ts)
+		if (unpack->oldest_start_ts > unpack->newest_stop_ts) {
+			__wt_timestamp_to_string(
+			    unpack->oldest_start_ts, ts_string[0]);
+			__wt_timestamp_to_string(
+			    unpack->newest_stop_ts, ts_string[1]);
 			WT_RET_VRFY(session,
 			    "cell %" PRIu32 " on page at %s has an oldest "
-			    "start timestamp newer than its newest start "
-			    "timestamp",
-			    cell_num - 1, tag);
-		if (unpack->newest_start_ts > unpack->newest_stop_ts)
-			WT_RET_VRFY(session,
-			    "cell %" PRIu32 " on page at %s has a newest start "
-			    "timestamp newer than its newest stop timestamp",
-			    cell_num - 1, tag);
+			    "start timestamp %s newer than its newest stop "
+			    "timestamp %s",
+			    cell_num - 1, tag, ts_string[0], ts_string[1]);
+		}
 
 		if (addr == NULL)
 			break;
@@ -310,8 +310,8 @@ __verify_dsk_ts(WT_SESSION_IMPL *session,
 		    "oldest start", addr->oldest_start_ts,
 		    true, tag));
 		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
-		    "newest start", unpack->newest_start_ts,
-		    "newest start", addr->newest_start_ts,
+		    "newest durable", unpack->newest_durable_ts,
+		    "newest durable", addr->newest_durable_ts,
 		    false, tag));
 		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
 		    "newest stop", unpack->newest_stop_ts,
@@ -329,11 +329,16 @@ __verify_dsk_ts(WT_SESSION_IMPL *session,
 			    "cell %" PRIu32 " on page at %s has a stop "
 			    "timestamp of 0",
 			    cell_num - 1, tag);
-		if (unpack->start_ts > unpack->stop_ts)
+		if (unpack->start_ts > unpack->stop_ts) {
+			__wt_timestamp_to_string(
+			    unpack->start_ts, ts_string[0]);
+			__wt_timestamp_to_string(
+			    unpack->stop_ts, ts_string[0]);
 			WT_RET_VRFY(session,
 			    "cell %" PRIu32 " on page at %s has a start "
-			    "timestamp newer than its stop timestamp ",
-			    cell_num - 1, tag);
+			    "timestamp %s newer than its stop timestamp %s",
+			    cell_num - 1, tag, ts_string[0], ts_string[1]);
+		}
 
 		if (addr == NULL)
 			break;
@@ -341,10 +346,6 @@ __verify_dsk_ts(WT_SESSION_IMPL *session,
 		    "start", unpack->start_ts,
 		    "oldest start", addr->oldest_start_ts,
 		    true, tag));
-		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
-		    "start", unpack->start_ts,
-		    "newest start", addr->newest_start_ts,
-		    false, tag));
 		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
 		    "stop", unpack->stop_ts,
 		    "newest stop", addr->newest_stop_ts,

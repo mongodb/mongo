@@ -59,7 +59,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         actual = dict((k, v) for k, v in c if v != 0)
         self.assertTrue(actual == expected)
         # Search for the expected items as well as iterating
-        for k, v in expected.iteritems():
+        for k, v in expected.items():
             self.assertEqual(c[k], v, "for key " + str(k))
         c.close()
         if txn_config:
@@ -71,7 +71,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(self.uri)
 
         # Insert keys 1..100 each with timestamp=key, in some order
-        orig_keys = range(1, 101)
+        orig_keys = list(range(1, 101))
         keys = orig_keys[:]
         random.shuffle(keys)
 

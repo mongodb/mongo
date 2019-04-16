@@ -83,6 +83,9 @@ struct __wt_table {
 #define	WT_SESSION_LOCKED_TABLE 					\
 	(WT_SESSION_LOCKED_TABLE_READ |					\
 	 WT_SESSION_LOCKED_TABLE_WRITE)
+#define	WT_SESSION_LOCKED_HOTBACKUP					\
+	(WT_SESSION_LOCKED_HOTBACKUP_READ |				\
+	 WT_SESSION_LOCKED_HOTBACKUP_WRITE)
 
 /*
  * WT_WITH_LOCK_WAIT --
@@ -253,6 +256,76 @@ struct __wt_table {
 		op;							\
 		F_CLR(session, WT_SESSION_LOCKED_TABLE_WRITE);		\
 		__wt_writeunlock(session, &S2C(session)->table_lock);	\
+	}								\
+} while (0)
+
+/*
+ * WT_WITH_HOTBACKUP_READ_LOCK --
+ *	Acquire the hot backup read lock and perform an operation provided that
+ *	there is no hot backup in progress.  The skipp parameter can be used to
+ *	check whether the operation got skipped or not.
+ */
+#define	WT_WITH_HOTBACKUP_READ_LOCK(session, op, skipp) do {		\
+	WT_CONNECTION_IMPL *__conn = S2C(session);			\
+	if ((skipp) != (bool *)NULL)					\
+		*(bool *)(skipp) = true;				\
+	if (F_ISSET(session, WT_SESSION_LOCKED_HOTBACKUP)) {		\
+		if (!__conn->hot_backup) {				\
+			if ((skipp) != (bool *)NULL)			\
+				*(bool *)(skipp) = false;		\
+			op;						\
+		}							\
+	} else {							\
+		__wt_readlock(session, &__conn->hot_backup_lock);	\
+		F_SET(session, WT_SESSION_LOCKED_HOTBACKUP_READ);	\
+		if (!__conn->hot_backup) {				\
+			if ((skipp) != (bool *)NULL)			\
+				*(bool *)(skipp) = false;		\
+			op;						\
+		}							\
+		F_CLR(session, WT_SESSION_LOCKED_HOTBACKUP_READ);	\
+		__wt_readunlock(session, &__conn->hot_backup_lock);	\
+	}								\
+} while (0)
+
+/*
+ * WT_WITH_HOTBACKUP_WRITE_LOCK --
+ *	Acquire the hot backup write lock and perform an operation.
+ */
+#define	WT_WITH_HOTBACKUP_WRITE_LOCK(session, op) do {			\
+	WT_CONNECTION_IMPL *__conn = S2C(session);			\
+	if (F_ISSET(session, WT_SESSION_LOCKED_HOTBACKUP_WRITE)) {	\
+		op;							\
+	} else {							\
+		WT_ASSERT(session,					\
+		    !F_ISSET(						\
+			session, WT_SESSION_LOCKED_HOTBACKUP_READ));	\
+		__wt_writelock(session, &__conn->hot_backup_lock);	\
+		F_SET(session, WT_SESSION_LOCKED_HOTBACKUP_WRITE);	\
+		op;							\
+		F_CLR(session, WT_SESSION_LOCKED_HOTBACKUP_WRITE);	\
+		__wt_writeunlock(session, &__conn->hot_backup_lock);	\
+	}								\
+} while (0)
+
+/*
+ * WT_WITH_HOTBACKUP_READ_LOCK_UNCOND --
+ *	Acquire the hot backup read lock and perform an operation
+ *	unconditionally.  This is a specialized macro for a few isolated cases.
+ *	Code that wishes to acquire the read lock should default to using
+ *	WT_WITH_HOTBACKUP_READ_LOCK which checks that there is no hot backup in
+ *	progress.
+ */
+#define	WT_WITH_HOTBACKUP_READ_LOCK_UNCOND(session, op) do {		\
+	WT_CONNECTION_IMPL *__conn = S2C(session);			\
+	if (F_ISSET(session, WT_SESSION_LOCKED_HOTBACKUP)) {		\
+		op;							\
+	} else {							\
+		__wt_readlock(session, &__conn->hot_backup_lock);	\
+		F_SET(session, WT_SESSION_LOCKED_HOTBACKUP_READ);	\
+		op;							\
+		F_CLR(session, WT_SESSION_LOCKED_HOTBACKUP_READ);	\
+		__wt_readunlock(session, &__conn->hot_backup_lock);	\
 	}								\
 } while (0)
 

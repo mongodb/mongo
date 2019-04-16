@@ -27,7 +27,9 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import math, struct
+from __future__ import print_function
+from .packing import _chr, _ord
+import math, struct, sys
 
 # Variable-length integer packing
 # need: up to 64 bits, both signed and unsigned
@@ -62,58 +64,66 @@ POS_2BYTE_MAX = 2**13 + POS_1BYTE_MAX
 MINUS_BIT = -1 << 64
 UINT64_MASK = 0xffffffffffffffff
 
+_python3 = (sys.version_info >= (3, 0, 0))
+if _python3:
+    xff_entry = 0xff
+    x00_entry = 0x00
+else:
+    xff_entry = '\xff'
+    x00_entry = '\x00'
+
 def getbits(x, start, end=0):
     '''return the least significant bits of x, from start to end'''
     return (x & ((1 << start) - 1)) >> (end)
 
 def get_int(b, size):
     r = 0
-    for i in xrange(size):
-        r = (r << 8) | ord(b[i])
+    for i in range(size):
+        r = (r << 8) | _ord(b[i])
     return r
 
 def pack_int(x):
     if x < NEG_2BYTE_MIN:
         packed = struct.pack('>Q', x & UINT64_MASK)
-        while packed and packed[0] == '\xff':
+        while packed and packed[0] == xff_entry:
             packed = packed[1:]
-        return chr(NEG_MULTI_MARKER | getbits(8 - len(packed), 4)) + packed
+        return _chr(NEG_MULTI_MARKER | getbits(8 - len(packed), 4)) + packed
     elif x < NEG_1BYTE_MIN:
         x -= NEG_2BYTE_MIN
-        return chr(NEG_2BYTE_MARKER | getbits(x, 13, 8)) + chr(getbits(x, 8))
+        return _chr(NEG_2BYTE_MARKER | getbits(x, 13, 8), getbits(x, 8))
     elif x < 0:
         x -= NEG_1BYTE_MIN
-        return chr(NEG_1BYTE_MARKER | getbits(x, 6))
+        return _chr(NEG_1BYTE_MARKER | getbits(x, 6))
     elif x <= POS_1BYTE_MAX:
-        return chr(POS_1BYTE_MARKER | getbits(x, 6))
+        return _chr(POS_1BYTE_MARKER | getbits(x, 6))
     elif x <= POS_2BYTE_MAX:
         x -= (POS_1BYTE_MAX + 1)
-        return chr(POS_2BYTE_MARKER | getbits(x, 13, 8)) + chr(getbits(x, 8))
+        return _chr(POS_2BYTE_MARKER | getbits(x, 13, 8), getbits(x, 8))
     elif x == POS_2BYTE_MAX + 1:
         # This is a special case where we could store the value with
         # just a single byte, but we append a zero byte so that the
         # encoding doesn't get shorter for this one value.
-        return chr(POS_MULTI_MARKER | 0x1) + chr(0)
+        return _chr(POS_MULTI_MARKER | 0x1, 0)
     else:
         packed = struct.pack('>Q', x - (POS_2BYTE_MAX + 1))
-        while packed and packed[0] == '\x00':
+        while packed and packed[0] == x00_entry:
             packed = packed[1:]
-        return chr(POS_MULTI_MARKER | getbits(len(packed), 4)) + packed
+        return _chr(POS_MULTI_MARKER | getbits(len(packed), 4)) + packed
 
 def unpack_int(b):
-    marker = ord(b[0])
+    marker = _ord(b[0])
     if marker < NEG_2BYTE_MARKER:
         sz = 8 - getbits(marker, 4)
         return ((-1 << (sz << 3)) | get_int(b[1:], sz), b[sz+1:])
     elif marker < NEG_1BYTE_MARKER:
-        return (NEG_2BYTE_MIN + ((getbits(marker, 5) << 8) | ord(b[1])), b[2:])
+        return (NEG_2BYTE_MIN + ((getbits(marker, 5) << 8) | _ord(b[1])), b[2:])
     elif marker < POS_1BYTE_MARKER:
         return (NEG_1BYTE_MIN + getbits(marker, 6), b[1:])
     elif marker < POS_2BYTE_MARKER:
         return (getbits(marker, 6), b[1:])
     elif marker < POS_MULTI_MARKER:
         return (POS_1BYTE_MAX + 1 +
-               ((getbits(marker, 5) << 8) | ord(b[1])), b[2:])
+               ((getbits(marker, 5) << 8) | _ord(b[1])), b[2:])
     else:
         sz = getbits(marker, 4)
         return (POS_2BYTE_MAX + 1 + get_int(b[1:], sz), b[sz+1:])
@@ -123,21 +133,21 @@ if __name__ == '__main__':
     import random
 
     for big in (100, 10000, 1 << 40, 1 << 64):
-        for i in xrange(1000):
+        for i in range(1000):
             r = random.randint(-big, big)
-            print "\rChecking %d" % r,
+            print("\rChecking %d" % r)
             if unpack_int(pack_int(r))[0] != r:
-                print "\nFound a problem with %d" % r
+                print("\nFound a problem with %d" % r)
                 break
 
         print
 
-        for i in xrange(1000):
+        for i in range(1000):
             r1 = random.randint(-big, big)
             r2  = random.randint(-big, big)
-            print "\rChecking %d, %d" % (r1, r2),
+            print("\rChecking %d, %d" % (r1, r2))
             if cmp(r1, r2) != cmp(pack_int(r1), pack_int(r2)):
-                print "\nFound a problem with %d, %d" % (r1, r2)
+                print("\nFound a problem with %d, %d" % (r1, r2))
                 break
 
         print

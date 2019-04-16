@@ -26,7 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import Queue
+try:
+    import Queue as queue  # python2
+except ImportError:
+    import queue
 import os, shutil, sys, threading, time, wiredtiger, wttest
 from helper import compare_tables
 
@@ -86,13 +89,13 @@ class backup_thread(threading.Thread):
                 # wttest to do that..
                 if not compare_tables(
                         self, sess, uris, "checkpoint=WiredTigerCheckpoint"):
-                    print "Error: checkpoint tables differ."
+                    print("Error: checkpoint tables differ.")
                 else:
                     wttest.WiredTigerTestCase.printVerbose(
                         3, "Checkpoint tables match")
 
                 if not compare_tables(self, bkp_session, uris):
-                    print "Error: backup tables differ."
+                    print("Error: backup tables differ.")
                 else:
                     wttest.WiredTigerTestCase.printVerbose(
                         3, "Backup tables match")
@@ -109,11 +112,11 @@ class backup_thread(threading.Thread):
 # 'd' for drop a table
 # 't' for create a table and insert a single item into it
 class op_thread(threading.Thread):
-    def __init__(self, conn, uris, key_fmt, queue, done):
+    def __init__(self, conn, uris, key_fmt, work_queue, done):
         self.conn = conn
         self.uris = uris
         self.key_fmt = key_fmt
-        self.queue = queue
+        self.work_queue = work_queue
         self.done = done
         threading.Thread.__init__(self)
 
@@ -127,7 +130,7 @@ class op_thread(threading.Thread):
                 cursors.append(sess.open_cursor(next_uri, None, None))
         while not self.done.isSet():
             try:
-                op, key, value = self.queue.get_nowait()
+                op, key, value = self.work_queue.get_nowait()
                 if op == 'gi': # Group insert a number of tables.
                     sess.begin_transaction()
                     for next_cur in cursors:
@@ -166,8 +169,8 @@ class op_thread(threading.Thread):
                         # These operations can fail, if the drop in another
                         # thread happened
                         pass
-                self.queue.task_done()
-            except Queue.Empty:
+                self.work_queue.task_done()
+            except queue.Empty:
                 # Wait on the queue until done is flagged
                 time.sleep(0.01)
         if (len(self.uris) == 1):

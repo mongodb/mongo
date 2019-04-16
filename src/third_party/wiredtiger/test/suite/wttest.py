@@ -29,6 +29,7 @@
 # WiredTigerTestCase
 #   parent class for all test cases
 #
+from __future__ import print_function
 
 # If unittest2 is available, use it in preference to (the old) unittest
 try:
@@ -44,6 +45,8 @@ def shortenWithEllipsis(s, maxlen):
     if len(s) > maxlen:
         s = s[0:maxlen-3] + '...'
     return s
+
+_python3 = (sys.version_info >= (3, 0, 0))
 
 class CapturedFd(object):
     """
@@ -192,7 +195,7 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._parentTestdir = d
         WiredTigerTestCase._builddir = builddir
         WiredTigerTestCase._origcwd = os.getcwd()
-        WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
+        WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 1)  # line buffered
         WiredTigerTestCase._gdbSubprocess = gdbSub
         WiredTigerTestCase._lldbSubprocess = lldbSub
         WiredTigerTestCase._longtest = longtest
@@ -293,7 +296,7 @@ class WiredTigerTestCase(unittest.TestCase):
             else:
                 extfiles[ext] = complete
         if len(extfiles) != 0:
-            result = ',extensions=[' + ','.join(extfiles.values()) + ']'
+            result = ',extensions=[' + ','.join(list(extfiles.values())) + ']'
         return result
 
     # Can be overridden, but first consider setting self.conn_config
@@ -311,10 +314,10 @@ class WiredTigerTestCase(unittest.TestCase):
         try:
             conn = self.wiredtiger_open(home, conn_param)
         except wiredtiger.WiredTigerError as e:
-            print "Failed wiredtiger_open: dir '%s', config '%s'" % \
-                (home, conn_param)
+            print("Failed wiredtiger_open: dir '%s', config '%s'" % \
+                (home, conn_param))
             raise e
-        self.pr(`conn`)
+        self.pr(repr(conn))
         return conn
 
     # Replacement for wiredtiger.wiredtiger_open that returns
@@ -392,13 +395,25 @@ class WiredTigerTestCase(unittest.TestCase):
             self.tearDown()
             raise
 
+    # Used as part of tearDown determining if there is an error.
+    def list2reason(self, result, fieldname):
+        exc_list = getattr(result, fieldname, None)
+        if exc_list and exc_list[-1][0] is self:
+            return exc_list[-1][1]
+
     def tearDown(self):
-        excinfo = sys.exc_info()
-        passed = (excinfo == (None, None, None))
-        if passed:
-            skipped = False
-        else:
-            skipped = (excinfo[0] == unittest.SkipTest)
+        # This approach works for all our support Python versions and
+        # is suggested by one of the answers in:
+        # https://stackoverflow.com/questions/4414234/getting-pythons-unittest-results-in-a-teardown-method
+        if hasattr(self, '_outcome'):  # Python 3.4+
+            result = self.defaultTestResult()  # these 2 methods have no side effects
+            self._feedErrorsToResult(result, self._outcome.errors)
+        else:  # Python 3.2 - 3.3 or 3.0 - 3.1 and 2.7
+            result = getattr(self, '_outcomeForDoCleanups', self._resultForDoCleanups)
+        error = self.list2reason(result, 'errors')
+        failure = self.list2reason(result, 'failures')
+        passed = not error and not failure
+
         self.pr('finishing')
 
         # Close all connections that weren't explicitly closed.
@@ -425,26 +440,26 @@ class WiredTigerTestCase(unittest.TestCase):
             os.chdir(self.origcwd)
 
         # Make sure no read-only files or directories were left behind
-        os.chmod(self.testdir, 0777)
+        os.chmod(self.testdir, 0o777)
         for root, dirs, files in os.walk(self.testdir):
             for d in dirs:
-                os.chmod(os.path.join(root, d), 0777)
+                os.chmod(os.path.join(root, d), 0o777)
             for f in files:
-                os.chmod(os.path.join(root, f), 0666)
+                os.chmod(os.path.join(root, f), 0o666)
+        self.pr('passed=' + str(passed))
 
         # Clean up unless there's a failure
-        if (passed or skipped) and not WiredTigerTestCase._preserveFiles:
+        if passed and not WiredTigerTestCase._preserveFiles:
             shutil.rmtree(self.testdir, ignore_errors=True)
         else:
             self.pr('preserving directory ' + self.testdir)
 
         elapsed = time.time() - self.starttime
         if elapsed > 0.001 and WiredTigerTestCase._verbose >= 2:
-            print "%s: %.2f seconds" % (str(self), elapsed)
-        if not passed and not skipped:
-            print "ERROR in " + str(self)
+            print("%s: %.2f seconds" % (str(self), elapsed))
+        if not passed:
+            print("ERROR in " + str(self))
             self.pr('FAIL')
-            self.prexception(excinfo)
             self.pr('preserving directory ' + self.testdir)
         if WiredTigerTestCase._verbose > 2:
             self.prhead('TEST COMPLETED')
@@ -515,7 +530,7 @@ class WiredTigerTestCase(unittest.TestCase):
         raised = False
         try:
             expr()
-        except BaseException, err:
+        except BaseException as err:
             if not isinstance(err, exceptionType):
                 self.fail('Exception of incorrect type raised, got type: ' + \
                     str(type(err)))
@@ -550,7 +565,7 @@ class WiredTigerTestCase(unittest.TestCase):
         """
         try:
             expr()
-        except BaseException, err:
+        except BaseException as err:
             sys.stderr.write('Exception: ' + str(err))
             raise
 
@@ -607,7 +622,7 @@ class WiredTigerTestCase(unittest.TestCase):
 
     @staticmethod
     def prout(s):
-        os.write(WiredTigerTestCase._dupout, s + '\n')
+        os.write(WiredTigerTestCase._dupout, str.encode(s + '\n'))
 
     def pr(self, s):
         """
@@ -631,6 +646,30 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._resultfile.write('\n')
         traceback.print_exception(excinfo[0], excinfo[1], excinfo[2], None, WiredTigerTestCase._resultfile)
         WiredTigerTestCase._resultfile.write('\n')
+
+    def recno(self, i):
+        """
+        return a recno key
+        """
+        if _python3:
+            return i
+        else:
+            return long(i)
+
+    def ord_byte(self, b):
+        """
+        return the 'ord' of a single byte.
+        In Python2 a set of bytes is represented as a string, and a single
+        byte is a string of length one.  In Python3, bytes are an array of
+        ints, so no explicit ord() call is needed.
+        """
+        if _python3:
+            return b
+        else:
+            return ord(b)
+
+    def is_python3(self):
+        return _python3
 
     # print directly to tty, useful for debugging
     def tty(self, message):

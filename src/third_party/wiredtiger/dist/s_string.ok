@@ -172,6 +172,7 @@ HHHH
 HHHHLL
 HHHLL
 HILQr
+HOTBACKUP
 Hendrik
 HyperLevelDB
 ID's
@@ -394,6 +395,7 @@ UIDs
 UINT
 ULINE
 UNC
+UNCOND
 URI
 URIs
 UTF
@@ -1197,6 +1199,7 @@ sizep
 sizev
 skiplist
 skiplists
+skipp
 slotsp
 slvg
 snaplen

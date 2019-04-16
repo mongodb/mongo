@@ -47,7 +47,7 @@ class test_cursor10(wttest.WiredTigerTestCase):
         if self.key_format == 'S':
             return 'key' + str(i).zfill(5)  # return key00001, key00002, etc.
         else:
-            return long(i+1)
+            return self.recno(i+1)
 
     def genvalue(self, i):
         return [ 'v0:' + str(i), i+1, 'v2' + str(i+2), i+3 ]
@@ -56,7 +56,7 @@ class test_cursor10(wttest.WiredTigerTestCase):
         if self.key_format == 'S':
             return int(k[3:])
         else:
-            return long(k-1)
+            return self.recno(k-1)
 
     def test_projection(self):
         """

@@ -29,6 +29,14 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
+def cmp(a, b):
+    if a > b:
+        return 1
+    elif b > a:
+        return -1
+    else:
+        return 0
+
 # test_index02.py
 #    test search_near in indices
 class test_index02(wttest.WiredTigerTestCase):
@@ -61,7 +69,7 @@ class test_index02(wttest.WiredTigerTestCase):
         cur.close()
 
         # Retry after reopening
-        for runs in xrange(2):
+        for runs in range(2):
             # search near should find a match
             cur = self.session.open_cursor(self.indexname, None, None)
             if self.ncol == 1:
@@ -78,14 +86,14 @@ class test_index02(wttest.WiredTigerTestCase):
         self.session.create(self.tablename, 'key_format=i,value_format=i,columns=(k,v)')
         self.session.create(self.indexname, self.indexconfig)
         cur = self.session.open_cursor(self.tablename)
-        for k in xrange(3):
+        for k in range(3):
             cur[k] = 5 * k + 10
         cur.close()
 
         search_keys = [ 1, 11, 15, 19, 21 ]
 
         # search near should find a match
-        for runs in xrange(2):
+        for runs in range(2):
             cur = self.session.open_cursor(self.indexname, None, None)
             for k in search_keys:
                 if self.ncol == 1:

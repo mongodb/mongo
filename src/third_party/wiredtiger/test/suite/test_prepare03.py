@@ -56,7 +56,7 @@ class test_prepare03(wttest.WiredTigerTestCase):
         if self.tablekind == 'row':
             return 'key' + str(i)
         else:
-            return long(i+1)
+            return self.recno(i+1)
 
     def genvalue(self, i):
         if self.tablekind == 'fix':
@@ -161,7 +161,7 @@ class test_prepare03(wttest.WiredTigerTestCase):
         # Search for a specific key.
         # Verify we get the expected error and then later we can update and
         # remove it.
-        cursor.set_key(self.genkey(self.nentries/2))
+        cursor.set_key(self.genkey(self.nentries//2))
         self.session.begin_transaction()
         self.session.prepare_transaction("prepare_timestamp=2a")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -178,7 +178,7 @@ class test_prepare03(wttest.WiredTigerTestCase):
         self.session.timestamp_transaction("durable_timestamp=2b")
         self.session.commit_transaction()
         cursor.search()
-        cursor.set_value(self.genvalue(self.nentries + self.nentries/2))
+        cursor.set_value(self.genvalue(self.nentries + self.nentries//2))
         cursor.update()
         cursor.remove()
 

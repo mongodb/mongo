@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import Queue
 import threading, time, wiredtiger, wttest
 import glob, os, shutil
 from helper import compare_files
@@ -34,6 +33,10 @@ from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet, simple_key
 from wtscenario import make_scenarios
 from wtthread import op_thread
+try:
+    xrange
+except NameError:  #python3
+    xrange = range
 
 # test_backup04.py
 #    Utilities: wt backup
@@ -67,14 +70,14 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     def populate(self, uri, dsize, rows):
         self.pr('populate: ' + uri + ' with ' + str(rows) + ' rows')
         cursor = self.session.open_cursor(uri, None)
-        for i in range(1, rows + 1):
+        for i in xrange(1, rows + 1):
             cursor[simple_key(cursor, i)] = str(i) + ':' + 'a' * dsize
         cursor.close()
 
     def update(self, uri, dsize, upd, rows):
         self.pr('update: ' + uri + ' with ' + str(rows) + ' rows')
         cursor = self.session.open_cursor(uri, None)
-        for i in range(1, rows + 1):
+        for i in xrange(1, rows + 1):
             cursor[simple_key(cursor, i)] = str(i) + ':' + upd * dsize
         cursor.close()
 

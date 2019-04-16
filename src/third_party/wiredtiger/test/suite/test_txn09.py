@@ -92,7 +92,7 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
         c = session.open_cursor(self.uri, None)
         actual = dict((k, v) for k, v in c if v != 0)
         # Search for the expected items as well as iterating
-        for k, v in expected.iteritems():
+        for k, v in expected.items():
             self.assertEqual(c[k], v)
         c.close()
         if txn_config:

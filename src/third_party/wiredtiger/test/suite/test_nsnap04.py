@@ -60,7 +60,7 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
 
         snapshots = []
         c = self.session.open_cursor(self.uri)
-        for i in xrange(self.nrows_per_itr):
+        for i in range(self.nrows_per_itr):
             c[i] = "some value"
 
         # Start a new transaction in a different session
@@ -75,7 +75,7 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
         self.check_named_snapshot(0, self.nrows_per_itr)
 
         # Insert some more content using the original session.
-        for i in xrange(self.nrows_per_itr):
+        for i in range(self.nrows_per_itr):
             c[2 * self.nrows_per_itr + i] = "some value"
 
         self.check_named_snapshot(0, self.nrows_per_itr)
@@ -91,7 +91,7 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
 
         snapshots = []
         c = self.session.open_cursor(self.uri)
-        for i in xrange(self.nrows_per_itr):
+        for i in range(self.nrows_per_itr):
             c[i] = "some value"
 
         self.session.begin_transaction("isolation=snapshot")
@@ -103,7 +103,7 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
         self.check_named_snapshot(0, self.nrows_per_itr)
 
         # Insert some more content using the active session.
-        for i in xrange(self.nrows_per_itr):
+        for i in range(self.nrows_per_itr):
             c[self.nrows_per_itr + i] = "some value"
 
         self.check_named_snapshot(0, 2 * self.nrows_per_itr)

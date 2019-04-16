@@ -69,9 +69,7 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Insert keys 1..100 each with timestamp=key, in some order
         nkeys = 100
-        keys = range(1, nkeys+1)
-
-        for k in keys:
+        for k in range(1, nkeys+1):
             c[k] = 'some value'
 
         # Start timestamps at 50

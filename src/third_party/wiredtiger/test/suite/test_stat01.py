@@ -107,7 +107,8 @@ class test_stat01(wttest.WiredTigerTestCase):
     # Test simple object statistics.
     def test_basic_data_source_stats(self):
         # Build an object.
-        config = self.config + ',key_format=' + self.keyfmt
+        config = self.config + ',key_format=' + self.keyfmt + \
+            ',value_format=S'
         self.session.create(self.uri, config)
         cursor = self.session.open_cursor(self.uri, None, None)
         value = ""

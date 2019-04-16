@@ -79,17 +79,17 @@ class test_las02(wttest.WiredTigerTestCase):
             ',stable_timestamp=' + timestamp_str(1))
 
         bigvalue = "aaaaa" * 100
-        self.large_updates(uri, bigvalue, ds, nrows / 3, 1)
+        self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
 
         # Check that all updates are seen
-        self.check(bigvalue, uri, nrows / 3, 1)
+        self.check(bigvalue, uri, nrows // 3, 1)
 
         # Check to see lookaside working with old timestamp
         bigvalue2 = "ddddd" * 100
         self.large_updates(uri, bigvalue2, ds, nrows, 100)
 
         # Check that the new updates are only seen after the update timestamp
-        self.check(bigvalue, uri, nrows / 3, 1)
+        self.check(bigvalue, uri, nrows // 3, 1)
         self.check(bigvalue2, uri, nrows, 100)
 
         # Force out most of the pages by updating a different tree
@@ -98,16 +98,16 @@ class test_las02(wttest.WiredTigerTestCase):
         # Now truncate half of the records
         self.session.begin_transaction()
         end = self.session.open_cursor(uri)
-        end.set_key(ds.key(nrows / 2))
+        end.set_key(ds.key(nrows // 2))
         self.session.truncate(None, None, end)
         end.close()
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(200))
 
         # Check that the truncate is visible after commit
-        self.check(bigvalue2, uri, nrows / 2, 200)
+        self.check(bigvalue2, uri, nrows // 2, 200)
 
         # Repeat earlier checks
-        self.check(bigvalue, uri, nrows / 3, 1)
+        self.check(bigvalue, uri, nrows // 3, 1)
         self.check(bigvalue2, uri, nrows, 100)
 
 if __name__ == '__main__':

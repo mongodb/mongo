@@ -325,6 +325,7 @@ if GetOption("lang-python"):
         print "The Python Interpreter must be 64-bit in order to build the python bindings"
         Exit(1)
 
+    pythonMajorVersion = sys.version_info.major
     pythonEnv = env.Clone()
     pythonEnv.Append(SWIGFLAGS=[
             "-python",
@@ -332,6 +333,7 @@ if GetOption("lang-python"):
             "-O",
             "-nodefaultctor",
             "-nodefaultdtor",
+            "-DPY_MAJOR_VERSION=" + str(pythonMajorVersion)
             ])
     # Ignore warnings in swig-generated code.
     pythonEnv['CFLAGS'].remove("/WX")

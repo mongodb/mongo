@@ -33,8 +33,8 @@ import suite_random
 #    Support scenarios based testing
 def powerrange(start, stop, mult):
     """
-    Like xrange, generates a range from start to stop.
-    Unlike xrange, the range is inclusive of stop,
+    Like range, generates a range from start to stop.
+    Unlike range, the range is inclusive of stop,
     each step is multiplicative, and as a special case,
     the stop value is returned as the last item.
     """
@@ -269,9 +269,9 @@ class wtscenario:
                     for lmax in powerrange(lmin, 512*megabyte, 1024):
                         for cache in [megabyte, 32*megabyte, 1000*megabyte]:
                             scen = wtscenario()
-                            scen.ioverflow = max(imin / 40, 40)
+                            scen.ioverflow = max(imin // 40, 40)
                             scen.imax = imax
-                            scen.loverflow = max(lmin / 40, 40)
+                            scen.loverflow = max(lmin // 40, 40)
                             scen.lmax = lmax
                             scen.cache_size = cache
                             s.append((scen.shortName(), dict(session_create_scenario=scen)))

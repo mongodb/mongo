@@ -124,7 +124,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
     # (having no records initially).  The last log file is this
     # (nrecords/2 + 1), given that we start with log 1.
     def record_to_logfile(self, recordnum):
-        return recordnum / 2 + 1
+        return recordnum // 2 + 1
 
     # Returns the first record number in a log file.
     def logfile_to_record(self, logfile):

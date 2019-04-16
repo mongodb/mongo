@@ -343,6 +343,28 @@ __wt_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 }
 
 /*
+ * __log_archive_once_int --
+ *	Helper for __log_archive_once.  Intended to be called while holding the
+ *	hot backup read lock.
+ */
+static int
+__log_archive_once_int(WT_SESSION_IMPL *session,
+    char **logfiles, u_int logcount, uint32_t min_lognum)
+{
+	uint32_t lognum;
+	u_int i;
+
+	for (i = 0; i < logcount; i++) {
+		WT_RET(__wt_log_extract_lognum(session, logfiles[i], &lognum));
+		if (lognum < min_lognum)
+			WT_RET(__wt_log_remove(
+			    session, WT_LOG_FILENAME, lognum));
+	}
+
+	return (0);
+}
+
+/*
  * __log_archive_once --
  *	Perform one iteration of log archiving.  Must be called with the
  *	log archive lock held.
@@ -353,15 +375,13 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	uint32_t lognum, min_lognum;
-	u_int i, logcount;
+	uint32_t min_lognum;
+	u_int logcount;
 	char **logfiles;
-	bool locked;
 
 	conn = S2C(session);
 	log = conn->log;
 	logcount = 0;
-	locked = false;
 	logfiles = NULL;
 
 	/*
@@ -386,22 +406,18 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	    session, conn->log_path, WT_LOG_FILENAME, &logfiles, &logcount));
 
 	/*
-	 * We can only archive files if a hot backup is not in progress or
-	 * if we are the backup.
+	 * If backup_file is non-zero we know we're coming from an incremental
+	 * backup cursor.  In that case just perform the archive operation
+	 * without the lock.
 	 */
-	__wt_readlock(session, &conn->hot_backup_lock);
-	locked = true;
-	if (!conn->hot_backup || backup_file != 0) {
-		for (i = 0; i < logcount; i++) {
-			WT_ERR(__wt_log_extract_lognum(
-			    session, logfiles[i], &lognum));
-			if (lognum < min_lognum)
-				WT_ERR(__wt_log_remove(
-				    session, WT_LOG_FILENAME, lognum));
-		}
-	}
-	__wt_readunlock(session, &conn->hot_backup_lock);
-	locked = false;
+	if (backup_file != 0)
+		ret = __log_archive_once_int(
+		    session, logfiles, logcount, min_lognum);
+	else
+		WT_WITH_HOTBACKUP_READ_LOCK(session,
+		    ret = __log_archive_once_int(
+			session, logfiles, logcount, min_lognum), NULL);
+	WT_ERR(ret);
 
 	/*
 	 * Indicate what is our new earliest LSN.  It is the start
@@ -411,8 +427,6 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 
 	if (0)
 err:		__wt_err(session, ret, "log archive server error");
-	if (locked)
-		__wt_readunlock(session, &conn->hot_backup_lock);
 	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
@@ -594,18 +608,15 @@ __log_file_server(void *arg)
 				 * truncate: both are OK, it's just more work
 				 * during cursor traversal.
 				 */
-				if (!conn->hot_backup) {
-					__wt_readlock(
-					    session, &conn->hot_backup_lock);
-					if (!conn->hot_backup &&
-					    conn->log_cursors == 0)
-						WT_ERR_ERROR_OK(
-						    __wt_ftruncate(session,
+				if (!conn->hot_backup &&
+				    conn->log_cursors == 0) {
+					WT_WITH_HOTBACKUP_READ_LOCK(session,
+					    WT_ERR_ERROR_OK(
+						__wt_ftruncate(
+						    session,
 						    close_fh,
 						    close_end_lsn.l.offset),
-						    ENOTSUP);
-					__wt_readunlock(
-					    session, &conn->hot_backup_lock);
+						    ENOTSUP), NULL);
 				}
 				WT_SET_LSN(&close_end_lsn,
 				    close_end_lsn.l.file + 1, 0);
@@ -976,11 +987,8 @@ __log_server(void *arg)
 				 * agreed not to rename or remove any files in
 				 * the database directory.
 				 */
-				__wt_readlock(session, &conn->hot_backup_lock);
-				if (!conn->hot_backup)
-					ret = __log_prealloc_once(session);
-				__wt_readunlock(
-				    session, &conn->hot_backup_lock);
+				WT_WITH_HOTBACKUP_READ_LOCK(session,
+				    ret = __log_prealloc_once(session), NULL);
 				WT_ERR(ret);
 			}
 

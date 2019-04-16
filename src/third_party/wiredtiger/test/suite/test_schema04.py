@@ -66,9 +66,9 @@ class test_schema04(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor('table:schema04', None, None)
         if phase == 0:
             range_from = 0
-            range_to = self.nentries / 2
+            range_to = self.nentries // 2
         else:
-            range_from = self.nentries / 2
+            range_from = self.nentries // 2
             range_to = self.nentries
 
         for i in range(range_from, range_to):

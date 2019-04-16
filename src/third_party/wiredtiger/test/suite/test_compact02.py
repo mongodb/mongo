@@ -77,7 +77,7 @@ class test_compact02(wttest.WiredTigerTestCase):
     bigvalue = "abcdefghi" * 1074          # 9*1074 == 9666
     smallvalue = "ihgfedcba" * 303         # 9*303 == 2727
 
-    fullsize = nrecords / 2 * len(bigvalue) + nrecords / 2 * len(smallvalue)
+    fullsize = nrecords // 2 * len(bigvalue) + nrecords // 2 * len(smallvalue)
 
     # Return the size of the file
     def getSize(self):
@@ -105,7 +105,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         try:
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
         except wiredtiger.WiredTigerError as e:
-            print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
+            print("Failed conn at '%s' with config '%s'" % (dir, conn_params))
         self.session = self.conn.open_session(None)
 
     # Create a table, add keys with both big and small values.
@@ -128,7 +128,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         # 2. Checkpoint and get stats on the table to confirm the size.
         self.session.checkpoint()
         sz = self.getSize()
-        self.pr('After populate ' + str(sz / mb) + 'MB')
+        self.pr('After populate ' + str(sz // mb) + 'MB')
         self.assertGreater(sz, self.fullsize)
 
         # 3. Delete the half of the records with the larger record size.
@@ -140,7 +140,7 @@ class test_compact02(wttest.WiredTigerTestCase):
                 c.set_key(i)
                 c.remove()
         c.close()
-        self.pr('Removed total ' + str((count * 9666) / mb) + 'MB')
+        self.pr('Removed total ' + str((count * 9666) // mb) + 'MB')
 
         # 4. Checkpoint
         self.session.checkpoint()
@@ -157,10 +157,10 @@ class test_compact02(wttest.WiredTigerTestCase):
 
         # 6. Get stats on compacted table.
         sz = self.getSize()
-        self.pr('After compact ' + str(sz / mb) + 'MB')
+        self.pr('After compact ' + str(sz // mb) + 'MB')
 
         # After compact, the file size should be less than half the full size.
-        self.assertLess(sz, self.fullsize / 2)
+        self.assertLess(sz, self.fullsize // 2)
 
 if __name__ == '__main__':
     wttest.run()

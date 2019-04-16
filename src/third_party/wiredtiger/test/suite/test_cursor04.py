@@ -82,7 +82,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
         if self.tablekind == 'row':
             return 'key' + str(i).zfill(5)  # return key00001, key00002, etc.
         else:
-            return long(i+1)
+            return self.recno(i+1)
 
     def genvalue(self, i):
         if self.tablekind == 'fix':
