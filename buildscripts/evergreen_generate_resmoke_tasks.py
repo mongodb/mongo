@@ -328,8 +328,8 @@ class EvergreenConfigGenerator(object):
                 cmd_timeout.timeout(timeout)
             if expected_suite_runtime:
                 exec_timeout = calculate_timeout(expected_suite_runtime, 3) * repeat_factor
-                LOGGER.debug("Setting exec_timeout to: %d (runtime=%d, repeat=%d)",
-                             exec_timeout, expected_suite_runtime, repeat_factor)
+                LOGGER.debug("Setting exec_timeout to: %d (runtime=%d, repeat=%d)", exec_timeout,
+                             expected_suite_runtime, repeat_factor)
                 cmd_timeout.exec_timeout(exec_timeout)
             commands.append(cmd_timeout.validate().resolve())
 
