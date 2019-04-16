@@ -710,6 +710,7 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
     invariant(!inAWriteUnitOfWork());
     invariant(_modeForTicket == MODE_NONE);
+    invariant(_clientState.load() == kInactive);
 
     if (opCtx) {
         getFlowControlTicket(opCtx, state.globalMode);
@@ -898,14 +899,14 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
 
 void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {
     auto ticketholder = FlowControlTicketholder::get(opCtx);
-    if (ticketholder && lockMode == LockMode::MODE_IX) {
-        // FlowControl only acts when a MODE_IX global lock is being taken. The clientState
-        // necessarily should only swap to being a queued writer followed by becoming an active
-        // writer. This will report clients waiting on flow control inside serverStatus'
-        // `currentQueue` metrics.
+    if (ticketholder && lockMode == LockMode::MODE_IX && _clientState.load() == kInactive) {
+        // FlowControl only acts when a MODE_IX global lock is being taken. The clientState is only
+        // being modified here to change serverStatus' `globalLock.currentQueue` metrics. This
+        // method must not exit with a side-effect on the clientState. That value is also used for
+        // tracking whether other resources need to be released.
         _clientState.store(kQueuedWriter);
+        auto restoreState = makeGuard([&] { _clientState.store(kInactive); });
         ticketholder->getTicket(opCtx, &_flowControlStats);
-        _clientState.store(kActiveWriter);
     }
 }
 
