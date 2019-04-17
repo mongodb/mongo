@@ -46,6 +46,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -1818,6 +1819,47 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_FALSE(rsStatus.hasField("lastStableRecoveryTimestamp"));
     ASSERT_FALSE(rsStatus.hasField("lastStableCheckpointTimestamp"));
+}
+
+TEST_F(TopoCoordTest, ReplSetGetStatusIPs) {
+    BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
+    std::string setName = "mySet";
+    auto now = Date_t::fromMillisSinceEpoch(100);
+    auto originalIPv6Enabled = IPv6Enabled();
+    ON_BLOCK_EXIT([&] { enableIPv6(originalIPv6Enabled); });
+
+    auto testIP = [&](const std::string& hostAndIP) -> std::string {
+        // Test framework requires that time moves forward.
+        now += Milliseconds(10);
+        updateConfig(BSON("_id" << setName << "version" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host" << hostAndIP))),
+                     0,
+                     now);
+
+        BSONObjBuilder statusBuilder;
+        Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
+        getTopoCoord().prepareStatusResponse({}, &statusBuilder, &resultStatus);
+        ASSERT_OK(resultStatus);
+        BSONObj rsStatus = statusBuilder.obj();
+        unittest::log() << rsStatus;
+        auto elem = rsStatus["members"].Array()[0]["ip"];
+        return elem.isNull() ? "null" : elem.String();
+    };
+
+    // We can't rely on any hostname like mongodb.org that requires DNS from the CI machine, test
+    // localhost and IP literals.
+    enableIPv6(false);
+    ASSERT_EQUALS("127.0.0.1", testIP("localhost:1234"));
+    enableIPv6(true);
+    // localhost can resolve to IPv4 or IPv6 depending on precedence.
+    auto localhostIP = testIP("localhost:1234");
+    if (localhostIP != "127.0.0.1" && localhostIP != "::1") {
+        FAIL(str::stream() << "Expected localhost IP to be 127.0.0.1 or ::1, not " << localhostIP);
+    }
+
+    ASSERT_EQUALS("1.2.3.4", testIP("1.2.3.4:1234"));
+    ASSERT_EQUALS("::1", testIP("[::1]:1234"));
+    ASSERT_EQUALS("null", testIP("test0:1234"));
 }
 
 TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhenAbsentFromConfig) {
