@@ -252,6 +252,7 @@ public:
 
 private:
     friend class Promise<T>;
+    friend class SharedPromise<T>;
     template <typename>
     friend class Future;
     template <typename>
@@ -501,6 +502,7 @@ private:
     template <typename>
     friend class future_details::FutureImpl;
     friend class Promise<T>;
+    friend class SharedPromise<T>;
 
     using SemiFuture<T>::unsafeToInlineFuture;
 
@@ -994,7 +996,7 @@ public:
     SharedPromise() = default;
 
     ~SharedPromise() {
-        if (MONGO_unlikely(!haveCompleted())) {
+        if (MONGO_unlikely(!_haveCompleted)) {
             _sharedState->setError({ErrorCodes::BrokenPromise, "broken promise"});
         }
     }
@@ -1014,44 +1016,39 @@ public:
 
     template <typename Func>
     void setWith(Func&& func) noexcept {
-        invariant(!haveCompleted());
+        invariant(!std::exchange(_haveCompleted, true));
         setFrom(Future<void>::makeReady().then(std::forward<Func>(func)));
     }
 
     void setFrom(Future<T>&& future) noexcept {
-        invariant(!haveCompleted());
+        invariant(!std::exchange(_haveCompleted, true));
         std::move(future).propagateResultTo(_sharedState.get());
     }
 
     template <typename... Args>
     void emplaceValue(Args&&... args) noexcept {
-        invariant(!haveCompleted());
+        invariant(!std::exchange(_haveCompleted, true));
         _sharedState->emplaceValue(std::forward<Args>(args)...);
     }
 
     void setError(Status status) noexcept {
         invariant(!status.isOK());
-        invariant(!haveCompleted());
+        invariant(!std::exchange(_haveCompleted, true));
         _sharedState->setError(std::move(status));
     }
 
     // TODO rename to not XXXWith and handle void
     void setFromStatusWith(StatusWith<T> sw) noexcept {
-        invariant(!haveCompleted());
+        invariant(!std::exchange(_haveCompleted, true));
         _sharedState->setFromStatusWith(std::move(sw));
     }
 
 private:
     friend class Future<void>;
 
-    bool haveCompleted() const noexcept {
-        // This can be relaxed because it is only called from the Promise thread which is also the
-        // only thread that will transition this from returning false to true. Additionally it isn't
-        // used to establish synchronization with any other thread.
-        return _sharedState->state.load(std::memory_order_relaxed) ==
-            future_details::SSBState::kFinished;
-    }
-
+    // This is slightly different from whether the SharedState is in kFinished, because this
+    // SharedPromise may have been completed with a Future that isn't ready yet.
+    bool _haveCompleted = false;
     const boost::intrusive_ptr<future_details::SharedState<T>> _sharedState =
         make_intrusive<future_details::SharedState<T>>();
 };

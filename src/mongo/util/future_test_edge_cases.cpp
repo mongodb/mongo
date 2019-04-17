@@ -251,7 +251,7 @@ TEST(Future_EdgeCases, interrupted_wait_then_then_with_bgthread) {
     std::move(future).then([] {}).get();
 }
 
-TEST(Future_EdgeCases, Racing_SharePromise_getFuture_and_emplaceValue) {
+TEST(Future_EdgeCases, Racing_SharedPromise_getFuture_and_emplaceValue) {
     SharedPromise<void> sp;
     std::vector<Future<void>> futs;
     futs.reserve(30);
@@ -286,7 +286,7 @@ TEST(Future_EdgeCases, Racing_SharePromise_getFuture_and_emplaceValue) {
     }
 }
 
-TEST(Future_EdgeCases, Racing_SharePromise_getFuture_and_setError) {
+TEST(Future_EdgeCases, Racing_SharedPromise_getFuture_and_setError) {
     SharedPromise<void> sp;
     std::vector<Future<void>> futs;
     futs.reserve(30);
@@ -319,6 +319,23 @@ TEST(Future_EdgeCases, Racing_SharePromise_getFuture_and_setError) {
     for (auto& fut : futs) {
         ASSERT_EQ(fut.getNoThrow(), failStatus());
     }
+}
+
+TEST(Future_EdgeCases, SharedPromise_CompleteWithUnreadyFuture) {
+    SharedSemiFuture<void> sf;
+    auto[promise, future] = makePromiseFuture<void>();
+
+    {
+        SharedPromise<void> sp;
+        sf = sp.getFuture();
+        sp.setFrom(std::move(future));
+    }
+
+    ASSERT(!sf.isReady());
+
+    promise.emplaceValue();
+    ASSERT(sf.isReady());
+    sf.get();
 }
 
 // Make sure we actually die if someone throws from the getAsync callback.
