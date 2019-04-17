@@ -64,24 +64,6 @@ constexpr StringData AggregationRequest::kExchangeName;
 
 constexpr long long AggregationRequest::kDefaultBatchSize;
 
-StatusWith<std::vector<BSONObj>> AggregationRequest::parsePipelineFromBSON(
-    BSONElement pipelineElem) {
-    std::vector<BSONObj> pipeline;
-    if (pipelineElem.eoo() || pipelineElem.type() != BSONType::Array) {
-        return {ErrorCodes::TypeMismatch, "'pipeline' option must be specified as an array"};
-    }
-
-    for (auto elem : pipelineElem.Obj()) {
-        if (elem.type() != BSONType::Object) {
-            return {ErrorCodes::TypeMismatch,
-                    "Each element of the 'pipeline' array must be an object"};
-        }
-        pipeline.push_back(elem.embeddedObject().getOwned());
-    }
-
-    return std::move(pipeline);
-}
-
 StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     const std::string& dbName,
     const BSONObj& cmdObj,

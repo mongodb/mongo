@@ -34,8 +34,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation_request',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

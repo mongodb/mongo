@@ -33,6 +33,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
@@ -55,11 +56,11 @@ public:
     static constexpr auto kCommandName = "findAndModify"_sd;
 
     /**
-     * Creates a new instance of an 'update' type findAndModify request.
+     * Creates a new instance of a 'update' type findAndModify request.
      */
     static FindAndModifyRequest makeUpdate(NamespaceString fullNs,
                                            BSONObj query,
-                                           BSONObj updateObj);
+                                           write_ops::UpdateModification update);
 
     /**
      * Creates a new instance of an 'remove' type findAndModify request.
@@ -99,7 +100,7 @@ public:
     const NamespaceString& getNamespaceString() const;
     BSONObj getQuery() const;
     BSONObj getFields() const;
-    BSONObj getUpdateObj() const;
+    const boost::optional<write_ops::UpdateModification>& getUpdate() const;
     BSONObj getSort() const;
     BSONObj getCollation() const;
     const std::vector<BSONObj>& getArrayFilters() const;
@@ -171,14 +172,13 @@ private:
     /**
      * Creates a new FindAndModifyRequest with the required fields.
      */
-    FindAndModifyRequest(NamespaceString fullNs, BSONObj query, BSONObj updateObj);
+    FindAndModifyRequest(NamespaceString fullNs,
+                         BSONObj query,
+                         boost::optional<write_ops::UpdateModification> update);
 
     // Required fields
     const NamespaceString _ns;
     BSONObj _query;
-
-    // Required for updates
-    BSONObj _updateObj;
 
     boost::optional<bool> _isUpsert;
     boost::optional<BSONObj> _fieldProjection;
@@ -188,7 +188,7 @@ private:
     boost::optional<bool> _shouldReturnNew;
     boost::optional<WriteConcernOptions> _writeConcern;
 
-    // Flag used internally to differentiate whether this is an update or remove type request.
-    bool _isRemove;
+    // Holds value when performing an update request and none when a remove request.
+    boost::optional<write_ops::UpdateModification> _update;
 };
 }

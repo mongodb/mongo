@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/unittest/unittest.h"
 
@@ -45,6 +46,23 @@ TEST(FindAndModifyRequest, BasicUpdate) {
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 }
+        })json"));
+
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON({}));
+}
+
+TEST(FindAndModifyRequest, PipelineUpdate) {
+    setTestCommandsEnabled(true);
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj pipelineBSON(
+        BSON("pipeline" << BSON_ARRAY(BSON("$addFields" << BSON("y" << 1)))));
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"), query, pipelineBSON["pipeline"]);
+
+    BSONObj expectedObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: { x: 1 },
+            update: [{$addFields: {y: 1}}]
         })json"));
 
     ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON({}));
@@ -363,7 +381,9 @@ TEST(FindAndModifyRequest, ParseWithUpdateOnlyRequiredFields) {
     auto request = parseStatus.getValue();
     ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
-    ASSERT_BSONOBJ_EQ(BSON("y" << 1), request.getUpdateObj());
+    ASSERT(request.getUpdate());
+    ASSERT(request.getUpdate()->type() == write_ops::UpdateModification::Type::kClassic);
+    ASSERT_BSONOBJ_EQ(BSON("y" << 1), request.getUpdate()->getUpdateClassic());
     ASSERT_EQUALS(false, request.isUpsert());
     ASSERT_EQUALS(false, request.isRemove());
     ASSERT_BSONOBJ_EQ(BSONObj(), request.getFields());
@@ -391,7 +411,9 @@ TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
     auto request = parseStatus.getValue();
     ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
-    ASSERT_BSONOBJ_EQ(BSON("y" << 1), request.getUpdateObj());
+    ASSERT(request.getUpdate());
+    ASSERT(request.getUpdate()->type() == write_ops::UpdateModification::Type::kClassic);
+    ASSERT_BSONOBJ_EQ(BSON("y" << 1), request.getUpdate()->getUpdateClassic());
     ASSERT_EQUALS(true, request.isUpsert());
     ASSERT_EQUALS(false, request.isRemove());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "y" << 1), request.getFields());
@@ -416,7 +438,7 @@ TEST(FindAndModifyRequest, ParseWithRemoveOnlyRequiredFields) {
     auto request = parseStatus.getValue();
     ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
-    ASSERT_BSONOBJ_EQ(BSONObj(), request.getUpdateObj());
+    ASSERT_FALSE(request.getUpdate());
     ASSERT_EQUALS(false, request.isUpsert());
     ASSERT_EQUALS(true, request.isRemove());
     ASSERT_BSONOBJ_EQ(BSONObj(), request.getFields());
@@ -441,7 +463,7 @@ TEST(FindAndModifyRequest, ParseWithRemoveFullSpec) {
     auto request = parseStatus.getValue();
     ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
-    ASSERT_BSONOBJ_EQ(BSONObj(), request.getUpdateObj());
+    ASSERT_FALSE(request.getUpdate());
     ASSERT_EQUALS(false, request.isUpsert());
     ASSERT_EQUALS(true, request.isRemove());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "y" << 1), request.getFields());
@@ -521,5 +543,49 @@ TEST(FindAndModifyRequest, ParseWithCollationTypeMismatch) {
     ASSERT_EQUALS(parseStatus.getStatus(), ErrorCodes::TypeMismatch);
 }
 
+TEST(FindAndModifyRequest, ParsesAndSerializesPipelineUpdate) {
+    setTestCommandsEnabled(true);
+    BSONObj cmdObj(fromjson(R"json({
+            query: { x: 1 },
+            update: [{$replaceRoot: {newRoot: {y: 1}}}]
+        })json"));
+
+    auto request =
+        unittest::assertGet(FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj));
+    ASSERT(request.getUpdate());
+    ASSERT(request.getUpdate()->type() == write_ops::UpdateModification::Type::kPipeline);
+    auto serialized = request.toBSON({});
+    ASSERT_BSONOBJ_EQ(serialized, fromjson(R"json({
+      findAndModify: "b",
+      query: {x: 1},
+      update: [{$replaceRoot: {newRoot: {y: 1}}}],
+      upsert: false,
+      fields: {},
+      sort: {},
+      collation: {},
+      new: false
+    })json"));
+    ASSERT_OK(FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), serialized).getStatus());
+}
+
+TEST(FindAndModifyRequest, RejectsBothArrayFiltersAndPipelineUpdate) {
+    setTestCommandsEnabled(true);
+    BSONObj cmdObj(fromjson(R"json({
+            query: { x: 1 },
+            update: [{$replaceRoot: {newRoot: {y: 1}}}],
+            arrayFilters: []
+        })json"));
+
+    auto swRequestNoFilters = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_EQ(swRequestNoFilters.getStatus(), ErrorCodes::FailedToParse);
+
+    cmdObj = fromjson(R"json({
+            query: { x: 1 },
+            update: [{$replaceRoot: {newRoot: {y: 1}}}],
+            arrayFilters: [{"i.x": 1}]
+        })json");
+    auto swRequestOneFilter = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_EQ(swRequestOneFilter.getStatus(), ErrorCodes::FailedToParse);
+}
 }  // unnamed namespace
 }  // namespace mongo

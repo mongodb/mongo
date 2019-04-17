@@ -40,7 +40,7 @@
     });
 
     assert.doesNotThrow(function() {
-        coll.explain("allPlansExecution").findAndModify({query: {a: {$gte: 1}}, update: true});
+        coll.explain("allPlansExecution").findAndModify({query: {a: {$gte: 1}}, update: {y: 1}});
     });
 
     assert.doesNotThrow(function() {

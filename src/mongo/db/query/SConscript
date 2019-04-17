@@ -173,6 +173,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/repl/optime',
         "$BUILD_DIR/mongo/idl/idl_parser",
         '$BUILD_DIR/mongo/rpc/command_status',

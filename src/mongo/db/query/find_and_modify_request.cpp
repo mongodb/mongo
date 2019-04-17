@@ -62,21 +62,19 @@ const std::vector<StringData> _knownFields{
 };
 }  // unnamed namespace
 
-FindAndModifyRequest::FindAndModifyRequest(NamespaceString fullNs, BSONObj query, BSONObj updateObj)
-    : _ns(std::move(fullNs)),
-      _query(query.getOwned()),
-      _updateObj(updateObj.getOwned()),
-      _isRemove(false) {}
+FindAndModifyRequest::FindAndModifyRequest(NamespaceString fullNs,
+                                           BSONObj query,
+                                           boost::optional<write_ops::UpdateModification> update)
+    : _ns(std::move(fullNs)), _query(query.getOwned()), _update(std::move(update)) {}
 
 FindAndModifyRequest FindAndModifyRequest::makeUpdate(NamespaceString fullNs,
                                                       BSONObj query,
-                                                      BSONObj updateObj) {
-    return FindAndModifyRequest(fullNs, query, updateObj);
+                                                      write_ops::UpdateModification update) {
+    return FindAndModifyRequest(fullNs, query, std::move(update));
 }
 
 FindAndModifyRequest FindAndModifyRequest::makeRemove(NamespaceString fullNs, BSONObj query) {
     FindAndModifyRequest request(fullNs, query, {});
-    request._isRemove = true;
     return request;
 }
 
@@ -86,14 +84,14 @@ BSONObj FindAndModifyRequest::toBSON(const BSONObj& commandPassthroughFields) co
     builder.append(kCmdName, _ns.coll());
     builder.append(kQueryField, _query);
 
-    if (_isRemove) {
-        builder.append(kRemoveField, true);
-    } else {
-        builder.append(kUpdateField, _updateObj);
+    if (_update) {
+        _update->serializeToBSON(kUpdateField, &builder);
 
         if (_isUpsert) {
             builder.append(kUpsertField, _isUpsert.get());
         }
+    } else {
+        builder.append(kRemoveField, true);
     }
 
     if (_fieldProjection) {
@@ -136,11 +134,12 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     BSONObj fields;
     BSONObj updateObj;
     BSONObj sort;
+    boost::optional<write_ops::UpdateModification> update;
+
     BSONObj collation;
     bool shouldReturnNew = false;
     bool isUpsert = false;
     bool isRemove = false;
-    bool isUpdate = false;
     bool arrayFiltersSet = false;
     std::vector<BSONObj> arrayFilters;
 
@@ -152,8 +151,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         } else if (field == kRemoveField) {
             isRemove = cmdObj[kRemoveField].trueValue();
         } else if (field == kUpdateField) {
-            updateObj = cmdObj.getObjectField(kUpdateField);
-            isUpdate = true;
+            update = write_ops::UpdateModification::parseFromBSON(cmdObj[kUpdateField]);
         } else if (field == kNewField) {
             shouldReturnNew = cmdObj[kNewField].trueValue();
         } else if (field == kFieldProjectionField) {
@@ -195,12 +193,12 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         }
     }
 
-    if (!isRemove && !isUpdate) {
+    if (!isRemove && !update) {
         return {ErrorCodes::FailedToParse, "Either an update or remove=true must be specified"};
     }
 
     if (isRemove) {
-        if (isUpdate) {
+        if (update) {
             return {ErrorCodes::FailedToParse, "Cannot specify both an update and remove=true"};
         }
 
@@ -219,12 +217,31 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         }
     }
 
-    FindAndModifyRequest request(std::move(fullNs), query, updateObj);
-    request._isRemove = isRemove;
+    if (update && update->type() == write_ops::UpdateModification::Type::kPipeline) {
+        if (arrayFiltersSet) {
+            return {ErrorCodes::FailedToParse, "Cannot specify arrayFilters and a pipeline update"};
+        }
+        if (!collation.isEmpty()) {
+            // TODO SERVER-40399
+            return {ErrorCodes::NotImplemented, "No support for collation and pipeline update"};
+        }
+        if (!fields.isEmpty()) {
+            // TODO SERVER-40404
+            return {ErrorCodes::NotImplemented, "No support for fields and pipeline update"};
+        }
+        if (!sort.isEmpty()) {
+            // TODO SERVER-40405
+            return {ErrorCodes::NotImplemented, "No support for sort and pipeline update"};
+        }
+    }
+
+    FindAndModifyRequest request(std::move(fullNs), query, std::move(update));
     request.setFieldProjection(fields);
     request.setSort(sort);
     request.setCollation(collation);
-    request.setArrayFilters(std::move(arrayFilters));
+    if (arrayFiltersSet) {
+        request.setArrayFilters(std::move(arrayFilters));
+    }
 
     if (!isRemove) {
         request.setShouldReturnNew(shouldReturnNew);
@@ -257,16 +274,16 @@ void FindAndModifyRequest::setQuery(BSONObj query) {
     _query = query.getOwned();
 }
 void FindAndModifyRequest::setUpdateObj(BSONObj updateObj) {
-    _updateObj = updateObj.getOwned();
+    _update.emplace(updateObj.getOwned());
 }
 
 void FindAndModifyRequest::setShouldReturnNew(bool shouldReturnNew) {
-    dassert(!_isRemove);
+    dassert(_update);
     _shouldReturnNew = shouldReturnNew;
 }
 
 void FindAndModifyRequest::setUpsert(bool upsert) {
-    dassert(!_isRemove);
+    dassert(_update);
     _isUpsert = upsert;
 }
 
@@ -286,8 +303,8 @@ BSONObj FindAndModifyRequest::getFields() const {
     return _fieldProjection.value_or(BSONObj());
 }
 
-BSONObj FindAndModifyRequest::getUpdateObj() const {
-    return _updateObj;
+const boost::optional<write_ops::UpdateModification>& FindAndModifyRequest::getUpdate() const {
+    return _update;
 }
 
 BSONObj FindAndModifyRequest::getSort() const {
@@ -314,6 +331,6 @@ bool FindAndModifyRequest::isUpsert() const {
 }
 
 bool FindAndModifyRequest::isRemove() const {
-    return _isRemove;
+    return !static_cast<bool>(_update);
 }
 }

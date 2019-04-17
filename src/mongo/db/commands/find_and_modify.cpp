@@ -110,7 +110,8 @@ void makeUpdateRequest(const OperationContext* opCtx,
                        UpdateRequest* requestOut) {
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
-    requestOut->setUpdateModification(args.getUpdateObj());
+    invariant(args.getUpdate());
+    requestOut->setUpdateModification(*args.getUpdate());
     requestOut->setSort(args.getSort());
     requestOut->setCollation(args.getCollation());
     requestOut->setArrayFilters(args.getArrayFilters());
@@ -213,7 +214,11 @@ public:
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
+        const auto request(uassertStatusOK(FindAndModifyRequest::parseFromBSON(
+            CommandHelpers::parseNsCollectionRequired("test", cmd), cmd)));
+        // TODO SERVER-40403 Add testing for write concern.
+        return request.isRemove() ||
+            request.getUpdate()->type() == write_ops::UpdateModification::Type::kClassic;
     }
 
     void addRequiredPrivileges(const std::string& dbname,
@@ -304,8 +309,14 @@ public:
         OpDebug* const opDebug = &curOp->debug();
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
-        if (shouldBypassDocumentValidationForCommand(cmdObj))
+        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+            // TODO SERVER-40401 Add support for bypassDocumentValidation.
+            uassert(ErrorCodes::NotImplemented,
+                    "No support for pipeline style updates and bypassDocumentValidation",
+                    !args.getUpdate() ||
+                        args.getUpdate()->type() != write_ops::UpdateModification::Type::kPipeline);
             maybeDisableValidation.emplace(opCtx);
+        }
 
         const auto txnParticipant = TransactionParticipant::get(opCtx);
         const auto inTransaction = txnParticipant && txnParticipant.inMultiDocumentTransaction();

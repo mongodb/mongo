@@ -72,7 +72,23 @@ public:
      * Parse an aggregation pipeline definition from 'pipelineElem'. Returns a non-OK status if
      * pipeline is not an array or if any of the array elements are not objects.
      */
-    static StatusWith<std::vector<BSONObj>> parsePipelineFromBSON(BSONElement pipelineElem);
+    static StatusWith<std::vector<BSONObj>> parsePipelineFromBSON(BSONElement pipelineElem) {
+        std::vector<BSONObj> pipeline;
+        if (pipelineElem.eoo() || pipelineElem.type() != BSONType::Array) {
+            return {ErrorCodes::TypeMismatch, "'pipeline' option must be specified as an array"};
+        }
+
+        for (auto elem : pipelineElem.Obj()) {
+            if (elem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        "Each element of the 'pipeline' array must be an object"};
+            }
+            pipeline.push_back(elem.embeddedObject().getOwned());
+        }
+
+        return std::move(pipeline);
+    }
+
 
     /**
      * Create a new instance of AggregationRequest by parsing the raw command object. Returns a
