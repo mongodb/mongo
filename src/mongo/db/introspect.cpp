@@ -250,7 +250,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
 
     WriteUnitOfWork wunit(opCtx);
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    invariant(db->createCollection(opCtx, dbProfilingNS.ns(), collectionOptions));
+    invariant(db->createCollection(opCtx, dbProfilingNS, collectionOptions));
     wunit.commit();
 
     return Status::OK();

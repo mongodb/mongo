@@ -285,7 +285,7 @@ public:
      * Generally, this method should not be called directly except by the repairDatabase()
      * free function.
      */
-    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns) = 0;
+    virtual Status repairRecordStore(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     /**
      * Creates a temporary RecordStore on the storage engine. This record store will drop itself

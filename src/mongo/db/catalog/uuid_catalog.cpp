@@ -510,7 +510,7 @@ std::unique_ptr<Collection> UUIDCatalog::deregisterCollectionObject(CollectionUU
 
     LOG(0) << "Deregistering collection object " << ns << " with UUID " << uuid;
 
-    // Make sure collection object eixsts.
+    // Make sure collection object exists.
     invariant(_collections.find(ns) != _collections.end());
     invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
 

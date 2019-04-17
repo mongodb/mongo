@@ -157,8 +157,8 @@ public:
         {
             OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
@@ -218,8 +218,8 @@ public:
         {
             OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
@@ -292,8 +292,8 @@ public:
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
@@ -358,8 +358,8 @@ public:
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
@@ -446,8 +446,8 @@ public:
         auto doc3 = BSON("_id" << 3 << "a" << BSON_ARRAY(BSON("c" << 1)));
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
 
 
             ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
@@ -526,8 +526,8 @@ public:
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
@@ -594,8 +594,8 @@ public:
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
@@ -668,8 +668,8 @@ public:
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(
                 coll->insertDocument(&_opCtx,
                                      InsertStatement(BSON("_id" << 1 << "x" << 1 << "a" << 2)),
@@ -736,8 +736,8 @@ public:
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(
                 coll->insertDocument(&_opCtx,
@@ -827,8 +827,8 @@ public:
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
@@ -903,8 +903,8 @@ public:
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
@@ -958,8 +958,8 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -1069,8 +1069,8 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
-            coll = _db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 

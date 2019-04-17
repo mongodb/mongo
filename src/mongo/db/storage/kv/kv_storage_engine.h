@@ -107,7 +107,7 @@ public:
 
     virtual bool isEphemeral() const;
 
-    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns);
+    virtual Status repairRecordStore(OperationContext* opCtx, const NamespaceString& nss);
 
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(
         OperationContext* opCtx) override;

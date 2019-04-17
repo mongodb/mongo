@@ -237,7 +237,7 @@ public:
 
             AutoGetOrCreateDb dbRaii(_opCtx, nss.db(), LockMode::MODE_X);
             WriteUnitOfWork wunit(_opCtx);
-            invariant(dbRaii.getDb()->createCollection(_opCtx, nss.ns()));
+            invariant(dbRaii.getDb()->createCollection(_opCtx, nss));
             wunit.commit();
         });
     }
@@ -310,7 +310,7 @@ public:
                                                            NamespaceString ns,
                                                            const Timestamp& ts) {
         OneOffRead oor(_opCtx, ts);
-        return kvCatalog->getMetaData(_opCtx, ns.ns());
+        return kvCatalog->getMetaData(_opCtx, ns);
     }
 
     StatusWith<BSONObj> doAtomicApplyOps(const std::string& dbName,
@@ -468,7 +468,7 @@ public:
         // getAllIdents() actually looks in the RecordStore for a list of all idents, and is thus
         // versioned by timestamp. We can expect a namespace to have a consistent ident across
         // timestamps, provided the collection does not get renamed.
-        auto expectedIdent = kvCatalog->getCollectionIdent(nss.ns());
+        auto expectedIdent = kvCatalog->getCollectionIdent(nss);
         auto idents = kvCatalog->getAllIdents(_opCtx);
         auto found = std::find(idents.begin(), idents.end(), expectedIdent);
 
@@ -1795,7 +1795,7 @@ public:
             // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
             WriteUnitOfWork wuow(_opCtx);
             Database* db = coll.getDb();
-            ASSERT_OK(db->dropCollection(_opCtx, nss.ns()));
+            ASSERT_OK(db->dropCollection(_opCtx, nss));
             wuow.commit();
         }
 
@@ -2684,7 +2684,7 @@ public:
         auto kvStorageEngine =
             dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
-        auto indexIdent = kvCatalog->getIndexIdent(_opCtx, nss.ns(), "user_1_db_1");
+        auto indexIdent = kvCatalog->getIndexIdent(_opCtx, nss, "user_1_db_1");
         assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, pastTs);
         assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, presentTs);
         assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, futureTs);

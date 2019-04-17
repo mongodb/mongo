@@ -47,11 +47,12 @@ protected:
                             StringData toNS,
                             bool stayTemp,
                             KVCatalog* catalog) {
-        return catalog->_replaceEntry(opCtx, fromNS, toNS, stayTemp);
+        return catalog->_replaceEntry(
+            opCtx, NamespaceString(fromNS), NamespaceString(toNS), stayTemp);
     }
 
     Status dropCollection(OperationContext* opCtx, StringData ns, KVCatalog* catalog) {
-        return catalog->_removeEntry(opCtx, ns);
+        return catalog->_removeEntry(opCtx, NamespaceString(ns));
     }
 };
 }

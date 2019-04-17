@@ -83,22 +83,22 @@ public:
      * collection.
      */
     Status dropCollection(OperationContext* opCtx,
-                          StringData fullns,
+                          NamespaceString nss,
                           repl::OpTime dropOpTime) const final;
     Status dropCollectionEvenIfSystem(OperationContext* opCtx,
-                                      const NamespaceString& fullns,
+                                      NamespaceString nss,
                                       repl::OpTime dropOpTime) const final;
 
-    Status dropView(OperationContext* opCtx, const NamespaceString& viewName) const final;
+    Status dropView(OperationContext* opCtx, NamespaceString viewName) const final;
 
     Status userCreateNS(OperationContext* opCtx,
-                        const NamespaceString& fullns,
+                        const NamespaceString& nss,
                         CollectionOptions collectionOptions,
                         bool createDefaultIndexes,
                         const BSONObj& idIndex) const final;
 
     Collection* createCollection(OperationContext* opCtx,
-                                 StringData ns,
+                                 const NamespaceString& nss,
                                  const CollectionOptions& options = CollectionOptions(),
                                  bool createDefaultIndexes = true,
                                  const BSONObj& idIndex = BSONObj()) const final;
@@ -107,27 +107,14 @@ public:
                       const NamespaceString& viewName,
                       const CollectionOptions& options) const final;
 
-    /**
-     * @param ns - this is fully qualified, which is maybe not ideal ???
-     */
-    Collection* getCollection(OperationContext* opCtx, StringData ns) const final;
-
-    Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const;
+    Collection* getCollection(OperationContext* opCtx, const NamespaceString& nss) const;
 
     Collection* getOrCreateCollection(OperationContext* opCtx,
                                       const NamespaceString& nss) const final;
 
-    /**
-     * Renames the fully qualified namespace 'fromNS' to the fully qualified namespace 'toNS'.
-     * Illegal to call unless both 'fromNS' and 'toNS' are within this database. Returns an error if
-     * 'toNS' already exists or 'fromNS' does not exist.
-     *
-     * The caller should hold a DB X lock and ensure there are no index builds in progress on either
-     * the 'fromNS' or the 'toNS'.
-     */
     Status renameCollection(OperationContext* opCtx,
-                            StringData fromNS,
-                            StringData toNS,
+                            NamespaceString fromNss,
+                            NamespaceString toNss,
                             bool stayTemp) const final;
 
     static Status validateDBName(StringData dbname);
@@ -168,14 +155,14 @@ private:
      * unreplicated collection drops.
      */
     Status _finishDropCollection(OperationContext* opCtx,
-                                 const NamespaceString& fullns,
+                                 const NamespaceString& nss,
                                  Collection* collection) const;
 
     /**
      * Removes all indexes for a collection.
      */
     void _dropCollectionIndexes(OperationContext* opCtx,
-                                const NamespaceString& fullns,
+                                const NamespaceString& nss,
                                 Collection* collection) const;
 
     const std::string _name;  // "dbname"

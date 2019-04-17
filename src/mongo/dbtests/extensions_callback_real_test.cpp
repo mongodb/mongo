@@ -54,7 +54,7 @@ public:
         Database* database = autoDb.getDb();
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT(database->createCollection(&_opCtx, _nss.ns()));
+            ASSERT(database->createCollection(&_opCtx, _nss));
             wunit.commit();
         }
     }
@@ -67,7 +67,7 @@ public:
         }
         {
             WriteUnitOfWork wunit(&_opCtx);
-            static_cast<void>(database->dropCollection(&_opCtx, _nss.ns()));
+            static_cast<void>(database->dropCollection(&_opCtx, _nss));
             wunit.commit();
         }
     }

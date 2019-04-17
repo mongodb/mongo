@@ -108,12 +108,14 @@ public:
 
     void cloneMap(UsageMap& out) const;
 
-    void collectionDropped(StringData ns, bool databaseDropped = false);
+    void collectionDropped(const NamespaceString& nss, bool databaseDropped = false);
 
     /**
      * Appends the collection-level latency statistics
      */
-    void appendLatencyStats(StringData ns, bool includeHistograms, BSONObjBuilder* builder);
+    void appendLatencyStats(const NamespaceString& nss,
+                            bool includeHistograms,
+                            BSONObjBuilder* builder);
 
     /**
      * Increments the global histogram only if the operation came from a user.

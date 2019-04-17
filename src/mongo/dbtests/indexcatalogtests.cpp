@@ -42,19 +42,19 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
-static const char* const _ns = "unittests.indexcatalog";
+static const NamespaceString _nss("unittests.indexcatalog");
 
 class IndexIteratorTests {
 public:
     IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(_ns), MODE_X);
-        OldClientContext ctx(&opCtx, _ns);
+        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
         _db = ctx.db();
-        _coll = _db->createCollection(&opCtx, _ns);
+        _coll = _db->createCollection(&opCtx, _nss);
         _catalog = _coll->getIndexCatalog();
         wuow.commit();
     }
@@ -62,23 +62,23 @@ public:
     ~IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(_ns), MODE_X);
-        OldClientContext ctx(&opCtx, _ns);
+        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
-        _db->dropCollection(&opCtx, _ns).transitional_ignore();
+        _db->dropCollection(&opCtx, _nss).transitional_ignore();
         wuow.commit();
     }
 
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        dbtests::WriteContextForTests ctx(&opCtx, _ns);
+        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns());
 
         int numFinishedIndexesStart = _catalog->numIndexesReady(&opCtx);
 
-        dbtests::createIndex(&opCtx, _ns, BSON("x" << 1)).transitional_ignore();
-        dbtests::createIndex(&opCtx, _ns, BSON("y" << 1)).transitional_ignore();
+        dbtests::createIndex(&opCtx, _nss.ns(), BSON("x" << 1)).transitional_ignore();
+        dbtests::createIndex(&opCtx, _nss.ns(), BSON("y" << 1)).transitional_ignore();
 
         ASSERT_TRUE(_catalog->numIndexesReady(&opCtx) == numFinishedIndexesStart + 2);
 
@@ -116,12 +116,12 @@ public:
     RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(_ns), MODE_X);
-        OldClientContext ctx(&opCtx, _ns);
+        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
         _db = ctx.db();
-        _coll = _db->createCollection(&opCtx, _ns);
+        _coll = _db->createCollection(&opCtx, _nss);
         _catalog = _coll->getIndexCatalog();
         wuow.commit();
     }
@@ -129,24 +129,24 @@ public:
     ~RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(_ns), MODE_X);
-        OldClientContext ctx(&opCtx, _ns);
+        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
-        _db->dropCollection(&opCtx, _ns).transitional_ignore();
+        _db->dropCollection(&opCtx, _nss).transitional_ignore();
         wuow.commit();
     }
 
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        dbtests::WriteContextForTests ctx(&opCtx, _ns);
+        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns());
         const std::string indexName = "x_1";
 
         ASSERT_OK(dbtests::createIndexFromSpec(
             &opCtx,
-            _ns,
-            BSON("name" << indexName << "ns" << _ns << "key" << BSON("x" << 1) << "v"
+            _nss.ns(),
+            BSON("name" << indexName << "ns" << _nss.ns() << "key" << BSON("x" << 1) << "v"
                         << static_cast<int>(kIndexVersion)
                         << "expireAfterSeconds"
                         << 5)));

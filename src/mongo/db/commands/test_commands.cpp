@@ -91,7 +91,7 @@ public:
         UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
         Collection* collection = db->getCollection(opCtx, nss);
         if (!collection) {
-            collection = db->createCollection(opCtx, nss.ns());
+            collection = db->createCollection(opCtx, nss);
             if (!collection) {
                 errmsg = "could not create collection";
                 return false;

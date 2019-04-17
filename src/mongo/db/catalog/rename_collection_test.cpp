@@ -329,8 +329,8 @@ void _createCollection(OperationContext* opCtx,
                         << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_TRUE(db->createCollection(opCtx, nss.ns(), options))
-            << "Failed to create collection " << nss << " due to unknown error.";
+        ASSERT_TRUE(db->createCollection(opCtx, nss, options)) << "Failed to create collection "
+                                                               << nss << " due to unknown error.";
         wuow.commit();
     });
 
@@ -459,7 +459,7 @@ Collection* _getCollection_inlock(OperationContext* opCtx, const NamespaceString
     if (!db) {
         return nullptr;
     }
-    return db->getCollection(opCtx, nss.ns());
+    return db->getCollection(opCtx, nss);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {

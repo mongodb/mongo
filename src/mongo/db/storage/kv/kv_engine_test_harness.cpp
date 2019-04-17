@@ -305,11 +305,11 @@ TEST_F(KVCatalogTest, Coll1) {
                                 CollectionOptions(),
                                 KVPrefix::kNotPrefixed,
                                 catalog.get()));
-        ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent("a.b"));
+        ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent(NamespaceString("a.b")));
         uow.commit();
     }
 
-    string ident = catalog->getCollectionIdent("a.b");
+    string ident = catalog->getCollectionIdent(NamespaceString("a.b"));
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
@@ -317,7 +317,7 @@ TEST_F(KVCatalogTest, Coll1) {
         catalog->init(&opCtx);
         uow.commit();
     }
-    ASSERT_EQUALS(ident, catalog->getCollectionIdent("a.b"));
+    ASSERT_EQUALS(ident, catalog->getCollectionIdent(NamespaceString("a.b")));
 
     {
         MyOperationContext opCtx(engine);
@@ -331,7 +331,7 @@ TEST_F(KVCatalogTest, Coll1) {
             .transitional_ignore();
         uow.commit();
     }
-    ASSERT_NOT_EQUALS(ident, catalog->getCollectionIdent("a.b"));
+    ASSERT_NOT_EQUALS(ident, catalog->getCollectionIdent(NamespaceString("a.b")));
 }
 
 TEST_F(KVCatalogTest, Idx1) {
@@ -357,8 +357,8 @@ TEST_F(KVCatalogTest, Idx1) {
                                 CollectionOptions(),
                                 KVPrefix::kNotPrefixed,
                                 catalog.get()));
-        ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent("a.b"));
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+        ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent(NamespaceString("a.b")));
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
         uow.commit();
     }
 
@@ -378,20 +378,21 @@ TEST_F(KVCatalogTest, Idx1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, "a.b", md);
+        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
         uow.commit();
     }
 
     string idxIndent;
     {
         MyOperationContext opCtx(engine);
-        idxIndent = catalog->getIndexIdent(&opCtx, "a.b", "foo");
+        idxIndent = catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo");
     }
 
     {
         MyOperationContext opCtx(engine);
-        ASSERT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, "a.b", "foo"));
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
+        ASSERT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"));
+        ASSERT_TRUE(catalog->isUserDataIdent(
+            catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo")));
     }
 
     {
@@ -400,7 +401,7 @@ TEST_F(KVCatalogTest, Idx1) {
 
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = "a.b";
-        catalog->putMetaData(&opCtx, "a.b", md);  // remove index
+        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);  // remove index
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -411,13 +412,13 @@ TEST_F(KVCatalogTest, Idx1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, "a.b", md);
+        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
         uow.commit();
     }
 
     {
         MyOperationContext opCtx(engine);
-        ASSERT_NOT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, "a.b", "foo"));
+        ASSERT_NOT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"));
     }
 }
 
@@ -444,8 +445,8 @@ TEST_F(KVCatalogTest, DirectoryPerDb1) {
                                 CollectionOptions(),
                                 KVPrefix::kNotPrefixed,
                                 catalog.get()));
-        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "a/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent(NamespaceString("a.b")), "a/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
         uow.commit();
     }
 
@@ -465,9 +466,10 @@ TEST_F(KVCatalogTest, DirectoryPerDb1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, "a.b", md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "a/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
+        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"), "a/");
+        ASSERT_TRUE(catalog->isUserDataIdent(
+            catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo")));
         uow.commit();
     }
 }
@@ -495,8 +497,8 @@ TEST_F(KVCatalogTest, Split1) {
                                 CollectionOptions(),
                                 KVPrefix::kNotPrefixed,
                                 catalog.get()));
-        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "collection/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent(NamespaceString("a.b")), "collection/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
         uow.commit();
     }
 
@@ -516,9 +518,11 @@ TEST_F(KVCatalogTest, Split1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, "a.b", md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "index/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
+        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"),
+                               "index/");
+        ASSERT_TRUE(catalog->isUserDataIdent(
+            catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo")));
         uow.commit();
     }
 }
@@ -546,8 +550,9 @@ TEST_F(KVCatalogTest, DirectoryPerAndSplit1) {
                                 CollectionOptions(),
                                 KVPrefix::kNotPrefixed,
                                 catalog.get()));
-        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "a/collection/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent(NamespaceString("a.b")),
+                               "a/collection/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
         uow.commit();
     }
 
@@ -567,9 +572,11 @@ TEST_F(KVCatalogTest, DirectoryPerAndSplit1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, "a.b", md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "a/index/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
+        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"),
+                               "a/index/");
+        ASSERT_TRUE(catalog->isUserDataIdent(
+            catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo")));
         uow.commit();
     }
 }
@@ -600,8 +607,9 @@ TEST_F(KVCatalogTest, RestartForPrefixes) {
             WriteUnitOfWork uow(&opCtx);
             ASSERT_OK(newCollection(
                 &opCtx, NamespaceString("a.b"), CollectionOptions(), abCollPrefix, catalog.get()));
-            ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent("a.b"));
-            ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+            ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent(NamespaceString("a.b")));
+            ASSERT_TRUE(
+                catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
             uow.commit();
         }
 
@@ -622,7 +630,7 @@ TEST_F(KVCatalogTest, RestartForPrefixes) {
             imd.isBackgroundSecondaryBuild = false;
             md.indexes.push_back(imd);
             md.prefix = abCollPrefix;
-            catalog->putMetaData(&opCtx, "a.b", md);
+            catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
             uow.commit();
         }
     }
@@ -637,7 +645,8 @@ TEST_F(KVCatalogTest, RestartForPrefixes) {
             stdx::make_unique<KVCatalog>(rs.get(), false, false, nullptr);
         catalog->init(&opCtx);
 
-        const BSONCollectionCatalogEntry::MetaData md = catalog->getMetaData(&opCtx, "a.b");
+        const BSONCollectionCatalogEntry::MetaData md =
+            catalog->getMetaData(&opCtx, NamespaceString("a.b"));
         ASSERT_EQ("a.b", md.ns);
         ASSERT_EQ(abCollPrefix, md.prefix);
         ASSERT_EQ(fooIndexPrefix, md.indexes[md.findIndexOffset("foo")].prefix);

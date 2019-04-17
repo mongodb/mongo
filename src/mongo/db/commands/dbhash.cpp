@@ -262,7 +262,7 @@ public:
                 }
 
                 // Compute the hash for this collection.
-                std::string hash = _hashCollection(opCtx, db, collNss.toString());
+                std::string hash = _hashCollection(opCtx, db, collNss);
 
                 collectionToHashMap[collNss.coll().toString()] = hash;
 
@@ -308,13 +308,9 @@ public:
     }
 
 private:
-    std::string _hashCollection(OperationContext* opCtx,
-                                Database* db,
-                                const std::string& fullCollectionName) {
+    std::string _hashCollection(OperationContext* opCtx, Database* db, const NamespaceString& nss) {
 
-        NamespaceString ns(fullCollectionName);
-
-        Collection* collection = db->getCollection(opCtx, ns);
+        Collection* collection = db->getCollection(opCtx, nss);
         invariant(collection);
 
         boost::optional<Lock::CollectionLock> collLock;
@@ -324,7 +320,7 @@ private:
             // intent mode. We need to also acquire the collection lock in intent mode to ensure
             // reading from the consistent snapshot doesn't overlap with any catalog operations on
             // the collection.
-            invariant(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IS));
+            invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
 
             auto minSnapshot = collection->getMinimumVisibleSnapshot();
             auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
@@ -357,9 +353,9 @@ private:
                                               InternalPlanner::IXSCAN_FETCH);
         } else if (collection->isCapped()) {
             exec = InternalPlanner::collectionScan(
-                opCtx, fullCollectionName, collection, PlanExecutor::NO_YIELD);
+                opCtx, nss.ns(), collection, PlanExecutor::NO_YIELD);
         } else {
-            log() << "can't find _id index for: " << fullCollectionName;
+            log() << "can't find _id index for: " << nss;
             return "no _id _index";
         }
 
@@ -375,7 +371,7 @@ private:
             n++;
         }
         if (PlanExecutor::IS_EOF != state) {
-            warning() << "error while hashing, db dropped? ns=" << fullCollectionName;
+            warning() << "error while hashing, db dropped? ns=" << nss;
             uasserted(34371,
                       "Plan executor error while running dbHash command: " +
                           WorkingSetCommon::toStatusString(c));

@@ -188,7 +188,7 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
                         IndexBuildsCoordinator::get(cleanupOpCtx)
                             ->assertNoIndexBuildInProgForCollection(collection->uuid().get());
                         WriteUnitOfWork wunit(cleanupOpCtx);
-                        uassertStatusOK(db->dropCollection(cleanupOpCtx, tempNamespace.ns()));
+                        uassertStatusOK(db->dropCollection(cleanupOpCtx, tempNamespace));
                         wunit.commit();
                     }
                 }
@@ -207,7 +207,7 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
                         IndexBuildsCoordinator::get(cleanupOpCtx)
                             ->assertNoIndexBuildInProgForCollection(collection->uuid().get());
                         WriteUnitOfWork wunit(cleanupOpCtx);
-                        uassertStatusOK(db->dropCollection(cleanupOpCtx, incLong.ns()));
+                        uassertStatusOK(db->dropCollection(cleanupOpCtx, incLong));
                         wunit.commit();
                     }
                 }
@@ -517,7 +517,7 @@ void State::prepTempCollection() {
 
             WriteUnitOfWork wuow(_opCtx);
             auto incColl = db->createCollection(
-                _opCtx, _config.incLong.ns(), options, false /* force no _id index */);
+                _opCtx, _config.incLong, options, false /* force no _id index */);
 
             auto rawIndexSpec =
                 BSON("key" << BSON("0" << 1) << "ns" << _config.incLong.ns() << "name"
@@ -597,7 +597,7 @@ void State::prepTempCollection() {
 
         WriteUnitOfWork wuow(_opCtx);
         auto const tempColl =
-            db->createCollection(_opCtx, _config.tempNamespace.ns(), options, buildIdIndex);
+            db->createCollection(_opCtx, _config.tempNamespace, options, buildIdIndex);
 
         for (const auto& indexToInsert : indexesToInsert) {
             try {
@@ -811,7 +811,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
         uassert(
             ErrorCodes::PrimarySteppedDown,
             str::stream() << "no longer primary while inserting mapReduce result into collection: "
-                          << nss.ns()
+                          << nss
                           << ": "
                           << redact(o),
             repl::ReplicationCoordinator::get(_opCtx)->canAcceptWritesFor(_opCtx, nss));
@@ -1443,7 +1443,7 @@ public:
             State state(opCtx, config);
             if (!state.sourceExists()) {
                 uasserted(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "namespace does not exist: " << config.nss.ns());
+                          str::stream() << "namespace does not exist: " << config.nss);
             }
 
             state.init();

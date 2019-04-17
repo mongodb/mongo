@@ -125,6 +125,10 @@ public:
         return "unittests.QueryStageMergeSort";
     }
 
+    static NamespaceString nss() {
+        return NamespaceString(ns());
+    }
+
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
@@ -140,10 +144,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -205,10 +209,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -269,10 +273,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -334,10 +338,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -403,10 +407,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -466,10 +470,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -518,10 +522,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -635,10 +639,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -729,10 +733,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -796,10 +800,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 

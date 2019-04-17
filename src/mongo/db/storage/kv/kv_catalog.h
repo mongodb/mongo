@@ -63,15 +63,18 @@ public:
 
     void init(OperationContext* opCtx);
 
-    void getAllCollections(std::vector<std::string>* out) const;
+    std::vector<NamespaceString> getAllCollections() const;
 
-    std::string getCollectionIdent(StringData ns) const;
+    std::string getCollectionIdent(const NamespaceString& nss) const;
 
-    std::string getIndexIdent(OperationContext* opCtx, StringData ns, StringData idName) const;
+    std::string getIndexIdent(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              StringData idName) const;
 
-    BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx, StringData ns) const;
+    BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx,
+                                                     const NamespaceString& nss) const;
     void putMetaData(OperationContext* opCtx,
-                     StringData ns,
+                     const NamespaceString& nss,
                      BSONCollectionCatalogEntry::MetaData& md);
 
     std::vector<std::string> getAllIdentsForDB(StringData db) const;
@@ -107,9 +110,9 @@ public:
      */
     std::string newInternalIdent();
 
-    void initCollection(OperationContext* opCtx, const std::string& ns, bool forRepair);
+    void initCollection(OperationContext* opCtx, const NamespaceString& nss, bool forRepair);
 
-    void reinitCollectionAfterRepair(OperationContext* opCtx, const std::string& ns);
+    void reinitCollectionAfterRepair(OperationContext* opCtx, const NamespaceString& nss);
 
     Status createCollection(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -117,11 +120,11 @@ public:
                             bool allocateDefaultSpace);
 
     Status renameCollection(OperationContext* opCtx,
-                            StringData fromNS,
-                            StringData toNS,
+                            const NamespaceString& fromNss,
+                            const NamespaceString& toNss,
                             bool stayTemp);
 
-    Status dropCollection(OperationContext* opCtx, StringData ns);
+    Status dropCollection(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
     class AddIdentChange;
@@ -132,23 +135,25 @@ private:
     friend class KVCatalogTest;
     friend class KVStorageEngineTest;
 
-    BSONObj _findEntry(OperationContext* opCtx, StringData ns, RecordId* out = NULL) const;
+    BSONObj _findEntry(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       RecordId* out = nullptr) const;
     Status _addEntry(OperationContext* opCtx,
-                     const NamespaceString& ns,
+                     const NamespaceString& nss,
                      const CollectionOptions& options,
                      KVPrefix prefix);
     Status _replaceEntry(OperationContext* opCtx,
-                         StringData fromNS,
-                         StringData toNS,
+                         const NamespaceString& fromNss,
+                         const NamespaceString& toNss,
                          bool stayTemp);
-    Status _removeEntry(OperationContext* opCtx, StringData ns);
+    Status _removeEntry(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Generates a new unique identifier for a new "thing".
-     * @param ns - the containing ns
+     * @param nss - the containing namespace
      * @param kind - what this "thing" is, likely collection or index
      */
-    std::string _newUniqueIdent(StringData ns, const char* kind);
+    std::string _newUniqueIdent(const NamespaceString& nss, const char* kind);
 
     // Helpers only used by constructor and init(). Don't call from elsewhere.
     static std::string _newRand();

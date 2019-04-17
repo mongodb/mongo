@@ -225,7 +225,7 @@ public:
         {
             WriteUnitOfWork uow(&opCtx);
             ASSERT(collectionExists(&opCtx, &ctx, ns));
-            ASSERT_OK(ctx.db()->dropCollection(&opCtx, ns));
+            ASSERT_OK(ctx.db()->dropCollection(&opCtx, NamespaceString(ns)));
             ASSERT(!collectionExists(&opCtx, &ctx, ns));
             if (!rollback) {
                 uow.commit();

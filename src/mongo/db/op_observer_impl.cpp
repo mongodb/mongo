@@ -795,7 +795,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     if (!db) {
         return;
     }
-    Collection* coll = db->getCollection(opCtx, nss.ns());
+    Collection* coll = db->getCollection(opCtx, nss);
 
     invariant(coll->uuid());
     invariant(coll->uuid() == uuid);

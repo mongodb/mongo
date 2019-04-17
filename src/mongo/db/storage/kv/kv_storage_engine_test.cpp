@@ -175,8 +175,7 @@ TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTables) {
     auto sideWrites = makeTemporary(opCtx.get());
     auto constraintViolations = makeTemporary(opCtx.get());
 
-    const auto indexIdent =
-        _storageEngine->getCatalog()->getIndexIdent(opCtx.get(), ns.ns(), indexName);
+    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(opCtx.get(), ns, indexName);
 
     indexBuildScan(opCtx.get(),
                    ns,
@@ -217,8 +216,7 @@ TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSe
     auto sideWrites = makeTemporary(opCtx.get());
     auto constraintViolations = makeTemporary(opCtx.get());
 
-    const auto indexIdent =
-        _storageEngine->getCatalog()->getIndexIdent(opCtx.get(), ns.ns(), indexName);
+    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(opCtx.get(), ns, indexName);
 
     indexBuildScan(opCtx.get(),
                    ns,

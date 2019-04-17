@@ -45,22 +45,22 @@ namespace PdfileTests {
 namespace Insert {
 class Base {
 public:
-    Base() : _lk(&_opCtx), _context(&_opCtx, ns()) {}
+    Base() : _lk(&_opCtx), _context(&_opCtx, nss().ns()) {}
 
     virtual ~Base() {
         if (!collection())
             return;
         WriteUnitOfWork wunit(&_opCtx);
-        _context.db()->dropCollection(&_opCtx, ns()).transitional_ignore();
+        _context.db()->dropCollection(&_opCtx, nss()).transitional_ignore();
         wunit.commit();
     }
 
 protected:
-    const char* ns() {
-        return "unittests.pdfiletests.Insert";
+    static NamespaceString nss() {
+        return NamespaceString("unittests.pdfiletests.Insert");
     }
     Collection* collection() {
-        return _context.db()->getCollection(&_opCtx, ns());
+        return _context.db()->getCollection(&_opCtx, nss());
     }
 
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
@@ -75,8 +75,7 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj x = BSON("x" << 1);
         ASSERT(x["_id"].type() == 0);
-        Collection* collection =
-            _context.db()->getOrCreateCollection(&_opCtx, NamespaceString(ns()));
+        Collection* collection = _context.db()->getOrCreateCollection(&_opCtx, nss());
         OpDebug* const nullOpDebug = nullptr;
         ASSERT(!collection->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
 

@@ -128,19 +128,19 @@ public:
      *
      * The caller should hold a DB X lock and ensure there are no index builds in progress on the
      * collection.
+     * N.B. Namespace argument is passed by value as it may otherwise disappear or change.
      */
     virtual Status dropCollection(OperationContext* const opCtx,
-                                  const StringData fullns,
+                                  NamespaceString nss,
                                   repl::OpTime dropOpTime = {}) const = 0;
     virtual Status dropCollectionEvenIfSystem(OperationContext* const opCtx,
-                                              const NamespaceString& fullns,
+                                              NamespaceString nss,
                                               repl::OpTime dropOpTime = {}) const = 0;
 
-    virtual Status dropView(OperationContext* const opCtx,
-                            const NamespaceString& viewName) const = 0;
+    virtual Status dropView(OperationContext* const opCtx, NamespaceString viewName) const = 0;
 
     virtual Collection* createCollection(OperationContext* const opCtx,
-                                         StringData ns,
+                                         const NamespaceString& nss,
                                          const CollectionOptions& options = CollectionOptions(),
                                          const bool createDefaultIndexes = true,
                                          const BSONObj& idIndex = BSONObj()) const = 0;
@@ -149,19 +149,18 @@ public:
                               const NamespaceString& viewName,
                               const CollectionOptions& options) const = 0;
 
-    /**
-     * @param ns - this is fully qualified, which is maybe not ideal ???
-     */
-    virtual Collection* getCollection(OperationContext* opCtx, const StringData ns) const = 0;
-
-    virtual Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const = 0;
+    virtual Collection* getCollection(OperationContext* opCtx,
+                                      const NamespaceString& nss) const = 0;
 
     virtual Collection* getOrCreateCollection(OperationContext* const opCtx,
                                               const NamespaceString& nss) const = 0;
 
+    /**
+     * Arguments are passed by value as they otherwise would be changing as result of renaming.
+     */
     virtual Status renameCollection(OperationContext* const opCtx,
-                                    const StringData fromNS,
-                                    const StringData toNS,
+                                    NamespaceString fromNss,
+                                    NamespaceString toNss,
                                     const bool stayTemp) const = 0;
 
     virtual const NamespaceString& getSystemViewsName() const = 0;

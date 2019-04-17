@@ -62,7 +62,7 @@ public:
         Database* database = autoDb.getDb();
         {
             WriteUnitOfWork wuow(_opCtx.get());
-            ASSERT(database->createCollection(_opCtx.get(), _nss.ns()));
+            ASSERT(database->createCollection(_opCtx.get(), _nss));
             wuow.commit();
         }
     }
@@ -72,7 +72,7 @@ public:
         Database* database = autoDb.getDb();
         if (database) {
             WriteUnitOfWork wuow(_opCtx.get());
-            ASSERT_OK(database->dropCollection(_opCtx.get(), _nss.ns()));
+            ASSERT_OK(database->dropCollection(_opCtx.get(), _nss));
             wuow.commit();
         }
     }

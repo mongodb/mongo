@@ -181,7 +181,7 @@ public:
     Status repairIdent(OperationContext* opCtx, StringData ident) override;
 
     Status recoverOrphanedIdent(OperationContext* opCtx,
-                                StringData ns,
+                                const NamespaceString& nss,
                                 StringData ident,
                                 const CollectionOptions& options) override;
 

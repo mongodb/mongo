@@ -195,8 +195,8 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->openDb(opCtx, nss.db());
     ASSERT_TRUE(db);
-    db->dropCollection(opCtx, nss.ns()).transitional_ignore();
-    auto coll = db->createCollection(opCtx, nss.ns(), options);
+    db->dropCollection(opCtx, nss).transitional_ignore();
+    auto coll = db->createCollection(opCtx, nss, options);
     ASSERT_TRUE(coll);
     wuow.commit();
     return coll;

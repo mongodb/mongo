@@ -186,7 +186,7 @@ void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
         ASSERT_TRUE(db);
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_TRUE(db->createCollection(opCtx, nss.ns()));
+        ASSERT_TRUE(db->createCollection(opCtx, nss));
         wuow.commit();
     });
 

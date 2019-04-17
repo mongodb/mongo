@@ -159,6 +159,9 @@ public:
     static const char* ns() {
         return "unittests.QueryStageAnd";
     }
+    NamespaceString nss() {
+        return NamespaceString(ns());
+    }
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
@@ -184,7 +187,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -270,7 +273,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -351,7 +354,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -395,7 +398,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -442,7 +445,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -488,7 +491,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -541,7 +544,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -592,7 +595,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -648,7 +651,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -696,7 +699,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -748,7 +751,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -797,7 +800,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -934,7 +937,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -1042,7 +1045,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -1096,7 +1099,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -1135,7 +1138,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -1178,7 +1181,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -1239,7 +1242,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -1291,7 +1294,7 @@ public:
         Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 

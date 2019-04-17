@@ -361,11 +361,11 @@ std::string KVCatalog::getFilesystemPathForDb(const std::string& dbName) const {
     }
 }
 
-std::string KVCatalog::_newUniqueIdent(StringData ns, const char* kind) {
+std::string KVCatalog::_newUniqueIdent(const NamespaceString& nss, const char* kind) {
     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
     StringBuilder buf;
     if (_directoryPerDb) {
-        buf << escapeDbName(nsToDatabaseSubstring(ns)) << '/';
+        buf << escapeDbName(nss.db()) << '/';
     }
     buf << kind;
     buf << (_directoryForIndexes ? '/' : '-');
@@ -407,11 +407,13 @@ void KVCatalog::init(OperationContext* opCtx) {
     }
 }
 
-void KVCatalog::getAllCollections(std::vector<std::string>* out) const {
+std::vector<NamespaceString> KVCatalog::getAllCollections() const {
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    std::vector<NamespaceString> result;
     for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
-        out->push_back(it->first);
+        result.push_back(NamespaceString(it->first));
     }
+    return result;
 }
 
 Status KVCatalog::_addEntry(OperationContext* opCtx,
@@ -420,7 +422,7 @@ Status KVCatalog::_addEntry(OperationContext* opCtx,
                             KVPrefix prefix) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
-    const string ident = _newUniqueIdent(nss.ns(), "collection");
+    const string ident = _newUniqueIdent(nss, "collection");
 
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
     Entry& old = _idents[nss.toString()];
@@ -451,31 +453,33 @@ Status KVCatalog::_addEntry(OperationContext* opCtx,
     return Status::OK();
 }
 
-std::string KVCatalog::getCollectionIdent(StringData ns) const {
+std::string KVCatalog::getCollectionIdent(const NamespaceString& nss) const {
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    NSToIdentMap::const_iterator it = _idents.find(ns.toString());
+    NSToIdentMap::const_iterator it = _idents.find(nss.toString());
     invariant(it != _idents.end());
     return it->second.ident;
 }
 
 std::string KVCatalog::getIndexIdent(OperationContext* opCtx,
-                                     StringData ns,
+                                     const NamespaceString& nss,
                                      StringData idxName) const {
-    BSONObj obj = _findEntry(opCtx, ns);
+    BSONObj obj = _findEntry(opCtx, nss);
     BSONObj idxIdent = obj["idxIdent"].Obj();
     return idxIdent[idxName].String();
 }
 
-BSONObj KVCatalog::_findEntry(OperationContext* opCtx, StringData ns, RecordId* out) const {
+BSONObj KVCatalog::_findEntry(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              RecordId* out) const {
     RecordId dl;
     {
         stdx::lock_guard<stdx::mutex> lk(_identsLock);
-        NSToIdentMap::const_iterator it = _idents.find(ns.toString());
-        invariant(it != _idents.end(), str::stream() << "Did not find collection. Ns: " << ns);
+        NSToIdentMap::const_iterator it = _idents.find(nss.toString());
+        invariant(it != _idents.end(), str::stream() << "Did not find collection. Ns: " << nss);
         dl = it->second.storedLoc;
     }
 
-    LOG(3) << "looking up metadata for: " << ns << " @ " << dl;
+    LOG(3) << "looking up metadata for: " << nss << " @ " << dl;
     RecordData data;
     if (!_rs->findRecord(opCtx, dl, &data)) {
         // since the in memory meta data isn't managed with mvcc
@@ -491,8 +495,8 @@ BSONObj KVCatalog::_findEntry(OperationContext* opCtx, StringData ns, RecordId* 
 }
 
 BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData(OperationContext* opCtx,
-                                                            StringData ns) const {
-    BSONObj obj = _findEntry(opCtx, ns);
+                                                            const NamespaceString& nss) const {
+    BSONObj obj = _findEntry(opCtx, nss);
     LOG(3) << " fetched CCE metadata: " << obj;
     BSONCollectionCatalogEntry::MetaData md;
     const BSONElement mdElement = obj["md"];
@@ -504,10 +508,10 @@ BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData(OperationContext* op
 }
 
 void KVCatalog::putMetaData(OperationContext* opCtx,
-                            StringData ns,
+                            const NamespaceString& nss,
                             BSONCollectionCatalogEntry::MetaData& md) {
     RecordId loc;
-    BSONObj obj = _findEntry(opCtx, ns, &loc);
+    BSONObj obj = _findEntry(opCtx, nss, &loc);
 
     {
         // rebuilt doc
@@ -528,7 +532,7 @@ void KVCatalog::putMetaData(OperationContext* opCtx,
                 continue;
             }
             // missing, create new
-            newIdentMap.append(name, _newUniqueIdent(ns, "index"));
+            newIdentMap.append(name, _newUniqueIdent(nss, "index"));
         }
         b.append("idxIdent", newIdentMap.obj());
 
@@ -543,19 +547,19 @@ void KVCatalog::putMetaData(OperationContext* opCtx,
 }
 
 Status KVCatalog::_replaceEntry(OperationContext* opCtx,
-                                StringData fromNS,
-                                StringData toNS,
+                                const NamespaceString& fromNss,
+                                const NamespaceString& toNss,
                                 bool stayTemp) {
     RecordId loc;
-    BSONObj old = _findEntry(opCtx, fromNS, &loc).getOwned();
+    BSONObj old = _findEntry(opCtx, fromNss, &loc).getOwned();
     {
         BSONObjBuilder b;
 
-        b.append("ns", toNS);
+        b.append("ns", toNss.ns());
 
         BSONCollectionCatalogEntry::MetaData md;
         md.parse(old["md"].Obj());
-        md.rename(toNS);
+        md.rename(toNss.ns());
         if (!stayTemp)
             md.options.temp = false;
         b.append("md", md.toBSON());
@@ -568,29 +572,30 @@ Status KVCatalog::_replaceEntry(OperationContext* opCtx,
     }
 
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    const NSToIdentMap::iterator fromIt = _idents.find(fromNS.toString());
+    const NSToIdentMap::iterator fromIt = _idents.find(fromNss.toString());
     invariant(fromIt != _idents.end());
 
-    opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, fromNS, fromIt->second));
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, toNS));
+    opCtx->recoveryUnit()->registerChange(
+        new RemoveIdentChange(this, fromNss.ns(), fromIt->second));
+    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, toNss.ns()));
 
     _idents.erase(fromIt);
-    _idents[toNS.toString()] = Entry(old["ident"].String(), loc);
+    _idents[toNss.toString()] = Entry(old["ident"].String(), loc);
 
     return Status::OK();
 }
 
-Status KVCatalog::_removeEntry(OperationContext* opCtx, StringData ns) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(ns), MODE_X));
+Status KVCatalog::_removeEntry(OperationContext* opCtx, const NamespaceString& nss) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    const NSToIdentMap::iterator it = _idents.find(ns.toString());
+    const NSToIdentMap::iterator it = _idents.find(nss.toString());
     if (it == _idents.end()) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found");
     }
 
-    opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, ns, it->second));
+    opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, nss.ns(), it->second));
 
-    LOG(1) << "deleting metadata for " << ns << " @ " << it->second.storedLoc;
+    LOG(1) << "deleting metadata for " << nss << " @ " << it->second.storedLoc;
     _rs->deleteRecord(opCtx, it->second.storedLoc);
     _idents.erase(it);
 
@@ -702,14 +707,16 @@ StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std
     return StatusWith<std::string>(std::move(ns));
 }
 
-void KVCatalog::initCollection(OperationContext* opCtx, const std::string& ns, bool forRepair) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
+void KVCatalog::initCollection(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               bool forRepair) {
+    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, nss);
     uassert(ErrorCodes::MustDowngrade,
-            str::stream() << "Collection does not have UUID in KVCatalog. Collection: " << ns,
+            str::stream() << "Collection does not have UUID in KVCatalog. Collection: " << nss,
             md.options.uuid);
 
     auto uuid = md.options.uuid.get();
-    auto ident = getCollectionIdent(ns);
+    auto ident = getCollectionIdent(nss);
 
     std::unique_ptr<RecordStore> rs;
     if (forRepair) {
@@ -717,21 +724,21 @@ void KVCatalog::initCollection(OperationContext* opCtx, const std::string& ns, b
         // repaired. This also ensures that if we try to use it, it will blow up.
         rs = nullptr;
     } else {
-        rs = _engine->getEngine()->getGroupedRecordStore(opCtx, ns, ident, md.options, md.prefix);
+        rs = _engine->getEngine()->getGroupedRecordStore(
+            opCtx, nss.ns(), ident, md.options, md.prefix);
         invariant(rs);
     }
 
     UUIDCatalog::get(getGlobalServiceContext())
-        .registerCatalogEntry(
-            uuid,
-            std::make_unique<KVCollectionCatalogEntry>(_engine, this, ns, ident, std::move(rs)));
+        .registerCatalogEntry(uuid,
+                              std::make_unique<KVCollectionCatalogEntry>(
+                                  _engine, this, nss.ns(), ident, std::move(rs)));
 }
 
-void KVCatalog::reinitCollectionAfterRepair(OperationContext* opCtx, const std::string& ns) {
-    auto nss = NamespaceString(ns);
+void KVCatalog::reinitCollectionAfterRepair(OperationContext* opCtx, const NamespaceString& nss) {
     auto& uuidCatalog = UUIDCatalog::get(getGlobalServiceContext());
     uuidCatalog.deregisterCatalogEntry(uuidCatalog.lookupUUIDByNSS(nss).get());
-    initCollection(opCtx, ns, false);
+    initCollection(opCtx, nss, false);
 }
 
 Status KVCatalog::createCollection(OperationContext* opCtx,
@@ -753,7 +760,7 @@ Status KVCatalog::createCollection(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    std::string ident = getCollectionIdent(nss.ns());
+    std::string ident = getCollectionIdent(nss);
 
     status =
         _engine->getEngine()->createGroupedRecordStore(opCtx, nss.ns(), ident, options, prefix);
@@ -788,27 +795,26 @@ Status KVCatalog::createCollection(OperationContext* opCtx,
 }
 
 Status KVCatalog::renameCollection(OperationContext* opCtx,
-                                   StringData fromNS,
-                                   StringData toNS,
+                                   const NamespaceString& fromNss,
+                                   const NamespaceString& toNss,
                                    bool stayTemp) {
-    const NamespaceString fromNss(fromNS);
-    const NamespaceString toNss(toNS);
     // TODO SERVER-39518 : Temporarily comment this out because dropCollection uses
     // this function and now it only takes a database IX lock. We can change
     // this invariant to IX once renameCollection only MODE_IX as well.
     // invariant(opCtx->lockState()->isDbLockedForMode(fromNss.db(), MODE_X));
 
-    const std::string identFrom = _engine->getCatalog()->getCollectionIdent(fromNS);
+    const std::string identFrom = _engine->getCatalog()->getCollectionIdent(fromNss);
 
-    Status status = _engine->getEngine()->okToRename(opCtx, fromNS, toNS, identFrom, nullptr);
+    Status status =
+        _engine->getEngine()->okToRename(opCtx, fromNss.ns(), toNss.ns(), identFrom, nullptr);
     if (!status.isOK())
         return status;
 
-    status = _replaceEntry(opCtx, fromNS, toNS, stayTemp);
+    status = _replaceEntry(opCtx, fromNss, toNss, stayTemp);
     if (!status.isOK())
         return status;
 
-    const std::string identTo = getCollectionIdent(toNS);
+    const std::string identTo = getCollectionIdent(toNss);
     invariant(identFrom == identTo);
 
     return Status::OK();
@@ -837,8 +843,7 @@ private:
     CollectionUUID _uuid;
 };
 
-Status KVCatalog::dropCollection(OperationContext* opCtx, StringData ns) {
-    NamespaceString nss(ns);
+Status KVCatalog::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
     CollectionCatalogEntry* const entry =
@@ -862,10 +867,10 @@ Status KVCatalog::dropCollection(OperationContext* opCtx, StringData ns) {
 
     invariant(entry->getTotalIndexCount(opCtx) == 0);
 
-    const std::string ident = getCollectionIdent(ns);
+    const std::string ident = getCollectionIdent(nss);
 
     // Remove metadata from mdb_catalog
-    Status status = _removeEntry(opCtx, ns);
+    Status status = _removeEntry(opCtx, nss);
     if (!status.isOK()) {
         return status;
     }

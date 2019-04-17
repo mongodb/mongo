@@ -69,7 +69,7 @@ public:
     int flushAllFiles(OperationContext* opCtx, bool sync) final {
         return 0;
     }
-    Status repairRecordStore(OperationContext* opCtx, const std::string& ns) final {
+    Status repairRecordStore(OperationContext* opCtx, const NamespaceString& ns) final {
         return Status::OK();
     }
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx) final {

@@ -1118,7 +1118,7 @@ Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
 }
 
 Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
-                                                StringData ns,
+                                                const NamespaceString& nss,
                                                 StringData ident,
                                                 const CollectionOptions& options) {
 #ifdef _WIN32
@@ -1148,10 +1148,9 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
         return status;
     }
 
-    log() << "Creating new RecordStore for collection " + ns + " with UUID: " +
-            (options.uuid ? options.uuid->toString() : "none");
+    log() << "Creating new RecordStore for collection " << nss << " with UUID: " << options.uuid;
 
-    status = createGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
+    status = createGroupedRecordStore(opCtx, nss.ns(), ident, options, KVPrefix::kNotPrefixed);
     if (!status.isOK()) {
         return status;
     }
@@ -1176,7 +1175,8 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
 
     WiredTigerSession sessionWrapper(_conn);
     WT_SESSION* session = sessionWrapper.getSession();
-    status = wtRCToStatus(session->salvage(session, _uri(ident).c_str(), NULL), "Salvage failed: ");
+    status =
+        wtRCToStatus(session->salvage(session, _uri(ident).c_str(), nullptr), "Salvage failed: ");
     if (status.isOK()) {
         return {ErrorCodes::DataModifiedByRepair,
                 str::stream() << "Salvaged data for ident " << ident};

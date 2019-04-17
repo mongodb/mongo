@@ -265,8 +265,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     log() << "CMD: create " << newCollName
                           << " - renaming existing collection with conflicting UUID " << uuid
                           << " to temporary collection " << tmpName;
-                    Status status =
-                        db->renameCollection(opCtx, newCollName.ns(), tmpName.ns(), stayTemp);
+                    Status status = db->renameCollection(opCtx, newCollName, tmpName, stayTemp);
                     if (!status.isOK())
                         return Result(status);
                     opObserver->onRenameCollection(opCtx,
@@ -284,8 +283,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     uassert(40655,
                             str::stream() << "Invalid name " << newCollName << " for UUID " << uuid,
                             currentName.db() == newCollName.db());
-                    Status status =
-                        db->renameCollection(opCtx, currentName.ns(), newCollName.ns(), stayTemp);
+                    Status status = db->renameCollection(opCtx, currentName, newCollName, stayTemp);
                     if (!status.isOK())
                         return Result(status);
                     opObserver->onRenameCollection(opCtx,

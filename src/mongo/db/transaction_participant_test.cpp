@@ -247,7 +247,7 @@ protected:
             WriteUnitOfWork wuow(opCtx());
             CollectionOptions options;
             options.uuid = _uuid;
-            db->createCollection(opCtx(), kNss.ns(), options);
+            db->createCollection(opCtx(), kNss, options);
             wuow.commit();
         }
 
@@ -545,7 +545,7 @@ TEST_F(TxnParticipantTest, PrepareFailsOnTemporaryCollection) {
         CollectionOptions options;
         options.uuid = tempCollUUID;
         options.temp = true;
-        db->createCollection(opCtx(), tempCollNss.ns(), options);
+        db->createCollection(opCtx(), tempCollNss, options);
         wuow.commit();
     }
 
@@ -3640,7 +3640,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
 
         AutoGetOrCreateDb autoDb(opCtx(), nss.db(), MODE_X);
         WriteUnitOfWork wuow(opCtx());
-        auto coll = autoDb.getDb()->getCollection(opCtx(), nss.ns());
+        auto coll = autoDb.getDb()->getCollection(opCtx(), nss);
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;
         ASSERT_OK(
@@ -3652,7 +3652,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
         Timestamp ts(1, i);
         AutoGetOrCreateDb autoDb(opCtx(), nss.db(), MODE_X);
         WriteUnitOfWork wuow(opCtx());
-        auto coll = autoDb.getDb()->getCollection(opCtx(), nss.ns());
+        auto coll = autoDb.getDb()->getCollection(opCtx(), nss);
         ASSERT(coll);
         auto cursor = coll->getCursor(opCtx());
         while (auto record = cursor->next()) {

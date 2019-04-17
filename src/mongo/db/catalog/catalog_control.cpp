@@ -179,7 +179,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         invariant(db, str::stream() << "failed to reopen database " << dbName);
         for (auto&& collNss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
-            auto collection = db->getCollection(opCtx, collNss.ns());
+            auto collection = db->getCollection(opCtx, collNss);
             invariant(collection,
                       str::stream() << "failed to get valid collection pointer for namespace "
                                     << collNss);

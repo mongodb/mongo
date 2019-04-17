@@ -488,23 +488,24 @@ public:
             return it->second;
         }
 
-        auto collProperties = getCollectionPropertiesImpl(opCtx, ns.key());
+        auto collProperties = getCollectionPropertiesImpl(opCtx, NamespaceString(ns.key()));
         _cache[ns] = collProperties;
         return collProperties;
     }
 
 private:
-    CollectionProperties getCollectionPropertiesImpl(OperationContext* opCtx, StringData ns) {
+    CollectionProperties getCollectionPropertiesImpl(OperationContext* opCtx,
+                                                     const NamespaceString& nss) {
         CollectionProperties collProperties;
 
-        Lock::DBLock dbLock(opCtx, nsToDatabaseSubstring(ns), MODE_IS);
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto db = databaseHolder->getDb(opCtx, ns);
+        auto db = databaseHolder->getDb(opCtx, nss.db());
         if (!db) {
             return collProperties;
         }
 
-        auto collection = db->getCollection(opCtx, ns);
+        auto collection = db->getCollection(opCtx, nss);
         if (!collection) {
             return collProperties;
         }

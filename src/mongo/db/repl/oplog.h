@@ -84,7 +84,9 @@ struct OplogLink {
  * If the collection already exists (and isReplSet is false),
  * set the 'last' Timestamp from the last entry of the oplog collection (side effect!)
  */
-void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName, bool isReplSet);
+void createOplog(OperationContext* opCtx,
+                 const NamespaceString& oplogCollectionName,
+                 bool isReplSet);
 
 /*
  * Shortcut for above function using oplogCollectionName = _oplogCollectionName,
@@ -232,7 +234,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
 /**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.
  */
-void initTimestampFromOplog(OperationContext* opCtx, const std::string& oplogNS);
+void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplogNS);
 
 /**
  * Sets the global Timestamp to be 'newTime'.

@@ -81,11 +81,11 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
             if (userInitiatedWritesAndNotPrimary) {
                 uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
                                        str::stream() << "Not primary while creating collection "
-                                                     << nsString.ns()
+                                                     << nsString
                                                      << " during upsert"));
             }
             WriteUnitOfWork wuow(opCtx);
-            collection = db->createCollection(opCtx, nsString.ns(), CollectionOptions());
+            collection = db->createCollection(opCtx, nsString, CollectionOptions());
             invariant(collection);
             wuow.commit();
         });

@@ -80,6 +80,9 @@ public:
     static const char* ns() {
         return "unittests.QueryStageFetch";
     }
+    static NamespaceString nss() {
+        return NamespaceString(ns());
+    }
 
 protected:
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
@@ -96,10 +99,10 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -158,13 +161,13 @@ public:
 class FetchStageFilter : public QueryStageFetchBase {
 public:
     void run() {
-        Lock::DBLock lk(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X);
+        Lock::DBLock lk(&_opCtx, nss().db(), MODE_X);
         OldClientContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns());
+        Collection* coll = db->getCollection(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, ns());
+            coll = db->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 

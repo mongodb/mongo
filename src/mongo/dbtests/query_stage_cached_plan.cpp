@@ -105,7 +105,7 @@ public:
         }
 
         WriteUnitOfWork wuow(&_opCtx);
-        database->dropCollection(&_opCtx, nss.ns()).transitional_ignore();
+        database->dropCollection(&_opCtx, nss).transitional_ignore();
         wuow.commit();
     }
 

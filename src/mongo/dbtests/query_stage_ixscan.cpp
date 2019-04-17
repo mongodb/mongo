@@ -54,8 +54,8 @@ public:
     virtual void setup() {
         WriteUnitOfWork wunit(&_opCtx);
 
-        _ctx.db()->dropCollection(&_opCtx, ns()).transitional_ignore();
-        _coll = _ctx.db()->createCollection(&_opCtx, ns());
+        _ctx.db()->dropCollection(&_opCtx, nss()).transitional_ignore();
+        _coll = _ctx.db()->createCollection(&_opCtx, nss());
 
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
             &_opCtx,
@@ -139,6 +139,9 @@ public:
 
     static const char* ns() {
         return "unittest.QueryStageIxscan";
+    }
+    static NamespaceString nss() {
+        return NamespaceString(ns());
     }
 
 protected:

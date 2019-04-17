@@ -92,7 +92,7 @@ public:
     }
 
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        Collection* collection = db->getCollection(&_opCtx, ns());
+        Collection* collection = db->getCollection(&_opCtx, NamespaceString(ns()));
         std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         return indexes.empty() ? nullptr : indexes[0];

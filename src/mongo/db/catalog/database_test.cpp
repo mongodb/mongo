@@ -158,7 +158,7 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
             ON_BLOCK_EXIT([&wuow] { wuow.commit(); });
 
             ASSERT_THROWS_CODE_AND_WHAT(
-                db->createCollection(_opCtx.get(), _nss.ns()),
+                db->createCollection(_opCtx.get(), _nss),
                 AssertionException,
                 ErrorCodes::DatabaseDropPending,
                 (StringBuilder() << "Cannot create collection " << _nss
@@ -179,12 +179,12 @@ void _testDropCollection(OperationContext* opCtx,
 
         WriteUnitOfWork wuow(opCtx);
         if (createCollectionBeforeDrop) {
-            ASSERT_TRUE(db->createCollection(opCtx, nss.ns(), collOpts));
+            ASSERT_TRUE(db->createCollection(opCtx, nss, collOpts));
         } else {
             ASSERT_FALSE(db->getCollection(opCtx, nss));
         }
 
-        ASSERT_OK(db->dropCollection(opCtx, nss.ns(), dropOpTime));
+        ASSERT_OK(db->dropCollection(opCtx, nss, dropOpTime));
 
         ASSERT_FALSE(db->getCollection(opCtx, nss));
         wuow.commit();
@@ -247,10 +247,10 @@ TEST_F(DatabaseTest, DropCollectionRejectsProvidedDropOpTimeIfWritesAreReplicate
         ASSERT_TRUE(db);
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_TRUE(db->createCollection(opCtx, nss.ns()));
+        ASSERT_TRUE(db->createCollection(opCtx, nss));
 
         repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-        ASSERT_EQUALS(ErrorCodes::BadValue, db->dropCollection(opCtx, nss.ns(), dropOpTime));
+        ASSERT_EQUALS(ErrorCodes::BadValue, db->dropCollection(opCtx, nss, dropOpTime));
     });
 }
 
@@ -290,7 +290,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
         Collection* collection = nullptr;
         {
             WriteUnitOfWork wuow(opCtx);
-            ASSERT_TRUE(collection = db->createCollection(opCtx, nss.ns()));
+            ASSERT_TRUE(collection = db->createCollection(opCtx, nss));
             wuow.commit();
         }
 
@@ -319,7 +319,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
         ASSERT_GREATER_THAN(indexCatalog->numIndexesInProgress(opCtx), 0);
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_THROWS_CODE(db->dropCollection(opCtx, nss.ns()),
+        ASSERT_THROWS_CODE(db->dropCollection(opCtx, nss),
                            AssertionException,
                            ErrorCodes::BackgroundOperationInProgressForNamespace);
     });
@@ -357,11 +357,11 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         WriteUnitOfWork wuow(opCtx);
         CollectionOptions fromCollectionOptions;
         fromCollectionOptions.uuid = fromUuid;
-        ASSERT_TRUE(db->createCollection(opCtx, fromNss.ns(), fromCollectionOptions));
+        ASSERT_TRUE(db->createCollection(opCtx, fromNss, fromCollectionOptions));
         ASSERT_EQUALS(fromNss, uuidCatalog.lookupNSSByUUID(fromUuid));
 
         auto stayTemp = false;
-        ASSERT_OK(db->renameCollection(opCtx, fromNss.ns(), toNss.ns(), stayTemp));
+        ASSERT_OK(db->renameCollection(opCtx, fromNss, toNss, stayTemp));
 
         ASSERT_FALSE(db->getCollection(opCtx, fromNss));
         auto toCollection = db->getCollection(opCtx, toNss);
@@ -428,7 +428,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         // collections in the database for collisions while generating the namespace.
         {
             WriteUnitOfWork wuow(_opCtx.get());
-            ASSERT_TRUE(db->createCollection(_opCtx.get(), nss1.ns()));
+            ASSERT_TRUE(db->createCollection(_opCtx.get(), nss1));
             wuow.commit();
         }
 
@@ -465,7 +465,7 @@ TEST_F(
         for (const auto c : charsToChooseFrom) {
             NamespaceString nss(_nss.db(), model.substr(0, model.find('%')) + std::string(1U, c));
             WriteUnitOfWork wuow(_opCtx.get());
-            ASSERT_TRUE(db->createCollection(_opCtx.get(), nss.ns()));
+            ASSERT_TRUE(db->createCollection(_opCtx.get(), nss));
             wuow.commit();
         }
 
@@ -544,7 +544,7 @@ TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdInde
             options.setNoIdIndex();
 
             ASSERT_THROWS_CODE_AND_WHAT(
-                db->createCollection(_opCtx.get(), _nss.ns(), options),
+                db->createCollection(_opCtx.get(), _nss, options),
                 AssertionException,
                 50001,
                 (StringBuilder() << "autoIndexId:false is not allowed for collection " << _nss

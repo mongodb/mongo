@@ -176,7 +176,7 @@ bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* opCtx,
         }
     }
 
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
     return true;
 }
 
@@ -196,7 +196,7 @@ void KVCollectionCatalogEntry::setIndexHead(OperationContext* opCtx,
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     md.indexes[offset].head = newHead;
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 }
 
 Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData indexName) {
@@ -205,10 +205,10 @@ Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData
     if (md.findIndexOffset(indexName) < 0)
         return Status::OK();  // never had the index so nothing to do.
 
-    const string ident = _catalog->getIndexIdent(opCtx, ns().ns(), indexName);
+    const string ident = _catalog->getIndexIdent(opCtx, ns(), indexName);
 
     md.eraseIndex(indexName);
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 
     // Lazily remove to isolate underlying engine from rollback.
     opCtx->recoveryUnit()->registerChange(new RemoveIndexChange(
@@ -250,9 +250,9 @@ Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
     }
 
     md.indexes.push_back(imd);
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 
-    string ident = _catalog->getIndexIdent(opCtx, ns().ns(), spec->indexName());
+    string ident = _catalog->getIndexIdent(opCtx, ns(), spec->indexName());
 
     auto kvEngine = _engine->getEngine();
     const Status status = kvEngine->createGroupedSortedDataInterface(opCtx, ident, spec, prefix);
@@ -294,7 +294,7 @@ void KVCollectionCatalogEntry::setIndexBuildScanning(
     md.indexes[offset].buildPhase = kIndexBuildScanning.toString();
     md.indexes[offset].sideWritesIdent = sideWritesIdent;
     md.indexes[offset].constraintViolationsIdent = constraintViolationsIdent;
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 }
 
 bool KVCollectionCatalogEntry::isIndexBuildScanning(OperationContext* opCtx,
@@ -315,7 +315,7 @@ void KVCollectionCatalogEntry::setIndexBuildDraining(OperationContext* opCtx,
     invariant(md.indexes[offset].buildPhase == kIndexBuildScanning.toString());
 
     md.indexes[offset].buildPhase = kIndexBuildDraining.toString();
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 }
 
 bool KVCollectionCatalogEntry::isIndexBuildDraining(OperationContext* opCtx,
@@ -335,7 +335,7 @@ void KVCollectionCatalogEntry::indexBuildSuccess(OperationContext* opCtx, String
     md.indexes[offset].buildPhase = boost::none;
     md.indexes[offset].sideWritesIdent = boost::none;
     md.indexes[offset].constraintViolationsIdent = boost::none;
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 }
 
 boost::optional<std::string> KVCollectionCatalogEntry::getSideWritesIdent(
@@ -361,13 +361,13 @@ void KVCollectionCatalogEntry::updateTTLSetting(OperationContext* opCtx,
     int offset = md.findIndexOffset(idxName);
     invariant(offset >= 0);
     md.indexes[offset].updateTTLSetting(newExpireSeconds);
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 }
 
 void KVCollectionCatalogEntry::updateIndexMetadata(OperationContext* opCtx,
                                                    const IndexDescriptor* desc) {
     // Update any metadata Ident has for this index
-    const string ident = _catalog->getIndexIdent(opCtx, ns().ns(), desc->indexName());
+    const string ident = _catalog->getIndexIdent(opCtx, ns(), desc->indexName());
     auto kvEngine = _engine->getEngine();
     kvEngine->alterIdentMetadata(opCtx, ident, desc);
 }
@@ -386,23 +386,23 @@ void KVCollectionCatalogEntry::updateValidator(OperationContext* opCtx,
     md.options.validator = validator;
     md.options.validationLevel = validationLevel.toString();
     md.options.validationAction = validationAction.toString();
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 }
 
 void KVCollectionCatalogEntry::setIsTemp(OperationContext* opCtx, bool isTemp) {
     MetaData md = _getMetaData(opCtx);
     md.options.temp = isTemp;
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 }
 
 void KVCollectionCatalogEntry::updateCappedSize(OperationContext* opCtx, long long size) {
     MetaData md = _getMetaData(opCtx);
     md.options.cappedSize = size;
-    _catalog->putMetaData(opCtx, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns(), md);
 }
 
 BSONCollectionCatalogEntry::MetaData KVCollectionCatalogEntry::_getMetaData(
     OperationContext* opCtx) const {
-    return _catalog->getMetaData(opCtx, ns().toString());
+    return _catalog->getMetaData(opCtx, ns());
 }
 }

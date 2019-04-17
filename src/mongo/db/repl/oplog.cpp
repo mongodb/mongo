@@ -703,14 +703,16 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
 
 }  // namespace
 
-void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName, bool isReplSet) {
+void createOplog(OperationContext* opCtx,
+                 const NamespaceString& oplogCollectionName,
+                 bool isReplSet) {
     Lock::GlobalWrite lk(opCtx);
 
     const auto service = opCtx->getServiceContext();
 
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
-    OldClientContext ctx(opCtx, oplogCollectionName);
+    OldClientContext ctx(opCtx, oplogCollectionName.ns());
     Collection* collection = ctx.db()->getCollection(opCtx, oplogCollectionName);
 
     if (collection) {
@@ -745,7 +747,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
     options.cappedSize = sz;
     options.autoIndexId = CollectionOptions::NO;
 
-    writeConflictRetry(opCtx, "createCollection", oplogCollectionName, [&] {
+    writeConflictRetry(opCtx, "createCollection", oplogCollectionName.ns(), [&] {
         WriteUnitOfWork uow(opCtx);
         invariant(ctx.db()->createCollection(opCtx, oplogCollectionName, options));
         acquireOplogCollectionForLogging(opCtx);
@@ -765,7 +767,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
 void createOplog(OperationContext* opCtx) {
     const auto isReplSet = ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
         ReplicationCoordinator::modeReplSet;
-    createOplog(opCtx, LocalOplogInfo::get(opCtx)->getOplogCollectionName().ns(), isReplSet);
+    createOplog(opCtx, LocalOplogInfo::get(opCtx)->getOplogCollectionName(), isReplSet);
 }
 
 std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) {
@@ -1987,10 +1989,11 @@ void setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
     LocalOplogInfo::get(service)->setNewTimestamp(service, newTime);
 }
 
-void initTimestampFromOplog(OperationContext* opCtx, const std::string& oplogNS) {
+void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplogNss) {
     DBDirectClient c(opCtx);
     static const BSONObj reverseNaturalObj = BSON("$natural" << -1);
-    BSONObj lastOp = c.findOne(oplogNS, Query().sort(reverseNaturalObj), NULL, QueryOption_SlaveOk);
+    BSONObj lastOp =
+        c.findOne(oplogNss.ns(), Query().sort(reverseNaturalObj), NULL, QueryOption_SlaveOk);
 
     if (!lastOp.isEmpty()) {
         LOG(1) << "replSet setting last Timestamp";

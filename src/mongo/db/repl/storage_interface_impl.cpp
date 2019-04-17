@@ -230,7 +230,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         {
             // Create the collection.
             WriteUnitOfWork wunit(opCtx.get());
-            fassert(40332, db.getDb()->createCollection(opCtx.get(), nss.ns(), options, false));
+            fassert(40332, db.getDb()->createCollection(opCtx.get(), nss, options, false));
             wunit.commit();
         }
 
@@ -411,7 +411,7 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
 }
 
 Status StorageInterfaceImpl::createOplog(OperationContext* opCtx, const NamespaceString& nss) {
-    mongo::repl::createOplog(opCtx, nss.ns(), true);
+    mongo::repl::createOplog(opCtx, nss, true);
     return Status::OK();
 }
 
@@ -444,7 +444,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
         }
         WriteUnitOfWork wuow(opCtx);
         try {
-            auto coll = db->createCollection(opCtx, nss.ns(), options);
+            auto coll = db->createCollection(opCtx, nss, options);
             invariant(coll);
         } catch (const AssertionException& ex) {
             return ex.toStatus();
@@ -516,8 +516,7 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
                                         << " not found.");
         }
         WriteUnitOfWork wunit(opCtx);
-        const auto status =
-            autoDB.getDb()->renameCollection(opCtx, fromNS.ns(), toNS.ns(), stayTemp);
+        const auto status = autoDB.getDb()->renameCollection(opCtx, fromNS, toNS, stayTemp);
         if (!status.isOK()) {
             return status;
         }

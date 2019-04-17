@@ -186,10 +186,10 @@ public:
      * it still exists when recovered.
      */
     virtual Status recoverOrphanedIdent(OperationContext* opCtx,
-                                        StringData ns,
+                                        const NamespaceString& nss,
                                         StringData ident,
                                         const CollectionOptions& options) {
-        auto status = createRecordStore(opCtx, ns, ident, options);
+        auto status = createRecordStore(opCtx, nss.ns(), ident, options);
         if (status.isOK()) {
             return {ErrorCodes::DataModifiedByRepair, "Orphan recovery created a new record store"};
         }

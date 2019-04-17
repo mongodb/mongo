@@ -138,7 +138,7 @@ bool Helpers::findById(OperationContext* opCtx,
                        bool* indexFound) {
     invariant(database);
 
-    Collection* collection = database->getCollection(opCtx, ns);
+    Collection* collection = database->getCollection(opCtx, NamespaceString(ns));
     if (!collection) {
         return false;
     }

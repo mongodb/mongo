@@ -49,6 +49,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
 static const char* const _ns = "unittests.indexupdate";
+static const NamespaceString _nss = NamespaceString(_ns);
 
 /**
  * Test fixture for a write locked test using collection _ns.  Includes functionality to
@@ -111,8 +112,8 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(db->dropCollection(&_opCtx, _nss));
+            coll = db->createCollection(&_opCtx, _nss);
 
             OpDebug* const nullOpDebug = nullptr;
             ASSERT_OK(coll->insertDocument(&_opCtx,
@@ -166,8 +167,8 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(db->dropCollection(&_opCtx, _nss));
+            coll = db->createCollection(&_opCtx, _nss);
 
             OpDebug* const nullOpDebug = nullptr;
             ASSERT_OK(coll->insertDocument(&_opCtx,
@@ -223,8 +224,8 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(db->dropCollection(&_opCtx, _nss));
+            coll = db->createCollection(&_opCtx, _nss);
             // Drop all indexes including id index.
             coll->getIndexCatalog()->dropAllIndexes(&_opCtx, true);
             // Insert some documents.
@@ -265,11 +266,11 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
+            ASSERT_OK(db->dropCollection(&_opCtx, _nss));
             CollectionOptions options;
             options.capped = true;
             options.cappedSize = 10 * 1024;
-            coll = db->createCollection(&_opCtx, _ns, options);
+            coll = db->createCollection(&_opCtx, _nss, options);
             coll->getIndexCatalog()->dropAllIndexes(&_opCtx, true);
             // Insert some documents.
             int32_t nDocs = 1000;

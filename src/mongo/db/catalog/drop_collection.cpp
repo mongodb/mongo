@@ -132,7 +132,7 @@ Status _dropCollection(OperationContext* opCtx,
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid().get());
     Status status =
         systemCollectionMode == DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops
-        ? db->dropCollection(opCtx, collectionName.ns(), dropOpTime)
+        ? db->dropCollection(opCtx, collectionName, dropOpTime)
         : db->dropCollectionEvenIfSystem(opCtx, collectionName, dropOpTime);
 
     if (!status.isOK()) {

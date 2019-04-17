@@ -140,14 +140,14 @@ void Top::_record(OperationContext* opCtx,
     }
 }
 
-void Top::collectionDropped(StringData ns, bool databaseDropped) {
+void Top::collectionDropped(const NamespaceString& nss, bool databaseDropped) {
     stdx::lock_guard<SimpleMutex> lk(_lock);
-    _usage.erase(ns);
+    _usage.erase(nss.ns());
 
     if (!databaseDropped) {
         // If a collection drop occurred, there will be a subsequent call to record for this
         // collection namespace which must be ignored. This does not apply to a database drop.
-        _collDropNs.insert(ns.toString());
+        _collDropNs.insert(nss.toString());
     }
 }
 
@@ -199,12 +199,14 @@ void Top::_appendStatsEntry(BSONObjBuilder& b, const char* statsName, const Usag
     bb.done();
 }
 
-void Top::appendLatencyStats(StringData ns, bool includeHistograms, BSONObjBuilder* builder) {
-    auto hashedNs = UsageMap::hasher().hashed_key(ns);
+void Top::appendLatencyStats(const NamespaceString& nss,
+                             bool includeHistograms,
+                             BSONObjBuilder* builder) {
+    auto hashedNs = UsageMap::hasher().hashed_key(nss.ns());
     stdx::lock_guard<SimpleMutex> lk(_lock);
     BSONObjBuilder latencyStatsBuilder;
     _usage[hashedNs].opLatencyHistogram.append(includeHistograms, &latencyStatsBuilder);
-    builder->append("ns", ns);
+    builder->append("ns", nss.ns());
     builder->append("latencyStats", latencyStatsBuilder.obj());
 }
 

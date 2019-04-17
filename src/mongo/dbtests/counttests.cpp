@@ -51,11 +51,11 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
 
-            _collection = _database->getCollection(&_opCtx, ns());
+            _collection = _database->getCollection(&_opCtx, nss());
             if (_collection) {
-                _database->dropCollection(&_opCtx, ns()).transitional_ignore();
+                _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            _collection = _database->createCollection(&_opCtx, ns());
+            _collection = _database->createCollection(&_opCtx, nss());
 
             IndexCatalog* indexCatalog = _collection->getIndexCatalog();
             auto indexSpec =
@@ -73,7 +73,7 @@ public:
     ~Base() {
         try {
             WriteUnitOfWork wunit(&_opCtx);
-            uassertStatusOK(_database->dropCollection(&_opCtx, ns()));
+            uassertStatusOK(_database->dropCollection(&_opCtx, nss()));
             wunit.commit();
         } catch (...) {
             FAIL("Exception while cleaning up collection");
@@ -83,6 +83,10 @@ public:
 protected:
     static const char* ns() {
         return "unittests.counttests";
+    }
+
+    static NamespaceString nss() {
+        return NamespaceString(ns());
     }
 
     void insert(const char* s) {

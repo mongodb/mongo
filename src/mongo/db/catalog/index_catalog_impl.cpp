@@ -167,7 +167,7 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
     KVStorageEngine* engine =
         checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
     std::string ident =
-        engine->getCatalog()->getIndexIdent(opCtx, _collection->ns().ns(), desc->indexName());
+        engine->getCatalog()->getIndexIdent(opCtx, _collection->ns(), desc->indexName());
 
     SortedDataInterface* sdi =
         engine->getEngine()->getGroupedSortedDataInterface(opCtx, ident, desc, entry->getPrefix());

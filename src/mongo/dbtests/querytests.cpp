@@ -67,11 +67,11 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             _database = _context.db();
-            _collection = _database->getCollection(&_opCtx, ns());
+            _collection = _database->getCollection(&_opCtx, nss());
             if (_collection) {
-                _database->dropCollection(&_opCtx, ns()).transitional_ignore();
+                _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            _collection = _database->createCollection(&_opCtx, ns());
+            _collection = _database->createCollection(&_opCtx, nss());
             wunit.commit();
         }
 
@@ -81,7 +81,7 @@ public:
     ~Base() {
         try {
             WriteUnitOfWork wunit(&_opCtx);
-            uassertStatusOK(_database->dropCollection(&_opCtx, ns()));
+            uassertStatusOK(_database->dropCollection(&_opCtx, nss()));
             wunit.commit();
         } catch (...) {
             FAIL("Exception while cleaning up collection");
@@ -91,6 +91,9 @@ public:
 protected:
     static const char* ns() {
         return "unittests.querytests";
+    }
+    static NamespaceString nss() {
+        return NamespaceString(ns());
     }
 
     void addIndex(const IndexSpec& spec) {
@@ -216,11 +219,11 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = ctx.db();
-            if (db->getCollection(&_opCtx, ns())) {
+            if (db->getCollection(&_opCtx, nss())) {
                 _collection = NULL;
-                db->dropCollection(&_opCtx, ns()).transitional_ignore();
+                db->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            _collection = db->createCollection(&_opCtx, ns(), CollectionOptions(), false);
+            _collection = db->createCollection(&_opCtx, nss(), CollectionOptions(), false);
             wunit.commit();
         }
         ASSERT(_collection);
@@ -1286,6 +1289,9 @@ public:
     const char* ns() {
         return _ns.c_str();
     }
+    NamespaceString nss() {
+        return NamespaceString(ns());
+    }
 
 private:
     string _ns;
@@ -1694,7 +1700,7 @@ public:
             Lock::GlobalWrite lk(&_opCtx);
             OldClientContext context(&_opCtx, ns());
             WriteUnitOfWork wunit(&_opCtx);
-            context.db()->createCollection(&_opCtx, ns(), coll_opts, false);
+            context.db()->createCollection(&_opCtx, nss(), coll_opts, false);
             wunit.commit();
         }
         insert(ns(), BSON("a" << 1));

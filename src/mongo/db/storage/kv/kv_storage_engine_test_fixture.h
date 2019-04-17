@@ -59,7 +59,7 @@ public:
             return ret;
         }
 
-        return _storageEngine->getCatalog()->getCollectionIdent(ns.ns());
+        return _storageEngine->getCatalog()->getCollectionIdent(ns);
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporary(OperationContext* opCtx) {
@@ -76,8 +76,7 @@ public:
     }
 
     Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, std::string indexName) {
-        std::string indexIdent =
-            _storageEngine->getCatalog()->getIndexIdent(opCtx, nss.ns(), indexName);
+        std::string indexIdent = _storageEngine->getCatalog()->getIndexIdent(opCtx, nss, indexName);
         return dropIdent(opCtx, indexIdent);
     }
 
@@ -95,10 +94,8 @@ public:
     }
 
     bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-        std::vector<std::string> allCollections;
-        _storageEngine->getCatalog()->getAllCollections(&allCollections);
-        return std::find(allCollections.begin(), allCollections.end(), nss.toString()) !=
-            allCollections.end();
+        auto allCollections = _storageEngine->getCatalog()->getAllCollections();
+        return std::count(allCollections.begin(), allCollections.end(), nss);
     }
     bool identExists(OperationContext* opCtx, const std::string& ident) {
         auto idents = getAllKVEngineIdents(opCtx);
@@ -167,7 +164,7 @@ public:
     }
 
     Status removeEntry(OperationContext* opCtx, StringData ns, KVCatalog* catalog) {
-        return catalog->_removeEntry(opCtx, ns);
+        return catalog->_removeEntry(opCtx, NamespaceString(ns));
     }
 
     KVStorageEngine* _storageEngine;

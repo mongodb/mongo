@@ -149,7 +149,7 @@ Status repairCollections(OperationContext* opCtx,
 
         log() << "Repairing collection " << nss;
 
-        Status status = engine->repairRecordStore(opCtx, nss.ns());
+        Status status = engine->repairRecordStore(opCtx, nss);
         if (!status.isOK())
             return status;
     }

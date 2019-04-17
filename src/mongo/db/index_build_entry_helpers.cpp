@@ -108,7 +108,7 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
                 WriteUnitOfWork wuow(opCtx);
                 CollectionOptions options;
                 Collection* collection = db->createCollection(
-                    opCtx, NamespaceString::kIndexBuildEntryNamespace.ns(), options);
+                    opCtx, NamespaceString::kIndexBuildEntryNamespace, options);
 
                 // Ensure the collection exists.
                 invariant(collection);

@@ -320,7 +320,7 @@ bool runCreateIndexes(OperationContext* opCtx,
 
         writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            collection = db->createCollection(opCtx, ns.ns(), CollectionOptions());
+            collection = db->createCollection(opCtx, ns, CollectionOptions());
             invariant(collection);
             wunit.commit();
         });
@@ -561,7 +561,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             options.uuid = collectionUUID;
             writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
-                collection = db->createCollection(opCtx, ns.ns(), options);
+                collection = db->createCollection(opCtx, ns, options);
                 invariant(collection,
                           str::stream() << "Failed to create collection " << ns.ns()
                                         << " during index creation: "

@@ -47,13 +47,13 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
     const auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
 
-    NamespaceString ns("test", "doc_seq");
+    NamespaceString nss("test", "doc_seq");
     DBDirectClient db(opCtx);
-    db.dropCollection(ns.ns());
-    ASSERT_EQ(db.count(ns.ns()), 0u);
+    db.dropCollection(nss.ns());
+    ASSERT_EQ(db.count(nss.ns()), 0u);
 
     OpMsgRequest request;
-    request.body = BSON("insert" << ns.coll() << "$db" << ns.db());
+    request.body = BSON("insert" << nss.coll() << "$db" << nss.db());
     request.sequences = {{"documents",
                           {
                               BSON("_id" << 1),
@@ -66,7 +66,7 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
     const auto reply = db.runCommand(std::move(request));
     ASSERT_EQ(int(reply->getProtocol()), int(rpc::Protocol::kOpMsg));
     ASSERT_BSONOBJ_EQ(reply->getCommandReply(), BSON("n" << 5 << "ok" << 1.0));
-    ASSERT_EQ(db.count(ns.ns()), 5u);
+    ASSERT_EQ(db.count(nss.ns()), 5u);
 }
 
 using std::string;
@@ -77,11 +77,11 @@ using std::string;
 class Base {
 public:
     Base() : db(&_opCtx) {
-        db.dropCollection(ns());
+        db.dropCollection(nss().ns());
     }
 
-    const char* ns() {
-        return "test.testCollection";
+    NamespaceString nss() {
+        return NamespaceString("test.testCollection");
     }
     const char* nsDb() {
         return "test";
@@ -99,12 +99,12 @@ public:
 namespace FileMD5 {
 struct Base {
     Base() : db(&_opCtx) {
-        db.dropCollection(ns());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("files_id" << 1 << "n" << 1)));
+        db.dropCollection(nss().ns());
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss().ns(), BSON("files_id" << 1 << "n" << 1)));
     }
 
-    const char* ns() {
-        return "test.fs.chunks";
+    NamespaceString nss() {
+        return NamespaceString("test.fs.chunks");
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
@@ -119,7 +119,7 @@ struct Type0 : Base {
             b.append("files_id", 0);
             b.append("n", 0);
             b.appendBinData("data", 6, BinDataGeneral, "hello ");
-            db.insert(ns(), b.obj());
+            db.insert(nss().ns(), b.obj());
         }
         {
             BSONObjBuilder b;
@@ -127,7 +127,7 @@ struct Type0 : Base {
             b.append("files_id", 0);
             b.append("n", 1);
             b.appendBinData("data", 5, BinDataGeneral, "world");
-            db.insert(ns(), b.obj());
+            db.insert(nss().ns(), b.obj());
         }
 
         BSONObj result;
@@ -143,7 +143,7 @@ struct Type2 : Base {
             b.append("files_id", 0);
             b.append("n", 0);
             b.appendBinDataArrayDeprecated("data", "hello ", 6);
-            db.insert(ns(), b.obj());
+            db.insert(nss().ns(), b.obj());
         }
         {
             BSONObjBuilder b;
@@ -151,7 +151,7 @@ struct Type2 : Base {
             b.append("files_id", 0);
             b.append("n", 1);
             b.appendBinDataArrayDeprecated("data", "world", 5);
-            db.insert(ns(), b.obj());
+            db.insert(nss().ns(), b.obj());
         }
 
         BSONObj result;
@@ -170,7 +170,7 @@ namespace SymbolArgument {
 class Drop : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(ns()));
+        ASSERT(db.createCollection(nss().ns()));
         {
             BSONObjBuilder cmd;
             cmd.appendSymbol("drop", nsColl());  // Use Symbol for SERVER-16260
@@ -186,7 +186,7 @@ public:
 class DropIndexes : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(ns()));
+        ASSERT(db.createCollection(nss().ns()));
 
         BSONObjBuilder cmd;
         cmd.appendSymbol("dropIndexes", nsColl());  // Use Symbol for SERVER-16260
@@ -202,7 +202,7 @@ public:
 class CreateIndexWithNoKey : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(ns()));
+        ASSERT(db.createCollection(nss().ns()));
 
         BSONObjBuilder indexSpec;
 
@@ -223,7 +223,7 @@ public:
 class CreateIndexWithDuplicateKey : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(ns()));
+        ASSERT(db.createCollection(nss().ns()));
 
         BSONObjBuilder indexSpec;
         indexSpec.append("key", BSON("a" << 1 << "a" << 1 << "b" << 1));
@@ -245,13 +245,13 @@ public:
 class FindAndModify : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(ns()));
+        ASSERT(db.createCollection(nss().ns()));
         {
             BSONObjBuilder b;
             b.genOID();
             b.append("name", "Tom");
             b.append("rating", 0);
-            db.insert(ns(), b.obj());
+            db.insert(nss().ns(), b.obj());
         }
 
         BSONObjBuilder cmd;
@@ -275,7 +275,8 @@ public:
         int n = 0;
         for (int x = 0; x < 20; x++) {
             for (int y = 0; y < 20; y++) {
-                db.insert(ns(), BSON("_id" << n << "loc" << BSON_ARRAY(x << y) << "z" << n % 5));
+                db.insert(nss().ns(),
+                          BSON("_id" << n << "loc" << BSON_ARRAY(x << y) << "z" << n % 5));
                 n++;
             }
         }
@@ -321,7 +322,7 @@ public:
 class Touch : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(ns()));
+        ASSERT(db.createCollection(nss().ns()));
         {
             BSONObjBuilder cmd;
             cmd.appendSymbol("touch", nsColl());  // Use Symbol for SERVER-16260

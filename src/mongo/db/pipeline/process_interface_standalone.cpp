@@ -288,7 +288,7 @@ void MongoInterfaceStandalone::appendLatencyStats(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   bool includeHistograms,
                                                   BSONObjBuilder* builder) const {
-    Top::get(opCtx->getServiceContext()).appendLatencyStats(nss.ns(), includeHistograms, builder);
+    Top::get(opCtx->getServiceContext()).appendLatencyStats(nss, includeHistograms, builder);
 }
 
 Status MongoInterfaceStandalone::appendStorageStats(OperationContext* opCtx,

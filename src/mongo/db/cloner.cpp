@@ -595,7 +595,7 @@ Status Cloner::createCollectionsForDb(
                 opCtx->checkForInterrupt();
                 WriteUnitOfWork wunit(opCtx);
 
-                Collection* collection = db->getCollection(opCtx, nss.ns());
+                Collection* collection = db->getCollection(opCtx, nss);
                 if (collection) {
                     if (!params.shardedColl) {
                         // If the collection is unsharded then we want to fail when a collection

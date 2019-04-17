@@ -122,7 +122,7 @@ void createCollection(OperationContext* opCtx,
         auto db = ctx.db();
         ASSERT_TRUE(db);
         mongo::WriteUnitOfWork wuow(opCtx);
-        auto coll = db->createCollection(opCtx, nss.ns(), options);
+        auto coll = db->createCollection(opCtx, nss, options);
         ASSERT_TRUE(coll);
         wuow.commit();
     });

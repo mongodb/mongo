@@ -103,7 +103,7 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
     const bool stayTemp = true;
     return writeConflictRetry(opCtx, "renameCollection", targetNs.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
-        auto status = targetDB->renameCollection(opCtx, targetNs.ns(), tmpName.ns(), stayTemp);
+        auto status = targetDB->renameCollection(opCtx, targetNs, tmpName, stayTemp);
         if (!status.isOK())
             return status;
 
@@ -118,8 +118,8 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
 }
 
 Status renameCollectionCommon(OperationContext* opCtx,
-                              const NamespaceString& source,
-                              const NamespaceString& target,
+                              NamespaceString source,  // Don't use a ref, as it's going to change.
+                              NamespaceString target,
                               OptionalCollectionUUID targetUUID,
                               repl::OpTime renameOpTimeFromApplyOps,
                               const RenameCollectionOptions& options) {
@@ -272,7 +272,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 {
                     // No logOp necessary because the entire renameCollection command is one logOp.
                     repl::UnreplicatedWritesBlock uwb(opCtx);
-                    status = targetDB->renameCollection(opCtx, source.ns(), target.ns(), stayTemp);
+                    status = targetDB->renameCollection(opCtx, source, target, stayTemp);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -360,12 +360,12 @@ Status renameCollectionCommon(OperationContext* opCtx,
             IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
                 targetColl->uuid().get());
 
-            status = targetDB->dropCollection(opCtx, targetColl->ns().ns(), renameOpTime);
+            status = targetDB->dropCollection(opCtx, targetColl->ns(), renameOpTime);
             if (!status.isOK()) {
                 return status;
             }
 
-            status = targetDB->renameCollection(opCtx, source.ns(), target.ns(), options.stayTemp);
+            status = targetDB->renameCollection(opCtx, source, target, options.stayTemp);
             if (!status.isOK()) {
                 return status;
             }
@@ -415,7 +415,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
         writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            tmpColl = targetDB->createCollection(opCtx, tmpName.ns(), collectionOptions);
+            tmpColl = targetDB->createCollection(opCtx, tmpName, collectionOptions);
             wunit.commit();
         });
     }
