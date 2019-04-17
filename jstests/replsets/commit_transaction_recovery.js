@@ -3,7 +3,7 @@
  * replaying the commitTransaction oplog entry. We hold back the snapshot so that we make sure that
  * the operations from the transaction are not reflected in the data when recovery starts.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
 (function() {

@@ -6,7 +6,7 @@
  * reflects the transaction. If the operations are replayed, this will cause a BSONTooLarge
  * exception.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
 (function() {

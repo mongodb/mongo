@@ -22,6 +22,14 @@
         return;
     }
 
+    function findPrepareEntry(oplogColl) {
+        if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
+            return oplogColl.findOne({op: "c", o: {"prepareTransaction": 1}});
+        } else {
+            return oplogColl.findOne({prepare: true});
+        }
+    }
+
     // A new replica set for both the commit and abort tests to ensure the same clean state.
     function doTest(commitOrAbort) {
         const replSet = new ReplSetTest({
@@ -60,20 +68,25 @@
         jsTestLog("Get transaction entry from config.transactions");
 
         const txnEntry = primary.getDB("config").transactions.findOne();
-        assert.eq(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
+        if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
+            assert.lt(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
+        } else {
+            assert.eq(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
+        }
 
         assert.soonNoExcept(() => {
             const secondaryTxnEntry = secondary.getDB("config").transactions.findOne();
+            assert(secondaryTxnEntry);
             assert.eq(secondaryTxnEntry, txnEntry, tojson(secondaryTxnEntry));
             return true;
         });
 
         jsTestLog("Find prepare oplog entry");
 
-        const oplogEntry = primaryOplog.findOne({prepare: true});
+        const oplogEntry = findPrepareEntry(primaryOplog);
         assert.eq(oplogEntry.ts, prepareTimestamp, tojson(oplogEntry));
         // Must already be written on secondary, since the config.transactions entry is.
-        const secondaryOplogEntry = secondaryOplog.findOne({prepare: true});
+        const secondaryOplogEntry = findPrepareEntry(secondaryOplog);
         assert.eq(secondaryOplogEntry.ts, prepareTimestamp, tojson(secondaryOplogEntry));
 
         jsTestLog("Insert documents until oplog exceeds oplogSize");
@@ -84,11 +97,11 @@
         jsTestLog(
             `Oplog dataSize = ${primaryOplog.dataSize()}, check the prepare entry still exists`);
 
-        assert.eq(oplogEntry, primaryOplog.findOne({prepare: true}));
+        assert.eq(oplogEntry, findPrepareEntry(primaryOplog));
         assert.soon(() => {
             return secondaryOplog.dataSize() > PrepareHelpers.oplogSizeBytes;
         });
-        assert.eq(oplogEntry, secondaryOplog.findOne({prepare: true}));
+        assert.eq(oplogEntry, findPrepareEntry(secondaryOplog));
 
         if (commitOrAbort === "commit") {
             jsTestLog("Commit prepared transaction and wait for oplog to shrink to max oplogSize");

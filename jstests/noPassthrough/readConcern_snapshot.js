@@ -17,8 +17,7 @@
     let session =
         rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     let sessionDb = session.getDatabase(dbName);
-    if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern ||
-        !sessionDb.serverStatus().storageEngine.persistent) {
+    if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern) {
         // Transactions with readConcern snapshot fail.
         session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),

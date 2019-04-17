@@ -2,7 +2,7 @@
  * Test that we can successfully reconstruct a prepared transaction that was prepared before the
  * stable timestamp at the end of startup recovery.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
 (function() {

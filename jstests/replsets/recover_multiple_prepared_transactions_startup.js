@@ -2,7 +2,7 @@
  * Test that startup recovery successfully recovers multiple prepared transactions and that we can
  * commit or abort the transaction afterwards.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
 (function() {
