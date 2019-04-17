@@ -242,7 +242,12 @@ StatusWith<std::unique_ptr<AuthenticationSession>> doSaslStart(OperationContext*
 
     auto session = std::make_unique<AuthenticationSession>(std::move(swMech.getValue()));
     Status statusStep = doSaslStep(opCtx, session.get(), cmdObj, result);
-    *principalName = session->getMechanism().getPrincipalName().toString();
+
+    if (!statusStep.isOK() || session->getMechanism().isSuccess()) {
+        // Only attempt to populate principal name if we're done (successfully or not).
+        *principalName = session->getMechanism().getPrincipalName().toString();
+    }
+
     if (!statusStep.isOK()) {
         return statusStep;
     }
