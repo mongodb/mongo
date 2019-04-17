@@ -298,7 +298,7 @@ public:
 
     private:
         IndexCatalogImpl* const _catalog;
-        const NamespaceString& _nss;
+        const NamespaceString _nss;
 
         BSONObj _spec;
         IndexBuildMethod _method;
