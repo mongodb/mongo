@@ -85,7 +85,10 @@ public:
               typename... Args,
               typename = std::enable_if_t<std::is_constructible_v<DerivedT, Args...>>>
     auto makeListener(Args&&... args) {
-        auto deleter = [this](auto listener) { _removeListener(listener); };
+        auto deleter = [this](auto listener) {
+            _removeListener(listener);
+            delete listener;
+        };
         auto ptr = new DerivedT(std::forward<Args>(args)...);
 
         _addListener(ptr);
