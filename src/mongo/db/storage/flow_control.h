@@ -101,7 +101,7 @@ private:
 
     std::vector<repl::MemberData> _prevMemberData;
 
-    int _prevLagSecs = 0;
+    long long _prevLagMillis = 0;
 };
 
 }  // namespace mongo

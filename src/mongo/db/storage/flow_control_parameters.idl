@@ -36,8 +36,15 @@ server_parameters:
         cpp_varname: 'gFlowControlEnabled'
         default: false
     flowControlTargetLagSeconds:
-        description: 'Target majority lag threshold where flow control will become engaged.'
+        description: 'Target maximum majority committed lag with flow control enabled'
         set_at: [ startup, runtime ]
         cpp_vartype: 'AtomicWord<std::int32_t>'
         cpp_varname: 'gFlowControlTargetLagSeconds'
         default: 10
+    flowControlThresholdLagPercentage:
+        description: 'Threshold percentage of target lag where flow control will become engaged'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<double>'
+        cpp_varname: 'gFlowControlThresholdLagPercentage'
+        default: 0.5
+        validator: { gte: 0.0, lte: 1.0 }

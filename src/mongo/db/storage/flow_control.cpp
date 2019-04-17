@@ -64,6 +64,20 @@ int multiplyWithOverflowCheck(double term1, double term2, int maxValue) {
 
     return static_cast<int>(ret);
 }
+
+long long getLagMillis(Date_t myLastApplied, Date_t lastCommitted) {
+    if (!myLastApplied.isFormattable() || !lastCommitted.isFormattable()) {
+        return 0;
+    }
+    const long long lagMillis = durationCount<Milliseconds>(myLastApplied - lastCommitted);
+    return lagMillis;
+}
+
+bool isLagged(Date_t myLastApplied, Date_t lastCommitted) {
+    const auto lagMillis = getLagMillis(myLastApplied, lastCommitted);
+    return lagMillis >= gFlowControlThresholdLagPercentage.load() *
+        durationCount<Milliseconds>(Seconds(gFlowControlTargetLagSeconds.load()));
+}
 }  // namespace
 
 FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord)
@@ -122,8 +136,19 @@ double FlowControl::_getMyLocksPerOp() {
 
 BSONObj FlowControl::generateSection(OperationContext* opCtx,
                                      const BSONElement& configElement) const {
-    const int lagSecs = _replCoord->getMyLastAppliedOpTime().getSecs() -
-        _replCoord->getLastCommittedOpTime().getSecs();
+    // Lag is not meaningful on arbiters.
+    const bool isArbiter =
+        _replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+        _replCoord->getMemberState().arbiter();
+
+    // Flow Control is only enabled if FCV is 4.2.
+    const bool isFCV42 =
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         serverGlobalParams.featureCompatibility.getVersion() ==
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+
+    const Date_t myLastAppliedWall = _replCoord->getMyLastAppliedOpTimeAndWallTime().wallTime;
+    const Date_t lastCommittedWall = _replCoord->getLastCommittedOpTimeAndWallTime().wallTime;
 
     BSONObjBuilder bob;
     bob.append("targetRateLimit", _lastTargetTicketsPermitted.load());
@@ -131,23 +156,37 @@ BSONObj FlowControl::generateSection(OperationContext* opCtx,
                FlowControlTicketholder::get(opCtx)->totalTimeAcquiringMicros());
     bob.append("locksPerOp", _lastLocksPerOp.load());
     bob.append("sustainerRate", _lastSustainerAppliedCount.load());
-    bob.append("isLagged", lagSecs >= gFlowControlTargetLagSeconds.load());
+    bob.append("isLagged", isFCV42 && !isArbiter && isLagged(myLastAppliedWall, lastCommittedWall));
 
     return bob.obj();
 }
 
 int FlowControl::getNumTickets() {
     const int maxTickets = 1000 * 1000 * 1000;
-    if (serverGlobalParams.enableMajorityReadConcern == false || gFlowControlEnabled == false) {
+
+    // Lag is not meaningful on arbiters.
+    const bool isArbiter =
+        _replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+        _replCoord->getMemberState().arbiter();
+
+    // Flow Control is only enabled if FCV is 4.2.
+    const bool isFCV42 =
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         serverGlobalParams.featureCompatibility.getVersion() ==
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+
+    if (serverGlobalParams.enableMajorityReadConcern == false || gFlowControlEnabled == false ||
+        isFCV42 == false || isArbiter) {
         return maxTickets;
     }
 
-    const Timestamp myLastApplied = _replCoord->getMyLastAppliedOpTime().getTimestamp();
-    const Timestamp lastCommitted = _replCoord->getLastCommittedOpTime().getTimestamp();
-    const int lagSecs = myLastApplied.getSecs() - lastCommitted.getSecs();
-
-    bool areWeLagged = lagSecs >= gFlowControlTargetLagSeconds.load();
-    if (areWeLagged && _approximateOpsBetween(lastCommitted.asULL(), myLastApplied.asULL()) == -1) {
+    const auto myLastApplied = _replCoord->getMyLastAppliedOpTimeAndWallTime();
+    const auto lastCommitted = _replCoord->getLastCommittedOpTimeAndWallTime();
+    const Timestamp myLastAppliedTs = myLastApplied.opTime.getTimestamp();
+    const Timestamp lastCommittedTs = lastCommitted.opTime.getTimestamp();
+    bool areWeLagged = isLagged(myLastApplied.wallTime, lastCommitted.wallTime);
+    if (areWeLagged &&
+        _approximateOpsBetween(lastCommittedTs.asULL(), myLastAppliedTs.asULL()) == -1) {
         // _approximateOpsBetween will return -1 if the input timestamps are in the same
         // "bucket". This is an indication that there are very few ops between the two timestamps.
         //
@@ -221,15 +260,16 @@ int FlowControl::getNumTickets() {
     // exercise readers would be delighted to spend their time on.
     ret = std::min(ret, maxTickets);
 
-    LOG(DEBUG_LOG_LEVEL) << "Are lagged? " << areWeLagged << " Prev lag: " << _prevLagSecs
-                         << " Curr lag: " << lagSecs << " OpsLagged: "
-                         << _approximateOpsBetween(lastCommitted.asULL(), myLastApplied.asULL())
+    const long long lagMillis = getLagMillis(myLastApplied.wallTime, lastCommitted.wallTime);
+    LOG(DEBUG_LOG_LEVEL) << "Are lagged? " << areWeLagged << " Prev lag millis: " << _prevLagMillis
+                         << " Curr lag millis: " << lagMillis << " OpsLagged: "
+                         << _approximateOpsBetween(lastCommittedTs.asULL(), myLastAppliedTs.asULL())
                          << " Granting: " << ret
                          << " Last granted: " << _lastTargetTicketsPermitted.load()
                          << " Acquisitions since last check: " << locksUsedLastPeriod;
 
     _lastTargetTicketsPermitted.store(ret);
-    _prevLagSecs = lagSecs;
+    _prevLagMillis = lagMillis;
     return ret;
 }
 
