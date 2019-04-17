@@ -45,7 +45,7 @@ mongoebench = yamlEnv.Program(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
+        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger' if get_option('wiredtiger') == 'on' else [],
         '$BUILD_DIR/mongo/embedded/embedded',
         '$BUILD_DIR/mongo/embedded/embedded_integration_helpers',
         '$BUILD_DIR/mongo/shell/benchrun',

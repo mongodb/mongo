@@ -146,7 +146,7 @@ if get_option('link-model') != 'dynamic-sdk':
             '$BUILD_DIR/mongo/db/mongod_options',
             '$BUILD_DIR/mongo/db/repl/repl_set_status_commands',
             '$BUILD_DIR/mongo/db/server_options',
-            "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger",
+            '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger' if get_option('wiredtiger') == 'on' else [],
             '$BUILD_DIR/mongo/embedded/embedded',
             '$BUILD_DIR/mongo/embedded/embedded_integration_helpers',
             '$BUILD_DIR/mongo/transport/service_entry_point',
