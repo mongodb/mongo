@@ -172,6 +172,10 @@ public:
             // clusterTime, even across yields.
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                           targetClusterTime);
+
+            // The $_internalReadAtClusterTime option also causes any storage-layer cursors created
+            // during plan execution to block on prepared transactions.
+            opCtx->recoveryUnit()->setIgnorePrepared(false);
         }
 
         // We lock the entire database in S-mode in order to ensure that the contents will not

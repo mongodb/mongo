@@ -334,6 +334,10 @@ public:
                 // clusterTime, even across yields.
                 opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                               targetClusterTime);
+
+                // The $_internalReadAtClusterTime option also causes any storage-layer cursors
+                // created during plan execution to block on prepared transactions.
+                opCtx->recoveryUnit()->setIgnorePrepared(false);
             }
 
             // Acquire locks. If the query is on a view, we release our locks and convert the query
