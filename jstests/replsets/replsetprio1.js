@@ -2,7 +2,8 @@
 
 (function() {
     "use strict";
-    var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
+    var replTest = new ReplSetTest(
+        {name: 'testSet', nodes: 3, nodeOptions: {setParameter: "numInitialSyncAttempts=2"}});
     var nodenames = replTest.nodeList();
 
     var nodes = replTest.startSet();
