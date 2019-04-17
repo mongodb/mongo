@@ -1273,7 +1273,6 @@ void _validateCatalogEntry(OperationContext* opCtx,
 Status CollectionImpl::validate(OperationContext* opCtx,
                                 ValidateCmdLevel level,
                                 bool background,
-                                std::unique_ptr<Lock::CollectionLock> collLk,
                                 ValidateResults* results,
                                 BSONObjBuilder* output) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IS));
@@ -1281,8 +1280,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
     try {
         ValidateResultsMap indexNsResultsMap;
         BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe
-        IndexConsistency indexConsistency(
-            opCtx, this, ns(), _recordStore, std::move(collLk), background);
+        IndexConsistency indexConsistency(opCtx, this, ns(), _recordStore, background);
         RecordStoreValidateAdaptor indexValidator = RecordStoreValidateAdaptor(
             opCtx, &indexConsistency, level, _indexCatalog.get(), &indexNsResultsMap);
 

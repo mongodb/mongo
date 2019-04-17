@@ -581,7 +581,7 @@ Status KVCatalog::_replaceEntry(OperationContext* opCtx,
 }
 
 Status KVCatalog::_removeEntry(OperationContext* opCtx, StringData ns) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(ns), MODE_X));
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
     const NSToIdentMap::iterator it = _idents.find(ns.toString());
     if (it == _idents.end()) {
@@ -793,7 +793,10 @@ Status KVCatalog::renameCollection(OperationContext* opCtx,
                                    bool stayTemp) {
     const NamespaceString fromNss(fromNS);
     const NamespaceString toNss(toNS);
-    invariant(opCtx->lockState()->isDbLockedForMode(fromNss.db(), MODE_X));
+    // TODO SERVER-39518 : Temporarily comment this out because dropCollection uses
+    // this function and now it only takes a database IX lock. We can change
+    // this invariant to IX once renameCollection only MODE_IX as well.
+    // invariant(opCtx->lockState()->isDbLockedForMode(fromNss.db(), MODE_X));
 
     const std::string identFrom = _engine->getCatalog()->getCollectionIdent(fromNS);
 
@@ -836,7 +839,7 @@ private:
 
 Status KVCatalog::dropCollection(OperationContext* opCtx, StringData ns) {
     NamespaceString nss(ns);
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
     CollectionCatalogEntry* const entry =
         UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);

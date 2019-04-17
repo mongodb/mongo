@@ -304,14 +304,10 @@ void UUIDCatalog::setCollectionNamespace(OperationContext* opCtx,
     });
 }
 
-void UUIDCatalog::onCloseDatabase(Database* db) {
+void UUIDCatalog::onCloseDatabase(OperationContext* opCtx, Database* db) {
+    invariant(opCtx->lockState()->isW());
     for (auto it = begin(db->name()); it != end(); ++it) {
-        auto coll = *it;
-        if (coll && coll->uuid()) {
-            // While the collection does not actually get dropped, we're going to destroy the
-            // Collection object, so for purposes of the UUIDCatalog it looks the same.
-            deregisterCollectionObject(coll->uuid().get());
-        }
+        deregisterCollectionObject(it.uuid().get());
     }
 
     auto rid = ResourceId(RESOURCE_DATABASE, db->name());
@@ -396,16 +392,6 @@ boost::optional<CollectionUUID> UUIDCatalog::lookupUUIDByNSS(const NamespaceStri
     return boost::none;
 }
 
-std::vector<CollectionCatalogEntry*> UUIDCatalog::getAllCatalogEntriesFromDb(
-    StringData dbName) const {
-    std::vector<UUID> uuids = getAllCollectionUUIDsFromDb(dbName);
-    std::vector<CollectionCatalogEntry*> ret;
-    for (auto& uuid : uuids) {
-        ret.push_back(lookupCollectionCatalogEntryByUUID(uuid));
-    }
-    return ret;
-}
-
 std::vector<CollectionUUID> UUIDCatalog::getAllCollectionUUIDsFromDb(StringData dbName) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
@@ -419,10 +405,18 @@ std::vector<CollectionUUID> UUIDCatalog::getAllCollectionUUIDsFromDb(StringData 
     return ret;
 }
 
-std::vector<NamespaceString> UUIDCatalog::getAllCollectionNamesFromDb(StringData dbName) const {
+std::vector<NamespaceString> UUIDCatalog::getAllCollectionNamesFromDb(OperationContext* opCtx,
+                                                                      StringData dbName) const {
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_S));
+
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+
     std::vector<NamespaceString> ret;
-    for (auto catalogEntry : getAllCatalogEntriesFromDb(dbName)) {
-        ret.push_back(catalogEntry->ns());
+    for (auto it = _orderedCollections.lower_bound(std::make_pair(dbName.toString(), minUuid));
+         it != _orderedCollections.end() && it->first.first == dbName;
+         ++it) {
+        ret.push_back(it->second->collectionCatalogEntry->ns());
     }
     return ret;
 }
