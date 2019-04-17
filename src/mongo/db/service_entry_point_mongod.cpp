@@ -34,7 +34,6 @@
 #include "mongo/db/service_entry_point_mongod.h"
 
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -104,10 +103,21 @@ public:
                              const repl::OpTime& lastOpBeforeRun,
                              BSONObjBuilder& commandResponseBuilder) const override {
         auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
         // Ensures that if we tried to do a write, we wait for write concern, even if that write was
         // a noop.
+        //
+        // Transactions do not stash their lockers on commit and abort, so after commit and abort,
+        // wasGlobalLockTakenForWrite will return whether any statement in the transaction as a
+        // whole acquired the global write lock.
+        //
+        // Speculative majority semantics dictate that "abortTransaction" should not wait for write
+        // concern on operations the transaction observed. As a result, "abortTransaction" only ever
+        // waits on an oplog entry it wrote (and has already set lastOp to) or previous writes on
+        // the same client.
         if ((lastOpAfterRun == lastOpBeforeRun) &&
-            GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked()) {
+            opCtx->lockState()->wasGlobalLockTakenForWrite() &&
+            (invocation->definition()->getName() != "abortTransaction")) {
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
             lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         }

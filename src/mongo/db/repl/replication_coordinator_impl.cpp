@@ -46,7 +46,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -1816,10 +1815,8 @@ void ReplicationCoordinatorImpl::_killUserOperationsOnStepDown(
 
         // Don't kill the stepdown thread.
         if (toKill && !toKill->isKillPending() && toKill->getOpID() != stepDownOpCtx->getOpID()) {
-            const GlobalLockAcquisitionTracker& globalLockTracker =
-                GlobalLockAcquisitionTracker::get(toKill);
-            if (globalLockTracker.getGlobalWriteLocked() ||
-                globalLockTracker.getGlobalSharedLockTaken()) {
+            auto locker = toKill->lockState();
+            if (locker->wasGlobalLockTakenInModeConflictingWithWrites()) {
                 serviceCtx->killOperation(lk, toKill, ErrorCodes::InterruptedDueToStepDown);
                 userOpsKilled.increment();
             } else {

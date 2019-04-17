@@ -588,6 +588,26 @@ bool LockerImpl::isCollectionLockedForMode(const NamespaceString& nss, LockMode 
     return false;
 }
 
+bool LockerImpl::wasGlobalLockTakenForWrite() const {
+    return _globalLockMode & ((1 << MODE_IX) | (1 << MODE_X));
+}
+
+bool LockerImpl::wasGlobalLockTakenInModeConflictingWithWrites() const {
+    return _wasGlobalLockTakenInModeConflictingWithWrites.load();
+}
+
+bool LockerImpl::wasGlobalLockTaken() const {
+    return _globalLockMode;
+}
+
+void LockerImpl::setGlobalLockTakenInMode(LockMode mode) {
+    _globalLockMode |= (1 << mode);
+
+    if (mode == MODE_IX || mode == MODE_X || mode == MODE_S) {
+        _wasGlobalLockTakenInModeConflictingWithWrites.store(true);
+    }
+}
+
 ResourceId LockerImpl::getWaitingResource() const {
     scoped_spinlock scopedLock(_lock);
 

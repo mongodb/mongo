@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -472,65 +471,65 @@ TEST_F(DConcurrencyTestFixture, RSTLmodeX_Timeout) {
 TEST_F(DConcurrencyTestFixture, GlobalLockXSetsGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 
     {
         Lock::GlobalLock globalWrite(opCtx, MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalWrite.isLocked());
     }
-    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockIXSetsGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
     {
         Lock::GlobalLock globalWrite(
             opCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalWrite.isLocked());
     }
-    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockSDoesNotSetGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
     {
         Lock::GlobalLock globalRead(opCtx, MODE_S, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockISDoesNotSetGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
     {
         Lock::GlobalLock globalRead(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockXSetsGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 
     { Lock::DBLock dbWrite(opCtx, "db", MODE_X); }
-    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 
     { Lock::DBLock dbRead(opCtx, "db", MODE_S); }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalWriteLockedWhenLockAcquisitionTimesOut) {
@@ -542,7 +541,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalWriteLockedWhenLockAc
     ASSERT(globalWrite0.isLocked());
 
     auto opCtx = clients[1].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
     {
         ASSERT_THROWS_CODE(
             Lock::GlobalLock(
@@ -550,92 +549,92 @@ TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalWriteLockedWhenLockAc
             AssertionException,
             ErrorCodes::LockTimeout);
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenForWrite());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockSSetsGlobalSharedLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, GlobalLockSSetsGlobalLockTakenInModeConflictingWithWrites) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     {
         Lock::GlobalLock globalWrite(opCtx, MODE_S, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalWrite.isLocked());
     }
-    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockISDoesNotSetGlobalSharedLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, GlobalLockISDoesNotSetGlobalLockTakenInModeConflictingWithWrites) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
     {
         Lock::GlobalLock globalRead(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockIXDoesNotSetGlobalSharedLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, GlobalLockIXSetsGlobalLockTakenInModeConflictingWithWrites) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
     {
         Lock::GlobalLock globalRead(opCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalSharedLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, GlobalLockXSetsGlobalLockTakenInModeConflictingWithWrites) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
     {
         Lock::GlobalLock globalRead(opCtx, MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalSharedLockTakeOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalLockTakenInModeConflictingWithWrites) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     { Lock::DBLock dbWrite(opCtx, "db", MODE_S); }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockISDoesNotSetGlobalSharedLockTakeOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, DBLockISDoesNotSetGlobalLockTakenInModeConflictingWithWrites) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     { Lock::DBLock dbWrite(opCtx, "db", MODE_IS); }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockIXDoesNotSetGlobalSharedLockTakeOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, DBLockIXSetsGlobalLockTakenInModeConflictingWithWrites) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     { Lock::DBLock dbWrite(opCtx, "db", MODE_IX); }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockXDoesNotSetGlobalSharedLockTakeOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, DBLockXSetsGlobalLockTakenInModeConflictingWithWrites) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     { Lock::DBLock dbRead(opCtx, "db", MODE_X); }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
 TEST_F(DConcurrencyTestFixture,
-       GlobalLockSDoesNotSetGlobalSharedLockTakenWhenLockAcquisitionTimesOut) {
+       GlobalLockSDoesNotSetGlobalLockTakenInModeConflictingWithWritesWhenLockAcquisitionTimesOut) {
     auto clients = makeKClientsWithLockers(2);
 
     // Take a global lock so that the next one times out.
@@ -644,7 +643,7 @@ TEST_F(DConcurrencyTestFixture,
     ASSERT(globalWrite0.isLocked());
 
     auto opCtx = clients[1].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
     {
         ASSERT_THROWS_CODE(
             Lock::GlobalLock(
@@ -652,7 +651,7 @@ TEST_F(DConcurrencyTestFixture,
             AssertionException,
             ErrorCodes::LockTimeout);
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockS_NoTimeoutDueToGlobalLockS) {

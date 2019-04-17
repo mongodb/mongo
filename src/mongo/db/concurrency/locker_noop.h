@@ -118,6 +118,20 @@ public:
         return false;
     }
 
+    virtual bool wasGlobalLockTakenForWrite() const {
+        return false;
+    }
+
+    virtual bool wasGlobalLockTakenInModeConflictingWithWrites() const {
+        return false;
+    }
+
+    virtual bool wasGlobalLockTaken() const {
+        return false;
+    }
+
+    virtual void setGlobalLockTakenInMode(LockMode mode) {}
+
     virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
         MONGO_UNREACHABLE;
     }

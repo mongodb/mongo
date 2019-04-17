@@ -158,6 +158,14 @@ public:
         return _wuowNestingLevel > 0;
     }
 
+    bool wasGlobalLockTakenForWrite() const override;
+
+    bool wasGlobalLockTakenInModeConflictingWithWrites() const override;
+
+    bool wasGlobalLockTaken() const override;
+
+    void setGlobalLockTakenInMode(LockMode mode) override;
+
     /**
      * Requests a lock for resource 'resId' with mode 'mode'. An OperationContext 'opCtx' must be
      * provided to interrupt waiting on the locker condition variable that indicates status of
@@ -356,6 +364,13 @@ private:
 
     // A structure for accumulating time spent getting flow control tickets.
     FlowControlTicketholder::CurOp _flowControlStats;
+
+    // Tracks the global lock modes ever acquired in this Locker's life. This value should only ever
+    // be accessed from the thread that owns the Locker.
+    unsigned char _globalLockMode = (1 << MODE_NONE);
+
+    // Tracks whether this operation should be killed on step down.
+    AtomicWord<bool> _wasGlobalLockTakenInModeConflictingWithWrites{false};
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //
