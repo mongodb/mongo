@@ -122,8 +122,7 @@ bool updateShardKeyForDocument(OperationContext* opCtx,
                                const WouldChangeOwningShardInfo& documentKeyChangeInfo,
                                int stmtId) {
     auto updatePreImage = documentKeyChangeInfo.getPreImage().getOwned();
-    invariant(documentKeyChangeInfo.getPostImage());
-    auto updatePostImage = documentKeyChangeInfo.getPostImage()->getOwned();
+    auto updatePostImage = documentKeyChangeInfo.getPostImage().getOwned();
 
     auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage, stmtId);
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, stmtId);

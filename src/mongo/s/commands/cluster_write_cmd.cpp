@@ -61,6 +61,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangAfterThrowWouldChangeOwningShardRetryableWrite);
+
 void batchErrorToLastError(const BatchedCommandRequest& request,
                            const BatchedCommandResponse& response,
                            LastError* error) {
@@ -226,6 +228,11 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
         return false;
 
     if (isRetryableWrite) {
+        if (MONGO_FAIL_POINT(hangAfterThrowWouldChangeOwningShardRetryableWrite)) {
+            log() << "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                opCtx, hangAfterThrowWouldChangeOwningShardRetryableWrite);
+        }
         RouterOperationContextSession routerSession(opCtx);
         try {
             // Start transaction and re-run the original update command
@@ -234,7 +241,8 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
 
             auto txnRouterForShardKeyChange =
                 documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
-
+            // Clear the error details from the response object before sending the write again
+            response->unsetErrDetails();
             ClusterWriter::write(opCtx, request, &stats, response);
             wouldChangeOwningShardErrorInfo =
                 getWouldChangeOwningShardErrorInfo(opCtx, request, response, !isRetryableWrite);

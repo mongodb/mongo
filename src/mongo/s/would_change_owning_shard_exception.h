@@ -46,12 +46,8 @@ class WouldChangeOwningShardInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::WouldChangeOwningShard;
 
-    explicit WouldChangeOwningShardInfo(const BSONObj& preImage,
-                                        const boost::optional<BSONObj>& postImage)
-        : _preImage(preImage.getOwned()) {
-        if (postImage)
-            _postImage = postImage->getOwned();
-    }
+    explicit WouldChangeOwningShardInfo(const BSONObj& preImage, const BSONObj& postImage)
+        : _preImage(preImage.getOwned()), _postImage(postImage.getOwned()) {}
 
     const auto& getPreImage() const {
         return _preImage;
@@ -76,7 +72,7 @@ private:
     BSONObj _preImage;
 
     // The post image returned by the update stage
-    boost::optional<BSONObj> _postImage;
+    BSONObj _postImage;
 };
 using WouldChangeOwningShardException = ExceptionFor<ErrorCodes::WouldChangeOwningShard>;
 

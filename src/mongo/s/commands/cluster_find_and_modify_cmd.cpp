@@ -110,7 +110,7 @@ void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
         if (matchedDoc) {
             result->append("value",
                            cmdObj.getBoolField("new")
-                               ? wouldChangeOwningShardExtraInfo.getPostImage().get()
+                               ? wouldChangeOwningShardExtraInfo.getPostImage()
                                : wouldChangeOwningShardExtraInfo.getPreImage());
         } else {
             result->appendNull("value");
