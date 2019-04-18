@@ -46,7 +46,8 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
     ConstDataRangeCursor compressedDataRange(buf);
 
     // Read the length of the uncompressed buffer
-    auto swUncompressedLength = compressedDataRange.readAndAdvanceNoThrow<LittleEndian<std::uint32_t>>();
+    auto swUncompressedLength =
+        compressedDataRange.readAndAdvanceNoThrow<LittleEndian<std::uint32_t>>();
     if (!swUncompressedLength.isOK()) {
         return {swUncompressedLength.getStatus()};
     }
