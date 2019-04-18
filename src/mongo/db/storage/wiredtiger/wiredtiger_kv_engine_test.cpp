@@ -43,6 +43,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/logger/logger.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -239,6 +240,14 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     // CheckpointThread will observe the new `checkpointDelaySecs` value.
     _engine->setInitialDataTimestamp(Timestamp(1, 1));
     wiredTigerGlobalOptions.checkpointDelaySecs = 1;
+
+    // To diagnose any intermittent failures, maximize logging from WiredTigerKVEngine and friends.
+    const auto kStorage = logger::LogComponent::kStorage;
+    auto originalVerbosity = logger::globalLogDomain()->getMinimumLogSeverity(kStorage);
+    logger::globalLogDomain()->setMinimumLoggedSeverity(kStorage, logger::LogSeverity::Debug(3));
+    ON_BLOCK_EXIT([&]() {
+        logger::globalLogDomain()->setMinimumLoggedSeverity(kStorage, originalVerbosity);
+    });
 
     // Simulate the callback that queries config.transactions for the oldest active transaction.
     boost::optional<Timestamp> oldestActiveTxnTimestamp;
