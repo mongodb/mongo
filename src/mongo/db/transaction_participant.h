@@ -506,6 +506,11 @@ public:
         void abortActiveUnpreparedOrStashPreparedTransaction(OperationContext* opCtx);
 
         /**
+         * Abort the transaction and write an abort oplog entry unconditionally.
+         */
+        void abortTransactionForStepUp(OperationContext* opCtx);
+
+        /**
          * Aborts the storage transaction of the prepared transaction on this participant by
          * releasing its resources. Also invalidates the session and the current transaction state.
          * Avoids writing any oplog entries or making any changes to the transaction table since the

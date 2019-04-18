@@ -1428,6 +1428,10 @@ void TransactionParticipant::Participant::abortActiveUnpreparedOrStashPreparedTr
     std::terminate();
 }
 
+void TransactionParticipant::Participant::abortTransactionForStepUp(OperationContext* opCtx) {
+    _abortActiveTransaction(opCtx, TransactionState::kInProgress, true);
+}
+
 void TransactionParticipant::Participant::_abortActiveTransaction(
     OperationContext* opCtx, TransactionState::StateSet expectedStates, bool writeOplog) {
     invariant(!o().txnResourceStash);

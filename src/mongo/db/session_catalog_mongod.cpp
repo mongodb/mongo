@@ -173,6 +173,56 @@ int removeSessionsTransactionRecords(OperationContext* opCtx,
     return response.getN();
 }
 
+void createTransactionTable(OperationContext* opCtx) {
+    const size_t initialExtentSize = 0;
+    const bool capped = false;
+    const bool maxSize = 0;
+    BSONObj result;
+
+    DBDirectClient client(opCtx);
+
+    if (client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                                initialExtentSize,
+                                capped,
+                                maxSize,
+                                &result)) {
+        return;
+    }
+
+    const auto status = getStatusFromCommandResult(result);
+
+    if (status == ErrorCodes::NamespaceExists) {
+        return;
+    }
+
+    uassertStatusOKWithContext(status,
+                               str::stream()
+                                   << "Failed to create the "
+                                   << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                                   << " collection");
+}
+
+void abortInProgressTransactions(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    Query query(BSON(SessionTxnRecord::kStateFieldName
+                     << DurableTxnState_serializer(DurableTxnStateEnum::kInProgress)));
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace, query);
+    if (cursor->more()) {
+        LOG(3) << "Aborting in-progress transactions on stepup.";
+    }
+    while (cursor->more()) {
+        auto txnRecord = SessionTxnRecord::parse(
+            IDLParserErrorContext("abort-in-progress-transactions"), cursor->next());
+        opCtx->setLogicalSessionId(txnRecord.getSessionId());
+        opCtx->setTxnNumber(txnRecord.getTxnNum());
+        MongoDOperationContextSession ocs(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        LOG(3) << "Aborting transaction sessionId: " << txnRecord.getSessionId().toBSON()
+               << " txnNumber " << txnRecord.getTxnNum();
+        txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnRecord.getTxnNum());
+        txnParticipant.abortTransactionForStepUp(opCtx);
+    }
+}
 }  // namespace
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
@@ -217,33 +267,9 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         }
     }
 
-    const size_t initialExtentSize = 0;
-    const bool capped = false;
-    const bool maxSize = 0;
+    abortInProgressTransactions(opCtx);
 
-    BSONObj result;
-
-    DBDirectClient client(opCtx);
-
-    if (client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                                initialExtentSize,
-                                capped,
-                                maxSize,
-                                &result)) {
-        return;
-    }
-
-    const auto status = getStatusFromCommandResult(result);
-
-    if (status == ErrorCodes::NamespaceExists) {
-        return;
-    }
-
-    uassertStatusOKWithContext(status,
-                               str::stream()
-                                   << "Failed to create the "
-                                   << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                                   << " collection");
+    createTransactionTable(opCtx);
 }
 
 boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {

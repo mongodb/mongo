@@ -1231,6 +1231,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/timer_stats',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
     ],
 )

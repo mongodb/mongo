@@ -112,26 +112,6 @@ TEST(OperationContextTest, SessionIdAndTransactionNumber) {
     ASSERT_EQUALS(5, *opCtx->getTxnNumber());
 }
 
-DEATH_TEST(OperationContextTest, SettingSessionIdMoreThanOnceShouldCrash, "invariant") {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
-    auto opCtx = client->makeOperationContext();
-
-    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
-    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
-}
-
-DEATH_TEST(OperationContextTest, SettingTransactionNumberMoreThanOnceShouldCrash, "invariant") {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
-    auto opCtx = client->makeOperationContext();
-
-    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
-
-    opCtx->setTxnNumber(5);
-    opCtx->setTxnNumber(5);
-}
-
 DEATH_TEST(OperationContextTest, SettingTransactionNumberWithoutSessionIdShouldCrash, "invariant") {
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("OperationContextTest");

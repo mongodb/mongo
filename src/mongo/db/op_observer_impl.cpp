@@ -1284,8 +1284,14 @@ void logCommitOrAbortForTransaction(OperationContext* opCtx,
     StmtId stmtId(1);
     if (gUseMultipleOplogEntryFormatForTransactions &&
         serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
+        durableState != DurableTxnStateEnum::kAborted) {
         stmtId = txnParticipant.retrieveCompletedTransactionOperations(opCtx).size() + 1;
+    }
+    // When we abort a transaction on stepup, we won't know the number of operations since we
+    // don't reconstruct them. Using the max integer would be safe.
+    if (durableState == DurableTxnStateEnum::kAborted) {
+        stmtId = std::numeric_limits<StmtId>::max();
     }
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
 

@@ -351,13 +351,11 @@ void OperationContext::setIsExecutingShutdown() {
 }
 
 void OperationContext::setLogicalSessionId(LogicalSessionId lsid) {
-    invariant(!_lsid);
     _lsid = std::move(lsid);
 }
 
 void OperationContext::setTxnNumber(TxnNumber txnNumber) {
     invariant(_lsid);
-    invariant(!_txnNumber);
     _txnNumber = txnNumber;
 }
 

@@ -579,15 +579,14 @@ public:
 
 
 protected:
-    void checkSessionAndTransactionFields(const BSONObj& oplogEntry, int expectedStmtId) {
+    void checkSessionAndTransactionFields(const BSONObj& oplogEntry) {
         ASSERT_BSONOBJ_EQ(session()->getSessionId().toBSON(), oplogEntry.getObjectField("lsid"));
         ASSERT_EQ(*opCtx()->getTxnNumber(), oplogEntry.getField("txnNumber").safeNumberLong());
-        ASSERT_EQ(expectedStmtId, oplogEntry.getIntField("stmtId"));
     }
-    void checkCommonFields(const BSONObj& oplogEntry, int expectedStmtId = 0) {
+    void checkCommonFields(const BSONObj& oplogEntry) {
         ASSERT_EQ("c"_sd, oplogEntry.getStringField("op"));
         ASSERT_EQ("admin.$cmd"_sd, oplogEntry.getStringField("ns"));
-        checkSessionAndTransactionFields(oplogEntry, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntry);
     }
 
     void assertTxnRecord(TxnNumber txnNum,
@@ -861,7 +860,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
     auto oplogIter = oplogInterface.makeIterator();
     {
         auto oplogEntryObj = unittest::assertGet(oplogIter->next()).first;
-        checkCommonFields(oplogEntryObj, 1);
+        checkCommonFields(oplogEntryObj);
         OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
         auto o = oplogEntry.getObject();
         auto oExpected = BSON("commitTransaction" << 1 << "commitTimestamp" << prepareTimestamp);
@@ -929,7 +928,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
     auto oplogIter = oplogInterface.makeIterator();
     {
         auto oplogEntryObj = unittest::assertGet(oplogIter->next()).first;
-        checkCommonFields(oplogEntryObj, 1);
+        checkCommonFields(oplogEntryObj);
         OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
         auto o = oplogEntry.getObject();
         auto oExpected = BSON("abortTransaction" << 1);
@@ -1387,7 +1386,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntryObj = getNOplogEntries(opCtx(), 1)[0];
-    checkSessionAndTransactionFields(oplogEntryObj, 0);
+    checkSessionAndTransactionFields(oplogEntryObj);
     auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     ASSERT(!oplogEntry.getPrepare());
     ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
@@ -1426,11 +1425,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 4);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -1438,7 +1436,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
@@ -1525,11 +1522,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -1537,7 +1533,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
@@ -1598,11 +1593,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -1610,7 +1604,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
@@ -1656,7 +1649,7 @@ TEST_F(OpObserverMultiEntryTransactionTest,
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 1);
     auto prepareEntryObj = oplogEntryObjs.back();
     const auto prepareOplogEntry = assertGet(OplogEntry::parse(prepareEntryObj));
-    checkSessionAndTransactionFields(prepareEntryObj, 0);
+    checkSessionAndTransactionFields(prepareEntryObj);
     // The startOpTime should refer to the prepare oplog entry for an empty transaction.
     const auto startOpTime = prepareOplogEntry.getOpTime();
 
@@ -1702,11 +1695,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
             opCtx(), reservedSlots, txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     }
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 5);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -1714,7 +1706,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
@@ -1819,11 +1810,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     }
 
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 3);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -1831,7 +1821,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
@@ -1910,11 +1899,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
     }
 
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 3);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -1922,7 +1910,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
@@ -2035,8 +2022,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     oplogEntryObjs = getNOplogEntries(opCtx(), 4);
     const auto commitOplogObj = oplogEntryObjs.back();
     // Statement id's for the inserts and prepare should be [0,1] and 2 respectively.
-    const auto expectedCommitStmtId = 3;
-    checkSessionAndTransactionFields(commitOplogObj, expectedCommitStmtId);
+    checkSessionAndTransactionFields(commitOplogObj);
     auto commitEntry = assertGet(OplogEntry::parse(commitOplogObj));
     auto o = commitEntry.getObject();
     auto oExpected = BSON(
@@ -2111,8 +2097,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
     oplogEntryObjs = getNOplogEntries(opCtx(), 3);
     auto abortOplogObj = oplogEntryObjs.back();
     // Statement id's for the insert and prepare should be 0 and 1 respectively.
-    const auto expectedAbortStmtId = 2;
-    checkSessionAndTransactionFields(abortOplogObj, expectedAbortStmtId);
+    checkSessionAndTransactionFields(abortOplogObj);
     auto abortEntry = assertGet(OplogEntry::parse(abortOplogObj));
     auto o = abortEntry.getObject();
     auto oExpected = BSON("abortTransaction" << 1);
@@ -2148,11 +2133,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 1);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -2160,7 +2144,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
@@ -2226,11 +2209,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPackingTest) {
     opObserver().onTransactionPrepare(
         opCtx(), reservedSlots, txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -2238,7 +2220,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPackingTest) {
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
@@ -2347,8 +2328,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
     oplogEntryObjs = getNOplogEntries(opCtx(), 3);
     const auto commitOplogObj = oplogEntryObjs.back();
     // Statement id is based on number of operations + prepare, not actual number of applyOps.
-    const auto expectedCommitStmtId = 3;
-    checkSessionAndTransactionFields(commitOplogObj, expectedCommitStmtId);
+    checkSessionAndTransactionFields(commitOplogObj);
     auto commitEntry = assertGet(OplogEntry::parse(commitOplogObj));
     auto o = commitEntry.getObject();
     auto oExpected = BSON(
@@ -2406,11 +2386,10 @@ TEST_F(OpObserverLargeMultiEntryTransactionTest, LargeTransactionCreatesMultiple
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
-    StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
+        checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
         ASSERT(!oplogEntry.getPrepare());
@@ -2418,7 +2397,6 @@ TEST_F(OpObserverLargeMultiEntryTransactionTest, LargeTransactionCreatesMultiple
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-        expectedStmtId++;
     }
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(operation1.toBSON()) << "partialTxn" << true);
