@@ -2829,6 +2829,14 @@ TEST(IDLValidatedField, Callback_validators) {
     tryFail(43, 123456789.01, "x-ray");
     tryFail(42, 123456789.11, "x-ray");
     tryFail(42, 123456789.01, "uniform");
+
+    Unusual_callback_validators obj1;
+    obj1.setInt_even(42);
+    ASSERT_THROWS(obj1.setInt_even(7), AssertionException);
+    obj1.setArray_of_int({42});
+    ASSERT_THROWS(obj1.setArray_of_int({7}), AssertionException);
+    obj1.setOne_int(One_int(42));
+    ASSERT_THROWS(obj1.setOne_int(One_int(7)), AssertionException);
 }
 
 // Positive: verify a command a string arg

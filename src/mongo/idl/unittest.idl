@@ -588,6 +588,35 @@ structs:
                 optional: true
                 validator: { callback: "validateStartsWith<'x'>" }
 
+    unusual_callback_validators:
+        description: Struct using fields with unusual callback validators
+        fields:
+            int_even:
+                type: int
+                optional: true
+                validator: { callback: 'validateEvenNumber' }
+            string_starts_with_x:
+                type: string
+                optional: true
+                validator: { callback: "validateStartsWith<'x'>" }
+            array_of_int:
+                type: array<int>
+                validator: { callback: "validateEvenNumber" }
+            array_of_int_optional:
+                type: array<int>
+                optional: true
+                validator: { callback: "validateEvenNumber" }
+            one_int:
+                type: one_int
+                validator: { callback: 'validateOneInt' }
+            one_int_optional:
+                type: one_int
+                optional: true
+                validator: { callback: 'validateOneInt' }
+            one_int_array:
+                type: array<one_int>
+                validator: { callback: 'validateOneInt' }
+
 
 ##################################################################################################
 #

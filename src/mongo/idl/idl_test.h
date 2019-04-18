@@ -27,7 +27,11 @@
  *    it in the license file.
  */
 
+#include <string>
+#include <vector>
+
 #include "mongo/base/status.h"
+#include "mongo/idl/unittest_import_gen.h"
 
 namespace mongo {
 namespace idl {
@@ -39,6 +43,16 @@ namespace test {
 inline Status validateEvenNumber(std::int32_t value) {
     if (value & 1) {
         return {ErrorCodes::BadValue, "Value must be even"};
+    }
+    return Status::OK();
+}
+
+inline Status validateEvenNumber(const std::vector<std::int32_t>& values) {
+    for (auto& value : values) {
+        auto status = validateEvenNumber(value);
+        if (!status.isOK()) {
+            return status;
+        }
     }
     return Status::OK();
 }
@@ -62,6 +76,24 @@ template <char letter>
 Status validateStartsWith(const std::string& value) {
     if ((value.empty() || value[0] != letter)) {
         return {ErrorCodes::BadValue, "Value does not begin with correct letter"};
+    }
+    return Status::OK();
+}
+
+
+/**
+ * Validate a struct
+ */
+inline Status validateOneInt(const mongo::idl::import::One_int& one) {
+    return validateEvenNumber(one.getValue());
+}
+
+inline Status validateOneInt(const std::vector<mongo::idl::import::One_int>& values) {
+    for (auto& value : values) {
+        auto status = validateEvenNumber(value.getValue());
+        if (!status.isOK()) {
+            return status;
+        }
     }
     return Status::OK();
 }

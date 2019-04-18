@@ -532,9 +532,9 @@ class _CppTypeOptional(_CppTypeDelegating):
         return self._base.get_setter_body(member_name, validator_method_name)
 
 
-def get_cpp_type(field):
+def get_cpp_type_without_optional(field):
     # type: (ast.Field) -> CppTypeBase
-    """Get the C++ Type information for the given field."""
+    """Get the C++ Type information for the given field but ignore optional."""
 
     cpp_type_info = None  # type: Any
 
@@ -547,6 +547,15 @@ def get_cpp_type(field):
 
     if field.array:
         cpp_type_info = _CppTypeArray(cpp_type_info, field)
+
+    return cpp_type_info
+
+
+def get_cpp_type(field):
+    # type: (ast.Field) -> CppTypeBase
+    """Get the C++ Type information for the given field."""
+
+    cpp_type_info = get_cpp_type_without_optional(field)
 
     if field.optional:
         cpp_type_info = _CppTypeOptional(cpp_type_info, field)

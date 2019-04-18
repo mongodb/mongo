@@ -627,7 +627,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate the C++ validators definition for a field."""
         assert field.validator
 
-        param_type = field.cpp_type
+        cpp_type_info = cpp_types.get_cpp_type_without_optional(field)
+        param_type = cpp_type_info.get_storage_type()
+
         if not cpp_types.is_primitive_type(param_type):
             param_type += '&'
 
@@ -1466,7 +1468,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate non-trivial field validators."""
         validator = field.validator
 
-        param_type = field.cpp_type
+        cpp_type_info = cpp_types.get_cpp_type_without_optional(field)
+        param_type = cpp_type_info.get_storage_type()
+
         if not cpp_types.is_primitive_type(param_type):
             param_type += '&'
 
