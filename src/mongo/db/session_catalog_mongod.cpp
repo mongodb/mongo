@@ -202,8 +202,17 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
     auto sessionKillTokens = std::make_shared<std::vector<SessionCatalog::KillToken>>();
 
     if (singleSessionDoc) {
-        sessionKillTokens->emplace_back(catalog->killSession(LogicalSessionId::parse(
-            IDLParserErrorContext("lsid"), singleSessionDoc->getField("_id").Obj())));
+        const auto lsid = LogicalSessionId::parse(IDLParserErrorContext("lsid"),
+                                                  singleSessionDoc->getField("_id").Obj());
+        catalog->scanSession(lsid, [&sessionKillTokens](const ObservableSession& session) {
+            const auto participant = TransactionParticipant::get(session);
+            uassert(ErrorCodes::PreparedTransactionInProgress,
+                    str::stream() << "Cannot modify the entry for session "
+                                  << session.getSessionId().getId()
+                                  << " because it is in the prepared state",
+                    !participant.transactionIsPrepared());
+            sessionKillTokens->emplace_back(session.kill());
+        });
     } else {
         SessionKiller::Matcher matcher(
             KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});

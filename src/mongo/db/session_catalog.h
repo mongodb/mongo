@@ -97,10 +97,9 @@ public:
      * not allowed to block, perform I/O or acquire any lock manager locks.
      * Iterates through the SessionCatalog and applies 'workerFn' to each Session. This locks the
      * SessionCatalog.
-     *
-     * TODO SERVER-33850: Take Matcher out of the SessionKiller namespace.
      */
     using ScanSessionsCallbackFn = stdx::function<void(const ObservableSession&)>;
+    void scanSession(const LogicalSessionId& lsid, const ScanSessionsCallbackFn& workerFn);
     void scanSessions(const SessionKiller::Matcher& matcher,
                       const ScanSessionsCallbackFn& workerFn);
 

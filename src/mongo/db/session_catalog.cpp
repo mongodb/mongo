@@ -116,6 +116,14 @@ SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationCo
     return SessionToKill(ScopedCheckedOutSession(*this, std::move(sri), std::move(killToken)));
 }
 
+void SessionCatalog::scanSession(const LogicalSessionId& lsid,
+                                 const ScanSessionsCallbackFn& workerFn) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    auto it = _sessions.find(lsid);
+    if (it != _sessions.end())
+        workerFn({lg, it->second->session});
+}
+
 void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
                                   const ScanSessionsCallbackFn& workerFn) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);

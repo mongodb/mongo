@@ -3,9 +3,11 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
+
+load("jstests/core/txns/libs/prepare_helpers.js");
+
 (function() {
     "use strict";
-    load("jstests/core/txns/libs/prepare_helpers.js");
 
     const dbName = "test";
     const collName = "commit_prepared_transaction";
@@ -33,6 +35,19 @@
     assert.eq(doc1, sessionColl.findOne(doc1));
 
     let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+
+    // Users should not be allowed to modify config.transaction entries for prepared transactions.
+    // This portion of the test needs to run on a connection without implicit sessions, because
+    // writes to `config.transactions` are disallowed under sessions.
+    {
+        var conn = new Mongo(db.getMongo().host);
+        conn._setDummyDefaultSession();
+        var configDB = conn.getDB('config');
+        assert.commandFailed(configDB.transactions.remove({"_id.id": session.getSessionId().id}));
+        assert.commandFailed(configDB.transactions.update({"_id.id": session.getSessionId().id},
+                                                          {$set: {extraField: 1}}));
+    }
+
     assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     // After commit the insert persists.
