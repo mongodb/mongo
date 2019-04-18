@@ -51,6 +51,15 @@ env.Library(target='task_executor_interface',
                 'remote_command',
             ])
 
+env.Library(target='scoped_task_executor',
+            source=[
+                'scoped_task_executor.cpp',
+            ],
+            LIBDEPS=[
+                'task_executor_interface',
+                '$BUILD_DIR/mongo/util/fail_point',
+            ])
+
 env.Library(target='network_interface',
             source=['network_interface.cpp',],
             LIBDEPS=[
@@ -325,5 +334,17 @@ env.CppIntegrationTest(
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
         '$BUILD_DIR/mongo/util/version_impl',
+    ],
+)
+
+env.CppUnitTest(
+    target='scoped_task_executor_test',
+    source=[
+        'scoped_task_executor_test.cpp',
+    ],
+    LIBDEPS=[
+        'scoped_task_executor',
+        'network_interface_mock',
+        'thread_pool_task_executor',
     ],
 )
