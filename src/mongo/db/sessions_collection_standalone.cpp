@@ -122,9 +122,4 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSession
                    makeFindFnForCommand(kSessionsNamespaceString, &client));
 }
 
-Status SessionsCollectionStandalone::removeTransactionRecords(OperationContext* opCtx,
-                                                              const LogicalSessionIdSet& sessions) {
-    MONGO_UNREACHABLE;
-}
-
 }  // namespace mongo

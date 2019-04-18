@@ -72,11 +72,8 @@ constexpr Milliseconds LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
 LogicalSessionCacheImpl::LogicalSessionCacheImpl(
     std::unique_ptr<ServiceLiaison> service,
     std::shared_ptr<SessionsCollection> collection,
-    std::shared_ptr<TransactionReaper> transactionReaper,
-    Options options)
-    : _refreshInterval(options.refreshInterval),
-      _sessionTimeout(options.sessionTimeout),
-      _service(std::move(service)),
+    std::shared_ptr<TransactionReaper> transactionReaper)
+    : _service(std::move(service)),
       _sessionsColl(std::move(collection)),
       _transactionReaper(std::move(transactionReaper)) {
     _stats.setLastSessionsCollectionJobTimestamp(now());
@@ -85,11 +82,12 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(
     if (!disableLogicalSessionCacheRefresh) {
         _service->scheduleJob({"LogicalSessionCacheRefresh",
                                [this](Client* client) { _periodicRefresh(client); },
-                               _refreshInterval});
+                               Milliseconds(logicalSessionRefreshMillis)});
+
         if (_transactionReaper) {
             _service->scheduleJob({"LogicalSessionCacheReap",
                                    [this](Client* client) { _periodicReap(client); },
-                                   _refreshInterval});
+                                   Milliseconds(logicalSessionRefreshMillis)});
         }
     }
 }
@@ -98,8 +96,8 @@ LogicalSessionCacheImpl::~LogicalSessionCacheImpl() {
     try {
         _service->join();
     } catch (...) {
-        // If we failed to join we might still be running a background thread,
-        // log but swallow the error since there is no good way to recover.
+        // If we failed to join we might still be running a background thread, log but swallow the
+        // error since there is no good way to recover
         severe() << "Failed to join background service thread";
     }
 }

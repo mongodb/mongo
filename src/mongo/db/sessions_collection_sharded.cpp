@@ -164,9 +164,4 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
     return doFetch(kSessionsNamespaceString, sessions, send);
 }
 
-Status SessionsCollectionSharded::removeTransactionRecords(OperationContext* opCtx,
-                                                           const LogicalSessionIdSet& sessions) {
-    return SessionsCollectionRS::removeTransactionRecordsHelper(opCtx, sessions);
-}
-
 }  // namespace mongo

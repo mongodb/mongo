@@ -90,24 +90,6 @@ public:
      */
     StatusWith<LogicalSessionIdSet> findRemovedSessions(
         OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
-
-    /**
-     * Removes the transaction records for the specified sessions from the
-     * transaction table.
-     *
-     * If a step-down happens on this node as this method is running, it may fail.
-     */
-    Status removeTransactionRecords(OperationContext* opCtx,
-                                    const LogicalSessionIdSet& sessions) override;
-
-    /**
-     * Helper for a shard server to run its transaction operations as a replica set
-     * member.
-     *
-     * If a step-down happens on this node as this method is running, it may fail.
-     */
-    static Status removeTransactionRecordsHelper(OperationContext* opCtx,
-                                                 const LogicalSessionIdSet& sessions);
 };
 
 }  // namespace mongo

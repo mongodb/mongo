@@ -259,26 +259,4 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionRS::findRemovedSessions(
                     });
 }
 
-Status SessionsCollectionRS::removeTransactionRecords(OperationContext* opCtx,
-                                                      const LogicalSessionIdSet& sessions) {
-    return dispatch(
-        NamespaceString::kSessionTransactionsTableNamespace,
-        opCtx,
-        [&] {
-            DBDirectClient client(opCtx);
-            return doRemove(NamespaceString::kSessionTransactionsTableNamespace,
-                            sessions,
-                            makeSendFnForBatchWrite(
-                                NamespaceString::kSessionTransactionsTableNamespace, &client));
-        },
-        [](DBClientBase*) {
-            return Status(ErrorCodes::NotMaster, "Not eligible to remove transaction records");
-        });
-}
-
-Status SessionsCollectionRS::removeTransactionRecordsHelper(OperationContext* opCtx,
-                                                            const LogicalSessionIdSet& sessions) {
-    return SessionsCollectionRS{}.removeTransactionRecords(opCtx, sessions);
-}
-
 }  // namespace mongo
