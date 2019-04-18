@@ -3,6 +3,12 @@
 
 load("jstests/ssl/libs/ssl_helpers.js");
 
+// Limit the amount of time we'll wait on a failure.
+// Apply equally to success tests as well so that
+// a failure to complete replication is more likely to
+// give us a false negative, than a false positive.
+ReplSetTest.kDefaultTimeoutMS = 3 * 60 * 1000;
+
 // Verify that requireSSL allows ssl connections
 print("=== Testing requireSSL/requireSSL cluster ===");
 replShouldSucceed("require-require", requireSSL, requireSSL);
