@@ -54,7 +54,7 @@ namespace mongo {
 namespace {
 
 const Milliseconds kSessionTimeout = duration_cast<Milliseconds>(kLogicalSessionDefaultTimeout);
-const Milliseconds kForceRefresh = LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
+const Milliseconds kForceRefresh{kLogicalSessionRefreshMillisDefault};
 
 using SessionList = std::list<LogicalSessionId>;
 using unittest::EnsureFCV;
@@ -79,7 +79,7 @@ public:
         auto mockService = stdx::make_unique<MockServiceLiaison>(_service);
         auto mockSessions = stdx::make_unique<MockSessionsCollection>(_sessions);
         _cache = stdx::make_unique<LogicalSessionCacheImpl>(
-            std::move(mockService), std::move(mockSessions), nullptr);
+            std::move(mockService), std::move(mockSessions), nullptr /* reaper */);
     }
 
     void waitUntilRefreshScheduled() {

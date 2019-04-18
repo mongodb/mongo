@@ -32,9 +32,6 @@
 #include "mongo/db/transaction_reaper.h"
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -47,7 +44,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -85,24 +82,21 @@ public:
         : _collection(std::move(collection)) {}
 
     int reap(OperationContext* opCtx) override {
-        auto const coord = mongo::repl::ReplicationCoordinator::get(opCtx);
-
         Handler handler(opCtx, *_collection);
         if (!handler.initialize()) {
             return 0;
         }
 
-        AutoGetCollection autoColl(
-            opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
-
-        // Only start reaping if the shard or config server node is currently the primary
-        if (!coord->canAcceptWritesForDatabase(
+        // Make a best-effort attempt to only reap when the node is running as a primary
+        const auto coord = mongo::repl::ReplicationCoordinator::get(opCtx);
+        if (!coord->canAcceptWritesForDatabase_UNSAFE(
                 opCtx, NamespaceString::kSessionTransactionsTableNamespace.db())) {
             return 0;
         }
 
         DBDirectClient client(opCtx);
 
+        // Fill all stale config.transactions entries
         auto query = makeQuery(opCtx->getServiceContext()->getFastClockSource()->now());
         auto cursor = client.query(
             NamespaceString::kSessionTransactionsTableNamespace, query, 0, 0, &kIdProjection);
@@ -126,35 +120,55 @@ private:
  * Removes the specified set of session ids from the persistent sessions collection and returns the
  * number of sessions actually removed.
  */
-int removeSessionsRecords(OperationContext* opCtx,
-                          SessionsCollection& sessionsCollection,
-                          const LogicalSessionIdSet& sessionIdsToRemove) {
+int removeSessionsTransactionRecords(OperationContext* opCtx,
+                                     SessionsCollection& sessionsCollection,
+                                     const LogicalSessionIdSet& sessionIdsToRemove) {
     if (sessionIdsToRemove.empty()) {
         return 0;
     }
 
-    Locker* locker = opCtx->lockState();
-
-    Locker::LockSnapshot snapshot;
-    invariant(locker->saveLockStateAndUnlock(&snapshot));
-
-    const auto guard = makeGuard([&] {
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        locker->restoreLockState(opCtx, snapshot);
-    });
-
-    // Top-level locks are freed, release any potential low-level (storage engine-specific
-    // locks). If we are yielding, we are at a safe place to do so.
-    opCtx->recoveryUnit()->abandonSnapshot();
-
-    // Track the number of yields in CurOp.
-    CurOp::get(opCtx)->yielded();
-
-    auto removed =
+    // From the passed-in sessions, find the ones which are actually expired/removed
+    auto expiredSessionIds =
         uassertStatusOK(sessionsCollection.findRemovedSessions(opCtx, sessionIdsToRemove));
-    uassertStatusOK(sessionsCollection.removeTransactionRecords(opCtx, removed));
 
-    return removed.size();
+    DBDirectClient client(opCtx);
+    int numDeleted = 0;
+
+    for (auto it = expiredSessionIds.begin(); it != expiredSessionIds.end();) {
+        write_ops::Delete deleteOp(NamespaceString::kSessionTransactionsTableNamespace);
+        deleteOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase base;
+            base.setOrdered(false);
+            return base;
+        }());
+        deleteOp.setDeletes([&] {
+            // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object
+            // size limit
+            const int kMaxBatchSize = 10'000;
+            std::vector<write_ops::DeleteOpEntry> entries;
+            for (; it != expiredSessionIds.end() && entries.size() < kMaxBatchSize; ++it) {
+                entries.emplace_back(BSON(LogicalSessionRecord::kIdFieldName << it->toBSON()),
+                                     false /* multi = false */);
+            }
+            return entries;
+        }());
+
+        BSONObj result;
+        client.runCommand(NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
+                          deleteOp.toBSON({}),
+                          result);
+
+        BatchedCommandResponse response;
+        std::string errmsg;
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Failed to parse response " << result,
+                response.parseBSON(result, &errmsg));
+        uassertStatusOK(response.getTopLevelStatus());
+
+        numDeleted += response.getN();
+    }
+
+    return numDeleted;
 }
 
 /**
@@ -173,7 +187,7 @@ public:
         _batch.insert(lsid);
 
         if (_batch.size() >= write_ops::kMaxWriteBatchSize) {
-            _numReaped += removeSessionsRecords(_opCtx, _sessionsCollection, _batch);
+            _numReaped += removeSessionsTransactionRecords(_opCtx, _sessionsCollection, _batch);
             _batch.clear();
         }
     }
@@ -182,7 +196,7 @@ public:
         invariant(!_finalized);
         _finalized = true;
 
-        _numReaped += removeSessionsRecords(_opCtx, _sessionsCollection, _batch);
+        _numReaped += removeSessionsTransactionRecords(_opCtx, _sessionsCollection, _batch);
         return _numReaped;
     }
 
@@ -217,14 +231,18 @@ public:
 
     void handleLsid(const LogicalSessionId& lsid) {
         invariant(_cm);
+
+        // This code attempts to group requests to 'removeSessionsTransactionRecords' to contain
+        // batches of lsids, which only fall on the same shard, so that the query to check whether
+        // they are alive doesn't need to do cross-shard scatter/gather queries
         const auto chunk = _cm->findIntersectingChunkWithSimpleCollation(lsid.toBSON());
-        const auto shardId = chunk.getShardId();
+        const auto& shardId = chunk.getShardId();
 
         auto& lsids = _shards[shardId];
         lsids.insert(lsid);
 
         if (lsids.size() >= write_ops::kMaxWriteBatchSize) {
-            _numReaped += removeSessionsRecords(_opCtx, _sessionsCollection, lsids);
+            _numReaped += removeSessionsTransactionRecords(_opCtx, _sessionsCollection, lsids);
             _shards.erase(shardId);
         }
     }
@@ -234,7 +252,8 @@ public:
         _finalized = true;
 
         for (const auto& pair : _shards) {
-            _numReaped += removeSessionsRecords(_opCtx, _sessionsCollection, pair.second);
+            _numReaped +=
+                removeSessionsTransactionRecords(_opCtx, _sessionsCollection, pair.second);
         }
 
         return _numReaped;

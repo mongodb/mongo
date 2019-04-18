@@ -296,8 +296,6 @@ public:
      */
     void alwaysAllowWrites(bool allowWrites);
 
-    void setMaster(bool isMaster);
-
     virtual ServiceContext* getServiceContext() override {
         return _service;
     }

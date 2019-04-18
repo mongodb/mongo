@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_cache_impl_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/refresh_sessions_gen.h"
 #include "mongo/db/service_liaison.h"
@@ -46,52 +47,28 @@ class Client;
 class OperationContext;
 class ServiceContext;
 
-extern int logicalSessionRefreshMillis;
-
 /**
  * A thread-safe cache structure for logical session records.
  *
- * The cache takes ownership of the passed-in ServiceLiaison and
- * SessionsCollection helper types.
+ * The cache takes ownership of the passed-in ServiceLiaison and SessionsCollection helper types.
+ *
+ * Uses the following service-wide parameters:
+ *  - A timeout value to use for sessions in the cache, in minutes. Defaults to 30 minutes.
+ *      --setParameter localLogicalSessionTimeoutMinutes=X
+ *
+ *  - The interval over which the cache will refresh session records. By default, this is set to
+ *    every 5 minutes (300,000). If the caller is setting the sessionTimeout by hand, it is
+ *    suggested that they consider also setting the refresh interval accordingly.
+ *      --setParameter logicalSessionRefreshMillis=X.
  */
 class LogicalSessionCacheImpl final : public LogicalSessionCache {
 public:
-    static constexpr Milliseconds kLogicalSessionDefaultRefresh = Milliseconds(5 * 60 * 1000);
-
-    /**
-     * An Options type to support the LogicalSessionCacheImpl.
-     */
-    struct Options {
-        Options(){};
-
-        /**
-         * A timeout value to use for sessions in the cache, in minutes.
-         *
-         * By default, this is set to 30 minutes.
-         *
-         * May be set with --setParameter localLogicalSessionTimeoutMinutes=X.
-         */
-        Minutes sessionTimeout = Minutes(localLogicalSessionTimeoutMinutes);
-
-        /**
-         * The interval over which the cache will refresh session records.
-         *
-         * By default, this is set to every 5 minutes (300,000). If the caller
-         * is setting the sessionTimeout by hand, it is suggested that they
-         * consider also setting the refresh interval accordingly.
-         *
-         * May be set with --setParameter logicalSessionRefreshMillis=X.
-         */
-        Milliseconds refreshInterval = Milliseconds(logicalSessionRefreshMillis);
-    };
-
     /**
      * Construct a new session cache.
      */
-    explicit LogicalSessionCacheImpl(std::unique_ptr<ServiceLiaison> service,
-                                     std::shared_ptr<SessionsCollection> collection,
-                                     std::shared_ptr<TransactionReaper> transactionReaper,
-                                     Options options = Options{});
+    LogicalSessionCacheImpl(std::unique_ptr<ServiceLiaison> service,
+                            std::shared_ptr<SessionsCollection> collection,
+                            std::shared_ptr<TransactionReaper> transactionReaper);
 
     LogicalSessionCacheImpl(const LogicalSessionCacheImpl&) = delete;
     LogicalSessionCacheImpl& operator=(const LogicalSessionCacheImpl&) = delete;
@@ -148,9 +125,6 @@ private:
      * Takes the lock and inserts the given record into the cache.
      */
     Status _addToCache(LogicalSessionRecord record);
-
-    const Milliseconds _refreshInterval;
-    const Minutes _sessionTimeout;
 
     // This value is only modified under the lock, and is modified
     // automatically by the background jobs.

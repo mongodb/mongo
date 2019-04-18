@@ -45,7 +45,7 @@ std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheS() {
     auto sessionsColl = stdx::make_unique<SessionsCollectionSharded>();
 
     return stdx::make_unique<LogicalSessionCacheImpl>(
-        std::move(liaison), std::move(sessionsColl), nullptr, LogicalSessionCacheImpl::Options{});
+        std::move(liaison), std::move(sessionsColl), nullptr /* reaper */);
 }
 
 }  // namespace mongo

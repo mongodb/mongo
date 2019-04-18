@@ -79,9 +79,6 @@ public:
      */
     virtual Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) = 0;
 
-    virtual Status removeTransactionRecords(OperationContext* opCtx,
-                                            const LogicalSessionIdSet& sessions) = 0;
-
     /**
      * Checks a set of lsids and returns the set that no longer exists
      *

@@ -28,30 +28,27 @@
 
 global:
   cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/logical_session_cache_impl.h"
 
 server_parameters:
 
   logicalSessionRefreshMillis:
-    description:  The interval (in milliseconds) at which the cache refreshes its logical session
-                  records against the main session store.
+    description: The interval (in milliseconds) at which the cache refreshes its logical session
+                 records against the main session store.
     set_at: startup
     cpp_vartype: int
     cpp_varname: logicalSessionRefreshMillis
-    default:
-      expr: static_cast<int>(LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh.count())
+    default: 300000
+
+  maxSessions:
+    description: The maximum number of sessions that can be cached.
+    set_at: startup
+    cpp_vartype: int
+    cpp_varname: maxSessions
+    default: 1000000
 
   disableLogicalSessionCacheRefresh:
-    description: "Disable the logical session cache refresh (For testing only)."
+    description: Disable the logical session cache refresh (for testing only).
     set_at: startup
     cpp_vartype: bool
     cpp_varname: disableLogicalSessionCacheRefresh
     default: false
-
-  maxSessions:
-    description: "The maximum number of sessions that can be cached."
-    set_at: startup
-    cpp_vartype: int
-    cpp_varname: maxSessions
-    default: "1000000"
