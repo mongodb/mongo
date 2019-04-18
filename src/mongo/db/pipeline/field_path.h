@@ -78,6 +78,14 @@ public:
     }
 
     /**
+     * Get the subpath including path elements [0, n].
+     */
+    StringData getSubpath(size_t n) const {
+        invariant(n + 1 < _fieldPathDotPosition.size());
+        return StringData(_fieldPath.c_str(), _fieldPathDotPosition[n + 1]);
+    }
+
+    /**
      * Return the ith field name from this path using zero-based indexes.
      */
     StringData getFieldName(size_t i) const {
