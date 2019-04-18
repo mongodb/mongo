@@ -265,9 +265,9 @@ def calculate_timeout(avg_runtime, scaling_factor):
     def round_to_minute(runtime):
         """Round the given seconds up to the nearest minute."""
         distance_to_min = 60 - (runtime % 60)
-        return runtime + distance_to_min
+        return int(math.ceil(runtime + distance_to_min))
 
-    return max(MIN_TIMEOUT_SECONDS, round_to_minute(int(math.ceil(avg_runtime))) * scaling_factor)
+    return max(MIN_TIMEOUT_SECONDS, round_to_minute(avg_runtime)) * scaling_factor
 
 
 class EvergreenConfigGenerator(object):
