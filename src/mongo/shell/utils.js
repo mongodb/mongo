@@ -23,21 +23,20 @@ function reconnect(db) {
 
 function _getErrorWithCode(codeOrObj, message) {
     var e = new Error(message);
-    if (codeOrObj != undefined) {
-        if (codeOrObj.writeError || codeOrObj.code) {
-            if (codeOrObj.writeError) {
-                e.code = codeOrObj.writeError.code;
-            } else if (codeOrObj.code) {
-                e.code = codeOrObj.code;
-            }
-
-            if (codeOrObj.hasOwnProperty("errorLabels")) {
-                e.errorLabels = codeOrObj.errorLabels;
-            }
-        } else {
-            // At this point assume codeOrObj is a number type
-            e.code = codeOrObj;
+    if (typeof codeOrObj === "object" && codeOrObj !== null) {
+        if (codeOrObj.hasOwnProperty("code")) {
+            e.code = codeOrObj.code;
         }
+
+        if (codeOrObj.hasOwnProperty("writeErrors")) {
+            e.writeErrors = codeOrObj.writeErrors;
+        }
+
+        if (codeOrObj.hasOwnProperty("errorLabels")) {
+            e.errorLabels = codeOrObj.errorLabels;
+        }
+    } else if (typeof codeOrObj === "number") {
+        e.code = codeOrObj;
     }
 
     return e;
