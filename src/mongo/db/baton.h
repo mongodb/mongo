@@ -33,6 +33,7 @@
 
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
 
@@ -46,6 +47,10 @@ class NetworkingBaton;
 
 }  // namespace transport
 
+class Baton;
+
+using BatonHandle = std::shared_ptr<Baton>;
+
 /**
  * A Baton is lightweight executor, with parallel forward progress guarantees.  Rather than
  * asynchronously running tasks through one, the baton records the intent of those tasks and defers
@@ -53,7 +58,9 @@ class NetworkingBaton;
  *
  * Note: This occurs automatically when opCtx waiting on a condition variable.
  */
-class Baton : public Waitable, public std::enable_shared_from_this<Baton> {
+class Baton : public Waitable,
+              public OutOfLineExecutor,
+              public std::enable_shared_from_this<Baton> {
 public:
     virtual ~Baton() = default;
 
@@ -84,7 +91,7 @@ public:
      * inline if passed a nullptr.  Examples of such work are logging, simple cleanup and
      * rescheduling the task on another executor.
      */
-    virtual void schedule(unique_function<void(OperationContext*)> func) noexcept = 0;
+    void schedule(Task func) noexcept override = 0;
 
     /**
      * Returns a networking view of the baton, if this baton supports networking functionality
@@ -98,10 +105,76 @@ public:
      */
     virtual void markKillOnClientDisconnect() noexcept = 0;
 
+    /**
+     * Holder for a SubBaton, detaches on destruction
+     */
+    class SubBatonHolder {
+        friend Baton;
+
+    public:
+        SubBatonHolder(const SubBatonHolder&) = delete;
+        SubBatonHolder& operator=(const SubBatonHolder&) = delete;
+
+        SubBatonHolder(SubBatonHolder&& other)
+            : _mustDetach(other._mustDetach), _baton(std::move(other._baton)) {
+            other._mustDetach = false;
+        }
+
+        SubBatonHolder& operator=(SubBatonHolder&& other) {
+            if (_mustDetach) {
+                _baton->detach();
+            }
+
+            _mustDetach = other._mustDetach;
+            _baton = std::move(other._baton);
+
+            other._mustDetach = false;
+
+            return *this;
+        }
+
+        ~SubBatonHolder() {
+            if (_mustDetach) {
+                _baton->detach();
+            }
+        }
+
+        const BatonHandle& operator*() const {
+            return _baton;
+        }
+
+        const BatonHandle& operator->() const {
+            return _baton;
+        }
+
+        void shutdown() {
+            if (!std::exchange(_mustDetach, false)) {
+                return;
+            }
+
+            _baton->detach();
+        }
+
+    private:
+        explicit SubBatonHolder(const BatonHandle& baton) : _baton(baton) {}
+
+        bool _mustDetach = true;
+        BatonHandle _baton;
+    };
+
+    /**
+     * Makes a sub baton for this baton.  A valid sub baton should proxy requests to the underlying
+     * baton until it is detached.  After that point, all jobs within the sub baton should be failed
+     * with a ShutdownInProgress status and all further work should be refused.
+     *
+     * NOTE: The held baton will not intercept networking() related calls.  If you intend to use the
+     * baton in that mode, you should use this type with the ScopedTaskExecutor to handle
+     * cancellation of async networking operations.
+     */
+    SubBatonHolder makeSubBaton();
+
 private:
     virtual void detachImpl() noexcept = 0;
 };
-
-using BatonHandle = std::shared_ptr<Baton>;
 
 }  // namespace mongo

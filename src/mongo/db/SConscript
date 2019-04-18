@@ -536,7 +536,9 @@ env.CppUnitTest(
 env.Library(
     target='service_context',
     source=[
+        'baton.cpp',
         'client.cpp',
+        'default_baton.cpp',
         'operation_context.cpp',
         'operation_context_group.cpp',
         'service_context.cpp',
@@ -545,6 +547,7 @@ env.Library(
         'repl_set_member_in_standalone_mode.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/multi_key_path_tracker',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
@@ -553,21 +556,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/periodic_runner',
-    ],
-    LIBDEPS_PRIVATE=[
-        'default_baton',
-    ],
-)
-
-env.Library(
-    target='default_baton',
-    source=[
-        'default_baton.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/clock_sources',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 

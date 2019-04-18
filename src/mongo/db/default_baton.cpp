@@ -38,6 +38,12 @@
 
 namespace mongo {
 
+namespace {
+
+const auto kDetached = Status(ErrorCodes::ShutdownInProgress, "Baton detached");
+
+}  // namespace
+
 DefaultBaton::DefaultBaton(OperationContext* opCtx) : _opCtx(opCtx) {}
 
 DefaultBaton::~DefaultBaton() {
@@ -68,16 +74,16 @@ void DefaultBaton::detachImpl() noexcept {
     }
 
     for (auto& job : scheduled) {
-        job(nullptr);
+        job(kDetached);
     }
 }
 
-void DefaultBaton::schedule(unique_function<void(OperationContext*)> func) noexcept {
+void DefaultBaton::schedule(Task func) noexcept {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     if (!_opCtx) {
         lk.unlock();
-        func(nullptr);
+        func(kDetached);
 
         return;
     }
@@ -108,7 +114,7 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
 
             lk.unlock();
             for (auto& job : toRun) {
-                job(_opCtx);
+                job(Status::OK());
             }
             lk.lock();
         }

@@ -605,8 +605,8 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
 
     for (const auto& cbState : todo) {
         if (cbState->baton) {
-            cbState->baton->schedule([this, cbState](OperationContext* opCtx) {
-                if (opCtx) {
+            cbState->baton->schedule([this, cbState](Status status) {
+                if (status.isOK()) {
                     runCallback(std::move(cbState));
                     return;
                 }

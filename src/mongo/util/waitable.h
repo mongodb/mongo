@@ -114,9 +114,6 @@ public:
         return true;
     }
 
-protected:
-    ~Waitable() noexcept {}
-
     enum class TimeoutState {
         NoTimeout,
         Timeout,
@@ -137,6 +134,9 @@ protected:
      * Like run, but only until the passed deadline has passed.
      */
     virtual TimeoutState run_until(ClockSource* clkSource, Date_t deadline) noexcept = 0;
+
+protected:
+    ~Waitable() noexcept {}
 };
 
 }  // namespace mongo

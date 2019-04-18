@@ -51,7 +51,7 @@ public:
 
     void markKillOnClientDisconnect() noexcept override;
 
-    void schedule(unique_function<void(OperationContext*)> func) noexcept override;
+    void schedule(Task func) noexcept override;
 
     void notify() noexcept override;
 
@@ -71,7 +71,7 @@ private:
 
     bool _hasIngressSocket = false;
 
-    std::vector<unique_function<void(OperationContext*)>> _scheduled;
+    std::vector<Task> _scheduled;
 };
 
 }  // namespace mongo

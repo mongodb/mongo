@@ -55,6 +55,8 @@ namespace transport {
  * We implement our networking reactor on top of poll + eventfd for wakeups
  */
 class TransportLayerASIO::BatonASIO : public NetworkingBaton {
+    static const inline auto kDetached = Status(ErrorCodes::ShutdownInProgress, "Baton detached");
+
     /**
      * We use this internal reactor timer to exit run_until calls (by forcing an early timeout for
      * ::poll).
@@ -159,8 +161,7 @@ public:
         stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         if (!_opCtx) {
-            return Status(ErrorCodes::ShutdownInProgress,
-                          "baton is detached, cannot waitUntil on timer");
+            return kDetached;
         }
 
         _safeExecute(std::move(lk),
@@ -209,11 +210,11 @@ public:
         return true;
     }
 
-    void schedule(unique_function<void(OperationContext*)> func) noexcept override {
+    void schedule(Task func) noexcept override {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (!_opCtx) {
-            func(nullptr);
+            func(kDetached);
 
             return;
         }
@@ -262,15 +263,11 @@ public:
 
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             while (_scheduled.size()) {
-                decltype(_scheduled) toRun;
-                {
-                    using std::swap;
-                    swap(_scheduled, toRun);
-                }
+                auto toRun = std::exchange(_scheduled, {});
 
                 lk.unlock();
                 for (auto& job : toRun) {
-                    job(_opCtx);
+                    job(Status::OK());
                 }
                 lk.lock();
             }
@@ -380,7 +377,7 @@ private:
         stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         if (!_opCtx) {
-            return Status(ErrorCodes::ShutdownInProgress, "baton is detached, cannot addSession");
+            return kDetached;
         }
 
         _safeExecute(std::move(lk),
@@ -411,17 +408,15 @@ private:
         }
 
         for (auto& job : scheduled) {
-            job(nullptr);
+            job(kDetached);
         }
 
         for (auto& session : sessions) {
-            session.second.promise.setError(Status(ErrorCodes::ShutdownInProgress,
-                                                   "baton is detached, cannot wait for socket"));
+            session.second.promise.setError(kDetached);
         }
 
         for (auto& pair : timers) {
-            pair.second.promise.setError(Status(ErrorCodes::ShutdownInProgress,
-                                                "baton is detached, completing timer early"));
+            pair.second.promise.setError(kDetached);
         }
     }
 
@@ -445,11 +440,10 @@ private:
     template <typename Callback>
     void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Callback&& cb) {
         if (_inPoll) {
-            _scheduled.push_back(
-                [ cb = std::forward<Callback>(cb), this ](OperationContext*) mutable {
-                    stdx::lock_guard<stdx::mutex> lk(_mutex);
-                    cb();
-                });
+            _scheduled.push_back([ cb = std::forward<Callback>(cb), this ](Status) mutable {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                cb();
+            });
 
             efd().notify();
         } else {
@@ -477,7 +471,7 @@ private:
     stdx::unordered_map<size_t, decltype(_timers)::const_iterator> _timersById;
 
     // For tasks that come in via schedule.  Or that were deferred because we were in poll
-    std::vector<unique_function<void(OperationContext*)>> _scheduled;
+    std::vector<Task> _scheduled;
 
     // We hold the two following values at the object level to save on allocations when a baton is
     // waited on many times over the course of its lifetime.

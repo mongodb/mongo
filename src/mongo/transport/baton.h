@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "mongo/db/baton.h"
-#include "mongo/transport/transport_layer.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
