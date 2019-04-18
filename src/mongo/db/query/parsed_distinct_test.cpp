@@ -85,6 +85,59 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
+TEST(ParsedDistinctTest, ConvertToAggregationDottedPathNoQuery) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
+
+    auto pd = ParsedDistinct::parse(opCtx,
+                                    testns,
+                                    fromjson("{distinct: 'testcoll', key: 'x.y.z', $db: 'testdb'}"),
+                                    ExtensionsCallbackNoop(),
+                                    !isExplain);
+    ASSERT_OK(pd.getStatus());
+
+    auto agg = pd.getValue().asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(!ar.getValue().getExplain());
+    ASSERT_EQ(ar.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+    ASSERT(ar.getValue().getReadConcern().isEmpty());
+    ASSERT(ar.getValue().getUnwrappedReadPref().isEmpty());
+    ASSERT(ar.getValue().getComment().empty());
+    ASSERT_EQUALS(ar.getValue().getMaxTimeMS(), 0u);
+
+    std::vector<BSONObj> expectedPipeline{
+        BSON("$unwind" << BSON("path"
+                               << "$x"
+                               << "preserveNullAndEmptyArrays"
+                               << true)),
+        BSON("$unwind" << BSON("path"
+                               << "$x.y"
+                               << "preserveNullAndEmptyArrays"
+                               << true)),
+        BSON("$unwind" << BSON("path"
+                               << "$x.y.z"
+                               << "preserveNullAndEmptyArrays"
+                               << true)),
+        BSON("$match" << BSON("x" << BSON("$_internalSchemaType"
+                                          << "object")
+                                  << "x.y"
+                                  << BSON("$_internalSchemaType"
+                                          << "object"))),
+        BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
+                                                                      << "$x.y.z")))};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
 TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
     QueryTestServiceContext serviceContext;
     auto uniqueTxn = serviceContext.makeOperationContext();
