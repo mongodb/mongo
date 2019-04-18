@@ -95,7 +95,10 @@
     allDocuments = [];
     allDocuments.push({a: 1, b: [2, 3, [4, 5], {c: 6}], d: {e: [1, 2]}});
     allDocuments.push({a: [1], b: [2, 3, 4, [5]], c: 6, d: {e: 1}});
-    allDocuments.push({a: [1, 2], b: 3, c: [6], d: [{e: 1}, {e: [1, 2]}]});
+    allDocuments.push({a: [[1]], b: [2, 3, [4], [5]], c: 6, d: [[{e: 1}]]});
+    allDocuments.push({a: [[1]], b: [2, 3, [4], [5]], c: 6, d: [{e: {f: 1}}]});
+    allDocuments.push({a: [[1]], b: [2, 3, [4], [5]], c: 6, d: {e: [[{f: 1}]]}});
+    allDocuments.push({a: [1, 2], b: 3, c: [6], d: [{e: 1}, {e: [1, 2]}, {e: {someObject: 1}}]});
     allDocuments.push({a: [1, 2], b: [4, 5], c: [undefined], d: [1]});
     allDocuments.push({a: null, b: [4, 5, null, undefined], c: [], d: {e: null}});
     allDocuments.push({a: undefined, b: null, c: [null], d: {e: undefined}});
@@ -111,4 +114,29 @@
     assertIdentityViewDistinctMatchesCollection("c");
     assertIdentityViewDistinctMatchesCollection("d");
     assertIdentityViewDistinctMatchesCollection("e");
+    assertIdentityViewDistinctMatchesCollection("d.e");
+    assertIdentityViewDistinctMatchesCollection("d.e.f");
+
+    // Test distinct on a deeply nested object through arrays.
+    coll.drop();
+    assert.writeOK(coll.insert({
+        a: [
+            {b: [{c: [{d: 1}]}]},
+            {b: {c: "not leaf"}},
+            {b: {c: [{d: 2, "not leaf": "not leaf"}]}},
+            {b: [{c: {d: 3}}]},
+            {b: {c: {d: 4}}, "not leaf": "not leaf"},
+            "not leaf",
+            // The documents below should not get traversed by the distinct() because of the
+            // doubly-nested arrays.
+            [[{b: {c: {d: "not leaf"}}}]],
+            [{b: {c: [[{d: "not leaf"}]]}}],
+        ]
+    }));
+    assert.writeOK(coll.insert({a: "not leaf"}));
+    assertIdentityViewDistinctMatchesCollection("a");
+    assertIdentityViewDistinctMatchesCollection("a.b");
+    assertIdentityViewDistinctMatchesCollection("a.b.c");
+    assertIdentityViewDistinctMatchesCollection("a.b.c.d");
+
 }());

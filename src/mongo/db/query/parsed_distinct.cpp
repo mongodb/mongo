@@ -46,6 +46,59 @@ const char ParsedDistinct::kQueryField[] = "query";
 const char ParsedDistinct::kCollationField[] = "collation";
 const char ParsedDistinct::kCommentField[] = "comment";
 
+namespace {
+
+/**
+ * Helper for when converting a distinct() to an aggregation pipeline. This function will add
+ * $unwind stages for each subpath of 'path'.
+ *
+ * See comments in ParsedDistinct::asAggregationCommand() for more detailed explanation.
+ */
+void addNestedUnwind(BSONArrayBuilder* pipelineBuilder, const FieldPath& unwindPath) {
+    for (size_t i = 0; i < unwindPath.getPathLength(); ++i) {
+        StringData pathPrefix = unwindPath.getSubpath(i);
+        BSONObjBuilder unwindStageBuilder(pipelineBuilder->subobjStart());
+        {
+            BSONObjBuilder unwindBuilder(unwindStageBuilder.subobjStart("$unwind"));
+            unwindBuilder.append("path", str::stream() << "$" << pathPrefix);
+            unwindBuilder.append("preserveNullAndEmptyArrays", true);
+        }
+        unwindStageBuilder.doneFast();
+    }
+}
+
+/**
+ * Helper for when converting a distinct() to an aggregation pipeline. This function may add a
+ * $match stage enforcing that intermediate subpaths are objects so that no implicit array
+ * traversal happens later on. The $match stage is only added when the path is dotted (e.g. "a.b"
+ * but for "xyz").
+ *
+ * See comments in ParsedDistinct::asAggregationCommand() for more detailed explanation.
+ */
+void addMatchRemovingNestedArrays(BSONArrayBuilder* pipelineBuilder, const FieldPath& unwindPath) {
+    if (unwindPath.getPathLength() == 1) {
+        return;
+    }
+    invariant(unwindPath.getPathLength() > 1);
+
+    BSONObjBuilder matchBuilder(pipelineBuilder->subobjStart());
+    BSONObjBuilder predicateBuilder(matchBuilder.subobjStart("$match"));
+
+
+    for (size_t i = 0; i < unwindPath.getPathLength() - 1; ++i) {
+        StringData pathPrefix = unwindPath.getSubpath(i);
+        // Add a clause to the $match predicate requiring that intermediate paths are objects so
+        // that no implicit array traversal happens.
+        predicateBuilder.append(pathPrefix,
+                                BSON("$_internalSchemaType"
+                                     << "object"));
+    }
+
+    predicateBuilder.doneFast();
+    matchBuilder.doneFast();
+}
+}  // namespace
+
 StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     BSONObjBuilder aggregationBuilder;
 
@@ -54,27 +107,42 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     aggregationBuilder.append("aggregate", qr.nss().coll());
 
     // Build a pipeline that accomplishes the distinct request. The building code constructs a
-    // pipeline that looks like this:
+    // pipeline that looks like this, assuming the distinct is on the key "a.b.c"
     //
     //      [
     //          { $match: { ... } },
-    //          { $unwind: { path: "$<key>", preserveNullAndEmptyArrays: true } },
+    //          { $unwind: { path: "a", preserveNullAndEmptyArrays: true } },
+    //          { $unwind: { path: "a.b", preserveNullAndEmptyArrays: true } },
+    //          { $unwind: { path: "a.b.c", preserveNullAndEmptyArrays: true } },
+    //          { $match: {"a": {$_internalSchemaType: "object"},
+    //                     "a.b": {$_internalSchemaType: "object"}}}
     //          { $group: { _id: null, distinct: { $addToSet: "$<key>" } } }
     //      ]
+    //
+    // The purpose of the intermediate $unwind stages is to deal with cases where there is an array
+    // along the distinct path. For example, if we're distincting on "a.b" and have a document like
+    // {a: [{b: 1}, {b: 2}]}, distinct() should produce two values: 1 and 2. If we were to only
+    // unwind on "a.b", the document would pass through the $unwind unmodified, and the $group
+    // stage would treat the entire array as a key, rather than each element.
+    //
+    // The reason for the $match with $_internalSchemaType is to deal with cases of nested
+    // arrays. The distinct command will not traverse paths inside of nested arrays. For example, a
+    // distinct on "a.b" with the following document will produce no results:
+    // {a: [[{b: 1}]]
+    //
+    // Any arrays remaining after the $unwinds must have been nested arrays, so in order to match
+    // the behavior of the distinct() command, we filter them out before the $group.
     BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
     if (!qr.getFilter().isEmpty()) {
         BSONObjBuilder matchStageBuilder(pipelineBuilder.subobjStart());
         matchStageBuilder.append("$match", qr.getFilter());
         matchStageBuilder.doneFast();
     }
-    BSONObjBuilder unwindStageBuilder(pipelineBuilder.subobjStart());
-    {
-        BSONObjBuilder unwindBuilder(unwindStageBuilder.subobjStart("$unwind"));
-        unwindBuilder.append("path", str::stream() << "$" << _key);
-        unwindBuilder.append("preserveNullAndEmptyArrays", true);
-        unwindBuilder.doneFast();
-    }
-    unwindStageBuilder.doneFast();
+
+    FieldPath path(_key);
+    addNestedUnwind(&pipelineBuilder, path);
+    addMatchRemovingNestedArrays(&pipelineBuilder, path);
+
     BSONObjBuilder groupStageBuilder(pipelineBuilder.subobjStart());
     {
         BSONObjBuilder groupBuilder(groupStageBuilder.subobjStart("$group"));

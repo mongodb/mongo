@@ -189,5 +189,14 @@ TEST(FieldPathTest, ConstructorAssertsOnDeeplyNestedArrayPath) {
                        AssertionException,
                        ErrorCodes::Overflow);
 }
+
+// Test FieldPath::getSubpath().
+TEST(FieldPathTest, GetSubpath) {
+    FieldPath path = FieldPath("foo.bar.baz");
+    ASSERT_EQUALS("foo", path.getSubpath(0));
+    ASSERT_EQUALS("foo.bar", path.getSubpath(1));
+    ASSERT_EQUALS("foo.bar.baz", path.getSubpath(2));
+}
+
 }  // namespace
 }  // namespace mongo
