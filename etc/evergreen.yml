@@ -418,6 +418,7 @@ variables:
   - enterprise-windows-64-2k8-inmem
   - enterprise-windows-64-2k8-nopush-template
   - enterprise-windows-64-2k8-openssl
+  - enterprise-windows-64-2k8-required
   - enterprise-windows-64-2k8-wtdevelop
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
@@ -9427,6 +9428,50 @@ buildvariants:
 #         Windows buildvariants           #
 ###########################################
 
+- name: enterprise-windows-64-2k8-required
+  display_name: "! Enterprise Windows 2008R2"
+  modules:
+    - enterprise
+  run_on:
+    - windows-64-vs2017-test
+  expansions: &enterprise_windows_64_2k8_expansions
+    burn_in_tests_build_variant: enterprise-windows-64-2k8
+    platform_decompress: unzip
+    exe: ".exe"
+    msi_target: msi
+    mh_target: dist-mh
+    content_type: application/zip
+    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    python: '/cygdrive/c/python/python36/python.exe'
+    ext: zip
+    use_scons_cache: true
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    tooltags: "ssl sasl"
+    build_mongoreplay: false
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    large_distro_name: windows-64-vs2017-compile
+  display_tasks:
+    - *dbtest
+  tasks:
+    - name: compile_TG
+      requires:
+        - name: burn_in_tests_gen
+        - name: verify_pip
+      distros:
+        - windows-64-vs2017-compile
+    - name: burn_in_tests_gen
+    - name: verify_pip
+    - name: buildscripts_test
+    - name: dbtest_TG
+      distros:
+        - windows-64-vs2017-compile
+    - name: noPassthrough_gen
+
 - name: windows-64-2k8-debug
   display_name: "* Windows 2008R2 DEBUG"
   run_on:
@@ -9608,35 +9653,17 @@ buildvariants:
     - windows-64-vs2017-compile
 
 - name: enterprise-windows-64-2k8
-  display_name: "! Enterprise Windows 2008R2"
+  display_name: "* Enterprise Windows 2008R2"
   modules:
   - enterprise
   run_on:
   - windows-64-vs2017-test
   expansions:
-    platform_decompress: unzip
-    exe: ".exe"
+    <<: *enterprise_windows_64_2k8_expansions
     push_path: win32
     push_bucket: downloads.10gen.com
     push_name: win32
     push_arch: x86_64-enterprise-windows-64
-    msi_target: msi
-    mh_target: dist-mh
-    content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python36/python.exe'
-    ext: zip
-    use_scons_cache: true
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    tooltags: "ssl sasl"
-    build_mongoreplay: false
-    jstestfuzz_num_generated_files: 35
-    target_resmoke_time: 20
-    large_distro_name: windows-64-vs2017-compile
   display_tasks:
   - *dbtest
   tasks:
