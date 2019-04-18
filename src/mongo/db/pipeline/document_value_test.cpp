@@ -147,10 +147,15 @@ TEST(DocumentSerialization, CanSerializeDocumentExactlyAtDepthLimit) {
 }
 
 TEST(DocumentSerialization, CannotSerializeDocumentThatExceedsDepthLimit) {
-    BSONObjBuilder builder;
-    appendNestedObject(BSONDepth::getMaxAllowableDepth() + 1, &builder);
+    MutableDocument md;
+    md.addField("a", Value(1));
+    Document doc(md.freeze());
+    for (size_t idx = 0; idx < BSONDepth::getMaxAllowableDepth(); ++idx) {
+        MutableDocument md;
+        md.addField("nested", Value(doc));
+        doc = md.freeze();
+    }
 
-    Document doc(builder.obj());
     BSONObjBuilder throwaway;
     ASSERT_THROWS_CODE(doc.toBson(&throwaway), AssertionException, ErrorCodes::Overflow);
     throwaway.abandon();
@@ -681,7 +686,7 @@ TEST(MetaFields, BadSerialization) {
     // Signal there are 0 fields.
     bb.appendNum(0);
     // This would specify a meta field with an invalid type.
-    bb.appendNum(char(DocumentStorage::MetaType::NUM_FIELDS) + 1);
+    bb.appendNum(char(MetaType::NUM_FIELDS) + 1);
     // Signals end of input.
     bb.appendNum(char(0));
     BufReader reader(bb.buf(), bb.len());

@@ -39,9 +39,7 @@
 namespace mongo {
 
 RouterStageRemoveMetadataFields::RouterStageRemoveMetadataFields(
-    OperationContext* opCtx,
-    std::unique_ptr<RouterExecStage> child,
-    std::vector<StringData> metadataFields)
+    OperationContext* opCtx, std::unique_ptr<RouterExecStage> child, StringDataSet metadataFields)
     : RouterExecStage(opCtx, std::move(child)), _metaFields(std::move(metadataFields)) {
     for (auto&& fieldName : _metaFields) {
         invariant(fieldName[0] == '$');  // We use this information to optimize next().
@@ -57,9 +55,7 @@ StatusWith<ClusterQueryResult> RouterStageRemoveMetadataFields::next(
 
     BSONObjIterator iterator(*childResult.getValue().getResult());
     // Find the first field that we need to remove.
-    while (iterator.more() && (*iterator).fieldName()[0] != '$' &&
-           std::find(_metaFields.begin(), _metaFields.end(), (*iterator).fieldNameStringData()) ==
-               _metaFields.end()) {
+    while (iterator.more() && (*iterator).fieldName()[0] != '$') {
         ++iterator;
     }
 
@@ -80,8 +76,7 @@ StatusWith<ClusterQueryResult> RouterStageRemoveMetadataFields::next(
     // Copy any remaining fields that are not metadata. We expect metadata fields are likely to be
     // at the end of the document, so there is likely nothing else to copy.
     while ((++iterator).more()) {
-        if (std::find(_metaFields.begin(), _metaFields.end(), (*iterator).fieldNameStringData()) ==
-            _metaFields.end()) {
+        if (!_metaFields.contains((*iterator).fieldNameStringData())) {
             builder.append(*iterator);
         }
     }

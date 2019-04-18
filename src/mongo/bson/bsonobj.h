@@ -710,13 +710,13 @@ public:
     }
 
     /** @return true if more elements exist to be enumerated. */
-    bool more() {
+    bool more() const {
         return _pos < _theend;
     }
 
     /** @return true if more elements exist to be enumerated INCLUDING the EOO element which is
      * always at the end. */
-    bool moreWithEOO() {
+    bool moreWithEOO() const {
         return _pos <= _theend;
     }
 

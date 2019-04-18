@@ -99,7 +99,7 @@ public:
     static constexpr StringData metaFieldSearchScore = "$searchScore"_sd;
     static constexpr StringData metaFieldSearchHighlights = "$searchHighlights"_sd;
 
-    static const std::vector<StringData> allMetadataFieldNames;
+    static const StringDataSet allMetadataFieldNames;
 
     /// Empty Document (does no allocation)
     Document() {}
@@ -246,7 +246,7 @@ public:
      *  This can potentially save time if you need to refer to a field multiple times.
      */
     Position positionOf(StringData fieldName) const {
-        return storage().findField(fieldName);
+        return storage().findField(fieldName, DocumentStorage::LookupPolicy::kCacheAndBSON);
     }
 
     /** Clone a document.
@@ -488,7 +488,8 @@ public:
      *        If duplicates are not allowed, consider removing this method.
      */
     void addField(StringData fieldName, const Value& val) {
-        storage().appendField(fieldName) = val;
+        storage().appendField(
+            fieldName, DocumentStorage::hashKey(fieldName), ValueElement::Kind::kInserted) = val;
     }
 
     /** Update field by key. If there is no field with that key, add one.
@@ -502,7 +503,10 @@ public:
         getField(key) = val;
     }
     MutableValue getField(StringData key) {
-        return MutableValue(storage().getField(key));
+        return MutableValue(storage().getField(key, DocumentStorage::LookupPolicy::kCacheOnly));
+    }
+    MutableValue getFieldNonLeaf(StringData key) {
+        return MutableValue(storage().getField(key, DocumentStorage::LookupPolicy::kCacheAndBSON));
     }
 
     /// Update field by Position. Must already be a valid Position.
@@ -610,6 +614,16 @@ public:
 
     size_t getApproximateSize() {
         return peek().getApproximateSize();
+    }
+
+    /** Create a new document storage with the BSON object.
+     *
+     *  The optional paramater 'stripMetadata' controls whether we strip the metadata fields (the
+     *  complete list is in Document::allMetadataFieldNames).
+     */
+    DocumentStorage& newStorageWithBson(const BSONObj& bson, bool stripMetadata) {
+        reset(make_intrusive<DocumentStorage>(bson, stripMetadata));
+        return const_cast<DocumentStorage&>(*storagePtr());
     }
 
 private:

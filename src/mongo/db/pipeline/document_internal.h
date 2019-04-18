@@ -69,6 +69,7 @@ private:
     unsigned index;
     friend class DocumentStorage;
     friend class DocumentStorageIterator;
+    friend class DocumentStorageCacheIterator;
 };
 
 #pragma pack(1)
@@ -80,9 +81,20 @@ class ValueElement {
     ValueElement& operator=(const ValueElement&) = delete;
 
 public:
+    enum class Kind : char {
+        // The value does not exist in the underlying BSON.
+        kInserted,
+        // The value has the image in the underlying BSON.
+        kCached,
+        // The value has been opportunistically inserted into the cache without checking the BSON.
+        kMaybeInserted
+    };
+
     Value val;
     Position nextCollision;  // Position of next field with same hashBucket
+    const unsigned hash;     // Cache the hash value for faster field name comparisons
     const int nameLen;       // doesn't include '\0'
+    Kind kind;               // See the possible kinds above for comments
     const char _name[1];     // pointer to start of name (use nameSD instead)
 
     ValueElement* next() {
@@ -126,17 +138,96 @@ private:
 };
 // Real size is sizeof(ValueElement) + nameLen
 #pragma pack()
-MONGO_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1));
+MONGO_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(unsigned) +
+                                             sizeof(int) + sizeof(char) + 1));
 
-// This is an internal class for Document. See FieldIterator for the public version.
+class DocumentStorage;
+
+/**
+ * This is an internal class for Document. See FieldIterator for the public version.
+ *
+ * We iterate the fields in 2 phases.
+ * In the first phase we walk the underlying bson and consult the cache to see if the current
+ * element has been modified. If the element has been deleted then we skip it, if it has been
+ * updated then we return the updated value from the cache.
+ * If it is not in the cache at all then the element has not been requested at all (i.e. nobody
+ * called getField with the current field name). At this point we could construct the Value in cache
+ * but we don't do it as not all iterator users actually inspect the values (e.g. size() just counts
+ * # of elements, it does not care about the values at all).
+ * This walk over the underlying bson makes the _it to 'jump around'.
+ *
+ * In the second phase (once we exhaust the bson) we walk the cache and return the inserted values
+ * as they were not present in the original bson.
+ *
+ * We do this 'complicated' dance in order to guarantee the original ordering of fields.
+ */
 class DocumentStorageIterator {
 public:
-    // DocumentStorage::iterator() and iteratorAll() are easier to use
-    DocumentStorageIterator(const ValueElement* first, const ValueElement* end, bool includeMissing)
-        : _first(first), _it(first), _end(end), _includeMissing(includeMissing) {
-        if (!_includeMissing)
-            skipMissing();
+    // DocumentStorage::iterator() and iteratorCacheOnly() are easier to use
+    DocumentStorageIterator(DocumentStorage* storage, BSONObjIterator bsonIt);
+
+    bool atEnd() const {
+        return !_bsonIt.more() && (_it == _end);
     }
+
+    const ValueElement& get() {
+        if (_it) {
+            return *_it;
+        } else {
+            return constructInCache();
+        }
+    }
+
+    Position position() const {
+        return Position(_it->ptr() - _first->ptr());
+    }
+
+    void advance();
+
+    const ValueElement* operator->() {
+        return &get();
+    }
+    const ValueElement& operator*() {
+        return get();
+    }
+
+    const ValueElement* cachedValue() const {
+        return _it;
+    }
+
+    BSONObjIterator& bsonIter() {
+        return _bsonIt;
+    }
+
+private:
+    /** Construct a new ValueElement in the storage cache. The value is coming from the current
+     *  BSONElement pointed to by _bsonIt.
+     */
+    const ValueElement& constructInCache();
+
+    void advanceOne() {
+        if (_bsonIt.more()) {
+            ++_bsonIt;
+            if (!_bsonIt.more()) {
+                _it = _first;
+            }
+        } else {
+            _it = _it->next();
+        }
+    }
+    bool shouldSkipDeleted();
+
+    BSONObjIterator _bsonIt;
+    const ValueElement* _first;
+    const ValueElement* _it;
+    const ValueElement* _end;
+    DocumentStorage* _storage;
+};
+
+class DocumentStorageCacheIterator {
+public:
+    DocumentStorageCacheIterator(const ValueElement* first, const ValueElement* end)
+        : _first(first), _it(first), _end(end) {}
 
     bool atEnd() const {
         return _it == _end;
@@ -152,8 +243,6 @@ public:
 
     void advance() {
         advanceOne();
-        if (!_includeMissing)
-            skipMissing();
     }
 
     const ValueElement* operator->() {
@@ -168,150 +257,43 @@ private:
         _it = _it->next();
     }
 
-    void skipMissing() {
-        while (!atEnd() && _it->val.missing()) {
-            advanceOne();
-        }
-    }
-
     const ValueElement* _first;
     const ValueElement* _it;
     const ValueElement* _end;
-    bool _includeMissing;
 };
 
-/// Storage class used by both Document and MutableDocument
-class DocumentStorage : public RefCountable {
-public:
-    DocumentStorage()
-        : _buffer(nullptr),
-          _bufferEnd(nullptr),
-          _usedBytes(0),
-          _numFields(0),
-          _hashTabMask(0),
-          _metaFields(),
-          _textScore(0),
-          _randVal(0),
-          _geoNearDistance(0),
-          _searchScore(0) {}
+enum MetaType : char {
+    TEXT_SCORE,
+    RAND_VAL,
+    SORT_KEY,
+    GEONEAR_DIST,
+    GEONEAR_POINT,
+    SEARCH_SCORE,
+    SEARCH_HIGHLIGHTS,
 
-    ~DocumentStorage();
+    // New fields must be added before the NUM_FIELDS sentinel.
+    NUM_FIELDS
+};
 
-    enum MetaType : char {
-        TEXT_SCORE,
-        RAND_VAL,
-        SORT_KEY,
-        GEONEAR_DIST,
-        GEONEAR_POINT,
-        SEARCH_SCORE,
-        SEARCH_HIGHLIGHTS,
+/**
+ * A simple container of all metadata fields
+ *
+ */
+struct MetadataFields {
+    std::bitset<MetaType::NUM_FIELDS> _metaFields;
+    double _textScore{0.0};
+    double _randVal{0.0};
+    BSONObj _sortKey;
+    double _geoNearDistance{0.0};
+    Value _geoNearPoint;
+    double _searchScore{0.0};
+    Value _searchHighlights;
 
-        // New fields must be added before the NUM_FIELDS sentinel.
-        NUM_FIELDS
-    };
+    MetadataFields() {}
+    // When adding a field, make sure to update the copy constructor.
+    MetadataFields(const MetadataFields& other);
 
-    static const DocumentStorage& emptyDoc() {
-        return kEmptyDoc;
-    }
-
-    size_t size() const {
-        // can't use _numFields because it includes removed Fields
-        size_t count = 0;
-        for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance())
-            count++;
-        return count;
-    }
-
-    /// Returns the position of the next field to be inserted
-    Position getNextPosition() const {
-        return Position(_usedBytes);
-    }
-
-    /// Returns the position of the named field (may be missing) or Position()
-    Position findField(StringData name) const;
-
-    // Document uses these
-    const ValueElement& getField(Position pos) const {
-        verify(pos.found());
-        return *(_firstElement->plusBytes(pos.index));
-    }
-    Value getField(StringData name) const {
-        Position pos = findField(name);
-        if (!pos.found())
-            return Value();
-        return getField(pos).val;
-    }
-
-    // MutableDocument uses these
-    ValueElement& getField(Position pos) {
-        verify(pos.found());
-        return *(_firstElement->plusBytes(pos.index));
-    }
-    Value& getField(StringData name) {
-        Position pos = findField(name);
-        if (!pos.found())
-            return appendField(name);  // TODO: find a way to avoid hashing name twice
-        return getField(pos).val;
-    }
-
-    /// Adds a new field with missing Value at the end of the document
-    Value& appendField(StringData name);
-
-    /** Preallocates space for fields. Use this to attempt to prevent buffer growth.
-     *  This is only valid to call before anything is added to the document.
-     */
-    void reserveFields(size_t expectedFields);
-
-    /// This skips missing values
-    DocumentStorageIterator iterator() const {
-        return DocumentStorageIterator(_firstElement, end(), false);
-    }
-
-    /// This includes missing values
-    DocumentStorageIterator iteratorAll() const {
-        return DocumentStorageIterator(_firstElement, end(), true);
-    }
-
-    /// Shallow copy of this. Caller owns memory.
-    boost::intrusive_ptr<DocumentStorage> clone() const;
-
-    size_t allocatedBytes() const {
-        return !_buffer ? 0 : (_bufferEnd - _buffer + hashTabBytes());
-    }
-
-    /**
-     * Compute the space allocated for the metadata fields. Will account for space allocated for
-     * unused metadata fields as well.
-     */
-    size_t getMetadataApproximateSize() const;
-
-    /**
-     * Copies all metadata from source if it has any.
-     * Note: does not clear metadata from this.
-     */
-    void copyMetaDataFrom(const DocumentStorage& source) {
-        if (source.hasTextScore()) {
-            setTextScore(source.getTextScore());
-        }
-        if (source.hasRandMetaField()) {
-            setRandMetaField(source.getRandMetaField());
-        }
-        if (source.hasSortKeyMetaField()) {
-            setSortKeyMetaField(source.getSortKeyMetaField());
-        }
-        if (source.hasGeoNearDistance()) {
-            setGeoNearDistance(source.getGeoNearDistance());
-        }
-        if (source.hasGeoNearPoint()) {
-            setGeoNearPoint(source.getGeoNearPoint());
-        }
-        if (source.hasSearchScore()) {
-            setSearchScore(source.getSearchScore());
-        }
-        if (source.hasSearchHighlights()) {
-            setSearchHighlights(source.getSearchHighlights());
-        }
-    }
+    size_t getApproximateSize() const;
 
     bool hasTextScore() const {
         return _metaFields.test(MetaType::TEXT_SCORE);
@@ -389,17 +371,273 @@ public:
         _metaFields.set(MetaType::SEARCH_HIGHLIGHTS);
         _searchHighlights = highlights;
     }
+};
 
-private:
+
+/// Storage class used by both Document and MutableDocument
+class DocumentStorage : public RefCountable {
+public:
+    DocumentStorage()
+        : _cache(nullptr),
+          _cacheEnd(nullptr),
+          _usedBytes(0),
+          _numFields(0),
+          _hashTabMask(0),
+          _bsonIt(_bson) {}
+
+    /**
+     * Construct a storage from the BSON. The BSON is lazily processed as fields are requested from
+     * the document. If we know that the BSON does not contain any metadata fields we can set the
+     * 'stripMetadata' flag to false that will speed up the field iteration.
+     */
+    DocumentStorage(const BSONObj& bson, bool stripMetadata) : DocumentStorage() {
+        _bson = bson.getOwned();
+        _bsonIt = BSONObjIterator(_bson);
+        _stripMetadata = stripMetadata;
+    }
+
+    ~DocumentStorage();
+
+    static const DocumentStorage& emptyDoc() {
+        return kEmptyDoc;
+    }
+
+    size_t size() const {
+        // can't use _numFields because it includes removed Fields
+        size_t count = 0;
+        for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance())
+            count++;
+        return count;
+    }
+
+    /// Returns the position of the next field to be inserted
+    Position getNextPosition() const {
+        return Position(_usedBytes);
+    }
+
+    enum class LookupPolicy {
+        // When looking up a field check the cache only.
+        kCacheOnly,
+        // Look up in a cache and when not found search the unrelying BSON.
+        kCacheAndBSON
+    };
+
+    /// Returns the position of the named field or Position()
+    Position findField(StringData name, LookupPolicy policy) const;
+
+    // Document uses these
+    const ValueElement& getField(Position pos) const {
+        verify(pos.found());
+        return *(_firstElement->plusBytes(pos.index));
+    }
+    Value getField(StringData name) const {
+        Position pos = findField(name, LookupPolicy::kCacheAndBSON);
+        if (!pos.found())
+            return Value();
+        return getField(pos).val;
+    }
+
+    // MutableDocument uses these
+    ValueElement& getField(Position pos) {
+        verify(pos.found());
+        return *(_firstElement->plusBytes(pos.index));
+    }
+    Value& getField(StringData name, LookupPolicy policy) {
+        Position pos = findField(name, policy);
+        if (!pos.found())
+            return appendField(name, hashKey(name), ValueElement::Kind::kMaybeInserted);
+        return getField(pos).val;
+    }
+
+    /// Adds a new field with missing Value at the end of the document
+    Value& appendField(StringData name, unsigned hash, ValueElement::Kind kind);
+
+    /** Preallocates space for fields. Use this to attempt to prevent buffer growth.
+     *  This is only valid to call before anything is added to the document.
+     */
+    void reserveFields(size_t expectedFields);
+
+    /// This returns values from the cache and underlying BSON.
+    DocumentStorageIterator iterator() const {
+        return DocumentStorageIterator(const_cast<DocumentStorage*>(this), BSONObjIterator(_bson));
+    }
+
+    /// This returns values from the cache only.
+    auto iteratorCacheOnly() const {
+        return DocumentStorageCacheIterator(_firstElement, end());
+    }
+
+    /// Shallow copy of this. Caller owns memory.
+    boost::intrusive_ptr<DocumentStorage> clone() const;
+
+    size_t allocatedBytes() const {
+        return !_cache ? 0 : (_cacheEnd - _cache + hashTabBytes());
+    }
+
+    auto bsonObjSize() const {
+        return _bson.objsize();
+    }
+    /**
+     * Compute the space allocated for the metadata fields. Will account for space allocated for
+     * unused metadata fields as well.
+     */
+    size_t getMetadataApproximateSize() const;
+
+    /**
+     * Copies all metadata from source if it has any.
+     * Note: does not clear metadata from this.
+     */
+    void copyMetaDataFrom(const DocumentStorage& source) {
+        // It the underlying BSON object is shared and the source does not have metadata then
+        // nothing needs to be copied. If the metadata is in the BSON then they are the same in
+        // this and source.
+        if (_bson.objdata() == source._bson.objdata() && !source._metadataFields) {
+            return;
+        }
+        if (source.hasTextScore()) {
+            setTextScore(source.getTextScore());
+        }
+        if (source.hasRandMetaField()) {
+            setRandMetaField(source.getRandMetaField());
+        }
+        if (source.hasSortKeyMetaField()) {
+            setSortKeyMetaField(source.getSortKeyMetaField());
+        }
+        if (source.hasGeoNearDistance()) {
+            setGeoNearDistance(source.getGeoNearDistance());
+        }
+        if (source.hasGeoNearPoint()) {
+            setGeoNearPoint(source.getGeoNearPoint());
+        }
+        if (source.hasSearchScore()) {
+            setSearchScore(source.getSearchScore());
+        }
+        if (source.hasSearchHighlights()) {
+            setSearchHighlights(source.getSearchHighlights());
+        }
+    }
+
+    bool hasTextScore() const {
+        loadLazyMetadata();
+        return _metadataFields->hasTextScore();
+    }
+    double getTextScore() const {
+        loadLazyMetadata();
+        return _metadataFields->getTextScore();
+    }
+    void setTextScore(double score) {
+        loadLazyMetadata();
+        _metadataFields->setTextScore(score);
+    }
+
+    bool hasRandMetaField() const {
+        loadLazyMetadata();
+        return _metadataFields->hasRandMetaField();
+    }
+    double getRandMetaField() const {
+        loadLazyMetadata();
+        return _metadataFields->getRandMetaField();
+    }
+    void setRandMetaField(double val) {
+        loadLazyMetadata();
+        _metadataFields->setRandMetaField(val);
+    }
+
+    bool hasSortKeyMetaField() const {
+        loadLazyMetadata();
+        return _metadataFields->hasSortKeyMetaField();
+    }
+    BSONObj getSortKeyMetaField() const {
+        loadLazyMetadata();
+        return _metadataFields->getSortKeyMetaField();
+    }
+    void setSortKeyMetaField(BSONObj sortKey) {
+        loadLazyMetadata();
+        _metadataFields->setSortKeyMetaField(sortKey);
+    }
+
+    bool hasGeoNearDistance() const {
+        loadLazyMetadata();
+        return _metadataFields->hasGeoNearDistance();
+    }
+    double getGeoNearDistance() const {
+        loadLazyMetadata();
+        return _metadataFields->getGeoNearDistance();
+    }
+    void setGeoNearDistance(double dist) {
+        loadLazyMetadata();
+        _metadataFields->setGeoNearDistance(dist);
+    }
+
+    bool hasGeoNearPoint() const {
+        loadLazyMetadata();
+        return _metadataFields->hasGeoNearPoint();
+    }
+    Value getGeoNearPoint() const {
+        loadLazyMetadata();
+        return _metadataFields->getGeoNearPoint();
+    }
+    void setGeoNearPoint(Value point) {
+        loadLazyMetadata();
+        _metadataFields->setGeoNearPoint(point);
+    }
+
+    bool hasSearchScore() const {
+        loadLazyMetadata();
+        return _metadataFields->hasSearchScore();
+    }
+    double getSearchScore() const {
+        loadLazyMetadata();
+        return _metadataFields->getSearchScore();
+    }
+    void setSearchScore(double score) {
+        loadLazyMetadata();
+        _metadataFields->setSearchScore(score);
+    }
+
+    bool hasSearchHighlights() const {
+        loadLazyMetadata();
+        return _metadataFields->hasSearchHighlights();
+    }
+    Value getSearchHighlights() const {
+        loadLazyMetadata();
+        return _metadataFields->getSearchHighlights();
+    }
+    void setSearchHighlights(Value highlights) {
+        loadLazyMetadata();
+        _metadataFields->setSearchHighlights(highlights);
+    }
+
+    static unsigned hashKey(StringData name) {
+        // TODO consider FNV-1a once we have a better benchmark corpus
+        unsigned out;
+        MurmurHash3_x86_32(name.rawData(), name.size(), 0, &out);
+        return out;
+    }
+
+    const ValueElement* begin() const {
+        return _firstElement;
+    }
+
     /// Same as lastElement->next() or firstElement() if empty.
     const ValueElement* end() const {
         return _firstElement ? _firstElement->plusBytes(_usedBytes) : nullptr;
     }
 
-    /// Allocates space in _buffer. Copies existing data if there is any.
+    auto stripMetadata() const {
+        return _stripMetadata;
+    }
+
+    Position constructInCache(const BSONElement& elem);
+
+private:
+    /// Returns the position of the named field in the cache or Position()
+    Position findFieldInCache(StringData name) const;
+
+    /// Allocates space in _cache. Copies existing data if there is any.
     void alloc(unsigned newSize);
 
-    /// Call after adding field to _buffer and increasing _numFields
+    /// Call after adding field to _cache and increasing _numFields
     void addFieldToHashTable(Position pos);
 
     // assumes _hashTabMask is (power of two) - 1
@@ -420,13 +658,6 @@ private:
         memset(static_cast<void*>(_hashTab), -1, hashTabBytes());
     }
 
-    static unsigned hashKey(StringData name) {
-        // TODO consider FNV-1a once we have a better benchmark corpus
-        unsigned out;
-        MurmurHash3_x86_32(name.rawData(), name.size(), 0, &out);
-        return out;
-    }
-
     unsigned bucketForKey(StringData name) const {
         return hashKey(name) & _hashTabMask;
     }
@@ -434,9 +665,11 @@ private:
     /// Adds all fields to the hash table
     void rehash() {
         hashTabInit();
-        for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance())
+        for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance())
             addFieldToHashTable(it.position());
     }
+
+    void loadLazyMetadata() const;
 
     enum {
         HASH_TAB_INIT_SIZE = 8,  // must be power of 2
@@ -444,23 +677,23 @@ private:
                                  // set to 1 to always hash
     };
 
-    // _buffer layout:
+    // _cache layout:
     // -------------------------------------------------------------------------------
     // | ValueElement1 Name1 | ValueElement2 Name2 | ... FREE SPACE ... | Hash Table |
     // -------------------------------------------------------------------------------
-    //  ^ _buffer and _firstElement point here                           ^
-    //                                _bufferEnd and _hashTab point here ^
+    //  ^ _cache and _firstElement point here                           ^
+    //                                _cacheEnd and _hashTab point here ^
     //
     //
     // When the buffer grows, the hash table moves to the new end.
     union {
-        char* _buffer;
+        char* _cache;
         ValueElement* _firstElement;
     };
 
     union {
-        // pointer to "end" of _buffer element space and start of hash table (same position)
-        char* _bufferEnd;
+        // pointer to "end" of _cache element space and start of hash table (same position)
+        char* _cacheEnd;
         Position* _hashTab;  // table lazily initialized once _numFields == HASH_TAB_MIN
     };
 
@@ -468,17 +701,19 @@ private:
     unsigned _numFields;    // this includes removed fields
     unsigned _hashTabMask;  // equal to hashTabBuckets()-1 but used more often
 
-    std::bitset<MetaType::NUM_FIELDS> _metaFields;
-    double _textScore;
-    double _randVal;
-    BSONObj _sortKey;
-    double _geoNearDistance;
-    Value _geoNearPoint;
-    double _searchScore;
-    Value _searchHighlights;
-    // When adding a field, make sure to update clone() and getMetadataApproximateSize() methods.
+    BSONObj _bson;
+    mutable BSONObjIterator _bsonIt;
+
+    mutable std::unique_ptr<MetadataFields> _metadataFields;
+
+    // The storage constructed from a BSON value may contain metadata. When we process the BSON we
+    // have to move the metadata to the MetadataFields object. If we know that the BSON does not
+    // have any metadata we can set _stripMetadata to false that will speed up the iteration.
+    bool _stripMetadata{false};
 
     // Defined in document.cpp
     static const DocumentStorage kEmptyDoc;
+
+    friend class DocumentStorageIterator;
 };
 }

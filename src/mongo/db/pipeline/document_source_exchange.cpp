@@ -361,7 +361,11 @@ size_t Exchange::loadNextBatch() {
                 bool full = false;
                 // The document is sent to all consumers.
                 for (auto& c : _consumers) {
-                    full = c->appendDocument(input, _maxBufferSize);
+                    // By default the Document is shallow copied. However, the broadcasted document
+                    // can be used by multiple threads (consumers) and the Document is not thread
+                    // safe. Hence we have to clone the Document.
+                    auto copy = DocumentSource::GetNextResult(input.getDocument().clone());
+                    full = c->appendDocument(copy, _maxBufferSize);
                 }
 
                 if (full)

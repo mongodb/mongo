@@ -242,7 +242,7 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     if (hasSort) {
         // Strip out the sort key after sorting.
         root = std::make_unique<RouterStageRemoveMetadataFields>(
-            opCtx, std::move(root), std::vector<StringData>{AsyncResultsMerger::kSortKeyField});
+            opCtx, std::move(root), StringDataSet{AsyncResultsMerger::kSortKeyField});
     }
 
     return root;

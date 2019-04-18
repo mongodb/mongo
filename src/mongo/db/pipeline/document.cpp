@@ -45,25 +45,97 @@ using std::vector;
 
 const DocumentStorage DocumentStorage::kEmptyDoc;
 
-const std::vector<StringData> Document::allMetadataFieldNames = {
-    Document::metaFieldGeoNearDistance,
-    Document::metaFieldGeoNearPoint,
-    Document::metaFieldRandVal,
-    Document::metaFieldSearchHighlights,
-    Document::metaFieldSearchScore,
-    Document::metaFieldSortKey,
-    Document::metaFieldTextScore};
+const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore,
+                                                    Document::metaFieldRandVal,
+                                                    Document::metaFieldSortKey,
+                                                    Document::metaFieldGeoNearDistance,
+                                                    Document::metaFieldGeoNearPoint,
+                                                    Document::metaFieldSearchScore,
+                                                    Document::metaFieldSearchHighlights};
 
-Position DocumentStorage::findField(StringData requested) const {
+DocumentStorageIterator::DocumentStorageIterator(DocumentStorage* storage, BSONObjIterator bsonIt)
+    : _bsonIt(std::move(bsonIt)),
+      _first(storage->begin()),
+      _it(_first),
+      _end(storage->end()),
+      _storage(storage) {
+    while (shouldSkipDeleted()) {
+        advanceOne();
+    }
+}
+
+const ValueElement& DocumentStorageIterator::constructInCache() {
+    // First construct the ValueElement in the document storage.
+    auto pos = _storage->constructInCache(*_bsonIt);
+
+    // The storage may have reallocated memory so update out pointers.
+    _first = _storage->begin();
+    _end = _storage->end();
+    _it = _first->plusBytes(pos.index);
+
+    return *_it;
+}
+
+void DocumentStorageIterator::advance() {
+    if (atEnd()) {
+        return;
+    }
+
+    do {
+        advanceOne();
+    } while (shouldSkipDeleted());
+}
+
+bool DocumentStorageIterator::shouldSkipDeleted() {
+    if (_bsonIt.more()) {
+        const auto fieldName = (*_bsonIt).fieldNameStringData();
+
+        // If we strip the metadata see if a field name matches the known list. All metadata fields
+        // start with '$' so optimize for a quick bailout.
+        if (_storage->stripMetadata() && fieldName[0] == '$' &&
+            Document::allMetadataFieldNames.contains(fieldName)) {
+            return true;
+        }
+        // Check if the field is in the cache and if so then check if it has been deleted (i.e. the
+        // val.missing() is true).
+        if (auto pos = _storage->findFieldInCache(fieldName); pos.found()) {
+            _it = _first->plusBytes(pos.index);
+            if (_it->kind == ValueElement::Kind::kMaybeInserted) {
+                // We have found the value in the BSON so it was not in fact inserted.
+                const_cast<ValueElement*>(_it)->kind = ValueElement::Kind::kCached;
+            }
+            if (_it->val.missing()) {
+                return true;
+            }
+        } else {
+            // This is subtle. The field is coming from the underlying BSON but it is not in the
+            // cache. We set the _it pointer to nullptr here so if anybody asks for its value (by
+            // dereferencing the iterator) the get() method will call constructInCache().
+            // We don't want to construct the object here as in many cases caller simply loop over
+            // the iterator without dereferencing.
+            _it = nullptr;
+        }
+    } else if (!atEnd()) {
+        if (_it->val.missing() || _it->kind == ValueElement::Kind::kCached) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+Position DocumentStorage::findFieldInCache(StringData requested) const {
     int reqSize = requested.size();  // get size calculation out of the way if needed
 
     if (_numFields >= HASH_TAB_MIN) {  // hash lookup
-        const unsigned bucket = bucketForKey(requested);
+        const unsigned hash = hashKey(requested);
+        const unsigned bucket = hash & _hashTabMask;
 
         Position pos = _hashTab[bucket];
         while (pos.found()) {
             const ValueElement& elem = getField(pos);
-            if (elem.nameLen == reqSize && memcmp(requested.rawData(), elem._name, reqSize) == 0) {
+            if (elem.hash == hash && elem.nameLen == reqSize &&
+                memcmp(requested.rawData(), elem._name, reqSize) == 0) {
                 return pos;
             }
 
@@ -71,7 +143,7 @@ Position DocumentStorage::findField(StringData requested) const {
             pos = elem.nextCollision;
         }
     } else {  // linear scan
-        for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance()) {
+        for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance()) {
             if (it->nameLen == reqSize && memcmp(requested.rawData(), it->_name, reqSize) == 0) {
                 return it.position();
             }
@@ -82,7 +154,37 @@ Position DocumentStorage::findField(StringData requested) const {
     return Position();
 }
 
-Value& DocumentStorage::appendField(StringData name) {
+Position DocumentStorage::findField(StringData requested, LookupPolicy policy) const {
+    if (auto pos = findFieldInCache(requested); pos.found() || policy == LookupPolicy::kCacheOnly) {
+        return pos;
+    }
+
+    while (_bsonIt.more()) {
+        BSONElement bsonElement(_bsonIt.next());
+        // In order to avoid repeatedly scanning the BSON we were constructed from, we'll bring in a
+        // copy of every value we encounter while searching here. That way the next time we search
+        // we won't have to reconsider elements we've already examined and can avoid an O(N^2) worst
+        // case performance.
+        auto pos = const_cast<DocumentStorage*>(this)->constructInCache(bsonElement);
+        if (requested == bsonElement.fieldNameStringData()) {
+            return pos;
+        }
+    }
+
+    // if we got here, there's no such field
+    return Position();
+}
+
+Position DocumentStorage::constructInCache(const BSONElement& elem) {
+    auto pos = getNextPosition();
+    const auto fieldName = elem.fieldNameStringData();
+    const unsigned hash = hashKey(fieldName);
+    appendField(fieldName, hash, ValueElement::Kind::kCached) = Value(elem);
+
+    return pos;
+}
+
+Value& DocumentStorage::appendField(StringData name, unsigned hash, ValueElement::Kind kind) {
     Position pos = getNextPosition();
     const int nameSize = name.size();
 
@@ -92,24 +194,26 @@ Value& DocumentStorage::appendField(StringData name) {
 
     // Make room for new field (and padding at end for alignment)
     const unsigned newUsed = ValueElement::align(_usedBytes + sizeof(ValueElement) + nameSize);
-    if (_buffer + newUsed > _bufferEnd)
+    if (_cache + newUsed > _cacheEnd)
         alloc(newUsed);
     _usedBytes = newUsed;
 
     // Append structure of a ValueElement
-    char* dest = _buffer + pos.index;  // must be after alloc since it changes _buffer
+    char* dest = _cache + pos.index;  // must be after alloc since it changes _cache
 #define append(x)                  \
     memcpy(dest, &(x), sizeof(x)); \
     dest += sizeof(x)
     append(value);
     append(nextCollision);
+    append(hash);
     append(nameSize);
+    append(kind);
     name.copyTo(dest, true);
 // Padding for alignment handled above
 #undef append
 
     // Make sure next field starts where we expect it
-    fassert(16486, getField(pos).next()->ptr() == _buffer + _usedBytes);
+    fassert(16486, getField(pos).next()->ptr() == _cache + _usedBytes);
 
     _numFields++;
 
@@ -139,9 +243,9 @@ void DocumentStorage::addFieldToHashTable(Position pos) {
 }
 
 void DocumentStorage::alloc(unsigned newSize) {
-    const bool firstAlloc = !_buffer;
+    const bool firstAlloc = !_cache;
     const bool doingRehash = needRehash();
-    const size_t oldCapacity = _bufferEnd - _buffer;
+    const size_t oldCapacity = _cacheEnd - _cache;
 
     // make new bucket count big enough
     while (needRehash() || hashTabBuckets() < HASH_TAB_INIT_SIZE)
@@ -154,13 +258,13 @@ void DocumentStorage::alloc(unsigned newSize) {
 
     uassert(16490, "Tried to make oversized document", capacity <= size_t(BufferMaxSize));
 
-    std::unique_ptr<char[]> oldBuf(_buffer);
-    _buffer = new char[capacity];
-    _bufferEnd = _buffer + capacity - hashTabBytes();
+    std::unique_ptr<char[]> oldBuf(_cache);
+    _cache = new char[capacity];
+    _cacheEnd = _cache + capacity - hashTabBytes();
 
     if (!firstAlloc) {
         // This just copies the elements
-        memcpy(_buffer, oldBuf.get(), _usedBytes);
+        memcpy(_cache, oldBuf.get(), _usedBytes);
 
         if (_numFields >= HASH_TAB_MIN) {
             // if we were hashing, deal with the hash table
@@ -175,7 +279,7 @@ void DocumentStorage::alloc(unsigned newSize) {
 }
 
 void DocumentStorage::reserveFields(size_t expectedFields) {
-    fassert(16487, !_buffer);
+    fassert(16487, !_cache);
 
     unsigned buckets = HASH_TAB_INIT_SIZE;
     while (buckets < expectedFields)
@@ -187,20 +291,20 @@ void DocumentStorage::reserveFields(size_t expectedFields) {
 
     uassert(16491, "Tried to make oversized document", newSize <= size_t(BufferMaxSize));
 
-    _buffer = new char[newSize + hashTabBytes()];
-    _bufferEnd = _buffer + newSize;
+    _cache = new char[newSize + hashTabBytes()];
+    _cacheEnd = _cache + newSize;
 }
 
 intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
-    auto out = make_intrusive<DocumentStorage>();
+    auto out = make_intrusive<DocumentStorage>(_bson, _stripMetadata);
 
-    if (_buffer) {
+    if (_cache) {
         // Make a copy of the buffer with the fields.
         // It is very important that the positions of each field are the same after cloning.
         const size_t bufferBytes = allocatedBytes();
-        out->_buffer = new char[bufferBytes];
-        out->_bufferEnd = out->_buffer + (_bufferEnd - _buffer);
-        memcpy(out->_buffer, _buffer, bufferBytes);
+        out->_cache = new char[bufferBytes];
+        out->_cacheEnd = out->_cache + (_cacheEnd - _cache);
+        memcpy(out->_cache, _cache, bufferBytes);
 
         out->_hashTabMask = _hashTabMask;
         out->_usedBytes = _usedBytes;
@@ -209,7 +313,7 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
         dassert(out->allocatedBytes() == bufferBytes);
 
         // Tell values that they have been memcpyed (updates ref counts)
-        for (DocumentStorageIterator it = out->iteratorAll(); !it.atEnd(); it.advance()) {
+        for (auto it = out->iteratorCacheOnly(); !it.atEnd(); it.advance()) {
             it->val.memcpyed();
         }
     } else {
@@ -220,50 +324,97 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
     }
 
     // Copy metadata
-    if (_metaFields.any()) {
-        out->_metaFields = _metaFields;
-        out->_textScore = _textScore;
-        out->_randVal = _randVal;
-        out->_sortKey = _sortKey.getOwned();
-        out->_geoNearDistance = _geoNearDistance;
-        out->_geoNearPoint = _geoNearPoint.getOwned();
-        out->_searchScore = _searchScore;
-        out->_searchHighlights = _searchHighlights;
+    if (_metadataFields) {
+        out->_metadataFields = std::make_unique<MetadataFields>(*_metadataFields);
     }
 
     return out;
 }
 
-size_t DocumentStorage::getMetadataApproximateSize() const {
-    // We count only the "deep" portion of the metadata values. The rest is counted in the size of
-    // the DocumentStorage class.
-    size_t size = 0;
+MetadataFields::MetadataFields(const MetadataFields& other) {
+    _metaFields = other._metaFields;
+    _textScore = other._textScore;
+    _randVal = other._randVal;
+    _sortKey = other._sortKey.getOwned();
+    _geoNearDistance = other._geoNearDistance;
+    _geoNearPoint = other._geoNearPoint.getOwned();
+    _searchScore = other._searchScore;
+    _searchHighlights = other._searchHighlights;
+}
+
+size_t MetadataFields::getApproximateSize() const {
+    size_t size = sizeof(MetadataFields);
+
+    // Count the "deep" portion of the metadata values.
     size += _sortKey.objsize();
     size += _geoNearPoint.getApproximateSize();
-    // Size of Value is double counted - once in sizeof(DocumentStorage) and once in
+    // Size of Value is double counted - once in sizeof(MetadataFields) and once in
     // getApproximateSize()
     size -= sizeof(_geoNearPoint);
     size += _searchHighlights.getApproximateSize();
     size -= sizeof(_searchHighlights);
+
     return size;
 }
 
-DocumentStorage::~DocumentStorage() {
-    std::unique_ptr<char[]> deleteBufferAtScopeEnd(_buffer);
+size_t DocumentStorage::getMetadataApproximateSize() const {
+    if (!_metadataFields) {
+        return 0;
+    }
 
-    for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance()) {
+    return _metadataFields->getApproximateSize();
+}
+
+DocumentStorage::~DocumentStorage() {
+    std::unique_ptr<char[]> deleteBufferAtScopeEnd(_cache);
+
+    for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance()) {
         it->val.~Value();  // explicit destructor call
     }
 }
 
-Document::Document(const BSONObj& bson) {
-    MutableDocument md(bson.nFields());
-
-    BSONObjIterator it(bson);
-    while (it.more()) {
-        BSONElement bsonElement(it.next());
-        md.addField(bsonElement.fieldNameStringData(), Value(bsonElement));
+void DocumentStorage::loadLazyMetadata() const {
+    if (_metadataFields) {
+        return;
     }
+
+    _metadataFields = std::make_unique<MetadataFields>();
+
+    BSONObjIterator it(_bson);
+    while (it.more()) {
+        BSONElement elem(it.next());
+        auto fieldName = elem.fieldNameStringData();
+        if (fieldName[0] == '$') {
+            if (fieldName == Document::metaFieldTextScore) {
+                _metadataFields->setTextScore(elem.Double());
+            } else if (fieldName == Document::metaFieldSearchScore) {
+                _metadataFields->setSearchScore(elem.Double());
+            } else if (fieldName == Document::metaFieldSearchHighlights) {
+                _metadataFields->setSearchHighlights(Value(elem));
+            } else if (fieldName == Document::metaFieldRandVal) {
+                _metadataFields->setRandMetaField(elem.Double());
+            } else if (fieldName == Document::metaFieldSortKey) {
+                _metadataFields->setSortKeyMetaField(elem.Obj());
+            } else if (fieldName == Document::metaFieldGeoNearDistance) {
+                _metadataFields->setGeoNearDistance(elem.Double());
+            } else if (fieldName == Document::metaFieldGeoNearPoint) {
+                Value val;
+                if (elem.type() == BSONType::Array) {
+                    val = Value(BSONArray(elem.embeddedObject()));
+                } else {
+                    invariant(elem.type() == BSONType::Object);
+                    val = Value(elem.embeddedObject());
+                }
+
+                _metadataFields->setGeoNearPoint(val);
+            }
+        }
+    }
+}
+
+Document::Document(const BSONObj& bson) {
+    MutableDocument md;
+    md.newStorageWithBson(bson, false);
 
     *this = md.freeze();
 }
@@ -293,7 +444,11 @@ void Document::toBson(BSONObjBuilder* builder, size_t recursionLevel) const {
             recursionLevel <= BSONDepth::getMaxAllowableDepth());
 
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
-        it->val.addToBsonObj(builder, it->nameSD(), recursionLevel);
+        if (auto cached = it.cachedValue()) {
+            cached->val.addToBsonObj(builder, cached->nameSD(), recursionLevel);
+        } else {
+            builder->append(*it.bsonIter());
+        }
     }
 }
 
@@ -333,47 +488,7 @@ BSONObj Document::toBsonWithMetaData() const {
 
 Document Document::fromBsonWithMetaData(const BSONObj& bson) {
     MutableDocument md;
-
-    BSONObjIterator it(bson);
-    while (it.more()) {
-        BSONElement elem(it.next());
-        auto fieldName = elem.fieldNameStringData();
-        if (fieldName[0] == '$') {
-            if (fieldName == metaFieldTextScore) {
-                md.setTextScore(elem.Double());
-                continue;
-            } else if (fieldName == metaFieldSearchScore) {
-                md.setSearchScore(elem.Double());
-                continue;
-            } else if (fieldName == metaFieldSearchHighlights) {
-                md.setSearchHighlights(Value(elem));
-                continue;
-            } else if (fieldName == metaFieldRandVal) {
-                md.setRandMetaField(elem.Double());
-                continue;
-            } else if (fieldName == metaFieldSortKey) {
-                md.setSortKeyMetaField(elem.Obj());
-                continue;
-            } else if (fieldName == metaFieldGeoNearDistance) {
-                md.setGeoNearDistance(elem.Double());
-                continue;
-            } else if (fieldName == metaFieldGeoNearPoint) {
-                Value val;
-                if (elem.type() == BSONType::Array) {
-                    val = Value(BSONArray(elem.embeddedObject()));
-                } else {
-                    invariant(elem.type() == BSONType::Object);
-                    val = Value(elem.embeddedObject());
-                }
-
-                md.setGeoNearPoint(val);
-                continue;
-            }
-        }
-
-        // Note: this will not parse out metadata in embedded documents.
-        md.addField(fieldName, Value(elem));
-    }
+    md.newStorageWithBson(bson, true);
 
     return md.freeze();
 }
@@ -389,7 +504,7 @@ MutableValue MutableDocument::getNestedFieldHelper(const FieldPath& dottedField,
     if (level == dottedField.getPathLength() - 1) {
         return getField(dottedField.getFieldName(level));
     } else {
-        MutableDocument nested(getField(dottedField.getFieldName(level)));
+        MutableDocument nested(getFieldNonLeaf(dottedField.getFieldName(level)));
         return nested.getNestedFieldHelper(dottedField, level + 1);
     }
 }
@@ -449,13 +564,14 @@ size_t Document::getApproximateSize() const {
     size_t size = sizeof(DocumentStorage);
     size += storage().allocatedBytes();
 
-    for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
+    for (auto it = storage().iteratorCacheOnly(); !it.atEnd(); it.advance()) {
         size += it->val.getApproximateSize();
         size -= sizeof(Value);  // already accounted for above
     }
 
     // The metadata also occupies space in the document storage that's pre-allocated.
     size += getMetadataApproximateSize();
+    size += storage().bsonObjSize();
 
     return size;
 }
@@ -472,6 +588,12 @@ void Document::hash_combine(size_t& seed,
 int Document::compare(const Document& rL,
                       const Document& rR,
                       const StringData::ComparatorInterface* stringComparator) {
+
+    if (&rL.storage() == &rR.storage()) {
+        // If the storage is the same (shared between the documents) then the documents must be
+        // equal.
+        return 0;
+    }
     DocumentStorageIterator lIt = rL.storage().iterator();
     DocumentStorageIterator rIt = rR.storage().iterator();
 
@@ -537,23 +659,23 @@ void Document::serializeForSorter(BufBuilder& buf) const {
     }
 
     if (hasTextScore()) {
-        buf.appendNum(char(DocumentStorage::MetaType::TEXT_SCORE + 1));
+        buf.appendNum(char(MetaType::TEXT_SCORE + 1));
         buf.appendNum(getTextScore());
     }
     if (hasRandMetaField()) {
-        buf.appendNum(char(DocumentStorage::MetaType::RAND_VAL + 1));
+        buf.appendNum(char(MetaType::RAND_VAL + 1));
         buf.appendNum(getRandMetaField());
     }
     if (hasSortKeyMetaField()) {
-        buf.appendNum(char(DocumentStorage::MetaType::SORT_KEY + 1));
+        buf.appendNum(char(MetaType::SORT_KEY + 1));
         getSortKeyMetaField().appendSelfToBufBuilder(buf);
     }
     if (hasSearchScore()) {
-        buf.appendNum(char(DocumentStorage::MetaType::SEARCH_SCORE + 1));
+        buf.appendNum(char(MetaType::SEARCH_SCORE + 1));
         buf.appendNum(getSearchScore());
     }
     if (hasSearchHighlights()) {
-        buf.appendNum(char(DocumentStorage::MetaType::SEARCH_HIGHLIGHTS + 1));
+        buf.appendNum(char(MetaType::SEARCH_HIGHLIGHTS + 1));
         getSearchHighlights().serializeForSorter(buf);
     }
     buf.appendNum(char(0));
@@ -568,16 +690,16 @@ Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeS
     }
 
     while (char marker = buf.read<char>()) {
-        if (marker == char(DocumentStorage::MetaType::TEXT_SCORE) + 1) {
+        if (marker == char(MetaType::TEXT_SCORE) + 1) {
             doc.setTextScore(buf.read<LittleEndian<double>>());
-        } else if (marker == char(DocumentStorage::MetaType::RAND_VAL) + 1) {
+        } else if (marker == char(MetaType::RAND_VAL) + 1) {
             doc.setRandMetaField(buf.read<LittleEndian<double>>());
-        } else if (marker == char(DocumentStorage::MetaType::SORT_KEY) + 1) {
+        } else if (marker == char(MetaType::SORT_KEY) + 1) {
             doc.setSortKeyMetaField(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
-        } else if (marker == char(DocumentStorage::MetaType::SEARCH_SCORE) + 1) {
+        } else if (marker == char(MetaType::SEARCH_SCORE) + 1) {
             doc.setSearchScore(buf.read<LittleEndian<double>>());
-        } else if (marker == char(DocumentStorage::MetaType::SEARCH_HIGHLIGHTS) + 1) {
+        } else if (marker == char(MetaType::SEARCH_HIGHLIGHTS) + 1) {
             doc.setSearchHighlights(
                 Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else {
