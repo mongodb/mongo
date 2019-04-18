@@ -194,6 +194,10 @@ public:
                             BSON(FeatureCompatibilityVersion::kCommandName << requestedVersion)))));
             }
 
+            if (LogicalTimeValidator::get(opCtx)) {
+                LogicalTimeValidator::get(opCtx)->enableKeyGenerator(opCtx, true);
+            }
+
             if (ShardingState::get(opCtx)->enabled()) {
                 // Ensure we try reading the keys for signing clusterTime immediately on upgrade.
                 // Remove after 3.4 -> 3.6 upgrade.
