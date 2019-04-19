@@ -816,14 +816,16 @@ var DB;
     DB.prototype.getLastErrorCmd = DB.prototype.getLastErrorObj;
 
     DB.prototype._getCollectionInfosCommand = function(
-        filter, nameOnly = false, authorizedCollections = false) {
+        filter, nameOnly = false, authorizedCollections = false, options = {}) {
         filter = filter || {};
-        var res = this.runCommand({
+        const cmd = {
             listCollections: 1,
             filter: filter,
             nameOnly: nameOnly,
             authorizedCollections: authorizedCollections
-        });
+        };
+
+        const res = this.runCommand(Object.merge(cmd, options));
         if (!res.ok) {
             throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
         }
@@ -898,13 +900,17 @@ var DB;
         }
     };
 
+    DB.prototype._getCollectionNamesInternal = function(options) {
+        return this._getCollectionInfosCommand({}, true, true, options).map(function(infoObj) {
+            return infoObj.name;
+        });
+    };
+
     /**
      * Returns this database's list of collection names in sorted order.
      */
     DB.prototype.getCollectionNames = function() {
-        return this.getCollectionInfos({}, true, true).map(function(infoObj) {
-            return infoObj.name;
-        });
+        return this._getCollectionNamesInternal({});
     };
 
     DB.prototype.tojson = function() {
@@ -1249,7 +1255,8 @@ var DB;
     };
 
     DB.autocomplete = function(obj) {
-        var colls = obj.getCollectionNames();
+        // Time out if a transaction or other op holds locks we need. Caller suppresses exceptions.
+        var colls = obj._getCollectionNamesInternal({maxTimeMS: 1000});
         var ret = [];
         for (var i = 0; i < colls.length; i++) {
             if (colls[i].match(/^[a-zA-Z0-9_.\$]+$/))
