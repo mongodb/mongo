@@ -916,7 +916,7 @@ functions:
             fi
 
             mkdir -p ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/android
-            cp -r embedded-android/build/repo/* ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/android
+            cp -r embedded-android/build/outputs/aar/* ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/android
         fi
 
   "shared scons cache pruning":
