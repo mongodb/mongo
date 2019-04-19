@@ -159,6 +159,10 @@ std::vector<repl::MemberData> ReplicationCoordinatorEmbedded::getMemberData() co
     UASSERT_NOT_IMPLEMENTED;
 }
 
+bool ReplicationCoordinatorEmbedded::canAcceptNonLocalWrites() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::waitForMemberState(MemberState, Milliseconds) {
     UASSERT_NOT_IMPLEMENTED;
 }

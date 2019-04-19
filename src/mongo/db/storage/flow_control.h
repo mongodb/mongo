@@ -95,7 +95,7 @@ private:
 
     repl::ReplicationCoordinator* _replCoord;
 
-    // These values are updated with each flow control computation that are also surfaced in server
+    // These values are updated with each flow control computation and are also surfaced in server
     // status.
     AtomicWord<int> _lastTargetTicketsPermitted{0};
     AtomicWord<double> _lastLocksPerOp{0.0};

@@ -176,10 +176,8 @@ double FlowControl::_getLocksPerOp() {
 
 BSONObj FlowControl::generateSection(OperationContext* opCtx,
                                      const BSONElement& configElement) const {
-    // Lag is not meaningful on arbiters.
-    const bool isArbiter =
-        _replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-        _replCoord->getMemberState().arbiter();
+    // Flow Control does not have use for lag measured on nodes that cannot accept writes.
+    const bool canAcceptWrites = _replCoord->canAcceptNonLocalWrites();
 
     // Flow Control is only enabled if FCV is 4.2.
     const bool isFCV42 =
@@ -198,7 +196,8 @@ BSONObj FlowControl::generateSection(OperationContext* opCtx,
                FlowControlTicketholder::get(opCtx)->totalTimeAcquiringMicros());
     bob.append("locksPerOp", _lastLocksPerOp.load());
     bob.append("sustainerRate", _lastSustainerAppliedCount.load());
-    bob.append("isLagged", isFCV42 && !isArbiter && isLagged(myLastAppliedWall, lastCommittedWall));
+    bob.append("isLagged",
+               isFCV42 && canAcceptWrites && isLagged(myLastAppliedWall, lastCommittedWall));
 
     return bob.obj();
 }
@@ -225,7 +224,7 @@ int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>&
     using namespace fmt::literals;
 
     const auto currSustainerAppliedTs = getMedianAppliedTimestamp(currMemberData);
-    const auto prevSustainerAppliedTs = getMedianAppliedTimestamp(_prevMemberData);
+    const auto prevSustainerAppliedTs = getMedianAppliedTimestamp(prevMemberData);
     invariant(prevSustainerAppliedTs <= currSustainerAppliedTs,
               "PrevSustainer: {} CurrSustainer: {}"_format(prevSustainerAppliedTs.toString(),
                                                            currSustainerAppliedTs.toString()));
@@ -253,10 +252,9 @@ int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>&
 }
 
 int FlowControl::getNumTickets() {
-    // Lag is not meaningful on arbiters.
-    const bool isArbiter =
-        _replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-        _replCoord->getMemberState().arbiter();
+
+    // Flow Control is only enabled on nodes that can accept writes.
+    const bool canAcceptWrites = _replCoord->canAcceptNonLocalWrites();
 
     // Flow Control is only enabled if FCV is 4.2.
     const bool isFCV42 =
@@ -272,7 +270,8 @@ int FlowControl::getNumTickets() {
     const std::int64_t locksUsedLastPeriod = _getLocksUsedLastPeriod();
 
     if (serverGlobalParams.enableMajorityReadConcern == false ||
-        gFlowControlEnabled.load() == false || isFCV42 == false || isArbiter || locksPerOp < 0.0) {
+        gFlowControlEnabled.load() == false || isFCV42 == false || canAcceptWrites == false ||
+        locksPerOp < 0.0) {
         _trimSamples(std::min(lastCommitted.opTime.getTimestamp(),
                               getMedianAppliedTimestamp(_prevMemberData)));
         return kMaxTickets;

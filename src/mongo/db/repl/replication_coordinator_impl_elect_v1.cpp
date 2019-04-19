@@ -247,6 +247,8 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
             return cbData.status;
         }
         auto opCtx = cc().makeOperationContext();
+        // Any writes that occur as part of an election should not be subject to Flow Control.
+        opCtx->setShouldParticipateInFlowControl(false);
         return _externalState->storeLocalLastVoteDocument(opCtx.get(), lastVote);
     }();
 

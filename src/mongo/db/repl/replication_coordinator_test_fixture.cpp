@@ -384,6 +384,9 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
 }
 
 void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) {
+    // Writes that occur in code paths that call signalDrainComplete are expected to be excluded
+    // from Flow Control.
+    opCtx->setShouldParticipateInFlowControl(false);
     getExternalState()->setFirstOpTimeOfMyTerm(OpTime(Timestamp(1, 1), getReplCoord()->getTerm()));
     getReplCoord()->signalDrainComplete(opCtx, getReplCoord()->getTerm());
 }

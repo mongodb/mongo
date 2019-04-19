@@ -113,6 +113,8 @@ public:
 
     virtual std::vector<MemberData> getMemberData() const override;
 
+    virtual bool canAcceptNonLocalWrites() const override;
+
     virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) override;
 
     virtual bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const override;

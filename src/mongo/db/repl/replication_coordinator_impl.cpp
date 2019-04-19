@@ -2146,6 +2146,11 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationCont
     return false;
 }
 
+bool ReplicationCoordinatorImpl::canAcceptNonLocalWrites() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _readWriteAbility->canAcceptNonLocalWrites(lk);
+}
+
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceString& ns) {
     invariant(opCtx->lockState()->isRSTLLocked());

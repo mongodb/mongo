@@ -80,6 +80,14 @@ public:
     OperationContext(Client* client, unsigned int opId);
     virtual ~OperationContext();
 
+    bool shouldParticipateInFlowControl() const {
+        return _shouldParticipateInFlowControl;
+    }
+
+    void setShouldParticipateInFlowControl(bool target) {
+        _shouldParticipateInFlowControl = target;
+    }
+
     /**
      * Interface for durability.  Caller DOES NOT own pointer.
      */
@@ -471,6 +479,7 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
+    bool _shouldParticipateInFlowControl = true;
 };
 
 namespace repl {

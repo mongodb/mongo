@@ -92,6 +92,8 @@ public:
 
     repl::MemberState getMemberState() const override;
 
+    bool canAcceptNonLocalWrites() const override;
+
     std::vector<repl::MemberData> getMemberData() const override;
 
     Status waitForMemberState(repl::MemberState, Milliseconds) override;

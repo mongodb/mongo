@@ -130,8 +130,11 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
     _lastKnownOpTime = lastKnownOpTime;
 
     invariant(!_noopRunner);
-    _noopRunner = stdx::make_unique<PeriodicNoopRunner>(
-        _writeInterval, [this](OperationContext* opCtx) { _writeNoop(opCtx); });
+    _noopRunner =
+        stdx::make_unique<PeriodicNoopRunner>(_writeInterval, [this](OperationContext* opCtx) {
+            opCtx->setShouldParticipateInFlowControl(false);
+            _writeNoop(opCtx);
+        });
     return Status::OK();
 }
 

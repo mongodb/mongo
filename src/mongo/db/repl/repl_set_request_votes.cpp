@@ -59,6 +59,8 @@ private:
         status = parsedArgs.initialize(cmdObj);
         uassertStatusOK(status);
 
+        // Any writes that occur as part of an election should not be subject to Flow Control.
+        opCtx->setShouldParticipateInFlowControl(false);
         ReplSetRequestVotesResponse response;
         status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(
             opCtx, parsedArgs, &response);

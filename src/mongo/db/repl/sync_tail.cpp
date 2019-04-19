@@ -423,6 +423,11 @@ void scheduleWritesToOplog(OperationContext* opCtx,
             invariant(status);
 
             auto opCtx = cc().makeOperationContext();
+
+            // This code path is only executed on secondaries and initial syncing nodes, so it is
+            // safe to exclude any writes from Flow Control.
+            opCtx->setShouldParticipateInFlowControl(false);
+
             UnreplicatedWritesBlock uwb(opCtx.get());
             ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
                 opCtx->lockState());
@@ -728,6 +733,11 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
         // collection name to refer to collections with different UUIDs.
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
+
+        // This code path gets used during elections, so it should not be subject to Flow Control.
+        // It is safe to exclude this operation context from Flow Control here because this code
+        // path only gets used on secondaries or on a node transitioning to primary.
+        opCtx.setShouldParticipateInFlowControl(false);
 
         // For pausing replication in tests.
         if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
@@ -1270,6 +1280,11 @@ void SyncTail::_applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors
             invariant(scheduleStatus);
 
             auto opCtx = cc().makeOperationContext();
+
+            // This code path is only executed on secondaries and initial syncing nodes, so it is
+            // safe to exclude any writes from Flow Control.
+            opCtx->setShouldParticipateInFlowControl(false);
+
             status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
                 [&] { return _applyFunc(opCtx.get(), &writer, this, &workerMultikeyPathInfo); });
         });
