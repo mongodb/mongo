@@ -363,6 +363,9 @@ selector:
   ## The next tag corresponds to long running-operations, as they may exhaust their number
   # of retries and result in a network error being thrown.
   - operations_longer_than_stepdown_interval
+  # This tag corresponds to operations which are run long enough to exceed the stepdown interval
+  # when grouped into transactions
+  - operations_longer_than_stepdown_interval_in_txns
 
 executor:
   config:

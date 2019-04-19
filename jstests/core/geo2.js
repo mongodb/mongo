@@ -1,4 +1,4 @@
-// @tags: [requires_fastcount]
+// @tags: [requires_fastcount, operations_longer_than_stepdown_interval_in_txns]
 
 t = db.geo2;
 t.drop();

@@ -5,6 +5,8 @@
 // with no failures.
 //
 // Related to SERVER-9824.
+//
+// @tags: [operations_longer_than_stepdown_interval_in_txns]
 
 var testDB = db.getSiblingDB('grow_hash_table');
 
