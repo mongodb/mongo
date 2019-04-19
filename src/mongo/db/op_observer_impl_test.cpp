@@ -1360,21 +1360,12 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
     auto uuid2 = CollectionUUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
-
     std::vector<InsertStatement> inserts1;
-    inserts1.emplace_back(0,
-                          BSON("_id" << 0 << "data"
-                                     << "x"));
-    inserts1.emplace_back(1,
-                          BSON("_id" << 1 << "data"
-                                     << "y"));
+    inserts1.emplace_back(0, BSON("_id" << 0));
+    inserts1.emplace_back(1, BSON("_id" << 1));
     std::vector<InsertStatement> inserts2;
-    inserts2.emplace_back(0,
-                          BSON("_id" << 2 << "data"
-                                     << "z"));
-    inserts2.emplace_back(1,
-                          BSON("_id" << 3 << "data"
-                                     << "w"));
+    inserts2.emplace_back(0, BSON("_id" << 2));
+    inserts2.emplace_back(1, BSON("_id" << 3));
     WriteUnitOfWork wuow(opCtx());
     AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
@@ -1390,49 +1381,63 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
         checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        if (expectedStmtId++ < 4) {
-            ASSERT_EQ("i", oplogEntryObj["op"].String());
-            ASSERT(oplogEntry.getInTxn());
-        } else {
-            ASSERT_EQ("admin.$cmd"_sd, oplogEntryObj["ns"].String());
-            ASSERT_EQ("c", oplogEntryObj["op"].String());
-        }
         ASSERT(!oplogEntry.getPrepare());
-        ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
+        expectedStmtId++;
     }
-    ASSERT_EQ(nss1, oplogEntries[0].getNss());
-    ASSERT_EQ(uuid1, *oplogEntries[0].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "data"
-                                 << "x"),
-                      oplogEntries[0].getObject());
-    ASSERT_FALSE(oplogEntries[0].getObject2());
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("_id" << 0)))
+                                     << "partialTxn"
+                                     << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
-    ASSERT_EQ(nss1, oplogEntries[1].getNss());
-    ASSERT_EQ(uuid1, *oplogEntries[1].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "data"
-                                 << "y"),
-                      oplogEntries[1].getObject());
-    ASSERT_FALSE(oplogEntries[1].getObject2());
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss1.toString()
+                                                   << "ui"
+                                                   << uuid1
+                                                   << "o"
+                                                   << BSON("_id" << 1)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 
-    ASSERT_EQ(nss2, oplogEntries[2].getNss());
-    ASSERT_EQ(uuid2, *oplogEntries[2].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "data"
-                                 << "z"),
-                      oplogEntries[2].getObject());
-    ASSERT_FALSE(oplogEntries[2].getObject2());
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss2.toString()
+                                                   << "ui"
+                                                   << uuid2
+                                                   << "o"
+                                                   << BSON("_id" << 2)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 
-    ASSERT_EQ(nss2, oplogEntries[3].getNss());
-    ASSERT_EQ(uuid2, *oplogEntries[3].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 3 << "data"
-                                 << "w"),
-                      oplogEntries[3].getObject());
-    ASSERT_FALSE(oplogEntries[3].getObject2());
-    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepared" << false << "count" << 4),
-                      oplogEntries[4].getObject());
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss2.toString()
+                                                   << "ui"
+                                                   << uuid2
+                                                   << "o"
+                                                   << BSON("_id" << 3)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[3].getObject());
+
+    oExpected = BSON("commitTransaction" << 1 << "prepared" << false << "count" << 4);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[4].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
@@ -1476,37 +1481,46 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
         checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        if (expectedStmtId++ < 2) {
-            ASSERT_EQ("u", oplogEntryObj["op"].String());
-            ASSERT(oplogEntry.getInTxn());
-        } else {
-            ASSERT_EQ("admin.$cmd"_sd, oplogEntryObj["ns"].String());
-            ASSERT_EQ("c", oplogEntryObj["op"].String());
-        }
         ASSERT(!oplogEntry.getPrepare());
-        ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
+        expectedStmtId++;
     }
-    ASSERT_EQ(nss1, oplogEntries[0].getNss());
-    ASSERT_EQ(uuid1, *oplogEntries[0].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("data"
-                                          << "x")),
-                      oplogEntries[0].getObject());
-    ASSERT_TRUE(oplogEntries[0].getObject2());
-    ASSERT_BSONOBJ_EQ(*oplogEntries[0].getObject2(), BSON("_id" << 0));
 
-    ASSERT_EQ(nss2, oplogEntries[1].getNss());
-    ASSERT_EQ(uuid2, *oplogEntries[1].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("data"
-                                          << "y")),
-                      oplogEntries[1].getObject());
-    ASSERT_TRUE(oplogEntries[1].getObject2());
-    ASSERT_BSONOBJ_EQ(*oplogEntries[1].getObject2(), BSON("_id" << 1));
-    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepared" << false << "count" << 2),
-                      oplogEntries[2].getObject());
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "u"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("$set" << BSON("data"
+                                                                               << "x"))
+                                                        << "o2"
+                                                        << BSON("_id" << 0)))
+                                     << "partialTxn"
+                                     << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
+
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "u"
+                                                   << "ns"
+                                                   << nss2.toString()
+                                                   << "ui"
+                                                   << uuid2
+                                                   << "o"
+                                                   << BSON("$set" << BSON("data"
+                                                                          << "y"))
+                                                   << "o2"
+                                                   << BSON("_id" << 1)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
+
+    oExpected = BSON("commitTransaction" << 1 << "prepared" << false << "count" << 2);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
@@ -1541,33 +1555,41 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
         checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        if (expectedStmtId++ < 2) {
-            ASSERT_EQ("d", oplogEntryObj["op"].String());
-            ASSERT(oplogEntry.getInTxn());
-        } else {
-            ASSERT_EQ("admin.$cmd"_sd, oplogEntryObj["ns"].String());
-            ASSERT_EQ("c", oplogEntryObj["op"].String());
-        }
         ASSERT(!oplogEntry.getPrepare());
-        ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
+        expectedStmtId++;
     }
-    ASSERT_EQ(nss1, oplogEntries[0].getNss());
-    ASSERT_EQ(uuid1, *oplogEntries[0].getUuid());
-    ASSERT_BSONOBJ_EQ(oplogEntries[0].getObject(), BSON("_id" << 0));
-    ASSERT_FALSE(oplogEntries[0].getObject2());
 
-    ASSERT_EQ(nss2, oplogEntries[1].getNss());
-    ASSERT_EQ(uuid2, *oplogEntries[1].getUuid());
-    ASSERT_BSONOBJ_EQ(oplogEntries[1].getObject(), BSON("_id" << 1));
-    ASSERT_FALSE(oplogEntries[1].getObject2());
-    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepared" << false << "count" << 2),
-                      oplogEntries[2].getObject());
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "d"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("_id" << 0)))
+                                     << "partialTxn"
+                                     << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
+
+    oExpected = oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                               << "d"
+                                                               << "ns"
+                                                               << nss2.toString()
+                                                               << "ui"
+                                                               << uuid2
+                                                               << "o"
+                                                               << BSON("_id" << 1)))
+                                            << "partialTxn"
+                                            << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
+
+    oExpected = BSON("commitTransaction" << 1 << "prepared" << false << "count" << 2);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 }
-
 
 TEST_F(OpObserverMultiEntryTransactionTest,
        PreparingEmptyTransactionOnlyWritesPrepareOplogEntryAndToTransactionTable) {
@@ -1633,47 +1655,68 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
         checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        if (expectedStmtId++ < 4) {
-            ASSERT_TRUE(oplogEntry.isCrudOpType());
-            ASSERT(oplogEntry.getOpType() == repl::OpTypeEnum::kInsert);
-            ASSERT_TRUE(oplogEntry.getInTxn());
-        } else {
-            ASSERT_EQ("admin.$cmd"_sd, oplogEntry.getNss().toString());
-            ASSERT_TRUE(oplogEntry.isCommand());
-            ASSERT_TRUE(OplogEntry::CommandType::kPrepareTransaction ==
-                        oplogEntry.getCommandType());
-        }
         ASSERT(!oplogEntry.getPrepare());
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
+        expectedStmtId++;
     }
-    ASSERT_EQ(nss1, oplogEntries[0].getNss());
-    ASSERT_EQ(uuid1, *oplogEntries[0].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 0), oplogEntries[0].getObject());
-    ASSERT_FALSE(oplogEntries[0].getObject2());
 
-    ASSERT_EQ(nss1, oplogEntries[1].getNss());
-    ASSERT_EQ(uuid1, *oplogEntries[1].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), oplogEntries[1].getObject());
-    ASSERT_FALSE(oplogEntries[1].getObject2());
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("_id" << 0)))
+                                     << "partialTxn"
+                                     << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
-    ASSERT_EQ(nss2, oplogEntries[2].getNss());
-    ASSERT_EQ(uuid2, *oplogEntries[2].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), oplogEntries[2].getObject());
-    ASSERT_FALSE(oplogEntries[2].getObject2());
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss1.toString()
+                                                   << "ui"
+                                                   << uuid1
+                                                   << "o"
+                                                   << BSON("_id" << 1)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 
-    ASSERT_EQ(nss2, oplogEntries[3].getNss());
-    ASSERT_EQ(uuid2, *oplogEntries[3].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 3), oplogEntries[3].getObject());
-    ASSERT_FALSE(oplogEntries[3].getObject2());
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss2.toString()
+                                                   << "ui"
+                                                   << uuid2
+                                                   << "o"
+                                                   << BSON("_id" << 2)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
+
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss2.toString()
+                                                   << "ui"
+                                                   << uuid2
+                                                   << "o"
+                                                   << BSON("_id" << 3)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[3].getObject());
+
+    oExpected = BSON("prepareTransaction" << 1);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[4].getObject());
 
     ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
-    ASSERT_BSONOBJ_EQ(BSON("prepareTransaction" << 1), oplogEntries[4].getObject());
-    ASSERT_FALSE(oplogEntries[4].getObject2());
-
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
+
     txnParticipant.stashTransactionResources(opCtx());
     assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
@@ -1726,42 +1769,48 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
         checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        if (expectedStmtId++ < 2) {
-            ASSERT_TRUE(oplogEntry.isCrudOpType());
-            ASSERT(oplogEntry.getOpType() == repl::OpTypeEnum::kUpdate);
-            ASSERT_TRUE(oplogEntry.getInTxn());
-        } else {
-            ASSERT_EQ("admin.$cmd"_sd, oplogEntry.getNss().toString());
-            ASSERT_TRUE(oplogEntry.isCommand());
-            ASSERT_TRUE(OplogEntry::CommandType::kPrepareTransaction ==
-                        oplogEntry.getCommandType());
-        }
         ASSERT(!oplogEntry.getPrepare());
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
+        expectedStmtId++;
     }
-    ASSERT_EQ(nss1, oplogEntries[0].getNss());
-    ASSERT_EQ(uuid1, *oplogEntries[0].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("data"
-                                          << "x")),
-                      oplogEntries[0].getObject());
-    ASSERT_TRUE(oplogEntries[0].getObject2());
-    ASSERT_BSONOBJ_EQ(*oplogEntries[0].getObject2(), BSON("_id" << 0));
 
-    ASSERT_EQ(nss2, oplogEntries[1].getNss());
-    ASSERT_EQ(uuid2, *oplogEntries[1].getUuid());
-    ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("data"
-                                          << "y")),
-                      oplogEntries[1].getObject());
-    ASSERT_TRUE(oplogEntries[1].getObject2());
-    ASSERT_BSONOBJ_EQ(*oplogEntries[1].getObject2(), BSON("_id" << 1));
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "u"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("$set" << BSON("data"
+                                                                               << "x"))
+                                                        << "o2"
+                                                        << BSON("_id" << 0)))
+                                     << "partialTxn"
+                                     << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
+
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "u"
+                                                   << "ns"
+                                                   << nss2.toString()
+                                                   << "ui"
+                                                   << uuid2
+                                                   << "o"
+                                                   << BSON("$set" << BSON("data"
+                                                                          << "y"))
+                                                   << "o2"
+                                                   << BSON("_id" << 1)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
+
+    oExpected = BSON("prepareTransaction" << 1);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 
     ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
-    ASSERT_BSONOBJ_EQ(BSON("prepareTransaction" << 1), oplogEntries[2].getObject());
-    ASSERT_FALSE(oplogEntries[2].getObject2());
-
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
 
     txnParticipant.stashTransactionResources(opCtx());
@@ -1808,36 +1857,42 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
         checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        if (expectedStmtId++ < 2) {
-            ASSERT_TRUE(oplogEntry.isCrudOpType());
-            ASSERT(oplogEntry.getOpType() == repl::OpTypeEnum::kDelete);
-            ASSERT_TRUE(oplogEntry.getInTxn());
-        } else {
-            ASSERT_EQ("admin.$cmd"_sd, oplogEntry.getNss().toString());
-            ASSERT_TRUE(oplogEntry.isCommand());
-            ASSERT_TRUE(OplogEntry::CommandType::kPrepareTransaction ==
-                        oplogEntry.getCommandType());
-        }
         ASSERT(!oplogEntry.getPrepare());
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
+        expectedStmtId++;
     }
-    ASSERT_EQ(nss1, oplogEntries[0].getNss());
-    ASSERT_EQ(uuid1, *oplogEntries[0].getUuid());
-    ASSERT_BSONOBJ_EQ(oplogEntries[0].getObject(), BSON("_id" << 0));
-    ASSERT_FALSE(oplogEntries[0].getObject2());
 
-    ASSERT_EQ(nss2, oplogEntries[1].getNss());
-    ASSERT_EQ(uuid2, *oplogEntries[1].getUuid());
-    ASSERT_BSONOBJ_EQ(oplogEntries[1].getObject(), BSON("_id" << 1));
-    ASSERT_FALSE(oplogEntries[1].getObject2());
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "d"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("_id" << 0)))
+                                     << "partialTxn"
+                                     << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
+
+    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                   << "d"
+                                                   << "ns"
+                                                   << nss2.toString()
+                                                   << "ui"
+                                                   << uuid2
+                                                   << "o"
+                                                   << BSON("_id" << 1)))
+                                << "partialTxn"
+                                << true);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
+
+    oExpected = BSON("prepareTransaction" << 1);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 
     ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
-    ASSERT_BSONOBJ_EQ(BSON("prepareTransaction" << 1), oplogEntries[2].getObject());
-    ASSERT_FALSE(oplogEntries[2].getObject2());
-
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
     txnParticipant.stashTransactionResources(opCtx());
     assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
@@ -1871,7 +1926,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
 
     const auto insertEntry = assertGet(OplogEntry::parse(oplogEntryObjs[0]));
-    ASSERT_TRUE(insertEntry.getOpType() == repl::OpTypeEnum::kInsert);
+    ASSERT_TRUE(insertEntry.getOpType() == repl::OpTypeEnum::kCommand);
+    ASSERT_TRUE(insertEntry.getCommandType() == OplogEntry::CommandType::kApplyOps);
 
     const auto startOpTime = insertEntry.getOpTime();
 
@@ -1947,7 +2003,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
 
     const auto insertEntry = assertGet(OplogEntry::parse(oplogEntryObjs[0]));
-    ASSERT_TRUE(insertEntry.getOpType() == repl::OpTypeEnum::kInsert);
+    ASSERT_TRUE(insertEntry.getOpType() == repl::OpTypeEnum::kCommand);
+    ASSERT_TRUE(insertEntry.getCommandType() == OplogEntry::CommandType::kApplyOps);
     const auto startOpTime = insertEntry.getOpTime();
 
     const auto prepareTimestamp = prepareOpTime.getTimestamp();

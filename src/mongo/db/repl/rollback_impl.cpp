@@ -811,7 +811,8 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                 invariant(iter.hasNext());
 
                 const auto prepareOplogEntry = iter.next(opCtx);
-                if (prepareOplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+                if (prepareOplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps &&
+                    prepareOplogEntry.shouldPrepare()) {
                     // Transform the prepare command into a normal applyOps command. If the
                     // "prepare" field were not removed, the operation would be ignored.
                     const auto swApplyOpsEntry =
