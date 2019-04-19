@@ -346,7 +346,7 @@ functions:
           if [ -s "$filename" ]; then
             echo "Rejecting task due to the following outliers:"
             cat "$filename"
-            exit 1
+            exit 0
           fi
     - command: shell.exec
       type: test
