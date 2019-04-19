@@ -2552,6 +2552,10 @@ var ReplSetTest = function(opts) {
     /**
      * Wait for a state indicator to go to a particular state or states.
      *
+     * Note that this waits for the state as indicated by the primary node.  If you want to wait for
+     * a node to actually reach SECONDARY state, as reported by itself, use awaitSecondaryNodes
+     * instead.
+     *
      * @param node is a single node or list of nodes, by id or conn
      * @param state is a single state or list of states
      * @param timeout how long to wait for the state to be reached

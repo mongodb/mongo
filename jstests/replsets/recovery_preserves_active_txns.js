@@ -74,7 +74,7 @@
 
         jsTestLog("Restarted");
 
-        replSet.waitForState(replSet.getSecondaries(), ReplSetTest.State.SECONDARY);
+        replSet.awaitSecondaryNodes();
         checkSecondaryOplog();
 
         if (commitOrAbort === "commit") {
