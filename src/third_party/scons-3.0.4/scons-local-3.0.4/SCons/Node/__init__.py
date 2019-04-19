@@ -529,6 +529,7 @@ class Node(object, with_metaclass(NoSlotsPyPy)):
 
     __slots__ = ['sources',
                  'sources_set',
+                 'target_peers', 
                  '_specific_sources',
                  'depends',
                  'depends_set',
@@ -784,7 +785,7 @@ class Node(object, with_metaclass(NoSlotsPyPy)):
         for parent in self.waiting_parents:
             parent.implicit = None
             try:
-                for peer in parent.attributes.target_peers:
+                for peer in parent.target_peers:
                     peer.implicit = None
             except AttributeError as e:
                 pass

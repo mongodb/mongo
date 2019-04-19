@@ -569,7 +569,7 @@ class BuilderBase(object):
         if len(tlist) > 1:
             # print("Builder:_execute():Tlist > 1 -> %s"%[str(t) for t in tlist])
             for t in tlist:
-                t.attributes.target_peers = tlist
+                t.target_peers = tlist
 
 
         # Check for errors with the specified target/source lists.
