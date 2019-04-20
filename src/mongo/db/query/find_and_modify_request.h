@@ -50,6 +50,10 @@ class StatusWith;
  */
 class FindAndModifyRequest {
 public:
+    static constexpr auto kBypassDocumentValidationFieldName = "bypassDocumentValidation"_sd;
+    static constexpr auto kLegacyCommandName = "findandmodify"_sd;
+    static constexpr auto kCommandName = "findAndModify"_sd;
+
     /**
      * Creates a new instance of an 'update' type findAndModify request.
      */
@@ -87,9 +91,10 @@ public:
 
     /**
      * Serializes this object into a BSON representation. Fields that are not
-     * set will not be part of the the serialized object.
+     * set will not be part of the the serialized object. Passthrough fields
+     * are appended.
      */
-    BSONObj toBSON() const;
+    BSONObj toBSON(const BSONObj& commandPassthroughFields) const;
 
     const NamespaceString& getNamespaceString() const;
     BSONObj getQuery() const;
