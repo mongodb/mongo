@@ -18,7 +18,8 @@ except ImportError as err:
     bson = None
 
 if sys.version_info[0] < 3:
-    raise gdb.GdbError("MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
+    raise gdb.GdbError(
+        "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
 
 
 def get_unique_ptr(obj):
