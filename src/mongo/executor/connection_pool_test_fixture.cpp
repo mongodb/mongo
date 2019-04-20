@@ -54,7 +54,8 @@ void TimerImpl::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
 
 void TimerImpl::cancelTimeout() {
     _timers.erase(this);
-    _cb = TimeoutCallback{};
+    TimeoutCallback cb;
+    _cb.swap(cb);
 }
 
 void TimerImpl::clear() {
