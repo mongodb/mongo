@@ -1366,8 +1366,9 @@ void Session::_logSlowTransaction(WithLock wl,
     // Only log multi-document transactions.
     if (_txnState != MultiDocumentTransactionState::kNone) {
         // Log the transaction if its duration is longer than the slowMS command threshold.
-        if (_singleTransactionStats.getDuration(curTimeMicros64()) >
-            serverGlobalParams.slowMS * 1000ULL) {
+        if (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||
+            _singleTransactionStats.getDuration(curTimeMicros64()) >
+                serverGlobalParams.slowMS * 1000ULL) {
             log(logger::LogComponent::kTransaction)
                 << "transaction "
                 << _transactionInfoForLog(lockStats, terminationCause, readConcernArgs);
