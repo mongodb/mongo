@@ -45,7 +45,7 @@ namespace {
 
 class OplogIteratorLocal : public OplogInterface::Iterator {
 public:
-    OplogIteratorLocal(OperationContext* opCtx, const std::string& collectionName);
+    OplogIteratorLocal(OperationContext* opCtx);
 
     StatusWith<Value> next() override;
 
@@ -56,15 +56,16 @@ private:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 
-OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx, const std::string& collectionName)
-    : _dbLock(opCtx, nsToDatabase(collectionName), MODE_IS),
-      _collectionLock(opCtx, NamespaceString(collectionName), MODE_S),
-      _ctx(opCtx, collectionName),
-      _exec(InternalPlanner::collectionScan(opCtx,
-                                            collectionName,
-                                            _ctx.db()->getCollection(opCtx, collectionName),
-                                            PlanExecutor::NO_YIELD,
-                                            InternalPlanner::BACKWARD)) {}
+OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
+    : _dbLock(opCtx, NamespaceString::kRsOplogNamespace.db(), MODE_IS),
+      _collectionLock(opCtx, NamespaceString::kRsOplogNamespace, MODE_S),
+      _ctx(opCtx, NamespaceString::kRsOplogNamespace.ns()),
+      _exec(InternalPlanner::collectionScan(
+          opCtx,
+          NamespaceString::kRsOplogNamespace.ns(),
+          _ctx.db()->getCollection(opCtx, NamespaceString::kRsOplogNamespace),
+          PlanExecutor::NO_YIELD,
+          InternalPlanner::BACKWARD)) {}
 
 StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
     BSONObj obj;
@@ -84,21 +85,19 @@ StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
 
 }  // namespace
 
-OplogInterfaceLocal::OplogInterfaceLocal(OperationContext* opCtx, const std::string& collectionName)
-    : _opCtx(opCtx), _collectionName(collectionName) {
+OplogInterfaceLocal::OplogInterfaceLocal(OperationContext* opCtx) : _opCtx(opCtx) {
     invariant(opCtx);
-    invariant(!collectionName.empty());
 }
 
 std::string OplogInterfaceLocal::toString() const {
     return str::stream() << "LocalOplogInterface: "
                             "operation context: "
-                         << _opCtx->getOpID() << "; collection: " << _collectionName;
+                         << _opCtx->getOpID()
+                         << "; collection: " << NamespaceString::kRsOplogNamespace;
 }
 
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() const {
-    return std::unique_ptr<OplogInterface::Iterator>(
-        new OplogIteratorLocal(_opCtx, _collectionName));
+    return std::unique_ptr<OplogInterface::Iterator>(new OplogIteratorLocal(_opCtx));
 }
 
 HostAndPort OplogInterfaceLocal::hostAndPort() const {

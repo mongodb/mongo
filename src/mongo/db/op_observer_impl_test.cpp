@@ -84,7 +84,7 @@ protected:
     // Assert that the oplog has the expected number of entries, and return them
     std::vector<BSONObj> getNOplogEntries(OperationContext* opCtx, int n) {
         std::vector<BSONObj> result(n);
-        repl::OplogInterfaceLocal oplogInterface(opCtx, NamespaceString::kRsOplogNamespace.ns());
+        repl::OplogInterfaceLocal oplogInterface(opCtx);
         auto oplogIter = oplogInterface.makeIterator();
         for (int i = n - 1; i >= 0; i--) {
             // The oplogIterator returns the entries in reverse order.
@@ -854,7 +854,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
         prepareTimestamp,
         txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
 
-    repl::OplogInterfaceLocal oplogInterface(opCtx(), NamespaceString::kRsOplogNamespace.ns());
+    repl::OplogInterfaceLocal oplogInterface(opCtx());
     auto oplogIter = oplogInterface.makeIterator();
     {
         auto oplogEntryObj = unittest::assertGet(oplogIter->next()).first;
@@ -919,7 +919,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
     opObserver().onTransactionAbort(opCtx(), abortSlot);
     txnParticipant.transitionToAbortedWithPrepareforTest(opCtx());
 
-    repl::OplogInterfaceLocal oplogInterface(opCtx(), NamespaceString::kRsOplogNamespace.ns());
+    repl::OplogInterfaceLocal oplogInterface(opCtx());
     auto oplogIter = oplogInterface.makeIterator();
     {
         auto oplogEntryObj = unittest::assertGet(oplogIter->next()).first;
@@ -974,7 +974,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUnpreparedAbortTest) {
     }
 
     // Assert no oplog entries were written.
-    repl::OplogInterfaceLocal oplogInterface(opCtx(), NamespaceString::kRsOplogNamespace.ns());
+    repl::OplogInterfaceLocal oplogInterface(opCtx());
     auto oplogIter = oplogInterface.makeIterator();
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
 }

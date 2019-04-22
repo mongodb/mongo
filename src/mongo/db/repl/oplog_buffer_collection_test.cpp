@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/sync_tail_test_fixture.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/barrier.h"
@@ -237,12 +238,12 @@ DEATH_TEST_F(OplogBufferCollectionTest,
 }
 
 /**
- * Check collection contents. OplogInterface returns documents in reverse natural order.
+ * Check collection contents.
  */
 void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const std::vector<BSONObj>& docs) {
-    std::vector<BSONObj> reversedTransformedDocs;
+    std::vector<BSONObj> transformedDocs;
     Timestamp ts;
     std::size_t sentinelCount = 0;
     for (const auto& doc : docs) {
@@ -250,20 +251,18 @@ void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
         BSONObj newDoc;
         std::tie(newDoc, ts, sentinelCount) =
             OplogBufferCollection::addIdToDocument(doc, ts, sentinelCount);
-        reversedTransformedDocs.push_back(newDoc);
+        transformedDocs.push_back(newDoc);
         if (doc.isEmpty()) {
             ASSERT_EQUALS(previousTimestamp, ts);
             continue;
         }
         ASSERT_GT(ts, previousTimestamp);
     }
-    std::reverse(reversedTransformedDocs.begin(), reversedTransformedDocs.end());
-    OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    for (const auto& doc : reversedTransformedDocs) {
-        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
+    CollectionReader reader(opCtx, nss);
+    for (const auto& doc : transformedDocs) {
+        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(reader.next()));
     }
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, reader.next().getStatus());
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionInitializesCorrectly) {

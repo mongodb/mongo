@@ -36,6 +36,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -276,6 +277,28 @@ void checkTxnTable(OperationContext* opCtx,
     if (expectedState) {
         ASSERT(*expectedState == txnRecord.getState());
     }
+}
+
+CollectionReader::CollectionReader(OperationContext* opCtx, const NamespaceString& nss)
+    : _collToScan(opCtx, nss),
+      _exec(InternalPlanner::collectionScan(opCtx,
+                                            nss.ns(),
+                                            _collToScan.getCollection(),
+                                            PlanExecutor::NO_YIELD,
+                                            InternalPlanner::FORWARD)) {}
+
+StatusWith<BSONObj> CollectionReader::next() {
+    BSONObj obj;
+
+    auto state = _exec->getNext(&obj, nullptr);
+    if (state == PlanExecutor::IS_EOF) {
+        return {ErrorCodes::CollectionIsEmpty,
+                str::stream() << "no more documents in " << _collToScan.getNss()};
+    }
+
+    // PlanExecutors that do not yield should only return ADVANCED or EOF.
+    invariant(state == PlanExecutor::ADVANCED);
+    return obj;
 }
 
 }  // namespace repl

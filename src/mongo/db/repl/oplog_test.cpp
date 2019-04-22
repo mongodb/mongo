@@ -80,7 +80,7 @@ void OplogTest::setUp() {
  * Assert that oplog only has a single entry and return that oplog entry.
  */
 OplogEntry _getSingleOplogEntry(OperationContext* opCtx) {
-    OplogInterfaceLocal oplogInterface(opCtx, NamespaceString::kRsOplogNamespace.ns());
+    OplogInterfaceLocal oplogInterface(opCtx);
     auto oplogIter = oplogInterface.makeIterator();
     auto opEntry = unittest::assertGet(oplogIter->next());
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus())
@@ -194,7 +194,7 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     // Read oplog entries from the oplog collection starting with the entry with the most recent
     // optime.
     auto opCtx = cc().makeOperationContext();
-    OplogInterfaceLocal oplogInterface(opCtx.get(), NamespaceString::kRsOplogNamespace.ns());
+    OplogInterfaceLocal oplogInterface(opCtx.get());
     auto oplogIter = oplogInterface.makeIterator();
     auto nextValue = oplogIter->next();
     while (nextValue.isOK()) {

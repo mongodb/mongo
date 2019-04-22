@@ -580,7 +580,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         }
     }
 
-    OplogInterfaceLocal localOplog(opCtx, NamespaceString::kRsOplogNamespace.ns());
+    OplogInterfaceLocal localOplog(opCtx);
 
     const int messagingPortTags = 0;
     ConnectionPool connectionPool(messagingPortTags);

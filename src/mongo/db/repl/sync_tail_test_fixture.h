@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
@@ -147,6 +148,19 @@ protected:
     Status runOpsInitialSync(std::vector<OplogEntry> ops);
 
     UUID kUuid{UUID::gen()};
+};
+
+// Utility class to allow easily scanning a collection.  Scans in forward order, returns
+// Status::CollectionIsEmpty when scan is exhausted.
+class CollectionReader {
+public:
+    CollectionReader(OperationContext* opCtx, const NamespaceString& nss);
+
+    StatusWith<BSONObj> next();
+
+private:
+    AutoGetCollectionForRead _collToScan;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 
 Status failedApplyCommand(OperationContext* opCtx,

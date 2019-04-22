@@ -48,9 +48,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/sync_tail_test_fixture.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -269,32 +269,26 @@ TEST_F(StorageInterfaceImplTest,
 }
 
 /**
- * Check collection contents. OplogInterface returns documents in reverse natural order.
+ * Check collection contents.
  */
 void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const std::vector<BSONObj>& docs) {
-    std::vector<BSONObj> reversedDocs(docs);
-    std::reverse(reversedDocs.begin(), reversedDocs.end());
-    OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    for (const auto& doc : reversedDocs) {
-        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
+    CollectionReader reader(opCtx, nss);
+    for (const auto& doc : docs) {
+        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(reader.next()));
     }
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, reader.next().getStatus());
 }
 
 void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const std::vector<TimestampedBSONObj>& docs) {
-    std::vector<TimestampedBSONObj> reversedDocs(docs);
-    std::reverse(reversedDocs.begin(), reversedDocs.end());
-    OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    for (const auto& doc : reversedDocs) {
-        ASSERT_BSONOBJ_EQ(doc.obj, unittest::assertGet(iter->next()).first);
+    CollectionReader reader(opCtx, nss);
+    for (const auto& doc : docs) {
+        ASSERT_BSONOBJ_EQ(doc.obj, unittest::assertGet(reader.next()));
     }
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, reader.next().getStatus());
 }
 
 /**
@@ -456,12 +450,8 @@ TEST_F(StorageInterfaceImplTest,
     }
     ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
 
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_BSONOBJ_EQ(doc2.doc, unittest::assertGet(iter->next()).first);
-    ASSERT_BSONOBJ_EQ(doc1.doc, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    // Check collection contents.
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc1.doc, doc2.doc});
 }
 
 TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLastOperation) {
@@ -477,12 +467,8 @@ TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLa
     auto op2 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts({op1, op2})));
 
-    // Check contents of oplog. OplogInterface iterates over oplog collection in reverse.
-    repl::OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_BSONOBJ_EQ(op2.obj, unittest::assertGet(iter->next()).first);
-    ASSERT_BSONOBJ_EQ(op1.obj, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    // Check contents of oplog.
+    _assertDocumentsInCollectionEquals(opCtx, nss, {op1.obj, op2.obj});
 }
 
 TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsWhenCollSpecifiedWithUUID) {
@@ -501,12 +487,8 @@ TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsWhenCollSpecified
     ASSERT_OK(storage.insertDocuments(
         opCtx, {nss.db().toString(), *options.uuid}, transformInserts({op1, op2})));
 
-    // Check contents of oplog. OplogInterface iterates over oplog collection in reverse.
-    repl::OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_BSONOBJ_EQ(op2.obj, unittest::assertGet(iter->next()).first);
-    ASSERT_BSONOBJ_EQ(op1.obj, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    // Check contents of oplog.
+    _assertDocumentsInCollectionEquals(opCtx, nss, {op1.obj, op2.obj});
 }
 
 TEST_F(StorageInterfaceImplTest,
@@ -1287,13 +1269,9 @@ TEST_F(StorageInterfaceImplTest,
                                               BoundInclusion::kIncludeStartKeyOnly,
                                               1U)));
 
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    // Check collection contents.
+    _assertDocumentsInCollectionEquals(
+        opCtx, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)});
 }
 
 TEST_F(StorageInterfaceImplTest,

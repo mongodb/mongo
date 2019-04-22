@@ -283,8 +283,7 @@ private:
 void RollbackImplTest::setUp() {
     RollbackTest::setUp();
 
-    _localOplog = stdx::make_unique<OplogInterfaceLocal>(_opCtx.get(),
-                                                         NamespaceString::kRsOplogNamespace.ns());
+    _localOplog = stdx::make_unique<OplogInterfaceLocal>(_opCtx.get());
     _remoteOplog = stdx::make_unique<OplogInterfaceMock>();
     _listener = stdx::make_unique<Listener>(this);
     _rollback = stdx::make_unique<RollbackImplForTest>(_localOplog.get(),
@@ -405,7 +404,7 @@ void _assertDocsInOplog(OperationContext* opCtx, std::vector<int> timestamps) {
         return makeOp(ts);
     });
 
-    OplogInterfaceLocal oplog(opCtx, NamespaceString::kRsOplogNamespace.ns());
+    OplogInterfaceLocal oplog(opCtx);
     auto iter = oplog.makeIterator();
     for (auto reverseIt = expectedOplog.rbegin(); reverseIt != expectedOplog.rend(); reverseIt++) {
         auto expectedTime = unittest::assertGet(OpTime::parseFromOplogEntry(*reverseIt));

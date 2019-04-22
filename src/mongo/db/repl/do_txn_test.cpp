@@ -53,7 +53,7 @@ namespace repl {
 namespace {
 
 boost::optional<OplogEntry> onAllTransactionCommit(OperationContext* opCtx) {
-    OplogInterfaceLocal oplogInterface(opCtx, NamespaceString::kRsOplogNamespace.ns());
+    OplogInterfaceLocal oplogInterface(opCtx);
     auto oplogIter = oplogInterface.makeIterator();
     auto opEntry = unittest::assertGet(oplogIter->next());
     return unittest::assertGet(OplogEntry::parse(opEntry.first));

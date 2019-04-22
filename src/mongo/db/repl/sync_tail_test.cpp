@@ -57,7 +57,6 @@
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
-#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
@@ -1723,11 +1722,10 @@ TEST_F(SyncTailTest, MultiSyncApplySkipsDocumentOnNamespaceNotFoundDuringInitial
     ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
     ASSERT_EQUALS(syncTail.numFetched, 0U);
 
-    OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
-    auto iter = collectionReader.makeIterator();
-    ASSERT_BSONOBJ_EQ(doc3, unittest::assertGet(iter->next()).first);
-    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(collectionReader.next()));
+    ASSERT_BSONOBJ_EQ(doc3, unittest::assertGet(collectionReader.next()));
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, collectionReader.next().getStatus());
 }
 
 TEST_F(SyncTailTest, MultiSyncApplySkipsIndexCreationOnNamespaceNotFoundDuringInitialSync) {
@@ -1749,11 +1747,10 @@ TEST_F(SyncTailTest, MultiSyncApplySkipsIndexCreationOnNamespaceNotFoundDuringIn
     ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
     ASSERT_EQUALS(syncTail.numFetched, 0U);
 
-    OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
-    auto iter = collectionReader.makeIterator();
-    ASSERT_BSONOBJ_EQ(doc3, unittest::assertGet(iter->next()).first);
-    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(collectionReader.next()));
+    ASSERT_BSONOBJ_EQ(doc3, unittest::assertGet(collectionReader.next()));
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, collectionReader.next().getStatus());
 
     // 'badNss' collection should not be implicitly created while attempting to create an index.
     ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), badNss).getCollection());
@@ -1773,11 +1770,10 @@ TEST_F(SyncTailTest, MultiSyncApplyFetchesMissingDocumentIfDocumentIsAvailableFr
 
     // The collection referenced by "ns" in the failed operation is automatically created to hold
     // the missing document fetched from the sync source. We verify the contents of the collection
-    // with the OplogInterfaceLocal class.
-    OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
-    auto iter = collectionReader.makeIterator();
-    ASSERT_BSONOBJ_EQ(updatedDocument, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    // with the CollectionReader class.
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDocument, unittest::assertGet(collectionReader.next()));
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, collectionReader.next().getStatus());
 }
 
 namespace {
