@@ -253,15 +253,19 @@ inline void walk(Stage<T>* stage,
  * "off-the-end", that is constructed from the final stage of a sub-pipeline and not actually
  * contained in that pipeline. This vector is empty for most stages which have only one child.
  * 'DocumentSource&' - the current stage of the 'pipeline' a Stage object is being built for.
+ *
+ * Returns the final Stage<T> of the pipeline along with the final off-the-end metadata T from
+ * calling the 'propagator' function on the last source.
  */
 template <typename T>
-inline Stage<T> makeTree(
+inline std::pair<Stage<T>, T> makeTree(
     std::deque<T>&& initialStageContents,
     const Pipeline& pipeline,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
-    return *detail::makeTreeWithOffTheEndStage(
-                std::move(initialStageContents), pipeline, propagator)
-                .first;
+    auto && [ finalStage, reshaper ] =
+        detail::makeTreeWithOffTheEndStage(std::move(initialStageContents), pipeline, propagator);
+
+    return std::pair(std::move(*finalStage), reshaper(finalStage.get().contents));
 }
 
 /**

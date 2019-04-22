@@ -127,14 +127,14 @@ TEST_F(PipelineMetadataTreeTest, LinearPipelinesConstructProperTrees) {
 
     ASSERT([&]() {
         auto pipePtr = jsonToPipeline("[{$project: {name : 1}}]");
-        return makeTree<TestThing>({initial}, *pipePtr, ignoreDocumentSourceAddOne);
+        return makeTree<TestThing>({initial}, *pipePtr, ignoreDocumentSourceAddOne).first;
     }() == Stage(TestThing{23}, {}, {}));
 
     ASSERT([&]() {
         auto pipePtr = jsonToPipeline(
             "[{$project: {name: 1, status: 1}}, "
             "{$match: {status: \"completed\"}}]");
-        return makeTree<TestThing>({initial}, *pipePtr, ignoreDocumentSourceAddOne);
+        return makeTree<TestThing>({initial}, *pipePtr, ignoreDocumentSourceAddOne).first;
     }() == Stage(TestThing{24}, makeUniqueStage(TestThing{23}, {}, {}), {}));
 
     ASSERT([&]() {
@@ -145,7 +145,7 @@ TEST_F(PipelineMetadataTreeTest, LinearPipelinesConstructProperTrees) {
             "{$match: {status: \"completed\"}}, "
             "{$match: {status: \"completed\"}}, "
             "{$match: {status: \"completed\"}}]");
-        return makeTree<TestThing>({initial}, *pipePtr, ignoreDocumentSourceAddOne);
+        return makeTree<TestThing>({initial}, *pipePtr, ignoreDocumentSourceAddOne).first;
     }() == Stage(TestThing{28},
                  makeUniqueStage(
                      TestThing{27},
@@ -237,7 +237,7 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
             "{$unwind: \"$instr\"}, "
             "{$group: {_id: {PositionID: \"$trade.mvtident\", \"InstrumentReference\": "
             "\"$instr.libelle\"}, NumberOfSecurities: {$sum:\"$trade.quantite\"}}}]");
-        return makeTree<TestThing>({{"1"}, {"2"}}, *pipePtr, buildRepresentativeString);
+        return makeTree<TestThing>({{"1"}, {"2"}}, *pipePtr, buildRepresentativeString).first;
     }() == Stage(TestThing{"1mpxul[2m]ulu"},
                  makeUniqueStage(
                      TestThing{"1mpxul[2m]ul"},
@@ -271,7 +271,7 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
             "{$bucket: {groupBy: \"$year\", boundaries: [ 2000, 2010, 2015, 2020]}}], "
             "\"categorizedByYears(Auto)\": [{$bucketAuto: {groupBy: \"$year\", buckets: 2}}]}}, "
             "{$limit: 12}]");
-        return makeTree<TestThing>({{""}}, *pipePtr, buildRepresentativeString);
+        return makeTree<TestThing>({{""}}, *pipePtr, buildRepresentativeString).first;
     }() == Stage(TestThing{"f[tugs, tmgs, tb]"},
                  makeUniqueStage(
                      TestThing{""},
@@ -343,7 +343,7 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
             "{$unwind: \"$instr\"}, "
             "{$group: {_id: {PositionID: \"$trade.mvtident\", \"InstrumentReference\": "
             "\"$instr.libelle\"}, NumberOfSecurities: {$sum:\"$trade.quantite\"}}}]");
-        auto tree = makeTree<TestThing>({{}, {}}, *pipePtr, takeTypeInfo);
+        auto tree = makeTree<TestThing>({{}, {}}, *pipePtr, takeTypeInfo).first;
         zip<TestThing>(&tree, &*pipePtr, tookTypeInfoOrThrow);
         previousStack.pop();
     }());
@@ -357,7 +357,7 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
             "{$bucket: {groupBy: \"$year\", boundaries: [ 2000, 2010, 2015, 2020]}}], "
             "\"categorizedByYears(Auto)\": [{$bucketAuto: {groupBy: \"$year\", buckets: 2}}]}}, "
             "{$limit: 12}]");
-        auto tree = makeTree<TestThing>({{}, {}}, *pipePtr, takeTypeInfo);
+        auto tree = makeTree<TestThing>({{}, {}}, *pipePtr, takeTypeInfo).first;
         zip<TestThing>(&tree, &*pipePtr, tookTypeInfoOrThrow);
         previousStack.pop();
     }());
