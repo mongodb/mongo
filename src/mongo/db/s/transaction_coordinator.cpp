@@ -191,9 +191,6 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
             // the success of the commit sequence.
             LOG(3) << "Two-phase commit completed for " << _lsid.getId() << ':' << _txnNumber;
 
-            if (MONGO_FAIL_POINT(doNotForgetCoordinator))
-                return Future<void>::makeReady(s);
-
             return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumber)
                 .onCompletion([ this, chainStatus = std::move(s) ](Status deleteDocStatus) {
                     if (_participantsDurable) {

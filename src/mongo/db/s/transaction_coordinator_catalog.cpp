@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(doNotForgetCoordinator);
-
 TransactionCoordinatorCatalog::TransactionCoordinatorCatalog() = default;
 
 TransactionCoordinatorCatalog::~TransactionCoordinatorCatalog() {
@@ -126,20 +124,6 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
         }
     }
 
-    if (MONGO_FAIL_POINT(doNotForgetCoordinator) && !coordinatorToReturn) {
-        // If the failpoint is on and we couldn't find the coordinator in the main catalog, fall
-        // back to the "defunct" catalog, which stores coordinators that have completed and would
-        // normally be forgotten.
-        auto coordinatorsForSessionIter = _coordinatorsBySessionDefunct.find(lsid);
-        if (coordinatorsForSessionIter != _coordinatorsBySessionDefunct.end()) {
-            const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
-            auto coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
-            if (coordinatorForTxnIter != coordinatorsForSession.end()) {
-                coordinatorToReturn = coordinatorForTxnIter->second;
-            }
-        }
-    }
-
     return coordinatorToReturn;
 }
 
@@ -179,21 +163,6 @@ void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNum
 
         if (coordinatorForTxnIter != coordinatorsForSession.end()) {
             auto coordinator = coordinatorForTxnIter->second;
-
-            if (MONGO_FAIL_POINT(doNotForgetCoordinator)) {
-                auto decisionFuture = coordinator->getDecision();
-                // Only remember a coordinator that completed successfully. We expect that the
-                // coordinator only completes with an error if the node stepped down or was shut
-                // down while coordinating the commit. If either of these occurred, a
-                // coordinateCommitTransaction retry will either find a new coordinator in the real
-                // catalog (if the coordinator's state was made durable before the failover or
-                // shutdown), or should find no coordinator and instead recover the decision from
-                // the local participant (if the failover or shutdown occurred before any of the
-                // coordinator's state was made durable).
-                if (decisionFuture.isReady() && decisionFuture.getNoThrow().isOK()) {
-                    _coordinatorsBySessionDefunct[lsid][txnNumber] = std::move(coordinator);
-                }
-            }
 
             coordinatorsForSession.erase(coordinatorForTxnIter);
             if (coordinatorsForSession.empty()) {
