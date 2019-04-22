@@ -81,6 +81,20 @@
     const hashAtClusterTime = {collections: res.collections, md5: res.md5};
     assert.eq(hashAtClusterTime, hashAfterOriginalInserts);
 
+    // Attempting to read at a null timestamp should return an error.
+    assert.commandFailedWithCode(collection.runCommand("find", {
+        batchSize: 2,
+        sort: {_id: 1},
+        $_internalReadAtClusterTime: new Timestamp(0, 0),
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    assert.commandFailedWithCode(db.runCommand({
+        dbHash: 1,
+        $_internalReadAtClusterTime: new Timestamp(0, 1),
+    }),
+                                 ErrorCodes.InvalidOptions);
+
     // Attempting to read at a clusterTime in the future should return an error.
     const futureClusterTime = new Timestamp(clusterTime.getTime() + 1000, 1);
 

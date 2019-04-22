@@ -131,6 +131,11 @@ public:
 
             auto targetClusterTime = elem.timestamp();
 
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "$_internalReadAtClusterTime value must not be a null"
+                                     " timestamp.",
+                    !targetClusterTime.isNull());
+
             // We aren't holding the global lock in intent mode, so it is possible after comparing
             // 'targetClusterTime' to 'lastAppliedOpTime' for the last applied opTime to go
             // backwards or for the term to change due to replication rollback. This isn't an actual
