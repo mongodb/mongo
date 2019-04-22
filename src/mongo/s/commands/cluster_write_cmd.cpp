@@ -282,8 +282,8 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
     } else {
         try {
             // Delete the original document and insert the new one
-            updatedShardKey =
-            updateShardKeyValue(opCtx, request, response, wouldChangeOwningShardErrorInfo.get());
+            updatedShardKey = updateShardKeyValue(
+                opCtx, request, response, wouldChangeOwningShardErrorInfo.get());
         } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
             Status status = ex->getKeyPattern().hasField("_id")
                 ? ex.toStatus().withContext(
@@ -292,7 +292,6 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
                 : ex.toStatus();
             uassertStatusOK(status);
         }
-       
     }
 
     if (updatedShardKey) {
