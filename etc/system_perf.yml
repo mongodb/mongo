@@ -1163,6 +1163,52 @@ buildvariants:
     - name: initialsync-logkeeper
 
 #######################################
+#  Atlas Like Buildvariants           #
+#######################################
+- name: atlas-like-M60
+  display_name: M60-Like 3-Node ReplSet
+  batchtime: 1440  # 24 hours
+  modules: *modules
+  expansions:
+    setup: atlas-like-replica
+    cluster: M60-like-replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile-variant: -enterprise
+  run_on:
+      - "rhel70-perf-M60-like"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+  tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+    - name: industry_benchmarks
+    - name: industry_benchmarks_secondary_reads
+    - name: crud_workloads
+    - name: jasper_smoke
+    - name: insert_remove
+    - name: service_architecture_workloads
+    - name: mixed_workloads
+    - name: misc_workloads
+    - name: map_reduce_workloads
+    - name: smoke_test
+    - name: retryable_writes_workloads
+    - name: industry_benchmarks_wmajority
+    - name: non_sharded_workloads
+    - name: bestbuy_agg
+    - name: bestbuy_agg_out
+    - name: bestbuy_query
+    - name: change_streams_throughput
+    - name: change_streams_latency
+    - name: snapshot_reads
+    - name: secondary_reads
+    # - name: tpcc # TPCC with SSL currently broken https://jira.mongodb.org/browse/TIG-1681
+    - name: linkbench
+    - name: big_update
+
+
+#######################################
 #  WT Develop Linux Buildvariants     #
 #######################################
 - name: wtdevelop-1-node-replSet
