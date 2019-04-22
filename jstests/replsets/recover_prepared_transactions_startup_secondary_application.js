@@ -3,7 +3,7 @@
  * up can then successfully apply commit or abort transaction oplog entries during secondary oplog
  * application.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
 (function() {
