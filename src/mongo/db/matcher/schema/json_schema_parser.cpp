@@ -1369,10 +1369,17 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
             // This checks the types of all the fields. Will throw on any parsing error.
             const IDLParserErrorContext encryptCtxt("encrypt");
             auto encryptInfo = EncryptionInfo::parse(encryptCtxt, encryptElt.embeddedObject());
+            auto infoType = encryptInfo.getBsonType();
+            uassert(31051,
+                    "A deterministically encrypted field must have exactly one specified "
+                    "non-object type.",
+                    encryptInfo.getAlgorithm() != FleAlgorithmEnum::kDeterministic ||
+                        ((infoType && infoType.get().typeSet().isSingleType()) &&
+                         !infoType.get().typeSet().hasType(BSONType::Object)));
 
             andExpr->add(new InternalSchemaBinDataSubTypeExpression(path, BinDataType::Encrypt));
 
-            if (auto typeOptional = encryptInfo.getBsonType())
+            if (auto typeOptional = infoType)
                 andExpr->add(new InternalSchemaBinDataEncryptedTypeExpression(
                     path, typeOptional->typeSet()));
         } catch (const AssertionException&) {
