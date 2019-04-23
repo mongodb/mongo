@@ -2450,7 +2450,7 @@ public:
          * 'RegexMatchHandler', as part of '_preExecutionState'. If not, it will be owned by
          * 'RegexExecutionState'.
          */
-        std::shared_ptr<pcre> pcre;
+        std::shared_ptr<pcre> pcrePtr;
         boost::optional<std::string> input;
         int startBytePos = 0;
         int startCodePointPos = 0;
