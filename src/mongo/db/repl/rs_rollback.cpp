@@ -756,6 +756,10 @@ void dropCollection(OperationContext* opCtx,
                     Database* db) {
     if (RollbackImpl::shouldCreateDataFiles()) {
         RemoveSaver removeSaver("rollback", "", nss.ns());
+        log() << "Rolling back createCollection on " << nss
+              << ": Preparing to write documents to a rollback file for a collection " << nss
+              << " with uuid " << *(collection->uuid()) << " to "
+              << removeSaver.file().generic_string();
 
         // Performs a collection scan and writes all documents in the collection to disk
         // in order to keep an archive of items that were rolled back.
@@ -1298,6 +1302,9 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
         if (RollbackImpl::shouldCreateDataFiles()) {
             removeSaver = std::make_unique<RemoveSaver>("rollback", "", nss.ns());
+            log() << "Preparing to write deleted documents to a rollback file for collection "
+                  << nss << " with uuid " << uuid.toString() << " to "
+                  << removeSaver->file().generic_string();
         }
 
         const auto& goodVersionsByDocID = nsAndGoodVersionsByDocID.second;
