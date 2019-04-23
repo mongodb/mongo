@@ -679,3 +679,8 @@ done:
 
    return kms_request_str_detach (sreq);
 }
+
+void
+kms_request_free_string (char* ptr) {
+   free(ptr);
+}

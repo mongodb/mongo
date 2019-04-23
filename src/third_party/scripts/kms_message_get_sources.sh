@@ -18,7 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=kms-message
-REVISION=8d91fa28cf179be591f595ca6611f74443357fdb
+REVISION=75e391a037d30941f8cad17568ea9bdd37962127
 
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))

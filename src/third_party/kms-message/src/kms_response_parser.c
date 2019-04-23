@@ -175,9 +175,13 @@ _parse_line (kms_response_parser_t *parser, int end)
           strcmp (key->str, "Content-Length") == 0) {
          if (!_parse_int (val->str, &parser->content_length)) {
             KMS_ERROR (parser, "Could not parse Content-Length header.");
+            kms_request_str_destroy (key);
+            kms_request_str_destroy (val);
             return PARSING_DONE;
          }
       }
+      kms_request_str_destroy (key);
+      kms_request_str_destroy (val);
       return PARSING_HEADER;
    }
    return PARSING_DONE;
