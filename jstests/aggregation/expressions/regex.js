@@ -238,14 +238,13 @@
         testRegexFindAggForKey(0, {input: "$text", regex: /foo/}, []);
         // Regex null.
         testRegexFindAggForKey(0, {input: "$text", regex: null}, []);
-        // Regex not present.
-        testRegexFindAggForKey(0, {input: "$text"}, []);
-        // Input not present.
-        testRegexFindAggForKey(0, {regex: /valid/}, []);
         // Input null.
         testRegexFindAggForKey(0, {input: null, regex: /valid/}, []);
-        // Empty object.
-        testRegexFindAggForKey(0, {}, []);
+        // Both null.
+        testRegexFindAggForKey(0, {input: null, regex: null}, []);
+        testRegexFindAggForKey(
+            0, {input: "$missingField", regex: "$missingField", options: "i"}, []);
+        testRegexFindAggForKey(0, {input: "$missingField", regex: "$$REMOVE", options: "i"}, []);
     })();
 
     (function testWithStartOptions() {
@@ -346,7 +345,7 @@
         testRegexAggException("incorrect type", 51103);
         // Test malformed regex.
         testRegexAggException({input: "$text", regex: "[0-9"}, 51111);
-        testRegexAggException({regex: "[a-c"}, 51111);
+        testRegexAggException({regex: "[a-c", input: null}, 51111);
         // Malformed regex because start options not at the beginning.
         testRegexAggException({input: "$text", regex: "^(*UCP)[[:alpha:]]+$"}, 51111);
         testRegexAggException({input: "$text", regex: "((*UCP)[[:alpha:]]+$)"}, 51111);
@@ -354,7 +353,7 @@
         assert.commandWorked(coll.insert({a: "string"}));
         assert.commandWorked(coll.insert({a: {b: "object"}}));
         testRegexAggException({input: "$a", regex: "valid"}, 51104);
-        testRegexAggException({input: "$a"}, 51104);
+        testRegexAggException({input: "$a", regex: null}, 51104);
         // 'regex' field is not string or regex.
         testRegexAggException({input: "$text", regex: ["incorrect"]}, 51105);
         // 'options' field is not string.
@@ -363,17 +362,32 @@
         testRegexAggException({input: "$text", regex: "valid", options: 'a'}, 51108);
         // 'options' are case-sensitive.
         testRegexAggException({input: "$text", regex: "valid", options: "I"}, 51108);
-        testRegexAggException({options: "I"}, 51108);
+        testRegexAggException({options: "I", regex: null, input: null}, 51108);
         // Options specified in both 'regex' and 'options'.
         testRegexAggException({input: "$text", regex: /(m(p))/i, options: "i"}, 51107);
         testRegexAggException({input: "$text", regex: /(m(p))/i, options: "x"}, 51107);
         testRegexAggException({input: "$text", regex: /(m(p))/m, options: ""}, 51107);
         // 'regex' as string with null characters.
         testRegexAggException({input: "$text", regex: "sasd\0", options: "i"}, 51109);
-        testRegexAggException({regex: "sa\x00sd", options: "i"}, 51109);
+        testRegexAggException({regex: "sa\x00sd", options: "i", input: null}, 51109);
         // 'options' as string with null characters.
         testRegexAggException({input: "$text", regex: /(m(p))/, options: "i\0"}, 51110);
-        testRegexAggException({input: "$text", options: "i\x00"}, 51110);
+        testRegexAggException({input: "$text", options: "i\x00", regex: null}, 51110);
+        // Invalid parameter.
+        testRegexAggException({input: "$text", invalid: "i"}, 31024);
+        testRegexAggException({input: "$text", regex: "sa", invalid: "$missingField"}, 31024);
+        testRegexAggException({input: "$text", regex: "sa", invalid: null}, 31024);
+        testRegexAggException({input: "$text", regex: "sa", invalid: []}, 31024);
+        // Regex not present.
+        testRegexAggException({input: "$text"}, 31023);
+        testRegexAggException({input: "$missingField"}, 31023);
+        testRegexAggException({input: "$text", options: "invalid"}, 31023);
+        // Input not present.
+        testRegexAggException({regex: /valid/}, 31022);
+        testRegexAggException({regex: "$missingField"}, 31022);
+        testRegexAggException({regex: "[0-9"}, 31022);
+        // Empty object.
+        testRegexAggException({}, 31022);
     })();
 
     (function testMultipleMatches() {

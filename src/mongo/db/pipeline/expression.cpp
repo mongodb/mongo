@@ -5669,64 +5669,42 @@ Value ExpressionConvert::performConversion(BSONType targetType, Value inputValue
     BSONType inputType = inputValue.getType();
     return table.findConversionFunc(inputType, targetType)(getExpressionContext(), inputValue);
 }
-namespace {
 
-boost::optional<Value> extractValueFromConstantExpression(
-    const std::string& fieldName,
-    const std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>& childExpressions) {
-    // Find the element with the fieldName.
-    auto expressionPairItr = std::find_if(
-        childExpressions.begin(), childExpressions.end(), [&](const auto& childExpression) {
-            return childExpression.first == fieldName;
-        });
+/* -------------------------- ExpressionRegex ------------------------------ */
 
-    // If the field doesn't exists it is still eligible for optimization.
-    if (expressionPairItr == childExpressions.end()) {
-        return Value(BSONNULL);
-    }
+ExpressionRegex::ExpressionRegex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 BSONElement expr,
+                                 const VariablesParseState& vpsIn,
+                                 const std::string& opName)
+    : Expression(expCtx), _opName(std::move(opName)) {
+    uassert(51103,
+            str::stream() << _opName << " expects an object of named arguments but found: "
+                          << expr.type(),
+            expr.type() == BSONType::Object);
 
-    // If the field exists and not null/constant, we cannot optimize.
-    if (!ExpressionConstant::isNullOrConstant(expressionPairItr->second)) {
-        return boost::none;
-    }
-    auto* expression = expressionPairItr->second.get();
-    return dynamic_cast<ExpressionConstant*>(expression)->getValue();
-}
-
-}  // namespace
-
-void RegexMatchHandler::optimize(boost::intrusive_ptr<Expression> expression) {
-    auto optimizedExpr = expression->optimize();
-
-    // If 'input', 'regex' and 'options' are null/constant then 'optimize()' will convert the
-    // object to an expression of type 'ExpressionConstant'.
-    if (auto* exprObj = dynamic_cast<ExpressionConstant*>(optimizedExpr.get())) {
-        _initialExecStateForConstantRegex = buildInitialState(exprObj->getValue());
-    } else if (auto* exprObj = dynamic_cast<ExpressionObject*>(optimizedExpr.get())) {
-        // Extract the children and check for constant 'regex' and 'options'.
-        auto& children = exprObj->getChildExpressions();
-        auto regex = extractValueFromConstantExpression("regex", children);
-        auto options = extractValueFromConstantExpression("options", children);
-
-        // If both 'regex' and 'options' are null/constant, we can pre-compile the execution state.
-        if (regex && options) {
-            RegexExecutionState executionState;
-            _extractRegexAndOptions(&executionState, *regex, *options);
-            _compile(&executionState);
-            _initialExecStateForConstantRegex = std::move(executionState);
+    for (auto&& elem : expr.embeddedObject()) {
+        const auto field = elem.fieldNameStringData();
+        if (field == "input"_sd) {
+            _input = parseOperand(expCtx, elem, vpsIn);
+        } else if (field == "regex"_sd) {
+            _regex = parseOperand(expCtx, elem, vpsIn);
+        } else if (field == "options"_sd) {
+            _options = parseOperand(expCtx, elem, vpsIn);
+        } else {
+            uasserted(31024,
+                      str::stream() << _opName << " found an unknown argument: "
+                                    << elem.fieldNameStringData());
         }
     }
+    uassert(31022, str::stream() << _opName << " requires 'input' parameter", _input);
+    uassert(31023, str::stream() << _opName << " requires 'regex' parameter", _regex);
 }
 
-RegexMatchHandler::RegexExecutionState RegexMatchHandler::buildInitialState(
-    const Value& inputExpr) const {
-    uassert(51103,
-            str::stream() << "expression expects an object of named arguments, but found type "
-                          << inputExpr.getType(),
-            inputExpr.getType() == BSONType::Object);
-    Value textInput = inputExpr.getDocument().getField("input");
-    Value regexPattern = inputExpr.getDocument().getField("regex");
-    Value regexOptions = inputExpr.getDocument().getField("options");
+ExpressionRegex::RegexExecutionState ExpressionRegex::buildInitialState(
+    const Document& root) const {
+    Value textInput = _input->evaluate(root);
+    Value regexPattern = _regex->evaluate(root);
+    Value regexOptions = _options ? _options->evaluate(root) : Value(BSONNULL);
 
     auto executionState = _initialExecStateForConstantRegex.value_or(RegexExecutionState());
 
@@ -5744,7 +5722,7 @@ RegexMatchHandler::RegexExecutionState RegexMatchHandler::buildInitialState(
     return executionState;
 }
 
-int RegexMatchHandler::execute(RegexExecutionState* regexState) const {
+int ExpressionRegex::execute(RegexExecutionState* regexState) const {
     invariant(regexState);
     invariant(!regexState->nullish());
     invariant(regexState->pcrePtr);
@@ -5761,13 +5739,14 @@ int RegexMatchHandler::execute(RegexExecutionState* regexState) const {
     // negative (other than -1) if there is an error during execution, and zero if capturesBuffer's
     // capacity is not sufficient to hold all the results. The latter scenario should never occur.
     uassert(51156,
-            str::stream() << "Error occurred while executing the regular expression. Result code:"
+            str::stream() << "Error occurred while executing the regular expression in " << _opName
+                          << ". Result code: "
                           << execResult,
             execResult == -1 || execResult == (regexState->numCaptures + 1));
     return execResult;
 }
 
-Value RegexMatchHandler::nextMatch(RegexExecutionState* regexState) const {
+Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
     int execResult = execute(regexState);
 
     // No match.
@@ -5816,13 +5795,34 @@ Value RegexMatchHandler::nextMatch(RegexExecutionState* regexState) const {
     return match.freezeToValue();
 }
 
-void RegexMatchHandler::_compile(RegexExecutionState* executionState) const {
+boost::intrusive_ptr<Expression> ExpressionRegex::optimize() {
+    _input = _input->optimize();
+    _regex = _regex->optimize();
+    if (_options) {
+        _options = _options->optimize();
+    }
+
+    if (ExpressionConstant::allNullOrConstant({_regex, _options})) {
+        _initialExecStateForConstantRegex.emplace();
+        _extractRegexAndOptions(
+            _initialExecStateForConstantRegex.get_ptr(),
+            dynamic_cast<ExpressionConstant*>(_regex.get())->getValue(),
+            _options ? dynamic_cast<ExpressionConstant*>(_options.get())->getValue() : Value());
+        _compile(_initialExecStateForConstantRegex.get_ptr());
+    }
+    return this;
+}
+
+void ExpressionRegex::_compile(RegexExecutionState* executionState) const {
+
     const auto pcreOptions =
-        regex_util::flags2PcreOptions(executionState->options, false).all_options();
+        regex_util::flagsToPcreOptions(executionState->options.value_or(""), false, _opName)
+            .all_options();
 
     if (!executionState->pattern) {
         return;
     }
+
     const char* compile_error;
     int eoffset;
 
@@ -5833,7 +5833,9 @@ void RegexMatchHandler::_compile(RegexExecutionState* executionState) const {
         pcre_compile(
             executionState->pattern->c_str(), pcreOptions, &compile_error, &eoffset, nullptr),
         pcre_free);
-    uassert(51111, str::stream() << "Invalid Regex: " << compile_error, executionState->pcrePtr);
+    uassert(51111,
+            str::stream() << "Invalid Regex in " << _opName << ": " << compile_error,
+            executionState->pcrePtr);
 
     // Calculate the number of capture groups present in 'pattern' and store in 'numCaptures'.
     const int pcre_retval = pcre_fullinfo(
@@ -5848,35 +5850,44 @@ void RegexMatchHandler::_compile(RegexExecutionState* executionState) const {
     executionState->capturesBuffer.resize((1 + executionState->numCaptures) * 3);
 }
 
-void RegexMatchHandler::_extractInputField(RegexExecutionState* executionState,
-                                           const Value& textInput) const {
+Value ExpressionRegex::serialize(bool explain) const {
+    return Value(
+        Document{{_opName,
+                  Document{{"input", _input->serialize(explain)},
+                           {"regex", _regex->serialize(explain)},
+                           {"options", _options ? _options->serialize(explain) : Value()}}}});
+}
+
+void ExpressionRegex::_extractInputField(RegexExecutionState* executionState,
+                                         const Value& textInput) const {
     uassert(51104,
-            "'input' field should be of type string",
+            str::stream() << _opName << " needs 'input' to be of type string",
             textInput.nullish() || textInput.getType() == BSONType::String);
     if (textInput.getType() == BSONType::String) {
         executionState->input = textInput.getString();
     }
 }
 
-void RegexMatchHandler::_extractRegexAndOptions(RegexExecutionState* executionState,
-                                                const Value& regexPattern,
-                                                const Value& regexOptions) const {
+void ExpressionRegex::_extractRegexAndOptions(RegexExecutionState* executionState,
+                                              const Value& regexPattern,
+                                              const Value& regexOptions) const {
     uassert(51105,
-            "'regex' field should be of type string or regex",
+            str::stream() << _opName << " needs 'regex' to be of type string or regex",
             regexPattern.nullish() || regexPattern.getType() == BSONType::String ||
                 regexPattern.getType() == BSONType::RegEx);
     uassert(51106,
-            "'options' should be of type string",
+            str::stream() << _opName << " needs 'options' to be of type string",
             regexOptions.nullish() || regexOptions.getType() == BSONType::String);
 
     // The 'regex' field can be a RegEx object and may have its own options...
     if (regexPattern.getType() == BSONType::RegEx) {
         StringData regexFlags = regexPattern.getRegexFlags();
         executionState->pattern = regexPattern.getRegex();
-        uassert(
-            51107,
-            str::stream() << "Found regex option(s) specified in both 'regex' and 'option' fields",
-            regexOptions.nullish() || regexFlags.empty());
+        uassert(51107,
+                str::stream()
+                    << _opName
+                    << ": found regex option(s) specified in both 'regex' and 'option' fields",
+                regexOptions.nullish() || regexFlags.empty());
         if (!regexFlags.empty()) {
             executionState->options = regexFlags.toString();
         }
@@ -5885,45 +5896,47 @@ void RegexMatchHandler::_extractRegexAndOptions(RegexExecutionState* executionSt
         executionState->pattern = regexPattern.getString();
     }
 
-    // If 'options' is non-null, we must extract and validate its contents even if 'regexPattern' is
-    // nullish.
+    // If 'options' is non-null, we must validate its contents even if 'regexPattern' is nullish.
     if (!regexOptions.nullish()) {
         executionState->options = regexOptions.getString();
     }
     uassert(51109,
-            "Regular expression cannot contain an embedded null byte",
-            !executionState->pattern || executionState->pattern->find('\0', 0) == string::npos);
+            str::stream() << _opName << ": regular expression cannot contain an embedded null byte",
+            !executionState->pattern ||
+                executionState->pattern->find('\0', 0) == std::string::npos);
+
     uassert(51110,
-            "Regular expression options string cannot contain an embedded null byte",
-            executionState->options.find('\0', 0) == string::npos);
+            str::stream() << _opName
+                          << ": regular expression options cannot contain an embedded null byte",
+            !executionState->options ||
+                executionState->options->find('\0', 0) == std::string::npos);
 }
 
-boost::intrusive_ptr<Expression> ExpressionRegexFind::optimize() {
-    _handler.optimize(vpOperand[0]);
-    return this;
+void ExpressionRegex::_doAddDependencies(DepsTracker* deps) const {
+    _input->addDependencies(deps);
+    _regex->addDependencies(deps);
+    if (_options) {
+        _options->addDependencies(deps);
+    }
 }
+
+/* -------------------------- ExpressionRegexFind ------------------------------ */
 
 Value ExpressionRegexFind::evaluate(const Document& root) const {
-    auto executionState = _handler.buildInitialState(vpOperand[0]->evaluate(root));
+    auto executionState = buildInitialState(root);
     if (executionState.nullish()) {
         return Value(BSONNULL);
     }
-    return _handler.nextMatch(&executionState);
+    return nextMatch(&executionState);
 }
 
 REGISTER_EXPRESSION(regexFind, ExpressionRegexFind::parse);
-const char* ExpressionRegexFind::getOpName() const {
-    return "$regexFind";
-}
 
-boost::intrusive_ptr<Expression> ExpressionRegexFindAll::optimize() {
-    _handler.optimize(vpOperand[0]);
-    return this;
-}
+/* -------------------------- ExpressionRegexFindAll ------------------------------ */
 
 Value ExpressionRegexFindAll::evaluate(const Document& root) const {
     std::vector<Value> output;
-    auto executionState = _handler.buildInitialState(vpOperand[0]->evaluate(root));
+    auto executionState = buildInitialState(root);
     if (executionState.nullish()) {
         return Value(output);
     }
@@ -5933,13 +5946,14 @@ Value ExpressionRegexFindAll::evaluate(const Document& root) const {
     // Using do...while loop because, when input is an empty string, we still want to see if there
     // is a match.
     do {
-        auto matchObj = _handler.nextMatch(&executionState);
+        auto matchObj = nextMatch(&executionState);
         if (matchObj.getType() == BSONType::jstNULL) {
             break;
         }
         totalDocSize += matchObj.getApproximateSize();
         uassert(51151,
-                "The size of buffer to store $regexFindAll output exceeded the 64MB limit",
+                str::stream() << getOpName()
+                              << ": the size of buffer to store output exceeded the 64MB limit",
                 totalDocSize <= mongo::BufferMaxSize);
 
         output.push_back(matchObj);
@@ -5969,24 +5983,15 @@ Value ExpressionRegexFindAll::evaluate(const Document& root) const {
 }
 
 REGISTER_EXPRESSION(regexFindAll, ExpressionRegexFindAll::parse);
-const char* ExpressionRegexFindAll::getOpName() const {
-    return "$regexFindAll";
-}
 
-boost::intrusive_ptr<Expression> ExpressionRegexMatch::optimize() {
-    _handler.optimize(vpOperand[0]);
-    return this;
-}
+/* -------------------------- ExpressionRegexMatch ------------------------------ */
 
 Value ExpressionRegexMatch::evaluate(const Document& root) const {
-    auto executionState = _handler.buildInitialState(vpOperand[0]->evaluate(root));
+    auto executionState = buildInitialState(root);
     // Return output of execute only if regex is not nullish.
-    return executionState.nullish() ? Value(false) : Value(_handler.execute(&executionState) > 0);
+    return executionState.nullish() ? Value(false) : Value(execute(&executionState) > 0);
 }
 
 REGISTER_EXPRESSION(regexMatch, ExpressionRegexMatch::parse);
-const char* ExpressionRegexMatch::getOpName() const {
-    return "$regexMatch";
-}
 
 }  // namespace mongo

@@ -36,8 +36,11 @@
 namespace mongo {
 namespace regex_util {
 /**
- * Utility to build PCRE regex option from the input options string.
+ * Builds PCRE regex options from the input options string. If 'ignoreInvalidOptions' is disabled,
+ * throws uassert on invalid flags.
  */
-pcrecpp::RE_Options flags2PcreOptions(StringData optionFlags, bool ignoreInvalidOptions);
+pcrecpp::RE_Options flagsToPcreOptions(StringData optionFlags,
+                                       bool ignoreInvalidOptions,
+                                       StringData opName = "");
 }
 }

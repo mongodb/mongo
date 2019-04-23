@@ -2434,26 +2434,33 @@ private:
     boost::intrusive_ptr<Expression> _onNull;
 };
 
-class RegexMatchHandler {
+class ExpressionRegex : public Expression {
 public:
     /**
-     * Object to hold data that is required by 'RegexMatchHandler' for calling 'execute()' or
-     * 'nextMatch()'.
+     * Object to hold data that is required when calling 'execute()' or 'nextMatch()'.
      */
     struct RegexExecutionState {
-        boost::optional<std::string> pattern;
-        std::string options;
-        int numCaptures = 0;
-        std::vector<int> capturesBuffer;
         /**
-         * If there is a constant regex, the underlying object of 'pcre' will be owned by
-         * 'RegexMatchHandler', as part of '_preExecutionState'. If not, it will be owned by
-         * 'RegexExecutionState'.
+         * The regex pattern, options, and captures buffer for the current execution context.
+         */
+        boost::optional<std::string> pattern;
+        boost::optional<std::string> options;
+        std::vector<int> capturesBuffer;
+        int numCaptures = 0;
+
+        /**
+         * If 'regex' is constant, 'pcrePtr' will be shared between the active RegexExecutionState
+         * and '_initialExecStateForConstantRegex'. If not, then the active RegexExecutionState is
+         * the sole owner.
          */
         std::shared_ptr<pcre> pcrePtr;
+
+        /**
+         * The input text and starting position for the current execution context.
+         */
         boost::optional<std::string> input;
-        int startBytePos = 0;
         int startCodePointPos = 0;
+        int startBytePos = 0;
 
         /**
          * If either the text input or regex pattern is nullish, then we consider the operation as a
@@ -2463,6 +2470,12 @@ public:
             return !input || !pattern;
         }
     };
+
+    /**
+     * Validates the structure of input passed in 'inputExpr'. If valid, generates an initial
+     * execution state. This returned object can later be used for calling execute() or nextMatch().
+     */
+    RegexExecutionState buildInitialState(const Document& root) const;
 
     /**
      * Checks if there is a match for the given input and pattern that are part of 'executionState'.
@@ -2482,91 +2495,121 @@ public:
     Value nextMatch(RegexExecutionState* executionState) const;
 
     /**
-     * Optimizes '$regex*' expressions. If the expression has a constant 'regex' and 'options'
-     * fields, then it can be optimized. Stores the optimized regex as part of '_constantRegex' so
-     * that it can be reused during expression evaluation.
+     * Optimizes '$regex*' expressions. If the expression has constant 'regex' and 'options' fields,
+     * then it can be optimized. Stores the optimized regex in '_initialExecStateForConstantRegex'
+     * so that it can be reused during expression evaluation.
      */
-    void optimize(boost::intrusive_ptr<Expression> expression);
+    boost::intrusive_ptr<Expression> optimize();
 
-    /**
-     * Validates the structure of input passed in 'inputExpr'. If valid, generates an initial
-     * execution state. This returned object can later be used for calling execute() or nextMatch().
-     */
-    RegexExecutionState buildInitialState(const Value& inputExpr) const;
     bool hasConstantRegex() const {
         return _initialExecStateForConstantRegex.has_value();
     }
+
+    Value serialize(bool explain) const;
+
+    const std::string& getOpName() const {
+        return _opName;
+    }
+
+protected:
+    ExpressionRegex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                    BSONElement expr,
+                    const VariablesParseState& vpsIn,
+                    const std::string& opName);
 
 private:
     void _extractInputField(RegexExecutionState* executionState, const Value& textInput) const;
     void _extractRegexAndOptions(RegexExecutionState* executionState,
                                  const Value& regexPattern,
                                  const Value& regexOptions) const;
+
     void _compile(RegexExecutionState* executionState) const;
+
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+    /**
+     * Expressions which, when evaluated for a given document, produce the the regex pattern, the
+     * regex option flags, and the input text to which the regex should be applied.
+     */
+    boost::intrusive_ptr<Expression> _input;
+    boost::intrusive_ptr<Expression> _regex;
+    boost::intrusive_ptr<Expression> _options;
+
     /**
      * This variable will be set when the $regex* expressions have constant values for their 'regex'
      * and 'options' fields, allowing us to pre-compile the regex and re-use it across the
      * Expression's lifetime.
      */
     boost::optional<RegexExecutionState> _initialExecStateForConstantRegex;
+
+    /**
+     * Name of the regex expression.
+     */
+    std::string _opName;
 };
 
-class ExpressionRegexFind final : public ExpressionFixedArity<ExpressionRegexFind, 1> {
+class ExpressionRegexFind final : public ExpressionRegex {
 public:
-    explicit ExpressionRegexFind(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ExpressionFixedArity<ExpressionRegexFind, 1>(expCtx) {}
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vpsIn) {
+        return new ExpressionRegexFind(expCtx, expr, vpsIn);
+    }
 
     Value evaluate(const Document& root) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
-    const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
-    bool hasConstantRegex() const {
-        return _handler.hasConstantRegex();
-    }
 
 private:
-    RegexMatchHandler _handler;
+    ExpressionRegexFind(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        BSONElement expr,
+                        const VariablesParseState& vpsIn)
+        : ExpressionRegex(expCtx, expr, vpsIn, "$regexFind") {}
 };
 
-class ExpressionRegexFindAll final : public ExpressionFixedArity<ExpressionRegexFindAll, 1> {
+class ExpressionRegexFindAll final : public ExpressionRegex {
 public:
-    explicit ExpressionRegexFindAll(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ExpressionFixedArity<ExpressionRegexFindAll, 1>(expCtx) {}
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vpsIn) {
+        return new ExpressionRegexFindAll(expCtx, expr, vpsIn);
+    }
 
     Value evaluate(const Document& root) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
-    const char* getOpName() const final;
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
-    bool hasConstantRegex() const {
-        return _handler.hasConstantRegex();
-    }
 
 private:
-    RegexMatchHandler _handler;
+    ExpressionRegexFindAll(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           BSONElement expr,
+                           const VariablesParseState& vpsIn)
+        : ExpressionRegex(expCtx, expr, vpsIn, "$regexFindAll") {}
 };
 
-class ExpressionRegexMatch final : public ExpressionFixedArity<ExpressionRegexMatch, 1> {
+class ExpressionRegexMatch final : public ExpressionRegex {
 public:
-    explicit ExpressionRegexMatch(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ExpressionFixedArity<ExpressionRegexMatch, 1>(expCtx) {}
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vpsIn) {
+        return new ExpressionRegexMatch(expCtx, expr, vpsIn);
+    }
 
     Value evaluate(const Document& root) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
-    const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
-    bool hasConstantRegex() const {
-        return _handler.hasConstantRegex();
-    }
 
 private:
-    RegexMatchHandler _handler;
+    ExpressionRegexMatch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         BSONElement expr,
+                         const VariablesParseState& vpsIn)
+        : ExpressionRegex(expCtx, expr, vpsIn, "$regexMatch") {}
 };
 }

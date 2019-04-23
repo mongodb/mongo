@@ -203,7 +203,7 @@ RegexMatchExpression::RegexMatchExpression(StringData path, const BSONElement& e
     : LeafMatchExpression(REGEX, path),
       _regex(e.regex()),
       _flags(e.regexFlags()),
-      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flags2PcreOptions(_flags, true))) {
+      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flagsToPcreOptions(_flags, true))) {
     uassert(ErrorCodes::BadValue, "regex not a regex", e.type() == RegEx);
     _init();
 }
@@ -212,7 +212,7 @@ RegexMatchExpression::RegexMatchExpression(StringData path, StringData regex, St
     : LeafMatchExpression(REGEX, path),
       _regex(regex.toString()),
       _flags(options.toString()),
-      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flags2PcreOptions(_flags, true))) {
+      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flagsToPcreOptions(_flags, true))) {
     _init();
 }
 
