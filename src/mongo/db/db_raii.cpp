@@ -162,7 +162,10 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         }
 
         invariant(lastAppliedTimestamp ||
-                  readSource == RecoveryUnit::ReadSource::kMajorityCommitted);
+                  // The kMajorityCommitted and kNoOverlap read sources already read from timestamps
+                  // that are safe with respect to concurrent secondary batch application.
+                  readSource == RecoveryUnit::ReadSource::kMajorityCommitted ||
+                  readSource == RecoveryUnit::ReadSource::kNoOverlap);
         invariant(readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
 
         // Yield locks in order to do the blocking call below.
@@ -190,6 +193,21 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             // calling getPointInTimeReadTimestamp().
             opCtx->recoveryUnit()->abandonSnapshot();
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+        }
+
+        // If there are pending catalog changes when using a no-overlap read source, we choose to
+        // take the PBWM lock to conflict with any in-progress batches. This prevents us from idly
+        // spinning in this loop trying to get a new read timestamp ahead of the minimum visible
+        // snapshot. This helps us guarantee liveness (i.e. we can eventually get a suitable read
+        // timestamp) but should not be necessary for correctness.
+        if (readSource == RecoveryUnit::ReadSource::kNoOverlap) {
+            invariant(!lastAppliedTimestamp);  // no-overlap read source selects its own timestamp.
+            _shouldNotConflictWithSecondaryBatchApplicationBlock = boost::none;
+            invariant(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
+
+            // Abandon our snapshot but don't change our read source, so that we can select a new
+            // read timestamp on the next loop iteration.
+            opCtx->recoveryUnit()->abandonSnapshot();
         }
 
         if (readSource == RecoveryUnit::ReadSource::kMajorityCommitted) {
