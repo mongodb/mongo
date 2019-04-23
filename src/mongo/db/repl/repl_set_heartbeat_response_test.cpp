@@ -118,7 +118,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
     ASSERT_EQUALS(2, hbResponseObj["state"].numberLong());
-    ASSERT_EQUALS("syncTarget:27017", hbResponseObj["syncingTo"].String());
+    ASSERT_EQUALS_CI("syncTarget:27017", hbResponseObj["syncingTo"].String());
 
     initializeResult =
         hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0, /*requireWallTime*/ true);

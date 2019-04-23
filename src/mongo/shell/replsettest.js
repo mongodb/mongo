@@ -279,7 +279,8 @@ var ReplSetTest = function(opts) {
                           "/" + node.name);
                 }
 
-                if (status.members[i].name == node.host || status.members[i].name == node.name) {
+                if (status.members[i].name.toLowerCase() == node.host.toLowerCase() ||
+                    status.members[i].name.toLowerCase() == node.name.toLowerCase()) {
                     for (var j = 0; j < states.length; j++) {
                         if (printStatus) {
                             print("Status -- " + " current state: " + status.members[i][ind] +
@@ -2597,7 +2598,7 @@ var ReplSetTest = function(opts) {
         print('Starting new replica set ' + self.name);
 
         self.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
-        self.host = self.useHostName ? (opts.host || getHostName()) : 'localhost';
+        self.host = (self.useHostName ? (opts.host || getHostName()) : 'localhost').toLowerCase();
         self.oplogSize = opts.oplogSize || 40;
         self.useSeedList = opts.useSeedList || false;
         self.keyFile = opts.keyFile;
@@ -2693,7 +2694,7 @@ var ReplSetTest = function(opts) {
         self.ports = existingNodes.map(node => node.split(':')[1]);
         self.nodes = existingNodes.map(node => new Mongo(node));
         self.waitForKeys = false;
-        self.host = existingNodes[0].split(':')[0];
+        self.host = existingNodes[0].split(':')[0].toLowerCase();
         self.name = conf._id;
     }
 

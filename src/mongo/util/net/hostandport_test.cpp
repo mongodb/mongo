@@ -39,6 +39,9 @@
 namespace mongo {
 namespace {
 
+// U+2603, Snowman, encoded as UTF-8.
+#define SNOWMAN "\xe2\x98\x83"
+
 TEST(HostAndPort, BasicLessThanComparison) {
     // Not less than self.
     ASSERT_FALSE(HostAndPort("a", 1) < HostAndPort("a", 1));
@@ -50,6 +53,12 @@ TEST(HostAndPort, BasicLessThanComparison) {
     // Then, order by port number.
     ASSERT_LESS_THAN(HostAndPort("a", 1), HostAndPort("a", 2));
     ASSERT_FALSE(HostAndPort("a", 2) < HostAndPort("a", 1));
+
+    // Case insensitive.
+    ASSERT_LESS_THAN(HostAndPort("A", 1), HostAndPort("a", 2));
+    ASSERT_LESS_THAN(HostAndPort("a", 1), HostAndPort("A", 2));
+    ASSERT_FALSE(HostAndPort("A", 2) < HostAndPort("a", 1));
+    ASSERT_FALSE(HostAndPort("a", 2) < HostAndPort("A", 1));
 }
 
 TEST(HostAndPort, BasicEquality) {
@@ -59,9 +68,21 @@ TEST(HostAndPort, BasicEquality) {
     ASSERT_FALSE(HostAndPort("a", 1) != HostAndPort("a", 1));
     ASSERT_NOT_EQUALS(HostAndPort("b", 1), HostAndPort("a", 1));
 
+    // Case insensitive.
+    ASSERT_EQUALS(HostAndPort("A", 1), HostAndPort("a", 1));
+    ASSERT_FALSE(HostAndPort("A", 1) != HostAndPort("a", 1));
+    ASSERT_NOT_EQUALS(HostAndPort("B", 1), HostAndPort("a", 1));
+
     // Comparison on port field
     ASSERT_FALSE(HostAndPort("a", 1) == HostAndPort("a", 2));
     ASSERT_NOT_EQUALS(HostAndPort("a", 1), HostAndPort("a", 2));
+}
+
+TEST(HostAndPort, CaseNormalization) {
+    ASSERT_EQUALS(HostAndPort(SNOWMAN "A", 1), HostAndPort(SNOWMAN "a", 1));
+    ASSERT_EQUALS(HostAndPort("A" SNOWMAN, 1), HostAndPort("a" SNOWMAN, 1));
+    ASSERT_NOT_EQUALS(HostAndPort(SNOWMAN "B", 1), HostAndPort(SNOWMAN "a", 1));
+    ASSERT_NOT_EQUALS(HostAndPort("B" SNOWMAN, 1), HostAndPort("a" SNOWMAN, 1));
 }
 
 TEST(HostAndPort, ImplicitPortSelection) {
@@ -106,6 +127,9 @@ TEST(HostAndPort, StaticParseFunction) {
                   HostAndPort("abc.def", 3421));
     ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("[243:1bc]:21")),
                   HostAndPort("243:1bc", 21));
+    ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("aBcD:21")), HostAndPort("abcd", 21));
+    ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("aB" SNOWMAN "cD:21")),
+                  HostAndPort("ab" SNOWMAN "cd", 21));
 }
 
 TEST(HostAndPort, RoundTripAbility) {

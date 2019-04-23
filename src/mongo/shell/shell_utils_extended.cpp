@@ -38,6 +38,7 @@
 
 #include <boost/filesystem.hpp>
 #include <fstream>
+#include <string>
 
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
@@ -330,11 +331,16 @@ BSONObj writeFile(const BSONObj& args, void* data) {
     return undefinedReturn;
 }
 
+// Return hostname normalized to lowercase for ease of use in tests.
 BSONObj getHostName(const BSONObj& a, void* data) {
     uassert(13411, "getHostName accepts no arguments", a.nFields() == 0);
     char buf[260];  // HOST_NAME_MAX is usually 255
     verify(gethostname(buf, 260) == 0);
     buf[259] = '\0';
+    for (char* c = buf; *c; c++) {
+        *c = static_cast<char>(tolower(static_cast<unsigned char>(*c)));
+    }
+
     return BSON("" << buf);
 }
 

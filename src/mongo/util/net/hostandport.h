@@ -51,6 +51,8 @@ class StringData;
  * Composed of some name component, followed optionally by a colon and a numeric port.  The name
  * might be an IPv4 or IPv6 address or a relative or fully qualified host name, or an absolute
  * path to a unix socket.
+ *
+ * Hostnames are converted to lowercase.
  */
 struct HostAndPort {
     /**

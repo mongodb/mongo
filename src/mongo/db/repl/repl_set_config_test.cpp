@@ -975,6 +975,25 @@ TEST(ReplSetConfig, ValidateFailsWithDuplicateMemberId) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
+TEST(ReplSetConfig, ValidateFailsWithDuplicateHostnameCaseInsensitive) {
+    ReplSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version"
+                                           << 1
+                                           << "protocolVersion"
+                                           << 1
+                                           << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345")
+                                                         << BSON("_id" << 1 << "host"
+                                                                       << "LOCALHOST:12345"))));
+    ASSERT_OK(status);
+
+    status = config.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
 TEST(ReplSetConfig, ValidateFailsWithInvalidMember) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
