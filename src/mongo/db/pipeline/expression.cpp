@@ -5747,9 +5747,9 @@ RegexMatchHandler::RegexExecutionState RegexMatchHandler::buildInitialState(
 int RegexMatchHandler::execute(RegexExecutionState* regexState) const {
     invariant(regexState);
     invariant(!regexState->nullish());
-    invariant(regexState->pcrePtr);
+    invariant(regexState->pcre);
 
-    int execResult = pcre_exec(regexState->pcrePtr.get(),
+    int execResult = pcre_exec(regexState->pcre.get(),
                                0,
                                regexState->input->c_str(),
                                regexState->input->size(),
@@ -5829,15 +5829,15 @@ void RegexMatchHandler::_compile(RegexExecutionState* executionState) const {
     // The C++ interface pcreccp.h doesn't have a way to capture the matched string (or the index of
     // the match). So we are using the C interface. First we compile all the regex options to
     // generate pcre object, which will later be used to match against the input string.
-    executionState->pcrePtr = std::shared_ptr<pcre>(
+    executionState->pcre = std::shared_ptr<pcre>(
         pcre_compile(
             executionState->pattern->c_str(), pcreOptions, &compile_error, &eoffset, nullptr),
         pcre_free);
-    uassert(51111, str::stream() << "Invalid Regex: " << compile_error, executionState->pcrePtr);
+    uassert(51111, str::stream() << "Invalid Regex: " << compile_error, executionState->pcre);
 
     // Calculate the number of capture groups present in 'pattern' and store in 'numCaptures'.
     const int pcre_retval = pcre_fullinfo(
-        executionState->pcrePtr.get(), NULL, PCRE_INFO_CAPTURECOUNT, &executionState->numCaptures);
+        executionState->pcre.get(), NULL, PCRE_INFO_CAPTURECOUNT, &executionState->numCaptures);
     invariant(pcre_retval == 0);
 
     // The first two-thirds of the vector is used to pass back captured substrings' start and
