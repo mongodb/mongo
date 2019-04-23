@@ -140,8 +140,12 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
 NamespaceString AutoGetCollection::resolveNamespaceStringOrUUID(OperationContext* opCtx,
                                                                 NamespaceStringOrUUID nsOrUUID) {
-    if (nsOrUUID.nss())
-        return *nsOrUUID.nss();
+    if (auto& nss = nsOrUUID.nss()) {
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Namespace " << *nss << " is not a valid collection name",
+                nss->isValid());
+        return *nss;
+    }
 
     UUIDCatalog& uuidCatalog = UUIDCatalog::get(opCtx);
     auto resolvedNss = uuidCatalog.lookupNSSByUUID(*nsOrUUID.uuid());
