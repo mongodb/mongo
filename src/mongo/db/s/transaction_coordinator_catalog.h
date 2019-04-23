@@ -138,10 +138,6 @@ private:
     // to the latest transaction should either be in the process of committing or aborting.
     LogicalSessionIdMap<TransactionCoordinatorMap> _coordinatorsBySession;
 
-    // Used only for testing. Contains TransactionCoordinator objects which have completed their
-    // commit coordination and would normally be expunged from memory.
-    LogicalSessionIdMap<TransactionCoordinatorMap> _coordinatorsBySessionDefunct;
-
     // Stores the result of the coordinator catalog's recovery attempt (the status passed to
     // exitStepUp). This is what the values mean:
     //
