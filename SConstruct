@@ -1025,6 +1025,23 @@ envDict = dict(BUILD_ROOT=buildDir,
 env = Environment(variables=env_vars, **envDict)
 del envDict
 
+for var in ['CC', 'CXX']:
+    if var not in env:
+        continue
+    path = env[var]
+    print('{} is {}'.format(var, path))
+    if not os.path.isabs(path):
+        which = shutil.which(path)
+        if which is None:
+            print('{} was not found in $PATH'.format(path))
+        else:
+            print('{} found in $PATH at {}'.format(path, which))
+            path = which
+
+    realpath = os.path.realpath(path)
+    if realpath != path:
+        print('{} resolves to {}'.format(path, realpath))
+
 env.AddMethod(mongo_platform.env_os_is_wrapper, 'TargetOSIs')
 env.AddMethod(mongo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
 
