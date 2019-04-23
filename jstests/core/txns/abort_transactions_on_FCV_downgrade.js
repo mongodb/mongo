@@ -1,11 +1,11 @@
-// Test that open unprepared transactions are aborted on FCV downgrade.
+// Test that open transactions are aborted on FCV downgrade.
 // @tags: [uses_transactions]
 (function() {
     "use strict";
     load("jstests/libs/feature_compatibility_version.js");
 
     const dbName = "test";
-    const collName = "abort_unprepared_transactions_on_FCV_downgrade";
+    const collName = "abort_transactions_on_FCV_downgrade";
     const testDB = db.getSiblingDB(dbName);
     const adminDB = db.getSiblingDB("admin");
     testDB[collName].drop({writeConcern: {w: "majority"}});

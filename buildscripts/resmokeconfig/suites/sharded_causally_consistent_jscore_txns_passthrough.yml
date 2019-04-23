@@ -12,7 +12,7 @@ selector:
   - jstests/core/txns/transactions_profiling_with_drops.js
 
   # No featureCompatibilityVersion parameter on mongos.
-  - jstests/core/txns/abort_unprepared_transactions_on_FCV_downgrade.js
+  - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
 
   # Mongos doesn't upconvert from local or majority level readConcern to snapshot.
   - jstests/core/txns/upconvert_read_concern.js
