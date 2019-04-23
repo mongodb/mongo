@@ -35,10 +35,8 @@ function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
     b_conn.setSlaveOk();
     var A = a_conn.getDB("test");
     var B = b_conn.getDB("test");
-    var AID = replTest.getNodeId(a_conn);
-    var BID = replTest.getNodeId(b_conn);
-    var Apath = MongoRunner.dataDir + "/" + testName + "-0/";
-    var Bpath = MongoRunner.dataDir + "/" + testName + "-1/";
+    var Apath = replTest.getDbPath(a_conn) + '/';
+    var Bpath = replTest.getDbPath(b_conn) + '/';
     assert(master == conns[0], "conns[0] assumed to be master");
     assert(a_conn.host == master.host);
 
@@ -50,12 +48,14 @@ function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
 
     var options = {writeConcern: {w: 2, wtimeout: replTest.kDefaultTimeoutMS}, upsert: true};
     assert.writeOK(A.foo.update({key: 'value1'}, {$set: {req: 'req'}}, options));
+    var AID = replTest.getNodeId(a_conn);
     replTest.stop(AID);
 
     master = replTest.getPrimary();
     assert(b_conn.host == master.host);
     options = {writeConcern: {w: 1, wtimeout: replTest.kDefaultTimeoutMS}, upsert: true};
     assert.writeOK(B.foo.update({key: 'value1'}, {$set: {res: 'res'}}, options));
+    var BID = replTest.getNodeId(b_conn);
     replTest.stop(BID);
     replTest.restart(AID);
     master = replTest.getPrimary();
@@ -84,7 +84,7 @@ function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
 
     // check here for rollback files
     var rollbackDir = Bpath + "rollback/";
-    assert.eq(pathExists(rollbackDir), shouldCreateRollbackFiles);
+    assert.eq(pathExists(rollbackDir), shouldCreateRollbackFiles, rollbackDir);
 
     // Verify data consistency between nodes.
     replTest.checkReplicatedDataHashes();

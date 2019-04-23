@@ -463,6 +463,13 @@ var ReplSetTest = function(opts) {
         return this.ports[n];
     };
 
+    this.getDbPath = function(node) {
+        // Get a replica set node (check for use of bridge).
+        const n = this.getNodeId(node);
+        const replNode = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
+        return replNode.dbpath;
+    };
+
     this._addPath = function(p) {
         if (!_alldbpaths)
             _alldbpaths = [p];
