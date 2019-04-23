@@ -80,6 +80,39 @@ void _appendUserInfo(const CurOp& c, BSONObjBuilder& builder, AuthorizationSessi
     builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getFullName());
 }
 
+/**
+ * When in scope, closes any active storage transactions and enforces prepare conflicts for reads.
+ *
+ * Locks must be held while this is in scope because both constructor and destructor access the
+ * storage engine.
+ */
+class EnforcePrepareConflictsBlock {
+public:
+    explicit EnforcePrepareConflictsBlock(OperationContext* opCtx)
+        : _opCtx(opCtx), _originalValue(opCtx->recoveryUnit()->getIgnorePrepared()) {
+        dassert(_opCtx->lockState()->isLocked());
+        dassert(!_opCtx->lockState()->inAWriteUnitOfWork());
+
+        // It is illegal to call setIgnorePrepared() while any storage transaction is active. This
+        // call is also harmless because any previous reads or writes should have already completed,
+        // as profile() is called at the end of an operation.
+        _opCtx->recoveryUnit()->abandonSnapshot();
+        _opCtx->recoveryUnit()->setIgnorePrepared(false);
+    }
+
+    ~EnforcePrepareConflictsBlock() {
+        dassert(_opCtx->lockState()->isLocked());
+        dassert(!_opCtx->lockState()->inAWriteUnitOfWork());
+
+        _opCtx->recoveryUnit()->abandonSnapshot();
+        _opCtx->recoveryUnit()->setIgnorePrepared(_originalValue);
+    }
+
+private:
+    OperationContext* _opCtx;
+    bool _originalValue;
+};
+
 }  // namespace
 
 
@@ -154,6 +187,10 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             }
 
             Lock::CollectionLock collLock(opCtx, db->getProfilingNS(), MODE_IX);
+
+            // The profiler performs writes even after read commands. Ignoring prepare conflicts is
+            // not allowed while performing writes, so temporarily enforce prepare conflicts.
+            EnforcePrepareConflictsBlock enforcePrepare(opCtx);
 
             Collection* const coll = db->getCollection(opCtx, db->getProfilingNS());
             if (coll) {
