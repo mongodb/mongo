@@ -29,6 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/date_time/gregorian/gregorian_types.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/optional.hpp>
 #include <vector>
 
@@ -51,6 +54,12 @@ namespace {
 using executor::RemoteCommandRequest;
 using std::vector;
 using unittest::assertGet;
+
+boost::gregorian::date currentDate() {
+    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+    return now.date();
+}
+
 
 BSONObj getReplSecondaryOkMetadata() {
     BSONObjBuilder o;

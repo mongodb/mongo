@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/optional.hpp>
 #include <cstdint>
 

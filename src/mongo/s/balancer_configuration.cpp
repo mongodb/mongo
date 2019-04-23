@@ -34,6 +34,9 @@
 #include "mongo/s/balancer_configuration.h"
 
 #include <algorithm>
+#include <boost/date_time/gregorian/gregorian_types.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -46,6 +49,25 @@
 
 namespace mongo {
 namespace {
+
+// parses time of day in "hh:mm" format assuming 'hh' is 00-23
+bool toPointInTime(const std::string& str, boost::posix_time::ptime* timeOfDay) {
+    int hh = 0;
+    int mm = 0;
+    if (2 != sscanf(str.c_str(), "%d:%d", &hh, &mm)) {
+        return false;
+    }
+
+    // verify that time is well formed
+    if ((hh / 24) || (mm / 60)) {
+        return false;
+    }
+
+    boost::posix_time::ptime res(boost::posix_time::second_clock::local_time().date(),
+                                 boost::posix_time::hours(hh) + boost::posix_time::minutes(mm));
+    *timeOfDay = res;
+    return true;
+}
 
 const char kValue[] = "value";
 const char kEnabled[] = "enabled";

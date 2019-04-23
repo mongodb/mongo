@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/date_time/gregorian/gregorian_types.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <ctime>
 #include <iosfwd>
 #include <limits>
@@ -320,11 +318,6 @@ void outputDateAsISOStringLocal(std::ostream& os, Date_t date);
  * Like dateToCtimeString, except outputs to a std::ostream.
  */
 void outputDateAsCtime(std::ostream& os, Date_t date);
-
-boost::gregorian::date currentDate();
-
-// parses time of day in "hh:mm" format assuming 'hh' is 00-23
-bool toPointInTime(const std::string& str, boost::posix_time::ptime* timeOfDay);
 
 void sleepsecs(int s);
 void sleepmillis(long long ms);
