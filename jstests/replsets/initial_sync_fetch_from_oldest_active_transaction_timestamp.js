@@ -44,8 +44,9 @@
 
     jsTestLog("Preparing a transaction that will later be the oldest active transaction");
 
-    // Prepare a transaction so that there is an active transaction with an oplog entry. The prepare
-    // timestamp will become the beginFetchingTimestamp during initial sync.
+    // Prepare a transaction so that there is an active transaction with an oplog entry. The
+    // timestamp of the first oplog entry of this transaction will become the beginFetchingTimestamp
+    // during initial sync.
     const session2 = primary.startSession({causalConsistency: false});
     const sessionDB2 = session2.getDatabase(dbName);
     const sessionColl2 = sessionDB2.getCollection(collName);
@@ -53,7 +54,12 @@
     assert.commandWorked(sessionColl2.insert({_id: 3}));
     const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
 
-    jsTestLog("beginFetchingTimestamp: " + prepareTimestamp2);
+    const oplog = primary.getDB("local").getCollection("oplog.rs");
+    const txnNum = session2.getTxnNumber_forTesting();
+    const op = oplog.findOne({"txnNumber": txnNum, "lsid.id": session2.getSessionId().id});
+    assert.neq(op, null);
+    const beginFetchingTs = op.ts;
+    jsTestLog("Expected beginFetchingTimestamp: " + beginFetchingTs);
 
     // Commit the first transaction so that we have an operation that is fetched during initial sync
     // but should not be applied. If this is applied, initial sync will fail because while trying to
@@ -118,15 +124,13 @@
 
     jsTestLog("Initial sync completed");
 
-    // Make sure the secondary has the prepare transaction oplog entry of the active transaction.
+    // Make sure the secondary fetched enough transaction oplog entries.
     secondary.setSlaveOk();
-    const localDB = secondary.getDB("local");
-    const oplog = localDB.getCollection("oplog.rs");
-    let res = oplog.find({"prepare": true});
-    assert.eq(res.count(), 1, res);
+    const secondaryOplog = secondary.getDB("local").getCollection("oplog.rs");
+    assert.eq(secondaryOplog.find({"ts": beginFetchingTs}).itcount(), 1);
 
     // Make sure the first transaction committed properly and is reflected after the initial sync.
-    res = secondary.getDB(dbName).getCollection(collName).findOne({_id: 2});
+    let res = secondary.getDB(dbName).getCollection(collName).findOne({_id: 2});
     assert.docEq(res, {_id: 2}, res);
 
     // TODO SERVER-36492: Step up the secondary, make sure that we get the prepare conflicts and

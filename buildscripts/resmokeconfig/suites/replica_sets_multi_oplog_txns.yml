@@ -4,8 +4,6 @@ selector:
   roots:
   - jstests/replsets/*.js
   exclude_files:
-  # Unblacklist these tests when initial sync is supported for large transactions.
-  - jstests/replsets/*initial_sync*.js
   # Unblacklist these tests when fastcount is fixed (SERVER-40566)
   - jstests/replsets/rollback_aborted_prepared_transaction.js
   - jstests/replsets/recover_prepared_transaction_state.js

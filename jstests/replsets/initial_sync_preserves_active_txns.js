@@ -36,17 +36,24 @@
     assert.commandWorked(session.getDatabase("test").test.insert({myTransaction: 1}));
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
     const txnEntry = primary.getDB("config").transactions.findOne();
-    assert.eq(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
+
+    // Make sure that the timestamp of the first oplog entry for this transaction matches the
+    // start timestamp in the transactions table.
+    let oplog = primary.getDB("local").getCollection("oplog.rs");
+    const txnNum = session.getTxnNumber_forTesting();
+    const op = oplog.findOne({"txnNumber": txnNum, "lsid.id": session.getSessionId().id});
+    assert.neq(op, null);
+    const firstTxnOpTs = op.ts;
+    assert.eq(txnEntry.startOpTime.ts, firstTxnOpTs, tojson(txnEntry));
 
     jsTestLog("Insert documents until oplog exceeds oplogSize");
 
     // Oplog with prepared txn grows indefinitely - let it reach twice its supposed max size.
     PrepareHelpers.growOplogPastMaxSize(replSet);
 
-    jsTestLog("Find prepare oplog entry");
+    jsTestLog("Make sure the transaction's first entry is still in the oplog");
 
-    const oplogEntry = primaryOplog.findOne({prepare: true});
-    assert.eq(oplogEntry.ts, prepareTimestamp, tojson(oplogEntry));
+    assert.eq(primaryOplog.find({ts: firstTxnOpTs}).itcount(), 1);
 
     jsTestLog("Add a secondary node");
 
@@ -62,8 +69,7 @@
     // Oplog grew past maxSize, and it includes the oldest active transaction's entry.
     const secondaryOplog = secondary.getDB("local").oplog.rs;
     assert.gt(secondaryOplog.dataSize(), PrepareHelpers.oplogSizeBytes);
-    const secondaryOplogEntry = secondaryOplog.findOne({prepare: true});
-    assert.eq(secondaryOplogEntry.ts, prepareTimestamp, tojson(secondaryOplogEntry));
+    assert.eq(secondaryOplog.find({ts: firstTxnOpTs}).itcount(), 1);
 
     const secondaryTxnEntry = secondary.getDB("config").transactions.findOne();
     assert.eq(secondaryTxnEntry, txnEntry, tojson(secondaryTxnEntry));
