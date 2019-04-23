@@ -87,6 +87,21 @@ template <typename T>
 inline constexpr bool isFutureLike<SharedSemiFuture<T>> = true;
 
 template <typename T>
+struct UnstatusTypeImpl {
+    using type = T;
+};
+template <typename T>
+struct UnstatusTypeImpl<StatusWith<T>> {
+    using type = T;
+};
+template <>
+struct UnstatusTypeImpl<Status> {
+    using type = void;
+};
+template <typename T>
+using UnstatusType = typename UnstatusTypeImpl<T>::type;
+
+template <typename T>
 struct UnwrappedTypeImpl {
     static_assert(!isFutureLike<T>);
     static_assert(!isStatusOrStatusWith<T>);
@@ -126,33 +141,28 @@ using UnwrappedType = typename UnwrappedTypeImpl<T>::type;
 template <typename T>
 struct FutureContinuationKindImpl {
     static_assert(!isFutureLike<T>);
-    template <typename U>
-    using type = Future<U>;
+    using type = Future<T>;
 };
 template <typename T>
 struct FutureContinuationKindImpl<Future<T>> {
-    template <typename U>
-    using type = Future<U>;
+    using type = Future<T>;
 };
 template <typename T>
 struct FutureContinuationKindImpl<SemiFuture<T>> {
-    template <typename U>
-    using type = SemiFuture<U>;
+    using type = SemiFuture<T>;
 };
 template <typename T>
 struct FutureContinuationKindImpl<ExecutorFuture<T>> {
     // Weird but right. ExecutorFuture needs to know the executor prior to running the continuation,
     // and in this case it doesn't.
-    template <typename U>
-    using type = SemiFuture<U>;
+    using type = SemiFuture<T>;
 };
 template <typename T>
 struct FutureContinuationKindImpl<SharedSemiFuture<T>> {
-    template <typename U>
-    using type = SemiFuture<U>;  // It will generate a child continuation.
+    using type = SemiFuture<T>;  // It will generate a child continuation.
 };
-template <typename T, typename U>
-using FutureContinuationKind = typename FutureContinuationKindImpl<T>::template type<U>;
+template <typename T>
+using FutureContinuationKind = typename FutureContinuationKindImpl<T>::type;
 
 template <typename T>
 struct AddRefUnlessVoidImpl {
@@ -178,20 +188,6 @@ using VoidToFakeVoid = std::conditional_t<std::is_void_v<T>, FakeVoid, T>;
 template <typename T>
 using FakeVoidToVoid = std::conditional_t<std::is_same_v<T, FakeVoid>, void, T>;
 
-// call(func, FakeVoid) -> func(Status::OK())
-// This simulates the implicit Status/T overloading you get by taking a StatusWith<T> that doesn't
-// work for Status/void and Status.
-// TODO replace this dispatch with constexpr if in c++17
-template <typename Func>
-inline auto callVoidOrStatus(Func&& func, std::true_type useStatus) {
-    return func(Status::OK());
-}
-
-template <typename Func>
-inline auto callVoidOrStatus(Func&& func, std::false_type useStatus) {
-    return func();
-}
-
 /**
  * call() normalizes arguments to hide the FakeVoid shenanigans from users of Futures.
  * In the future it may also expand tuples to argument lists.
@@ -202,16 +198,8 @@ inline auto call(Func&& func, Arg&& arg) {
 }
 
 template <typename Func>
-inline auto call(Func&& func) {
-    return func();
-}
-
-template <typename Func>
 inline auto call(Func&& func, FakeVoid) {
-    auto useStatus = std::integral_constant<bool,
-                                            (!stdx::is_invocable<Func>() &&
-                                             stdx::is_invocable<Func, Status>())>();
-    return callVoidOrStatus(func, useStatus);
+    return func();
 }
 
 template <typename Func>
@@ -223,48 +211,27 @@ inline auto call(Func&& func, StatusWith<FakeVoid> sw) {
  * statusCall() normalizes return values so everything returns StatusWith<T>. Exceptions are
  * converted to !OK statuses. void and Status returns are converted to StatusWith<FakeVoid>
  */
-template <
-    typename Func,
-    typename... Args,
-    typename RawResult = decltype(call(std::declval<Func>(), std::declval<Args>()...)),
-    typename = std::enable_if_t<!std::is_void<RawResult>::value &&
-                                !std::is_same<RawResult, Status>::value>,
-    typename Result = std::conditional_t<isStatusWith<RawResult>, RawResult, StatusWith<RawResult>>>
-inline Result statusCall(Func&& func, Args&&... args) noexcept {
+template <typename Func, typename... Args>
+inline auto statusCall(Func&& func, Args&&... args) noexcept {
+    using RawResult = decltype(call(func, std::forward<Args>(args)...));
+    using Result = StatusWith<VoidToFakeVoid<UnstatusType<RawResult>>>;
     try {
-        return call(func, std::forward<Args>(args)...);
+        IF_CONSTEXPR(std::is_void_v<RawResult>) {
+            call(func, std::forward<Args>(args)...);
+            return Result(FakeVoid());
+        }
+        else IF_CONSTEXPR(std::is_same_v<RawResult, Status>) {
+            auto s = call(func, std::forward<Args>(args)...);
+            if (!s.isOK()) {
+                return Result(std::move(s));
+            }
+            return Result(FakeVoid());
+        }
+        else {
+            return Result(call(func, std::forward<Args>(args)...));
+        }
     } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-}
-
-template <typename Func,
-          typename... Args,
-          typename RawResult = decltype(call(std::declval<Func>(), std::declval<Args>()...)),
-          typename = std::enable_if_t<std::is_void<RawResult>::value>>
-inline StatusWith<FakeVoid> statusCall(Func&& func, Args&&... args) noexcept {
-    try {
-        call(func, std::forward<Args>(args)...);
-        return FakeVoid{};
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-}
-
-template <typename Func,
-          typename... Args,
-          typename RawResult = decltype(call(std::declval<Func>(), std::declval<Args>()...)),
-          typename = std::enable_if_t<std::is_same<RawResult, Status>::value>,
-          typename = void,
-          typename = void>
-inline StatusWith<FakeVoid> statusCall(Func&& func, Args&&... args) noexcept {
-    try {
-        auto status = call(func, std::forward<Args>(args)...);
-        if (status.isOK())
-            return FakeVoid{};
-        return std::move(status);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+        return Result(ex.toStatus());
     }
 }
 
@@ -275,53 +242,28 @@ inline StatusWith<FakeVoid> statusCall(Func&& func, Args&&... args) noexcept {
  * This is equivalent to uassertStatusOK(statusCall(func, args...)), but avoids catching just to
  * rethrow.
  */
-template <
-    typename Func,
-    typename... Args,
-    typename Result = decltype(call(std::declval<Func>(), std::declval<Args>()...)),
-    typename = std::enable_if_t<!std::is_void<Result>::value && !isStatusOrStatusWith<Result>>>
-inline Result throwingCall(Func&& func, Args&&... args) {
-    return call(func, std::forward<Args>(args)...);
-}
-
-template <typename Func,
-          typename... Args,
-          typename Result = decltype(call(std::declval<Func>(), std::declval<Args>()...)),
-          typename = std::enable_if_t<std::is_void<Result>::value>>
-inline FakeVoid throwingCall(Func&& func, Args&&... args) {
-    call(func, std::forward<Args>(args)...);
-    return FakeVoid{};
-}
-
-template <typename Func,
-          typename... Args,
-          typename Result = decltype(call(std::declval<Func>(), std::declval<Args>()...)),
-          typename = std::enable_if_t<std::is_same<Result, Status>::value>,
-          typename = void>
-inline FakeVoid throwingCall(Func&& func, Args&&... args) {
-    uassertStatusOK(call(func, std::forward<Args>(args)...));
-    return FakeVoid{};
-}
-
-template <typename Func,
-          typename... Args,
-          typename StatusWithResult = decltype(call(std::declval<Func>(), std::declval<Args>()...)),
-          typename = std::enable_if_t<isStatusWith<StatusWithResult>>,
-          typename = void,
-          typename = void>
-inline typename StatusWithResult::value_type throwingCall(Func&& func, Args&&... args) noexcept {
-    return uassertStatusOK(call(func, std::forward<Args>(args)...));
+template <typename Func, typename... Args>
+inline auto throwingCall(Func&& func, Args&&... args) {
+    using Result = decltype(call(func, std::forward<Args>(args)...));
+    IF_CONSTEXPR(std::is_void_v<Result>) {
+        call(func, std::forward<Args>(args)...);
+        return FakeVoid{};
+    }
+    else IF_CONSTEXPR(std::is_same_v<Result, Status>) {
+        uassertStatusOK(call(func, std::forward<Args>(args)...));
+        return FakeVoid{};
+    }
+    else IF_CONSTEXPR(isStatusWith<Result>) {
+        return uassertStatusOK(call(func, std::forward<Args>(args)...));
+    }
+    else {
+        return call(func, std::forward<Args>(args)...);
+    }
 }
 
 template <typename Func, typename... Args>
-using RawNormalizedCallResult =
-    decltype(throwingCall(std::declval<Func>(), std::declval<VoidToFakeVoid<Args>>()...));
-
-template <typename Func, typename... Args>
-using NormalizedCallResult =
-    std::conditional_t<std::is_same<RawNormalizedCallResult<Func, Args...>, FakeVoid>::value,
-                       void,
-                       RawNormalizedCallResult<Func, Args...>>;
+using NormalizedCallResult = FakeVoidToVoid<
+    UnstatusType<decltype(call(std::declval<Func>(), std::declval<VoidToFakeVoid<Args>>()...))>>;
 
 template <typename T>
 struct SharedStateImpl;
@@ -865,230 +807,215 @@ public:
 
         return generalImpl(
             // on ready success:
-            [&](T&& val) { call(func, std::move(val)); },
+            [&](T&& val) { call(func, StatusWith<T>(std::move(val))); },
             // on ready failure:
-            [&](Status&& status) { call(func, std::move(status)); },
+            [&](Status&& status) { call(func, StatusWith<T>(std::move(status))); },
             // on not ready yet:
             [&] {
                 _shared->callback = [func = std::forward<Func>(func)](SharedStateBase *
                                                                       ssb) mutable noexcept {
                     const auto input = checked_cast<SharedState<T>*>(ssb);
                     if (input->status.isOK()) {
-                        call(func, std::move(*input->data));
+                        call(func, StatusWith<T>(std::move(*input->data)));
                     } else {
-                        call(func, std::move(input->status));
+                        call(func, StatusWith<T>(std::move(input->status)));
                     }
                 };
             });
     }
 
-    template <typename Func,
-              typename Result = NormalizedCallResult<Func, T>,
-              typename = std::enable_if_t<!isFutureLike<Result>>>
-        FutureImpl<Result> then(Func&& func) && noexcept {
-        return generalImpl(
-            // on ready success:
-            [&](T&& val) {
-                return FutureImpl<Result>::makeReady(statusCall(func, std::move(val)));
-            },
-            // on ready failure:
-            [&](Status&& status) { return FutureImpl<Result>::makeReady(std::move(status)); },
-            // on not ready yet:
-            [&] {
-                return makeContinuation<Result>([func = std::forward<Func>(func)](
-                    SharedState<T> * input, SharedState<Result> * output) mutable noexcept {
-                    if (!input->status.isOK())
-                        return output->setError(std::move(input->status));
+    template <typename Func>
+        auto then(Func&& func) && noexcept {
+        using Result = NormalizedCallResult<Func, T>;
+        IF_CONSTEXPR(!isFutureLike<Result>) {
+            return generalImpl(
+                // on ready success:
+                [&](T&& val) {
+                    return FutureImpl<Result>::makeReady(statusCall(func, std::move(val)));
+                },
+                // on ready failure:
+                [&](Status&& status) { return FutureImpl<Result>::makeReady(std::move(status)); },
+                // on not ready yet:
+                [&] {
+                    return makeContinuation<Result>([func = std::forward<Func>(func)](
+                        SharedState<T> * input, SharedState<Result> * output) mutable noexcept {
+                        if (!input->status.isOK())
+                            return output->setError(std::move(input->status));
 
-                    output->setFromStatusWith(statusCall(func, std::move(*input->data)));
+                        output->setFromStatusWith(statusCall(func, std::move(*input->data)));
+                    });
                 });
-            });
-    }
-
-    template <typename Func,
-              typename RawResult = NormalizedCallResult<Func, T>,
-              typename = std::enable_if_t<isFutureLike<RawResult>>,
-              typename UnwrappedResult = typename RawResult::value_type>
-        FutureImpl<UnwrappedResult> then(Func&& func) && noexcept {
-        return generalImpl(
-            // on ready success:
-            [&](T&& val) {
-                try {
-                    return FutureImpl<UnwrappedResult>(throwingCall(func, std::move(val)));
-                } catch (const DBException& ex) {
-                    return FutureImpl<UnwrappedResult>::makeReady(ex.toStatus());
-                }
-            },
-            // on ready failure:
-            [&](Status&& status) {
-                return FutureImpl<UnwrappedResult>::makeReady(std::move(status));
-            },
-            // on not ready yet:
-            [&] {
-                return makeContinuation<UnwrappedResult>([func = std::forward<Func>(func)](
-                    SharedState<T> * input,
-                    SharedState<UnwrappedResult> * output) mutable noexcept {
-                    if (!input->status.isOK())
-                        return output->setError(std::move(input->status));
-
+        }
+        else {
+            using UnwrappedResult = typename Result::value_type;
+            return generalImpl(
+                // on ready success:
+                [&](T&& val) {
                     try {
-                        throwingCall(func, std::move(*input->data)).propagateResultTo(output);
+                        return FutureImpl<UnwrappedResult>(throwingCall(func, std::move(val)));
                     } catch (const DBException& ex) {
-                        output->setError(ex.toStatus());
+                        return FutureImpl<UnwrappedResult>::makeReady(ex.toStatus());
                     }
-                });
-            });
-    }
+                },
+                // on ready failure:
+                [&](Status&& status) {
+                    return FutureImpl<UnwrappedResult>::makeReady(std::move(status));
+                },
+                // on not ready yet:
+                [&] {
+                    return makeContinuation<UnwrappedResult>([func = std::forward<Func>(func)](
+                        SharedState<T> * input,
+                        SharedState<UnwrappedResult> * output) mutable noexcept {
+                        if (!input->status.isOK())
+                            return output->setError(std::move(input->status));
 
-    template <typename Func,
-              typename Result = NormalizedCallResult<Func, StatusOrStatusWith<T>>,
-              typename = std::enable_if_t<!isFutureLike<Result>>>
-        FutureImpl<Result> onCompletion(Func&& func) && noexcept {
-        using Wrapper = StatusOrStatusWith<T>;
-
-        return generalImpl(
-            // on ready success:
-            [&](T&& val) {
-                return FutureImpl<Result>::makeReady(
-                    statusCall(std::forward<Func>(func), Wrapper(std::move(val))));
-            },
-            // on ready failure:
-            [&](Status&& status) {
-                return FutureImpl<Result>::makeReady(
-                    statusCall(std::forward<Func>(func), Wrapper(std::move(status))));
-            },
-            // on not ready yet:
-            [&] {
-                return makeContinuation<Result>([func = std::forward<Func>(func)](
-                    SharedState<T> * input, SharedState<Result> * output) mutable noexcept {
-                    if (!input->status.isOK())
-                        return output->setFromStatusWith(
-                            statusCall(func, Wrapper(std::move(input->status))));
-
-                    output->setFromStatusWith(statusCall(func, Wrapper(std::move(*input->data))));
-                });
-            });
-    }
-
-    template <typename Func,
-              typename RawResult = NormalizedCallResult<Func, StatusOrStatusWith<T>>,
-              typename = std::enable_if_t<isFutureLike<RawResult>>,
-              typename UnwrappedResult = typename RawResult::value_type>
-        FutureImpl<UnwrappedResult> onCompletion(Func&& func) && noexcept {
-        using Wrapper = StatusOrStatusWith<T>;
-        return generalImpl(
-            // on ready success:
-            [&](T&& val) {
-                try {
-                    return FutureImpl<UnwrappedResult>(
-                        throwingCall(std::forward<Func>(func), Wrapper(std::move(val))));
-                } catch (const DBException& ex) {
-                    return FutureImpl<UnwrappedResult>::makeReady(ex.toStatus());
-                }
-            },
-            // on ready failure:
-            [&](Status&& status) {
-                try {
-                    return FutureImpl<UnwrappedResult>(
-                        throwingCall(std::forward<Func>(func), Wrapper(std::move(status))));
-                } catch (const DBException& ex) {
-                    return FutureImpl<UnwrappedResult>::makeReady(ex.toStatus());
-                }
-            },
-            // on not ready yet:
-            [&] {
-                return makeContinuation<UnwrappedResult>([func = std::forward<Func>(func)](
-                    SharedState<T> * input,
-                    SharedState<UnwrappedResult> * output) mutable noexcept {
-                    if (!input->status.isOK()) {
                         try {
-                            throwingCall(func, Wrapper(std::move(input->status)))
+                            throwingCall(func, std::move(*input->data)).propagateResultTo(output);
+                        } catch (const DBException& ex) {
+                            output->setError(ex.toStatus());
+                        }
+                    });
+                });
+        }
+    }
+
+    template <typename Func>
+        auto onCompletion(Func&& func) && noexcept {
+        using Wrapper = StatusOrStatusWith<T>;
+        using Result = NormalizedCallResult<Func, StatusOrStatusWith<T>>;
+        IF_CONSTEXPR(!isFutureLike<Result>) {
+            return generalImpl(
+                // on ready success:
+                [&](T&& val) {
+                    return FutureImpl<Result>::makeReady(
+                        statusCall(std::forward<Func>(func), Wrapper(std::move(val))));
+                },
+                // on ready failure:
+                [&](Status&& status) {
+                    return FutureImpl<Result>::makeReady(
+                        statusCall(std::forward<Func>(func), Wrapper(std::move(status))));
+                },
+                // on not ready yet:
+                [&] {
+                    return makeContinuation<Result>([func = std::forward<Func>(func)](
+                        SharedState<T> * input, SharedState<Result> * output) mutable noexcept {
+                        if (!input->status.isOK())
+                            return output->setFromStatusWith(
+                                statusCall(func, Wrapper(std::move(input->status))));
+
+                        output->setFromStatusWith(
+                            statusCall(func, Wrapper(std::move(*input->data))));
+                    });
+                });
+        }
+        else {
+            using UnwrappedResult = typename Result::value_type;
+            return generalImpl(
+                // on ready success:
+                [&](T&& val) {
+                    try {
+                        return FutureImpl<UnwrappedResult>(
+                            throwingCall(std::forward<Func>(func), Wrapper(std::move(val))));
+                    } catch (const DBException& ex) {
+                        return FutureImpl<UnwrappedResult>::makeReady(ex.toStatus());
+                    }
+                },
+                // on ready failure:
+                [&](Status&& status) {
+                    try {
+                        return FutureImpl<UnwrappedResult>(
+                            throwingCall(std::forward<Func>(func), Wrapper(std::move(status))));
+                    } catch (const DBException& ex) {
+                        return FutureImpl<UnwrappedResult>::makeReady(ex.toStatus());
+                    }
+                },
+                // on not ready yet:
+                [&] {
+                    return makeContinuation<UnwrappedResult>([func = std::forward<Func>(func)](
+                        SharedState<T> * input,
+                        SharedState<UnwrappedResult> * output) mutable noexcept {
+                        if (!input->status.isOK()) {
+                            try {
+                                throwingCall(func, Wrapper(std::move(input->status)))
+                                    .propagateResultTo(output);
+                            } catch (const DBException& ex) {
+                                output->setError(ex.toStatus());
+                            }
+
+                            return;
+                        }
+
+                        try {
+                            throwingCall(func, Wrapper(std::move(*input->data)))
                                 .propagateResultTo(output);
                         } catch (const DBException& ex) {
                             output->setError(ex.toStatus());
                         }
-
-                        return;
-                    }
-
-                    try {
-                        throwingCall(func, Wrapper(std::move(*input->data)))
-                            .propagateResultTo(output);
-                    } catch (const DBException& ex) {
-                        output->setError(ex.toStatus());
-                    }
+                    });
                 });
-            });
+        }
     }
 
-    template <typename Func,
-              typename Result = RawNormalizedCallResult<Func, Status>,
-              typename = std::enable_if_t<!isFutureLike<Result>>>
+    template <typename Func>
         FutureImpl<FakeVoidToVoid<T>> onError(Func&& func) && noexcept {
+        using Result = NormalizedCallResult<Func, Status>;
         static_assert(
-            std::is_same<Result, T>::value,
+            std::is_same<VoidToFakeVoid<UnwrappedType<Result>>, T>::value,
             "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
 
-        return generalImpl(
-            // on ready success:
-            [&](T&& val) { return FutureImpl<T>::makeReady(std::move(val)); },
-            // on ready failure:
-            [&](Status&& status) {
-                return FutureImpl<T>::makeReady(statusCall(func, std::move(status)));
-            },
-            // on not ready yet:
-            [&] {
-                return makeContinuation<T>([func = std::forward<Func>(func)](
-                    SharedState<T> * input, SharedState<T> * output) mutable noexcept {
-                    if (input->status.isOK())
-                        return output->emplaceValue(std::move(*input->data));
+        IF_CONSTEXPR(!isFutureLike<Result>) {
+            return generalImpl(
+                // on ready success:
+                [&](T&& val) { return FutureImpl<T>::makeReady(std::move(val)); },
+                // on ready failure:
+                [&](Status&& status) {
+                    return FutureImpl<T>::makeReady(statusCall(func, std::move(status)));
+                },
+                // on not ready yet:
+                [&] {
+                    return makeContinuation<T>([func = std::forward<Func>(func)](
+                        SharedState<T> * input, SharedState<T> * output) mutable noexcept {
+                        if (input->status.isOK())
+                            return output->emplaceValue(std::move(*input->data));
 
-                    output->setFromStatusWith(statusCall(func, std::move(input->status)));
+                        output->setFromStatusWith(statusCall(func, std::move(input->status)));
+                    });
                 });
-            });
-    }
-
-    template <typename Func,
-              typename Result = RawNormalizedCallResult<Func, Status>,
-              typename = std::enable_if_t<isFutureLike<Result>>,
-              typename = void>
-        FutureImpl<FakeVoidToVoid<T>> onError(Func&& func) && noexcept {
-        static_assert(
-            std::is_same_v<VoidToFakeVoid<UnwrappedType<Result>>, T>,
-            "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
-
-        return generalImpl(
-            // on ready success:
-            [&](T&& val) { return FutureImpl<T>::makeReady(std::move(val)); },
-            // on ready failure:
-            [&](Status&& status) {
-                try {
-                    return FutureImpl<T>(throwingCall(func, std::move(status)));
-                } catch (const DBException& ex) {
-                    return FutureImpl<T>::makeReady(ex.toStatus());
-                }
-            },
-            // on not ready yet:
-            [&] {
-                return makeContinuation<T>([func = std::forward<Func>(func)](
-                    SharedState<T> * input, SharedState<T> * output) mutable noexcept {
-                    if (input->status.isOK())
-                        return output->emplaceValue(std::move(*input->data));
-
+        }
+        else {
+            return generalImpl(
+                // on ready success:
+                [&](T&& val) { return FutureImpl<T>::makeReady(std::move(val)); },
+                // on ready failure:
+                [&](Status&& status) {
                     try {
-                        throwingCall(func, std::move(input->status)).propagateResultTo(output);
+                        return FutureImpl<T>(throwingCall(func, std::move(status)));
                     } catch (const DBException& ex) {
-                        output->setError(ex.toStatus());
+                        return FutureImpl<T>::makeReady(ex.toStatus());
                     }
+                },
+                // on not ready yet:
+                [&] {
+                    return makeContinuation<T>([func = std::forward<Func>(func)](
+                        SharedState<T> * input, SharedState<T> * output) mutable noexcept {
+                        if (input->status.isOK())
+                            return output->emplaceValue(std::move(*input->data));
+
+                        try {
+                            throwingCall(func, std::move(input->status)).propagateResultTo(output);
+                        } catch (const DBException& ex) {
+                            output->setError(ex.toStatus());
+                        }
+                    });
                 });
-            });
+        }
     }
 
     template <ErrorCodes::Error code, typename Func>
         FutureImpl<FakeVoidToVoid<T>> onError(Func&& func) && noexcept {
-        using Result = RawNormalizedCallResult<Func, Status>;
+        using Result = NormalizedCallResult<Func, Status>;
         static_assert(
-            std::is_same_v<VoidToFakeVoid<UnwrappedType<Result>>, T>,
+            std::is_same_v<UnwrappedType<Result>, FakeVoidToVoid<T>>,
             "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
 
         if (_immediate || (isReady() && _shared->status.isOK()))
@@ -1106,8 +1033,8 @@ public:
 
     template <ErrorCategory category, typename Func>
         FutureImpl<FakeVoidToVoid<T>> onErrorCategory(Func&& func) && noexcept {
-        using Result = RawNormalizedCallResult<Func, Status>;
-        static_assert(std::is_same_v<VoidToFakeVoid<UnwrappedType<Result>>, T>,
+        using Result = NormalizedCallResult<Func, Status>;
+        static_assert(std::is_same_v<UnwrappedType<Result>, FakeVoidToVoid<T>>,
                       "func passed to Future<T>::onErrorCategory must return T, StatusWith<T>, "
                       "or Future<T>");
 

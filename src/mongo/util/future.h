@@ -509,7 +509,7 @@ private:
     template <typename Func, typename Arg, typename U>
     static auto wrap(future_details::FutureImpl<U>&& impl) {
         using namespace future_details;
-        return FutureContinuationKind<NormalizedCallResult<Func, Arg>, U>(std::move(impl));
+        return FutureContinuationKind<NormalizedCallResult<Func, Arg>>(std::move(impl));
     }
 };
 
