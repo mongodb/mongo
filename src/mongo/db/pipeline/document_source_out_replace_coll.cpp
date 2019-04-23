@@ -131,6 +131,9 @@ void DocumentSourceOutReplaceColl::finalize() {
 
     pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(
         pExpCtx->opCtx, renameCommandObj, outputNs, _originalOutOptions, _originalIndexes);
+
+    // The rename succeeded, so the temp collection no longer exists.
+    _tempNs = {};
 };
 
 }  // namespace mongo
