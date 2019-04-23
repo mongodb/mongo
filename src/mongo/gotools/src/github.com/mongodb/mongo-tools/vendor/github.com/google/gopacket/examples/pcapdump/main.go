@@ -40,15 +40,15 @@ func main() {
 		// just call pcap.OpenLive if you want a simple handle.
 		inactive, err := pcap.NewInactiveHandle(*iface)
 		if err != nil {
-			log.Fatal("could not create: %v", err)
+			log.Fatalf("could not create: %v", err)
 		}
 		defer inactive.CleanUp()
 		if err = inactive.SetSnapLen(*snaplen); err != nil {
-			log.Fatal("could not set snap length: %v", err)
+			log.Fatalf("could not set snap length: %v", err)
 		} else if err = inactive.SetPromisc(*promisc); err != nil {
-			log.Fatal("could not set promisc mode: %v", err)
+			log.Fatalf("could not set promisc mode: %v", err)
 		} else if err = inactive.SetTimeout(time.Second); err != nil {
-			log.Fatal("could not set timeout: %v", err)
+			log.Fatalf("could not set timeout: %v", err)
 		}
 		if *tstype != "" {
 			if t, err := pcap.TimestampSourceFromString(*tstype); err != nil {
@@ -61,12 +61,12 @@ func main() {
 			log.Fatal("PCAP Activate error:", err)
 		}
 		defer handle.Close()
-		if len(flag.Args()) > 0 {
-			bpffilter := strings.Join(flag.Args(), " ")
-			fmt.Fprintf(os.Stderr, "Using BPF filter %q\n", bpffilter)
-			if err = handle.SetBPFFilter(bpffilter); err != nil {
-				log.Fatal("BPF filter error:", err)
-			}
+	}
+	if len(flag.Args()) > 0 {
+		bpffilter := strings.Join(flag.Args(), " ")
+		fmt.Fprintf(os.Stderr, "Using BPF filter %q\n", bpffilter)
+		if err = handle.SetBPFFilter(bpffilter); err != nil {
+			log.Fatal("BPF filter error:", err)
 		}
 	}
 	dumpcommand.Run(handle)

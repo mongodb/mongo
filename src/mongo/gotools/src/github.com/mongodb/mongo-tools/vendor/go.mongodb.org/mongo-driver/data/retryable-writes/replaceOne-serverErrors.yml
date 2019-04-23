@@ -1,0 +1,58 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+# TODO: this should change to 4.0 once 4.0.0 is released.
+minServerVersion: '3.99'
+
+tests:
+    -
+        description: "ReplaceOne succeeds after PrimarySteppedDown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["update"]
+                errorCode: 189
+        operation:
+            name: "replaceOne"
+            arguments:
+                filter: { _id: 1 }
+                replacement: { _id: 1, x: 111 }
+        outcome:
+            result:
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+            collection:
+                data:
+                    - { _id: 1, x: 111 }
+                    - { _id: 2, x: 22 }
+    -
+        description: "ReplaceOne succeeds after WriteConcernError ShutdownInProgress"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["update"]
+                writeConcernError:
+                    code: 91
+                    errmsg: Replication is being shut down
+        operation:
+            name: "replaceOne"
+            arguments:
+                filter: { _id: 1 }
+                replacement: { _id: 1, x: 111 }
+        outcome:
+            result:
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+            collection:
+                data:
+                    - { _id: 1, x: 111 }
+                    - { _id: 2, x: 22 }

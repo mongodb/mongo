@@ -1,0 +1,54 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+# TODO: this should change to 4.0 once 4.0.0 is released.
+minServerVersion: '3.99'
+
+tests:
+    -
+        description: "FindOneAndReplace succeeds after PrimarySteppedDown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["findAndModify"]
+                errorCode: 189
+        operation:
+            name: "findOneAndReplace"
+            arguments:
+                filter: { _id: 1 }
+                replacement: { _id: 1, x: 111 }
+                returnDocument: "Before"
+        outcome:
+            result: { _id: 1, x: 11 }
+            collection:
+                data:
+                    - { _id: 1, x: 111 }
+                    - { _id: 2, x: 22 }
+    -
+        description: "FindOneAndReplace succeeds after WriteConcernError ShutdownInProgress"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["findAndModify"]
+                writeConcernError:
+                    code: 91
+                    errmsg: Replication is being shut down
+        operation:
+            name: "findOneAndReplace"
+            arguments:
+                filter: { _id: 1 }
+                replacement: { _id: 1, x: 111 }
+                returnDocument: "Before"
+        outcome:
+            result: { _id: 1, x: 11 }
+            collection:
+                data:
+                    - { _id: 1, x: 111 }
+                    - { _id: 2, x: 22 }

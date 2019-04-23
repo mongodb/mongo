@@ -1,0 +1,5 @@
+uri: "mongodb+srv://10gen.cc/"
+seeds: []
+hosts: []
+error: true
+comment: Should fail because host in URI does not have {hostname}, {domainname} and {tld}.

@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mongodb/mongo-tools/common/text"
+	"github.com/mongodb/mongo-tools-common/text"
 	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
 )
 

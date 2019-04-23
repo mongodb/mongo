@@ -11,10 +11,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools-common/bsonutil"
+	"github.com/mongodb/mongo-tools-common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestExtendedJSON(t *testing.T) {
@@ -22,17 +23,17 @@ func TestExtendedJSON(t *testing.T) {
 
 	Convey("Serializing a doc to extended JSON should work", t, func() {
 		x := bson.M{
-			"_id": bson.NewObjectId(),
+			"_id": primitive.NewObjectID(),
 			"hey": "sup",
 			"subdoc": bson.M{
-				"subid": bson.NewObjectId(),
+				"subid": primitive.NewObjectID(),
 			},
 			"array": []interface{}{
-				bson.NewObjectId(),
-				bson.Undefined,
+				primitive.NewObjectID(),
+				primitive.Undefined{},
 			},
 		}
-		out, err := bsonutil.ConvertBSONValueToJSON(x)
+		out, err := bsonutil.ConvertBSONValueToLegacyExtJSON(x)
 		So(err, ShouldBeNil)
 
 		jsonEncoder := json.NewEncoder(os.Stdout)

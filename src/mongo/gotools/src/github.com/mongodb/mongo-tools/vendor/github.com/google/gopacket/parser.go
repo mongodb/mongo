@@ -116,7 +116,7 @@ func NewDecodingLayerParser(first LayerType, decoders ...DecodingLayer) *Decodin
 //      decodedLayers := make([]gopacket.LayerType, 0, 10)
 //      for {
 //        data, _, err := source.ReadPacketData()
-//        if err == nil {
+//        if err != nil {
 //          fmt.Println("Error reading packet data: ", err)
 //          continue
 //        }
@@ -158,6 +158,9 @@ func (l *DecodingLayerParser) DecodeLayers(data []byte, decoded *[]LayerType) (e
 	for len(data) > 0 {
 		decoder, ok := l.decoders[typ]
 		if !ok {
+			if l.IgnoreUnsupported {
+				return nil
+			}
 			return UnsupportedLayerType(typ)
 		} else if err = decoder.DecodeFromBytes(data, l.df); err != nil {
 			return err
@@ -195,4 +198,10 @@ type DecodingLayerParserOptions struct {
 	// callers.  IgnorePanic defaults to false, thus if the caller does
 	// nothing decode panics will be returned as errors.
 	IgnorePanic bool
+	// IgnoreUnsupported will stop parsing and return a nil error when it
+	// encounters a layer it doesn't have a parser for, instead of returning an
+	// UnsupportedLayerType error.  If this is true, it's up to the caller to make
+	// sure that all expected layers have been parsed (by checking the decoded
+	// slice).
+	IgnoreUnsupported bool
 }

@@ -1,0 +1,62 @@
+description: "Secondary with mismatched 'me' tells us who the primary is"
+
+uri: "mongodb://a/?replicaSet=rs"
+
+phases: [
+
+    # A is a secondary with mismatched "me". Remove A, add PossiblePrimary B.
+    {
+        responses: [
+            ["a:27017", {
+                ok: 1,
+                ismaster: false,
+                secondary: true,
+                me: "c:27017",
+                hosts: ["b:27017"],
+                setName: "rs",
+                primary: "b:27017",
+                minWireVersion: 0,
+                maxWireVersion: 6
+            }]
+        ],
+
+        outcome: {
+            servers: {
+                "b:27017": {
+                    type: "PossiblePrimary",
+                    setName:
+                }
+            },
+            topologyType: "ReplicaSetNoPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs",
+        }
+    },
+
+    # Discover B is primary.
+    {
+        responses: [
+            ["b:27017", {
+                ok: 1,
+                ismaster: true,
+                me: "b:27017",
+                hosts: ["b:27017"],
+                setName: "rs",
+                minWireVersion: 0,
+                maxWireVersion: 6
+            }]
+        ],
+
+        outcome: {
+            servers: {
+                "b:27017": {
+                    type: "RSPrimary",
+                    setName: "rs"
+                }
+            },
+            topologyType: "ReplicaSetWithPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs"
+        }
+    }
+]

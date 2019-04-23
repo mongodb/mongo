@@ -9,10 +9,12 @@ package layers
 
 import (
 	"encoding/binary"
-	"fmt"
+	"errors"
+
 	"github.com/google/gopacket"
 )
 
+// Potential values for ARP.Operation.
 const (
 	ARPRequest = 1
 	ARPReply   = 2
@@ -64,11 +66,11 @@ func (arp *ARP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeO
 	}
 	if opts.FixLengths {
 		if len(arp.SourceHwAddress) != len(arp.DstHwAddress) {
-			return fmt.Errorf("mismatched hardware address sizes")
+			return errors.New("mismatched hardware address sizes")
 		}
 		arp.HwAddressSize = uint8(len(arp.SourceHwAddress))
 		if len(arp.SourceProtAddress) != len(arp.DstProtAddress) {
-			return fmt.Errorf("mismatched prot address sizes")
+			return errors.New("mismatched prot address sizes")
 		}
 		arp.ProtAddressSize = uint8(len(arp.SourceProtAddress))
 	}

@@ -1,0 +1,61 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+minServerVersion: '3.6'
+
+tests:
+    -
+        description: "FindOneAndDelete is committed on first attempt"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+        operation:
+            name: "findOneAndDelete"
+            arguments:
+                filter: { x: { $gte: 11 }}
+                sort: { x: 1 }
+        outcome:
+            result: { _id: 1, x: 11 }
+            collection:
+                data:
+                    - { _id: 2, x: 22 }
+    -
+        description: "FindOneAndDelete is not committed on first attempt"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "findOneAndDelete"
+            arguments:
+                filter: { x: { $gte: 11 }}
+                sort: { x: 1 }
+        outcome:
+            result: { _id: 1, x: 11 }
+            collection:
+                data:
+                    - { _id: 2, x: 22 }
+    -
+        description: "FindOneAndDelete is never committed"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 2 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "findOneAndDelete"
+            arguments:
+                filter: { x: { $gte: 11 }}
+                sort: { x: 1 }
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }

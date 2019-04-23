@@ -1,0 +1,298 @@
+# Test that all the operations go to the same mongos.
+#
+# The assertion is implicit: that all the read operations succeed.
+# If the driver does not properly pin to a single mongos then one of the
+# operations in a transaction will eventually be sent to a different mongos,
+# which is unaware of the transaction, and the mongos will return a command
+# error. An example of such an error is:
+# {
+#   'ok': 0.0,
+#   'errmsg': 'cannot continue txnId -1 for session 28938f50-9d29-4ca5-8de5-ddaf261267c4 - 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU= with txnId 1',
+#   'code': 251,
+#   'codeName': 'NoSuchTransaction',
+#   'errorLabels': ['TransientTransactionError']
+# }
+#
+# This test doesn't check contents of command-started events.
+# Note: these tests should also pass when run against a replica set.
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+data: &data
+  - {_id: 1}
+  - {_id: 2}
+
+tests:
+  - description: countDocuments
+    operations:
+      - name: startTransaction
+        object: session0
+      - &countDocuments
+        name: countDocuments
+        object: collection
+        arguments:
+          filter:
+            _id: 2
+          session: session0
+        result: 1
+      - *countDocuments
+      - *countDocuments
+      - *countDocuments
+      - *countDocuments
+      - *countDocuments
+      - *countDocuments
+      - *countDocuments
+      - name: commitTransaction
+        object: session0
+
+    outcome:
+      collection:
+        data: *data
+
+  - description: distinct
+    operations:
+      - name: startTransaction
+        object: session0
+      - &distinct
+        name: distinct
+        object: collection
+        arguments:
+          fieldName: _id
+          session: session0
+        result: [1, 2]
+      - *distinct
+      - *distinct
+      - *distinct
+      - *distinct
+      - *distinct
+      - *distinct
+      - *distinct
+      - name: commitTransaction
+        object: session0
+
+    outcome:
+      collection:
+        data: *data
+
+  - description: find
+    operations:
+      - name: startTransaction
+        object: session0
+      - &find
+        name: find
+        object: collection
+        arguments:
+          filter:
+            _id: 2
+          session: session0
+        result:
+          - {_id: 2}
+      - *find
+      - *find
+      - *find
+      - *find
+      - *find
+      - *find
+      - *find
+      - name: commitTransaction
+        object: session0
+
+    outcome:
+      collection:
+        data: *data
+
+  - description: insertOne
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 3
+          session: session0
+        result:
+          insertedId: 3
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 4
+          session: session0
+        result:
+          insertedId: 4
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 5
+          session: session0
+        result:
+          insertedId: 5
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 6
+          session: session0
+        result:
+          insertedId: 6
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 7
+          session: session0
+        result:
+          insertedId: 7
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 8
+          session: session0
+        result:
+          insertedId: 8
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 9
+          session: session0
+        result:
+          insertedId: 9
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 10
+          session: session0
+        result:
+          insertedId: 10
+      - name: commitTransaction
+        object: session0
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+          - {_id: 3}
+          - {_id: 4}
+          - {_id: 5}
+          - {_id: 6}
+          - {_id: 7}
+          - {_id: 8}
+          - {_id: 9}
+          - {_id: 10}
+
+  - description: mixed read write operations
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 3
+          session: session0
+        result:
+          insertedId: 3
+      - &countDocuments
+        name: countDocuments
+        object: collection
+        arguments:
+          filter:
+            _id: 3
+          session: session0
+        result: 1
+      - *countDocuments
+      - *countDocuments
+      - *countDocuments
+      - *countDocuments
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 4
+          session: session0
+        result:
+          insertedId: 4
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 5
+          session: session0
+        result:
+          insertedId: 5
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 6
+          session: session0
+        result:
+          insertedId: 6
+      - name: insertOne
+        object: collection
+        arguments:
+          document:
+            _id: 7
+          session: session0
+        result:
+          insertedId: 7
+      - name: commitTransaction
+        object: session0
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+          - {_id: 3}
+          - {_id: 4}
+          - {_id: 5}
+          - {_id: 6}
+          - {_id: 7}
+
+  - description: multiple commits
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertMany
+        object: collection
+        arguments:
+          documents:
+            - _id: 3
+            - _id: 4
+          session: session0
+        result:
+          insertedIds: {0: 3, 1: 4}
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+          - {_id: 3}
+          - {_id: 4}

@@ -6,6 +6,14 @@
 
 package mongoimport
 
+import (
+	"fmt"
+
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools/common/log"
+)
+
 var Usage = `<options> <file>
 
 Import CSV, TSV or JSON data into MongoDB. If no file is provided, mongoimport reads from stdin.
@@ -37,6 +45,9 @@ type InputOptions struct {
 
 	// Indicates that field names include type descriptions
 	ColumnsHaveTypes bool `long:"columnsHaveTypes" description:"indicated that the field list (from --fields, --fieldsFile, or --headerline) specifies types; They must be in the form of '<colName>.<type>(<arg>)'. The type can be one of: auto, binary, bool, date, date_go, date_ms, date_oracle, double, int32, int64, string. For each of the date types, the argument is a datetime layout string. For the binary type, the argument can be one of: base32, base64, hex. All other types take an empty argument. Only valid for CSV and TSV imports. e.g. zipcode.string(), thumbnail.binary(base64)"`
+
+	// Indicates that the legacy extended JSON format should be used to parse JSON documents. Defaults to false.
+	Legacy bool `long:"legacy" default:"false" description:"use the legacy extended JSON format (defaults to 'false')"`
 }
 
 // Name returns a description of the InputOptions struct.
@@ -91,4 +102,44 @@ type IngestOptions struct {
 // Name returns a description of the IngestOptions struct.
 func (_ *IngestOptions) Name() string {
 	return "ingest"
+}
+
+// Options contains all the possible options that can be used to configure mongoimport.
+type Options struct {
+	*options.ToolOptions
+	*InputOptions
+	*IngestOptions
+	ParsedArgs []string
+}
+
+// ParseOptions reads command line arguments and converts them into options used to configure mongoimport.
+func ParseOptions(rawArgs []string, versionStr, gitCommit string) (Options, error) {
+	opts := options.New("mongoimport", versionStr, gitCommit, Usage,
+		options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
+	inputOpts := &InputOptions{}
+	ingestOpts := &IngestOptions{}
+	opts.AddOptions(inputOpts)
+	opts.AddOptions(ingestOpts)
+	opts.URI.AddKnownURIParameters(options.KnownURIOptionsWriteConcern)
+
+	args, err := opts.ParseArgs(rawArgs)
+	if err != nil {
+		return Options{}, err
+	}
+
+	log.SetVerbosity(opts.Verbosity)
+	opts.URI.LogUnsupportedOptions()
+
+	wc, err := db.NewMongoWriteConcern(ingestOpts.WriteConcern, opts.URI.ParsedConnString())
+	if err != nil {
+		return Options{}, fmt.Errorf("error constructing write concern: %v", err)
+	}
+	opts.WriteConcern = wc
+
+	return Options{
+		opts,
+		inputOpts,
+		ingestOpts,
+		args,
+	}, nil
 }

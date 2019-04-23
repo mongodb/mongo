@@ -1,0 +1,21 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 22}
+    - {_id: 3, x: 33}
+
+tests:
+    -
+        description: "Aggregate with multiple stages"
+        operation:
+            name: aggregate
+            arguments:
+                pipeline:
+                    - $sort: {x: 1}
+                    - $match: 
+                        _id: {$gt: 1}
+                batchSize: 2
+
+        outcome:
+            result:
+                - {_id: 2, x: 22}
+                - {_id: 3, x: 33}

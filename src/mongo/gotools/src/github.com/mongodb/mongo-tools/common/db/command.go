@@ -7,11 +7,7 @@
 package db
 
 import (
-	"fmt"
-	"strings"
-
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	mgo "gopkg.in/mgo.v2"
 )
 
 // Query flags
@@ -152,40 +148,6 @@ func (sp *SessionProvider) SupportsCollectionUUID() (bool, error) {
 	}
 
 	return false, nil
-}
-
-// SupportsRepairCursor takes in an example db and collection name and
-// returns true if the connected server supports the repairCursor command.
-// It returns false and the error that occurred if it is not supported.
-func (sp *SessionProvider) SupportsRepairCursor(db, collection string) (bool, error) {
-	session, err := sp.GetSession()
-	if err != nil {
-		return false, err
-	}
-	session.SetSocketTimeout(0)
-	defer session.Close()
-
-	// This check is slightly hacky, but necessary to allow users to run repair without
-	// permissions to all collections. There are multiple reasons a repair command could fail,
-	// but we are only interested in the ones that imply that the repair command is not
-	// usable by the connected server. If we do not get one of these specific error messages,
-	// we will let the error happen again later.
-	repairIter := session.DB(db).C(collection).Repair()
-	repairIter.Next(bson.D{})
-	err = repairIter.Err()
-	if err == nil {
-		return true, nil
-	}
-	if strings.Index(err.Error(), "no such cmd: repairCursor") > -1 {
-		// return a helpful error message for early server versions
-		return false, fmt.Errorf("--repair flag cannot be used on mongodb versions before 2.7.8")
-	}
-	if strings.Index(err.Error(), "repair iterator not supported") > -1 {
-		// helpful error message if the storage engine does not support repair (WiredTiger)
-		return false, fmt.Errorf("--repair is not supported by the connected storage engine")
-	}
-
-	return true, nil
 }
 
 // SupportsWriteCommands returns true if the connected server supports write

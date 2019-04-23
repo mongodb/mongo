@@ -1,0 +1,75 @@
+description: "setVersion is ignored if there is no electionId"
+
+uri: "mongodb://a/?replicaSet=rs"
+
+phases: [
+
+    # Primary A is discovered and tells us about B.
+    {
+        responses: [
+            ["a:27017", {
+                ok: 1,
+                ismaster: true,
+                hosts: ["a:27017", "b:27017"],
+                setName: "rs",
+                setVersion: 2,
+                minWireVersion: 0,
+                maxWireVersion: 6
+            }]
+        ],
+
+        outcome: {
+            servers: {
+                "a:27017": {
+                    type: "RSPrimary",
+                    setName: "rs",
+                    setVersion: 2 ,
+                    electionId:
+                },
+                "b:27017": {
+                    type: "Unknown",
+                    setName: ,
+                    electionId:
+                }
+            },
+            topologyType: "ReplicaSetWithPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs",
+        }
+    },
+
+    # B is elected, its setVersion is older but we believe it anyway, because
+    # setVersion is only used in conjunction with electionId.
+    {
+        responses: [
+            ["b:27017", {
+                ok: 1,
+                ismaster: true,
+                hosts: ["a:27017", "b:27017"],
+                setName: "rs",
+                setVersion: 1,
+                minWireVersion: 0,
+                maxWireVersion: 6
+            }]
+        ],
+
+        outcome: {
+            servers: {
+                "a:27017": {
+                    type: "Unknown",
+                    setName: ,
+                    electionId:
+                },
+                "b:27017": {
+                    type: "RSPrimary",
+                    setName: "rs",
+                    setVersion: 1,
+                    electionId:
+                }
+            },
+            topologyType: "ReplicaSetWithPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs",
+        }
+    }
+]

@@ -1,0 +1,334 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 22}
+
+minServerVersion: '2.6'
+
+tests:
+    -
+        description: "BulkWrite with deleteOne operations"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                # Note: as in the "DeleteOne when many documents match" test in
+                # deleteOne.yml, we omit a deleteOne operation that might match
+                # multiple documents as that would hinder our ability to assert
+                # the final state of the collection under test.
+                requests:
+                    -
+                        # does not match an existing document
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 3 }
+                    -
+                        # deletes the matched document
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 2 }
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 1
+                insertedCount: 0
+                insertedIds: {}
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 0
+                upsertedIds: {}
+            collection:
+                data:
+                    - {_id: 1, x: 11 }
+    -
+        description: "BulkWrite with deleteMany operations"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        # does not match any existing documents
+                        name: "deleteMany"
+                        arguments:
+                            filter: { x: { $lt: 11 } }
+                    -
+                        # deletes the matched documents
+                        name: "deleteMany"
+                        arguments:
+                            filter: { x: { $lte: 22 } }
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 2
+                insertedCount: 0
+                insertedIds: {}
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 0
+                upsertedIds: {}
+            collection:
+                data: []
+    -
+        description: "BulkWrite with insertOne operations"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 3, x: 33 }
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 4, x: 44 }
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedCount: 2
+                insertedIds: { 0: 3, 1: 4 }
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 0
+                upsertedIds: {}
+            collection:
+                data:
+                    - {_id: 1, x: 11 }
+                    - {_id: 2, x: 22 }
+                    - {_id: 3, x: 33 }
+                    - {_id: 4, x: 44 }
+    -
+        description: "BulkWrite with replaceOne operations"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                # Note: as in the "ReplaceOne when many documents match" test in
+                # replaceOne.yml, we omit a replaceOne operation that might
+                # match multiple documents as that would hinder our ability to
+                # assert the final state of the collection under test.
+                requests:
+                    -
+                        # does not match an existing document
+                        name: "replaceOne"
+                        arguments:
+                            filter: { _id: 3 }
+                            replacement: { x: 33 }
+                    -
+                        # does not modify the matched document
+                        name: "replaceOne"
+                        arguments:
+                            filter: { _id: 1 }
+                            # Repeat _id in replacement document so the server
+                            # does not report a modification for this update.
+                            # See: https://jira.mongodb.org/browse/SERVER-36405
+                            replacement: { _id: 1, x: 11 }
+                    -
+                        # modifies the matched document
+                        name: "replaceOne"
+                        arguments:
+                            filter: { _id: 1 }
+                            replacement: { x: 12 }
+                    -
+                        # does not match an existing document and upserts
+                        name: "replaceOne"
+                        arguments:
+                            filter: { _id: 3 }
+                            replacement: { x: 33 }
+                            upsert: true
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedCount: 0
+                insertedIds: {}
+                matchedCount: 2
+                modifiedCount: 1
+                upsertedCount: 1
+                upsertedIds: { 3: 3 }
+            collection:
+                data:
+                    - {_id: 1, x: 12 }
+                    - {_id: 2, x: 22 }
+                    - {_id: 3, x: 33 }
+    -
+        description: "BulkWrite with updateOne operations"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                # Note: as in the "UpdateOne when many documents match" test in
+                # updateOne.yml, we omit an updateOne operation that might match
+                # multiple documents as that would hinder our ability to assert
+                # the final state of the collection under test.
+                requests:
+                    -
+                        # does not match an existing document
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 0 }
+                            update: { $set: { x: 0 } }
+                    -
+                        # does not modify the matched document
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 1 }
+                            update: { $set: { x: 11 } }
+                    -
+                        # modifies the matched document
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x: 1 } }
+                    -
+                        # does not match an existing document and upserts
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 3 }
+                            update: { $set: { x: 33 } }
+                            upsert: true
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedCount: 0
+                insertedIds: {}
+                matchedCount: 2
+                modifiedCount: 1
+                upsertedCount: 1
+                upsertedIds: { 3: 3 }
+            collection:
+                data:
+                    - {_id: 1, x: 11 }
+                    - {_id: 2, x: 23 }
+                    - {_id: 3, x: 33 }
+    -
+        description: "BulkWrite with updateMany operations"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        # does not match any existing documents
+                        name: "updateMany"
+                        arguments:
+                            filter: { x: { $lt: 11 } }
+                            update: { $set: { x: 0 } }
+                    -
+                        # does not modify the matched documents
+                        name: "updateMany"
+                        arguments:
+                            filter: { x: { $lte: 22 } }
+                            update: { $unset: { y: 1 } }
+                    -
+                        # modifies the matched documents
+                        name: "updateMany"
+                        arguments:
+                            filter: { x: { $lte: 22 } }
+                            update: { $inc: { x: 1 } }
+                    -
+                        # does not match any existing documents and upserts
+                        name: "updateMany"
+                        arguments:
+                            filter: { _id: 3 }
+                            update: { $set: { x: 33 } }
+                            upsert: true
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedCount: 0
+                insertedIds: {}
+                matchedCount: 4
+                modifiedCount: 2
+                upsertedCount: 1
+                upsertedIds: { 3: 3 }
+            collection:
+                data:
+                    - {_id: 1, x: 12 }
+                    - {_id: 2, x: 23 }
+                    - {_id: 3, x: 33 }
+    -
+        description: "BulkWrite with mixed ordered operations"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 3, x: 33 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x: 1 } }
+                    -
+                        name: "updateMany"
+                        arguments:
+                            filter: { _id: { $gt: 1 } }
+                            update: { $inc: { x: 1 } }
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 4, x: 44 }
+                    -
+                        name: "deleteMany"
+                        arguments:
+                            filter: { x: { $nin: [ 24, 34 ] } }
+                    -
+                        name: "replaceOne"
+                        arguments:
+                            filter: { _id: 4 }
+                            replacement: { _id: 4, x: 44 }
+                            upsert: true
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 2
+                insertedCount: 2
+                insertedIds: { 0: 3, 3: 4 }
+                matchedCount: 3
+                modifiedCount: 3
+                upsertedCount: 1
+                upsertedIds: { 5: 4 }
+            collection:
+                data:
+                    - {_id: 2, x: 24 }
+                    - {_id: 3, x: 34 }
+                    - {_id: 4, x: 44 }
+    -
+        description: "BulkWrite with mixed unordered operations"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                # We omit inserting multiple documents and updating documents
+                # that may not exist at the start of this test as we cannot
+                # assume the order in which the operations will execute.
+                requests:
+                    -
+                        name: "replaceOne"
+                        arguments:
+                            filter: { _id: 3 }
+                            replacement: { _id: 3, x: 33 }
+                            upsert: true
+                    -
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 1 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x: 1 } }
+                options: { ordered: false }
+        outcome:
+            result:
+                deletedCount: 1
+                insertedCount: 0
+                insertedIds: {}
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 1
+                upsertedIds: { 0: 3 }
+            collection:
+                data:
+                    - {_id: 2, x: 23 }
+                    - {_id: 3, x: 33 }

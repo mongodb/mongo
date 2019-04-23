@@ -1,0 +1,203 @@
+description: "Replica set discovery"
+
+uri: "mongodb://a/?replicaSet=rs"
+
+phases: [
+
+    # At first, a, b, and c are secondaries.
+    {
+        responses: [
+
+                ["a:27017", {
+
+                    ok: 1,
+                    ismaster: false,
+                    secondary: true,
+                    setName: "rs",
+                    hosts: ["a:27017", "b:27017", "c:27017"],
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            servers: {
+
+                "a:27017": {
+
+                    type: "RSSecondary",
+                    setName: "rs"
+                },
+
+                "b:27017": {
+
+                    type: "Unknown",
+                    setName:
+                },
+
+                "c:27017": {
+
+                    type: "Unknown",
+                    setName:
+                }
+            },
+            topologyType: "ReplicaSetNoPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs"
+        }
+    },
+
+    # Admin removes a, adds a high-priority member d which becomes primary.
+    {
+        responses: [
+
+                ["b:27017", {
+
+                    ok: 1,
+                    ismaster: false,
+                    secondary: true,
+                    setName: "rs",
+                    primary: "d:27017",
+                    hosts: ["b:27017", "c:27017", "d:27017"],
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            servers: {
+
+                "a:27017": {
+
+                    type: "RSSecondary",
+                    setName: "rs"
+                },
+
+                "b:27017": {
+
+                    type: "RSSecondary",
+                    setName: "rs"
+                },
+
+                "c:27017": {
+
+                    type: "Unknown",
+                    setName:
+                },
+
+                "d:27017": {
+
+                    type: "PossiblePrimary",
+                    setName:
+                }
+            },
+            topologyType: "ReplicaSetNoPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs"
+        }
+    },
+
+    # Primary responds.
+    {
+        responses: [
+
+                ["d:27017", {
+
+                    ok: 1,
+                    ismaster: true,
+                    setName: "rs",
+                    hosts: ["b:27017", "c:27017", "d:27017", "e:27017"],
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            # e is new.
+            servers: {
+
+                "b:27017": {
+
+                    type: "RSSecondary",
+                    setName: "rs"
+                },
+
+                "c:27017": {
+
+                    type: "Unknown",
+                    setName:
+                },
+
+                "d:27017": {
+
+                    type: "RSPrimary",
+                    setName: "rs"
+                },
+
+                "e:27017": {
+
+                    type: "Unknown",
+                    setName:
+                }
+            },
+            topologyType: "ReplicaSetWithPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs"
+        }
+    },
+
+    # Stale response from c.
+    {
+        responses: [
+
+                ["c:27017", {
+
+                    ok: 1,
+                    ismaster: false,
+                    secondary: true,
+                    setName: "rs",
+                    hosts: ["a:27017", "b:27017", "c:27017"],
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            # We don't add a back.
+            # We don't remove e.
+            servers: {
+
+                "b:27017": {
+
+                    type: "RSSecondary",
+                    setName: "rs"
+                },
+
+                "c:27017": {
+
+                    type: "RSSecondary",
+                    setName: "rs"
+                },
+
+                "d:27017": {
+
+                    type: "RSPrimary",
+                    setName: "rs"
+                },
+
+                "e:27017": {
+
+                    type: "Unknown",
+                    setName:
+                }
+            },
+            topologyType: "ReplicaSetWithPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs"
+        }
+    }
+]

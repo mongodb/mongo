@@ -1,0 +1,50 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+# TODO: this should change to 4.0 once 4.0.0 is released.
+minServerVersion: '3.99'
+
+tests:
+    -
+        description: "FindOneAndDelete succeeds after PrimarySteppedDown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["findAndModify"]
+                errorCode: 189
+        operation:
+            name: "findOneAndDelete"
+            arguments:
+                filter: { x: { $gte: 11 }}
+                sort: { x: 1 }
+        outcome:
+            result: { _id: 1, x: 11 }
+            collection:
+                data:
+                    - { _id: 2, x: 22 }
+    -
+        description: "FindOneAndDelete succeeds after WriteConcernError ShutdownInProgress"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["findAndModify"]
+                writeConcernError:
+                    code: 91
+                    errmsg: Replication is being shut down
+        operation:
+            name: "findOneAndDelete"
+            arguments:
+                filter: { x: { $gte: 11 }}
+                sort: { x: 1 }
+        outcome:
+            result: { _id: 1, x: 11 }
+            collection:
+                data:
+                    - { _id: 2, x: 22 }

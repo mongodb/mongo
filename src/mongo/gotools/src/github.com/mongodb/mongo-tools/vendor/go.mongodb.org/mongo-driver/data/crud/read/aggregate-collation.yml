@@ -1,0 +1,17 @@
+data:
+    - {_id: 1, x: 'ping'}
+minServerVersion: '3.4'
+
+tests:
+    -
+        description: "Aggregate with collation"
+        operation:
+            name: aggregate
+            arguments:
+                pipeline:
+                    - $match:
+                        x: 'PING'
+                collation: { locale: 'en_US', strength: 2 } # https://docs.mongodb.com/master/reference/collation/#collation-document
+        outcome:
+            result:
+                - {_id: 1, x: 'ping'}

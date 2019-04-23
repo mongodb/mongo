@@ -1,0 +1,28 @@
+# Driver doesn't validate maxStalenessSeconds for mongos
+---
+heartbeatFrequencyMS: 10000
+topology_description:
+  type: Sharded
+  servers:
+  - &1
+    address: a:27017
+    type: Mongos
+    avg_rtt_ms: 5
+    lastUpdateTime: 0
+    maxWireVersion: 5
+    lastWrite: {lastWriteDate: {$numberLong: "1"}}
+  - &2
+    address: b:27017
+    type: Mongos
+    avg_rtt_ms: 50  # Too far.
+    lastUpdateTime: 0
+    maxWireVersion: 5
+    lastWrite: {lastWriteDate: {$numberLong: "1"}}
+read_preference:
+  mode: Nearest
+  maxStalenessSeconds: 1  # OK for sharding.
+suitable_servers:
+- *1
+- *2
+in_latency_window:
+- *1

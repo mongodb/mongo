@@ -1,0 +1,37 @@
+tests:
+    -
+        description: "Default"
+        uri: "mongodb://localhost/"
+        valid: true
+        warning: false
+        readConcern: { }
+    -
+        description: "local specified"
+        uri: "mongodb://localhost/?readConcernLevel=local"
+        valid: true
+        warning: false
+        readConcern: { level: "local" }
+    -
+        description: "majority specified"
+        uri: "mongodb://localhost/?readConcernLevel=majority"
+        valid: true
+        warning: false
+        readConcern: { level: "majority" }
+    -
+        description: "available specified"
+        uri: "mongodb://localhost?readConcernLevel=available"
+        valid: true
+        warning: false
+        readConcern: { level: "available" }
+    -
+        description: "snapshot specified"
+        uri: "mongodb://localhost?readConcernLevel=snapshot"
+        valid: true
+        warning: false
+        readConcern: { level: "snapshot" }
+    -
+        description: "linearizable specified"
+        uri: "mongodb://localhost?readConcernLevel=linearizable"
+        valid: true
+        warning: false
+        readConcern: { level: "linearizable" }

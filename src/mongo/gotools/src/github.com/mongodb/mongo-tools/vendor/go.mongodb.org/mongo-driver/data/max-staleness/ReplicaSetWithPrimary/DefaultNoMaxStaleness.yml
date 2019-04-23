@@ -1,0 +1,26 @@
+# By default, a read preference sets no maximum on staleness.
+---
+topology_description:
+  type: ReplicaSetWithPrimary
+  servers:
+  - &1
+    address: a:27017
+    type: RSPrimary
+    avg_rtt_ms: 50  # Too far.
+    lastUpdateTime: 0
+    maxWireVersion: 5
+    lastWrite: {lastWriteDate: {$numberLong: "1000001"}}
+  - &2
+    address: b:27017
+    type: RSSecondary
+    avg_rtt_ms: 5
+    lastUpdateTime: 0
+    maxWireVersion: 5
+    lastWrite: {lastWriteDate: {$numberLong: "1"}}  # Very stale.
+read_preference:
+  mode: Nearest
+suitable_servers:  # Very stale server is fine.
+- *1
+- *2
+in_latency_window:
+- *2

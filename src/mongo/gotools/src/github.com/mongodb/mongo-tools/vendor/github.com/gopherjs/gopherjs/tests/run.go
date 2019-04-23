@@ -112,6 +112,9 @@ var knownFails = map[string]failReason{
 	"fixedbugs/issue22662b.go": {category: usesUnsupportedPackage, desc: "os/exec.Command unsupported"},
 	"fixedbugs/issue23188.go":  {desc: "incorrect order of evaluation of index operations"},
 	"fixedbugs/issue24547.go":  {desc: "incorrect computing method sets with shadowed methods"},
+
+	// These are new tests in Go 1.11.5
+	"fixedbugs/issue28688.go": {category: notApplicable, desc: "testing runtime optimisations"},
 }
 
 type failCategory uint8

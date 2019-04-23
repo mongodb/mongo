@@ -8,18 +8,19 @@
 package mongostat
 
 import (
+	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
 	"github.com/mongodb/mongo-tools/mongostat/stat_consumer"
 	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
 	"github.com/mongodb/mongo-tools/mongostat/status"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 // MongoStat is a container for the user-specified options and
@@ -233,11 +234,15 @@ func (cluster *AsyncClusterMonitor) Monitor(sleep time.Duration) error {
 func NewNodeMonitor(opts options.ToolOptions, fullHost string) (*NodeMonitor, error) {
 	optsCopy := opts
 	host, port := parseHostPort(fullHost)
-	optsCopy.Connection = &options.Connection{
-		Host:    host,
-		Port:    port,
-		Timeout: opts.Timeout,
+	optsCopy.Connection.Host = host
+	optsCopy.Connection.Port = port
+	uriCopy := *opts.URI
+	newCS, err := rewriteURI(uriCopy.ConnectionString, fullHost)
+	if err != nil {
+		return nil, err
 	}
+	uriCopy.ConnectionString = newCS
+	optsCopy.URI = &uriCopy
 	optsCopy.Direct = true
 	sessionProvider, err := db.NewSessionProvider(optsCopy)
 	if err != nil {
@@ -251,35 +256,53 @@ func NewNodeMonitor(opts options.ToolOptions, fullHost string) (*NodeMonitor, er
 	}, nil
 }
 
+func rewriteURI(oldURI, newAddress string) (string, error) {
+	u, err := url.Parse(oldURI)
+	if err != nil {
+		return "", err
+	}
+	u.Host = newAddress
+	return u.String(), nil
+}
+
+func (node *NodeMonitor) Disconnect() {
+	node.sessionProvider.Close()
+}
+
 // Report collects the stat info for a single node and sends found hostnames on
 // the "discover" channel if checkShards is true.
 func (node *NodeMonitor) Poll(discover chan string, checkShards bool) (*status.ServerStatus, error) {
 	stat := &status.ServerStatus{}
 	log.Logvf(log.DebugHigh, "getting session on server: %v", node.host)
-	s, err := node.sessionProvider.GetSession()
+	session, err := node.sessionProvider.GetSession()
 	if err != nil {
 		log.Logvf(log.DebugLow, "got error getting session to server %v", node.host)
 		return nil, err
 	}
 	log.Logvf(log.DebugHigh, "got session on server: %v", node.host)
 
-	// The read pref for the session must be set to 'secondary' to enable using
-	// the driver with 'direct' connections, which disables the built-in
-	// replset discovery mechanism since we do our own node discovery here.
-	s.SetMode(mgo.Eventual, true)
-
-	// Disable the socket timeout - otherwise if db.serverStatus() takes a long time on the server
-	// side, the client will close the connection early and report an error.
-	s.SetSocketTimeout(0)
-	defer s.Close()
-
-	err = s.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, stat)
+	result := session.Database("admin").RunCommand(nil, bson.D{{"serverStatus", 1}, {"recordStats", 0}})
+	err = result.Err()
 	if err != nil {
 		log.Logvf(log.DebugLow, "got error calling serverStatus against server %v", node.host)
 		return nil, err
 	}
+	tempBson, err := result.DecodeBytes()
+	if err != nil {
+		log.Logvf(log.Always, "Encountered error decoding serverStatus: %v\n", err)
+		return nil, fmt.Errorf("Error decoding serverStatus: %v\n", err)
+	}
+	err = bson.Unmarshal(tempBson, &stat)
+	if err != nil {
+		log.Logvf(log.Always, "Encountered error reading serverStatus: %v\n", err)
+		return nil, fmt.Errorf("Error reading serverStatus: %v\n", err)
+	}
+	// The flattened version is required by some lookup functions
 	statMap := make(map[string]interface{})
-	s.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, statMap)
+	err = result.Decode(&statMap)
+	if err != nil {
+		return nil, fmt.Errorf("Error flattening serverStatus: %v\n", err)
+	}
 	stat.Flattened = status.Flatten(statMap)
 
 	node.Err = nil
@@ -297,15 +320,21 @@ func (node *NodeMonitor) Poll(discover chan string, checkShards bool) (*status.S
 	stat.Host = node.host
 	if discover != nil && stat != nil && status.IsMongos(stat) && checkShards {
 		log.Logvf(log.DebugLow, "checking config database to discover shards")
-		shardCursor := s.DB("config").C("shards").Find(bson.M{}).Iter()
+		shardCursor, err := session.Database("config").Collection("shards").Find(nil, bson.M{}, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error discovering shards: %v", err)
+		}
 		shard := ConfigShard{}
-		for shardCursor.Next(&shard) {
+		for shardCursor.Next(nil) {
+			if cursorErr := shardCursor.Decode(&shard); cursorErr != nil {
+				return nil, fmt.Errorf("error decoding shard info: %v", err)
+			}
 			shardHosts := strings.Split(shard.Host, ",")
 			for _, shardHost := range shardHosts {
 				discover <- shardHost
 			}
 		}
-		shardCursor.Close()
+		shardCursor.Close(nil)
 	}
 
 	return stat, nil

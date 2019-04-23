@@ -7,14 +7,14 @@
 package mongoimport
 
 import (
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"testing"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2/bson"
 )
 
 func init() {
@@ -378,12 +378,12 @@ func TestFieldParsers(t *testing.T) {
 
 		Convey("parses valid decimal values correctly", func() {
 			for _, ts := range []string{"12235.2355", "42", "0", "-124", "-124.55"} {
-				testVal, err := bson.ParseDecimal128(ts)
+				testVal, err := primitive.ParseDecimal128(ts)
 				So(err, ShouldBeNil)
 				parsedValue, err := p.Parse(ts)
 				So(err, ShouldBeNil)
 
-				So(testVal, ShouldResemble, parsedValue.(bson.Decimal128))
+				So(testVal, ShouldResemble, parsedValue.(primitive.Decimal128))
 			}
 		})
 		Convey("does not parse invalid decimal values", func() {

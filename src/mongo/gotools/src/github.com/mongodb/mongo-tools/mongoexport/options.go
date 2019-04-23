@@ -9,6 +9,10 @@ package mongoexport
 import (
 	"fmt"
 	"io/ioutil"
+
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
 )
 
 var Usage = `<options>
@@ -42,6 +46,9 @@ type OutputFormatOptions struct {
 
 	// NoHeaderLine, if set, will export CSV data without a list of field names at the first line.
 	NoHeaderLine bool `long:"noHeaderLine" description:"export CSV data without a list of field names at the first line"`
+
+	// JSONFormat specifies what extended JSON format to export (canonical or relaxed). Defaults to relaxed.
+	JSONFormat jsonFormat `long:"jsonFormat" value-name:"<type>" default:"relaxed" description:"the extended JSON format to output, either canonical or relaxed (defaults to 'relaxed')"`
 }
 
 // Name returns a human-readable group name for output format options.
@@ -56,8 +63,8 @@ type InputOptions struct {
 	SlaveOk        bool   `long:"slaveOk" short:"k" description:"allow secondary reads if available (default true)" default:"false" default-mask:"-"`
 	ReadPreference string `long:"readPreference" value-name:"<string>|<json>" description:"specify either a preference name or a preference json object"`
 	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot)"`
-	Skip           int    `long:"skip" value-name:"<count>" description:"number of documents to skip"`
-	Limit          int    `long:"limit" value-name:"<count>" description:"limit the number of documents to export"`
+	Skip           int64  `long:"skip" value-name:"<count>" description:"number of documents to skip"`
+	Limit          int64  `long:"limit" value-name:"<count>" description:"limit the number of documents to export"`
 	Sort           string `long:"sort" value-name:"<json>" description:"sort order, as a JSON string, e.g. '{x:1}'"`
 	AssertExists   bool   `long:"assertExists" default:"false" description:"if specified, export fails if the collection does not exist"`
 }
@@ -82,4 +89,58 @@ func (inputOptions *InputOptions) GetQuery() ([]byte, error) {
 		return content, err
 	}
 	panic("GetQuery can return valid values only for query or queryFile input")
+}
+
+// Options represents all possible options that can be used to configure mongoexport.
+type Options struct {
+	*options.ToolOptions
+	*OutputFormatOptions
+	*InputOptions
+	ParsedArgs []string
+}
+
+// ParseOptions reads command line arguments and converts them into options that can be used to configure mongoexport.
+func ParseOptions(rawArgs []string, versionStr, gitCommit string) (Options, error) {
+	// initialize command-line opts
+	opts := options.New("mongoexport", versionStr, gitCommit, Usage,
+		options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
+	outputOpts := &OutputFormatOptions{}
+	opts.AddOptions(outputOpts)
+	inputOpts := &InputOptions{}
+	opts.AddOptions(inputOpts)
+	opts.AddKnownURIParameters(options.KnownURIOptionsReadPreference)
+
+	args, err := opts.ParseArgs(rawArgs)
+	if err != nil {
+		return Options{}, err
+	}
+	if len(args) != 0 {
+		return Options{}, fmt.Errorf("too many positional arguments: %v", args)
+	}
+
+	log.SetVerbosity(opts.Verbosity)
+
+	// verify URI options and log them
+	opts.URI.LogUnsupportedOptions()
+
+	if inputOpts.SlaveOk {
+		if inputOpts.ReadPreference != "" {
+			return Options{}, fmt.Errorf("--slaveOk can't be specified when --readPreference is specified")
+		}
+
+		log.Logvf(log.Always, "--slaveOk is deprecated and --readPreference=nearest should be used instead")
+		inputOpts.ReadPreference = "nearest"
+	}
+
+	opts.ReadPreference, err = db.NewReadPreference(inputOpts.ReadPreference, opts.URI.ParsedConnString())
+	if err != nil {
+		return Options{}, fmt.Errorf("error parsing --readPreference: %v", err)
+	}
+
+	return Options{
+		opts,
+		outputOpts,
+		inputOpts,
+		args,
+	}, nil
 }

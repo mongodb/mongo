@@ -7,17 +7,18 @@
 package mongorestore
 
 import (
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/common/util"
-
+	"fmt"
 	"os"
 	"testing"
 
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/testtype"
+	"github.com/mongodb/mongo-tools-common/testutil"
+	"github.com/mongodb/mongo-tools/common/options"
 	. "github.com/smartystreets/goconvey/convey"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
 func init() {
@@ -27,10 +28,19 @@ func init() {
 	})
 }
 
-var (
-	testServer = "localhost"
-	testPort   = db.DefaultTestPort
-)
+func getRestoreWithArgs(additionalArgs ...string) (*MongoRestore, error) {
+	opts, err := ParseOptions(append(testutil.GetBareArgs(), additionalArgs...), "", "")
+	if err != nil {
+		return nil, fmt.Errorf("error parsing args: %v", err)
+	}
+
+	restore, err := New(opts)
+	if err != nil {
+		return nil, fmt.Errorf("error making new instance of mongorestore: %v", err)
+	}
+
+	return restore, nil
+}
 
 func TestMongorestore(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
@@ -40,33 +50,28 @@ func TestMongorestore(t *testing.T) {
 	}
 
 	Convey("With a test MongoRestore", t, func() {
-		inputOptions := &InputOptions{}
-		outputOptions := &OutputOptions{
-			NumParallelCollections: 1,
-			NumInsertionWorkers:    1,
+		args := []string{
+			NumParallelCollectionsOption, "1",
+			NumInsertionWorkersOption, "1",
 		}
-		nsOptions := &NSOptions{}
-		provider, toolOpts, err := testutil.GetBareSessionProvider()
-		if err != nil {
-			log.Logvf(log.Always, "error connecting to host: %v", err)
-			os.Exit(util.ExitError)
-		}
-		restore := MongoRestore{
-			ToolOptions:     toolOpts,
-			OutputOptions:   outputOptions,
-			InputOptions:    inputOptions,
-			NSOptions:       nsOptions,
-			SessionProvider: provider,
-		}
-		session, _ := provider.GetSession()
-		defer session.Close()
-		c1 := session.DB("db1").C("c1")
-		c1.DropCollection()
+
+		restore, err := getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
+
+		session, _ := restore.SessionProvider.GetSession()
+
+		db := session.Database("db1")
+		Convey("and majority is used as the default write concern", func() {
+			So(db.WriteConcern(), ShouldResemble, writeconcern.New(writeconcern.WMajority()))
+		})
+
+		c1 := db.Collection("c1")
+		c1.Drop(nil)
 		Convey("and an explicit target restores from that dump directory", func() {
 			restore.TargetDirectory = "testdata/testdirs"
 			err = restore.Restore()
 			So(err, ShouldBeNil)
-			count, err := c1.Count()
+			count, err := c1.CountDocuments(nil, bson.M{})
 			So(err, ShouldBeNil)
 			So(count, ShouldEqual, 100)
 		})
@@ -80,11 +85,10 @@ func TestMongorestore(t *testing.T) {
 			restore.TargetDirectory = "-"
 			err = restore.Restore()
 			So(err, ShouldBeNil)
-			count, err := c1.Count()
+			count, err := c1.CountDocuments(nil, bson.M{})
 			So(err, ShouldBeNil)
 			So(count, ShouldEqual, 100)
 		})
-
 	})
 }
 
@@ -94,40 +98,25 @@ func TestMongorestoreCantPreserveUUID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("No server available")
 	}
-	defer session.Close()
 	fcv := testutil.GetFCV(session)
 	if cmp, err := testutil.CompareFCV(fcv, "3.6"); err != nil || cmp >= 0 {
 		t.Skip("Requires server with FCV less than 3.6")
 	}
 
-	Convey("With a test MongoRestore", t, func() {
-		nsOptions := &NSOptions{}
-		provider, toolOpts, err := testutil.GetBareSessionProvider()
-		if err != nil {
-			log.Logvf(log.Always, "error connecting to host: %v", err)
-			os.Exit(util.ExitError)
+	Convey("PreserveUUID restore with incompatible destination FCV errors", func() {
+		args := []string{
+			NumParallelCollectionsOption, "1",
+			NumInsertionWorkersOption, "1",
+			PreserveUUIDOption,
+			DropOption,
+			"testdata/oplogdump",
 		}
+		restore, err := getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
 
-		Convey("PreserveUUID restore with incompatible destination FCV errors", func() {
-			inputOptions := &InputOptions{}
-			outputOptions := &OutputOptions{
-				NumParallelCollections: 1,
-				NumInsertionWorkers:    1,
-				PreserveUUID:           true,
-				Drop:                   true,
-			}
-			restore := MongoRestore{
-				ToolOptions:     toolOpts,
-				OutputOptions:   outputOptions,
-				InputOptions:    inputOptions,
-				NSOptions:       nsOptions,
-				SessionProvider: provider,
-			}
-			restore.TargetDirectory = "testdata/oplogdump"
-			err = restore.Restore()
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "target host does not support --preserveUUID")
-		})
+		err = restore.Restore()
+		So(err, ShouldNotBeNil)
+		So(err.Error(), ShouldContainSubstring, "target host does not support --preserveUUID")
 	})
 }
 
@@ -137,7 +126,6 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("No server available")
 	}
-	defer session.Close()
 	fcv := testutil.GetFCV(session)
 	if cmp, err := testutil.CompareFCV(fcv, "3.6"); err != nil || cmp < 0 {
 		t.Skip("Requires server with FCV 3.6 or later")
@@ -147,33 +135,21 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 	originalUUID := "699f503df64b4aa8a484a8052046fa3a"
 
 	Convey("With a test MongoRestore", t, func() {
-		nsOptions := &NSOptions{}
-		provider, toolOpts, err := testutil.GetBareSessionProvider()
-		if err != nil {
-			log.Logvf(log.Always, "error connecting to host: %v", err)
-			os.Exit(util.ExitError)
-		}
-
-		c1 := session.DB("db1").C("c1")
-		c1.DropCollection()
+		c1 := session.Database("db1").Collection("c1")
+		c1.Drop(nil)
 
 		Convey("normal restore gives new UUID", func() {
-			inputOptions := &InputOptions{}
-			outputOptions := &OutputOptions{
-				NumParallelCollections: 1,
-				NumInsertionWorkers:    1,
+			args := []string{
+				NumParallelCollectionsOption, "1",
+				NumInsertionWorkersOption, "1",
+				"testdata/oplogdump",
 			}
-			restore := MongoRestore{
-				ToolOptions:     toolOpts,
-				OutputOptions:   outputOptions,
-				InputOptions:    inputOptions,
-				NSOptions:       nsOptions,
-				SessionProvider: provider,
-			}
-			restore.TargetDirectory = "testdata/oplogdump"
+			restore, err := getRestoreWithArgs(args...)
+			So(err, ShouldBeNil)
+
 			err = restore.Restore()
 			So(err, ShouldBeNil)
-			count, err := c1.Count()
+			count, err := c1.CountDocuments(nil, bson.M{})
 			So(err, ShouldBeNil)
 			So(count, ShouldEqual, 5)
 			info, err := db.GetCollectionInfo(c1)
@@ -182,44 +158,34 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 		})
 
 		Convey("PreserveUUID restore without drop errors", func() {
-			inputOptions := &InputOptions{}
-			outputOptions := &OutputOptions{
-				NumParallelCollections: 1,
-				NumInsertionWorkers:    1,
-				PreserveUUID:           true,
+			args := []string{
+				NumParallelCollectionsOption, "1",
+				NumInsertionWorkersOption, "1",
+				PreserveUUIDOption,
+				"testdata/oplogdump",
 			}
-			restore := MongoRestore{
-				ToolOptions:     toolOpts,
-				OutputOptions:   outputOptions,
-				InputOptions:    inputOptions,
-				NSOptions:       nsOptions,
-				SessionProvider: provider,
-			}
-			restore.TargetDirectory = "testdata/oplogdump"
+			restore, err := getRestoreWithArgs(args...)
+			So(err, ShouldBeNil)
+
 			err = restore.Restore()
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "cannot specify --preserveUUID without --drop")
 		})
 
 		Convey("PreserveUUID with drop preserves UUID", func() {
-			inputOptions := &InputOptions{}
-			outputOptions := &OutputOptions{
-				NumParallelCollections: 1,
-				NumInsertionWorkers:    1,
-				PreserveUUID:           true,
-				Drop:                   true,
+			args := []string{
+				NumParallelCollectionsOption, "1",
+				NumInsertionWorkersOption, "1",
+				PreserveUUIDOption,
+				DropOption,
+				"testdata/oplogdump",
 			}
-			restore := MongoRestore{
-				ToolOptions:     toolOpts,
-				OutputOptions:   outputOptions,
-				InputOptions:    inputOptions,
-				NSOptions:       nsOptions,
-				SessionProvider: provider,
-			}
-			restore.TargetDirectory = "testdata/oplogdump"
+			restore, err := getRestoreWithArgs(args...)
+			So(err, ShouldBeNil)
+
 			err = restore.Restore()
 			So(err, ShouldBeNil)
-			count, err := c1.Count()
+			count, err := c1.CountDocuments(nil, bson.M{})
 			So(err, ShouldBeNil)
 			So(count, ShouldEqual, 5)
 			info, err := db.GetCollectionInfo(c1)
@@ -228,21 +194,16 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 		})
 
 		Convey("PreserveUUID on a file without UUID metadata errors", func() {
-			inputOptions := &InputOptions{}
-			outputOptions := &OutputOptions{
-				NumParallelCollections: 1,
-				NumInsertionWorkers:    1,
-				PreserveUUID:           true,
-				Drop:                   true,
+			args := []string{
+				NumParallelCollectionsOption, "1",
+				NumInsertionWorkersOption, "1",
+				PreserveUUIDOption,
+				DropOption,
+				"testdata/testdirs",
 			}
-			restore := MongoRestore{
-				ToolOptions:     toolOpts,
-				OutputOptions:   outputOptions,
-				InputOptions:    inputOptions,
-				NSOptions:       nsOptions,
-				SessionProvider: provider,
-			}
-			restore.TargetDirectory = "testdata/testdirs"
+			restore, err := getRestoreWithArgs(args...)
+			So(err, ShouldBeNil)
+
 			err = restore.Restore()
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "--preserveUUID used but no UUID found")

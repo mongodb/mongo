@@ -296,7 +296,7 @@ variables:
     use_scons_cache: true
     multiversion_platform: windows
     multiversion_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
     large_distro_name: windows-64-vs2017-compile
@@ -8219,7 +8219,7 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -8395,7 +8395,7 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
@@ -8490,7 +8490,7 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1804
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
@@ -8621,7 +8621,7 @@ buildvariants:
     packager_arch: ppc64le
     packager_distro: ubuntu1804
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: ppc64le
@@ -8725,7 +8725,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: s390x
@@ -8893,7 +8893,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: ubuntu1804
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: s390x
@@ -9020,7 +9020,7 @@ buildvariants:
     packager_distro: amazon
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
   display_tasks:
@@ -9217,7 +9217,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -9418,7 +9418,7 @@ buildvariants:
     use_scons_cache: true
     multiversion_platform: windows
     multiversion_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
@@ -9754,7 +9754,7 @@ buildvariants:
         --serviceExecutor=adaptive \
         --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
         --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
   tasks:
   - name: compile_TG
@@ -9786,7 +9786,7 @@ buildvariants:
     use_scons_cache: true
     multiversion_platform: windows
     multiversion_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
     large_distro_name: windows-64-vs2017-compile
   display_tasks:
@@ -9980,7 +9980,7 @@ buildvariants:
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     use_scons_cache: true
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
   tasks:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
@@ -10171,7 +10171,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 4
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -10217,7 +10217,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: osx
     push_arch: x86_64-enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include" --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 4
@@ -10702,7 +10702,7 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
@@ -10974,7 +10974,7 @@ buildvariants:
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     large_distro_name: rhel62-large
   display_tasks:
@@ -11198,7 +11198,7 @@ buildvariants:
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
     timeout_secs: 10800 # 3 hour timeout
     use_scons_cache: false
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -11357,7 +11357,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -11729,7 +11729,7 @@ buildvariants:
     push_name: linux
     push_arch: ppc64le-enterprise-rhel71
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: rhel71
     multiversion_architecture: ppc64le
@@ -11862,7 +11862,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel72
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: rhel72
     multiversion_architecture: s390x
@@ -11992,7 +11992,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel67
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -12187,7 +12187,7 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -12258,7 +12258,7 @@ buildvariants:
     # We need --allocator=system here solely due to SERVER-27675
     compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -12312,7 +12312,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -12374,7 +12374,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: suse12
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: suse12
     multiversion_architecture: s390x
@@ -12502,7 +12502,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: suse12
     repo_edition: org
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     multiversion_platform: suse12
     multiversion_architecture: s390x
@@ -12646,7 +12646,7 @@ buildvariants:
     packager_distro: debian81
     repo_edition: enterprise
     scons_cache: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -12807,7 +12807,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian92
     repo_edition: enterprise
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     scons_cache_scope: shared
     build_mongoreplay: true
   display_tasks:
@@ -12992,7 +12992,7 @@ buildvariants:
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     large_distro_name: rhel62-large
   display_tasks:
@@ -13537,7 +13537,7 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_factor: 0.25
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13631,7 +13631,7 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13968,7 +13968,7 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     scons_cache_scope: shared
   display_tasks:
@@ -14280,7 +14280,7 @@ buildvariants:
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --allocator=system
     scons_cache_scope: shared
     scons_cache_mode: all
-    tooltags: "ssl sasl"
+    tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
   - *dbtest

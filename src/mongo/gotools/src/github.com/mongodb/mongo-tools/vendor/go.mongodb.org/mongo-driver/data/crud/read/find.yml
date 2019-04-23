@@ -1,0 +1,49 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 22}
+    - {_id: 3, x: 33}
+    - {_id: 4, x: 44}
+    - {_id: 5, x: 55}
+
+tests:
+    -
+        description: "Find with filter"
+        operation:
+            name: "find"
+            arguments:
+                filter: {_id: 1}
+
+        outcome:
+            result:
+                - {_id: 1, x: 11}
+
+    - 
+        description: "Find with filter, sort, skip, and limit"
+        operation: 
+            name: "find"
+            arguments:
+                filter: 
+                    _id: {$gt: 2}
+                sort: {_id: 1}
+                skip: 2
+                limit: 2
+
+        outcome:
+            result:
+                - {_id: 5, x: 55}
+    -
+        description: "Find with limit, sort, and batchsize"
+        operation: 
+            name: "find"
+            arguments:
+                filter: {}
+                sort: {_id: 1}
+                limit: 4
+                batchSize: 2
+
+        outcome:
+            result:
+                - {_id: 1, x: 11}
+                - {_id: 2, x: 22}
+                - {_id: 3, x: 33}
+                - {_id: 4, x: 44}

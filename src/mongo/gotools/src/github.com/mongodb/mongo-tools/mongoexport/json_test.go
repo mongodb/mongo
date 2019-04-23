@@ -10,10 +10,11 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools-common/json"
+	"github.com/mongodb/mongo-tools-common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestWriteJSON(t *testing.T) {
@@ -25,8 +26,8 @@ func TestWriteJSON(t *testing.T) {
 		Convey("Special types should serialize as extended JSON", func() {
 
 			Convey("ObjectId should have an extended JSON format", func() {
-				jsonExporter := NewJSONExportOutput(false, false, out)
-				objId := bson.NewObjectId()
+				jsonExporter := NewJSONExportOutput(false, false, out, relaxed)
+				objId := primitive.NewObjectID()
 				err := jsonExporter.WriteHeader()
 				So(err, ShouldBeNil)
 				err = jsonExporter.ExportDocument(bson.D{{"_id", objId}})
@@ -34,6 +35,21 @@ func TestWriteJSON(t *testing.T) {
 				err = jsonExporter.WriteFooter()
 				So(err, ShouldBeNil)
 				So(out.String(), ShouldEqual, `{"_id":{"$oid":"`+objId.Hex()+`"}}`+"\n")
+			})
+
+			Convey("Canoncial format should be outputted if canonical is specified", func() {
+				exporter := NewJSONExportOutput(false, false, out, canonical)
+
+				err := exporter.WriteHeader()
+				So(err, ShouldBeNil)
+
+				err = exporter.ExportDocument(bson.D{{"x", int32(1)}})
+				So(err, ShouldBeNil)
+
+				err = exporter.WriteFooter()
+				So(err, ShouldBeNil)
+
+				So(out.String(), ShouldEqual, `{"x":{"$numberInt":"1"}}`+"\n")
 			})
 
 			Reset(func() {
@@ -50,13 +66,13 @@ func TestJSONArray(t *testing.T) {
 	Convey("With a JSON export output in array mode", t, func() {
 		out := &bytes.Buffer{}
 		Convey("exporting a bunch of documents should produce valid json", func() {
-			jsonExporter := NewJSONExportOutput(true, false, out)
+			jsonExporter := NewJSONExportOutput(true, false, out, relaxed)
 			err := jsonExporter.WriteHeader()
 			So(err, ShouldBeNil)
 
 			// Export a few docs of various types
 
-			testObjs := []interface{}{bson.NewObjectId(), "asd", 12345, 3.14159, bson.D{{"A", 1}}}
+			testObjs := []interface{}{primitive.NewObjectID(), "asd", 12345, 3.14159, bson.D{{"A", 1}}}
 			for _, obj := range testObjs {
 				err = jsonExporter.ExportDocument(bson.D{{"_id", obj}})
 				So(err, ShouldBeNil)

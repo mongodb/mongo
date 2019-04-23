@@ -46,6 +46,39 @@ func (a TCPPort) String() string {
 	return strconv.Itoa(int(a))
 }
 
+// LayerType returns a LayerType that would be able to decode the
+// application payload. It uses some well-known ports such as 53 for
+// DNS.
+//
+// Returns gopacket.LayerTypePayload for unknown/unsupported port numbers.
+func (a TCPPort) LayerType() gopacket.LayerType {
+	lt := tcpPortLayerType[uint16(a)]
+	if lt != 0 {
+		return lt
+	}
+	return gopacket.LayerTypePayload
+}
+
+var tcpPortLayerType = [65536]gopacket.LayerType{
+	53:   LayerTypeDNS,
+	443:  LayerTypeTLS,       // https
+	502:  LayerTypeModbusTCP, // modbustcp
+	636:  LayerTypeTLS,       // ldaps
+	989:  LayerTypeTLS,       // ftps-data
+	990:  LayerTypeTLS,       // ftps
+	992:  LayerTypeTLS,       // telnets
+	993:  LayerTypeTLS,       // imaps
+	994:  LayerTypeTLS,       // ircs
+	995:  LayerTypeTLS,       // pop3s
+	5061: LayerTypeTLS,       // ips
+}
+
+// RegisterTCPPortLayerType creates a new mapping between a TCPPort
+// and an underlaying LayerType.
+func RegisterTCPPortLayerType(port TCPPort, layerType gopacket.LayerType) {
+	tcpPortLayerType[port] = layerType
+}
+
 // String returns the port as "number(name)" if there's a well-known port name,
 // or just "number" if there isn't.  Well-known names are stored in
 // UDPPortNames.
@@ -57,18 +90,37 @@ func (a UDPPort) String() string {
 }
 
 // LayerType returns a LayerType that would be able to decode the
-// application payload. It use some well-known port such as 53 for DNS.
+// application payload. It uses some well-known ports such as 53 for
+// DNS.
 //
 // Returns gopacket.LayerTypePayload for unknown/unsupported port numbers.
 func (a UDPPort) LayerType() gopacket.LayerType {
-	switch a {
-	case 53:
-		return LayerTypeDNS
-	case 6343:
-		return LayerTypeSFlow
-	default:
-		return gopacket.LayerTypePayload
+	lt := udpPortLayerType[uint16(a)]
+	if lt != 0 {
+		return lt
 	}
+	return gopacket.LayerTypePayload
+}
+
+var udpPortLayerType = [65536]gopacket.LayerType{
+	53:   LayerTypeDNS,
+	123:  LayerTypeNTP,
+	4789: LayerTypeVXLAN,
+	67:   LayerTypeDHCPv4,
+	68:   LayerTypeDHCPv4,
+	546:  LayerTypeDHCPv6,
+	547:  LayerTypeDHCPv6,
+	5060: LayerTypeSIP,
+	6343: LayerTypeSFlow,
+	6081: LayerTypeGeneve,
+	3784: LayerTypeBFD,
+	2152: LayerTypeGTPv1U,
+}
+
+// RegisterUDPPortLayerType creates a new mapping between a UDPPort
+// and an underlaying LayerType.
+func RegisterUDPPortLayerType(port UDPPort, layerType gopacket.LayerType) {
+	udpPortLayerType[port] = layerType
 }
 
 // String returns the port as "number(name)" if there's a well-known port name,

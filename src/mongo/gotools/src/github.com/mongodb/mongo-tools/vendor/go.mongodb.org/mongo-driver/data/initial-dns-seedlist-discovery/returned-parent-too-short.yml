@@ -1,0 +1,5 @@
+uri: "mongodb+srv://test13.test.build.10gen.cc/"
+seeds: []
+hosts: []
+error: true
+comment: Should fail because returned host name's parent (build.10gen.cc) misses "test."

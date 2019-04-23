@@ -1,0 +1,189 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data: []
+
+tests:
+  - description: run command with default read preference
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: runCommand
+        object: database
+        command_name: insert
+        arguments:
+          session: session0
+          command:
+            insert: *collection_name
+            documents:
+              - _id : 1
+        result:
+          n: 1
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id : 1
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+
+  - description: run command with secondary read preference in client option and primary read preference in transaction options
+
+    clientOptions:
+      readPreference: secondary
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            readPreference:
+              mode: Primary
+      - name: runCommand
+        object: database
+        command_name: insert
+        arguments:
+          session: session0
+          command:
+            insert: *collection_name
+            documents:
+              - _id : 1
+        result:
+          n: 1
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id : 1
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+
+  - description: run command with explicit primary read preference
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: runCommand
+        object: database
+        command_name: insert
+        arguments:
+          session: session0
+          command:
+            insert: *collection_name
+            documents:
+              - _id : 1
+          readPreference:
+            mode: Primary
+        result:
+          n: 1
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id : 1
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+
+  - description: run command fails with explicit secondary read preference
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: runCommand
+        object: database
+        command_name: find
+        arguments:
+          session: session0
+          command:
+            find: *collection_name
+          readPreference:
+            mode: Secondary
+        result:
+          errorContains: read preference in a transaction must be primary
+
+  - description: run command fails with secondary read preference from transaction options
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            readPreference:
+              mode: Secondary
+      - name: runCommand
+        object: database
+        command_name: find
+        arguments:
+          session: session0
+          command:
+            find: *collection_name
+        result:
+          errorContains: read preference in a transaction must be primary
+

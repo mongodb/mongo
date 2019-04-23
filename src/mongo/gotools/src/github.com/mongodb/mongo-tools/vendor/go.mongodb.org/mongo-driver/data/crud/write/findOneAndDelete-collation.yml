@@ -1,0 +1,23 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 'ping'}
+    - {_id: 3, x: 'pINg'}
+minServerVersion: '3.4'
+
+tests:
+    -
+        description: "FindOneAndDelete when one document matches with collation"
+        operation:
+            name: findOneAndDelete
+            arguments:
+                filter: {_id: 2, x: 'PING'}
+                projection: {x: 1, _id: 0}
+                sort: {x: 1}
+                collation: { locale: 'en_US', strength: 2 } # https://docs.mongodb.com/master/reference/collation/#collation-document
+
+        outcome:
+            result: {x: 'ping'}
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 3, x: 'pINg'}

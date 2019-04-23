@@ -1,0 +1,77 @@
+tests:
+    -
+        description: "Multiple Unix domain sockets and auth DB resembling a socket (relative path)"
+        uri: "mongodb://rel%2Fmongodb-27017.sock,rel%2Fmongodb-27018.sock/admin.sock"
+        valid: true
+        warning: false
+        hosts:
+            -
+                type: "unix"
+                host: "rel/mongodb-27017.sock"
+                port: ~
+            -
+                type: "unix"
+                host: "rel/mongodb-27018.sock"
+                port: ~
+        auth:
+            username: ~
+            password: ~
+            db: "admin.sock"
+        options: ~
+    -
+        description: "Multiple Unix domain sockets with auth DB resembling a path (relative path)"
+        uri: "mongodb://rel%2Fmongodb-27017.sock,rel%2Fmongodb-27018.sock/admin.shoe"
+        valid: true
+        warning: false
+        hosts:
+            -
+                type: "unix"
+                host: "rel/mongodb-27017.sock"
+                port: ~
+            -
+                type: "unix"
+                host: "rel/mongodb-27018.sock"
+                port: ~
+        auth:
+            username: ~
+            password: ~
+            db: "admin.shoe"
+        options: ~
+    -
+        description: "Multiple Unix domain sockets and auth DB resembling a socket (absolute path)"
+        uri: "mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/admin.sock"
+        valid: true
+        warning: false
+        hosts:
+            -
+                type: "unix"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
+            -
+                type: "unix"
+                host: "/tmp/mongodb-27018.sock"
+                port: ~
+        auth:
+            username: ~
+            password: ~
+            db: "admin.sock"
+        options: ~
+    -
+        description: "Multiple Unix domain sockets with auth DB resembling a path (absolute path)"
+        uri: "mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/admin.shoe"
+        valid: true
+        warning: false
+        hosts:
+            -
+                type: "unix"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
+            -
+                type: "unix"
+                host: "/tmp/mongodb-27018.sock"
+                port: ~
+        auth:
+            username: ~
+            password: ~
+            db: "admin.shoe"
+        options: ~

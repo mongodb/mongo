@@ -10,9 +10,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/text"
 	"sort"
 	"time"
+
+	"github.com/mongodb/mongo-tools-common/text"
 )
 
 // FormattableDiff represents a diff of two samples taken by mongotop,

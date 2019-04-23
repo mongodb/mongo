@@ -18,9 +18,8 @@
 package main
 
 import (
-	"bytes"
+	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"time"
@@ -36,7 +35,7 @@ import (
 type scanner struct {
 	// iface is the interface to send packets on.
 	iface *net.Interface
-	// destination, gateway (if applicable), and soruce IP addresses to use.
+	// destination, gateway (if applicable), and source IP addresses to use.
 	dst, gw, src net.IP
 
 	handle *pcap.Handle
@@ -119,7 +118,7 @@ func (s *scanner) getHwAddr() (net.HardwareAddr, error) {
 	// Wait 3 seconds for an ARP reply.
 	for {
 		if time.Since(start) > time.Second*3 {
-			return nil, fmt.Errorf("timeout getting ARP reply")
+			return nil, errors.New("timeout getting ARP reply")
 		}
 		data, _, err := s.handle.ReadPacketData()
 		if err == pcap.NextErrorTimeoutExpired {
@@ -130,7 +129,7 @@ func (s *scanner) getHwAddr() (net.HardwareAddr, error) {
 		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.NoCopy)
 		if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
 			arp := arpLayer.(*layers.ARP)
-			if bytes.Equal(arp.SourceProtAddress, arpDst) {
+			if net.IP(arp.SourceProtAddress).Equal(net.IP(arpDst)) {
 				return net.HardwareAddr(arp.SourceHwAddress), nil
 			}
 		}

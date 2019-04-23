@@ -15,18 +15,23 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
-	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/auth"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools-common/archive"
+	"github.com/mongodb/mongo-tools-common/auth"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/intents"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/progress"
+	"github.com/mongodb/mongo-tools-common/util"
 	"github.com/mongodb/mongo-tools/mongorestore/ns"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+const (
+	progressBarLength   = 24
+	progressBarWaitTime = time.Second * 3
 )
 
 // MongoRestore is a container for the user-specified options and
@@ -47,10 +52,9 @@ type MongoRestore struct {
 
 	// other internal state
 	manager *intents.Manager
-	safety  *mgo.Safe
 
 	objCheck         bool
-	oplogLimit       bson.MongoTimestamp
+	oplogLimit       primitive.Timestamp
 	isMongos         bool
 	useWriteCommands bool
 	authVersions     authVersionPair
@@ -77,6 +81,59 @@ type MongoRestore struct {
 }
 
 type collectionIndexes map[string][]IndexDocument
+
+// New initializes an instance of MongoRestore according to the provided options.
+func New(opts Options) (*MongoRestore, error) {
+	provider, err := db.NewSessionProvider(*opts.ToolOptions)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to host: %v", err)
+	}
+
+	// start up the progress bar manager
+	progressManager := progress.NewBarWriter(log.Writer(0), progressBarWaitTime, progressBarLength, true)
+	progressManager.Start()
+
+	restore := &MongoRestore{
+		ToolOptions:     opts.ToolOptions,
+		OutputOptions:   opts.OutputOptions,
+		InputOptions:    opts.InputOptions,
+		NSOptions:       opts.NSOptions,
+		TargetDirectory: opts.TargetDirectory,
+		SessionProvider: provider,
+		ProgressManager: progressManager,
+	}
+
+	return restore, nil
+}
+
+// SupportsCollectionUUID was removed from common/db/command.go, so copied to here
+func SupportsCollectionUUID(sp *db.SessionProvider) (bool, error) {
+	session, err := sp.GetSession()
+	if err != nil {
+		return false, err
+	}
+
+	collInfo, err := db.GetCollectionInfo(session.Database("admin").Collection("system.version"))
+	if err != nil {
+		return false, err
+	}
+
+	// On FCV 3.6+, admin.system.version will have a UUID
+	if collInfo != nil && collInfo.GetUUID() != "" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// Close ends any connections and cleans up other internal state.
+func (restore *MongoRestore) Close() {
+	restore.SessionProvider.Close()
+	barWriter, ok := restore.ProgressManager.(*progress.BarWriter)
+	if ok { // should always be ok
+		barWriter.Stop()
+	}
+}
 
 // ParseAndValidateOptions returns a non-nil error if user-supplied options are invalid.
 func (restore *MongoRestore) ParseAndValidateOptions() error {
@@ -146,16 +203,15 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	}
 
 	log.Logvf(log.DebugLow, "connected to node type: %v", nodeType)
-	restore.safety, err = db.BuildWriteConcern(restore.OutputOptions.WriteConcern, nodeType,
-		restore.ToolOptions.URI.ParsedConnString())
-	if err != nil {
-		return fmt.Errorf("error parsing write concern: %v", err)
-	}
 
 	// deprecations with --nsInclude --nsExclude
 	if restore.NSOptions.DB != "" || restore.NSOptions.Collection != "" {
 		// these are only okay if restoring from a bson file
-		_, fileType := restore.getInfoFromFilename(restore.TargetDirectory)
+		_, fileType, err := restore.getInfoFromFilename(restore.TargetDirectory)
+		if err != nil {
+			return err
+		}
+
 		if fileType != BSONFileType {
 			log.Logvf(log.Always, "the --db and --collection args should only be used when "+
 				"restoring from a BSON file. Other uses are deprecated and will not exist "+
@@ -231,7 +287,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 			return fmt.Errorf("cannot specify --preserveUUID without --drop")
 		}
 
-		ok, err := restore.SessionProvider.SupportsCollectionUUID()
+		ok, err := SupportsCollectionUUID(restore.SessionProvider)
 		if err != nil {
 			return err
 		}

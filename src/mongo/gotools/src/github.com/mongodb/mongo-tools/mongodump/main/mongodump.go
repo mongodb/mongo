@@ -11,11 +11,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/progress"
+	"github.com/mongodb/mongo-tools-common/signals"
+	"github.com/mongodb/mongo-tools-common/util"
 	"github.com/mongodb/mongo-tools/mongodump"
 )
 
@@ -24,9 +24,14 @@ const (
 	progressBarWaitTime = time.Second * 3
 )
 
+var (
+	VersionStr = "built-without-version-string"
+	GitCommit  = "build-without-git-commit"
+)
+
 func main() {
 	// initialize command-line opts
-	opts := options.New("mongodump", mongodump.Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
+	opts := options.New("mongodump", VersionStr, GitCommit, mongodump.Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
 
 	inputOpts := &mongodump.InputOptions{}
 	opts.AddOptions(inputOpts)

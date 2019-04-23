@@ -9,13 +9,16 @@ package layers
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
-	"github.com/google/gopacket"
 	"net"
+
+	"github.com/google/gopacket"
 )
 
 const (
-	IPv6HopByHopOptionJumbogram = 0xC2 // RFC 2675
+	// IPv6HopByHopOptionJumbogram code as defined in RFC 2675
+	IPv6HopByHopOptionJumbogram = 0xC2
 )
 
 const (
@@ -40,10 +43,11 @@ type IPv6 struct {
 }
 
 // LayerType returns LayerTypeIPv6
-func (i *IPv6) LayerType() gopacket.LayerType { return LayerTypeIPv6 }
+func (ipv6 *IPv6) LayerType() gopacket.LayerType { return LayerTypeIPv6 }
 
-func (i *IPv6) NetworkFlow() gopacket.Flow {
-	return gopacket.NewFlow(EndpointIPv6, i.SrcIP, i.DstIP)
+// NetworkFlow returns this new Flow (EndpointIPv6, SrcIP, DstIP)
+func (ipv6 *IPv6) NetworkFlow() gopacket.Flow {
+	return gopacket.NewFlow(EndpointIPv6, ipv6.SrcIP, ipv6.DstIP)
 }
 
 // Search for Jumbo Payload TLV in IPv6HopByHop and return (length, true) if found
@@ -61,7 +65,7 @@ func getIPv6HopByHopJumboLength(hopopts *IPv6HopByHop) (uint32, bool, error) {
 		return 0, false, nil
 	}
 	if len(tlv.OptionData) != 4 {
-		return 0, false, fmt.Errorf("Jumbo length TLV data must have length 4")
+		return 0, false, errors.New("Jumbo length TLV data must have length 4")
 	}
 	l := binary.BigEndian.Uint32(tlv.OptionData)
 	if l <= ipv6MaxPayloadLength {
@@ -113,7 +117,7 @@ func setIPv6PayloadJumboLength(hbh []byte) error {
 		opt := hbh[offset]
 		if opt == 0 {
 			//Pad1
-			offset += 1
+			offset++
 			continue
 		}
 		optLen := int(hbh[offset+1])
@@ -126,13 +130,13 @@ func setIPv6PayloadJumboLength(hbh []byte) error {
 		}
 		offset += 2 + optLen
 	}
-	return fmt.Errorf("Jumbo TLV not found")
+	return errors.New("Jumbo TLV not found")
 }
 
 // SerializeTo writes the serialized form of this layer into the
 // SerializationBuffer, implementing gopacket.SerializableLayer.
 // See the docs for gopacket.SerializableLayer for more info.
-func (ip6 *IPv6) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
+func (ipv6 *IPv6) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
 	var jumbo bool
 	var err error
 
@@ -143,25 +147,35 @@ func (ip6 *IPv6) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Serialize
 		if opts.FixLengths {
 			// We need to set the length later because the hop-by-hop header may
 			// not exist or else need padding, so pLen may yet change
-			addIPv6JumboOption(ip6)
-		} else if ip6.HopByHop == nil {
+			addIPv6JumboOption(ipv6)
+		} else if ipv6.HopByHop == nil {
 			return fmt.Errorf("Cannot fit payload length of %d into IPv6 packet", pLen)
 		} else {
-			_, ok, err := getIPv6HopByHopJumboLength(ip6.HopByHop)
+			_, ok, err := getIPv6HopByHopJumboLength(ipv6.HopByHop)
 			if err != nil {
 				return err
 			}
 			if !ok {
-				return fmt.Errorf("Missing jumbo length hop-by-hop option")
+				return errors.New("Missing jumbo length hop-by-hop option")
 			}
 		}
 	}
-	if ip6.HopByHop != nil {
-		if ip6.NextHeader != IPProtocolIPv6HopByHop {
-			// Just fix it instead of throwing an error
-			ip6.NextHeader = IPProtocolIPv6HopByHop
+
+	hbhAlreadySerialized := false
+	if ipv6.HopByHop != nil {
+		for _, l := range b.Layers() {
+			if l == LayerTypeIPv6HopByHop {
+				hbhAlreadySerialized = true
+				break
+			}
 		}
-		err = ip6.HopByHop.SerializeTo(b, opts)
+	}
+	if ipv6.HopByHop != nil && !hbhAlreadySerialized {
+		if ipv6.NextHeader != IPProtocolIPv6HopByHop {
+			// Just fix it instead of throwing an error
+			ipv6.NextHeader = IPProtocolIPv6HopByHop
+		}
+		err = ipv6.HopByHop.SerializeTo(b, opts)
 		if err != nil {
 			return err
 		}
@@ -174,95 +188,106 @@ func (ip6 *IPv6) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Serialize
 			}
 		}
 	}
+
 	if !jumbo && pLen > ipv6MaxPayloadLength {
-		return fmt.Errorf("Cannot fit payload into IPv6 header")
+		return errors.New("Cannot fit payload into IPv6 header")
 	}
 	bytes, err := b.PrependBytes(40)
 	if err != nil {
 		return err
 	}
-	bytes[0] = (ip6.Version << 4) | (ip6.TrafficClass >> 4)
-	bytes[1] = (ip6.TrafficClass << 4) | uint8(ip6.FlowLabel>>16)
-	binary.BigEndian.PutUint16(bytes[2:], uint16(ip6.FlowLabel))
+	bytes[0] = (ipv6.Version << 4) | (ipv6.TrafficClass >> 4)
+	bytes[1] = (ipv6.TrafficClass << 4) | uint8(ipv6.FlowLabel>>16)
+	binary.BigEndian.PutUint16(bytes[2:], uint16(ipv6.FlowLabel))
 	if opts.FixLengths {
 		if jumbo {
-			ip6.Length = 0
+			ipv6.Length = 0
 		} else {
-			ip6.Length = uint16(pLen)
+			ipv6.Length = uint16(pLen)
 		}
 	}
-	binary.BigEndian.PutUint16(bytes[4:], ip6.Length)
-	bytes[6] = byte(ip6.NextHeader)
-	bytes[7] = byte(ip6.HopLimit)
-	if err := ip6.AddressTo16(); err != nil {
+	binary.BigEndian.PutUint16(bytes[4:], ipv6.Length)
+	bytes[6] = byte(ipv6.NextHeader)
+	bytes[7] = byte(ipv6.HopLimit)
+	if err := ipv6.AddressTo16(); err != nil {
 		return err
 	}
-	copy(bytes[8:], ip6.SrcIP)
-	copy(bytes[24:], ip6.DstIP)
+	copy(bytes[8:], ipv6.SrcIP)
+	copy(bytes[24:], ipv6.DstIP)
 	return nil
 }
 
-func (ip6 *IPv6) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
-	ip6.Version = uint8(data[0]) >> 4
-	ip6.TrafficClass = uint8((binary.BigEndian.Uint16(data[0:2]) >> 4) & 0x00FF)
-	ip6.FlowLabel = binary.BigEndian.Uint32(data[0:4]) & 0x000FFFFF
-	ip6.Length = binary.BigEndian.Uint16(data[4:6])
-	ip6.NextHeader = IPProtocol(data[6])
-	ip6.HopLimit = data[7]
-	ip6.SrcIP = data[8:24]
-	ip6.DstIP = data[24:40]
-	ip6.HopByHop = nil
-	ip6.BaseLayer = BaseLayer{data[:40], data[40:]}
+// DecodeFromBytes implementation according to gopacket.DecodingLayer
+func (ipv6 *IPv6) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	if len(data) < 40 {
+		df.SetTruncated()
+		return fmt.Errorf("Invalid ip6 header. Length %d less than 40", len(data))
+	}
+	ipv6.Version = uint8(data[0]) >> 4
+	ipv6.TrafficClass = uint8((binary.BigEndian.Uint16(data[0:2]) >> 4) & 0x00FF)
+	ipv6.FlowLabel = binary.BigEndian.Uint32(data[0:4]) & 0x000FFFFF
+	ipv6.Length = binary.BigEndian.Uint16(data[4:6])
+	ipv6.NextHeader = IPProtocol(data[6])
+	ipv6.HopLimit = data[7]
+	ipv6.SrcIP = data[8:24]
+	ipv6.DstIP = data[24:40]
+	ipv6.HopByHop = nil
+	ipv6.BaseLayer = BaseLayer{data[:40], data[40:]}
 
 	// We treat a HopByHop IPv6 option as part of the IPv6 packet, since its
 	// options are crucial for understanding what's actually happening per packet.
-	if ip6.NextHeader == IPProtocolIPv6HopByHop {
-		err := ip6.hbh.DecodeFromBytes(ip6.Payload, df)
+	if ipv6.NextHeader == IPProtocolIPv6HopByHop {
+		err := ipv6.hbh.DecodeFromBytes(ipv6.Payload, df)
 		if err != nil {
 			return err
 		}
-		ip6.HopByHop = &ip6.hbh
-		pEnd, jumbo, err := getIPv6HopByHopJumboLength(ip6.HopByHop)
+		ipv6.HopByHop = &ipv6.hbh
+		pEnd, jumbo, err := getIPv6HopByHopJumboLength(ipv6.HopByHop)
 		if err != nil {
 			return err
 		}
-		if jumbo && ip6.Length == 0 {
+		if jumbo && ipv6.Length == 0 {
 			pEnd := int(pEnd)
-			if pEnd > len(ip6.Payload) {
+			if pEnd > len(ipv6.Payload) {
 				df.SetTruncated()
-				pEnd = len(ip6.Payload)
+				pEnd = len(ipv6.Payload)
 			}
-			ip6.Payload = ip6.Payload[:pEnd]
+			ipv6.Payload = ipv6.Payload[:pEnd]
 			return nil
-		} else if jumbo && ip6.Length != 0 {
-			return fmt.Errorf("IPv6 has jumbo length and IPv6 length is not 0")
-		} else if !jumbo && ip6.Length == 0 {
-			return fmt.Errorf("IPv6 length 0, but HopByHop header does not have jumbogram option")
+		} else if jumbo && ipv6.Length != 0 {
+			return errors.New("IPv6 has jumbo length and IPv6 length is not 0")
+		} else if !jumbo && ipv6.Length == 0 {
+			return errors.New("IPv6 length 0, but HopByHop header does not have jumbogram option")
+		} else {
+			ipv6.Payload = ipv6.Payload[ipv6.hbh.ActualLength:]
 		}
 	}
 
-	if ip6.Length == 0 {
-		return fmt.Errorf("IPv6 length 0, but next header is %v, not HopByHop", ip6.NextHeader)
-	} else {
-		pEnd := int(ip6.Length)
-		if pEnd > len(ip6.Payload) {
-			df.SetTruncated()
-			pEnd = len(ip6.Payload)
-		}
-		ip6.Payload = ip6.Payload[:pEnd]
+	if ipv6.Length == 0 {
+		return fmt.Errorf("IPv6 length 0, but next header is %v, not HopByHop", ipv6.NextHeader)
 	}
+
+	pEnd := int(ipv6.Length)
+	if pEnd > len(ipv6.Payload) {
+		df.SetTruncated()
+		pEnd = len(ipv6.Payload)
+	}
+	ipv6.Payload = ipv6.Payload[:pEnd]
+
 	return nil
 }
 
-func (i *IPv6) CanDecode() gopacket.LayerClass {
+// CanDecode implementation according to gopacket.DecodingLayer
+func (ipv6 *IPv6) CanDecode() gopacket.LayerClass {
 	return LayerTypeIPv6
 }
 
-func (i *IPv6) NextLayerType() gopacket.LayerType {
-	if i.HopByHop != nil {
-		return i.HopByHop.NextHeader.LayerType()
+// NextLayerType implementation according to gopacket.DecodingLayer
+func (ipv6 *IPv6) NextLayerType() gopacket.LayerType {
+	if ipv6.HopByHop != nil {
+		return ipv6.HopByHop.NextHeader.LayerType()
 	}
-	return i.NextHeader.LayerType()
+	return ipv6.NextHeader.LayerType()
 }
 
 func decodeIPv6(data []byte, p gopacket.PacketBuilder) error {
@@ -276,10 +301,7 @@ func decodeIPv6(data []byte, p gopacket.PacketBuilder) error {
 	if err != nil {
 		return err
 	}
-	if ip6.HopByHop != nil {
-		return p.NextDecoder(ip6.HopByHop.NextHeader)
-	}
-	return p.NextDecoder(ip6.NextHeader)
+	return p.NextDecoder(ip6.NextLayerType())
 }
 
 type ipv6HeaderTLVOption struct {
@@ -385,10 +407,17 @@ type ipv6ExtensionBase struct {
 	ActualLength int
 }
 
-func decodeIPv6ExtensionBase(data []byte) (i ipv6ExtensionBase) {
+func decodeIPv6ExtensionBase(data []byte, df gopacket.DecodeFeedback) (i ipv6ExtensionBase, returnedErr error) {
+	if len(data) < 2 {
+		df.SetTruncated()
+		return ipv6ExtensionBase{}, fmt.Errorf("Invalid ip6-extension header. Length %d less than 2", len(data))
+	}
 	i.NextHeader = IPProtocol(data[0])
 	i.HeaderLength = data[1]
 	i.ActualLength = int(i.HeaderLength)*8 + 8
+	if len(data) < i.ActualLength {
+		return ipv6ExtensionBase{}, fmt.Errorf("Invalid ip6-extension header. Length %d less than specified length %d", len(data), i.ActualLength)
+	}
 	i.Contents = data[:i.ActualLength]
 	i.Payload = data[i.ActualLength:]
 	return
@@ -402,17 +431,23 @@ type IPv6ExtensionSkipper struct {
 	BaseLayer
 }
 
+// DecodeFromBytes implementation according to gopacket.DecodingLayer
 func (i *IPv6ExtensionSkipper) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
-	extension := decodeIPv6ExtensionBase(data)
+	extension, err := decodeIPv6ExtensionBase(data, df)
+	if err != nil {
+		return err
+	}
 	i.BaseLayer = BaseLayer{data[:extension.ActualLength], data[extension.ActualLength:]}
 	i.NextHeader = extension.NextHeader
 	return nil
 }
 
+// CanDecode implementation according to gopacket.DecodingLayer
 func (i *IPv6ExtensionSkipper) CanDecode() gopacket.LayerClass {
 	return LayerClassIPv6Extension
 }
 
+// NextLayerType implementation according to gopacket.DecodingLayer
 func (i *IPv6ExtensionSkipper) NextLayerType() gopacket.LayerType {
 	return i.NextHeader.LayerType()
 }
@@ -429,6 +464,7 @@ type IPv6HopByHop struct {
 // LayerType returns LayerTypeIPv6HopByHop.
 func (i *IPv6HopByHop) LayerType() gopacket.LayerType { return LayerTypeIPv6HopByHop }
 
+// SerializeTo implementation according to gopacket.SerializableLayer
 func (i *IPv6HopByHop) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
 	var bytes []byte
 	var err error
@@ -447,7 +483,7 @@ func (i *IPv6HopByHop) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Ser
 
 	length := len(bytes) + 2
 	if length%8 != 0 {
-		return fmt.Errorf("IPv6HopByHop actual length must be multiple of 8")
+		return errors.New("IPv6HopByHop actual length must be multiple of 8")
 	}
 	bytes, err = b.PrependBytes(2)
 	if err != nil {
@@ -461,8 +497,13 @@ func (i *IPv6HopByHop) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Ser
 	return nil
 }
 
+// DecodeFromBytes implementation according to gopacket.DecodingLayer
 func (i *IPv6HopByHop) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
-	i.ipv6ExtensionBase = decodeIPv6ExtensionBase(data)
+	var err error
+	i.ipv6ExtensionBase, err = decodeIPv6ExtensionBase(data, df)
+	if err != nil {
+		return err
+	}
 	offset := 2
 	for offset < i.ActualLength {
 		opt := decodeIPv6HeaderTLVOption(data[offset:])
@@ -482,6 +523,7 @@ func decodeIPv6HopByHop(data []byte, p gopacket.PacketBuilder) error {
 	return p.NextDecoder(i.NextHeader)
 }
 
+// SetJumboLength adds the IPv6HopByHopOptionJumbogram with the given length
 func (o *IPv6HopByHopOption) SetJumboLength(len uint32) {
 	o.OptionType = IPv6HopByHopOptionJumbogram
 	o.OptionLength = 4
@@ -510,8 +552,12 @@ type IPv6Routing struct {
 func (i *IPv6Routing) LayerType() gopacket.LayerType { return LayerTypeIPv6Routing }
 
 func decodeIPv6Routing(data []byte, p gopacket.PacketBuilder) error {
+	base, err := decodeIPv6ExtensionBase(data, p)
+	if err != nil {
+		return err
+	}
 	i := &IPv6Routing{
-		ipv6ExtensionBase: decodeIPv6ExtensionBase(data),
+		ipv6ExtensionBase: base,
 		RoutingType:       data[2],
 		SegmentsLeft:      data[3],
 		Reserved:          data[4:8],
@@ -549,6 +595,10 @@ type IPv6Fragment struct {
 func (i *IPv6Fragment) LayerType() gopacket.LayerType { return LayerTypeIPv6Fragment }
 
 func decodeIPv6Fragment(data []byte, p gopacket.PacketBuilder) error {
+	if len(data) < 8 {
+		p.SetTruncated()
+		return fmt.Errorf("Invalid ip6-fragment header. Length %d less than 8", len(data))
+	}
 	i := &IPv6Fragment{
 		BaseLayer:      BaseLayer{data[:8], data[8:]},
 		NextHeader:     IPProtocol(data[0]),
@@ -574,8 +624,13 @@ type IPv6Destination struct {
 // LayerType returns LayerTypeIPv6Destination.
 func (i *IPv6Destination) LayerType() gopacket.LayerType { return LayerTypeIPv6Destination }
 
+// DecodeFromBytes implementation according to gopacket.DecodingLayer
 func (i *IPv6Destination) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
-	i.ipv6ExtensionBase = decodeIPv6ExtensionBase(data)
+	var err error
+	i.ipv6ExtensionBase, err = decodeIPv6ExtensionBase(data, df)
+	if err != nil {
+		return err
+	}
 	offset := 2
 	for offset < i.ActualLength {
 		opt := decodeIPv6HeaderTLVOption(data[offset:])
@@ -616,7 +671,7 @@ func (i *IPv6Destination) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.
 
 	length := len(bytes) + 2
 	if length%8 != 0 {
-		return fmt.Errorf("IPv6Destination actual length must be multiple of 8")
+		return errors.New("IPv6Destination actual length must be multiple of 8")
 	}
 	bytes, err = b.PrependBytes(2)
 	if err != nil {
@@ -635,16 +690,17 @@ func checkIPv6Address(addr net.IP) error {
 		return nil
 	}
 	if len(addr) == net.IPv4len {
-		return fmt.Errorf("address is IPv4")
+		return errors.New("address is IPv4")
 	}
 	return fmt.Errorf("wrong length of %d bytes instead of %d", len(addr), net.IPv6len)
 }
 
-func (ip *IPv6) AddressTo16() error {
-	if err := checkIPv6Address(ip.SrcIP); err != nil {
+// AddressTo16 ensures IPv6.SrcIP and IPv6.DstIP are actually IPv6 addresses (i.e. 16 byte addresses)
+func (ipv6 *IPv6) AddressTo16() error {
+	if err := checkIPv6Address(ipv6.SrcIP); err != nil {
 		return fmt.Errorf("Invalid source IPv6 address (%s)", err)
 	}
-	if err := checkIPv6Address(ip.DstIP); err != nil {
+	if err := checkIPv6Address(ipv6.DstIP); err != nil {
 		return fmt.Errorf("Invalid destination IPv6 address (%s)", err)
 	}
 	return nil

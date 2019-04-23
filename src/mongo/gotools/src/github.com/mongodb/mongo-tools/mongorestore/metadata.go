@@ -10,15 +10,13 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/mongodb/mongo-tools/common"
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/intents"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/util"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Specially treated restore collection types.
@@ -37,14 +35,9 @@ type authVersionPair struct {
 
 // Metadata holds information about a collection's options and indexes.
 type Metadata struct {
-	Options bson.D          `json:"options,omitempty"`
-	Indexes []IndexDocument `json:"indexes"`
-	UUID    string          `json:"uuid"`
-}
-
-// this struct is used to read in the options of a set of indexes
-type metaDataMapIndex struct {
-	Indexes []bson.M `json:"indexes"`
+	Options bson.D          `bson:"options,omitempty"`
+	Indexes []IndexDocument `bson:"indexes"`
+	UUID    string          `bson:"uuid"`
 }
 
 // IndexDocument holds information about a collection's index.
@@ -64,49 +57,9 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (*Metadata, erro
 
 	meta := &Metadata{}
 
-	err := json.Unmarshal(jsonBytes, meta)
+	err := bson.UnmarshalExtJSON(jsonBytes, true, meta)
 	if err != nil {
 		return nil, err
-	}
-
-	// first get the ordered key information for each index,
-	// then merge it with a set of options stored as a map
-	metaAsMap := metaDataMapIndex{}
-	err = json.Unmarshal(jsonBytes, &metaAsMap)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling metadata as map: %v", err)
-	}
-	for i := range meta.Indexes {
-		// remove "key", and "partialFilterExpression" from the map so we can decode them properly later
-		delete(metaAsMap.Indexes[i], "key")
-		delete(metaAsMap.Indexes[i], "partialFilterExpression")
-
-		// parse extra index fields
-		meta.Indexes[i].Options = metaAsMap.Indexes[i]
-		if err := bsonutil.ConvertJSONDocumentToBSON(meta.Indexes[i].Options); err != nil {
-			return nil, fmt.Errorf("extended json error: %v", err)
-		}
-
-		// parse the values of the index keys, so we can support extended json
-		for pos, field := range meta.Indexes[i].Key {
-			meta.Indexes[i].Key[pos].Value, err = bsonutil.ParseJSONValue(field.Value)
-			if err != nil {
-				return nil, fmt.Errorf("extended json in 'key.%v' field: %v", field.Name, err)
-			}
-		}
-		// parse the values of the index keys, so we can support extended json
-		for pos, field := range meta.Indexes[i].PartialFilterExpression {
-			meta.Indexes[i].PartialFilterExpression[pos].Value, err = bsonutil.ParseJSONValue(field.Value)
-			if err != nil {
-				return nil, fmt.Errorf("extended json in 'partialFilterExpression.%v' field: %v", field.Name, err)
-			}
-		}
-	}
-
-	// parse the values of options fields, to support extended json
-	meta.Options, err = bsonutil.GetExtendedBsonD(meta.Options)
-	if err != nil {
-		return nil, fmt.Errorf("extended json in 'options': %v", err)
 	}
 
 	return meta, nil
@@ -130,11 +83,14 @@ func (restore *MongoRestore) LoadIndexesFromBSON() error {
 		defer bsonSource.Close()
 
 		// iterate over stored indexes, saving all that match the collection
-		indexDocument := &IndexDocument{}
-		for bsonSource.Next(indexDocument) {
+		for {
+			indexDocument := IndexDocument{}
+			if !bsonSource.Next(&indexDocument) {
+				break
+			}
 			namespace := indexDocument.Options["ns"].(string)
 			dbCollectionIndexes[dbname][stripDBFromNS(namespace)] =
-				append(dbCollectionIndexes[dbname][stripDBFromNS(namespace)], *indexDocument)
+				append(dbCollectionIndexes[dbname][stripDBFromNS(namespace)], indexDocument)
 		}
 		if err := bsonSource.Err(); err != nil {
 			return fmt.Errorf("error scanning system.indexes: %v", err)
@@ -145,7 +101,7 @@ func (restore *MongoRestore) LoadIndexesFromBSON() error {
 }
 
 func stripDBFromNS(ns string) string {
-	_, c := common.SplitNamespace(ns)
+	_, c := util.SplitNamespace(ns)
 	return c
 }
 
@@ -167,13 +123,19 @@ func (restore *MongoRestore) CollectionExists(intent *intents.Intent) (bool, err
 		if err != nil {
 			return false, fmt.Errorf("error establishing connection: %v", err)
 		}
-		defer session.Close()
-		collections, err := session.DB(intent.DB).CollectionNames()
+		collections, err := session.Database(intent.DB).ListCollections(nil, bson.M{})
 		if err != nil {
 			return false, err
 		}
 		// update the cache
-		restore.knownCollections[intent.DB] = collections
+		for collections.Next(nil) {
+			colNameRaw := collections.Current.Lookup("name")
+			colName, ok := colNameRaw.StringValueOK()
+			if !ok {
+				return false, fmt.Errorf("invalid collection name: %v", colNameRaw)
+			}
+			restore.knownCollections[intent.DB] = append(restore.knownCollections[intent.DB], colName)
+		}
 	}
 
 	// now check the cache for the given collection name
@@ -209,16 +171,13 @@ func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []Ind
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	session.SetSafe(&mgo.Safe{})
-	defer session.Close()
 
 	// then attempt the createIndexes command
 	rawCommand := bson.D{
 		{"createIndexes", intent.C},
 		{"indexes", indexes},
 	}
-	results := bson.M{}
-	err = session.DB(intent.DB).Run(rawCommand, &results)
+	err = session.Database(intent.DB).RunCommand(nil, rawCommand).Err()
 	if err == nil {
 		return nil
 	}
@@ -245,12 +204,9 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index Ind
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	defer session.Close()
 
-	// overwrite safety to make sure we catch errors
-	session.SetSafe(&mgo.Safe{})
-	indexCollection := session.DB(intent.DB).C("system.indexes")
-	err = indexCollection.Insert(index)
+	indexCollection := session.Database(intent.DB).Collection("system.indexes")
+	_, err = indexCollection.InsertOne(nil, index)
 	if err != nil {
 		return fmt.Errorf("insert error: %v", err)
 	}
@@ -265,7 +221,6 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	defer session.Close()
 
 	switch {
 
@@ -277,13 +232,17 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 
 }
 
-func (restore *MongoRestore) createCollectionWithCommand(session *mgo.Session, intent *intents.Intent, options bson.D) error {
+func (restore *MongoRestore) createCollectionWithCommand(session *mongo.Client, intent *intents.Intent, options bson.D) error {
 	command := createCollectionCommand(intent, options)
-	res := bson.M{}
-	err := session.DB(intent.DB).Run(command, &res)
-	if err != nil {
+
+	// If there is no error, the result doesnt matter
+	singleRes := session.Database(intent.DB).RunCommand(nil, command, nil)
+	if err := singleRes.Err(); err != nil {
 		return fmt.Errorf("error running create command: %v", err)
 	}
+
+	res := bson.M{}
+	singleRes.Decode(&res)
 	if util.IsFalsy(res["ok"]) {
 		return fmt.Errorf("create command: %v", res["errmsg"])
 	}
@@ -291,33 +250,23 @@ func (restore *MongoRestore) createCollectionWithCommand(session *mgo.Session, i
 
 }
 
-func (restore *MongoRestore) createCollectionWithApplyOps(session *mgo.Session, intent *intents.Intent, options bson.D, uuidHex string) error {
+func (restore *MongoRestore) createCollectionWithApplyOps(session *mongo.Client, intent *intents.Intent, options bson.D, uuidHex string) error {
 	command := createCollectionCommand(intent, options)
 	uuid, err := hex.DecodeString(uuidHex)
 	if err != nil {
 		return fmt.Errorf("Couldn't restore UUID because UUID was invalid: %s", err)
 	}
 
-	b, err := bson.Marshal(command)
-	if err != nil {
-		return err
-	}
-	var rawCommand bson.RawD
-	err = bson.Unmarshal(b, &rawCommand)
-	if err != nil {
-		return err
-	}
-
 	createOp := struct {
-		Operation string       `bson:"op"`
-		Namespace string       `bson:"ns"`
-		Object    bson.RawD    `bson:"o"`
-		UI        *bson.Binary `bson:"ui,omitempty"`
+		Operation string            `bson:"op"`
+		Namespace string            `bson:"ns"`
+		Object    bson.D            `bson:"o"`
+		UI        *primitive.Binary `bson:"ui,omitempty"`
 	}{
 		Operation: "c",
 		Namespace: intent.DB + ".$cmd",
-		Object:    rawCommand,
-		UI:        &bson.Binary{Kind: 0x04, Data: uuid},
+		Object:    command,
+		UI:        &primitive.Binary{Subtype: 0x04, Data: uuid},
 	}
 
 	return restore.ApplyOps(session, []interface{}{createOp})
@@ -330,6 +279,33 @@ func createCollectionCommand(intent *intents.Intent, options bson.D) bson.D {
 // RestoreUsersOrRoles accepts a users intent and a roles intent, and restores
 // them via _mergeAuthzCollections. Either or both can be nil. In the latter case
 // nothing is done.
+//
+// _mergeAuthzCollections is an internal server command implemented specifically for mongorestore. Instead of inserting
+// into the admin.system.{roles, users} collections (which isn't allowed due to some locking policies), we construct
+// temporary collections that are then merged with or replace the existing ones.
+//
+// The "drop" argument that determines whether the merge replaces the existing users/roles or adds to them.
+//
+// The "db" argument determines which databases' users and roles are merged. If left blank, it merges users and roles
+// from all databases. When the user restores the admin database, we assume they wish to restore the users and roles for
+// all databases, not just the admin ones, so we leave the "db" field blank in that case.
+//
+// The "temp{Users,Roles}Collection" arguments determine which temporary collections to merge from, and the presence of
+// either determines which collection to merge to. (e.g. if tempUsersCollection is defined, admin.system.users is merged
+// into).
+//
+// This command must be run on the "admin" database. Thus, the temporary collections must be on the admin db as well.
+// This command must also be run on the primary.
+//
+// Example command:
+// {
+//    _mergeAuthzCollections: 1,
+//    db: "foo",
+//    tempUsersCollection: "myTempUsers"
+//    drop: true
+//    writeConcern: {w: "majority"}
+// }
+//
 func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) error {
 
 	type loopArg struct {
@@ -362,7 +338,6 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	defer session.Close()
 
 	// For each of the users and roles intents:
 	//   build up the mergeArgs component of the _mergeAuthzCollections command
@@ -375,8 +350,9 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 			log.Logvf(log.Always, "%v file '%v' is empty; skipping %v restoration", arg.intentType, arg.intent.Location, arg.intentType)
 		}
 		log.Logvf(log.Always, "restoring %v from %v", arg.intentType, arg.intent.Location)
-		mergeArgs = append(mergeArgs, bson.DocElem{
-			Name:  arg.mergeParamName,
+
+		mergeArgs = append(mergeArgs, bson.E{
+			Key:   arg.mergeParamName,
 			Value: "admin." + arg.tempCollectionName,
 		})
 
@@ -394,7 +370,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 		}
 		if tempCollectionNameExists {
 			log.Logvf(log.Info, "dropping preexisting temporary collection admin.%v", arg.tempCollectionName)
-			err = session.DB("admin").C(arg.tempCollectionName).DropCollection()
+			err = session.Database("admin").Collection(arg.tempCollectionName).Drop(nil)
 			if err != nil {
 				return fmt.Errorf("error dropping preexisting temporary collection %v: %v", arg.tempCollectionName, err)
 			}
@@ -413,9 +389,8 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 				log.Logvf(log.Info, "error establishing connection to drop temporary collection admin.%v: %v", arg.tempCollectionName, e)
 				return
 			}
-			defer session.Close()
 			log.Logvf(log.DebugHigh, "dropping temporary collection admin.%v", arg.tempCollectionName)
-			e = session.DB("admin").C(arg.tempCollectionName).DropCollection()
+			e = session.Database("admin").Collection(arg.tempCollectionName).Drop(nil)
 			if e != nil {
 				log.Logvf(log.Info, "error dropping temporary collection admin.%v: %v", arg.tempCollectionName, e)
 			}
@@ -428,34 +403,39 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 		userTargetDB = ""
 	}
 
-	// we have to manually convert mgo's safety to a writeconcern object
-	writeConcern := bson.M{}
-	if restore.safety == nil {
-		writeConcern["w"] = 0
-	} else {
-		if restore.safety.WMode != "" {
-			writeConcern["w"] = restore.safety.WMode
-		} else {
-			writeConcern["w"] = restore.safety.W
-		}
-	}
+	adminDB := session.Database("admin")
 
-	command := bsonutil.MarshalD{}
+	command := bson.D{}
 	command = append(command,
-		bson.DocElem{Name: "_mergeAuthzCollections", Value: 1})
+		bson.E{Key: "_mergeAuthzCollections", Value: 1})
 	command = append(command,
 		mergeArgs...)
 	command = append(command,
-		bson.DocElem{Name: "drop", Value: restore.OutputOptions.Drop},
-		bson.DocElem{Name: "writeConcern", Value: writeConcern},
-		bson.DocElem{Name: "db", Value: userTargetDB})
+		bson.E{Key: "drop", Value: restore.OutputOptions.Drop},
+		bson.E{Key: "db", Value: userTargetDB})
+
+	if restore.ToolOptions.WriteConcern != nil {
+		_, wcBson, err := restore.ToolOptions.WriteConcern.MarshalBSONValue()
+		if err != nil {
+			return fmt.Errorf("error parsing write concern: %v", err)
+		}
+
+		writeConcern := bson.M{}
+		err = bson.Unmarshal(wcBson, &writeConcern)
+		if err != nil {
+			return fmt.Errorf("error parsing write concern: %v", err)
+		}
+
+		command = append(command, bson.E{Key: "writeConcern", Value: writeConcern})
+	}
 
 	log.Logvf(log.DebugLow, "merging users/roles from temp collections")
-	res := bson.M{}
-	err = session.Run(command, &res)
-	if err != nil {
+	resSingle := adminDB.RunCommand(nil, command)
+	if err = resSingle.Err(); err != nil {
 		return fmt.Errorf("error running merge command: %v", err)
 	}
+	res := bson.M{}
+	resSingle.Decode(&res)
 	if util.IsFalsy(res["ok"]) {
 		return fmt.Errorf("_mergeAuthzCollections command: %v", res["errmsg"])
 	}
@@ -492,15 +472,24 @@ func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
 	defer bsonSource.Close()
 
-	versionDoc := bson.M{}
-	for bsonSource.Next(&versionDoc) {
+	for {
+		versionDoc := bson.M{}
+		if !bsonSource.Next(&versionDoc) {
+			break
+		}
+
 		id, ok := versionDoc["_id"].(string)
 		if ok && id == "authSchema" {
-			authVersion, ok := versionDoc["currentVersion"].(int)
-			if ok {
+			switch authVersion := versionDoc["currentVersion"].(type) {
+			case int:
 				return authVersion, nil
+			case int32:
+				return int(authVersion), nil
+			case int64:
+				return int(authVersion), nil
+			default:
+				return 0, fmt.Errorf("can't unmarshal system.version curentVersion as an int: %v", versionDoc["currentVersion"])
 			}
-			return 0, fmt.Errorf("can't unmarshal system.version curentVersion as an int")
 		}
 		log.Logvf(log.DebugLow, "system.version document is not an authSchema %v", versionDoc["_id"])
 	}
@@ -586,8 +575,7 @@ func (restore *MongoRestore) DropCollection(intent *intents.Intent) error {
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	defer session.Close()
-	err = session.DB(intent.DB).C(intent.C).DropCollection()
+	err = session.Database(intent.DB).Collection(intent.C).Drop(nil)
 	if err != nil {
 		return fmt.Errorf("error dropping collection: %v", err)
 	}

@@ -12,12 +12,13 @@ package dumpcommand
 import (
 	"flag"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/ip4defrag"
-	"github.com/google/gopacket/layers" // pulls in all layers decoders
 	"log"
 	"os"
 	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/ip4defrag"
+	"github.com/google/gopacket/layers" // pulls in all layers decoders
 )
 
 var (
@@ -43,6 +44,7 @@ func Run(src gopacket.PacketDataSource) {
 	source := gopacket.NewPacketSource(src, dec)
 	source.Lazy = *lazy
 	source.NoCopy = true
+	source.DecodeStreamsAsDatagrams = true
 	fmt.Fprintln(os.Stderr, "Starting to read packets")
 	count := 0
 	bytes := int64(0)

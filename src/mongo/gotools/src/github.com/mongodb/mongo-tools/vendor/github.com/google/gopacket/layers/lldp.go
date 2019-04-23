@@ -8,7 +8,9 @@ package layers
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+
 	"github.com/google/gopacket"
 )
 
@@ -35,6 +37,10 @@ type LinkLayerDiscoveryValue struct {
 	Value  []byte
 }
 
+func (c *LinkLayerDiscoveryValue) len() int {
+	return 0
+}
+
 // LLDPChassisIDSubType specifies the value type for a single LLDPChassisID.ID
 type LLDPChassisIDSubType byte
 
@@ -55,6 +61,20 @@ type LLDPChassisID struct {
 	ID      []byte
 }
 
+func (c *LLDPChassisID) serialize() []byte {
+
+	var buf = make([]byte, c.serializedLen())
+	idLen := uint16(LLDPTLVChassisID)<<9 | uint16(len(c.ID)+1) //id should take 7 bits, length should take 9 bits, +1 for subtype
+	binary.BigEndian.PutUint16(buf[0:2], idLen)
+	buf[2] = byte(c.Subtype)
+	copy(buf[3:], c.ID)
+	return buf
+}
+
+func (c *LLDPChassisID) serializedLen() int {
+	return len(c.ID) + 3 // +2 for id and length, +1 for subtype
+}
+
 // LLDPPortIDSubType specifies the value type for a single LLDPPortID.ID
 type LLDPPortIDSubType byte
 
@@ -73,6 +93,20 @@ const (
 type LLDPPortID struct {
 	Subtype LLDPPortIDSubType
 	ID      []byte
+}
+
+func (c *LLDPPortID) serialize() []byte {
+
+	var buf = make([]byte, c.serializedLen())
+	idLen := uint16(LLDPTLVPortID)<<9 | uint16(len(c.ID)+1) //id should take 7 bits, length should take 9 bits, +1 for subtype
+	binary.BigEndian.PutUint16(buf[0:2], idLen)
+	buf[2] = byte(c.Subtype)
+	copy(buf[3:], c.ID)
+	return buf
+}
+
+func (c *LLDPPortID) serializedLen() int {
+	return len(c.ID) + 3 // +2 for id and length, +1 for subtype
 }
 
 // LinkLayerDiscovery is a packet layer containing the LinkLayer Discovery Protocol.
@@ -731,13 +765,36 @@ func (c *LinkLayerDiscovery) LayerType() gopacket.LayerType {
 	return LayerTypeLinkLayerDiscovery
 }
 
+// SerializeTo serializes LLDP packet to bytes and writes on SerializeBuffer.
+func (c *LinkLayerDiscovery) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
+	chassIDLen := c.ChassisID.serializedLen()
+	portIDLen := c.PortID.serializedLen()
+	vb, err := b.AppendBytes(chassIDLen + portIDLen + 4) // +4 for TTL
+	if err != nil {
+		return err
+	}
+	copy(vb[:chassIDLen], c.ChassisID.serialize())
+	copy(vb[chassIDLen:], c.PortID.serialize())
+	ttlIDLen := uint16(LLDPTLVTTL)<<9 | uint16(2)
+	binary.BigEndian.PutUint16(vb[chassIDLen+portIDLen:], ttlIDLen)
+	binary.BigEndian.PutUint16(vb[chassIDLen+portIDLen+2:], c.TTL)
+
+	vb, err = b.AppendBytes(2) // End Tlv, 2 bytes
+	if err != nil {
+		return err
+	}
+	binary.BigEndian.PutUint16(vb[len(vb)-2:], uint16(0)) //End tlv, 2 bytes, all zero
+	return nil
+
+}
+
 func decodeLinkLayerDiscovery(data []byte, p gopacket.PacketBuilder) error {
 	var vals []LinkLayerDiscoveryValue
 	vData := data[0:]
 	for len(vData) > 0 {
 		nbit := vData[0] & 0x01
 		t := LLDPTLVType(vData[0] >> 1)
-		val := LinkLayerDiscoveryValue{Type: t, Length: uint16(nbit<<8 + vData[1])}
+		val := LinkLayerDiscoveryValue{Type: t, Length: uint16(nbit)<<8 + uint16(vData[1])}
 		if val.Length > 0 {
 			val.Value = vData[2 : val.Length+2]
 		}
@@ -746,12 +803,12 @@ func decodeLinkLayerDiscovery(data []byte, p gopacket.PacketBuilder) error {
 			break
 		}
 		if len(vData) < int(2+val.Length) {
-			return fmt.Errorf("Malformed LinkLayerDiscovery Header")
+			return errors.New("Malformed LinkLayerDiscovery Header")
 		}
 		vData = vData[2+val.Length:]
 	}
 	if len(vals) < 4 {
-		return fmt.Errorf("Missing mandatory LinkLayerDiscovery TLV")
+		return errors.New("Missing mandatory LinkLayerDiscovery TLV")
 	}
 	c := &LinkLayerDiscovery{}
 	gotEnd := false
@@ -761,19 +818,19 @@ func decodeLinkLayerDiscovery(data []byte, p gopacket.PacketBuilder) error {
 			gotEnd = true
 		case LLDPTLVChassisID:
 			if len(v.Value) < 2 {
-				return fmt.Errorf("Malformed LinkLayerDiscovery ChassisID TLV")
+				return errors.New("Malformed LinkLayerDiscovery ChassisID TLV")
 			}
 			c.ChassisID.Subtype = LLDPChassisIDSubType(v.Value[0])
 			c.ChassisID.ID = v.Value[1:]
 		case LLDPTLVPortID:
 			if len(v.Value) < 2 {
-				return fmt.Errorf("Malformed LinkLayerDiscovery PortID TLV")
+				return errors.New("Malformed LinkLayerDiscovery PortID TLV")
 			}
 			c.PortID.Subtype = LLDPPortIDSubType(v.Value[0])
 			c.PortID.ID = v.Value[1:]
 		case LLDPTLVTTL:
 			if len(v.Value) < 2 {
-				return fmt.Errorf("Malformed LinkLayerDiscovery TTL TLV")
+				return errors.New("Malformed LinkLayerDiscovery TTL TLV")
 			}
 			c.TTL = binary.BigEndian.Uint16(v.Value[0:2])
 		default:
@@ -781,7 +838,7 @@ func decodeLinkLayerDiscovery(data []byte, p gopacket.PacketBuilder) error {
 		}
 	}
 	if c.ChassisID.Subtype == 0 || c.PortID.Subtype == 0 || !gotEnd {
-		return fmt.Errorf("Missing mandatory LinkLayerDiscovery TLV")
+		return errors.New("Missing mandatory LinkLayerDiscovery TLV")
 	}
 	c.Contents = data
 	p.AddLayer(c)

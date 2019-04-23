@@ -55,14 +55,24 @@ func RegisterLayerType(num int, meta LayerTypeMetadata) LayerType {
 		if ltMeta[num].inUse {
 			panic("Layer type already exists")
 		}
+	} else {
+		if ltMetaMap[LayerType(num)].inUse {
+			panic("Layer type already exists")
+		}
+	}
+	return OverrideLayerType(num, meta)
+}
+
+// OverrideLayerType acts like RegisterLayerType, except that if the layer type
+// has already been registered, it overrides the metadata with the passed-in
+// metadata intead of panicing.
+func OverrideLayerType(num int, meta LayerTypeMetadata) LayerType {
+	if 0 <= num && num < maxLayerType {
 		ltMeta[num] = layerTypeMetadata{
 			inUse:             true,
 			LayerTypeMetadata: meta,
 		}
 	} else {
-		if ltMetaMap[LayerType(num)].inUse {
-			panic("Layer type already exists")
-		}
 		ltMetaMap[LayerType(num)] = layerTypeMetadata{
 			inUse:             true,
 			LayerTypeMetadata: meta,

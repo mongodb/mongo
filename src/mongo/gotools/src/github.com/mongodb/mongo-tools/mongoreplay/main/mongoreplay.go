@@ -23,6 +23,11 @@ const (
 	// Go reserves exit code 2 for its own use
 )
 
+var (
+	VersionStr = "built-without-version-string"
+	GitCommit  = "build-without-git-commit"
+)
+
 func main() {
 	versionOpts := mongoreplay.VersionOptions{}
 	versionFlagParser := flags.NewParser(&versionOpts, flags.Default)
@@ -32,7 +37,7 @@ func main() {
 		os.Exit(ExitError)
 	}
 
-	if versionOpts.PrintVersion() {
+	if versionOpts.PrintVersion(VersionStr, GitCommit) {
 		os.Exit(ExitOk)
 	}
 
@@ -41,7 +46,7 @@ func main() {
 		os.Exit(ExitError)
 	}
 
-	opts := mongoreplay.Options{}
+	opts := mongoreplay.Options{VersionStr: VersionStr, GitCommit: GitCommit}
 
 	var parser = flags.NewParser(&opts, flags.Default)
 

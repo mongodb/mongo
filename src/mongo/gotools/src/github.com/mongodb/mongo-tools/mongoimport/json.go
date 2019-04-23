@@ -12,10 +12,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools-common/bsonutil"
+	"github.com/mongodb/mongo-tools-common/json"
+	"github.com/mongodb/mongo-tools-common/log"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 // JSONInputReader is an implementation of InputReader that reads documents
@@ -54,12 +54,16 @@ type JSONInputReader struct {
 
 	// numDecoders is the number of concurrent goroutines to use for decoding
 	numDecoders int
+
+	// legacyExtJSON specifies whether or not the legacy extended JSON format should be used.
+	legacyExtJSON bool
 }
 
 // JSONConverter implements the Converter interface for JSON input.
 type JSONConverter struct {
-	data  []byte
-	index uint64
+	data          []byte
+	index         uint64
+	legacyExtJSON bool
 }
 
 var (
@@ -76,7 +80,7 @@ var (
 
 // NewJSONInputReader creates a new JSONInputReader in array mode if specified,
 // configured to read data to the given io.Reader.
-func NewJSONInputReader(isArray bool, in io.Reader, numDecoders int) *JSONInputReader {
+func NewJSONInputReader(isArray bool, legacyExtJSON bool, in io.Reader, numDecoders int) *JSONInputReader {
 	szCount := newSizeTrackingReader(newBomDiscardingReader(in))
 	return &JSONInputReader{
 		isArray:            isArray,
@@ -85,6 +89,7 @@ func NewJSONInputReader(isArray bool, in io.Reader, numDecoders int) *JSONInputR
 		readOpeningBracket: false,
 		bytesFromReader:    make([]byte, 1),
 		numDecoders:        numDecoders,
+		legacyExtJSON:      legacyExtJSON,
 	}
 }
 
@@ -133,8 +138,9 @@ func (r *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D) (re
 				return
 			}
 			rawChan <- JSONConverter{
-				data:  rawBytes,
-				index: r.numProcessed,
+				data:          rawBytes,
+				index:         r.numProcessed,
+				legacyExtJSON: r.legacyExtJSON,
 			}
 			r.numProcessed++
 		}
@@ -151,6 +157,19 @@ func (r *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D) (re
 // Convert implements the Converter interface for JSON input. It converts a
 // JSONConverter struct to a BSON document.
 func (c JSONConverter) Convert() (bson.D, error) {
+	if c.legacyExtJSON {
+		return c.convertLegacyExtJSON()
+	}
+
+	var doc bson.D
+	if err := bson.UnmarshalExtJSON(c.data, false, &doc); err != nil {
+		return nil, err
+	}
+
+	return doc, nil
+}
+
+func (c JSONConverter) convertLegacyExtJSON() (bson.D, error) {
 	document, err := json.UnmarshalBsonD(c.data)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", c.index, err)

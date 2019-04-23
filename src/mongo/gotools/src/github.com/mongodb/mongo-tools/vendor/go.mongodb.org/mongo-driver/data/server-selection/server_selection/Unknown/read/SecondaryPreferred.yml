@@ -1,0 +1,10 @@
+topology_description:
+  type: Unknown
+  servers: []
+operation: read
+read_preference:
+  mode: SecondaryPreferred
+  tag_sets:
+  - data_center: nyc
+suitable_servers: []
+in_latency_window: []

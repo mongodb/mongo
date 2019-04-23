@@ -1,0 +1,228 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data:
+  - _id: 1
+  - _id: 2
+  - _id: 3
+
+tests:
+  - description: findOneAndUpdate
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: findOneAndUpdate
+        object: collection
+        arguments:
+          session: session0
+          filter: {_id: 3}
+          update:
+            $inc: {x: 1}
+          returnDocument: Before
+        result: {_id: 3}
+      - name: findOneAndUpdate
+        object: collection
+        arguments:
+          session: session0
+          filter: {_id: 4}
+          update:
+            $inc: {x: 1}
+          upsert: true
+          returnDocument: After
+        result: {_id: 4, x: 1}
+      - name: commitTransaction
+        object: session0
+      - name: startTransaction
+        object: session0
+      # Test a second time to ensure txnNumber is incremented.
+      - name: findOneAndUpdate
+        object: collection
+        arguments:
+          session: session0
+          filter: {_id: 3}
+          update:
+            $inc: {x: 1}
+          returnDocument: Before
+        result: {_id: 3, x: 1}
+      - name: commitTransaction
+        object: session0
+      # Test a third time to ensure abort works.
+      - name: startTransaction
+        object: session0
+      - name: findOneAndUpdate
+        object: collection
+        arguments:
+          session: session0
+          filter: {_id: 3}
+          update:
+            $inc: {x: 1}
+          returnDocument: Before
+        result: {_id: 3, x: 2}
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            findAndModify: *collection_name
+            query: {_id: 3}
+            update: {$inc: {x: 1}}
+            new: false
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            readConcern:
+            writeConcern:
+          command_name: findAndModify
+          database_name: *database_name
+      - command_started_event:
+          command:
+            findAndModify: *collection_name
+            query: {_id: 4}
+            update: {$inc: {x: 1}}
+            new: true
+            upsert: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            readConcern:
+            writeConcern:
+          command_name: findAndModify
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            readConcern:
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            findAndModify: *collection_name
+            query: {_id: 3}
+            update: {$inc: {x: 1}}
+            new: false
+            lsid: session0
+            txnNumber:
+              $numberLong: "2"
+            startTransaction: true
+            autocommit: false
+            readConcern:
+              afterClusterTime: 42
+            writeConcern:
+          command_name: findAndModify
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "2"
+            startTransaction:
+            autocommit: false
+            readConcern:
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            findAndModify: *collection_name
+            query: {_id: 3}
+            update: {$inc: {x: 1}}
+            new: false
+            lsid: session0
+            txnNumber:
+              $numberLong: "3"
+            startTransaction: true
+            autocommit: false
+            readConcern:
+              afterClusterTime: 42
+            writeConcern:
+          command_name: findAndModify
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "3"
+            startTransaction:
+            autocommit: false
+            readConcern:
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+          - {_id: 3, x: 2}
+          - {_id: 4, x: 1}
+
+  - description: collection writeConcern ignored for findOneAndUpdate
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+      - name: findOneAndUpdate
+        object: collection
+        collectionOptions:
+          writeConcern:
+            w: majority
+        arguments:
+          session: session0
+          filter: {_id: 3}
+          update:
+            $inc: {x: 1}
+          returnDocument: Before
+        result: {_id: 3}
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            findAndModify: *collection_name
+            query: {_id: 3}
+            update:
+              $inc: {x: 1}
+            new: false
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            readConcern:
+            writeConcern:
+          command_name: findAndModify
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            readConcern:
+            writeConcern:
+              w: majority
+          command_name: commitTransaction
+          database_name: admin
+

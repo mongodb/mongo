@@ -198,7 +198,7 @@ buildvariants:
   run_on:
   - linux-64-amzn-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 - name: amazon2-enterprise
@@ -206,7 +206,7 @@ buildvariants:
   run_on:
   - amazon2-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 #######################################
@@ -218,7 +218,7 @@ buildvariants:
   run_on:
   - debian81-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 - name: debian92-enterprise
@@ -226,7 +226,7 @@ buildvariants:
   run_on:
   - debian92-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 #######################################
@@ -250,7 +250,7 @@ buildvariants:
   run_on:
   - rhel62-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 - name: rhel70-enterprise
@@ -258,7 +258,7 @@ buildvariants:
   run_on:
   - rhel70
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 #######################################
@@ -270,7 +270,7 @@ buildvariants:
   run_on:
   - suse12-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 #######################################
@@ -282,7 +282,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 - name: ubuntu1604-enterprise
@@ -290,7 +290,7 @@ buildvariants:
   run_on:
   - ubuntu1604-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 #######################################
@@ -330,7 +330,7 @@ buildvariants:
   stepback: false
   batchtime: 10080 # weekly
   expansions:
-    build_tags: 'ssl sasl'
+    build_tags: 'ssl sasl gssapi'
   tasks: *atlas_live_tasks
 
 - name: ubuntu1604-ppc64le-enterprise
@@ -340,7 +340,7 @@ buildvariants:
   stepback: false
   batchtime: 10080 # weekly
   expansions:
-    build_tags: 'ssl sasl'
+    build_tags: 'ssl sasl gssapi'
   tasks: *atlas_live_tasks
 
 #######################################
@@ -354,7 +354,7 @@ buildvariants:
   stepback: false
   batchtime: 10080 # weekly
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
 - name: ubuntu1604-s390x-enterprise
@@ -364,5 +364,5 @@ buildvariants:
   stepback: false
   batchtime: 10080 # weekly
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks

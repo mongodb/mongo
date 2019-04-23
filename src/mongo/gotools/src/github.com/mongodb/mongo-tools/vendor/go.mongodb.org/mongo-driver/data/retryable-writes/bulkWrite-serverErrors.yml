@@ -1,0 +1,90 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+# TODO: this should change to 4.0 once 4.0.0 is released.
+minServerVersion: '3.99'
+
+tests:
+    -
+        description: "BulkWrite succeeds after PrimarySteppedDown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["update"]
+                errorCode: 189
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 1 }
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 3, x: 33 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 1
+                insertedIds: { 1: 3 }
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 2, x: 23 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "BulkWrite succeeds after WriteConcernError ShutdownInProgress"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                writeConcernError:
+                    code: 91
+                    errmsg: Replication is being shut down
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 1 }
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 3, x: 33 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 1
+                insertedIds: { 1: 3 }
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 2, x: 23 }
+                    - { _id: 3, x: 33 }

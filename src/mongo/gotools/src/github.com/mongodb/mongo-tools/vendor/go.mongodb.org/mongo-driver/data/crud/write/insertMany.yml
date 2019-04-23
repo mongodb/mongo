@@ -1,0 +1,21 @@
+data:
+    - {_id: 1, x: 11}
+
+tests:
+    -
+        description: "InsertMany with non-existing documents"
+        operation:
+            name: "insertMany"
+            arguments:
+                documents: 
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+
+        outcome:
+            result:
+                insertedIds: { 0: 2, 1: 3 }
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}

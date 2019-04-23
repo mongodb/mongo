@@ -1,0 +1,35 @@
+description: "Connect to mongos"
+
+uri: "mongodb://a"
+
+phases: [
+
+    {
+        responses: [
+
+                ["a:27017", {
+
+                    ok: 1,
+                    ismaster: true,
+                    msg: "isdbgrid",
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            servers: {
+
+                "a:27017": {
+
+                    type: "Mongos",
+                    setName:
+                }
+            },
+            topologyType: "Single",
+            logicalSessionTimeoutMinutes: null,
+            setName:
+        }
+    }
+]

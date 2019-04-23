@@ -1,0 +1,138 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+minServerVersion: '3.6'
+
+tests:
+    -
+        description: "UpdateOne is committed on first attempt"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+        operation:
+            name: "updateOne"
+            arguments:
+                filter: { _id: 1 }
+                update: { $inc: { x : 1 }}
+        outcome:
+            result:
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+            collection:
+                data:
+                    - { _id: 1, x: 12 }
+                    - { _id: 2, x: 22 }
+    -
+        description: "UpdateOne is not committed on first attempt"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "updateOne"
+            arguments:
+                filter: { _id: 1 }
+                update: { $inc: { x : 1 }}
+        outcome:
+            result:
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+            collection:
+                data:
+                    - { _id: 1, x: 12 }
+                    - { _id: 2, x: 22 }
+    -
+        description: "UpdateOne is never committed"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 2 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "updateOne"
+            arguments:
+                filter: { _id: 1 }
+                update: { $inc: { x : 1 }}
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+    -
+        description: "UpdateOne with upsert is committed on first attempt"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+        operation:
+            name: "updateOne"
+            arguments:
+                filter: { _id: 3, x: 33 }
+                update: { $inc: { x : 1 }}
+                upsert: true
+        outcome:
+            result:
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 1
+                upsertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 34 }
+    -
+        description: "UpdateOne with upsert is not committed on first attempt"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "updateOne"
+            arguments:
+                filter: { _id: 3, x: 33 }
+                update: { $inc: { x : 1 }}
+                upsert: true
+        outcome:
+            result:
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 1
+                upsertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 34 }
+    -
+        description: "UpdateOne with upsert is never committed"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 2 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "updateOne"
+            arguments:
+                filter: { _id: 3, x: 33 }
+                update: { $inc: { x : 1 }}
+                upsert: true
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }

@@ -57,7 +57,7 @@ func NewMultiplexer(out io.WriteCloser, shutdownInputs notifier) *Multiplexer {
 		},
 	}
 	mux.selectCases = []reflect.SelectCase{
-		reflect.SelectCase{
+		{
 			Dir:  reflect.SelectRecv,
 			Chan: reflect.ValueOf(mux.Control),
 			Send: reflect.Value{},

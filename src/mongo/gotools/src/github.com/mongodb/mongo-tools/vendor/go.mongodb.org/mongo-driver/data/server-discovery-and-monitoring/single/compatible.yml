@@ -1,0 +1,26 @@
+description: "Standalone with large maxWireVersion"
+uri: "mongodb://a"
+phases: [
+    {
+        responses: [
+                ["a:27017", {
+                    ok: 1,
+                    ismaster: true,
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+        outcome: {
+            servers: {
+                "a:27017": {
+                    type: "Standalone",
+                    setName:
+                }
+            },
+            topologyType: "Single",
+            logicalSessionTimeoutMinutes: null,
+            setName: ,
+            compatible: true
+        }
+    }
+]

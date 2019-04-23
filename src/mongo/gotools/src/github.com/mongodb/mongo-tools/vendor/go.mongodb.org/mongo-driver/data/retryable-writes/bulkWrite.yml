@@ -1,0 +1,403 @@
+data:
+    - { _id: 1, x: 11 }
+
+minServerVersion: '3.6'
+
+tests:
+    -
+        description: "First command is retried"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                    -
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 1 }
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 1
+                insertedIds: { 0: 2 }
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 2, x: 23 }
+    -
+        # Write operations in this ordered batch are intentionally sequenced so
+        # that each write command consists of a single statement, which will
+        # fail on the first attempt and succeed on the second, retry attempt.
+        description: "All commands are retried"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 7 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 3, x: 33 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 4, x: 44 }
+                            update: { $inc: { x : 1 }}
+                            upsert: true
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 5, x: 55 }
+                    -
+                        name: "replaceOne"
+                        arguments:
+                            filter: { _id: 3 }
+                            replacement: { _id: 3, x: 333 }
+                    -
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 1 }
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 1
+                insertedIds: { 0: 2, 2: 3, 4: 5 }
+                matchedCount: 2
+                modifiedCount: 2
+                upsertedCount: 1
+                upsertedIds: { 3: 4 }
+            collection:
+                data:
+                    - { _id: 2, x: 23 }
+                    - { _id: 3, x: 333 }
+                    - { _id: 4, x: 45 }
+                    - { _id: 5, x: 55 }
+    -
+        description: "Both commands are retried after their first statement fails"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 2 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 1 }
+                            update: { $inc: { x : 1 }}
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedIds: { 0: 2 }
+                matchedCount: 2
+                modifiedCount: 2
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 1, x: 12 }
+                    - { _id: 2, x: 23 }
+    -
+        description: "Second command is retried after its second statement fails"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { skip: 2 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 1 }
+                            update: { $inc: { x : 1 }}
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedIds: { 0: 2 }
+                matchedCount: 2
+                modifiedCount: 2
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 1, x: 12 }
+                    - { _id: 2, x: 23 }
+    -
+        description: "BulkWrite with unordered execution"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 3, x: 33 }
+                options: { ordered: false }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedIds: { 0: 2, 1: 3 }
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "First insertOne is never committed"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 2 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                    -
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 1 }
+                options: { ordered: true }
+        outcome:
+            error: true
+            result:
+                deletedCount: 0
+                insertedIds: { }
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+    -
+        description: "Second updateOne is never committed"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { skip: 1 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                    -
+                        name: "deleteOne"
+                        arguments:
+                            filter: { _id: 1 }
+                options: { ordered: true }
+        outcome:
+            error: true
+            result:
+                deletedCount: 0
+                insertedIds: { 0: 2 }
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+    -
+        description: "Third updateOne is never committed"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { skip: 2 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 1 }
+                            update: { $inc: { x : 1 }}
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                    -
+                        name: "updateOne"
+                        arguments:
+                            filter: { _id: 2 }
+                            update: { $inc: { x : 1 }}
+                options: { ordered: true }
+        outcome:
+            error: true
+            result:
+                deletedCount: 0
+                insertedIds: { 1: 2 }
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 1, x: 12 }
+                    - { _id: 2, x: 22 }
+    -
+        # The onPrimaryTransactionalWrite fail point only triggers for write
+        # operations that include a transaction ID. Therefore, it will not
+        # affect the initial deleteMany and will trigger once (and only once)
+        # for the first insertOne attempt.
+        description: "Single-document write following deleteMany is retried"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "deleteMany"
+                        arguments:
+                            filter: { x: 11 }
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 1
+                insertedIds: { 1: 2 }
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 2, x: 22 }
+    -
+        # The onPrimaryTransactionalWrite fail point only triggers for write
+        # operations that include a transaction ID. Therefore, it will not
+        # affect the initial updateMany and will trigger once (and only once)
+        # for the first insertOne attempt.
+        description: "Single-document write following updateMany is retried"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        name: "updateMany"
+                        arguments:
+                            filter: { x: 11 }
+                            update: { $inc: { x : 1 }}
+                    -
+                        name: "insertOne"
+                        arguments:
+                            document: { _id: 2, x: 22 }
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedIds: { 1: 2 }
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+                upsertedIds: { }
+            collection:
+                data:
+                    - { _id: 1, x: 12 }
+                    - { _id: 2, x: 22 }

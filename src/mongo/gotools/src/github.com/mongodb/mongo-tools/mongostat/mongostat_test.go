@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools-common/testtype"
 	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
 	"github.com/mongodb/mongo-tools/mongostat/status"
 	. "github.com/smartystreets/goconvey/convey"

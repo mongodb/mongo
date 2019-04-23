@@ -7,76 +7,53 @@
 package mongofiles
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-// Regression test for TOOLS-1741
-func TestWriteConcernWithURIParsing(t *testing.T) {
+func TestWriteConcernOptionParsing(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
-	Convey("With an IngestOptions and ToolsOptions", t, func() {
+	Convey("Testing write concern parsing from command line and URI", t, func() {
+		Convey("Parsing with neither URI nor command line option should set a majority write concern", func() {
+			opts, err := ParseOptions([]string{}, "", "")
 
-		// create an 'EnabledOptions' to determine what options should be able to be
-		// parsed and set form the input.
-		enabled := options.EnabledOptions{URI: true}
-
-		// create a new tools options to hold the parsed options
-		opts := options.New("", "", enabled)
-
-		// create a 'StorageOptions', which holds the value of the write concern
-		// for mongofiles.
-		storageOpts := &StorageOptions{}
-		opts.AddOptions(storageOpts)
-
-		// Specify that a write concern set on the URI is not an error and is a known
-		// possible option.
-		opts.URI.AddKnownURIParameters(options.KnownURIOptionsWriteConcern)
-
-		Convey("Parsing with no value should leave write concern empty", func() {
-			_, err := opts.ParseArgs([]string{})
 			So(err, ShouldBeNil)
-			So(storageOpts.WriteConcern, ShouldEqual, "")
-			Convey("and building write concern object, WMode should be majority", func() {
-				sessionSafety, err := db.BuildWriteConcern(storageOpts.WriteConcern, "",
-					opts.ParsedConnString())
-				So(err, ShouldBeNil)
-				So(sessionSafety.WMode, ShouldEqual, "majority")
-			})
+			So(opts.StorageOptions.WriteConcern, ShouldEqual, "")
+			So(opts.ToolOptions.WriteConcern, ShouldResemble, writeconcern.New(writeconcern.WMajority()))
 		})
 
-		Convey("Parsing with no writeconcern in URI should not error", func() {
+		Convey("Parsing with URI with no write concern specified in it should set a majority write concern", func() {
 			args := []string{
 				"--uri", "mongodb://localhost:27017/test",
 			}
-			_, err := opts.ParseArgs(args)
+			opts, err := ParseOptions(args, "", "")
+
 			So(err, ShouldBeNil)
-			So(storageOpts.WriteConcern, ShouldEqual, "")
-			Convey("and parsing write concern, WMode should be majority", func() {
-				sessionSafety, err := db.BuildWriteConcern(storageOpts.WriteConcern, "",
-					opts.ParsedConnString())
-				So(err, ShouldBeNil)
-				So(sessionSafety, ShouldNotBeNil)
-				So(sessionSafety.WMode, ShouldEqual, "majority")
-			})
+			So(opts.ToolOptions.WriteConcern, ShouldResemble, writeconcern.New(writeconcern.WMajority()))
 		})
-		Convey("Parsing with both writeconcern in URI and command line should error", func() {
+
+		Convey("Parsing with writeconcern only in URI should set it correctly", func() {
 			args := []string{
-				"--uri", "mongodb://localhost:27017/test",
-				"--writeConcern", "majority",
+				"--uri", "mongodb://localhost:27017/test?w=2",
 			}
-			_, err := opts.ParseArgs(args)
+			opts, err := ParseOptions(args, "", "")
+
 			So(err, ShouldBeNil)
-			So(storageOpts.WriteConcern, ShouldEqual, "majority")
-			Convey("and parsing write concern, WMode should be majority", func() {
-				_, err := db.BuildWriteConcern(storageOpts.WriteConcern, "",
-					opts.ParsedConnString())
-				So(err, ShouldResemble, fmt.Errorf("cannot specify writeConcern string and connectionString object"))
-			})
+			So(opts.StorageOptions.WriteConcern, ShouldEqual, "")
+			So(opts.ToolOptions.WriteConcern, ShouldResemble, writeconcern.New(writeconcern.W(2)))
+		})
+
+		Convey("Parsing with writeconcern only in command line should set it correctly", func() {
+			args := []string{
+				"--writeConcern", "{w: 2, j: true}",
+			}
+			opts, err := ParseOptions(args, "", "")
+
+			So(err, ShouldBeNil)
+			So(opts.ToolOptions.WriteConcern, ShouldResemble, writeconcern.New(writeconcern.W(2), writeconcern.J(true)))
 		})
 	})
 }

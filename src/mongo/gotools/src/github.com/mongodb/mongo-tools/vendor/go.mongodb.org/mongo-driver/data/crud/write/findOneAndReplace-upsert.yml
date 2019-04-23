@@ -1,0 +1,91 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 22}
+    - {_id: 3, x: 33}
+minServerVersion: '2.6'
+
+tests:
+    -
+        description: "FindOneAndReplace when no documents match without id specified with upsert returning the document before modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: {_id: 4}
+                replacement: {x: 44}
+                projection: {x: 1, _id: 0}
+                # Omit the sort option as it has no effect when no documents
+                # match and would only cause an inconsistent return value on
+                # pre-3.0 servers when combined with returnDocument "before"
+                # (see: SERVER-17650).
+                upsert: true
+
+        outcome:
+            result: null
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+                    - {_id: 4, x: 44}
+    -
+        description: "FindOneAndReplace when no documents match without id specified with upsert returning the document after modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: {_id: 4}
+                replacement: {x: 44}
+                projection: {x: 1, _id: 0}
+                returnDocument: After
+                sort: {x: 1}
+                upsert: true
+
+        outcome:
+            result: {x: 44}
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+                    - {_id: 4, x: 44}
+    -
+        description: "FindOneAndReplace when no documents match with id specified with upsert returning the document before modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: {_id: 4}
+                replacement: {_id: 4, x: 44}
+                projection: {x: 1, _id: 0}
+                # Omit the sort option as it has no effect when no documents
+                # match and would only cause an inconsistent return value on
+                # pre-3.0 servers when combined with returnDocument "before"
+                # (see: SERVER-17650).
+                upsert: true
+
+        outcome:
+            result: null
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+                    - {_id: 4, x: 44}
+    -
+        description: "FindOneAndReplace when no documents match with id specified with upsert returning the document after modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: {_id: 4}
+                replacement: {_id: 4, x: 44}
+                projection: {x: 1, _id: 0}
+                returnDocument: After
+                sort: {x: 1}
+                upsert: true
+
+        outcome:
+            result: {x: 44}
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+                    - {_id: 4, x: 44}

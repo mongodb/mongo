@@ -1,0 +1,268 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data: []
+
+tests:
+  - description: bulk
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: deleteOne
+        object: collection
+        arguments:
+          session: session0
+          filter:
+            _id: 1
+        result:
+          deletedCount: 1
+      - name: bulkWrite
+        object: collection
+        arguments:
+          session: session0
+          requests:
+            - name: insertOne
+              arguments:
+                document: {_id: 1}
+            - name: updateOne
+              arguments:
+                filter: {_id: 1}
+                update: {$set: {x: 1}}
+            - name: updateOne
+              arguments:
+                filter: {_id: 2}
+                update: {$set: {x: 2}}
+                upsert: true # Produces upsertedIds: {2: 2} in the result.
+            - name: insertOne
+              arguments:
+                document: {_id: 3}
+            - name: insertOne
+              arguments:
+                document: {_id: 4}
+            - name: insertOne
+              arguments:
+                document: {_id: 5}
+            - name: insertOne
+              arguments:
+                document: {_id: 6}
+            - name: insertOne
+              arguments:
+                document: {_id: 7}
+            # Keep replaces segregated from updates, so that drivers that aren't able to coalesce
+            # adjacent updates and replaces into a single update command will still pass this test
+            - name: replaceOne
+              arguments:
+                filter: {_id: 1}
+                replacement: {y: 1}
+            - name: replaceOne
+              arguments:
+                filter: {_id: 2}
+                replacement: {y: 2}
+            - name: deleteOne
+              arguments:
+                filter: {_id: 3}
+            - name: deleteOne
+              arguments:
+                filter: {_id: 4}
+            - name: updateMany
+              arguments:
+                filter: {_id: {$gte: 2}}
+                update: {$set: {z: 1}}
+            # Keep deleteMany segregated from deleteOne, so that drivers that aren't able to coalesce
+            # adjacent mixed deletes into a single delete command will still pass this test
+            - name: deleteMany
+              arguments:
+                filter: {_id: {$gte: 6}}
+        result:
+          deletedCount: 4
+          insertedCount: 6
+          insertedIds: {0: 1, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7}
+          matchedCount: 7
+          modifiedCount: 7
+          upsertedCount: 1
+          upsertedIds: {2: 2}
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            delete: *collection_name
+            deletes:
+              - q: {_id: 1}
+                limit: 1
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: delete
+          database_name: *database_name
+      # Commands in the bulkWrite.
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {_id: 1}
+                u: {$set: {x: 1}}
+                multi: false
+                upsert: false
+              - q: {_id: 2}
+                u: {$set: {x: 2}}
+                multi: false
+                upsert: true
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 3
+              - _id: 4
+              - _id: 5
+              - _id: 6
+              - _id: 7
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {_id: 1}
+                u: {y: 1}
+                multi: false
+                upsert: false
+              - q: {_id: 2}
+                u: {y: 2}
+                multi: false
+                upsert: false
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            delete: *collection_name
+            deletes:
+              - q: {_id: 3}
+                limit: 1
+              - q: {_id: 4}
+                limit: 1
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: delete
+          database_name: *database_name
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {_id: {$gte: 2}}
+                u: {$set: {z: 1}}
+                multi: true
+                upsert: false
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            delete: *collection_name
+            deletes:
+              - q: {_id: {$gte: 6}}
+                limit: 0
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: delete
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1, y: 1}
+          - {_id: 2, y: 2, z: 1}
+          - {_id: 5, z: 1}

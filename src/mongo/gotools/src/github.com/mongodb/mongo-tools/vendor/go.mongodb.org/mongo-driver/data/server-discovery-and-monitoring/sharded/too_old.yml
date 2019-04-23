@@ -1,0 +1,36 @@
+description: "Multiple mongoses with default maxWireVersion of 0"
+uri: "mongodb://a,b"
+phases: [
+    {
+        responses: [
+                ["a:27017", {
+                    ok: 1,
+                    ismaster: true,
+                    msg: "isdbgrid",
+                    minWireVersion: 2,
+                    maxWireVersion: 6
+                }],
+                ["b:27017", {
+                    ok: 1,
+                    ismaster: true,
+                    msg: "isdbgrid"
+                }]
+        ],
+        outcome: {
+            servers: {
+                "a:27017": {
+                    type: "Mongos",
+                    setName:
+                },
+                "b:27017": {
+                    type: "Mongos",
+                    setName:
+                }
+            },
+            topologyType: "Sharded",
+            logicalSessionTimeoutMinutes: null,
+            setName: ,
+            compatible: false
+        }
+    }
+]

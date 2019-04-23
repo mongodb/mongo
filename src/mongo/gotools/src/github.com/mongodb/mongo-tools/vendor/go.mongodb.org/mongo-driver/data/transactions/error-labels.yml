@@ -1,0 +1,953 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data: []
+
+tests:
+  - description: DuplicateKey errors do not contain transient label
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertMany
+        object: collection
+        arguments:
+          session: session0
+          documents:
+            - _id: 1
+            - _id: 1
+        result:
+          # Don't assert on errorCodeName because (after SERVER-38583) the
+          # DuplicateKey is reported in writeErrors, not as a top-level
+          # command error.
+          errorLabelsOmit: ["TransientTransactionError", "UnknownTransactionCommitResult"]
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: NotMaster errors contain transient label
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["insert"]
+          errorCode: 10107  # NotMaster
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          # Note, the server will return the errorLabel in this case.
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: WriteConflict errors contain transient label
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["insert"]
+          errorCode: 112  # WriteConflict
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          # Note, the server will return the errorLabel in this case.
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: NoSuchTransaction errors contain transient label
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["insert"]
+          errorCode: 251  # NoSuchTransaction
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          # Note, the server will return the errorLabel in this case.
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: NoSuchTransaction errors on commit contain transient label
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["commitTransaction"]
+          errorCode: 251  # NoSuchTransaction
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          # Note, the server will return the errorLabel in this case.
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: add transient label to connection errors
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 4 }
+      data:
+          failCommands: ["insert", "find", "aggregate", "distinct"]
+          closeConnection: true
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result: &transient_label_only
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      - name: find
+        object: collection
+        arguments:
+          session: session0
+        result: *transient_label_only
+      - name: aggregate
+        object: collection
+        arguments:
+          pipeline:
+            - $project:
+                _id: 1
+          session: session0
+        result: *transient_label_only
+      - name: distinct
+        object: collection
+        arguments:
+          fieldName: _id
+          session: session0
+        result: *transient_label_only
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            find: *collection_name
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+          command_name: find
+          database_name: *database_name
+      - command_started_event:
+          command:
+            aggregate: *collection_name
+            pipeline:
+              - $project:
+                  _id: 1
+            cursor: {}
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+          command_name: aggregate
+          database_name: *database_name
+      - command_started_event:
+          command:
+            distinct: *collection_name
+            key: _id
+            lsid: session0
+            readConcern:
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+          command_name: distinct
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: add unknown commit label to connection errors
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 2 }
+      data:
+          failCommands: ["commitTransaction"]
+          closeConnection: true
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsContain: ["UnknownTransactionCommitResult"]
+          errorLabelsOmit: ["TransientTransactionError"]
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            # commitTransaction applies w:majority on retries
+            writeConcern: { w: majority, wtimeout: 10000 }
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern: { w: majority, wtimeout: 10000 }
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: add unknown commit label to retryable commit errors
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 2 }
+      data:
+          failCommands: ["commitTransaction"]
+          errorCode: 11602  # InterruptedDueToStepDown
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsContain: ["UnknownTransactionCommitResult"]
+          errorLabelsOmit: ["TransientTransactionError"]
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            # commitTransaction applies w:majority on retries
+            writeConcern: { w: majority, wtimeout: 10000 }
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern: { w: majority, wtimeout: 10000 }
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: add unknown commit label to writeConcernError ShutdownInProgress
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 2 }
+      data:
+          failCommands: ["commitTransaction"]
+          writeConcernError:
+            code: 91
+            errmsg: Replication is being shut down
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsContain: ["UnknownTransactionCommitResult"]
+          errorLabelsOmit: ["TransientTransactionError"]
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            # commitTransaction applies w:majority on retries
+            writeConcern: { w: majority, wtimeout: 10000 }
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            # commitTransaction applies w:majority on retries
+            writeConcern: { w: majority, wtimeout: 10000 }
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: add unknown commit label to writeConcernError WriteConcernFailed
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["commitTransaction"]
+          writeConcernError:
+            code: 64  # WriteConcernFailed without wtimeout
+            errmsg: multiple errors reported
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsContain: ["UnknownTransactionCommitResult"]
+          errorLabelsOmit: ["TransientTransactionError"]
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            # commitTransaction applies w:majority on retries
+            writeConcern: { w: majority, wtimeout: 10000 }
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: add unknown commit label to writeConcernError WriteConcernFailed with wtimeout
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["commitTransaction"]
+          writeConcernError:
+            code: 64
+            codeName: WriteConcernFailed
+            errmsg: waiting for replication timed out
+            errInfo: {wtimeout: True}
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsContain: ["UnknownTransactionCommitResult"]
+          errorLabelsOmit: ["TransientTransactionError"]
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            # commitTransaction applies w:majority on retries
+            writeConcern: { w: majority, wtimeout: 10000 }
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: omit unknown commit label to writeConcernError UnsatisfiableWriteConcern
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["commitTransaction"]
+          writeConcernError:
+            code: 100  # UnsatisfiableWriteConcern
+            errmsg: Not enough data-bearing nodes
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsOmit: ["TransientTransactionError", "UnknownTransactionCommitResult"]
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: omit unknown commit label to writeConcernError UnknownReplWriteConcern
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["commitTransaction"]
+          writeConcernError:
+            code: 79  # UnknownReplWriteConcern
+            errmsg: No write concern mode named 'blah' found in replica set configuration
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsOmit: ["TransientTransactionError", "UnknownTransactionCommitResult"]
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1

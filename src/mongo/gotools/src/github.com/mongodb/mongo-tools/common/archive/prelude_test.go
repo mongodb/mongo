@@ -49,9 +49,9 @@ func TestPrelude(t *testing.T) {
 			NamespaceMetadatas: []*CollectionMetadata{cm1, cm2, cm3, cm4},
 			DBS:                []string{"db1", "db2", "db3"},
 			NamespaceMetadatasByDB: map[string][]*CollectionMetadata{
-				"db1": []*CollectionMetadata{cm1, cm2},
-				"db2": []*CollectionMetadata{cm3},
-				"db3": []*CollectionMetadata{cm4},
+				"db1": {cm1, cm2},
+				"db2": {cm3},
+				"db3": {cm4},
 			},
 		}
 		buf := &bytes.Buffer{}

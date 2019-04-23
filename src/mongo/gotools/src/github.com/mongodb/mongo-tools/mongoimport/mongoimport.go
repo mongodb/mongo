@@ -8,13 +8,14 @@
 package mongoimport
 
 import (
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/progress"
+	"github.com/mongodb/mongo-tools-common/util"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	driverOpts "go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/tomb.v2"
 
 	"fmt"
@@ -96,9 +97,35 @@ type InputReader interface {
 	sizeTracker
 }
 
-// ValidateSettings ensures that the tool specific options supplied for
+// New constructs a new MongoImport instance from the provided options. This will fail if the options are invalid or if
+// it cannot establish a new connection to the server.
+func New(opts Options) (*MongoImport, error) {
+	mi := &MongoImport{
+		ToolOptions:   opts.ToolOptions,
+		InputOptions:  opts.InputOptions,
+		IngestOptions: opts.IngestOptions,
+	}
+	if err := mi.validateSettings(opts.ParsedArgs); err != nil {
+		return nil, fmt.Errorf("error validating settings: %v", err)
+	}
+
+	sessionProvider, err := db.NewSessionProvider(*opts.ToolOptions)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to host: %v", err)
+	}
+
+	mi.SessionProvider = sessionProvider
+	return mi, nil
+}
+
+// Close disconnects the server.
+func (imp *MongoImport) Close() {
+	imp.SessionProvider.Close()
+}
+
+// validateSettings ensures that the tool specific options supplied for
 // MongoImport are valid.
-func (imp *MongoImport) ValidateSettings(args []string) error {
+func (imp *MongoImport) validateSettings(args []string) error {
 	// namespace must have a valid database; if none is specified, use 'test'
 	if imp.ToolOptions.DB == "" {
 		imp.ToolOptions.DB = "test"
@@ -147,6 +174,9 @@ func (imp *MongoImport) ValidateSettings(args []string) error {
 
 		if _, err := ValidatePG(imp.InputOptions.ParseGrace); err != nil {
 			return err
+		}
+		if imp.InputOptions.Legacy {
+			return fmt.Errorf("cannot use --legacy if input type is not JSON")
 		}
 	} else {
 		// input type is JSON
@@ -335,6 +365,26 @@ func (imp *MongoImport) ImportDocuments() (uint64, error) {
 	return imp.importDocuments(inputReader)
 }
 
+func (imp *MongoImport) getTargetConnection() (connURL string, err error) {
+	connURL = util.DefaultHost
+	if imp.ToolOptions.Host != "" {
+		connURL = imp.ToolOptions.Host
+	} else if imp.ToolOptions.URI.ConnectionString != "" {
+		connURL = strings.Join(imp.ToolOptions.URI.GetConnectionAddrs(), ",")
+		if connURL == "" {
+			return connURL, fmt.Errorf("error parsing connection string from URI")
+		}
+		if imp.ToolOptions.URI.ParsedConnString().ReplicaSet != "" {
+			connURL = imp.ToolOptions.URI.ParsedConnString().ReplicaSet +
+				"/" + connURL
+		}
+	}
+	if imp.ToolOptions.Port != "" {
+		connURL = connURL + ":" + imp.ToolOptions.Port
+	}
+	return connURL, nil
+}
+
 // importDocuments is a helper to ImportDocuments and does all the ingestion
 // work by taking data from the inputReader source and writing it to the
 // appropriate namespace
@@ -343,15 +393,12 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 	if err != nil {
 		return 0, err
 	}
-	defer session.Close()
 
-	connURL := imp.ToolOptions.Host
-	if connURL == "" {
-		connURL = util.DefaultHost
+	connURL, err := imp.getTargetConnection()
+	if err != nil {
+		return 0, err
 	}
-	if imp.ToolOptions.Port != "" {
-		connURL = connURL + ":" + imp.ToolOptions.Port
-	}
+
 	log.Logvf(log.Always, "connected to: %v", connURL)
 
 	log.Logvf(log.Info, "ns: %v.%v",
@@ -365,21 +412,15 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 	}
 	log.Logvf(log.Info, "connected to node type: %v", imp.nodeType)
 
-	if err = imp.configureSession(session); err != nil {
-		return 0, fmt.Errorf("error configuring session: %v", err)
-	}
-
 	// drop the database if necessary
 	if imp.IngestOptions.Drop {
 		log.Logvf(log.Always, "dropping: %v.%v",
 			imp.ToolOptions.DB,
 			imp.ToolOptions.Collection)
-		collection := session.DB(imp.ToolOptions.DB).
-			C(imp.ToolOptions.Collection)
-		if err := collection.DropCollection(); err != nil {
-			if err.Error() != db.ErrNsNotFound {
-				return 0, err
-			}
+		collection := session.Database(imp.ToolOptions.DB).
+			Collection(imp.ToolOptions.Collection)
+		if err := collection.Drop(nil); err != nil {
+			return 0, err
 		}
 	}
 
@@ -436,27 +477,6 @@ func (imp *MongoImport) ingestDocuments(readDocs chan bson.D) (retErr error) {
 	return
 }
 
-// configureSession takes in a session and modifies it with properly configured
-// settings. It does the following configurations:
-//
-// 1. Sets the session to not timeout
-// 2. Sets the write concern on the session
-// 3. Sets the session safety
-//
-// returns an error if it's unable to set the write concern
-func (imp *MongoImport) configureSession(session *mgo.Session) error {
-	// sockets to the database will never be forcibly closed
-	session.SetSocketTimeout(0)
-	sessionSafety, err := db.BuildWriteConcern(imp.IngestOptions.WriteConcern, imp.nodeType,
-		imp.ToolOptions.ParsedConnString())
-	if err != nil {
-		return fmt.Errorf("write concern error: %v", err)
-	}
-	session.SetSafe(sessionSafety)
-
-	return nil
-}
-
 type flushInserter interface {
 	Insert(doc interface{}) error
 	Flush() error
@@ -469,20 +489,19 @@ func (imp *MongoImport) runInsertionWorker(readDocs chan bson.D) (err error) {
 	if err != nil {
 		return fmt.Errorf("error connecting to mongod: %v", err)
 	}
-	defer session.Close()
-	if err = imp.configureSession(session); err != nil {
-		return fmt.Errorf("error configuring session: %v", err)
-	}
-	collection := session.DB(imp.ToolOptions.DB).C(imp.ToolOptions.Collection)
+	collection := session.Database(imp.ToolOptions.DB).Collection(imp.ToolOptions.Collection)
 
 	var inserter flushInserter
 	if imp.IngestOptions.Mode == modeInsert {
-		inserter = db.NewBufferedBulkInserter(collection, imp.IngestOptions.BulkBufferSize, !imp.IngestOptions.StopOnError)
+		bufferedInserter := db.NewBufferedBulkInserter(collection, imp.IngestOptions.BulkBufferSize, !imp.IngestOptions.StopOnError)
+		bufferedInserter.SetBypassDocumentValidation(imp.IngestOptions.BypassDocumentValidation)
 		if !imp.IngestOptions.MaintainInsertionOrder {
-			inserter.(*db.BufferedBulkInserter).Unordered()
+			bufferedInserter.Unordered()
 		}
+
+		inserter = bufferedInserter
 	} else {
-		inserter = imp.newUpserter(collection)
+		inserter = imp.newUpserter(collection, imp.IngestOptions.BypassDocumentValidation)
 	}
 
 readLoop:
@@ -504,12 +523,12 @@ readLoop:
 
 	err = inserter.Flush()
 	// TOOLS-349 correct import count for bulk operations
-	if bulkError, ok := err.(*mgo.BulkError); ok {
-		failedDocs := make(map[int]bool) // index of failures
-		for _, failure := range bulkError.Cases() {
-			failedDocs[failure.Index] = true
+	if bulkError, ok := err.(mongo.BulkWriteException); ok {
+		if bulkError.WriteConcernError != nil {
+			log.Logvf(log.Always, "write concern error when inserting documents: %v", bulkError.WriteConcernError)
 		}
-		numFailures := len(failedDocs)
+
+		numFailures := len(bulkError.WriteErrors)
 		if numFailures > 0 {
 			log.Logvf(log.Always, "num failures: %d", numFailures)
 			atomic.AddUint64(&imp.insertionCount, ^uint64(numFailures-1))
@@ -519,30 +538,40 @@ readLoop:
 }
 
 type upserter struct {
-	imp        *MongoImport
-	collection *mgo.Collection
+	imp         *MongoImport
+	collection  *mongo.Collection
+	insertOpts  *driverOpts.InsertOneOptions
+	replaceOpts *driverOpts.ReplaceOptions
+	updateOpts  *driverOpts.UpdateOptions
 }
 
-func (imp *MongoImport) newUpserter(collection *mgo.Collection) *upserter {
+func (imp *MongoImport) newUpserter(collection *mongo.Collection, bypassDocValidation bool) *upserter {
 	return &upserter{
-		imp:        imp,
-		collection: collection,
+		imp:         imp,
+		collection:  collection,
+		insertOpts:  driverOpts.InsertOne().SetBypassDocumentValidation(bypassDocValidation),
+		replaceOpts: driverOpts.Replace().SetBypassDocumentValidation(bypassDocValidation).SetUpsert(true),
+		updateOpts:  driverOpts.Update().SetBypassDocumentValidation(bypassDocValidation).SetUpsert(true),
 	}
 }
 
 // Insert is part of the flushInserter interface and performs
 // upserts or inserts.
 func (up *upserter) Insert(doc interface{}) error {
-	document := doc.(bson.D)
+	document, ok := doc.(bson.D)
+	if !ok {
+		return fmt.Errorf("expected doc to be of type bson.D")
+	}
+
 	selector := constructUpsertDocument(up.imp.upsertFields, document)
 	var err error
 	if selector == nil { // modeInsert || doc-not-exist
 		log.Logvf(log.Info, "Could not construct selector from %v, falling back to insert mode", up.imp.upsertFields)
-		err = up.collection.Insert(document)
+		_, err = up.collection.InsertOne(nil, document, up.insertOpts)
 	} else if up.imp.IngestOptions.Mode == modeUpsert {
-		_, err = up.collection.Upsert(selector, document)
+		_, err = up.collection.ReplaceOne(nil, selector, document, up.replaceOpts)
 	} else { // modeMerge
-		_, err = up.collection.Upsert(selector, bson.M{"$set": document})
+		_, err = up.collection.UpdateOne(nil, selector, bson.M{"$set": document}, up.updateOpts)
 	}
 	return err
 }
@@ -610,5 +639,5 @@ func (imp *MongoImport) getInputReader(in io.Reader) (InputReader, error) {
 	} else if imp.InputOptions.Type == TSV {
 		return NewTSVInputReader(colSpecs, in, out, imp.IngestOptions.NumDecodingWorkers, ignoreBlanks), nil
 	}
-	return NewJSONInputReader(imp.InputOptions.JSONArray, in, imp.IngestOptions.NumDecodingWorkers), nil
+	return NewJSONInputReader(imp.InputOptions.JSONArray, imp.InputOptions.Legacy, in, imp.IngestOptions.NumDecodingWorkers), nil
 }

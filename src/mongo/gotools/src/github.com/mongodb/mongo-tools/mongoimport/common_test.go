@@ -11,12 +11,12 @@ import (
 	"io"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 	"gopkg.in/tomb.v2"
 )
 
@@ -29,7 +29,7 @@ func init() {
 var (
 	index         = uint64(0)
 	csvConverters = []CSVConverter{
-		CSVConverter{
+		{
 			colSpecs: []ColumnSpec{
 				{"field1", new(FieldAutoParser), pgAutoCast, "auto"},
 				{"field2", new(FieldAutoParser), pgAutoCast, "auto"},
@@ -38,7 +38,7 @@ var (
 			data:  []string{"a", "b", "c"},
 			index: index,
 		},
-		CSVConverter{
+		{
 			colSpecs: []ColumnSpec{
 				{"field4", new(FieldAutoParser), pgAutoCast, "auto"},
 				{"field5", new(FieldAutoParser), pgAutoCast, "auto"},
@@ -47,7 +47,7 @@ var (
 			data:  []string{"d", "e", "f"},
 			index: index,
 		},
-		CSVConverter{
+		{
 			colSpecs: []ColumnSpec{
 				{"field7", new(FieldAutoParser), pgAutoCast, "auto"},
 				{"field8", new(FieldAutoParser), pgAutoCast, "auto"},
@@ -56,7 +56,7 @@ var (
 			data:  []string{"d", "e", "f"},
 			index: index,
 		},
-		CSVConverter{
+		{
 			colSpecs: []ColumnSpec{
 				{"field10", new(FieldAutoParser), pgAutoCast, "auto"},
 				{"field11", new(FieldAutoParser), pgAutoCast, "auto"},
@@ -65,7 +65,7 @@ var (
 			data:  []string{"d", "e", "f"},
 			index: index,
 		},
-		CSVConverter{
+		{
 			colSpecs: []ColumnSpec{
 				{"field13", new(FieldAutoParser), pgAutoCast, "auto"},
 				{"field14", new(FieldAutoParser), pgAutoCast, "auto"},
@@ -105,7 +105,7 @@ func convertBSONDToRaw(documents []bson.D) []bson.Raw {
 	for _, document := range documents {
 		rawBytes, err := bson.Marshal(document)
 		So(err, ShouldBeNil)
-		rawBSONDocuments = append(rawBSONDocuments, bson.Raw{3, rawBytes})
+		rawBSONDocuments = append(rawBSONDocuments, rawBytes)
 	}
 	return rawBSONDocuments
 }
@@ -240,7 +240,7 @@ func TestSetNestedValue(t *testing.T) {
 		}
 		Convey("ensure top level fields are set and others, unchanged", func() {
 			testDocument := &currentDocument
-			expectedDocument := bson.DocElem{"c", 4}
+			expectedDocument := bson.E{"c", 4}
 			setNestedValue("c", 4, testDocument)
 			newDocument := *testDocument
 			So(len(newDocument), ShouldEqual, 3)
@@ -252,7 +252,7 @@ func TestSetNestedValue(t *testing.T) {
 			setNestedValue("c.b", "4", testDocument)
 			newDocument := *testDocument
 			So(len(newDocument), ShouldEqual, 3)
-			So(newDocument[2].Name, ShouldResemble, "c")
+			So(newDocument[2].Key, ShouldResemble, "c")
 			So(*newDocument[2].Value.(*bson.D), ShouldResemble, expectedDocument)
 		})
 		Convey("ensure existing nested level fields are set and others, unchanged", func() {
@@ -261,17 +261,17 @@ func TestSetNestedValue(t *testing.T) {
 			setNestedValue("b.d", 9, testDocument)
 			newDocument := *testDocument
 			So(len(newDocument), ShouldEqual, 2)
-			So(newDocument[1].Name, ShouldResemble, "b")
+			So(newDocument[1].Key, ShouldResemble, "b")
 			So(*newDocument[1].Value.(*bson.D), ShouldResemble, expectedDocument)
 		})
 		Convey("ensure subsequent calls update fields accordingly", func() {
 			testDocument := &currentDocument
 			expectedDocumentOne := bson.D{{"c", "d"}, {"d", 9}}
-			expectedDocumentTwo := bson.DocElem{"f", 23}
+			expectedDocumentTwo := bson.E{"f", 23}
 			setNestedValue("b.d", 9, testDocument)
 			newDocument := *testDocument
 			So(len(newDocument), ShouldEqual, 2)
-			So(newDocument[1].Name, ShouldResemble, "b")
+			So(newDocument[1].Key, ShouldResemble, "b")
 			So(*newDocument[1].Value.(*bson.D), ShouldResemble, expectedDocumentOne)
 			setNestedValue("f", 23, testDocument)
 			newDocument = *testDocument
@@ -385,11 +385,11 @@ func TestTokensToBSON(t *testing.T) {
 			}
 			bsonD, err := tokensToBSON(colSpecs, tokens, uint64(0), false)
 			So(err, ShouldBeNil)
-			So(expectedDocument[0].Name, ShouldResemble, bsonD[0].Name)
+			So(expectedDocument[0].Key, ShouldResemble, bsonD[0].Key)
 			So(expectedDocument[0].Value, ShouldResemble, bsonD[0].Value)
-			So(expectedDocument[1].Name, ShouldResemble, bsonD[1].Name)
+			So(expectedDocument[1].Key, ShouldResemble, bsonD[1].Key)
 			So(expectedDocument[1].Value, ShouldResemble, bsonD[1].Value)
-			So(expectedDocument[2].Name, ShouldResemble, bsonD[2].Name)
+			So(expectedDocument[2].Key, ShouldResemble, bsonD[2].Key)
 			So(expectedDocument[2].Value, ShouldResemble, *bsonD[2].Value.(*bson.D))
 		})
 	})
@@ -401,7 +401,7 @@ func TestProcessDocuments(t *testing.T) {
 	Convey("Given an import worker", t, func() {
 		index := uint64(0)
 		csvConverters := []CSVConverter{
-			CSVConverter{
+			{
 				colSpecs: []ColumnSpec{
 					{"field1", new(FieldAutoParser), pgAutoCast, "auto"},
 					{"field2", new(FieldAutoParser), pgAutoCast, "auto"},
@@ -410,7 +410,7 @@ func TestProcessDocuments(t *testing.T) {
 				data:  []string{"a", "b", "c"},
 				index: index,
 			},
-			CSVConverter{
+			{
 				colSpecs: []ColumnSpec{
 					{"field4", new(FieldAutoParser), pgAutoCast, "auto"},
 					{"field5", new(FieldAutoParser), pgAutoCast, "auto"},
@@ -438,7 +438,7 @@ func TestProcessDocuments(t *testing.T) {
 			iw := &importWorker{
 				unprocessedDataChan:   inputChannel,
 				processedDocumentChan: outputChannel,
-				tomb: &tomb.Tomb{},
+				tomb:                  &tomb.Tomb{},
 			}
 			inputChannel <- csvConverters[0]
 			inputChannel <- csvConverters[1]
@@ -460,7 +460,7 @@ func TestProcessDocuments(t *testing.T) {
 			iw := &importWorker{
 				unprocessedDataChan:   inputChannel,
 				processedDocumentChan: outputChannel,
-				tomb: &tomb.Tomb{},
+				tomb:                  &tomb.Tomb{},
 			}
 			inputChannel <- csvConverters[0]
 			inputChannel <- csvConverters[1]
@@ -493,15 +493,15 @@ func TestDoSequentialStreaming(t *testing.T) {
 			make(chan bson.D),
 		}
 		importWorkers := []*importWorker{
-			&importWorker{
+			{
 				unprocessedDataChan:   workerInputChannel[0],
 				processedDocumentChan: workerOutputChannel[0],
-				tomb: &tomb.Tomb{},
+				tomb:                  &tomb.Tomb{},
 			},
-			&importWorker{
+			{
 				unprocessedDataChan:   workerInputChannel[1],
 				processedDocumentChan: workerOutputChannel[1],
-				tomb: &tomb.Tomb{},
+				tomb:                  &tomb.Tomb{},
 			},
 		}
 		Convey("documents moving through the input channel should be processed and returned in sequence", func() {

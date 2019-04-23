@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/password"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/password"
+	"github.com/mongodb/mongo-tools-common/signals"
+	"github.com/mongodb/mongo-tools-common/util"
 	"github.com/mongodb/mongo-tools/mongostat"
 	"github.com/mongodb/mongo-tools/mongostat/stat_consumer"
 	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
@@ -51,10 +51,15 @@ func optionCustomHeaders(option string) (headers []string) {
 	return
 }
 
+var (
+	VersionStr = "built-without-version-string"
+	GitCommit  = "build-without-git-commit"
+)
+
 func main() {
 	// initialize command-line opts
 	opts := options.New(
-		"mongostat",
+		"mongostat", VersionStr, GitCommit,
 		mongostat.Usage,
 		options.EnabledOptions{Connection: true, Auth: true, Namespace: false, URI: true})
 	opts.UseReadOnlyHostDescription()
@@ -237,11 +242,17 @@ func main() {
 	}
 
 	for _, v := range seedHosts {
-		stat.AddNewNode(v)
+		if err := stat.AddNewNode(v); err != nil {
+			log.Logv(log.Always, err.Error())
+			os.Exit(util.ExitError)
+		}
 	}
 
 	// kick it off
 	err = stat.Run()
+	for _, monitor := range stat.Nodes {
+		monitor.Disconnect()
+	}
 	formatter.Finish()
 	if err != nil {
 		log.Logvf(log.Always, "Failed: %v", err)

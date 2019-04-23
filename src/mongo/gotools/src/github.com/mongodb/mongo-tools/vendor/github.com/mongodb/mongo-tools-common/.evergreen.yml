@@ -1,0 +1,777 @@
+#######################################
+#    Tools Driver Config for MCI      #
+#######################################
+# default command type
+command_type: system
+
+# run the same task in the previous revision if the current task fails
+stepback: true
+
+mongo_tools_variables:
+
+## Common mongodb arguments
+  mongod_arguments:
+    default: &mongod_default_startup_args
+      mongod_args: ""
+      mongod_port: 33333
+    ssl: &mongod_ssl_startup_args
+      mongod_args: "--sslMode requireSSL --sslCAFile db/testdata/ca.pem --sslPEMKeyFile db/testdata/server.pem"
+      mongod_port: 33333
+
+  mongo_arguments:
+    default: &mongo_default_startup_args
+      mongo_args: &mongo_default_startup_args_string "--port 33333"
+      mongod_port: 33333
+    ssl: &mongo_ssl_startup_args
+      mongo_args: "--port 33333 --ssl --sslCAFile ./db/testdata/ca.pem --sslPEMKeyFile ./db/testdata/server.pem --sslAllowInvalidCertificates"
+      mongod_port: 33333
+
+functions:
+
+  "attach-test-results":
+    - command: gotest.parse_files
+      type: system
+      params:
+        files:
+          - "src/github.com/mongodb/mongo-tools-common/testing_output/*.suite"
+  "fetch source" :
+    - command: shell.exec
+      params:
+        script: |
+          set -x
+          set -v
+          set -e
+          mkdir -p src/github.com/mongodb
+    - command: git.get_project
+      params:
+        directory: src/github.com/mongodb/mongo-tools-common
+
+  "download mongod":
+    command: shell.exec
+    params:
+      working_dir: src/github.com/mongodb/mongo-tools-common
+      script: |
+        set -x
+        set -v
+        set -e
+        mongotarget=$(if [ "${mongo_target}" ]; then echo "${mongo_target}"; else echo "${mongo_os}"; fi)
+        mongoversion=$(if [ "${mongo_version_always_use_latest}" ]; then echo "latest"; else echo "${mongo_version}"; fi)
+        dlurl=$(python binaryurl.py --edition=${mongo_edition} --target=$mongotarget --version=$mongoversion --arch=${mongo_arch|x86_64})
+        filename=$(echo $dlurl | sed -e "s_.*/__")
+        mkdir -p bin
+        curl -s $dlurl --output $filename
+        ${decompress} $filename
+        rm $filename
+        if [ "${only_shell}" ]; then
+          mv -f ./mongodb-*/bin/mongo${extension} ./bin/
+        else
+          mv -f ./mongodb-*/bin/mongo${extension} ./bin/
+          mv -f ./mongodb-*/bin/mongos${extension} ./bin/
+          mv -f ./mongodb-*/bin/mongod${extension} ./bin/
+        fi
+        chmod +x ./bin/*
+        rm -rf ./mongodb-*
+
+  "start mongod":
+    command: shell.exec
+    params:
+      working_dir: src/github.com/mongodb/mongo-tools-common
+      background: true
+      script: |
+        set -x
+        set -v
+        set -e
+        rm -rf mongodb/db_files mongodb/${logfile|run.log}
+        mkdir -p mongodb/db_files
+        echo "Starting mongod..."
+        PATH=$PWD/bin:$PATH ./bin/mongod${extension}  --port ${mongod_port} ${mongod_args} ${additional_args} --dbpath mongodb/db_files --setParameter=enableTestCommands=1
+
+  "wait for mongod to be ready":
+    command: shell.exec
+    params:
+      working_dir: src/github.com/mongodb/mongo-tools-common
+      script: |
+        set -x
+        set -v
+        SECS=0
+        while true ; do
+            set -o verbose
+            ./bin/mongo${extension} ${mongo_args} --eval 'true;'
+            if [ "$?" = "0" ]; then
+                echo "mongod ready";
+                exit 0
+            else
+                SECS=`expr $SECS + 1`
+                if [ $SECS -gt 20 ]; then
+                    echo "mongod not ready after 20 seconds"
+                    exit 1
+                fi
+                echo "waiting for mongod ( ${mongo_args} ) to be ready..."  ;
+                sleep 1 ;
+            fi
+        done
+
+  "setup kerberos integration test":
+    command: shell.exec
+    params:
+      working_dir: src/github.com/mongodb/mongo-tools-common
+      # Set up Kerberos stuff: run kinit if necessary, and add KDC to registry
+      # on Windows (see https://wiki.mongodb.com/display/DH/Testing+Kerberos)
+      script: |
+        set -e
+        # export sensitive info before `set -x`
+        if [ '${run_kinit}' = 'true' ]; then
+            # BUILD-3830
+            mkdir -p "$(pwd)/.evergreen"
+            touch "$(pwd)/.evergreen/krb5.conf.empty"
+            export KRB5_CONFIG="$(pwd)/.evergreen/krb5.conf.empty"
+
+            echo "Writing keytab"
+            echo ${kerberos_keytab} | base64 -d > "$(pwd)/.evergreen/drivers.keytab"
+            echo "Running kinit"
+            kinit -k -t "$(pwd)/.evergreen/drivers.keytab" -p drivers@LDAPTEST.10GEN.CC;
+        fi;
+        set -x
+        set -v
+        if [ "Windows_NT" = "$OS" ]; then
+          cmd /c "REG ADD HKLM\SYSTEM\ControlSet001\Control\Lsa\Kerberos\Domains\LDAPTEST.10GEN.CC /v KdcNames /d ldaptest.10gen.cc /t REG_MULTI_SZ /f"
+        fi;
+
+  "run tool unit tests":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src/github.com/mongodb/mongo-tools-common
+      script: |
+        set -x
+        set -v
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
+
+        . ./set_goenv.sh
+        GOROOT="" set_goenv || exit
+        if [ "${UNIT_TEST}" = "true" ]; then
+          export TOOLS_TESTING_UNIT="true"
+        fi;
+        if [ "${DB_TESTS}" = "true" ]; then
+            export TOOLS_TESTING_DB="true"
+        fi
+        if [ "${run_coverage}" = "true" ]; then
+            export RUN_COVERAGE="true"
+        fi
+        export ON_EVERGREEN="true"
+        ./runTests.sh -v
+        exit $?
+
+  "run tool integration tests":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src/github.com/mongodb/mongo-tools-common
+      script: |
+        # export sensitive info before `set -x`
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+            export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+        fi;
+        set -x
+        set -v
+        . ./set_goenv.sh
+        GOROOT="" set_goenv || exit
+        if [ "${INT_TEST}" = "true" ]; then
+          export TOOLS_TESTING_INTEGRATION="true"
+        fi;
+        if [ "${USE_SSL}" = "true" ]; then
+          export TOOLS_TESTING_SSL="true"
+          export TOOLS_TESTING_INTEGRATION="true"
+        fi;
+        if [ "${AUTH_TEST}" = "true" ]; then
+          export TOOLS_TESTING_AUTH="true"
+          export TOOLS_TESTING_INTEGRATION="true"
+        fi;
+        if [ "${KERBEROS_TEST}" = "true" ]; then
+          export TOOLS_TESTING_KERBEROS="true"
+        fi;
+        if [ "${create_mongod_users_command}" != "" ]; then
+          export TOOLS_TESTING_AUTH_USERNAME=${auth_username}
+          export TOOLS_TESTING_AUTH_PASSWORD=${auth_password}
+          echo "${create_mongod_users_command}" | ./bin/mongo${extension} ${mongo_args} admin
+        fi;
+        export ON_EVERGREEN="true"
+        ./runTests.sh -v
+        exit $?
+
+tasks:
+
+- name: unit
+  commands:
+    - command: expansions.update
+    - func: "fetch source"
+    - func: "run tool unit tests"
+      vars:
+          UNIT_TEST: "true"
+          run_coverage: "true"
+    - func: "attach-test-results"
+
+- name: integration-4.0
+  commands:
+    - func: "fetch source"
+    - command: expansions.update
+    - func: "download mongod"
+      vars:
+        mongo_version: "4.0"
+    - func: "start mongod"
+    - func: "wait for mongod to be ready"
+    - func: "run tool integration tests"
+      vars:
+          INT_TEST: "true" 
+    - func: "attach-test-results"
+
+- name: integration-4.0-auth
+  commands:
+    - func: "fetch source"
+    # Concat auth args
+    - command: expansions.update
+      params:
+        updates:
+          - key: "mongod_args"
+            concat: " --auth"
+          - key: "auth_username"
+            value: "passwordIsTaco"
+          - key: "auth_password"
+            value: "Taco"
+          - key: "create_mongod_users_command"
+            value: "db.createUser({ user: '${auth_username}', pwd: '${auth_password}', roles: [{ role: '__system', db: 'admin' }] });"
+    - func: "download mongod"
+      vars:
+        mongo_version: "4.0"
+    - func: "start mongod"
+    - func: "wait for mongod to be ready"
+    - func: "run tool integration tests"
+      vars:
+          INT_TEST: "true"
+          AUTH_TEST: "true"
+    - func: "attach-test-results"
+- name: kerberos
+  commands:
+    - func: "fetch source"
+    # Explicitly run ONLY Kerberos tests
+    - command: expansions.update
+      params:
+        updates:
+          - key: "args"
+            value: "${args} -test.types=kerberos"
+    - func: "setup kerberos integration test"
+    - func: "run tool integration tests"
+      vars:
+          KERBEROS_TEST: "true"
+    - func: "attach-test-results"
+
+- name: lint
+  commands:
+    - func: "fetch source"
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src/github.com/mongodb/mongo-tools-common
+        script: |
+          set -x
+          set -v
+          set -e
+          . ./set_goenv.sh
+          GOROOT="" set_goenv || exit
+          go get -u golang.org/x/lint/golint
+          export PATH="$GOPATH/bin:$PATH"
+          ./runLint.sh
+
+- name: vet
+  commands:
+    - func: "fetch source"
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src/github.com/mongodb/mongo-tools-common
+        script: |
+          set -x
+          set -v
+          set -e
+          . ./set_goenv.sh
+          GOROOT="" set_goenv || exit
+          go vet -composites=false ./...
+
+buildvariants:
+
+#######################################
+#     Amazon x86_64 Buildvariants     #
+#######################################
+
+- name: amazonlinux64
+  display_name: Amazon Linux 64
+  run_on:
+  - linux-64-amzn-test
+  expansions:
+    build_tags: ""
+  tasks:
+  - name: unit
+
+- name: amazonlinux64-enterprise
+  display_name: Amazon Linux 64 Enterprise
+  run_on:
+  - linux-64-amzn-test
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+- name: amazon2
+  display_name: Amazon Linux 64 v2
+  run_on:
+  - amazon2-test
+  expansions:
+    build_tags: ""
+  tasks:
+  - name: unit
+
+- name: amazon2-enterprise
+  display_name: Amazon Linux 64 v2 Enterprise
+  run_on:
+  - amazon2-test
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+#######################################
+#     Debian x86_64 Buildvariants     #
+#######################################
+
+- name: debian81
+  display_name: Debian 8.1
+  run_on:
+  - debian81-test
+  expansions:
+    build_tags: ""
+  tasks:
+  - name: unit
+
+- name: debian81-enterprise
+  display_name: Debian 8.1 Enterprise
+  run_on:
+  - debian81-test
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+- name: debian92
+  display_name: Debian 9.2
+  run_on:
+  - debian92-test
+  expansions:
+    build_tags: ""
+  tasks:
+  - name: unit
+
+- name: debian92-enterprise
+  display_name: Debian 9.2 Enterprise
+  run_on:
+  - debian92-test
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+#######################################
+#           macOS Buildvariant        #
+#######################################
+
+- name: macOS-1012
+  display_name: MacOS 10.12
+  run_on:
+  - macos-1012
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "osx"
+    mongo_target: "osx-ssl"
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+- name: macOS-1012-ssl
+  display_name: MacOS 10.12 SSL
+  run_on:
+  - macos-1012
+  expansions:
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
+    mongo_os: "osx"
+    mongo_target: "osx-ssl"
+    build_tags: "ssl"
+    excludes: requires_many_files
+    USE_SSL: "true"
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+#######################################
+#     RHEL x86_64 Buildvariants       #
+#######################################
+
+- name: rhel62
+  display_name: RHEL 6.2
+  run_on:
+  - rhel62-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel62"
+    mongo_edition: "targeted"
+    build_tags: ""
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+- name: rhel62-ssl
+  display_name: RHEL 6.2 SSL
+  run_on:
+  - rhel62-test
+  expansions:
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
+    mongo_os: "rhel62"
+    mongo_edition: "enterprise"
+    build_tags: "ssl"
+    edition: ssl
+    smoke_use_ssl: --use-ssl
+    USE_SSL: "true"
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+- name: rhel62-enterprise
+  display_name: RHEL 6.2 Enterprise
+  run_on:
+  - rhel62-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel62"
+    mongo_edition: "enterprise"
+    build_tags: "ssl sasl"
+    edition: enterprise
+    run_kinit: true
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+  - name: kerberos
+  - name: vet
+  - name: lint
+
+- name: rhel70
+  display_name: RHEL 7.0
+  run_on:
+  - rhel70
+  expansions:
+    build_tags: ""
+  tasks:
+  - name: unit
+
+- name: rhel70-enterprise
+  display_name: RHEL 7.0 Enterprise
+  run_on:
+  - rhel70
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+#######################################
+#     SUSE x86_64 Buildvariants       #
+#######################################
+
+- name: suse12
+  display_name: SUSE 12
+  run_on:
+  - suse12-test
+  expansions:
+    build_tags: ""
+  tasks:
+  - name: unit
+
+- name: suse12-enterprise
+  display_name: SUSE 12 Enterprise
+  run_on:
+  - suse12-test
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+#######################################
+#    Ubuntu x86_64 Buildvariants      #
+#######################################
+
+- name: ubuntu1404
+  display_name: Ubuntu 14.04
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    build_tags: ""
+  tasks:
+  - name: unit
+
+- name: ubuntu1404-enterprise
+  display_name: Ubuntu 14.04 Enterprise
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+- name: ubuntu1604
+  display_name: Ubuntu 16.04
+  run_on:
+  - ubuntu1604-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1604"
+    mongo_edition: "targeted"
+    build_tags: ""
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+- name: ubuntu1604-ssl
+  display_name: Ubuntu 16.04 SSL
+  run_on:
+  - ubuntu1604-test
+  expansions:
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
+    mongo_os: "ubuntu1604"
+    mongo_edition: "enterprise"
+    build_tags: "ssl"
+    edition: ssl
+    USE_SSL: "true"
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+- name: ubuntu1604-enterprise
+  display_name: Ubuntu 16.04 Enterprise
+  run_on:
+  - ubuntu1604-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1604"
+    mongo_edition: "enterprise"
+    build_tags: "ssl sasl"
+    edition: enterprise
+    run_kinit: true
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+  - name: kerberos
+
+- name: ubuntu1804
+  display_name: Ubuntu 18.04
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    build_tags: ""
+  tasks:
+  - name: unit
+
+- name: ubuntu1804-enterprise
+  display_name: Ubuntu 18.04 Enterprise
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+#######################################
+#        Windows Buildvariants        #
+#######################################
+
+- name: windows-64
+  display_name: Windows 64-bit
+  run_on:
+  - windows-64-vs2013-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "windows-64"
+    mongo_target: "windows_x86_64-2008plus-ssl"
+    extension: .exe
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+- name: windows-64-ssl
+  display_name: Windows 64-bit SSL
+  run_on:
+  - windows-64-vs2013-compile
+  expansions:
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
+    mongo_os: "windows-64"
+    mongo_target: "windows_x86_64-2008plus-ssl"
+    build_tags: "ssl"
+    edition: ssl
+    extension: .exe
+    USE_SSL: "true"
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+- name: windows-64-enterprise
+  display_name: Windows 64-bit Enterprise
+  run_on:
+  - windows-64-vs2013-compile
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "windows-64"
+    mongo_edition: "enterprise"
+    mongo_target: "windows"
+    build_tags: "sasl ssl"
+    edition: enterprise
+    extension: .exe
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+  - name: kerberos
+
+#######################################
+#        ARM Buildvariants            #
+#######################################
+
+- name: ubuntu1604-arm64-ssl
+  display_name: ZAP ARM64 Ubuntu 16.04 SSL
+  run_on:
+  - ubuntu1604-arm64-small
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1604"
+    mongo_edition: "targeted"
+    mongo_arch: "arm64"
+    build_tags: "ssl"
+    edition: ssl
+    USE_SSL: "true"
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+#######################################
+#        Power Buildvariants          #
+#######################################
+
+- name: rhel71-ppc64le-enterprise
+  display_name: ZAP PPC64LE RHEL 7.1 Enterprise
+  run_on:
+  - rhel71-power8-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel71"
+    mongo_edition: "enterprise"
+    mongo_arch: "ppc64le"
+    build_tags: 'ssl sasl'
+    edition: enterprise
+    run_kinit: true
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+
+- name: ubuntu1604-ppc64le-enterprise
+  display_name: ZAP PPC64LE Ubuntu 16.04 Enterprise
+  run_on:
+  - ubuntu1604-power8-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    build_tags: 'ssl sasl'
+  tasks:
+  - name: unit
+
+#######################################
+#     Z (s390x) Buildvariants         #
+#######################################
+
+- name: rhel67-s390x-enterprise
+  display_name: ZAP s390x RHEL 6.7 Enterprise
+  run_on:
+  - rhel67-zseries-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel67"
+    mongo_edition: "enterprise"
+    mongo_arch: "s390x"
+    build_tags: "sasl ssl"
+    edition: enterprise
+    run_kinit: true
+  tasks:
+  - name: unit
+  - name: integration-4.0
+  - name: integration-4.0-auth
+  - name: kerberos
+
+- name: ubuntu1604-s390x-enterprise
+  display_name: ZAP s390x Ubuntu 16.04 Enterprise
+  run_on:
+  - ubuntu1604-zseries-small
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: unit
+
+#######################################
+#     Experimental Buildvariants      #
+#######################################
+
+- name: ubuntu-race
+  stepback: false
+  batchtime: 1440 # daily
+  display_name: z Race Detector Ubuntu 16.04
+  run_on:
+  - ubuntu1604-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1604"
+    mongo_edition: "enterprise"
+    build_tags: "sasl ssl"
+    args: "-race"
+  tasks:
+  - name: unit
+  - name: integration-4.0

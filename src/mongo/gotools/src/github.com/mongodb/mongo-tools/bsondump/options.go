@@ -6,13 +6,32 @@
 
 package bsondump
 
+import (
+	"fmt"
+
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+)
+
 var Usage = `<options> <file>
 
 View and debug .bson files.
 
 See http://docs.mongodb.org/manual/reference/program/bsondump/ for more information.`
 
-type BSONDumpOptions struct {
+// Options contains all the possible options used to configure bsondump.
+type Options struct {
+	*options.ToolOptions
+	*OutputOptions
+}
+
+// Types out output supported by the --type option
+const (
+	DebugOutputType = "debug"
+	JSONOutputType  = "json"
+)
+
+type OutputOptions struct {
 	// Format to display the BSON data file
 	Type string `long:"type" value-name:"<type>" default:"json" default-mask:"-" description:"type of output: debug, json (default 'json')"`
 
@@ -29,14 +48,40 @@ type BSONDumpOptions struct {
 	OutFileName string `long:"outFile" description:"path to output file to dump BSON to; default is stdout"`
 }
 
-func (_ *BSONDumpOptions) Name() string {
+func (*OutputOptions) Name() string {
 	return "output"
 }
 
-func (_ *BSONDumpOptions) PostParse() error {
-	return nil
-}
+// ParseOptions translates the command line arguments into an Options used to configure BSONDump.
+func ParseOptions(rawArgs []string, versionStr, gitCommit string) (Options, error) {
+	toolOpts := options.New("bsondump", versionStr, gitCommit, Usage, options.EnabledOptions{})
+	outputOpts := &OutputOptions{}
+	toolOpts.AddOptions(outputOpts)
 
-func (_ *BSONDumpOptions) Validate() error {
-	return nil
+	args, err := toolOpts.ParseArgs(rawArgs)
+	if err != nil {
+		return Options{}, fmt.Errorf("error parsing command line options: %v", err)
+	}
+
+	log.SetVerbosity(toolOpts.Verbosity)
+
+	if len(args) > 1 {
+		return Options{}, fmt.Errorf("too many positional arguments: %v", args)
+	}
+
+	// If the user specified a bson input file
+	if len(args) == 1 {
+		if outputOpts.BSONFileName != "" {
+			return Options{}, fmt.Errorf("cannot specify both a positional argument and --bsonFile")
+		}
+
+		outputOpts.BSONFileName = args[0]
+	}
+
+	switch outputOpts.Type {
+	case "", DebugOutputType, JSONOutputType:
+		return Options{toolOpts, outputOpts}, nil
+	default:
+		return Options{}, fmt.Errorf("unsupported output type '%v'. Must be either '%v' or '%v'", DebugOutputType, JSONOutputType, outputOpts.Type)
+	}
 }

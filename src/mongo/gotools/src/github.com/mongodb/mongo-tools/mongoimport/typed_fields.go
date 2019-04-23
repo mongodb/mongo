@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math"
 	"regexp"
 	"strconv"
@@ -18,7 +19,6 @@ import (
 	"time"
 
 	"github.com/mongodb/mongo-tools/mongoimport/dateconv"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // columnType defines different types for columns that can be parsed distinctly
@@ -280,7 +280,7 @@ func (ip *FieldInt64Parser) Parse(in string) (interface{}, error) {
 type FieldDecimalParser struct{}
 
 func (ip *FieldDecimalParser) Parse(in string) (interface{}, error) {
-	return bson.ParseDecimal128(in)
+	return primitive.ParseDecimal128(in)
 }
 
 type FieldStringParser struct{}

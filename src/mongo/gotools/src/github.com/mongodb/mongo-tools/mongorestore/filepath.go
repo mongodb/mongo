@@ -16,11 +16,10 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/mongodb/mongo-tools/common"
-	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools-common/archive"
+	"github.com/mongodb/mongo-tools-common/intents"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/util"
 )
 
 // FileType describes the various types of restore documents.
@@ -206,34 +205,40 @@ func (f *stdinFile) Close() error {
 }
 
 // getInfoFromFilename pulls the base collection name and FileType from a given file.
-func (restore *MongoRestore) getInfoFromFilename(filename string) (string, FileType) {
+func (restore *MongoRestore) getInfoFromFilename(filename string) (string, FileType, error) {
 	baseFileName := filepath.Base(filename)
+
+	baseName := ""
+	fileType := UnknownFileType
+
 	// .bin supported for legacy reasons
 	if strings.HasSuffix(baseFileName, ".bin") {
-		baseName := strings.TrimSuffix(baseFileName, ".bin")
-		return baseName, BSONFileType
-	}
-	// Gzip indicates that files in a dump directory should have a .gz suffix
-	// but it does not indicate that the "files" provided by the archive should,
-	// compressed or otherwise.
-	if restore.InputOptions.Gzip && restore.InputOptions.Archive == "" {
+		baseName = strings.TrimSuffix(baseFileName, ".bin")
+		fileType = BSONFileType
+	} else if restore.InputOptions.Gzip && restore.InputOptions.Archive == "" {
+		// Gzip indicates that files in a dump directory should have a .gz suffix
+		// but it does not indicate that the "files" provided by the archive should,
+		// compressed or otherwise.
 		if strings.HasSuffix(baseFileName, ".metadata.json.gz") {
-			baseName := strings.TrimSuffix(baseFileName, ".metadata.json.gz")
-			return baseName, MetadataFileType
+			baseName = strings.TrimSuffix(baseFileName, ".metadata.json.gz")
+			fileType = MetadataFileType
 		} else if strings.HasSuffix(baseFileName, ".bson.gz") {
-			baseName := strings.TrimSuffix(baseFileName, ".bson.gz")
-			return baseName, BSONFileType
+			baseName = strings.TrimSuffix(baseFileName, ".bson.gz")
+			fileType = BSONFileType
 		}
-		return "", UnknownFileType
-	}
-	if strings.HasSuffix(baseFileName, ".metadata.json") {
-		baseName := strings.TrimSuffix(baseFileName, ".metadata.json")
-		return baseName, MetadataFileType
+	} else if strings.HasSuffix(baseFileName, ".metadata.json") {
+		baseName = strings.TrimSuffix(baseFileName, ".metadata.json")
+		fileType = MetadataFileType
 	} else if strings.HasSuffix(baseFileName, ".bson") {
-		baseName := strings.TrimSuffix(baseFileName, ".bson")
-		return baseName, BSONFileType
+		baseName = strings.TrimSuffix(baseFileName, ".bson")
+		fileType = BSONFileType
 	}
-	return "", UnknownFileType
+
+	unescaped, err := util.UnescapeCollectionName(baseName)
+	if err != nil {
+		return "", UnknownFileType, fmt.Errorf("error parsing collection name from filename \"%v\": %v", baseName, err)
+	}
+	return unescaped, fileType, nil
 }
 
 // CreateAllIntents drills down into a dump folder, creating intents for all of
@@ -342,7 +347,11 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 			log.Logvf(log.Always, `don't know what to do with subdirectory "%v", skipping...`,
 				filepath.Join(dir.Name(), entry.Name()))
 		} else {
-			collection, fileType := restore.getInfoFromFilename(entry.Name())
+			collection, fileType, err := restore.getInfoFromFilename(entry.Name())
+			if err != nil {
+				return err
+			}
+
 			sourceNS := db + "." + collection
 			switch fileType {
 			case BSONFileType:
@@ -381,7 +390,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 					skip = true
 				}
 				destNS := restore.renamer.Get(sourceNS)
-				destDB, destC := common.SplitNamespace(destNS)
+				destDB, destC := util.SplitNamespace(destNS)
 				intent := &intents.Intent{
 					DB:   destDB,
 					C:    destC,
@@ -435,7 +444,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 
 				usesMetadataFiles = true
 				destNS := restore.renamer.Get(sourceNS)
-				rnDB, rnC := common.SplitNamespace(destNS)
+				rnDB, rnC := util.SplitNamespace(destNS)
 				intent := &intents.Intent{
 					DB: rnDB,
 					C:  rnC,
@@ -496,7 +505,11 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 		return fmt.Errorf("file %v is a directory, not a bson file", dir.Path())
 	}
 
-	baseName, fileType := restore.getInfoFromFilename(dir.Name())
+	baseName, fileType, err := restore.getInfoFromFilename(dir.Name())
+	if err != nil {
+		return err
+	}
+
 	if fileType != BSONFileType {
 		return fmt.Errorf("file %v does not have .bson extension", dir.Path())
 	}
@@ -564,7 +577,11 @@ func (restore *MongoRestore) handleBSONInsteadOfDirectory(path string) error {
 	// like a bson file and infer as much as we can
 	if restore.NSOptions.Collection == "" {
 		// if the user did not set -c, use the file name for the collection
-		newCollectionName, fileType := restore.getInfoFromFilename(path)
+		newCollectionName, fileType, err := restore.getInfoFromFilename(path)
+		if err != nil {
+			return err
+		}
+
 		if fileType != BSONFileType {
 			return fmt.Errorf("file %v does not have .bson extension", path)
 		}

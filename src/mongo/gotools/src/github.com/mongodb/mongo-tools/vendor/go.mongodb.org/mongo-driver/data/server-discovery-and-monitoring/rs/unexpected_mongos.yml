@@ -1,0 +1,28 @@
+description: "Unexpected mongos"
+
+uri: "mongodb://b/?replicaSet=rs"
+
+phases: [
+
+    {
+        responses: [
+
+                ["b:27017", {
+
+                    ok: 1,
+                    ismaster: true,
+                    msg: "isdbgrid",
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            servers: {},
+            topologyType: "ReplicaSetNoPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs"
+        }
+    }
+]

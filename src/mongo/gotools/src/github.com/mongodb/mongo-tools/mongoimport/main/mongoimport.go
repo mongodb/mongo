@@ -11,33 +11,25 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/signals"
+	"github.com/mongodb/mongo-tools-common/util"
 	"github.com/mongodb/mongo-tools/mongoimport"
 )
 
+var (
+	VersionStr = "built-without-version-string"
+	GitCommit  = "build-without-git-commit"
+)
+
 func main() {
-	// initialize command-line opts
-	opts := options.New("mongoimport", mongoimport.Usage,
-		options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
-
-	inputOpts := &mongoimport.InputOptions{}
-	opts.AddOptions(inputOpts)
-	ingestOpts := &mongoimport.IngestOptions{}
-	opts.AddOptions(ingestOpts)
-	opts.URI.AddKnownURIParameters(options.KnownURIOptionsWriteConcern)
-
-	args, err := opts.ParseArgs(os.Args[1:])
+	opts, err := mongoimport.ParseOptions(os.Args[1:], VersionStr, GitCommit)
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
 		log.Logvf(log.Always, "try 'mongoimport --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
-	log.SetVerbosity(opts.Verbosity)
 	signals.Handle()
 
 	// print help, if specified
@@ -50,30 +42,12 @@ func main() {
 		return
 	}
 
-	// verify uri options and log them
-	opts.URI.LogUnsupportedOptions()
-
-	// create a session provider to connect to the db
-	sessionProvider, err := db.NewSessionProvider(*opts)
+	m, err := mongoimport.New(opts)
 	if err != nil {
-		log.Logvf(log.Always, "error connecting to host: %v", err)
+		log.Logvf(log.Always, err.Error())
 		os.Exit(util.ExitError)
 	}
-	defer sessionProvider.Close()
-	sessionProvider.SetBypassDocumentValidation(ingestOpts.BypassDocumentValidation)
-
-	m := mongoimport.MongoImport{
-		ToolOptions:     opts,
-		InputOptions:    inputOpts,
-		IngestOptions:   ingestOpts,
-		SessionProvider: sessionProvider,
-	}
-
-	if err = m.ValidateSettings(args); err != nil {
-		log.Logvf(log.Always, "error validating settings: %v", err)
-		log.Logvf(log.Always, "try 'mongoimport --help' for more information")
-		os.Exit(util.ExitError)
-	}
+	defer m.Close()
 
 	numDocs, err := m.ImportDocuments()
 	if !opts.Quiet {

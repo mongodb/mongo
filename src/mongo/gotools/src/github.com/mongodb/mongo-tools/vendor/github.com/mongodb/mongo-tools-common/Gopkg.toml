@@ -1,0 +1,55 @@
+# Gopkg.toml example
+#
+# Refer to https://golang.github.io/dep/docs/Gopkg.toml.html
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#   name = "github.com/x/y"
+#   version = "2.4.0"
+#
+# [prune]
+#   non-go = false
+#   go-tests = true
+#   unused-packages = true
+
+
+[[constraint]]
+  revision = "44476384cd4721b68705e72f19e95d1a3a504370"
+  name = "github.com/howeyc/gopass"
+
+[[constraint]]
+  name = "github.com/jessevdk/go-flags"
+  revision = "97448c91aac742cbca3d020b3e769013a420a06f"
+
+[[constraint]]
+  name = "github.com/smartystreets/goconvey"
+  revision = "bf58a9a1291224109919756b4dcc469c670cc7e4"
+
+[[constraint]]
+  name = "golang.org/x/crypto"
+  revision = "1f22c0103821b9390939b6776727195525381532"
+
+[[constraint]]
+  name = "gopkg.in/mgo.v2"
+  source = "github.com/10gen/mgo"
+  revision = "8c133fd1d0fc316302df84fc12769e17fb473bb1"
+
+[prune]
+  go-tests = true
+  unused-packages = true
+
+[[constraint]]
+  name = "go.mongodb.org/mongo-driver"
+  revision = "51421e413403fe3c9b0097147841f752421133e4"

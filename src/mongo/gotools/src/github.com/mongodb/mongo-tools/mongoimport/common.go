@@ -17,11 +17,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools-common/bsonutil"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/util"
+	"go.mongodb.org/mongo-driver/bson"
 	"gopkg.in/tomb.v2"
 )
 
@@ -155,7 +155,7 @@ func constructUpsertDocument(upsertFields []string, document bson.D) bson.D {
 		if val != nil {
 			hasDocumentKey = true
 		}
-		upsertDocument = append(upsertDocument, bson.DocElem{Name: key, Value: val})
+		upsertDocument = append(upsertDocument, bson.E{Key: key, Value: val})
 	}
 	if !hasDocumentKey {
 		return nil
@@ -283,7 +283,7 @@ func removeBlankFields(document bson.D) (newDocument bson.D) {
 func setNestedValue(key string, value interface{}, document *bson.D) {
 	index := strings.Index(key, ".")
 	if index == -1 {
-		*document = append(*document, bson.DocElem{Name: key, Value: value})
+		*document = append(*document, bson.E{Key: key, Value: value})
 		return
 	}
 	keyName := key[0:index]
@@ -299,7 +299,7 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 	}
 	setNestedValue(key[index+1:], value, subDocument)
 	if !existingKey {
-		*document = append(*document, bson.DocElem{Name: keyName, Value: subDocument})
+		*document = append(*document, bson.E{Key: keyName, Value: subDocument})
 	}
 }
 
@@ -324,7 +324,7 @@ func streamDocuments(ordered bool, numDecoders int, readDocs chan Converter, out
 		iw := &importWorker{
 			unprocessedDataChan:   inChan,
 			processedDocumentChan: outChan,
-			tomb: importTomb,
+			tomb:                  importTomb,
 		}
 		importWorkers = append(importWorkers, iw)
 		wg.Add(1)
@@ -389,7 +389,7 @@ func tokensToBSON(colSpecs []ColumnSpec, tokens []string, numProcessed uint64, i
 			if strings.Index(colSpecs[index].Name, ".") != -1 {
 				setNestedValue(colSpecs[index].Name, parsedValue, &document)
 			} else {
-				document = append(document, bson.DocElem{Name: colSpecs[index].Name, Value: parsedValue})
+				document = append(document, bson.E{Key: colSpecs[index].Name, Value: parsedValue})
 			}
 		} else {
 			parsedValue = autoParse(token)
@@ -398,7 +398,7 @@ func tokensToBSON(colSpecs []ColumnSpec, tokens []string, numProcessed uint64, i
 				return nil, fmt.Errorf("duplicate field name - on %v - for token #%v ('%v') in document #%v",
 					key, index+1, parsedValue, numProcessed)
 			}
-			document = append(document, bson.DocElem{Name: key, Value: parsedValue})
+			document = append(document, bson.E{Key: key, Value: parsedValue})
 		}
 	}
 	return document, nil

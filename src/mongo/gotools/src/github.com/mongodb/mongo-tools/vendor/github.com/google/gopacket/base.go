@@ -33,14 +33,30 @@ type Layer interface {
 type Payload []byte
 
 // LayerType returns LayerTypePayload
-func (p Payload) LayerType() LayerType     { return LayerTypePayload }
-func (p Payload) LayerContents() []byte    { return []byte(p) }
-func (p Payload) LayerPayload() []byte     { return nil }
-func (p Payload) Payload() []byte          { return []byte(p) }
-func (p Payload) String() string           { return fmt.Sprintf("%d byte(s)", len(p)) }
-func (p Payload) GoString() string         { return LongBytesGoString([]byte(p)) }
-func (p Payload) CanDecode() LayerClass    { return LayerTypePayload }
+func (p Payload) LayerType() LayerType { return LayerTypePayload }
+
+// LayerContents returns the bytes making up this layer.
+func (p Payload) LayerContents() []byte { return []byte(p) }
+
+// LayerPayload returns the payload within this layer.
+func (p Payload) LayerPayload() []byte { return nil }
+
+// Payload returns this layer as bytes.
+func (p Payload) Payload() []byte { return []byte(p) }
+
+// String implements fmt.Stringer.
+func (p Payload) String() string { return fmt.Sprintf("%d byte(s)", len(p)) }
+
+// GoString implements fmt.GoStringer.
+func (p Payload) GoString() string { return LongBytesGoString([]byte(p)) }
+
+// CanDecode implements DecodingLayer.
+func (p Payload) CanDecode() LayerClass { return LayerTypePayload }
+
+// NextLayerType implements DecodingLayer.
 func (p Payload) NextLayerType() LayerType { return LayerTypeZero }
+
+// DecodeFromBytes implements DecodingLayer.
 func (p *Payload) DecodeFromBytes(data []byte, df DecodeFeedback) error {
 	*p = Payload(data)
 	return nil
@@ -74,13 +90,27 @@ func decodePayload(data []byte, p PacketBuilder) error {
 type Fragment []byte
 
 // LayerType returns LayerTypeFragment
-func (p *Fragment) LayerType() LayerType     { return LayerTypeFragment }
-func (p *Fragment) LayerContents() []byte    { return []byte(*p) }
-func (p *Fragment) LayerPayload() []byte     { return nil }
-func (p *Fragment) Payload() []byte          { return []byte(*p) }
-func (p *Fragment) String() string           { return fmt.Sprintf("%d byte(s)", len(*p)) }
-func (p *Fragment) CanDecode() LayerClass    { return LayerTypeFragment }
+func (p *Fragment) LayerType() LayerType { return LayerTypeFragment }
+
+// LayerContents implements Layer.
+func (p *Fragment) LayerContents() []byte { return []byte(*p) }
+
+// LayerPayload implements Layer.
+func (p *Fragment) LayerPayload() []byte { return nil }
+
+// Payload returns this layer as a byte slice.
+func (p *Fragment) Payload() []byte { return []byte(*p) }
+
+// String implements fmt.Stringer.
+func (p *Fragment) String() string { return fmt.Sprintf("%d byte(s)", len(*p)) }
+
+// CanDecode implements DecodingLayer.
+func (p *Fragment) CanDecode() LayerClass { return LayerTypeFragment }
+
+// NextLayerType implements DecodingLayer.
 func (p *Fragment) NextLayerType() LayerType { return LayerTypeZero }
+
+// DecodeFromBytes implements DecodingLayer.
 func (p *Fragment) DecodeFromBytes(data []byte, df DecodeFeedback) error {
 	*p = Fragment(data)
 	return nil

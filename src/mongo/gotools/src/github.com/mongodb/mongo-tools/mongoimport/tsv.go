@@ -12,7 +12,7 @@ import (
 	"io"
 	"strings"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const (

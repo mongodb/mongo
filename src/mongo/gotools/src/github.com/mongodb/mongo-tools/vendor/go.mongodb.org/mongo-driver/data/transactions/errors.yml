@@ -1,0 +1,125 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data: []
+tests:
+  - description: start insert start
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: startTransaction
+        object: session0
+        result:
+          # Client-side error.
+          errorContains: transaction already in progress
+      # Just to clean up.
+      - name: commitTransaction
+        object: session0
+
+  - description: start twice
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: startTransaction
+        object: session0
+        result:
+          # Client-side error.
+          errorContains: transaction already in progress
+
+  - description: commit and start twice
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+      - name: startTransaction
+        object: session0
+      - name: startTransaction
+        object: session0
+        result:
+          # Client-side error.
+          errorContains: transaction already in progress
+
+  - description: write conflict commit
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: startTransaction
+        object: session1
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session1
+          document:
+            _id: 1
+        result:
+          errorCodeName: WriteConflict
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      - name: commitTransaction
+        object: session0
+      - name: commitTransaction
+        object: session1
+        result:
+          errorCodeName: NoSuchTransaction
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+
+  - description: write conflict abort
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: startTransaction
+        object: session1
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session1
+          document:
+            _id: 1
+        result:
+          errorCodeName: WriteConflict
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      - name: commitTransaction
+        object: session0
+      # Driver ignores "NoSuchTransaction" error.
+      - name: abortTransaction
+        object: session1

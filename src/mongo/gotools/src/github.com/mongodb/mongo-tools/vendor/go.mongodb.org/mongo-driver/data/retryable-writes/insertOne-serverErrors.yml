@@ -1,0 +1,471 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+# TODO: this should change to 4.0 once 4.0.0 is released.
+minServerVersion: '3.99'
+
+tests:
+    -
+        description: "InsertOne succeeds after connection failure"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                closeConnection: true
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after NotMaster"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 10107
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after NotMasterOrSecondary"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 13436
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after NotMasterNoSlaveOk"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 13435
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after InterruptedDueToReplStateChange"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 11602
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after InterruptedAtShutdown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 11600
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after PrimarySteppedDown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 189
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after ShutdownInProgress"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 91
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after HostNotFound"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 7
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after HostUnreachable"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 6
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after SocketException"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 9001
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after NetworkTimeout"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 89
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne fails after Interrupted"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                errorCode: 11601
+                closeConnection: false
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+    -
+        description: "InsertOne succeeds after WriteConcernError InterruptedAtShutdown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                writeConcernError:
+                    code: 11600
+                    errmsg: Replication is being shut down
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after WriteConcernError InterruptedDueToReplStateChange"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                writeConcernError:
+                    code: 11602
+                    errmsg: Replication is being shut down
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after WriteConcernError PrimarySteppedDown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                writeConcernError:
+                    code: 189
+                    errmsg: Replication is being shut down
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne succeeds after WriteConcernError ShutdownInProgress"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                writeConcernError:
+                    code: 91
+                    errmsg: Replication is being shut down
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne fails after multiple retryable writeConcernErrors"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 2 }
+            data:
+                failCommands: ["insert"]
+                writeConcernError:
+                    code: 91
+                    errmsg: Replication is being shut down
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }  # The write was still applied.
+    -
+        description: "InsertOne fails after WriteConcernError Interrupted"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                writeConcernError:
+                    code: 11601
+                    errmsg: operation was interrupted
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }  # The write was still applied.
+    -
+        description: "InsertOne fails after WriteConcernError WriteConcernFailed"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["insert"]
+                writeConcernError:
+                    code: 64
+                    codeName: WriteConcernFailed
+                    errmsg: waiting for replication timed out
+                    errInfo: {wtimeout: True}
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }  # The write was still applied.

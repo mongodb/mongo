@@ -1,0 +1,32 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 22}
+    - {_id: 3, x: 33}
+
+tests:
+    -
+        description: "Distinct without a filter"
+        operation:
+            name: distinct
+            arguments:
+                fieldName: "x"
+                filter: {}
+
+        outcome:
+            result: 
+                - 11
+                - 22
+                - 33
+    -
+        description: "Distinct with a filter"
+        operation:
+            name: distinct
+            arguments:
+                fieldName: "x"
+                filter: 
+                    _id: {$gt: 1}
+
+        outcome:
+            result: 
+                - 22
+                - 33

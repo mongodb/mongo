@@ -1,0 +1,97 @@
+description: "Parse logicalSessionTimeoutMinutes from mongoses"
+
+uri: "mongodb://a,b"
+
+phases: [
+
+    {
+        responses: [
+
+                ["a:27017", {
+
+                    ok: 1,
+                    ismaster: true,
+                    msg: "isdbgrid",
+                    logicalSessionTimeoutMinutes: 1,
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }],
+
+                ["b:27017", {
+
+                    ok: 1,
+                    ismaster: true,
+                    msg: "isdbgrid",
+                    logicalSessionTimeoutMinutes: 2,
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            servers: {
+
+                "a:27017": {
+
+                    type: "Mongos",
+                    setName:
+                },
+
+                "b:27017": {
+
+                    type: "Mongos",
+                    setName:
+                }
+            },
+            topologyType: "Sharded",
+            logicalSessionTimeoutMinutes: 1,  # Minimum of the two
+            setName:
+        }
+    },
+    # Now an ismaster response with no logicalSessionTimeoutMinutes
+    {
+        responses: [
+
+                ["a:27017", {
+
+                    ok: 1,
+                    ismaster: true,
+                    msg: "isdbgrid",
+                    logicalSessionTimeoutMinutes: 1,
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }],
+
+                ["b:27017", {
+
+                    ok: 1,
+                    ismaster: true,
+                    msg: "isdbgrid",
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            servers: {
+
+                "a:27017": {
+
+                    type: "Mongos",
+                    setName:
+                },
+
+                "b:27017": {
+
+                    type: "Mongos",
+                    setName:
+                }
+            },
+            topologyType: "Sharded",
+            logicalSessionTimeoutMinutes: null,  # Sessions not supported now
+            setName:
+        }
+    }
+]

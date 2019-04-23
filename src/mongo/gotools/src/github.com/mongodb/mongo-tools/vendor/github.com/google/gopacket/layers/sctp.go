@@ -8,9 +8,11 @@ package layers
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
-	"github.com/google/gopacket"
 	"hash/crc32"
+
+	"github.com/google/gopacket"
 )
 
 // SCTP contains information on the top level of an SCTP packet.
@@ -26,17 +28,13 @@ type SCTP struct {
 func (s *SCTP) LayerType() gopacket.LayerType { return LayerTypeSCTP }
 
 func decodeSCTP(data []byte, p gopacket.PacketBuilder) error {
-	sctp := &SCTP{
-		SrcPort:         SCTPPort(binary.BigEndian.Uint16(data[:2])),
-		sPort:           data[:2],
-		DstPort:         SCTPPort(binary.BigEndian.Uint16(data[2:4])),
-		dPort:           data[2:4],
-		VerificationTag: binary.BigEndian.Uint32(data[4:8]),
-		Checksum:        binary.BigEndian.Uint32(data[8:12]),
-		BaseLayer:       BaseLayer{data[:12], data[12:]},
-	}
+	sctp := &SCTP{}
+	err := sctp.DecodeFromBytes(data, p)
 	p.AddLayer(sctp)
 	p.SetTransportLayer(sctp)
+	if err != nil {
+		return err
+	}
 	return p.NextDecoder(sctpChunkTypePrefixDecoder)
 }
 
@@ -70,6 +68,29 @@ func (s SCTP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOpt
 	return nil
 }
 
+func (sctp *SCTP) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	if len(data) < 12 {
+		return errors.New("Invalid SCTP common header length")
+	}
+	sctp.SrcPort = SCTPPort(binary.BigEndian.Uint16(data[:2]))
+	sctp.sPort = data[:2]
+	sctp.DstPort = SCTPPort(binary.BigEndian.Uint16(data[2:4]))
+	sctp.dPort = data[2:4]
+	sctp.VerificationTag = binary.BigEndian.Uint32(data[4:8])
+	sctp.Checksum = binary.BigEndian.Uint32(data[8:12])
+	sctp.BaseLayer = BaseLayer{data[:12], data[12:]}
+
+	return nil
+}
+
+func (t *SCTP) CanDecode() gopacket.LayerClass {
+	return LayerTypeSCTP
+}
+
+func (t *SCTP) NextLayerType() gopacket.LayerType {
+	return gopacket.LayerTypePayload
+}
+
 // SCTPChunk contains the common fields in all SCTP chunks.
 type SCTPChunk struct {
 	BaseLayer
@@ -91,16 +112,28 @@ func roundUpToNearest4(i int) int {
 	return i + 4 - (i % 4)
 }
 
-func decodeSCTPChunk(data []byte) SCTPChunk {
+func decodeSCTPChunk(data []byte) (SCTPChunk, error) {
 	length := binary.BigEndian.Uint16(data[2:4])
+	if length < 4 {
+		return SCTPChunk{}, errors.New("invalid SCTP chunk length")
+	}
 	actual := roundUpToNearest4(int(length))
+	ct := SCTPChunkType(data[0])
+
+	// For SCTP Data, use a separate layer for the payload
+	delta := 0
+	if ct == SCTPChunkTypeData {
+		delta = int(actual) - int(length)
+		actual = 16
+	}
+
 	return SCTPChunk{
-		Type:         SCTPChunkType(data[0]),
+		Type:         ct,
 		Flags:        data[1],
 		Length:       length,
 		ActualLength: actual,
-		BaseLayer:    BaseLayer{data[:actual], data[actual:]},
-	}
+		BaseLayer:    BaseLayer{data[:actual], data[actual : len(data)-delta]},
+	}, nil
 }
 
 // SCTPParameter is a TLV parameter inside a SCTPChunk.
@@ -140,7 +173,11 @@ type SCTPUnknownChunkType struct {
 }
 
 func decodeSCTPChunkTypeUnknown(data []byte, p gopacket.PacketBuilder) error {
-	sc := &SCTPUnknownChunkType{SCTPChunk: decodeSCTPChunk(data)}
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
+	sc := &SCTPUnknownChunkType{SCTPChunk: chunk}
 	sc.bytes = data[:sc.ActualLength]
 	p.AddLayer(sc)
 	p.SetErrorLayer(sc)
@@ -176,40 +213,111 @@ type SCTPData struct {
 	TSN                                   uint32
 	StreamId                              uint16
 	StreamSequence                        uint16
-	PayloadProtocol                       uint32
-	PayloadData                           []byte
+	PayloadProtocol                       SCTPPayloadProtocol
 }
 
 // LayerType returns gopacket.LayerTypeSCTPData.
 func (s *SCTPData) LayerType() gopacket.LayerType { return LayerTypeSCTPData }
 
-// Payload returns the data payload of the SCTP data chunk.
-func (s *SCTPData) Payload() []byte {
-	return s.PayloadData
+// SCTPPayloadProtocol represents a payload protocol
+type SCTPPayloadProtocol uint32
+
+// SCTPPayloadProtocol constonts from http://www.iana.org/assignments/sctp-parameters/sctp-parameters.xhtml
+const (
+	SCTPProtocolReserved  SCTPPayloadProtocol = 0
+	SCTPPayloadUIA                            = 1
+	SCTPPayloadM2UA                           = 2
+	SCTPPayloadM3UA                           = 3
+	SCTPPayloadSUA                            = 4
+	SCTPPayloadM2PA                           = 5
+	SCTPPayloadV5UA                           = 6
+	SCTPPayloadH248                           = 7
+	SCTPPayloadBICC                           = 8
+	SCTPPayloadTALI                           = 9
+	SCTPPayloadDUA                            = 10
+	SCTPPayloadASAP                           = 11
+	SCTPPayloadENRP                           = 12
+	SCTPPayloadH323                           = 13
+	SCTPPayloadQIPC                           = 14
+	SCTPPayloadSIMCO                          = 15
+	SCTPPayloadDDPSegment                     = 16
+	SCTPPayloadDDPStream                      = 17
+	SCTPPayloadS1AP                           = 18
+)
+
+func (p SCTPPayloadProtocol) String() string {
+	switch p {
+	case SCTPProtocolReserved:
+		return "Reserved"
+	case SCTPPayloadUIA:
+		return "UIA"
+	case SCTPPayloadM2UA:
+		return "M2UA"
+	case SCTPPayloadM3UA:
+		return "M3UA"
+	case SCTPPayloadSUA:
+		return "SUA"
+	case SCTPPayloadM2PA:
+		return "M2PA"
+	case SCTPPayloadV5UA:
+		return "V5UA"
+	case SCTPPayloadH248:
+		return "H.248"
+	case SCTPPayloadBICC:
+		return "BICC"
+	case SCTPPayloadTALI:
+		return "TALI"
+	case SCTPPayloadDUA:
+		return "DUA"
+	case SCTPPayloadASAP:
+		return "ASAP"
+	case SCTPPayloadENRP:
+		return "ENRP"
+	case SCTPPayloadH323:
+		return "H.323"
+	case SCTPPayloadQIPC:
+		return "QIPC"
+	case SCTPPayloadSIMCO:
+		return "SIMCO"
+	case SCTPPayloadDDPSegment:
+		return "DDPSegment"
+	case SCTPPayloadDDPStream:
+		return "DDPStream"
+	case SCTPPayloadS1AP:
+		return "S1AP"
+	}
+	return fmt.Sprintf("Unknown(%d)", p)
 }
 
 func decodeSCTPData(data []byte, p gopacket.PacketBuilder) error {
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPData{
-		SCTPChunk:       decodeSCTPChunk(data),
+		SCTPChunk:       chunk,
 		Unordered:       data[1]&0x4 != 0,
 		BeginFragment:   data[1]&0x2 != 0,
 		EndFragment:     data[1]&0x1 != 0,
 		TSN:             binary.BigEndian.Uint32(data[4:8]),
 		StreamId:        binary.BigEndian.Uint16(data[8:10]),
 		StreamSequence:  binary.BigEndian.Uint16(data[10:12]),
-		PayloadProtocol: binary.BigEndian.Uint32(data[12:16]),
+		PayloadProtocol: SCTPPayloadProtocol(binary.BigEndian.Uint32(data[12:16])),
 	}
 	// Length is the length in bytes of the data, INCLUDING the 16-byte header.
-	sc.PayloadData = data[16:sc.Length]
 	p.AddLayer(sc)
-	p.SetApplicationLayer(sc)
-	return p.NextDecoder(gopacket.DecodeFunc(decodeWithSCTPChunkTypePrefix))
+	return p.NextDecoder(gopacket.LayerTypePayload)
 }
 
 // SerializeTo is for gopacket.SerializableLayer.
 func (sc SCTPData) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
-	length := 16 + len(sc.PayloadData)
-	bytes, err := b.PrependBytes(roundUpToNearest4(length))
+	payload := b.Bytes()
+	// Pad the payload to a 32 bit boundary
+	if rem := len(payload) % 4; rem != 0 {
+		b.AppendBytes(4 - rem)
+	}
+	length := 16
+	bytes, err := b.PrependBytes(length)
 	if err != nil {
 		return err
 	}
@@ -225,12 +333,11 @@ func (sc SCTPData) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seriali
 		flags |= 0x1
 	}
 	bytes[1] = flags
-	binary.BigEndian.PutUint16(bytes[2:4], uint16(length))
+	binary.BigEndian.PutUint16(bytes[2:4], uint16(length+len(payload)))
 	binary.BigEndian.PutUint32(bytes[4:8], sc.TSN)
 	binary.BigEndian.PutUint16(bytes[8:10], sc.StreamId)
 	binary.BigEndian.PutUint16(bytes[10:12], sc.StreamSequence)
-	binary.BigEndian.PutUint32(bytes[12:16], sc.PayloadProtocol)
-	copy(bytes[16:], sc.PayloadData)
+	binary.BigEndian.PutUint32(bytes[12:16], uint32(sc.PayloadProtocol))
 	return nil
 }
 
@@ -258,8 +365,12 @@ func (sc *SCTPInit) LayerType() gopacket.LayerType {
 }
 
 func decodeSCTPInit(data []byte, p gopacket.PacketBuilder) error {
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPInit{
-		SCTPChunk:                      decodeSCTPChunk(data),
+		SCTPChunk:                      chunk,
 		InitiateTag:                    binary.BigEndian.Uint32(data[4:8]),
 		AdvertisedReceiverWindowCredit: binary.BigEndian.Uint32(data[8:12]),
 		OutboundStreams:                binary.BigEndian.Uint16(data[12:14]),
@@ -283,7 +394,6 @@ func (sc SCTPInit) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seriali
 		payload = append(payload, SCTPParameter(param).Bytes()...)
 	}
 	length := 20 + len(payload)
-
 	bytes, err := b.PrependBytes(roundUpToNearest4(length))
 	if err != nil {
 		return err
@@ -316,8 +426,12 @@ func (sc *SCTPSack) LayerType() gopacket.LayerType {
 }
 
 func decodeSCTPSack(data []byte, p gopacket.PacketBuilder) error {
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPSack{
-		SCTPChunk:                      decodeSCTPChunk(data),
+		SCTPChunk:                      chunk,
 		CumulativeTSNAck:               binary.BigEndian.Uint32(data[4:8]),
 		AdvertisedReceiverWindowCredit: binary.BigEndian.Uint32(data[8:12]),
 		NumGapACKs:                     binary.BigEndian.Uint16(data[12:14]),
@@ -396,8 +510,12 @@ func (sc *SCTPHeartbeat) LayerType() gopacket.LayerType {
 }
 
 func decodeSCTPHeartbeat(data []byte, p gopacket.PacketBuilder) error {
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPHeartbeat{
-		SCTPChunk: decodeSCTPChunk(data),
+		SCTPChunk: chunk,
 	}
 	paramData := data[4:sc.Length]
 	for len(paramData) > 0 {
@@ -447,9 +565,13 @@ func (sc *SCTPError) LayerType() gopacket.LayerType {
 }
 
 func decodeSCTPError(data []byte, p gopacket.PacketBuilder) error {
-	// remarkably similarot decodeSCTPHeartbeat ;)
+	// remarkably similar to decodeSCTPHeartbeat ;)
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPError{
-		SCTPChunk: decodeSCTPChunk(data),
+		SCTPChunk: chunk,
 	}
 	paramData := data[4:sc.Length]
 	for len(paramData) > 0 {
@@ -490,8 +612,12 @@ type SCTPShutdown struct {
 func (sc *SCTPShutdown) LayerType() gopacket.LayerType { return LayerTypeSCTPShutdown }
 
 func decodeSCTPShutdown(data []byte, p gopacket.PacketBuilder) error {
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPShutdown{
-		SCTPChunk:        decodeSCTPChunk(data),
+		SCTPChunk:        chunk,
 		CumulativeTSNAck: binary.BigEndian.Uint32(data[4:8]),
 	}
 	p.AddLayer(sc)
@@ -520,8 +646,12 @@ type SCTPShutdownAck struct {
 func (sc *SCTPShutdownAck) LayerType() gopacket.LayerType { return LayerTypeSCTPShutdownAck }
 
 func decodeSCTPShutdownAck(data []byte, p gopacket.PacketBuilder) error {
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPShutdownAck{
-		SCTPChunk: decodeSCTPChunk(data),
+		SCTPChunk: chunk,
 	}
 	p.AddLayer(sc)
 	return p.NextDecoder(gopacket.DecodeFunc(decodeWithSCTPChunkTypePrefix))
@@ -549,8 +679,12 @@ type SCTPCookieEcho struct {
 func (sc *SCTPCookieEcho) LayerType() gopacket.LayerType { return LayerTypeSCTPCookieEcho }
 
 func decodeSCTPCookieEcho(data []byte, p gopacket.PacketBuilder) error {
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPCookieEcho{
-		SCTPChunk: decodeSCTPChunk(data),
+		SCTPChunk: chunk,
 	}
 	sc.Cookie = data[4:sc.Length]
 	p.AddLayer(sc)
@@ -588,8 +722,12 @@ func (sc *SCTPEmptyLayer) LayerType() gopacket.LayerType {
 }
 
 func decodeSCTPEmptyLayer(data []byte, p gopacket.PacketBuilder) error {
+	chunk, err := decodeSCTPChunk(data)
+	if err != nil {
+		return err
+	}
 	sc := &SCTPEmptyLayer{
-		SCTPChunk: decodeSCTPChunk(data),
+		SCTPChunk: chunk,
 	}
 	p.AddLayer(sc)
 	return p.NextDecoder(gopacket.DecodeFunc(decodeWithSCTPChunkTypePrefix))

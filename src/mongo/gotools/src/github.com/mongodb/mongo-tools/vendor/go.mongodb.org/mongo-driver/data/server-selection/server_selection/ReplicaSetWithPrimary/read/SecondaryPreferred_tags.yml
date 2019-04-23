@@ -1,0 +1,28 @@
+# Attempt to select the secondary, except its tag doesn't match.
+# Fall back to primary.
+---
+topology_description:
+  type: ReplicaSetWithPrimary
+  servers:
+  - &1
+    address: a:27017
+    avg_rtt_ms: 5
+    type: RSPrimary
+    tags:
+      data_center: nyc
+  - &2
+    address: b:27017
+    avg_rtt_ms: 5
+    type: RSSecondary
+    tags:
+      data_center: sf  # No match.
+operation: read
+read_preference:
+  mode: SecondaryPreferred
+  tag_sets:
+  - data_center: nyc
+suitable_servers:
+- *1
+in_latency_window:
+- *1
+

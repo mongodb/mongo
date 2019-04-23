@@ -9,12 +9,12 @@ package mongorestore
 import (
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/intents"
-	commonOpts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
+	"github.com/mongodb/mongo-tools-common/intents"
+	commonOpts "github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/testtype"
+	"github.com/mongodb/mongo-tools-common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const ExistsDB = "restore_collection_exists"
@@ -38,9 +38,12 @@ func TestCollectionExists(t *testing.T) {
 		Convey("and some test data in a server", func() {
 			session, err := restore.SessionProvider.GetSession()
 			So(err, ShouldBeNil)
-			So(session.DB(ExistsDB).C("one").Insert(bson.M{}), ShouldBeNil)
-			So(session.DB(ExistsDB).C("two").Insert(bson.M{}), ShouldBeNil)
-			So(session.DB(ExistsDB).C("three").Insert(bson.M{}), ShouldBeNil)
+			_, insertErr := session.Database(ExistsDB).Collection("one").InsertOne(nil, bson.M{})
+			So(insertErr, ShouldBeNil)
+			_, insertErr = session.Database(ExistsDB).Collection("two").InsertOne(nil, bson.M{})
+			So(insertErr, ShouldBeNil)
+			_, insertErr = session.Database(ExistsDB).Collection("three").InsertOne(nil, bson.M{})
+			So(insertErr, ShouldBeNil)
 
 			Convey("collections that exist should return true", func() {
 				exists, err := restore.CollectionExists(&intents.Intent{DB: ExistsDB, C: "one"})
@@ -61,14 +64,13 @@ func TestCollectionExists(t *testing.T) {
 			})
 
 			Reset(func() {
-				session.DB(ExistsDB).DropDatabase()
-				session.Close()
+				session.Database(ExistsDB).Drop(nil)
 			})
 		})
 
 		Convey("and a fake cache should be used instead of the server when it exists", func() {
 			restore.knownCollections = map[string][]string{
-				ExistsDB: []string{"cats", "dogs", "snakes"},
+				ExistsDB: {"cats", "dogs", "snakes"},
 			}
 			exists, err := restore.CollectionExists(&intents.Intent{DB: ExistsDB, C: "dogs"})
 			So(err, ShouldBeNil)

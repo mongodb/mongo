@@ -33,7 +33,7 @@ type ServerStatus struct {
 	Mem                *MemStats              `bson:"mem"`
 	Repl               *ReplStatus            `bson:"repl"`
 	ShardCursorType    map[string]interface{} `bson:"shardCursorType"`
-	StorageEngine      map[string]string      `bson:"storageEngine"`
+	StorageEngine      *StorageEngine         `bson:"storageEngine"`
 	WiredTiger         *WiredTiger            `bson:"wiredTiger"`
 }
 
@@ -51,6 +51,10 @@ type ConcurrentTransactions struct {
 
 type ConcurrentTransStats struct {
 	Out int64 `bson:"out"`
+}
+
+type StorageEngine struct {
+	Name string `bson:"name"`
 }
 
 // CacheStats stores cache statistics for WiredTiger.

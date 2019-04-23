@@ -1,0 +1,45 @@
+data:
+    - {_id: 1, y: [{b: 3}, {b: 1}]}
+    - {_id: 2, y: [{b: 0}, {b: 1}]}
+
+minServerVersion: '3.5.6'
+
+tests:
+    -
+        description: "BulkWrite with arrayFilters"
+        operation:
+            name: "bulkWrite"
+            arguments:
+                requests:
+                    -
+                        # UpdateOne when one document matches arrayFilters
+                        name: "updateOne"
+                        arguments:
+                            filter: {}
+                            update:
+                                $set: {"y.$[i].b": 2}
+                            arrayFilters:
+                              - {i.b: 3}
+                    -
+                        # UpdateMany when multiple documents match arrayFilters
+                        name: "updateMany"
+                        arguments:
+                            filter: {}
+                            update:
+                                $set: {"y.$[i].b": 2}
+                            arrayFilters:
+                              - {i.b: 1}
+                options: { ordered: true }
+        outcome:
+            result:
+                deletedCount: 0
+                insertedCount: 0
+                insertedIds: {}
+                matchedCount: 3
+                modifiedCount: 3
+                upsertedCount: 0
+                upsertedIds: {}
+            collection:
+                data:
+                    - {_id: 1, y: [{b: 2}, {b: 2}]}
+                    - {_id: 2, y: [{b: 0}, {b: 2}]}

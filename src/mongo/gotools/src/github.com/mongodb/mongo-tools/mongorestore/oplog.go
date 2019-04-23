@@ -11,13 +11,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/intents"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/progress"
+	"github.com/mongodb/mongo-tools-common/util"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // oplogMaxCommandSize sets the maximum size for multiple buffered ops in the
@@ -48,8 +49,6 @@ func (restore *MongoRestore) RestoreOplog() error {
 	bsonSource := db.NewDecodedBSONSource(db.NewBufferlessBSONSource(intent.BSONFile))
 	defer bsonSource.Close()
 
-	rawOplogEntry := &bson.Raw{}
-
 	var totalOps int64
 	var entrySize int
 
@@ -63,13 +62,16 @@ func (restore *MongoRestore) RestoreOplog() error {
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	defer session.Close()
 
-	for bsonSource.Next(rawOplogEntry) {
-		entrySize = len(rawOplogEntry.Data)
+	for {
+		rawOplogEntry := bsonSource.LoadNext()
+		if rawOplogEntry == nil {
+			break
+		}
+		entrySize = len(rawOplogEntry)
 
 		entryAsOplog := db.Oplog{}
-		err = bson.Unmarshal(rawOplogEntry.Data, &entryAsOplog)
+		err = bson.Unmarshal(rawOplogEntry, &entryAsOplog)
 		if err != nil {
 			return fmt.Errorf("error reading oplog: %v", err)
 		}
@@ -113,12 +115,13 @@ func (restore *MongoRestore) RestoreOplog() error {
 
 // ApplyOps is a wrapper for the applyOps database command, we pass in
 // a session to avoid opening a new connection for a few inserts at a time.
-func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{}) error {
-	res := bson.M{}
-	err := session.Run(bson.D{{"applyOps", entries}}, &res)
-	if err != nil {
+func (restore *MongoRestore) ApplyOps(session *mongo.Client, entries []interface{}) error {
+	singleRes := session.Database("admin").RunCommand(nil, bson.D{{"applyOps", entries}})
+	if err := singleRes.Err(); err != nil {
 		return fmt.Errorf("applyOps: %v", err)
 	}
+	res := bson.M{}
+	singleRes.Decode(&res)
 	if util.IsFalsy(res["ok"]) {
 		return fmt.Errorf("applyOps command: %v", res["errmsg"])
 	}
@@ -128,28 +131,28 @@ func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{
 
 // TimestampBeforeLimit returns true if the given timestamp is allowed to be
 // applied to mongorestore's target database.
-func (restore *MongoRestore) TimestampBeforeLimit(ts bson.MongoTimestamp) bool {
-	if restore.oplogLimit == 0 {
+func (restore *MongoRestore) TimestampBeforeLimit(ts primitive.Timestamp) bool {
+	if restore.oplogLimit.T == 0 && restore.oplogLimit.I == 0 {
 		// always valid if there is no --oplogLimit set
 		return true
 	}
-	return ts < restore.oplogLimit
+	return util.TimestampGreaterThan(restore.oplogLimit, ts)
 }
 
 // ParseTimestampFlag takes in a string the form of <time_t>:<ordinal>,
 // where <time_t> is the seconds since the UNIX epoch, and <ordinal> represents
 // a counter of operations in the oplog that occurred in the specified second.
 // It parses this timestamp string and returns a bson.MongoTimestamp type.
-func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
+func ParseTimestampFlag(ts string) (primitive.Timestamp, error) {
 	var seconds, increment int
 	timestampFields := strings.Split(ts, ":")
 	if len(timestampFields) > 2 {
-		return 0, fmt.Errorf("too many : characters")
+		return primitive.Timestamp{}, fmt.Errorf("too many : characters")
 	}
 
 	seconds, err := strconv.Atoi(timestampFields[0])
 	if err != nil {
-		return 0, fmt.Errorf("error parsing timestamp seconds: %v", err)
+		return primitive.Timestamp{}, fmt.Errorf("error parsing timestamp seconds: %v", err)
 	}
 
 	// parse the increment field if it exists
@@ -157,7 +160,7 @@ func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
 		if len(timestampFields[1]) > 0 {
 			increment, err = strconv.Atoi(timestampFields[1])
 			if err != nil {
-				return 0, fmt.Errorf("error parsing timestamp increment: %v", err)
+				return primitive.Timestamp{}, fmt.Errorf("error parsing timestamp increment: %v", err)
 			}
 		} else {
 			// handle the case where the user writes "<time_t>:" with no ordinal
@@ -165,8 +168,7 @@ func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
 		}
 	}
 
-	timestamp := (int64(seconds) << 32) | int64(increment)
-	return bson.MongoTimestamp(timestamp), nil
+	return primitive.Timestamp{T: uint32(seconds), I: uint32(increment)}, nil
 }
 
 // filterUUIDs removes 'ui' entries from ops, including nested applyOps ops.
@@ -178,7 +180,7 @@ func (restore *MongoRestore) filterUUIDs(op db.Oplog) (db.Oplog, error) {
 
 		// new createIndexes oplog command requires 'ui', so if we aren't
 		// preserving UUIDs, we must convert it to an old style index insert
-		if op.Operation == "c" && op.Object[0].Name == "createIndexes" {
+		if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
 			return convertCreateIndexToIndexInsert(op)
 		}
 	}
@@ -226,7 +228,7 @@ func convertCreateIndexToIndexInsert(op db.Oplog) (db.Oplog, error) {
 // isApplyOpsCmd returns true if a document seems to be an applyOps command.
 func isApplyOpsCmd(cmd bson.D) bool {
 	for _, v := range cmd {
-		if v.Name == "applyOps" {
+		if v.Key == "applyOps" {
 			return true
 		}
 	}

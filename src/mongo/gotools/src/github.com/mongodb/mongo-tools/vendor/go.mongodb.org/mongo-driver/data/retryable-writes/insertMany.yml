@@ -1,0 +1,77 @@
+data:
+    - { _id: 1, x: 11 }
+
+minServerVersion: '3.6'
+
+tests:
+    -
+        description: "InsertMany succeeds after one network error"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+        operation:
+            name: "insertMany"
+            arguments:
+                documents:
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+                options: { ordered: true }
+        outcome:
+            result:
+                insertedIds: { 0: 2, 1: 3 }
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertMany with unordered execution"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+        operation:
+            name: "insertMany"
+            arguments:
+                documents:
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+                options: { ordered: false }
+        outcome:
+            result:
+                insertedIds: { 0: 2, 1: 3 }
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertMany fails after multiple network errors"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            # Normally, a mongod will insert the documents as a batch with a
+            # single commit. If this fails, mongod may try to insert each
+            # document one at a time depending on the failure. Therefore our
+            # single insert command may trigger the failpoint twice on each
+            # driver attempt. This test permanently enables the fail point to
+            # ensure the retry attempt always fails.
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: "alwaysOn"
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "insertMany"
+            arguments:
+                documents:
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+                    - { _id: 4, x: 44 }
+                options: { ordered: true }
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }

@@ -1,0 +1,405 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data: []
+
+tests:
+  - description: abort
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: abortTransaction
+        object: session0
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+               $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              "$numberLong": "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+              afterClusterTime: 42
+            lsid: session0
+            txnNumber:
+              $numberLong: "2"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "2"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: implicit abort
+
+    operations:
+      # Start a transaction but don't commit - the driver calls abortTransaction
+      # from ClientSession.endSession().
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: two aborts
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: abortTransaction
+        object: session0
+      - name: abortTransaction
+        object: session0
+        result:
+          errorContains: cannot call abortTransaction twice
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: abort without start
+
+    operations:
+      - name: abortTransaction
+        object: session0
+        result:
+          errorContains: no transaction started
+
+    expectations: []
+
+    outcome:
+      collection:
+        data: []
+
+  - description: abort directly after no-op commit
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: commitTransaction
+        object: session0
+      - name: abortTransaction  # Error calling abort after no-op commit.
+        object: session0
+        result:
+          errorContains: Cannot call abortTransaction after calling commitTransaction
+
+    expectations: []
+
+    outcome:
+      collection:
+        data: []
+
+  - description: abort directly after commit
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+      - name: abortTransaction  # Error calling abort after commit.
+        object: session0
+        result:
+          errorContains: Cannot call abortTransaction after calling commitTransaction
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: abort ignores TransactionAborted
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      # Abort the server transaction with a duplicate key error.
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          # Don't assert on errorCodeName because (after SERVER-38583) the
+          # DuplicateKey is reported in writeErrors, not as a top-level
+          # command error.
+          errorLabelsOmit: ["TransientTransactionError", "UnknownTransactionCommitResult"]
+      # Make sure the server aborted the transaction.
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          errorCodeName: NoSuchTransaction
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      # abortTransaction must ignore the TransactionAborted and succeed.
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+               $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+               $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+               $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+
+    outcome:
+      collection:
+        data: []
+
+  - description: abort does not apply writeConcern
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: 10
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: abortTransaction
+        object: session0
+        # No write concern error.
+
+    outcome:
+      collection:
+        data: []

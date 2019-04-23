@@ -28,6 +28,14 @@
 required = ["github.com/3rf/mongo-lint"]
 
 [[constraint]]
+  name = "github.com/mongodb/mongo-tools-common"
+  branch = "master"
+
+[[constraint]]
+  name = "go.mongodb.org/mongo-driver"
+  revision = "51421e413403fe3c9b0097147841f752421133e4"
+
+[[constraint]]
   name = "github.com/10gen/escaper"
   revision = "17fe61c658dcbdcbf246c783f4f7dc97efde3a8b"
 
@@ -37,11 +45,12 @@ required = ["github.com/3rf/mongo-lint"]
 
 [[constraint]]
   name = "github.com/10gen/openssl"
-  revision = "812b95859f13cba543f6ad860fcff4bb0f7fcdaa"
+  revision = "fc9a1d560ec3549c695198fe39b9de7f89a7503d"
 
 [[constraint]]
   name = "github.com/google/gopacket"
-  revision = "1b0b78901cdd351ecfc68bf1a2adafcd2ff30220"
+  # v1.1.16 plus fixes for compilation errors
+  revision = "7edef24d642a09d18efcf1e00a9dc2d4c6342c82"
 
 [[constraint]]
   name = "github.com/howeyc/gopass"
@@ -78,7 +87,7 @@ required = ["github.com/3rf/mongo-lint"]
 
 [[override]]
   name = "github.com/jtolds/gls"
-  revision = "8ddce2a84170772b95dd5d576c48d517b22cac63"
+  version = "4.20.0"
 
 [[override]]
   name = "github.com/jacobsa/oglematchers"
@@ -98,7 +107,7 @@ required = ["github.com/3rf/mongo-lint"]
 
 [[override]]
   name = "github.com/mattn/go-runewidth"
-  revision = "d6bea18f789704b5f83375793155289da36a3c7f"
+  version = "v0.0.4"
 
 [[override]]
   name = "github.com/golang/snappy"
@@ -115,4 +124,3 @@ required = ["github.com/3rf/mongo-lint"]
 [prune]
   go-tests = true
   # unused-packages = true
-

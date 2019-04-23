@@ -46,6 +46,7 @@ mongo_tools_variables:
       - name: integration-auth
       - name: legacy30
       - name: lint-go
+      - name: format-go
       - name: lint-js
       - name: qa-tests-3.2
       - name: qa-tests-3.4
@@ -96,6 +97,7 @@ mongo_tools_variables:
       - name: integration
       - name: integration-auth
       - name: lint-go
+      - name: format-go
       - name: lint-js
       - name: qa-tests-3.2
       - name: qa-tests-3.4
@@ -295,6 +297,7 @@ mongo_tools_variables:
       mongod_port: 33333
 
 functions:
+
   "run legacy tests":
     command: shell.exec
     type: test
@@ -350,7 +353,7 @@ functions:
         GOROOT="" set_goenv || exit
         go version
         env | grep ^GO
-        go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags failpoints ${build_tags})" -o bin/${tool} ${tool}/main/${tool}.go
+        go build $(buildflags) -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags failpoints ${build_tags})" -o bin/${tool} ${tool}/main/${tool}.go
         ./bin/${tool} --version
 
   "download mongod":
@@ -440,7 +443,7 @@ functions:
         . ./set_goenv.sh
         GOROOT="" set_goenv || exit
         cd ${package}
-        go test -ldflags "$(print_ldflags)" ${coverage_args} -tags "$(print_tags ${build_tags})" -test.v > unit.suite
+        go test $(buildflags) -ldflags "$(print_ldflags)" ${coverage_args} -tags "$(print_tags ${build_tags})" -test.v > unit.suite
         export exitcode=$?
         cat unit.suite
         cp unit.suite $basedir/.
@@ -739,6 +742,17 @@ functions:
         set -e
         GOPATH=$PWD go get github.com/10gen/ftdc-utils/cmd/ftdc
 
+  "fetch golangci-lint" :
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src/github.com/mongodb/mongo-tools
+        script: |
+          set -x
+          set -v
+          set -e
+          curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
+
   "create auth_user" :
   - command: shell.exec
     params:
@@ -806,7 +820,7 @@ functions:
         if [ "${TESTING_REPLAY}" = "true" ]; then
             export TOOLS_TESTING_REPLAY="true"
         fi
-        ${environment_vars} go test -ldflags "$(print_ldflags)" ${additional_args} -v > ${filename}.suite
+        ${environment_vars} go test $(buildflags) -ldflags "$(print_ldflags)" ${additional_args} -v > ${filename}.suite
 
 
 pre:
@@ -821,20 +835,21 @@ pre:
         exit 0
 
 post:
+    # attach.results works for jstests, gotest.parse_files for golang tests
   - command: attach.results
     params:
       file_location: src/github.com/mongodb/mongo-tools/report.json
+  - command: gotest.parse_files
+    params:
+      files: ["src/github.com/mongodb/mongo-tools/testing_output/*.suite"]
   - command: shell.exec
     params:
       silent: true
       script: |
         set -x
-          set -v
+        set -v
         ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py} >/dev/null 2>&1
         exit 0
-  - command: gotest.parse_files
-    params:
-      files: ["src/github.com/mongodb/mongo-tools/*.suite"]
   - command: shell.exec
     params:
       script: |
@@ -1007,6 +1022,23 @@ tasks:
       vars:
         test_path: "test/legacy30"
         smoke_args: "--authMechanism SCRAM-SHA-1"
+
+- name: format-go
+  commands:
+    - func: "fetch source"
+    - func: "fetch golangci-lint"
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src/github.com/mongodb/mongo-tools
+        script: |
+          set -x
+          set -v
+          set -e
+          . ./set_goenv.sh
+          GOROOT="" set_goenv || exit
+          PATH=$PATH:$PWD/bin golangci-lint run --disable-all -E gofmt ./...
+          exit $?
 
 - name: lint-go
   commands:
@@ -1624,7 +1656,7 @@ buildvariants:
   run_on:
   - linux-64-amzn-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -1644,7 +1676,7 @@ buildvariants:
   run_on:
   - amazon2-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -1668,7 +1700,7 @@ buildvariants:
   run_on:
   - debian81-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -1688,7 +1720,7 @@ buildvariants:
   run_on:
   - debian92-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -1772,7 +1804,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "rhel62"
     mongo_edition: "enterprise"
-    build_tags: "ssl sasl"
+    build_tags: "ssl sasl gssapi"
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
     arch: "linux/x86_64"
@@ -1797,7 +1829,7 @@ buildvariants:
   run_on:
   - rhel70
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -1821,7 +1853,7 @@ buildvariants:
   run_on:
   - suse12-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -1845,7 +1877,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -1893,7 +1925,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "ubuntu1604"
     mongo_edition: "enterprise"
-    build_tags: "ssl sasl"
+    build_tags: "ssl sasl gssapi"
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
     arch: "linux/x86_64"
@@ -1918,7 +1950,7 @@ buildvariants:
   run_on:
   - ubuntu1804-test
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -1976,7 +2008,7 @@ buildvariants:
     mongo_os: "windows-64"
     mongo_edition: "enterprise"
     mongo_target: "windows"
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
     smoke_use_ssl: --use-ssl
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     resmoke_use_ssl: _ssl
@@ -2030,7 +2062,7 @@ buildvariants:
     mongo_os: "rhel71"
     mongo_edition: "enterprise"
     mongo_arch: "ppc64le"
-    build_tags: 'ssl sasl'
+    build_tags: 'ssl sasl gssapi'
     resmoke_use_ssl: _ssl
     resmoke_args: -j 4
     excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
@@ -2047,7 +2079,7 @@ buildvariants:
   stepback: false
   batchtime: 10080 # weekly
   expansions:
-    build_tags: 'ssl sasl'
+    build_tags: 'ssl sasl gssapi'
   tasks:
   - name: dist
   - name: replay-dist
@@ -2068,7 +2100,7 @@ buildvariants:
     mongo_os: "rhel67"
     mongo_edition: "enterprise"
     mongo_arch: "s390x"
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
     resmoke_use_ssl: _ssl
     excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
     resmoke_args: -j 2
@@ -2085,7 +2117,7 @@ buildvariants:
   stepback: false
   batchtime: 10080 # weekly
   expansions:
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
   tasks:
   - name: dist
   - name: replay-dist
@@ -2105,9 +2137,9 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "ubuntu1604"
     mongo_edition: "enterprise"
-    build_tags: "sasl ssl"
+    build_tags: "sasl gssapi ssl"
     arch: "linux/x86_64"
-    args: "-race"
+    args: "-buildmode=default -race"
     excludes: requires_large_ram
     integration_test_args: integration
   tasks: *ubuntu_x86_64_race_tasks

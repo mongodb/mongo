@@ -32,6 +32,7 @@ examples/statsassembly/statsassembly
 examples/arpscan/arpscan
 examples/bidirectional/bidirectional
 examples/bytediff/bytediff
+examples/reassemblydump/reassemblydump
 layers/gen
 macs/gen
 pcap/pcap_tester

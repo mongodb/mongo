@@ -9,10 +9,13 @@ package mongotop
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
 	"time"
+
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 // MongoTop is a container for the user-specified options and
@@ -35,48 +38,66 @@ type MongoTop struct {
 }
 
 func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
-	session, err := mt.SessionProvider.GetSession()
-	if err != nil {
-		return nil, err
-	}
-	defer session.Close()
-	session.SetSocketTimeout(0)
-
-	var currentServerStatus ServerStatus
-	var currentTop Top
-	commandName := "top"
-	var dest interface{} = &currentTop
 	if mt.OutputOptions.Locks {
-		commandName = "serverStatus"
-		dest = &currentServerStatus
+		return mt.runServerStatusDiff()
 	}
-	err = session.DB("admin").Run(commandName, dest)
+	return mt.runTopDiff()
+}
+
+func (mt *MongoTop) runTopDiff() (outDiff FormattableDiff, err error) {
+	commandName := "top"
+	dest := &bsonx.Doc{}
+	err = mt.SessionProvider.RunString(commandName, dest, "admin")
 	if err != nil {
-		mt.previousServerStatus = nil
 		mt.previousTop = nil
 		return nil, err
 	}
-	if mt.OutputOptions.Locks {
-		if currentServerStatus.Locks == nil {
+	// Remove 'note' field that prevents easy decoding, then round-trip
+	// again to simplify unpacking into the nested data structure
+	totals, err := dest.LookupErr("totals")
+	if err != nil {
+		return nil, err
+	}
+	recoded, err := totals.Document().Delete("note").MarshalBSON()
+	if err != nil {
+		return nil, err
+	}
+	topinfo := make(map[string]NSTopInfo)
+	err = bson.Unmarshal(recoded, &topinfo)
+	if err != nil {
+		return nil, err
+	}
+	currentTop := Top{Totals: topinfo}
+	if mt.previousTop != nil {
+		topDiff := currentTop.Diff(*mt.previousTop)
+		outDiff = topDiff
+	}
+	mt.previousTop = &currentTop
+	return outDiff, nil
+}
+
+func (mt *MongoTop) runServerStatusDiff() (outDiff FormattableDiff, err error) {
+	var currentServerStatus ServerStatus
+	commandName := "serverStatus"
+	var dest interface{} = &currentServerStatus
+	err = mt.SessionProvider.RunString(commandName, dest, "admin")
+	if err != nil {
+		mt.previousServerStatus = nil
+		return nil, err
+	}
+	if currentServerStatus.Locks == nil {
+		return nil, fmt.Errorf("server does not support reporting lock information")
+	}
+	for _, ns := range currentServerStatus.Locks {
+		if ns.AcquireCount != nil {
 			return nil, fmt.Errorf("server does not support reporting lock information")
 		}
-		for _, ns := range currentServerStatus.Locks {
-			if ns.AcquireCount != nil {
-				return nil, fmt.Errorf("server does not support reporting lock information")
-			}
-		}
-		if mt.previousServerStatus != nil {
-			serverStatusDiff := currentServerStatus.Diff(*mt.previousServerStatus)
-			outDiff = serverStatusDiff
-		}
-		mt.previousServerStatus = &currentServerStatus
-	} else {
-		if mt.previousTop != nil {
-			topDiff := currentTop.Diff(*mt.previousTop)
-			outDiff = topDiff
-		}
-		mt.previousTop = &currentTop
 	}
+	if mt.previousServerStatus != nil {
+		serverStatusDiff := currentServerStatus.Diff(*mt.previousServerStatus)
+		outDiff = serverStatusDiff
+	}
+	mt.previousServerStatus = &currentServerStatus
 	return outDiff, nil
 }
 

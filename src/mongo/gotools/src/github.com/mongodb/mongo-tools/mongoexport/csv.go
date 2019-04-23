@@ -9,9 +9,9 @@ package mongoexport
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/json"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools-common/bsonutil"
+	"github.com/mongodb/mongo-tools-common/json"
+	"go.mongodb.org/mongo-driver/bson"
 	"io"
 	"reflect"
 	"strconv"
@@ -72,7 +72,7 @@ func (csvExporter *CSVExportOutput) Flush() error {
 // ExportDocument writes a line to output with the CSV representation of a document.
 func (csvExporter *CSVExportOutput) ExportDocument(document bson.D) error {
 	rowOut := make([]string, 0, len(csvExporter.Fields))
-	extendedDoc, err := bsonutil.ConvertBSONValueToJSON(document)
+	extendedDoc, err := bsonutil.ConvertBSONValueToLegacyExtJSON(document)
 	if err != nil {
 		return err
 	}

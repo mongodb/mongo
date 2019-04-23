@@ -7,22 +7,21 @@
 package mongodump
 
 import (
+	"context"
 	"fmt"
 	"io"
 
-	"github.com/mongodb/mongo-tools/common/bsonutil"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/json"
-	"github.com/mongodb/mongo-tools/common/log"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/intents"
+	"github.com/mongodb/mongo-tools-common/log"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 // Metadata holds information about a collection's options and indexes.
 type Metadata struct {
-	Options interface{}   `json:"options,omitempty"`
-	Indexes []interface{} `json:"indexes"`
-	UUID    string        `json:"uuid,omitempty"`
+	Options bson.M   `json:"options,omitempty"`
+	Indexes []bson.D `json:"indexes"`
+	UUID    string   `json:"uuid,omitempty"`
 }
 
 // IndexDocumentFromDB is used internally to preserve key ordering.
@@ -39,18 +38,11 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOut
 		// We have to initialize Indexes to an empty slice, not nil, so that an empty
 		// array is marshalled into json instead of null. That is, {indexes:[]} is okay
 		// but {indexes:null} will cause assertions in our legacy C++ mongotools
-		Indexes: []interface{}{},
+		Indexes: []bson.D{},
 	}
 
 	// The collection options were already gathered while building the list of intents.
-	// We convert them to JSON so that they can be written to the metadata json file as text.
-	if intent.Options != nil {
-		if meta.Options, err = bsonutil.ConvertBSONValueToJSON(*intent.Options); err != nil {
-			return fmt.Errorf("error converting collection options to JSON: %v", err)
-		}
-	} else {
-		meta.Options = nil
-	}
+	meta.Options = intent.Options
 
 	// If a collection has a UUID, it was gathered while building the list of
 	// intents.  Otherwise, it will be the empty string.
@@ -67,13 +59,13 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOut
 	if err != nil {
 		return err
 	}
-	defer session.Close()
 
 	if intent.IsView() {
 		log.Logvf(log.DebugLow, "not dumping indexes metadata for '%v' because it is a view", intent.Namespace())
 	} else {
 		// get the indexes
-		indexesIter, err := db.GetIndexes(session.DB(intent.DB).C(intent.C))
+		indexesIter, err := db.GetIndexes(session.Database(intent.DB).Collection(intent.C))
+		defer indexesIter.Close(context.Background())
 		if err != nil {
 			return err
 		}
@@ -82,13 +74,15 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOut
 			return nil
 		}
 
-		indexOpts := &bson.D{}
-		for indexesIter.Next(indexOpts) {
-			convertedIndex, err := bsonutil.ConvertBSONValueToJSON(*indexOpts)
+		ctx := context.Background()
+		for indexesIter.Next(ctx) {
+			indexOpts := &bson.D{}
+			err := indexesIter.Decode(indexOpts)
 			if err != nil {
-				return fmt.Errorf("error converting index (%#v): %v", convertedIndex, err)
+				return fmt.Errorf("error converting index: %v", err)
 			}
-			meta.Indexes = append(meta.Indexes, convertedIndex)
+
+			meta.Indexes = append(meta.Indexes, *indexOpts)
 		}
 
 		if err := indexesIter.Err(); err != nil {
@@ -97,7 +91,7 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOut
 	}
 
 	// Finally, we send the results to the writer as JSON bytes
-	jsonBytes, err := json.Marshal(meta)
+	jsonBytes, err := bson.MarshalExtJSON(meta, true, false)
 	if err != nil {
 		return fmt.Errorf("error marshalling metadata json for collection `%v`: %v", intent.Namespace(), err)
 	}

@@ -11,9 +11,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools-common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestTSVStreamDocument(t *testing.T) {
@@ -139,7 +139,7 @@ func TestTSVStreamDocument(t *testing.T) {
 			So(r.StreamDocument(true, docChan), ShouldBeNil)
 			for i := 0; i < len(expectedReads); i++ {
 				for j, readDocument := range <-docChan {
-					So(readDocument.Name, ShouldEqual, expectedReads[i][j].Name)
+					So(readDocument.Key, ShouldEqual, expectedReads[i][j].Key)
 					So(readDocument.Value, ShouldEqual, expectedReads[i][j].Value)
 				}
 			}

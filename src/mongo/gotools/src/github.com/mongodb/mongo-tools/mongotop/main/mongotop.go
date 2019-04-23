@@ -8,21 +8,27 @@
 package main
 
 import (
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongotop"
-	"gopkg.in/mgo.v2"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/signals"
+	"github.com/mongodb/mongo-tools-common/util"
+	"github.com/mongodb/mongo-tools/mongotop"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+)
+
+var (
+	VersionStr = "built-without-version-string"
+	GitCommit  = "build-without-git-commit"
 )
 
 func main() {
 	// initialize command-line opts
-	opts := options.New("mongotop", mongotop.Usage,
+	opts := options.New("mongotop", VersionStr, GitCommit, mongotop.Usage,
 		options.EnabledOptions{Auth: true, Connection: true, Namespace: false, URI: true})
 	opts.UseReadOnlyHostDescription()
 
@@ -81,15 +87,15 @@ func main() {
 		os.Exit(util.ExitBadOptions)
 	}
 
+	if opts.ReplicaSetName == "" {
+		opts.ReadPreference = readpref.PrimaryPreferred()
+	}
+
 	// create a session provider to connect to the db
 	sessionProvider, err := db.NewSessionProvider(*opts)
 	if err != nil {
 		log.Logvf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
-	}
-
-	if opts.ReplicaSetName == "" {
-		sessionProvider.SetReadPreference(mgo.PrimaryPreferred)
 	}
 
 	// fail fast if connecting to a mongos

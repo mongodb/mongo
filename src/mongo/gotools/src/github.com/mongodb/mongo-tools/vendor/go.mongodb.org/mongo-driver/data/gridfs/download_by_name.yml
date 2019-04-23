@@ -1,0 +1,113 @@
+﻿data:
+    files:
+        -
+            _id: { "$oid" : "000000000000000000000001" }
+            length: 1
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-01T00:00:00.000Z" }
+            md5: "47ed733b8d10be225eceba344d533586"
+            filename: "abc"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000002" }
+            length: 1
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-02T00:00:00.000Z" }
+            md5: "b15835f133ff2e27c7cb28117bfae8f4"
+            filename: "abc"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000003" }
+            length: 1
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-03T00:00:00.000Z" }
+            md5: "eccbc87e4b5ce2fe28308fd9f2a7baf3"
+            filename: "abc"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000004" }
+            length: 1
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-04T00:00:00.000Z" }
+            md5: "f623e75af30e62bbd73d6df5b50bb7b5"
+            filename: "abc"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000005" }
+            length: 1
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-05T00:00:00.000Z" }
+            md5: "4c614360da93c0a041b22e537de151eb"
+            filename: "abc"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+    chunks:
+        - { _id : { "$oid" : "000000000000000000000001" }, files_id : { "$oid" : "000000000000000000000001" }, n : 0, data : { $hex : "11" } }
+        - { _id : { "$oid" : "000000000000000000000002" }, files_id : { "$oid" : "000000000000000000000002" }, n : 0, data : { $hex : "22" } }
+        - { _id : { "$oid" : "000000000000000000000003" }, files_id : { "$oid" : "000000000000000000000003" }, n : 0, data : { $hex : "33" } }
+        - { _id : { "$oid" : "000000000000000000000004" }, files_id : { "$oid" : "000000000000000000000004" }, n : 0, data : { $hex : "44" } }
+        - { _id : { "$oid" : "000000000000000000000005" }, files_id : { "$oid" : "000000000000000000000005" }, n : 0, data : { $hex : "55" } }
+
+tests:
+    -
+        description: "Download_by_name when revision is 0"
+        act:
+            operation: download_by_name
+            arguments:
+                filename: "abc"
+                options: { revision : 0 }
+        assert:
+            result: { $hex : "11" }
+    -
+        description: "Download_by_name when revision is 1"
+        act:
+            operation: download_by_name
+            arguments:
+                filename: "abc"
+                options: { revision : 1 }
+        assert:
+            result: { $hex : "22" }
+    -
+        description: "Download_by_name when revision is -2"
+        act:
+            operation: download_by_name
+            arguments:
+                filename: "abc"
+                options: { revision : -2 }
+        assert:
+            result: { $hex : "44" }
+    -
+        description: "Download_by_name when revision is -1"
+        act:
+            operation: download_by_name
+            arguments:
+                filename: "abc"
+                options: { revision : -1 }
+        assert:
+            result: { $hex : "55" }
+    -
+        description: "Download_by_name when files entry does not exist"
+        act:
+            operation: download_by_name
+            arguments:
+                filename: "xyz"
+        assert:
+            error: "FileNotFound"
+    -
+        description: "Download_by_name when revision does not exist"
+        act:
+            operation: download_by_name
+            arguments:
+                filename: "abc"
+                options: { revision : 999 }
+        assert:
+            error: "RevisionNotFound"

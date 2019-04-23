@@ -8,24 +8,24 @@
 package main
 
 import (
-	"github.com/mongodb/mongo-tools/bsondump"
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/signals"
-	"github.com/mongodb/mongo-tools/common/util"
 	"os"
+
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/signals"
+	"github.com/mongodb/mongo-tools-common/util"
+	"github.com/mongodb/mongo-tools/bsondump"
+)
+
+var (
+	VersionStr = "built-without-version-string"
+	GitCommit  = "build-without-git-commit"
 )
 
 func main() {
 	// initialize command-line opts
-	opts := options.New("bsondump", bsondump.Usage, options.EnabledOptions{})
-	bsonDumpOpts := &bsondump.BSONDumpOptions{}
-	opts.AddOptions(bsonDumpOpts)
-
-	args, err := opts.ParseArgs(os.Args[1:])
+	opts, err := bsondump.ParseOptions(os.Args[1:], VersionStr, GitCommit)
 	if err != nil {
-		log.Logvf(log.Always, "error parsing command line options: %v", err)
+		log.Logvf(log.Always, "%v", err)
 		log.Logvf(log.Always, "try 'bsondump --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
@@ -40,55 +40,25 @@ func main() {
 		return
 	}
 
-	log.SetVerbosity(opts.Verbosity)
 	signals.Handle()
 
-	if len(args) > 1 {
-		log.Logvf(log.Always, "too many positional arguments: %v", args)
-		log.Logvf(log.Always, "try 'bsondump --help' for more information")
-		os.Exit(util.ExitBadOptions)
+	dumper, err := bsondump.New(opts)
+	if err != nil {
+		log.Logv(log.Always, err.Error())
+		os.Exit(util.ExitError)
 	}
-
-	// If the user specified a bson input file
-	if len(args) == 1 {
-		if bsonDumpOpts.BSONFileName != "" {
-			log.Logvf(log.Always, "Cannot specify both a positional argument and --bsonFile")
-			os.Exit(util.ExitBadOptions)
+	defer func() {
+		err := dumper.Close()
+		if err != nil {
+			log.Logvf(log.Always, "error cleaning up: %v", err)
+			os.Exit(util.ExitError)
 		}
+	}()
 
-		bsonDumpOpts.BSONFileName = args[0]
-	}
-
-	dumper := bsondump.BSONDump{
-		ToolOptions:     opts,
-		BSONDumpOptions: bsonDumpOpts,
-	}
-
-	reader, err := bsonDumpOpts.GetBSONReader()
-	if err != nil {
-		log.Logvf(log.Always, "Getting BSON Reader Failed: %v", err)
-		os.Exit(util.ExitError)
-	}
-	dumper.BSONSource = db.NewBSONSource(reader)
-	defer dumper.BSONSource.Close()
-
-	writer, err := bsonDumpOpts.GetWriter()
-	if err != nil {
-		log.Logvf(log.Always, "Getting Writer Failed: %v", err)
-		os.Exit(util.ExitError)
-	}
-	dumper.Out = writer
-	defer dumper.Out.Close()
-
-	log.Logvf(log.DebugLow, "running bsondump with --objcheck: %v", bsonDumpOpts.ObjCheck)
-
-	if len(bsonDumpOpts.Type) != 0 && bsonDumpOpts.Type != "debug" && bsonDumpOpts.Type != "json" {
-		log.Logvf(log.Always, "Unsupported output type '%v'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
-		os.Exit(util.ExitBadOptions)
-	}
+	log.Logvf(log.DebugLow, "running bsondump with --objcheck: %v", opts.ObjCheck)
 
 	var numFound int
-	if bsonDumpOpts.Type == "debug" {
+	if opts.Type == bsondump.DebugOutputType {
 		numFound, err = dumper.Debug()
 	} else {
 		numFound, err = dumper.JSON()

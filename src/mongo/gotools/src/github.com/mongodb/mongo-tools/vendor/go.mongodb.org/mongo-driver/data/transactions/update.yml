@@ -1,0 +1,246 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data:
+  - _id: 1
+  - _id: 2
+  - _id: 3
+
+tests:
+  - description: update
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: updateOne
+        object: collection
+        arguments:
+          session: session0
+          filter: {_id: 4}
+          update:
+            $inc: {x: 1}
+          upsert: true
+        result:
+          matchedCount: 0
+          modifiedCount: 0
+          upsertedCount: 1
+          upsertedId: 4
+      - name: replaceOne
+        object: collection
+        arguments:
+          session: session0
+          filter: {x: 1}
+          replacement: {y: 1}
+        result:
+          matchedCount: 1
+          modifiedCount: 1
+          upsertedCount: 0
+      - name: updateMany
+        object: collection
+        arguments:
+          session: session0
+          filter:
+            _id: {$gte: 3}
+          update:
+            $set: {z: 1}
+        result:
+          matchedCount: 2
+          modifiedCount: 2
+          upsertedCount: 0
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {_id: 4}
+                u: {$inc: {x: 1}}
+                multi: false
+                upsert: true
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {x: 1}
+                u: {y: 1}
+                multi: false
+                upsert: false
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {_id: {$gte: 3}}
+                u: {$set: {z: 1}}
+                multi: true
+                upsert: false
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+          - {_id: 3, z: 1}
+          - {_id: 4, y: 1, z: 1}
+
+  - description: collections writeConcern ignored for update
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+      - name: updateOne
+        object: collection
+        collectionOptions:
+          writeConcern:
+            w: majority
+        arguments:
+          session: session0
+          filter: {_id: 4}
+          update:
+            $inc: {x: 1}
+          upsert: true
+        result:
+          matchedCount: 0
+          modifiedCount: 0
+          upsertedCount: 1
+          upsertedId: 4
+      - name: replaceOne
+        object: collection
+        collectionOptions:
+          writeConcern:
+            w: majority
+        arguments:
+          session: session0
+          filter: {x: 1}
+          replacement: {y: 1}
+        result:
+          matchedCount: 1
+          modifiedCount: 1
+          upsertedCount: 0
+      - name: updateMany
+        object: collection
+        collectionOptions:
+          writeConcern:
+            w: majority
+        arguments:
+          session: session0
+          filter:
+            _id: {$gte: 3}
+          update:
+            $set: {z: 1}
+        result:
+          matchedCount: 2
+          modifiedCount: 2
+          upsertedCount: 0
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {_id: 4}
+                u: {$inc: {x: 1}}
+                multi: false
+                upsert: true
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {x: 1}
+                u: {y: 1}
+                multi: false
+                upsert: false
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              - q: {_id: {$gte: 3}}
+                u: {$set: {z: 1}}
+                multi: true
+                upsert: false
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: update
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+          command_name: commitTransaction
+          database_name: admin

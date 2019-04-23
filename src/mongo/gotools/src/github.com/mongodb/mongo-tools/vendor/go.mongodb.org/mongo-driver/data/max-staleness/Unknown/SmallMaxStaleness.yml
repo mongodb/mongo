@@ -1,0 +1,14 @@
+# Driver doesn't validate maxStalenessSeconds while TopologyType is Unknown.
+---
+heartbeatFrequencyMS: 10000
+topology_description:
+  type: Unknown
+  servers:
+  - &1
+    address: a:27017
+    type: Unknown
+read_preference:
+  mode: Nearest
+  maxStalenessSeconds: 1
+suitable_servers: []
+in_latency_window: []

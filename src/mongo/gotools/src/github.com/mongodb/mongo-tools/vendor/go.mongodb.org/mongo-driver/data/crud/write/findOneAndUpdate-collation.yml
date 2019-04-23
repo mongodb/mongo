@@ -1,0 +1,27 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 'ping'}
+    - {_id: 3, x: 'pINg'}
+minServerVersion: '3.4'
+
+tests:
+    -
+        description: "FindOneAndUpdate when many documents match with collation returning the document before modification"
+        operation:
+            name: findOneAndUpdate
+            arguments:
+                filter:
+                    x: 'PING'
+                update:
+                    $set: {x: 'pong'}
+                projection: {x: 1, _id: 0}
+                sort: {_id: 1}
+                collation: { locale: 'en_US', strength: 2 } # https://docs.mongodb.com/master/reference/collation/#collation-document
+
+        outcome:
+            result: {x: 'ping'}
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 'pong'}
+                    - {_id: 3, x: 'pINg'}

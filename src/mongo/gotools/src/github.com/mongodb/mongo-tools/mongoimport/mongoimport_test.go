@@ -16,12 +16,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testtype"
-	"github.com/mongodb/mongo-tools/common/testutil"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/testtype"
+	"github.com/mongodb/mongo-tools-common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	driverOpts "go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
@@ -36,24 +37,34 @@ func checkOnlyHasDocuments(sessionProvider db.SessionProvider, expectedDocuments
 	if err != nil {
 		return err
 	}
-	defer session.Close()
 
-	collection := session.DB(testDb).C(testCollection)
-	dbDocuments := []bson.M{}
-	err = collection.Find(nil).Sort("_id").All(&dbDocuments)
+	collection := session.Database(testDb).Collection(testCollection)
+	cursor, err := collection.Find(nil, bson.D{}, driverOpts.Find().SetSort(bson.D{{"_id", 1}}))
 	if err != nil {
 		return err
 	}
-	if len(dbDocuments) != len(expectedDocuments) {
-		return fmt.Errorf("document count mismatch: expected %#v, got %#v",
-			len(expectedDocuments), len(dbDocuments))
+
+	var docs []bson.M
+	for cursor.Next(nil) {
+		var doc bson.M
+		if err = cursor.Decode(&doc); err != nil {
+			return err
+		}
+
+		docs = append(docs, doc)
 	}
-	for index := range dbDocuments {
-		if !reflect.DeepEqual(dbDocuments[index], expectedDocuments[index]) {
+	if len(docs) != len(expectedDocuments) {
+		return fmt.Errorf("document count mismatch: expected %#v, got %#v",
+			len(expectedDocuments), len(docs))
+	}
+
+	for index := range docs {
+		if !reflect.DeepEqual(docs[index], expectedDocuments[index]) {
 			return fmt.Errorf("document mismatch: expected %#v, got %#v",
-				expectedDocuments[index], dbDocuments[index])
+				expectedDocuments[index], docs[index])
 		}
 	}
+
 	return nil
 }
 
@@ -62,16 +73,14 @@ func countDocuments(sessionProvider *db.SessionProvider) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer session.Close()
 
-	collection := session.DB(testDb).C(testCollection)
-	dbDocuments := []bson.M{}
-	// Count via scan because 'count' command can be an approximation
-	err = collection.Find(nil).All(&dbDocuments)
+	collection := session.Database(testDb).Collection(testCollection)
+	n, err := collection.CountDocuments(nil, bson.D{})
 	if err != nil {
 		return 0, err
 	}
-	return len(dbDocuments), nil
+
+	return int(n), nil
 }
 
 // getBasicToolOptions returns a test helper to instantiate the session provider
@@ -117,6 +126,23 @@ func NewMongoImport() (*MongoImport, error) {
 	}, nil
 }
 
+// NewMockMongoImport gets an instance of MongoImport with no underlying SessionProvider.
+// Use this for tests that don't communicate with the server (e.g. options parsing tests)
+func NewMockMongoImport() *MongoImport {
+	toolOptions := getBasicToolOptions()
+	inputOptions := &InputOptions{
+		ParseGrace: "stop",
+	}
+	ingestOptions := &IngestOptions{}
+
+	return &MongoImport{
+		ToolOptions:     toolOptions,
+		InputOptions:    inputOptions,
+		IngestOptions:   ingestOptions,
+		SessionProvider: nil,
+	}
+}
+
 func TestSplitInlineHeader(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("handle normal, untyped headers", t, func() {
@@ -147,234 +173,218 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no collection is given", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.ToolOptions.Namespace.DB = ""
 			imp.ToolOptions.Namespace.Collection = ""
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if an invalid type is given", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.Type = "invalid"
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if neither --headerline is supplied "+
 			"nor --fields/--fieldFile", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.Type = CSV
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("no error should be thrown if --headerline is not supplied "+
 			"but --fields is supplied", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fields := "a,b,c"
 			imp.InputOptions.Fields = &fields
 			imp.InputOptions.Type = CSV
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("no error should be thrown if no input type is supplied", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			imp := NewMockMongoImport()
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("no error should be thrown if there's just one positional argument", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
-			So(imp.ValidateSettings([]string{"a"}), ShouldBeNil)
+			imp := NewMockMongoImport()
+			So(imp.validateSettings([]string{"a"}), ShouldBeNil)
 		})
 
 		Convey("an error should be thrown if --file is used with one positional argument", func() {
-			imp, err := NewMongoImport()
+			imp := NewMockMongoImport()
 			imp.InputOptions.File = "abc"
-			So(err, ShouldBeNil)
-			So(imp.ValidateSettings([]string{"a"}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{"a"}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if there's more than one positional argument", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
-			So(imp.ValidateSettings([]string{"a", "b"}), ShouldNotBeNil)
+			imp := NewMockMongoImport()
+			So(imp.validateSettings([]string{"a", "b"}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if --headerline is used with JSON input", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.HeaderLine = true
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if --fields is used with JSON input", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fields := ""
 			imp.InputOptions.Fields = &fields
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 			fields = "a,b,c"
 			imp.InputOptions.Fields = &fields
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if --fieldFile is used with JSON input", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fieldFile := ""
 			imp.InputOptions.FieldFile = &fieldFile
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 			fieldFile = "test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if --ignoreBlanks is used with JSON input", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.IngestOptions.IgnoreBlanks = true
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("no error should be thrown if --headerline is not supplied "+
 			"but --fieldFile is supplied", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fieldFile := "test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
 			imp.InputOptions.Type = CSV
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("an error should be thrown if --mode is incorrect", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.IngestOptions.Mode = "wrong"
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if a field in the --upsertFields "+
 			"argument starts with a dollar sign", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
 			imp.IngestOptions.Mode = modeUpsert
 			imp.IngestOptions.UpsertFields = "a,$b,c"
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 			imp.IngestOptions.UpsertFields = "a,.b,c"
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("no error should be thrown if --upsertFields is supplied without "+
 			"--mode=xxx", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
 			imp.IngestOptions.UpsertFields = "a,b,c"
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 			So(imp.IngestOptions.Mode, ShouldEqual, modeUpsert)
 		})
 
 		Convey("an error should be thrown if --upsertFields is used with "+
 			"--mode=insert", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
 			imp.IngestOptions.Mode = modeInsert
 			imp.IngestOptions.UpsertFields = "a"
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("if --mode=upsert is used without --upsertFields, _id should be set as "+
 			"the upsert field", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
 			imp.IngestOptions.Mode = modeUpsert
 			imp.IngestOptions.UpsertFields = ""
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 			So(imp.upsertFields, ShouldResemble, []string{"_id"})
 		})
 
 		Convey("no error should be thrown if all fields in the --upsertFields "+
 			"argument are valid", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
 			imp.IngestOptions.Mode = modeUpsert
 			imp.IngestOptions.UpsertFields = "a,b,c"
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("no error should be thrown if --fields is supplied with CSV import", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fields := "a,b,c"
 			imp.InputOptions.Fields = &fields
 			imp.InputOptions.Type = CSV
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("an error should be thrown if an empty --fields is supplied with CSV import", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fields := ""
 			imp.InputOptions.Fields = &fields
 			imp.InputOptions.Type = CSV
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("no error should be thrown if --fieldFile is supplied with CSV import", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fieldFile := "test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
 			imp.InputOptions.Type = CSV
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("an error should be thrown if no collection and no file is supplied", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fieldFile := "test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
 			imp.InputOptions.Type = CSV
 			imp.ToolOptions.Namespace.Collection = ""
-			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("no error should be thrown if --file is used (without -c) supplied "+
 			"- the file name should be used as the collection name", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.File = "input"
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
 			imp.ToolOptions.Namespace.Collection = ""
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 			So(imp.ToolOptions.Namespace.Collection, ShouldEqual,
 				imp.InputOptions.File)
 		})
 
 		Convey("with no collection name and a file name the base name of the "+
 			"file (without the extension) should be used as the collection name", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
 			imp.ToolOptions.Namespace.Collection = ""
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 			So(imp.ToolOptions.Namespace.Collection, ShouldEqual, "input")
+		})
+
+		Convey("error should be thrown if --legacy is specified and input type is not JSON", func() {
+			imp := NewMockMongoImport()
+			imp.InputOptions.Type = CSV
+			fieldFile := "test.csv"
+			imp.InputOptions.FieldFile = &fieldFile
+			imp.InputOptions.Legacy = true
+			So(imp.validateSettings([]string{}), ShouldNotBeNil)
 		})
 	})
 }
@@ -385,29 +395,26 @@ func TestGetSourceReader(t *testing.T) {
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
 				"the reader does not exist", func() {
-				imp, err := NewMongoImport()
-				So(err, ShouldBeNil)
+				imp := NewMockMongoImport()
 				imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
 				imp.InputOptions.Type = CSV
 				imp.ToolOptions.Namespace.Collection = ""
-				_, _, err = imp.getSourceReader()
+				_, _, err := imp.getSourceReader()
 				So(err, ShouldNotBeNil)
 			})
 
 			Convey("no error should be thrown if the file exists", func() {
-				imp, err := NewMongoImport()
-				So(err, ShouldBeNil)
+				imp := NewMockMongoImport()
 				imp.InputOptions.File = "testdata/test_array.json"
 				imp.InputOptions.Type = JSON
-				_, _, err = imp.getSourceReader()
+				_, _, err := imp.getSourceReader()
 				So(err, ShouldBeNil)
 			})
 
 			Convey("no error should be thrown if stdin is used", func() {
-				imp, err := NewMongoImport()
-				So(err, ShouldBeNil)
+				imp := NewMockMongoImport()
 				imp.InputOptions.File = ""
-				_, _, err = imp.getSourceReader()
+				_, _, err := imp.getSourceReader()
 				So(err, ShouldBeNil)
 			})
 		})
@@ -417,84 +424,74 @@ func TestGetInputReader(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Given a io.Reader on calling getInputReader", t, func() {
 		Convey("should parse --fields using valid csv escaping", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.Fields = new(string)
 			*imp.InputOptions.Fields = "foo.auto(),bar.date(January 2, 2006)"
 			imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
 			imp.InputOptions.ColumnsHaveTypes = true
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("should complain about non-escaped new lines in --fields", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.Fields = new(string)
 			*imp.InputOptions.Fields = "foo.auto(),\nblah.binary(hex),bar.date(January 2, 2006)"
 			imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
 			imp.InputOptions.ColumnsHaveTypes = true
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown if neither --fields nor --fieldFile "+
 			"is used", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown if --fields is used", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fields := "a,b,c"
 			imp.InputOptions.Fields = &fields
 			imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown if --fieldFile is used and it "+
 			"references a valid file", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fieldFile := "testdata/test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("an error should be thrown if --fieldFile is used and it "+
 			"references an invalid file", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fieldFile := "/path/to/input/file/dot/input.txt"
 			imp.InputOptions.FieldFile = &fieldFile
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldNotBeNil)
 		})
 		Convey("no error should be thrown for CSV import inputs", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.Type = CSV
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown for TSV import inputs", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.Type = TSV
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown for JSON import inputs", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			imp.InputOptions.Type = JSON
-			_, err = imp.getInputReader(&os.File{})
+			_, err := imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("an error should be thrown if --fieldFile fields are invalid", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fieldFile := "testdata/test_fields_invalid.txt"
 			imp.InputOptions.FieldFile = &fieldFile
 			file, err := os.Open(fieldFile)
@@ -503,8 +500,7 @@ func TestGetInputReader(t *testing.T) {
 			So(err, ShouldNotBeNil)
 		})
 		Convey("no error should be thrown if --fieldFile fields are valid", func() {
-			imp, err := NewMongoImport()
-			So(err, ShouldBeNil)
+			imp := NewMockMongoImport()
 			fieldFile := "testdata/test_fields_valid.txt"
 			imp.InputOptions.FieldFile = &fieldFile
 			file, err := os.Open(fieldFile)
@@ -527,8 +523,10 @@ func TestImportDocuments(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error getting session: %v", err)
 			}
-			defer session.Close()
-			session.DB(testDb).C(testCollection).RemoveAll(nil)
+			_, err = session.Database(testDb).Collection(testCollection).DeleteMany(nil, bson.D{})
+			if err != nil {
+				t.Fatalf("error dropping collection: %v", err)
+			}
 		})
 		Convey("no error should be thrown for CSV import on test data and all "+
 			"CSV data lines should be imported correctly", func() {
@@ -576,9 +574,9 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": int(2)},
-				bson.M{"_id": 5, "c": "6e"},
-				bson.M{"_id": 7, "b": int(8), "c": int(6)},
+				{"_id": int32(1), "b": int32(2)},
+				{"_id": int32(5), "c": "6e"},
+				{"_id": int32(7), "b": int32(8), "c": int32(6)},
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
@@ -593,9 +591,9 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": int(2), "c": ""},
-				bson.M{"_id": 5, "b": "", "c": "6e"},
-				bson.M{"_id": 7, "b": int(8), "c": int(6)},
+				{"_id": int32(1), "b": int32(2), "c": ""},
+				{"_id": int32(5), "b": "", "c": "6e"},
+				{"_id": int32(7), "b": int32(8), "c": int32(6)},
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
@@ -612,9 +610,9 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": int(2), "c": int(3)},
-				bson.M{"_id": 3, "b": 5.4, "c": "string"},
-				bson.M{"_id": 5, "b": int(6), "c": int(6)},
+				{"_id": int32(1), "b": int32(2), "c": int32(3)},
+				{"_id": int32(3), "b": 5.4, "c": "string"},
+				{"_id": int32(5), "b": int32(6), "c": int32(6)},
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
@@ -633,9 +631,9 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": int(2), "c": int(3)},
-				bson.M{"_id": 3, "b": 5.4, "c": "string"},
-				bson.M{"_id": 5, "b": int(6), "c": int(6)},
+				{"_id": int32(1), "b": int32(2), "c": int32(3)},
+				{"_id": int32(3), "b": 5.4, "c": "string"},
+				{"_id": int32(5), "b": int32(6), "c": int32(6)},
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
@@ -653,10 +651,10 @@ func TestImportDocuments(t *testing.T) {
 			So(numImported, ShouldEqual, 5)
 
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": int(2), "c": int(3)},
-				bson.M{"_id": 3, "b": 5.4, "c": "string"},
-				bson.M{"_id": 5, "b": int(6), "c": int(6)},
-				bson.M{"_id": 8, "b": int(6), "c": int(6)},
+				{"_id": int32(1), "b": int32(2), "c": int32(3)},
+				{"_id": int32(3), "b": 5.4, "c": "string"},
+				{"_id": int32(5), "b": int32(6), "c": int32(6)},
+				{"_id": int32(8), "b": int32(6), "c": int32(6)},
 			}
 			// all docs except the one with duplicate _id - should be imported
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
@@ -675,9 +673,9 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": int(2), "c": int(3)},
-				bson.M{"_id": 3, "b": 5.4, "c": "string"},
-				bson.M{"_id": 5, "b": int(6), "c": int(6)},
+				{"_id": int32(1), "b": int32(2), "c": int32(3)},
+				{"_id": int32(3), "b": 5.4, "c": "string"},
+				{"_id": int32(5), "b": int32(6), "c": int32(6)},
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
@@ -723,9 +721,9 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "c": int(2), "b": int(3)},
-				bson.M{"_id": 3, "c": 5.4, "b": "string"},
-				bson.M{"_id": 5, "c": int(6), "b": int(6)},
+				{"_id": int32(1), "c": int32(2), "b": int32(3)},
+				{"_id": int32(3), "c": 5.4, "b": "string"},
+				{"_id": int32(5), "c": int32(6), "b": int32(6)},
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
@@ -743,10 +741,10 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 5)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": int(2), "c": int(3)},
-				bson.M{"_id": 3, "b": 5.4, "c": "string"},
-				bson.M{"_id": 5, "b": int(6), "c": int(9)},
-				bson.M{"_id": 8, "b": int(6), "c": int(6)},
+				{"_id": int32(1), "b": int32(2), "c": int32(3)},
+				{"_id": int32(3), "b": 5.4, "c": "string"},
+				{"_id": int32(5), "b": int32(6), "c": int32(9)},
+				{"_id": int32(8), "b": int32(6), "c": int32(6)},
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
@@ -764,9 +762,9 @@ func TestImportDocuments(t *testing.T) {
 			_, err = imp.ImportDocuments()
 			So(err, ShouldNotBeNil)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": int(2), "c": int(3)},
-				bson.M{"_id": 3, "b": 5.4, "c": "string"},
-				bson.M{"_id": 5, "b": int(6), "c": int(6)},
+				{"_id": int32(1), "b": int32(2), "c": int32(3)},
+				{"_id": int32(3), "b": 5.4, "c": "string"},
+				{"_id": int32(5), "b": int32(6), "c": int32(6)},
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
@@ -782,7 +780,7 @@ func TestImportDocuments(t *testing.T) {
 		Convey("an error should be thrown if a plain JSON file is supplied", func() {
 			fileHandle, err := os.Open("testdata/test_plain.json")
 			So(err, ShouldBeNil)
-			jsonInputReader := NewJSONInputReader(true, fileHandle, 1)
+			jsonInputReader := NewJSONInputReader(true, true, fileHandle, 1)
 			docChan := make(chan bson.D, 1)
 			So(jsonInputReader.StreamDocument(true, docChan), ShouldNotBeNil)
 		})
@@ -832,23 +830,101 @@ func TestImportDocuments(t *testing.T) {
 	})
 }
 
+func TestGetTargetDestination(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
+	Convey("Given mongoimport instance, on calling getTargetConnection", t, func() {
+		imp := NewMockMongoImport()
+		imp.ToolOptions = options.New("", "", "", "", options.EnabledOptions{URI: true})
+		Convey("no error should be thrown with undefined --host and --port", func() {
+			imp.ToolOptions.Host = ""
+			imp.ToolOptions.Port = ""
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "localhost")
+		})
+		Convey("no error should be thrown with undefined --host and defined --port", func() {
+			imp.ToolOptions.Host = ""
+			imp.ToolOptions.Port = "30000"
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "localhost:30000")
+		})
+		Convey("no error should be thrown with defined --host and undefined --port", func() {
+			imp.ToolOptions.Host = "foobar"
+			imp.ToolOptions.Port = ""
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "foobar")
+		})
+		Convey("no error should be thrown with defined standalone --host containing port", func() {
+			imp.ToolOptions.Host = "foobar:30000"
+			imp.ToolOptions.Port = ""
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "foobar:30000")
+		})
+		Convey("no error should be thrown with defined replica set --host", func() {
+			imp.ToolOptions.Host = "replica/foo1:30000,foo2:30000,foo3:30000"
+			imp.ToolOptions.Port = ""
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "replica/foo1:30000,foo2:30000,foo3:30000")
+		})
+		Convey("no error should be thrown with defined standalone --uri", func() {
+			_, err := imp.ToolOptions.ParseArgs([]string{"--uri=mongodb://foo1:30000"})
+			So(err, ShouldBeNil)
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "foo1:30000")
+		})
+		Convey("no error should be thrown with defined replica set --uri", func() {
+			_, err := imp.ToolOptions.ParseArgs([]string{"--uri=mongodb://foo1,foo2,foo3/dbx?replicaSet=replica"})
+			So(err, ShouldBeNil)
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "replica/foo1,foo2,foo3")
+		})
+		Convey("no error should be thrown with defined replica set --uri containing credentials", func() {
+			_, err := imp.ToolOptions.ParseArgs([]string{"--uri=mongodb://username:password@foo1,foo2,foo3/dbx?replicaSet=replica"})
+			So(err, ShouldBeNil)
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "replica/foo1,foo2,foo3")
+		})
+		Convey("no error should be thrown with defined SRV --uri", func() {
+			// NOTE: this requires SRV and TXT records in DNS as specified here:
+			// https://github.com/mongodb/specifications/tree/master/source/initial-dns-seedlist-discovery
+			_, err := imp.ToolOptions.ParseArgs([]string{"--uri=mongodb+srv://test5.test.build.10gen.cc/dbx?replicaSet=rs0"})
+			url, err := imp.getTargetConnection()
+			So(err, ShouldBeNil)
+			So(url, ShouldEqual, "rs0/localhost.test.build.10gen.cc:27017")
+		})
+		Convey("an error should be thrown with defined SRV --uri but no record found", func() {
+			// NOTE: this requires SRV and TXT records in DNS as specified here:
+			// https://github.com/mongodb/specifications/tree/master/source/initial-dns-seedlist-discovery
+			_, err := imp.ToolOptions.ParseArgs([]string{"--uri=mongodb+srv://test4.test.build.10gen.cc/dbx?replicaSet=rs0"})
+			url, err := imp.getTargetConnection()
+			So(err, ShouldNotBeNil)
+			So(url, ShouldEqual, "")
+		})
+	})
+}
+
 // Regression test for TOOLS-1694 to prevent issue from TOOLS-1115
 func TestHiddenOptionsDefaults(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a new mongoimport with empty options", t, func() {
-		imp, err := NewMongoImport()
-		imp.ToolOptions = options.New("", "", options.EnabledOptions{})
-		So(err, ShouldBeNil)
+		imp := NewMockMongoImport()
+		imp.ToolOptions = options.New("", "", "", "", options.EnabledOptions{})
 		Convey("Then parsing should fill args with expected defaults", func() {
 			_, err := imp.ToolOptions.ParseArgs([]string{})
 			So(err, ShouldBeNil)
 
 			// collection cannot be empty in validate
 			imp.ToolOptions.Collection = "col"
-			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.validateSettings([]string{}), ShouldBeNil)
 			So(imp.IngestOptions.NumDecodingWorkers, ShouldEqual, runtime.NumCPU())
 			So(imp.IngestOptions.BulkBufferSize, ShouldEqual, 1000)
 		})
 	})
-
 }

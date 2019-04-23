@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/common/util"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/intents"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/progress"
+	"github.com/mongodb/mongo-tools-common/util"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const insertBufferFactor = 16
@@ -93,9 +93,8 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		return fmt.Errorf("error reading database: %v", err)
 	}
 
-	if restore.safety == nil && !restore.OutputOptions.Drop && collectionExists {
+	if !restore.OutputOptions.Drop && collectionExists {
 		log.Logvf(log.Always, "restoring to existing collection %v without dropping", intent.Namespace())
-		log.Logv(log.Always, "Important: restored data will be inserted without raising errors; check your server log")
 	}
 
 	if restore.OutputOptions.Drop {
@@ -174,11 +173,11 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 				// If the collection has an idIndex, then we are about to create it, so
 				// ignore the value of autoIndexId.
 				for j, opt := range options {
-					if opt.Name == "autoIndexId" {
+					if opt.Key == "autoIndexId" {
 						options = append(options[:j], options[j+1:]...)
 					}
 				}
-				options = append(options, bson.DocElem{"idIndex", index})
+				options = append(options, bson.E{"idIndex", index})
 				indexes = append(indexes[:i], indexes[i+1:]...)
 				break
 			}
@@ -246,10 +245,8 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	if err != nil {
 		return int64(0), fmt.Errorf("error establishing connection: %v", err)
 	}
-	session.SetSafe(restore.safety)
-	defer session.Close()
 
-	collection := session.DB(dbName).C(colName)
+	collection := session.Database(dbName).Collection(colName)
 
 	documentCount := int64(0)
 	watchProgressor := progress.NewCounter(fileSize)
@@ -269,8 +266,11 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 
 	// stream documents for this collection on docChan
 	go func() {
-		doc := bson.Raw{}
-		for bsonSource.Next(&doc) {
+		for {
+			doc := bsonSource.LoadNext()
+			if doc == nil {
+				break
+			}
 			select {
 			case <-restore.termChan:
 				log.Logvf(log.Always, "terminating read on %v.%v", dbName, colName)
@@ -278,9 +278,9 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 				close(docChan)
 				return
 			default:
-				rawBytes := make([]byte, len(doc.Data))
-				copy(rawBytes, doc.Data)
-				docChan <- bson.Raw{Data: rawBytes}
+				rawBytes := make([]byte, len(doc))
+				copy(rawBytes, doc)
+				docChan <- bson.Raw(rawBytes)
 				documentCount++
 			}
 		}
@@ -291,22 +291,17 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 
 	for i := 0; i < maxInsertWorkers; i++ {
 		go func() {
-			// get a session copy for each insert worker
-			s := session.Copy()
-			defer s.Close()
-
-			coll := collection.With(s)
-			bulk := db.NewBufferedBulkInserter(
-				coll, restore.OutputOptions.BulkBufferSize, !restore.OutputOptions.StopOnError)
+			bulk := db.NewBufferedBulkInserter(collection, restore.OutputOptions.BulkBufferSize, !restore.OutputOptions.StopOnError)
+			bulk.SetBypassDocumentValidation(restore.OutputOptions.BypassDocumentValidation)
 			for rawDoc := range docChan {
 				if restore.objCheck {
-					err := bson.Unmarshal(rawDoc.Data, &bson.D{})
+					err := bson.Unmarshal(rawDoc, &bson.D{})
 					if err != nil {
 						resultChan <- fmt.Errorf("invalid object: %v", err)
 						return
 					}
 				}
-				if err := bulk.Insert(rawDoc); err != nil {
+				if err := bulk.InsertRaw(rawDoc); err != nil {
 					if db.IsConnectionError(err) || restore.OutputOptions.StopOnError {
 						// Propagate this error, since it's either a fatal connection error
 						// or the user has turned on --stopOnError
@@ -318,7 +313,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 				}
 				watchProgressor.Set(file.Pos())
 			}
-			err := bulk.Flush()
+			err = bulk.Flush()
 			if err != nil {
 				if !db.IsConnectionError(err) && !restore.OutputOptions.StopOnError {
 					// Suppress this error since it's not a severe connection error and

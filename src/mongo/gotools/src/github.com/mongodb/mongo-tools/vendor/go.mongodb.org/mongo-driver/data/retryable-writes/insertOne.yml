@@ -1,0 +1,64 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+minServerVersion: '3.6'
+
+tests:
+    -
+        description: "InsertOne is committed on first attempt"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne is not committed on first attempt"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 1 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            result:
+                insertedId: 3
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }
+                    - { _id: 3, x: 33 }
+    -
+        description: "InsertOne is never committed"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: onPrimaryTransactionalWrite
+            mode: { times: 2 }
+            data: { failBeforeCommitExceptionCode: 1 }
+        operation:
+            name: "insertOne"
+            arguments:
+                document: { _id: 3, x: 33 }
+        outcome:
+            error: true
+            collection:
+                data:
+                    - { _id: 1, x: 11 }
+                    - { _id: 2, x: 22 }

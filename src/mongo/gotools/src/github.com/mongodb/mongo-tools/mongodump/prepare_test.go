@@ -9,7 +9,7 @@ package mongodump
 import (
 	"testing"
 
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools-common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -66,22 +66,22 @@ type testTable struct {
 func TestShouldSkipSystemNamespace(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	tests := []testTable{
-		testTable{
+		{
 			db:     "test",
 			coll:   "system",
 			output: false,
 		},
-		testTable{
+		{
 			db:     "test",
 			coll:   "system.nonsense",
 			output: true,
 		},
-		testTable{
+		{
 			db:     "test",
 			coll:   "system.js",
 			output: false,
 		},
-		testTable{
+		{
 			db:     "test",
 			coll:   "test",
 			output: false,

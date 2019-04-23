@@ -54,7 +54,7 @@ func CreateUserWithRole(session *mgo.Session, user,
 			{"createUser", user},
 			{"pwd", password},
 			{"roles", []bson.M{
-				bson.M{
+				{
 					"role": role,
 					"db":   "admin",
 				},

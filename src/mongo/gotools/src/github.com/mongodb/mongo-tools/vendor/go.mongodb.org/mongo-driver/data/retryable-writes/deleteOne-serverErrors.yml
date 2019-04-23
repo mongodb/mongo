@@ -1,0 +1,50 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+# TODO: this should change to 4.0 once 4.0.0 is released.
+minServerVersion: '3.99'
+
+tests:
+    -
+        description: "DeleteOne succeeds after PrimarySteppedDown"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["delete"]
+                errorCode: 189
+        operation:
+            name: "deleteOne"
+            arguments:
+                filter: { _id: 1 }
+        outcome:
+            result:
+                deletedCount: 1
+            collection:
+                data:
+                    - { _id: 2, x: 22 }
+    -
+        description: "DeleteOne succeeds after WriteConcernError ShutdownInProgress"
+        clientOptions:
+            retryWrites: true
+        failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+                failCommands: ["delete"]
+                writeConcernError:
+                    code: 91
+                    errmsg: Replication is being shut down
+        operation:
+            name: "deleteOne"
+            arguments:
+                filter: { _id: 1 }
+        outcome:
+            result:
+                deletedCount: 1
+            collection:
+                data:
+                    - { _id: 2, x: 22 }

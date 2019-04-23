@@ -17,16 +17,16 @@ set_goenv() {
         *)
             PREF_GOROOT="/opt/golang/go1.11"
             # XXX might not need mongodbtoolchain anymore
-            PREF_PATH="$PREF_GOROOT/bin:/opt/mongodbtoolchain/v2/bin/:$PATH"
+            PREF_PATH="$PREF_GOROOT/bin:/opt/mongodbtoolchain/v3/bin/:$PATH"
         ;;
     esac
 
     # Set OS-level compilation flags
     case $UNAME_S in
-        'CYGWIN*')
+        CYGWIN*)
             export CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"
             ;;
-        'Darwin')
+        Darwin)
             export CGO_CFLAGS="-mmacosx-version-min=10.11"
             export CGO_LDFLAGS="-mmacosx-version-min=10.11"
             ;;
@@ -40,13 +40,13 @@ set_goenv() {
         UNAME_M=$(PATH="/usr/bin:/bin" uname -m)
         case $UNAME_M in
             aarch64)
-                export CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc
+                export CC=/opt/mongodbtoolchain/v3/bin/aarch64-mongodb-linux-gcc
             ;;
             ppc64le)
-                export CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc
+                export CC=/opt/mongodbtoolchain/v3/bin/ppc64le-mongodb-linux-gcc
             ;;
             s390x)
-                export CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc
+                export CC=/opt/mongodbtoolchain/v3/bin/s390x-mongodb-linux-gcc
             ;;
             *)
                 # Not needed for other architectures
@@ -83,9 +83,9 @@ set_goenv() {
 
 print_ldflags() {
     VersionStr="$(git describe)"
-    Gitspec="$(git rev-parse HEAD)"
-    importpath="github.com/mongodb/mongo-tools/common/options"
-    echo "-X ${importpath}.VersionStr=${VersionStr} -X ${importpath}.Gitspec=${Gitspec}"
+    GitCommit="$(git rev-parse HEAD)"
+    importpath="main"
+    echo "-X ${importpath}.VersionStr=${VersionStr} -X ${importpath}.GitCommit=${GitCommit}"
 }
 
 print_tags() {
@@ -103,4 +103,16 @@ print_tags() {
         ;;
     esac
     echo "$tags"
+}
+
+# On linux, we want to set buildmode=pie for ASLR support
+buildflags() {
+    flags=""
+    UNAME_S=$(PATH="/usr/bin:/bin" uname -s)
+    case $UNAME_S in
+        Linux)
+            flags="-buildmode=pie"
+        ;;
+    esac
+    echo "$flags"
 }

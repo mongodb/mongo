@@ -32,13 +32,11 @@ for i in common/db common/archive common/bsonutil common/db/tlsgo common/failpoi
           export COVERAGE_ARGS="-coverprofile=coverage_$COMMON_SUBPKG.out"
         fi
         if [ "$ON_EVERGREEN" = "true" ]; then
-            (cd $i && go test -ldflags "$(print_ldflags)" -tags "$(print_tags $tags $TOOLS_BUILD_TAGS)" "$COVERAGE_ARGS" > "$OUTPUT_DIR/$COMMON_SUBPKG.suite")
+            (cd $i && go test $(buildflags) -ldflags "$(print_ldflags)" $tags -tags "$(print_tags $TOOLS_BUILD_TAGS)" "$COVERAGE_ARGS" > "$OUTPUT_DIR/$COMMON_SUBPKG.suite")
             exitcode=$?
             cat "$OUTPUT_DIR/$COMMON_SUBPKG.suite"
-            # Evergreen looks for test files here
-            cp "$OUTPUT_DIR/$COMMON_SUBPKG.suite" "$SCRIPT_DIR"
         else
-            (cd $i && go test -ldflags "$(print_ldflags)" "$(print_tags $tags)" "$COVERAGE_ARGS" )
+            (cd $i && go test $(buildflags) -ldflags "$(print_ldflags)" "$(print_tags $tags)" "$COVERAGE_ARGS" )
             exitcode=$?
         fi
         if [ $exitcode -ne 0 ]; then

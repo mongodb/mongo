@@ -1,0 +1,5 @@
+uri: "mongodb+srv://test17.test.build.10gen.cc/"
+seeds: []
+hosts: []
+error: true
+comment: Should fail because returned host name's TLD "not-cc" mismatches URI TLD "cc".

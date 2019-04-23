@@ -106,6 +106,7 @@ if [ ! -z "$GEN" ]; then
   popd
   pushd layers
   go run gen.go | gofmt > iana_ports.go
+  go run gen2.go | gofmt > enums_generated.go
   popd
 fi
 
@@ -125,6 +126,9 @@ if [ -f /usr/include/pcap.h ]; then
   Root pcap_tester --mode=basic
   Root pcap_tester --mode=filtered
   Root pcap_tester --mode=timestamp || echo "You might not support timestamp sources"
+  popd
+  pushd examples/afpacket
+  go build
   popd
   pushd examples/pcapdump
   go build
@@ -153,6 +157,9 @@ popd
 pushd tcpassembly
 go test ./...
 popd
+pushd reassembly
+go test ./...
+popd
 pushd layers
 gofmt -w gen.go
 go build gen.go
@@ -179,6 +186,16 @@ if [ -f /usr/include/pfring.h ]; then
   go build
   popd
 fi
+pushd ip4defrag
+go test ./...
+popd
+pushd defrag
+go test ./...
+popd
+
+for travis_script in `ls .travis.*.sh`; do
+  ./$travis_script
+done
 
 # Run our initial commit
 git commit "$@"

@@ -1,0 +1,22 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 'ping'}
+    - {_id: 3, x: 'pINg'}
+minServerVersion: '3.4'
+
+tests:
+    -
+        description: "DeleteOne when many documents matches with collation"
+        operation:
+            name: "deleteOne"
+            arguments:
+                filter: {x: 'PING'}
+                collation: { locale: 'en_US', strength: 2 } # https://docs.mongodb.com/master/reference/collation/#collation-document
+
+        outcome:
+            result:
+                deletedCount: 1
+            collection:
+                data:
+                   - {_id: 1, x: 11}
+                   - {_id: 3, x: 'pINg'}

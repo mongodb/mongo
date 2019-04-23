@@ -1,0 +1,208 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data: []
+
+tests:
+  - description: increment txnNumber
+
+    clientOptions:
+      retryWrites: true
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+      # Retryable write should include the next txnNumber
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 2
+        result:
+          insertedId: 2
+      # Next transaction should include the next txnNumber
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 3
+        result:
+          insertedId: 3
+      - name: abortTransaction
+        object: session0
+      # Retryable write should include the next txnNumber
+      - name: insertMany
+        object: collection
+        arguments:
+          documents:
+            - _id: 4
+            - _id: 5
+          session: session0
+        result:
+          insertedIds: {0: 4, 1: 5}
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 2
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "2"
+            startTransaction:
+            autocommit:
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 3
+            ordered: true
+            readConcern:
+              afterClusterTime: 42
+            lsid: session0
+            txnNumber:
+              $numberLong: "3"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "3"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 4
+              - _id: 5
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "4"
+            startTransaction:
+            autocommit:
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+          - _id: 2
+          - _id: 4
+          - _id: 5
+
+  - description: writes are not retried
+
+    clientOptions:
+      retryWrites: true
+
+    failPoint:
+        configureFailPoint: failCommand
+        mode: { times: 1 }
+        data:
+            failCommands: ["insert"]
+            closeConnection: true
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          errorLabelsContain: ["TransientTransactionError"]
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []

@@ -6,13 +6,22 @@
 
 package mongofiles
 
+import (
+	"fmt"
+
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/log"
+	"github.com/mongodb/mongo-tools-common/options"
+)
+
+// Usage string printed as part of --help
 var Usage = `<options> <command> <filename or _id>
 
 Manipulate gridfs files using the command line.
 
 Possible commands include:
 	list      - list all files; 'filename' is an optional prefix which listed filenames must begin with
-	search    - search all files; 'filename' is a substring which listed filenames must contain
+	search    - search all files; 'filename' is a regex which listed filenames must match
 	put       - add a file with filename 'filename'
 	put_id    - add a file with filename 'filename' and a given '_id'
 	get       - get a file with filename 'filename'
@@ -21,6 +30,56 @@ Possible commands include:
 	delete_id - delete a file with the given '_id'
 
 See http://docs.mongodb.org/manual/reference/program/mongofiles/ for more information.`
+
+// ParseOptions reads command line arguments and converts them into options used to configure a MongoFiles instance
+func ParseOptions(rawArgs []string, versionStr, gitCommit string) (Options, error) {
+	// initialize command-line opts
+	opts := options.New("mongofiles", versionStr, gitCommit, Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: false, URI: true})
+
+	storageOpts := &StorageOptions{}
+	inputOpts := &InputOptions{}
+
+	opts.AddOptions(storageOpts)
+	opts.AddOptions(inputOpts)
+	opts.URI.AddKnownURIParameters(options.KnownURIOptionsReadPreference)
+	opts.URI.AddKnownURIParameters(options.KnownURIOptionsWriteConcern)
+
+	args, err := opts.ParseArgs(rawArgs)
+	if err != nil {
+		return Options{}, fmt.Errorf("error parsing command line options: %v\ntry 'mongofiles --help' for more information", err)
+	}
+
+	log.SetVerbosity(opts.Verbosity)
+
+	// verify uri options and log them
+	opts.URI.LogUnsupportedOptions()
+
+	// add the specified database to the namespace options struct
+	opts.Namespace.DB = storageOpts.DB
+
+	// set WriteConcern
+	wc, err := db.NewMongoWriteConcern(storageOpts.WriteConcern, opts.URI.ParsedConnString())
+	if err != nil {
+		return Options{}, fmt.Errorf("error parsing --writeConcern: %v", err)
+	}
+	opts.WriteConcern = wc
+
+	// set ReadPreference
+	opts.ReadPreference, err = db.NewReadPreference(inputOpts.ReadPreference, opts.URI.ParsedConnString())
+	if err != nil {
+		return Options{}, fmt.Errorf("error parsing --readPreference: %v", err)
+	}
+
+	return Options{opts, storageOpts, inputOpts, args}, nil
+}
+
+// Options contains all the possible options that can configure mongofiles
+type Options struct {
+	*options.ToolOptions
+	*StorageOptions
+	*InputOptions
+	ParsedArgs []string
+}
 
 // StorageOptions defines the set of options to use in storing/retrieving data from server.
 type StorageOptions struct {
@@ -46,7 +105,7 @@ type StorageOptions struct {
 }
 
 // Name returns a human-readable group name for storage options.
-func (_ *StorageOptions) Name() string {
+func (*StorageOptions) Name() string {
 	return "storage"
 }
 

@@ -1,0 +1,37 @@
+description: "Wrong setName"
+
+uri: "mongodb://a,b/?replicaSet=rs"
+
+phases: [
+
+    {
+        responses: [
+
+                ["b:27017", {
+
+                    ok: 1,
+                    ismaster: false,
+                    secondary: true,
+                    hosts: ["b:27017", "c:27017"],
+                    setName: "wrong",
+                    minWireVersion: 0,
+                    maxWireVersion: 6
+                }]
+        ],
+
+        outcome: {
+
+            servers: {
+
+                "a:27017": {
+
+                    type: "Unknown",
+                    setName:
+                }
+            },
+            topologyType: "ReplicaSetNoPrimary",
+            logicalSessionTimeoutMinutes: null,
+            setName: "rs"
+        }
+    }
+]

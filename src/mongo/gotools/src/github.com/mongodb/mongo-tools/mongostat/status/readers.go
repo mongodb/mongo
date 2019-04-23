@@ -12,8 +12,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/text"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools-common/text"
+	"github.com/mongodb/mongo-tools-common/util"
 )
 
 type ReaderConfig struct {
@@ -143,8 +143,8 @@ func diffOp(newStat, oldStat *ServerStatus, f func(*OpcountStats) int64, both bo
 
 func getStorageEngine(stat *ServerStatus) string {
 	val := "mmapv1"
-	if stat.StorageEngine != nil && stat.StorageEngine["name"] != "" {
-		val = stat.StorageEngine["name"]
+	if stat.StorageEngine != nil && stat.StorageEngine.Name != "" {
+		val = stat.StorageEngine.Name
 	}
 	return val
 }

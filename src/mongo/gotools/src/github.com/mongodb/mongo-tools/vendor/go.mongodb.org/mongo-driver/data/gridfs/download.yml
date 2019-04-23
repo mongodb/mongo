@@ -1,0 +1,192 @@
+﻿data:
+    files:
+        -
+            _id: { "$oid" : "000000000000000000000001" }
+            length: 0
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-01T00:00:00.000Z" }
+            md5: "d41d8cd98f00b204e9800998ecf8427e"
+            filename: "length-0"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000002" }
+            length: 0
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-01T00:00:00.000Z" }
+            md5: "d41d8cd98f00b204e9800998ecf8427e"
+            filename: "length-0-with-empty-chunk"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000003" }
+            length: 2
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-01T00:00:00.000Z" }
+            md5: "c700ed4fdb1d27055aa3faa2c2432283"
+            filename: "length-2"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000004" }
+            length: 8
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-01T00:00:00.000Z" }
+            md5: "dd254cdc958e53abaa67da9f797125f5"
+            filename: "length-8"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000005" }
+            length: 10
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-01T00:00:00.000Z" }
+            md5: "57d83cd477bfb1ccd975ab33d827a92b"
+            filename: "length-10"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+        -
+            _id: { "$oid" : "000000000000000000000006" }
+            length: 2
+            chunkSize: 4
+            uploadDate: { "$date" : "1970-01-01T00:00:00.000Z" }
+            md5: "c700ed4fdb1d27055aa3faa2c2432283"
+            contentType: "application/octet-stream"
+            aliases: []
+            metadata: {}
+    chunks:
+        - { _id : { "$oid" : "000000000000000000000001" }, files_id : { "$oid" : "000000000000000000000002" }, n : 0, data : { $hex : "" } }
+        - { _id : { "$oid" : "000000000000000000000002" }, files_id : { "$oid" : "000000000000000000000003" }, n : 0, data : { $hex : "1122" } }
+        - { _id : { "$oid" : "000000000000000000000003" }, files_id : { "$oid" : "000000000000000000000004" }, n : 0, data : { $hex : "11223344" } }
+        - { _id : { "$oid" : "000000000000000000000004" }, files_id : { "$oid" : "000000000000000000000004" }, n : 1, data : { $hex : "55667788" } }
+        - { _id : { "$oid" : "000000000000000000000005" }, files_id : { "$oid" : "000000000000000000000005" }, n : 0, data : { $hex : "11223344" } }
+        - { _id : { "$oid" : "000000000000000000000006" }, files_id : { "$oid" : "000000000000000000000005" }, n : 1, data : { $hex : "55667788" } }
+        - { _id : { "$oid" : "000000000000000000000007" }, files_id : { "$oid" : "000000000000000000000005" }, n : 2, data : { $hex : "99aa" } }
+        - { _id : { "$oid" : "000000000000000000000008" }, files_id : { "$oid" : "000000000000000000000006" }, n : 0, data : { $hex : "1122" } }
+
+tests:
+    -
+        description: "Download when length is zero"
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000001" }
+                options: { }
+        assert:
+            result: { $hex : "" }
+    -
+        description: "Download when length is zero and there is one empty chunk"
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000002" }
+                options: { }
+        assert:
+            result: { $hex : "" }
+    -
+        description: "Download when there is one chunk"
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000003" }
+                options: { }
+        assert:
+            result: { $hex : "1122" }
+    -
+        description: "Download when there are two chunks"
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000004" }
+                options: { }
+        assert:
+            result: { $hex : "1122334455667788" }
+    -
+        description: "Download when there are three chunks"
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000005" }
+                options: { }
+        assert:
+            result: { $hex : "112233445566778899aa" }
+    -
+        description: "Download when files entry does not exist"
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000000" }
+                options: { }
+        assert:
+            error: "FileNotFound"
+    -
+        description: "Download when an intermediate chunk is missing"
+        arrange:
+            data:
+                -
+                    { delete : "fs.chunks", deletes : [
+                        { q : { files_id : { "$oid" : "000000000000000000000005" }, n : 1 }, limit : 1 }
+                    ] }
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000005" }
+        assert:
+            error: "ChunkIsMissing"
+    -
+        description: "Download when final chunk is missing"
+        arrange:
+            data:
+                -
+                    { delete : "fs.chunks", deletes : [
+                        { q : { files_id : { "$oid" : "000000000000000000000005" }, n : 1 }, limit : 1 }
+                    ] }
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000005" }
+        assert:
+            error: "ChunkIsMissing"
+    -
+        description: "Download when an intermediate chunk is the wrong size"
+        arrange:
+            data:
+                -
+                    { update : "fs.chunks", updates : [
+                        { q : { files_id : { "$oid" : "000000000000000000000005" }, n : 1 }, u : { $set : { data : { $hex : "556677" } } } },
+                        { q : { files_id : { "$oid" : "000000000000000000000005" }, n : 2 }, u : { $set : { data : { $hex : "8899aa" } } } }
+                    ] }
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000005" }
+        assert:
+            error: "ChunkIsWrongSize"
+    -
+        description: "Download when final chunk is the wrong size"
+        arrange:
+            data:
+                -
+                    { update : "fs.chunks", updates : [
+                        { q : { files_id : { "$oid" : "000000000000000000000005" }, n : 2 }, u : { $set : { data : { $hex : "99" } } } }
+                    ] }
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000005" }
+        assert:
+            error: "ChunkIsWrongSize"
+    -
+        description: "Download legacy file with no name"
+        act:
+            operation: download
+            arguments:
+                id: { "$oid" : "000000000000000000000006" }
+                options: { }
+        assert:
+            result: { $hex : "1122" }

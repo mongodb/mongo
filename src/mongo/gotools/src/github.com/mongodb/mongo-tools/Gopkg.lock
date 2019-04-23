@@ -21,14 +21,14 @@
   revision = "afcced55e92d9b6b93ccf32508238c08cfbaddb8"
 
 [[projects]]
-  digest = "1:17fd6441926671a4ff4580786816ae9f9f4f08705821d41907c26b4b9a0ddbaa"
+  digest = "1:70d6415a756d8180faa29c99dd08a37cab123c04d6c0d01d885ccc7d612a93b3"
   name = "github.com/10gen/openssl"
   packages = [
     ".",
     "utils",
   ]
   pruneopts = "T"
-  revision = "812b95859f13cba543f6ad860fcff4bb0f7fcdaa"
+  revision = "fc9a1d560ec3549c695198fe39b9de7f89a7503d"
 
 [[projects]]
   digest = "1:d9d83b3d983f3e6f78baf83e19666facd3377e81acde31f7db8a6fcd31eae009"
@@ -38,6 +38,14 @@
   revision = "3550fdcf1f43b89aaeabaa4559eaae6dc4407e42"
 
 [[projects]]
+  digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
+  name = "github.com/go-stack/stack"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
+  version = "v1.8.0"
+
+[[projects]]
   digest = "1:5bced478af5ed1c177ed96002039dd5c3b304fb89f883c3da87e14c54942b545"
   name = "github.com/golang/snappy"
   packages = ["."]
@@ -45,7 +53,7 @@
   revision = "d9eb7a3d35ec988b8585d4a0068e462c27d28380"
 
 [[projects]]
-  digest = "1:6ab71fd3d97c04408a09606acd1c3e56d2546f962b1c57dd6e249ed36c5ed1f9"
+  digest = "1:f9c618e8c569f950d5cd339a475eaef92e02e5e63d1434fd7e7881bfa5f02901"
   name = "github.com/google/gopacket"
   packages = [
     ".",
@@ -54,15 +62,15 @@
     "tcpassembly",
   ]
   pruneopts = "T"
-  revision = "1b0b78901cdd351ecfc68bf1a2adafcd2ff30220"
+  revision = "7edef24d642a09d18efcf1e00a9dc2d4c6342c82"
 
 [[projects]]
   branch = "master"
-  digest = "1:4d4c5d77b8fc930d16722d1d271788b96e304db03888d4552ade6d8cfc650d11"
+  digest = "1:c5b612f12dc3ba60fc0a6ff1508890954df5dbd9757bdeb601014018f1f730c2"
   name = "github.com/gopherjs/gopherjs"
   packages = ["js"]
   pruneopts = "T"
-  revision = "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee"
+  revision = "847fc94819f9d5a4e7154e2203b36f6dbace6f48"
 
 [[projects]]
   digest = "1:8e9ae4fedb2abb5267f2cd69f8d3010e6c464a9c51d1fa1f9d192c0757ac691a"
@@ -79,18 +87,45 @@
   revision = "97448c91aac742cbca3d020b3e769013a420a06f"
 
 [[projects]]
-  digest = "1:e60e4265f8a89c03c9a01de4849f413e8db802662176e4087d0fdbad868bf5f3"
+  digest = "1:4b63210654b1f2b664f74ec434a1bb1cb442b3d75742cc064a10808d1cca6361"
   name = "github.com/jtolds/gls"
   packages = ["."]
   pruneopts = "T"
-  revision = "8ddce2a84170772b95dd5d576c48d517b22cac63"
+  revision = "b4936e06046bbecbb94cae9c18127ebe510a2cb9"
+  version = "v4.20"
 
 [[projects]]
-  digest = "1:1583473db99b1057f15e6acf80fee5848c055aad49614f56862690aadcb87694"
+  digest = "1:0356f3312c9bd1cbeda81505b7fd437501d8e778ab66998ef69f00d7f9b3a0d7"
   name = "github.com/mattn/go-runewidth"
   packages = ["."]
   pruneopts = "T"
-  revision = "d6bea18f789704b5f83375793155289da36a3c7f"
+  revision = "3ee7d812e62a0804a7d0a324e0249ca2db3476d3"
+  version = "v0.0.4"
+
+[[projects]]
+  branch = "master"
+  digest = "1:34fd703595b17e19c3025578b7de549c8fb043995309506921df4ffc87eb9ce7"
+  name = "github.com/mongodb/mongo-tools-common"
+  packages = [
+    "archive",
+    "auth",
+    "bsonutil",
+    "db",
+    "failpoint",
+    "intents",
+    "json",
+    "log",
+    "options",
+    "password",
+    "progress",
+    "signals",
+    "testtype",
+    "testutil",
+    "text",
+    "util",
+  ]
+  pruneopts = "T"
+  revision = "cf9a7970421213e06e0f745fa2adeb861fa12f4a"
 
 [[projects]]
   digest = "1:f363c75e8cac5653bc5c0c2b90cbd8a522fdc48c13a5f8d85078750f82d1a009"
@@ -136,19 +171,77 @@
   revision = "f936fb050dc6b5fe4a96b485a6f069e8bdc59aeb"
 
 [[projects]]
-  digest = "1:577b99fc55ee19cbf1ffd072808c91ced78cd732bd9d0517bec9b90e532069cb"
+  branch = "master"
+  digest = "1:fb87ad6629b8ae41bdf7bec0a22cc4a5553ab550b4a52c88edacfbfe61ffd87d"
+  name = "github.com/xdg/scram"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "7eeb5667e42c09cb51bf7b7c28aea8c56767da90"
+
+[[projects]]
+  branch = "master"
+  digest = "1:f5c1d04bc09c644c592b45b9f0bad4030521b1a7d11c7dadbb272d9439fa6e8e"
   name = "github.com/xdg/stringprep"
   packages = ["."]
   pruneopts = "T"
-  revision = "bd625b8dc1e3b0f57412280ccbcc317f0c69d8db"
-  version = "v1.0.0"
+  revision = "73f8eece6fdcd902c185bf651de50f3828bed5ed"
+
+[[projects]]
+  digest = "1:32a9a7633bd99e681bbf89723928377fedaf9137cdfcc010848828a6cda1f46c"
+  name = "go.mongodb.org/mongo-driver"
+  packages = [
+    "bson",
+    "bson/bsoncodec",
+    "bson/bsonrw",
+    "bson/bsontype",
+    "bson/primitive",
+    "event",
+    "internal",
+    "mongo",
+    "mongo/gridfs",
+    "mongo/options",
+    "mongo/readconcern",
+    "mongo/readpref",
+    "mongo/writeconcern",
+    "tag",
+    "version",
+    "x/bsonx",
+    "x/bsonx/bsoncore",
+    "x/mongo/driver",
+    "x/mongo/driver/auth",
+    "x/mongo/driver/auth/internal/gssapi",
+    "x/mongo/driver/session",
+    "x/mongo/driver/topology",
+    "x/mongo/driver/uuid",
+    "x/network/address",
+    "x/network/command",
+    "x/network/compressor",
+    "x/network/connection",
+    "x/network/connstring",
+    "x/network/description",
+    "x/network/result",
+    "x/network/wiremessage",
+  ]
+  pruneopts = "T"
+  revision = "51421e413403fe3c9b0097147841f752421133e4"
 
 [[projects]]
   digest = "1:0f2b2cb9f84318c0f71fed3087ff9ac370370f842469b71b00348c3d72a19b44"
   name = "golang.org/x/crypto"
-  packages = ["ssh/terminal"]
+  packages = [
+    "pbkdf2",
+    "ssh/terminal",
+  ]
   pruneopts = "T"
   revision = "1f22c0103821b9390939b6776727195525381532"
+
+[[projects]]
+  branch = "master"
+  digest = "1:7054d0b00df4ca102284022b5014be2a790bf3bc5dda947678e4c1f0d8238287"
+  name = "golang.org/x/sync"
+  packages = ["semaphore"]
+  pruneopts = "T"
+  revision = "e225da77a7e68af35c70ccbf71af2b83e6acac3c"
 
 [[projects]]
   digest = "1:6164911cb5e94e8d8d5131d646613ff82c14f5a8ce869de2f6d80d9889df8c5a"
@@ -201,9 +294,35 @@
     "github.com/google/gopacket/tcpassembly",
     "github.com/howeyc/gopass",
     "github.com/jessevdk/go-flags",
+    "github.com/mongodb/mongo-tools-common/archive",
+    "github.com/mongodb/mongo-tools-common/auth",
+    "github.com/mongodb/mongo-tools-common/bsonutil",
+    "github.com/mongodb/mongo-tools-common/db",
+    "github.com/mongodb/mongo-tools-common/failpoint",
+    "github.com/mongodb/mongo-tools-common/intents",
+    "github.com/mongodb/mongo-tools-common/json",
+    "github.com/mongodb/mongo-tools-common/log",
+    "github.com/mongodb/mongo-tools-common/options",
+    "github.com/mongodb/mongo-tools-common/password",
+    "github.com/mongodb/mongo-tools-common/progress",
+    "github.com/mongodb/mongo-tools-common/signals",
+    "github.com/mongodb/mongo-tools-common/testtype",
+    "github.com/mongodb/mongo-tools-common/testutil",
+    "github.com/mongodb/mongo-tools-common/text",
+    "github.com/mongodb/mongo-tools-common/util",
     "github.com/nsf/termbox-go",
     "github.com/patrickmn/go-cache",
     "github.com/smartystreets/goconvey/convey",
+    "go.mongodb.org/mongo-driver/bson",
+    "go.mongodb.org/mongo-driver/bson/bsontype",
+    "go.mongodb.org/mongo-driver/bson/primitive",
+    "go.mongodb.org/mongo-driver/mongo",
+    "go.mongodb.org/mongo-driver/mongo/gridfs",
+    "go.mongodb.org/mongo-driver/mongo/options",
+    "go.mongodb.org/mongo-driver/mongo/readpref",
+    "go.mongodb.org/mongo-driver/mongo/writeconcern",
+    "go.mongodb.org/mongo-driver/x/bsonx",
+    "go.mongodb.org/mongo-driver/x/network/connstring",
     "golang.org/x/crypto/ssh/terminal",
     "gopkg.in/mgo.v2",
     "gopkg.in/mgo.v2/bson",

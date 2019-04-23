@@ -1,0 +1,87 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 22}
+    - {_id: 3, x: 33}
+minServerVersion: '2.6'
+
+tests:
+    -
+        description: "UpdateMany when many documents match"
+        operation:
+            name: "updateMany"
+            arguments:
+                filter: 
+                    _id: {$gt: 1}
+                update: 
+                    $inc: {x: 1}
+
+        outcome:
+            result:
+                matchedCount: 2
+                modifiedCount: 2
+                upsertedCount: 0
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 23}
+                    - {_id: 3, x: 34}
+    -
+        description: "UpdateMany when one document matches"
+        operation:
+            name: "updateMany"
+            arguments:
+                filter: {_id: 1}
+                update: 
+                    $inc: {x: 1}
+
+        outcome:
+            result:
+                matchedCount: 1
+                modifiedCount: 1
+                upsertedCount: 0
+            collection:
+                data:
+                    - {_id: 1, x: 12}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+    -
+        description: "UpdateMany when no documents match"
+        operation:
+            name: "updateMany"
+            arguments:
+                filter: {_id: 4}
+                update: 
+                    $inc: {x: 1}
+
+        outcome:
+            result:
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 0
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+    -
+        description: "UpdateMany with upsert when no documents match"
+        operation:
+            name: "updateMany"
+            arguments:
+                filter: {_id: 4}
+                update: 
+                    $inc: {x: 1}
+                upsert: true
+
+        outcome:
+            result:
+                matchedCount: 0
+                modifiedCount: 0
+                upsertedCount: 1
+                upsertedId: 4
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+                    - {_id: 4, x: 1}

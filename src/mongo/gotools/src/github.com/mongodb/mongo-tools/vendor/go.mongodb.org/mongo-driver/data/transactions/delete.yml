@@ -1,0 +1,184 @@
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data:
+  - _id: 1
+  - _id: 2
+  - _id: 3
+  - _id: 4
+  - _id: 5
+
+tests:
+  - description: delete
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: deleteOne
+        object: collection
+        arguments:
+          session: session0
+          filter:
+            _id: 1
+        result:
+          deletedCount: 1
+      - name: deleteMany
+        object: collection
+        arguments:
+          session: session0
+          filter:
+            _id: {$lte: 3}
+        result:
+          deletedCount: 2
+      - name: deleteOne
+        object: collection
+        arguments:
+          session: session0
+          filter:
+            _id: 4
+        result:
+          deletedCount: 1
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            delete: *collection_name
+            deletes:
+              - q: {_id: 1}
+                limit: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: delete
+          database_name: *database_name
+      - command_started_event:
+          command:
+            delete: *collection_name
+            deletes:
+              - q: {_id: {$lte: 3}}
+                limit: 0
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: delete
+          database_name: *database_name
+      - command_started_event:
+          command:
+            delete: *collection_name
+            deletes:
+              - q: {_id: 4}
+                limit: 1
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: delete
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 5
+
+  - description: collection writeConcern ignored for delete
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+      - name: deleteOne
+        object: collection
+        collectionOptions:
+          writeConcern:
+            w: majority
+        arguments:
+          session: session0
+          filter:
+            _id: 1
+        result:
+          deletedCount: 1
+      - name: deleteMany
+        object: collection
+        collectionOptions:
+          writeConcern:
+            w: majority
+        arguments:
+          session: session0
+          filter:
+            _id: {$lte: 3}
+        result:
+          deletedCount: 2
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            delete: *collection_name
+            deletes:
+              - q: {_id: 1}
+                limit: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: delete
+          database_name: *database_name
+      - command_started_event:
+          command:
+            delete: *collection_name
+            deletes:
+              - q: {_id: {$lte: 3}}
+                limit: 0
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: delete
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+          command_name: commitTransaction
+          database_name: admin

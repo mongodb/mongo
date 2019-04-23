@@ -27,6 +27,7 @@ static int checkX509_STORE_error(char* err, size_t err_len) {
                  ERR_reason_error_string(errCode));
         return 0;
     }
+    ERR_clear_error();
     return 1;
 }
 

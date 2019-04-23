@@ -1,0 +1,18 @@
+data:
+    - {_id: 1, x: 11}
+
+tests:
+    -
+        description: "InsertOne with a non-existing document"
+        operation:
+            name: "insertOne"
+            arguments:
+                document: {_id: 2, x: 22}
+
+        outcome:
+            result:
+                insertedId: 2
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}

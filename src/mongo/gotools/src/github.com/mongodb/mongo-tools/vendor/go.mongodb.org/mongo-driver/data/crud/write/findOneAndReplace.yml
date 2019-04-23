@@ -1,0 +1,113 @@
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 22}
+    - {_id: 3, x: 33}
+
+tests:
+    -
+        description: "FindOneAndReplace when many documents match returning the document before modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: 
+                    _id: {$gt: 1}
+                replacement: {x: 32}
+                projection: {x: 1, _id: 0}
+                sort: {x: 1}
+
+        outcome:
+            result: {x: 22}
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 32}
+                    - {_id: 3, x: 33}
+    -
+        description: "FindOneAndReplace when many documents match returning the document after modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: 
+                    _id: {$gt: 1}
+                replacement: {x: 32}
+                projection: {x: 1, _id: 0}
+                returnDocument: After
+                sort: {x: 1}
+
+        outcome:
+            result: {x: 32}
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 32}
+                    - {_id: 3, x: 33}
+    -
+        description: "FindOneAndReplace when one document matches returning the document before modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: {_id: 2}
+                replacement: {x: 32}
+                projection: {x: 1, _id: 0}
+                sort: {x: 1}
+
+        outcome:
+            result: {x: 22}
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 32}
+                    - {_id: 3, x: 33}
+    -
+        description: "FindOneAndReplace when one document matches returning the document after modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: {_id: 2}
+                replacement: {x: 32}
+                projection: {x: 1, _id: 0}
+                returnDocument: After
+                sort: {x: 1}
+
+        outcome:
+            result: {x: 32}
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 32}
+                    - {_id: 3, x: 33}
+    -
+        description: "FindOneAndReplace when no documents match returning the document before modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: {_id: 4}
+                replacement: {x: 44}
+                projection: {x: 1, _id: 0}
+                sort: {x: 1}
+
+        outcome:
+            result: null
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+    -
+        description: "FindOneAndReplace when no documents match returning the document after modification"
+        operation:
+            name: findOneAndReplace
+            arguments:
+                filter: {_id: 4}
+                replacement: {x: 44}
+                projection: {x: 1, _id: 0}
+                returnDocument: After
+                sort: {x: 1}
+
+        outcome:
+            result: null
+            collection:
+                data:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}

@@ -1,0 +1,11 @@
+uri: "mongodb+srv://test2.test.build.10gen.cc/?replicaSet=repl0"
+seeds:
+    - localhost.test.build.10gen.cc:27018
+    - localhost.test.build.10gen.cc:27019
+hosts:
+    - localhost:27017
+    - localhost:27018
+    - localhost:27019
+options:
+    replicaSet: repl0
+    ssl: true

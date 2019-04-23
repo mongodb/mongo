@@ -1,0 +1,99 @@
+tests:
+    -
+        description: "Default"
+        valid: true
+        writeConcern: {}
+        writeConcernDocument: {}
+        isServerDefault: true
+        isAcknowledged: true
+    -
+        description: "W as a number"
+        valid: true
+        writeConcern: { w: 3 }
+        writeConcernDocument: { w: 3 }
+        isServerDefault: false
+        isAcknowledged: true
+    -
+        description: "W as an invalid number"
+        valid: false
+        writeConcern: { w: -3 }
+        writeConcernDocument: ~
+        isServerDefault: ~
+        isAcknowledged: ~
+    -
+        description: "W as majority"
+        valid: true
+        writeConcern: { w: "majority" }
+        writeConcernDocument: { w: "majority" }
+        isServerDefault: false
+        isAcknowledged: true
+    -
+        description: "W as a custom string"
+        valid: true
+        writeConcern: { w: "my_mode" }
+        writeConcernDocument: { w: "my_mode" }
+        isServerDefault: false
+        isAcknowledged: true
+    -
+        description: "WTimeoutMS"
+        valid: true
+        writeConcern: { wtimeoutMS: 1000 }
+        writeConcernDocument: { wtimeout: 1000 }
+        isServerDefault: false
+        isAcknowledged: true
+    -
+        description: "WTimeoutMS as an invalid number"
+        valid: false
+        writeConcern: { wtimeoutMS: -1000 }
+        writeConcernDocument: ~
+        isServerDefault: ~
+        isAcknowledged: ~
+    -
+        description: "Journal as true"
+        valid: true
+        writeConcern: { journal: true }
+        writeConcernDocument: { j: true }
+        isServerDefault: false
+        isAcknowledged: true
+    -
+        description: "Journal as false"
+        valid: true
+        writeConcern: { journal: false }
+        writeConcernDocument: { j: false }
+        isServerDefault: false
+        isAcknowledged: true
+    -
+        description: "Unacknowledged with only w"
+        valid: true
+        writeConcern: { w: 0 }
+        writeConcernDocument: { w: 0 }
+        isServerDefault: false
+        isAcknowledged: false
+    -
+        description: "Unacknowledged with wtimeoutMS"
+        valid: true
+        writeConcern: { w: 0, wtimeoutMS: 500 }
+        writeConcernDocument: { w: 0, wtimeout: 500 }
+        isServerDefault: false
+        isAcknowledged: false
+    -
+        description: "Unacknowledged with journal"
+        valid: true
+        writeConcern: { w: 0, journal: false }
+        writeConcernDocument: { w: 0, j: false }
+        isServerDefault: false
+        isAcknowledged: false
+    -
+        description: "W is 0 with journal true"
+        valid: false
+        writeConcern: { w: 0, journal: true }
+        writeConcernDocument: { w: 0, j: true }
+        isServerDefault: false
+        isAcknowledged: true
+    -
+        description: "Everything"
+        valid: true
+        writeConcern: { w: 3, wtimeoutMS: 1000, journal: true }
+        writeConcernDocument: { w: 3, wtimeout: 1000, j: true }
+        isServerDefault: false
+        isAcknowledged: true

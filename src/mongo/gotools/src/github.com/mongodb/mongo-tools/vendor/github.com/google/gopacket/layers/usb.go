@@ -81,27 +81,6 @@ const (
 	USBTransportTypeBulk        USBTransportType = 0x03 // Bulk transfers can be used for large bursty data, using all remaining available bandwidth, no guarantees on bandwidth or latency, such as file transfers.
 )
 
-func (a USBTransportType) LayerType() gopacket.LayerType {
-	return USBTypeMetadata[a].LayerType
-}
-
-func (a USBTransportType) String() string {
-	switch a {
-	case USBTransportTypeTransferIn:
-		return "Transfer In"
-	case USBTransportTypeIsochronous:
-		return "Isochronous"
-	case USBTransportTypeInterrupt:
-		return "Interrupt"
-	case USBTransportTypeControl:
-		return "Control"
-	case USBTransportTypeBulk:
-		return "Bulk"
-	default:
-		return "Unknown transport type"
-	}
-}
-
 type USBDirectionType uint8
 
 const (
