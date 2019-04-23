@@ -28,12 +28,7 @@ class FreeMonWebServer {
         this.fault_type = fault_type;
 
         if (_isWindows()) {
-            const paths = ["c:\\python37\\python.exe", "c:\\python\\python37\\python.exe"];
-            for (let p of paths) {
-                if (fileExists(p)) {
-                    this.python = p;
-                }
-            }
+            this.python = "python.exe";
         }
 
         print("Using python interpreter: " + this.python);
