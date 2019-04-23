@@ -6,49 +6,66 @@
 
     load('jstests/noPassthrough/libs/index_build.js');
 
-    const failpoint = 'hangAfterStartingIndexBuildUnlocked';
-    assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
+    const collName = "collstats_show_ready_and_in_progress_indexes";
+    const testDB = db.getSiblingDB("test");
+    const testColl = db.getCollection(collName);
+    testColl.drop();
 
-    const conn = db.getMongo();
-
-    const collName = 'collStats';
-    const coll = db.getCollection(collName);
-
-    const bulk = coll.initializeUnorderedBulkOp();
-    const numDocs = 5;
-    for (let i = 0; i < numDocs; i++) {
+    const bulk = testColl.initializeUnorderedBulkOp();
+    for (let i = 0; i < 5; ++i) {
         bulk.insert({a: i, b: i * i});
     }
     assert.commandWorked(bulk.execute());
 
-    // Start two index builds in the background.
-    const awaitParallelShell = startParallelShell(() => {
-        db.runCommand({
-            createIndexes: 'collStats',
-            indexes: [
-                {key: {a: 1}, name: 'a_1', background: true},
-                {key: {b: 1}, name: 'b_1', background: true}
-            ]
-        });
-    }, conn.port);
+    assert.commandWorked(db.adminCommand(
+        {configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "alwaysOn"}));
 
-    // Wait until both index builds begin.
-    IndexBuildTest.waitForIndexBuildToStart(db);
+    let awaitParallelShell;
+    try {
+        jsTest.log("Starting a parallel shell to run two background index builds");
+        awaitParallelShell = startParallelShell(() => {
+            db.getSiblingDB("test").runCommand({
+                createIndexes: "collstats_show_ready_and_in_progress_indexes",
+                indexes: [
+                    {key: {a: 1}, name: 'a_1', background: true},
+                    {key: {b: 1}, name: 'b_1', background: true}
+                ]
+            });
+        }, db.getMongo().port);
 
-    const collStats = assert.commandWorked(db.runCommand({collStats: collName}));
+        jsTest.log("Waiting until the index build begins.");
+        // Note that we cannot use checkLog here to wait for the failpoint logging because this test
+        // shares a mongod with other tests that might have already provoked identical failpoint
+        // logging.
+        IndexBuildTest.waitForIndexBuildToStart(testDB);
 
-    // Ensure the existence of the indexes in the following fields: 'indexSizes', 'nindexes' and
-    // 'indexDetails'.
-    assert.gte(collStats.indexSizes._id_, 0);
-    assert.gte(collStats.indexSizes.a_1, 0);
-    assert.gte(collStats.indexSizes.b_1, 0);
+        jsTest.log("Running collStats on collection '" + collName +
+                   "' to check for expected 'indexSizes', 'nindexes' and 'indexBuilds' results");
+        const collStatsRes = assert.commandWorked(db.runCommand({collStats: collName}));
 
-    assert.eq(3, collStats.nindexes);
+        assert(typeof(collStatsRes.indexSizes._id_) != 'undefined',
+               "expected 'indexSizes._id_' to exist: " + tojson(collStatsRes));
+        assert(typeof(collStatsRes.indexSizes.a_1) != 'undefined',
+               "expected 'indexSizes.a_1' to exist: " + tojson(collStatsRes));
+        assert(typeof(collStatsRes.indexSizes.b_1) != 'undefined',
+               "expected 'indexSizes.b_1' to exist: " + tojson(collStatsRes));
 
-    assert.eq(2, collStats.indexBuilds.length);
-    assert.eq('a_1', collStats.indexBuilds[0]);
-    assert.eq('b_1', collStats.indexBuilds[1]);
+        assert.eq(3, collStatsRes.nindexes, "expected 'nindexes' to be 3: " + tojson(collStatsRes));
 
-    assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "off"}));
-    awaitParallelShell();
+        assert.eq(2,
+                  collStatsRes.indexBuilds.length,
+                  "expected to find 2 entries in 'indexBuilds': " + tojson(collStatsRes));
+        assert.eq('a_1',
+                  collStatsRes.indexBuilds[0],
+                  "expected to find an 'a_1' index build:" + tojson(collStatsRes));
+        assert.eq('b_1',
+                  collStatsRes.indexBuilds[1],
+                  "expected to find an 'b_1' index build:" + tojson(collStatsRes));
+    } finally {
+        // Ensure the failpoint is unset, even if there are assertion failures, so that we do not
+        // hang the test/mongod.
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "off"}));
+        awaitParallelShell();
+    }
 })();
