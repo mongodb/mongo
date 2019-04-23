@@ -1373,6 +1373,20 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
                         ((infoType && infoType.get().typeSet().isSingleType()) &&
                          !infoType.get().typeSet().hasType(BSONType::Object)));
 
+            if (auto bsonType = encryptInfo.getBsonType()) {
+                auto typeSet = bsonType->typeSet();
+                auto checkType = [typeSet](BSONType typeToCheck) {
+                    uassert(31041,
+                            std::string("Cannot encrypt single-valued type")
+                                .append(typeName(typeToCheck)),
+                            !typeSet.hasType(typeToCheck));
+                };
+                checkType(BSONType::MinKey);
+                checkType(BSONType::MaxKey);
+                checkType(BSONType::Undefined);
+                checkType(BSONType::jstNULL);
+            }
+
             andExpr->add(new InternalSchemaBinDataSubTypeExpression(path, BinDataType::Encrypt));
 
             if (auto typeOptional = infoType)

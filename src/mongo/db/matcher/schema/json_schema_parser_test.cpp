@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -2232,6 +2233,70 @@ TEST(JSONSchemaParserTest, FailsToParseWithObjectInArrayBSONTypeInDeterministicE
                                             << BSON_ARRAY("object")));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), 31051);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseWithSingleValueBSONTypeInEncryptObject) {
+    auto uuid = UUID::gen();
+    // Test MinKey
+    BSONObj encrypt = BSON("encrypt" << BSON("algorithm"
+                                             << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+                                             << "initializationVector"
+                                             << BSONBinData(NULL, 0, BinDataType::BinDataGeneral)
+                                             << "bsonType"
+                                             << "minKey"
+                                             << "keyId"
+                                             << BSON_ARRAY(uuid)));
+    BSONObj schema = BSON("type"
+                          << "object"
+                          << "properties"
+                          << BSON("foo" << encrypt));
+    auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_EQ(result.getStatus().code(), 31041);
+    // Test MaxKey
+    encrypt = BSON("encrypt" << BSON("algorithm"
+                                     << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+                                     << "initializationVector"
+                                     << BSONBinData(NULL, 0, BinDataType::BinDataGeneral)
+                                     << "bsonType"
+                                     << "maxKey"
+                                     << "keyId"
+                                     << BSON_ARRAY(uuid)));
+    schema = BSON("type"
+                  << "object"
+                  << "properties"
+                  << BSON("foo" << encrypt));
+    result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_EQ(result.getStatus().code(), 31041);
+    // Test Undefined
+    encrypt = BSON("encrypt" << BSON("algorithm"
+                                     << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+                                     << "initializationVector"
+                                     << BSONBinData(NULL, 0, BinDataType::BinDataGeneral)
+                                     << "bsonType"
+                                     << "undefined"
+                                     << "keyId"
+                                     << BSON_ARRAY(uuid)));
+    schema = BSON("type"
+                  << "object"
+                  << "properties"
+                  << BSON("foo" << encrypt));
+    result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_EQ(result.getStatus().code(), 31041);
+    // Test Null
+    encrypt = BSON("encrypt" << BSON("algorithm"
+                                     << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+                                     << "initializationVector"
+                                     << BSONBinData(NULL, 0, BinDataType::BinDataGeneral)
+                                     << "bsonType"
+                                     << "null"
+                                     << "keyId"
+                                     << BSON_ARRAY(uuid)));
+    schema = BSON("type"
+                  << "object"
+                  << "properties"
+                  << BSON("foo" << encrypt));
+    result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_EQ(result.getStatus().code(), 31041);
 }
 
 }  // namespace
