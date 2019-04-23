@@ -36,23 +36,26 @@ BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
                        ErrorCodes::Error code,
                        bool hasWriteConcernError) {
+    BSONArrayBuilder labelArray;
 
-    // By specifying "autocommit", the user indicates they want to run a transaction.
-    // It is always false when set.
-    if (!sessionOptions.getAutocommit()) {
-        return {};
+    // Note that we only apply the TransientTxnError label if the "autocommit" field is present in
+    // the session options. When present, "autocommit" will always be false, so we don't check its
+    // value.
+    if (sessionOptions.getAutocommit() &&
+        isTransientTransactionError(code,
+                                    hasWriteConcernError,
+                                    commandName == "commitTransaction" ||
+                                        commandName == "coordinateCommitTransaction")) {
+        // An error code for which isTransientTransactionError() is true indicates a transaction
+        // failure with no persistent side effects.
+        labelArray << txn::TransientTxnErrorFieldName;
     }
 
-    // The errors that indicate the transaction fails without any persistent side-effect.
-    bool isTransient = isTransientTransactionError(
-        code,
-        hasWriteConcernError,
-        commandName == "commitTransaction" || commandName == "coordinateCommitTransaction");
-
-    if (isTransient) {
-        return BSON("errorLabels" << BSON_ARRAY(txn::TransientTxnErrorFieldName));
+    if (ErrorCodes::isNonResumableChangeStreamError(code)) {
+        labelArray << "NonResumableChangeStreamError";
     }
-    return {};
+
+    return (labelArray.arrSize() > 0) ? BSON("errorLabels" << labelArray.arr()) : BSONObj();
 }
 
 }  // namespace mongo

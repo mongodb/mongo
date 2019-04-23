@@ -357,4 +357,4 @@ error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChu
 
 error_class("VoteAbortError", ["NoSuchTransaction", "TransactionTooOld"])
 
-error_class("NonRetryableChangeStreamError", ["ChangeStreamFatalError", "ChangeStreamHistoryLost"])
+error_class("NonResumableChangeStreamError", ["ChangeStreamFatalError", "ChangeStreamHistoryLost"])
