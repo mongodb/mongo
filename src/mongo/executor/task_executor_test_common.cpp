@@ -169,16 +169,6 @@ COMMON_EXECUTOR_TEST(RunOne) {
     ASSERT_OK(status);
 }
 
-COMMON_EXECUTOR_TEST(Schedule1ButShutdown) {
-    TaskExecutor& executor = getExecutor();
-    Status status = getDetectableErrorStatus();
-    ASSERT_OK(executor.scheduleWork(makeSetStatusAndShutdownClosure(&status)).getStatus());
-    executor.shutdown();
-    launchExecutorThread();
-    joinExecutorThread();
-    ASSERT_EQUALS(status, ErrorCodes::CallbackCanceled);
-}
-
 COMMON_EXECUTOR_TEST(Schedule2Cancel1) {
     TaskExecutor& executor = getExecutor();
     Status status1 = getDetectableErrorStatus();

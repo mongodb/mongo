@@ -100,7 +100,8 @@ TEST_F(ShardingTaskExecutorTest, MissingLsidAddsLsidInCommand) {
 
     executor::ShardingTaskExecutor executor(std::move(_threadPool));
     executor.startup();
-    _network->enterNetwork();
+
+    NetworkInterfaceMock::InNetworkGuard ing(_network);
 
     const RemoteCommandRequest request(HostAndPort("localhost", 27017),
                                        "mydb",
@@ -124,7 +125,7 @@ TEST_F(ShardingTaskExecutorTest, IncompleteLsidAddsLsidInCommand) {
 
     executor::ShardingTaskExecutor executor(std::move(_threadPool));
     executor.startup();
-    _network->enterNetwork();
+    NetworkInterfaceMock::InNetworkGuard ing(_network);
 
     BSONObjBuilder bob;
     bob.append("whatsUp", "doc");
