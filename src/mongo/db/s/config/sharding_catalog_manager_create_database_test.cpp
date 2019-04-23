@@ -106,7 +106,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
 
     // Return size information about first shard
     onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(s0.getHost(), request.target.toString());
+        ASSERT_EQUALS(HostAndPort(s0.getHost()), request.target);
         ASSERT_EQUALS("admin", request.dbname);
         std::string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
@@ -121,7 +121,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
 
     // Return size information about second shard
     onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(s1.getHost(), request.target.toString());
+        ASSERT_EQUALS(HostAndPort(s1.getHost()), request.target);
         ASSERT_EQUALS("admin", request.dbname);
         std::string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
@@ -136,7 +136,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
 
     // Return size information about third shard
     onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(s2.getHost(), request.target.toString());
+        ASSERT_EQUALS(HostAndPort(s2.getHost()), request.target);
         ASSERT_EQUALS("admin", request.dbname);
         std::string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);

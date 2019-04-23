@@ -58,7 +58,9 @@ HostAndPort::HostAndPort(StringData text) {
     uassertStatusOK(initialize(text));
 }
 
-HostAndPort::HostAndPort(const std::string& h, int p) : _host(h), _port(p) {}
+// Normalize hostname by lowercasing ASCII uppercase characters. Ignore non-ASCII characters.
+// Assume input is ASCII or UTF-8.
+HostAndPort::HostAndPort(const std::string& h, int p) : _host(str::toLower(h)), _port(p) {}
 
 HostAndPort::HostAndPort(SockAddr addr) : _addr(std::move(addr)) {
     uassertStatusOK(initialize(_addr->toString(true)));
@@ -207,7 +209,8 @@ Status HostAndPort::initialize(StringData s) {
     } else {
         port = -1;
     }
-    _host = hostPart.toString();
+
+    _host = str::toLower(hostPart);
     _port = port;
     return Status::OK();
 }

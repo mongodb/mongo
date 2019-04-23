@@ -86,6 +86,15 @@
     addShardRes = st.s.adminCommand({addShard: getHostName() + ":" + portWithoutHostRunning});
     assertAddShardFailed(addShardRes);
 
+    // 1.c. with uppercase hostname.
+
+    jsTest.log("Adding a standalone with an uppercase hostname should succeed.");
+    let standalone1c = MongoRunner.runMongod({shardsvr: ''});
+    addShardRes = st.s.adminCommand({addshard: standalone1c.name.toUpperCase()});
+    assertAddShardSucceeded(addShardRes);
+    removeShardWithName(addShardRes.shardAdded);
+    MongoRunner.stopMongod(standalone1c);
+
     // 2. Test adding a *replica set* with an ordinary set name
 
     // 2.a. with or without specifying the shardName.
@@ -139,6 +148,20 @@
     assertAddShardFailed(addShardRes);
 
     rst3.stopSet();
+
+    // 2.c. with uppercase hostnames.
+
+    jsTest.log("Adding a replica set uppercase hostname should succeed.");
+    let rst2c = new ReplSetTest({name: "rst2c", nodes: 1});
+    rst2c.startSet({shardsvr: ''});
+    rst2c.initiate();
+    let rst2cURI = `${rst2c.name}/${rst2c.getPrimary().name.toUpperCase()}`;
+    jsTestLog(`URI with uppercase hostname: ${rst2cURI}`);
+    addShardRes = st.s.adminCommand({addShard: rst2cURI});
+    assertAddShardSucceeded(addShardRes);
+    assert.eq(rst2c.name, addShardRes.shardAdded);
+    removeShardWithName(addShardRes.shardAdded);
+    rst2c.stopSet();
 
     // 3. Test adding a replica set whose *set name* is "config" with or without specifying the
     // shardName.
