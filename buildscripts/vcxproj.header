@@ -23,6 +23,7 @@
     <ProjectName>%_TARGET_%</ProjectName>
     <RootNamespace>mongod</RootNamespace>
     <PlatformToolset>v141</PlatformToolset>
+    <UseNativeEnvironment>true</UseNativeEnvironment>
     <!-- <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid> -->
     <Keyword>MakeFileProj</Keyword>
     <RootNamespace>%_TARGET_%</RootNamespace>
