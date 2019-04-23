@@ -48,6 +48,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -555,6 +556,17 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                     }
                 }
                 return Status::OK();
+            }
+            // TODO(SERVER-39797): Remove commitTransaction handling for unprepared transactions.
+            case OplogEntry::CommandType::kCommitTransaction: {
+                IDLParserErrorContext ctx("commitTransaction");
+                auto commitCommand = CommitTransactionOplogObject::parse(ctx, obj);
+                const bool prepared = !commitCommand.getPrepared() || *commitCommand.getPrepared();
+                if (!prepared) {
+                    log() << "Ignoring unprepared commitTransaction during rollback: "
+                          << redact(oplogEntry.toBSON());
+                    return Status::OK();
+                }
             }
             default: {
                 std::string message = str::stream() << "Can't roll back this command yet: "
