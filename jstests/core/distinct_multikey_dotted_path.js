@@ -30,6 +30,9 @@
 
     // Run an agg pipeline with a $group, and convert the results so they're equivalent
     // to what a distinct() would return.
+    // Note that $group will treat an array as its own key rather than unwinding it. This means
+    // that a $group on a field that's multikey will have different behavior than a distinct(), so
+    // we only use this function for non-multikey fields.
     function distinctResultsFromPipeline(pipeline) {
         const res = coll.aggregate(pipeline).toArray();
         return res.map((x) => x._id);
@@ -62,9 +65,11 @@
 
         assert.eq(true, planHasStage(db, expl.queryPlanner.winningPlan, "DISTINCT_SCAN"), expl);
 
-        // TODO: SERVER-40465 not checking the results for an equivalent aggregation, since results
-        // from the aggregation with a predicate (a $match preceeding the $group) may not match the
-        // results from distinct() with a predicate.
+        const pipeline = [{$match: numPredicate}].concat(getAggPipelineForDistinct("a.b.c"));
+        const aggResults = distinctResultsFromPipeline(pipeline);
+        assert.sameMembers(aggResults, results);
+        const aggExpl = assert.commandWorked(coll.explain().aggregate(pipeline));
+        assert.gt(getAggPlanStages(aggExpl, "DISTINCT_SCAN").length, 0);
     })();
 
     // Make the index multi key.
@@ -84,12 +89,7 @@
 
         assert.eq(true, planHasStage(db, expl.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
-        // Do the same thing with aggregation.
-        const pipeline = getAggPipelineForDistinct("a.b.c");
-        const aggResults = distinctResultsFromPipeline(pipeline);
-        assert.sameMembers(aggResults, multiKeyResults);
-        const aggExpl = assert.commandWorked(coll.explain().aggregate(pipeline));
-        assert.gt(getAggPlanStages(aggExpl, "DISTINCT_SCAN").length, 0);
+        // Not running same query with $group now that the field is multikey. See comment above.
     })();
 
     // We cannot use the DISTINCT_SCAN optimization when there is a multikey path in the key and
@@ -106,9 +106,7 @@
         assert.eq(false, planHasStage(db, expl.queryPlanner.winningPlan, "DISTINCT_SCAN"), expl);
         assert.eq(true, planHasStage(db, expl.queryPlanner.winningPlan, "IXSCAN"), expl);
 
-        // TODO: SERVER-40465 not checking the results for an equivalent aggregation, since results
-        // from the aggregation with a predicate (a $match preceeding the $group) may not match the
-        // results from distinct() with a predicate.
+        // Not running same query with $group now that the field is multikey. See comment above.
     })();
 
     // Perform a distinct on a path where the last component is multikey.
@@ -133,12 +131,7 @@
         const expl = coll.explain().distinct("a.b");
         assert.eq(true, planHasStage(db, expl.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
-        // Do the same thing with aggregation.
-        const pipeline = getAggPipelineForDistinct("a.b");
-        const aggResults = distinctResultsFromPipeline(pipeline);
-        assert.sameMembers(aggResults, multiKeyResults);
-        const aggExpl = assert.commandWorked(coll.explain().aggregate(pipeline));
-        assert.gt(getAggPlanStages(aggExpl, "DISTINCT_SCAN").length, 0);
+        // Not running same query with $group now that the field is multikey. See comment above.
     })();
 
     (function testDistinctOnPathWhereLastComponentIsMultiKeyWithPredicate() {
@@ -157,9 +150,7 @@
         assert.eq(false, planHasStage(db, expl.queryPlanner.winningPlan, "DISTINCT_SCAN"));
         assert.eq(true, planHasStage(db, expl.queryPlanner.winningPlan, "IXSCAN"));
 
-        // TODO: SERVER-40465 not checking the results for an equivalent aggregation, since results
-        // from the aggregation with a predicate (a $match preceeding the $group) may not match the
-        // results from distinct() with a predicate.
+        // Not running same query with $group now that the field is multikey. See comment above.
     })();
 
     // If the path we distinct() on includes an array index, a COLLSCAN should be used,

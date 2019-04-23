@@ -263,4 +263,32 @@ TEST(GetExecutorTest, GetAllowedPathSpecifiedWildcardIndicesByName) {
                        {"a.$**_1"});
 }
 
+TEST(GetExecutorTest, isComponentOfPathMultikeyNoMetadata) {
+    BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
+    MultikeyPaths multikeyInfo = {};
+
+    ASSERT_TRUE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "a"));
+    ASSERT_TRUE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "b.c"));
+
+    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfo, "a"));
+    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfo, "b.c"));
+}
+
+TEST(GetExecutorTest, isComponentOfPathMultikeyWithMetadata) {
+    BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
+    MultikeyPaths multikeyInfo = {{}, {1}};
+
+    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "a"));
+    ASSERT_TRUE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "b.c"));
+}
+
+TEST(GetExecutorTest, isComponentOfPathMultikeyWithEmptyMetadata) {
+    BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
+
+
+    MultikeyPaths multikeyInfoAllPathsScalar = {{}, {}};
+    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfoAllPathsScalar, "a"));
+    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfoAllPathsScalar, "b.c"));
+}
+
 }  // namespace

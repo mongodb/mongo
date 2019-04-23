@@ -124,6 +124,35 @@ namespace wcp = ::mongo::wildcard_planning;
 bool turnIxscanIntoCount(QuerySolution* soln);
 }  // namespace
 
+bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
+                                  bool isMultikey,
+                                  const MultikeyPaths& indexMultikeyInfo,
+                                  StringData path) {
+    if (!isMultikey) {
+        return false;
+    }
+
+    size_t keyPatternFieldIndex = 0;
+    bool found = false;
+    if (indexMultikeyInfo.empty()) {
+        // There is no path-level multikey information available, so we must assume 'path' is
+        // multikey.
+        return true;
+    }
+
+    for (auto&& elt : indexKeyPattern) {
+        if (elt.fieldNameStringData() == path) {
+            found = true;
+            break;
+        }
+        keyPatternFieldIndex++;
+    }
+    invariant(found);
+
+    invariant(indexMultikeyInfo.size() > keyPatternFieldIndex);
+    return !indexMultikeyInfo[keyPatternFieldIndex].empty();
+}
+
 IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                                            const IndexCatalogEntry& ice,
                                            const CanonicalQuery* canonicalQuery) {
@@ -1455,6 +1484,9 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     QueryPlannerParams plannerParams;
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN | plannerOptions;
 
+    // If the caller did not request a "strict" distinct scan then we may choose a plan which
+    // unwinds arrays and treats each element in an array as its own key.
+    const bool mayUnwindArrays = !(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
         collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     auto query = parsedDistinct.getQuery()->getQueryRequest().getFilter();
@@ -1462,6 +1494,17 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         const IndexCatalogEntry* ice = ii->next();
         const IndexDescriptor* desc = ice->descriptor();
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
+            if (!mayUnwindArrays && isAnyComponentOfPathMultikey(desc->keyPattern(),
+                                                                 desc->isMultikey(opCtx),
+                                                                 desc->getMultikeyPaths(opCtx),
+                                                                 parsedDistinct.getKey())) {
+                // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
+                // then an index which is multikey on the distinct field may not be used. This is
+                // because when indexing an array each element gets inserted individually. Any plan
+                // which involves scanning the index will have effectively "unwound" all arrays.
+                continue;
+            }
+
             plannerParams.indices.push_back(
                 indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
@@ -1472,6 +1515,14 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                 plannerParams.indices.push_back(
                     indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
             }
+
+            // It is not necessary to do any checks about 'mayUnwindArrays' in this case, because:
+            // 1) If there is no predicate on the distinct(), a wildcard indices may not be used.
+            // 2) distinct() _with_ a predicate may not be answered with a DISTINCT_SCAN on _any_
+            // multikey index.
+
+            // So, we will not distinct scan a wildcard index that's multikey on the distinct()
+            // field, regardless of the value of 'mayUnwindArrays'.
         }
     }
 

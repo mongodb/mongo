@@ -67,6 +67,17 @@ void fillOutPlannerParams(OperationContext* opCtx,
                           QueryPlannerParams* plannerParams);
 
 /**
+ * Return whether or not any component of the path 'path' is multikey given an index key pattern
+ * and multikeypaths. If no multikey metdata is available for the index, and the index is marked
+ * multikey, conservatively assumes that a component of 'path' _is_ multikey. The 'isMultikey'
+ * property of an index is false for indexes that definitely have no multikey paths.
+ */
+bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
+                                  bool isMultikey,
+                                  const MultikeyPaths& indexMultikeyInfo,
+                                  StringData path);
+
+/**
  * Converts the catalog metadata for an index into an IndexEntry, which is a format that is meant to
  * be consumed by the query planner. This function can perform index reads and should not be called
  * unless access to the storage engine is permitted.
@@ -166,6 +177,14 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * field. Without this flag, getExecutorDistinct() may use a plan that takes advantage of
  * DISTINCT_SCAN to filter some but not all duplicates (so that de-duplication is still necessary
  * after query execution), or it may fall back to a regular IXSCAN.
+ *
+ * Providing QueryPlannerParams::STRICT_DISTINCT_ONLY also implies that the resulting plan may not
+ * "unwind" arrays. That is, it will not return separate values for each element in an array. For
+ * example, in a collection with documents {a: [10, 11]}, {a: 12}, a distinct command on field 'a'
+ * can process the "unwound" values 10, 11, and 12, but a $group by 'a' needs to see documents for
+ * the original [10, 11] and 12 values. In the latter case (in which the caller provides a
+ * STRICT_DISTINCT_ONLY), a DISTINCT_SCAN is not possible, and the caller would have to fall back
+ * to a different plan.
  *
  * Note that this function uses the projection in 'parsedDistinct' to produce a covered query when
  * possible, but when a covered query is not possible, the resulting plan may elide the projection

@@ -220,6 +220,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         // possible, we return nullptr, and the caller is responsible for trying again without
         // passing a 'groupIdForDistinctScan' value.
         ParsedDistinct parsedDistinct(std::move(cq.getValue()), *groupIdForDistinctScan);
+
+        // Note that we request a "strict" distinct plan because:
+        // 1) We do not want to have to de-duplicate the results of the plan.
+        //
+        // 2) We not want a plan that will return separate values for each array element. For
+        // example, if we have a document {a: [1,2]} and group by "a" a DISTINCT_SCAN on an "a"
+        // index would produce one result for '1' and another for '2', which would be incorrect.
         auto distinctExecutor =
             getExecutorDistinct(opCtx,
                                 collection,
