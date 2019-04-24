@@ -122,6 +122,10 @@ boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::reco
         return boost::none;
     }
 
+    // Make sure that recover can terminate right away if coordinateCommit never reached
+    // the coordinator.
+    coordinator->cancelIfCommitNotYetStarted();
+
     return coordinator->onCompletion().then(
         [coordinator] { return coordinator->getDecision().get(); });
 
@@ -257,6 +261,20 @@ void TransactionCoordinatorService::CatalogAndScheduler::onStepDown() {
 void TransactionCoordinatorService::CatalogAndScheduler::join() {
     recoveryTaskCompleted->wait();
     catalog.join();
+}
+
+void TransactionCoordinatorService::cancelIfCommitNotYetStarted(OperationContext* opCtx,
+                                                                LogicalSessionId lsid,
+                                                                TxnNumber txnNumber) {
+    auto cas = _getCatalogAndScheduler(opCtx);
+    auto& catalog = cas->catalog;
+
+    // No need to look at every coordinator since we cancel old coordinators when adding new ones.
+    if (auto latestTxnNumAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
+        if (txnNumber == latestTxnNumAndCoordinator->first) {
+            latestTxnNumAndCoordinator->second->cancelIfCommitNotYetStarted();
+        }
+    }
 }
 
 }  // namespace mongo

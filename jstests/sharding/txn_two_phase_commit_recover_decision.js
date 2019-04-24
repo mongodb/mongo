@@ -325,9 +325,9 @@
         // Start transaction and run CRUD ops on several shards.
         const recoveryToken = startNewCrossShardTransactionThroughMongos();
 
-        // Try to recover decision from other mongos. This should block until the transaction
-        // coordinator is canceled after transactionLifetimeLimitSeconds, after which it should
-        // abort the local participant and return NoSuchTransaction.
+        // Try to recover decision from other mongos. This should preemptively cancel the
+        // coordinator, after which it should abort the local participant and return
+        // NoSuchTransaction.
         assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();

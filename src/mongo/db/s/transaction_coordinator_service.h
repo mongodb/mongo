@@ -102,6 +102,13 @@ public:
      */
     void onShardingInitialization(OperationContext* opCtx, bool isPrimary);
 
+    /**
+     * Cancel commit on the coordinator for the given transaction only if it has not started yet.
+     */
+    void cancelIfCommitNotYetStarted(OperationContext* opCtx,
+                                     LogicalSessionId lsid,
+                                     TxnNumber txnNumber);
+
 private:
     struct CatalogAndScheduler {
         CatalogAndScheduler(ServiceContext* service) : scheduler(service) {}
