@@ -402,5 +402,28 @@ TEST_F(MetadataManagerTest, RangesToCleanMembership) {
     notifn.abandon();
 }
 
+TEST_F(MetadataManagerTest, CleanUpEmptyChunkManagerObjects) {
+    _manager->setFilteringMetadata(makeEmptyMetadata());
+
+    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
+
+    auto scm1 = *_manager->getActiveMetadata(_manager, boost::none);
+    {
+        _manager->setFilteringMetadata(cloneMetadataPlusChunk(scm1, cr1));
+        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1UL);
+        ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
+
+        auto scm2 = *_manager->getActiveMetadata(_manager, boost::none);
+        ASSERT_EQ(scm2->getChunks().size(), 1UL);
+        _manager->setFilteringMetadata(cloneMetadataPlusChunk(scm2, cr2));
+        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 2UL);
+    }
+
+    // scm2 should be destructed and removed from _metadata, but scm1 should remain
+    ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1UL);
+    ASSERT_EQ((*_manager->getActiveMetadata(_manager, boost::none))->getChunks().size(), 2UL);
+}
+
 }  // namespace
 }  // namespace mongo
