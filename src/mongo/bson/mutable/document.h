@@ -518,7 +518,54 @@ private:
     const Element _root;
 };
 
+inline int Document::compareWith(const Document& other,
+                                 const StringData::ComparatorInterface* comparator,
+                                 bool considerFieldName) const {
+    // We cheat and use Element::compareWithElement since we know that 'other' is a
+    // Document and has a 'hidden' fieldname that is always indentical across all Document
+    // instances.
+    return root().compareWithElement(other.root(), comparator, considerFieldName);
+}
+
+inline int Document::compareWithBSONObj(const BSONObj& other,
+                                        const StringData::ComparatorInterface* comparator,
+                                        bool considerFieldName) const {
+    return root().compareWithBSONObj(other, comparator, considerFieldName);
+}
+
+inline void Document::writeTo(BSONObjBuilder* builder) const {
+    return root().writeTo(builder);
+}
+
+inline BSONObj Document::getObject() const {
+    BSONObjBuilder builder;
+    writeTo(&builder);
+    return builder.obj();
+}
+
+inline Element Document::root() {
+    return _root;
+}
+
+inline ConstElement Document::root() const {
+    return _root;
+}
+
+inline Element Document::end() {
+    return Element(this, Element::kInvalidRepIdx);
+}
+
+inline ConstElement Document::end() const {
+    return const_cast<Document*>(this)->end();
+}
+
+inline std::string Document::toString() const {
+    return getObject().toString();
+}
+
+inline bool Document::isInPlaceModeEnabled() const {
+    return getCurrentInPlaceMode() == kInPlaceEnabled;
+}
+
 }  // namespace mutablebson
 }  // namespace mongo
-
-#include "mongo/bson/mutable/document-inl.h"

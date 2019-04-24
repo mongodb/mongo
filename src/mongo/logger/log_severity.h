@@ -145,7 +145,59 @@ private:
 
 std::ostream& operator<<(std::ostream& os, LogSeverity severity);
 
+LogSeverity LogSeverity::Severe() {
+    return LogSeverity(-4);
+}
+LogSeverity LogSeverity::Error() {
+    return LogSeverity(-3);
+}
+LogSeverity LogSeverity::Warning() {
+    return LogSeverity(-2);
+}
+LogSeverity LogSeverity::Info() {
+    return LogSeverity(-1);
+}
+LogSeverity LogSeverity::Log() {
+    return LogSeverity(0);
+}
+LogSeverity LogSeverity::Debug(int debugLevel) {
+    // It would be appropriate to use std::max or std::clamp instead,
+    // but it seems better not to drag in all of <algorithm> here.
+    return LogSeverity(debugLevel > kMaxDebugLevel ? kMaxDebugLevel : debugLevel);
+}
+
+LogSeverity LogSeverity::cast(int ll) {
+    return LogSeverity(ll);
+}
+
+int LogSeverity::toInt() const {
+    return _severity;
+}
+LogSeverity LogSeverity::moreSevere() const {
+    return LogSeverity(_severity - 1);
+}
+LogSeverity LogSeverity::lessSevere() const {
+    return LogSeverity(_severity + 1);
+}
+
+bool LogSeverity::operator==(LogSeverity other) const {
+    return _severity == other._severity;
+}
+bool LogSeverity::operator!=(LogSeverity other) const {
+    return _severity != other._severity;
+}
+bool LogSeverity::operator<(LogSeverity other) const {
+    return _severity > other._severity;
+}
+bool LogSeverity::operator<=(LogSeverity other) const {
+    return _severity >= other._severity;
+}
+bool LogSeverity::operator>(LogSeverity other) const {
+    return _severity < other._severity;
+}
+bool LogSeverity::operator>=(LogSeverity other) const {
+    return _severity <= other._severity;
+}
+
 }  // namespace logger
 }  // namespace mongo
-
-#include "mongo/logger/log_severity-inl.h"

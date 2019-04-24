@@ -29,14 +29,31 @@
 
 #pragma once
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class FieldParser {
+private:
+    template <typename T>
+    static void _genFieldErrMsg(const BSONElement& elem,
+                                const BSONField<T>& field,
+                                StringData expected,
+                                std::string* errMsg) {
+        using namespace fmt::literals;
+        if (!errMsg)
+            return;
+        *errMsg = "wrong type for '{}' field, expected {}, found {}"_format(
+            field(), expected, elem.toString());
+    }
+
 public:
     /**
      * Returns true and fills in 'out' with the contents of the field described by 'field'
@@ -321,7 +338,296 @@ public:
                               std::string* errMsg = NULL);
 };
 
-}  // namespace mongo
+template <typename T>
+FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                             const BSONField<T>& field,
+                                             T* out,
+                                             std::string* errMsg) {
+    BSONElement elem = doc[field.name()];
+    if (elem.eoo()) {
+        if (field.hasDefault()) {
+            field.getDefault().cloneTo(out);
+            return FIELD_DEFAULT;
+        } else {
+            return FIELD_NONE;
+        }
+    }
 
-// Inline functions for templating
-#include "field_parser-inl.h"
+    if (elem.type() != Object && elem.type() != Array) {
+        _genFieldErrMsg(elem, field, "Object/Array", errMsg);
+        return FIELD_INVALID;
+    }
+
+    if (!out->parseBSON(elem.embeddedObject(), errMsg)) {
+        return FIELD_INVALID;
+    }
+
+    return FIELD_SET;
+}
+
+template <typename T>
+FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                             const BSONField<T*>& field,
+                                             T** out,
+                                             std::string* errMsg) {
+    BSONElement elem = doc[field.name()];
+    if (elem.eoo()) {
+        if (field.hasDefault()) {
+            std::unique_ptr<T> temp(new T);
+            field.getDefault()->cloneTo(temp.get());
+
+            *out = temp.release();
+            return FIELD_DEFAULT;
+        } else {
+            return FIELD_NONE;
+        }
+    }
+
+    if (elem.type() != Object && elem.type() != Array) {
+        _genFieldErrMsg(elem, field, "Object/Array", errMsg);
+        return FIELD_INVALID;
+    }
+
+    std::unique_ptr<T> temp(new T);
+    if (!temp->parseBSON(elem.embeddedObject(), errMsg)) {
+        return FIELD_INVALID;
+    }
+
+    *out = temp.release();
+    return FIELD_SET;
+}
+
+template <typename T>
+FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                             const BSONField<T>& field,
+                                             T** out,
+                                             std::string* errMsg) {
+    BSONElement elem = doc[field.name()];
+    if (elem.eoo()) {
+        if (field.hasDefault()) {
+            *out = new T;
+            field.getDefault().cloneTo(*out);
+            return FIELD_DEFAULT;
+        } else {
+            return FIELD_NONE;
+        }
+    }
+
+    if (elem.type() != Object && elem.type() != Array) {
+        _genFieldErrMsg(elem, field(), "vector or array", errMsg);
+        return FIELD_INVALID;
+    }
+
+    std::unique_ptr<T> temp(new T);
+    if (!temp->parseBSON(elem.embeddedObject(), errMsg)) {
+        return FIELD_INVALID;
+    }
+
+    *out = temp.release();
+    return FIELD_SET;
+}
+
+// Extracts an array into a vector
+template <typename T>
+FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                             const BSONField<std::vector<T>>& field,
+                                             std::vector<T>* out,
+                                             std::string* errMsg) {
+    return extract(doc[field.name()], field, out, errMsg);
+}
+
+template <typename T>
+FieldParser::FieldState FieldParser::extract(BSONElement elem,
+                                             const BSONField<std::vector<T>>& field,
+                                             std::vector<T>* out,
+                                             std::string* errMsg) {
+    using namespace fmt::literals;
+    if (elem.eoo()) {
+        if (field.hasDefault()) {
+            *out = field.getDefault();
+            return FIELD_DEFAULT;
+        } else {
+            return FIELD_NONE;
+        }
+    }
+
+    if (elem.type() == Array) {
+        BSONArray arr = BSONArray(elem.embeddedObject());
+        std::string elErrMsg;
+
+        // Append all the new elements to the end of the vector
+        size_t initialSize = out->size();
+        out->resize(initialSize + arr.nFields());
+
+        int i = 0;
+        BSONObjIterator objIt(arr);
+        while (objIt.more()) {
+            BSONElement next = objIt.next();
+            BSONField<T> fieldFor(next.fieldName(), out->at(initialSize + i));
+
+            if (!FieldParser::extract(next, fieldFor, &out->at(initialSize + i), &elErrMsg)) {
+                if (errMsg) {
+                    *errMsg = "error parsing element {} of field {}{}"_format(
+                        i, field(), causedBy(elErrMsg));
+                }
+                return FIELD_INVALID;
+            }
+            i++;
+        }
+
+        return FIELD_SET;
+    }
+
+    _genFieldErrMsg(elem, field, "vector array", errMsg);
+    return FIELD_INVALID;
+}
+
+template <typename T>
+FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                             const BSONField<std::vector<T*>>& field,
+                                             std::vector<T*>* out,
+                                             std::string* errMsg) {
+    dassert(!field.hasDefault());
+
+    BSONElement elem = doc[field.name()];
+    if (elem.eoo()) {
+        return FIELD_NONE;
+    }
+
+    return extract(elem, field, out, errMsg);
+}
+
+template <typename T>
+FieldParser::FieldState FieldParser::extract(BSONElement elem,
+                                             const BSONField<std::vector<T*>>& field,
+                                             std::vector<T*>* out,
+                                             std::string* errMsg) {
+    if (elem.type() != Array) {
+        _genFieldErrMsg(elem, field, "vector array", errMsg);
+        return FIELD_INVALID;
+    }
+
+    BSONArray arr = BSONArray(elem.embeddedObject());
+    BSONObjIterator objIt(arr);
+    while (objIt.more()) {
+        BSONElement next = objIt.next();
+
+        if (next.type() != Object) {
+            _genFieldErrMsg(elem, field, "object", errMsg);
+            return FIELD_INVALID;
+        }
+
+        std::unique_ptr<T> toInsert(new T);
+
+        if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
+            return FIELD_INVALID;
+        }
+
+        out->push_back(toInsert.release());
+    }
+
+    return FIELD_SET;
+}
+
+template <typename T>
+FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                             const BSONField<std::vector<T*>>& field,
+                                             std::vector<T*>** out,
+                                             std::string* errMsg) {
+    using namespace fmt::literals;
+    dassert(!field.hasDefault());
+
+    BSONElement elem = doc[field.name()];
+    if (elem.eoo()) {
+        return FIELD_NONE;
+    }
+
+    if (elem.type() != Array) {
+        _genFieldErrMsg(elem, field, "vector array", errMsg);
+        return FIELD_INVALID;
+    }
+
+    auto tempVector = std::make_unique<std::vector<T*>>();
+    auto guard = makeGuard([&tempVector] {
+        if (tempVector) {
+            for (T*& raw : *tempVector) {
+                delete raw;
+            }
+        }
+    });
+
+    BSONArray arr = BSONArray(elem.embeddedObject());
+    BSONObjIterator objIt(arr);
+    while (objIt.more()) {
+        BSONElement next = objIt.next();
+
+        if (next.type() != Object) {
+            if (errMsg) {
+                *errMsg = "wrong type for '{}' field contents, expected object, found {}"_format(
+                    field(), elem.type());
+            }
+            return FIELD_INVALID;
+        }
+
+        std::unique_ptr<T> toInsert(new T);
+        if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
+            return FIELD_INVALID;
+        }
+
+        tempVector->push_back(toInsert.release());
+    }
+    *out = tempVector.release();
+    return FIELD_SET;
+}
+
+// Extracts an object into a map
+template <typename K, typename T>
+FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                             const BSONField<std::map<K, T>>& field,
+                                             std::map<K, T>* out,
+                                             std::string* errMsg) {
+    return extract(doc[field.name()], field, out, errMsg);
+}
+
+template <typename K, typename T>
+FieldParser::FieldState FieldParser::extract(BSONElement elem,
+                                             const BSONField<std::map<K, T>>& field,
+                                             std::map<K, T>* out,
+                                             std::string* errMsg) {
+    using namespace fmt::literals;
+    if (elem.eoo()) {
+        if (field.hasDefault()) {
+            *out = field.getDefault();
+            return FIELD_DEFAULT;
+        } else {
+            return FIELD_NONE;
+        }
+    }
+
+    if (elem.type() == Object) {
+        BSONObj obj = elem.embeddedObject();
+        std::string elErrMsg;
+
+        BSONObjIterator objIt(obj);
+        while (objIt.more()) {
+            BSONElement next = objIt.next();
+            T& value = (*out)[next.fieldName()];
+
+            BSONField<T> fieldFor(next.fieldName(), value);
+            if (!FieldParser::extract(next, fieldFor, &value, &elErrMsg)) {
+                if (errMsg) {
+                    *errMsg = "error parsing map element {} of field {}{}"_format(
+                        next.fieldName(), field(), causedBy(elErrMsg));
+                }
+                return FIELD_INVALID;
+            }
+        }
+
+        return FIELD_SET;
+    }
+
+    _genFieldErrMsg(elem, field, "vector array", errMsg);
+    return FIELD_INVALID;
+}
+
+}  // namespace mongo

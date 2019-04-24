@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/working_set.h"
 
