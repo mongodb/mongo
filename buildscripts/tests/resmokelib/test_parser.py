@@ -42,6 +42,36 @@ class TestLocalCommandLine(unittest.TestCase):
             "--continueOnFailure",
         ])
 
+    def test_keeps_exclude_with_any_tags_option(self):
+        cmdline = _parser.to_local_args([
+            "--suites=my_suite",
+            "--excludeWithAnyTags=tag1,tag2,tag4",
+            "--excludeWithAnyTags=tag3,tag5",
+            "--storageEngine=my_storage_engine",
+        ])
+
+        self.assertEqual(cmdline, [
+            "--suites=my_suite",
+            "--storageEngine=my_storage_engine",
+            "--excludeWithAnyTags=tag1,tag2,tag4",
+            "--excludeWithAnyTags=tag3,tag5",
+        ])
+
+    def test_keeps_include_with_any_tags_option(self):
+        cmdline = _parser.to_local_args([
+            "--suites=my_suite",
+            "--includeWithAnyTags=tag1,tag2,tag4",
+            "--includeWithAnyTags=tag3,tag5",
+            "--storageEngine=my_storage_engine",
+        ])
+
+        self.assertEqual(cmdline, [
+            "--suites=my_suite",
+            "--storageEngine=my_storage_engine",
+            "--includeWithAnyTags=tag1,tag2,tag4",
+            "--includeWithAnyTags=tag3,tag5",
+        ])
+
     def test_keeps_no_journal_option(self):
         cmdline = _parser.to_local_args([
             "--suites=my_suite",

@@ -381,7 +381,7 @@ def _make_parser():  # pylint: disable=too-many-statements
     return parser
 
 
-def to_local_args(args=None):  # pylint: disable=too-many-locals
+def to_local_args(args=None):  # pylint: disable=too-many-branches,too-many-locals
     """
     Return a command line invocation for resmoke.py suitable for being run outside of Evergreen.
 
@@ -432,6 +432,14 @@ def to_local_args(args=None):  # pylint: disable=too-many-locals
         "--tagFile",
     ])
 
+    def format_option(option_name, option_value):
+        """
+        Return <option_name>=<option_value>.
+
+        This function assumes that 'option_name' is always "--" prefix and isn't "-" prefixed.
+        """
+        return "%s=%s" % (option_name, option_value)
+
     for option_dest in sorted(vars(options)):
         option_value = getattr(options, option_dest)
         option = options_by_dest[option_dest]
@@ -445,18 +453,20 @@ def to_local_args(args=None):  # pylint: disable=too-many-locals
             continue
 
         if option.takes_value():
-            # The following serialization assumes 'option_name' is always "--" prefixed and isn't
-            # "-" prefixed.
-            arg = "%s=%s" % (option_name, option_value)
-
-            # We track the value for the --suites and --storageEngine command line options
-            # separately in order to more easily sort them to the front.
-            if option_dest == "suite_files":
-                suites_arg = arg
-            elif option_dest == "storage_engine":
-                storage_engine_arg = arg
+            if option.action == "append":
+                args = [format_option(option_name, elem) for elem in option_value]
+                other_local_args.extend(args)
             else:
-                other_local_args.append(arg)
+                arg = format_option(option_name, option_value)
+
+                # We track the value for the --suites and --storageEngine command line options
+                # separately in order to more easily sort them to the front.
+                if option_dest == "suite_files":
+                    suites_arg = arg
+                elif option_dest == "storage_engine":
+                    storage_engine_arg = arg
+                else:
+                    other_local_args.append(arg)
         else:
             other_local_args.append(option_name)
 
