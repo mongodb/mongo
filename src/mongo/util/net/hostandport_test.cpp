@@ -140,6 +140,9 @@ TEST(HostAndPort, Fmt) {
         ASSERT_EQUALS(fmt::format("<{}>", hp), "<" + hps + ">");
         ASSERT_EQUALS(fmt::format("{}", hp), hps);
         ASSERT_EQUALS(fmt::format("{1:} says {0:}", "hello", hp), hps + " says hello");
+        // Reject garbase modifiers, but an empty modifier should be okay.
+        ASSERT_THROWS(fmt::format("{:x}", hp), fmt::format_error);
+        ASSERT_EQUALS(fmt::format("{:}", hp), hps);
     }
 }
 
