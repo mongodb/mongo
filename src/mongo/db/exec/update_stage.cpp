@@ -921,12 +921,15 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata meta
                           << " shard key field.",
             !_params.request->isMulti());
 
-    // An update to a shard key value must either be a retryable write or run in a transaction.
+    // If this node is a replica set primary node, an attempted update to the shard key value must
+    // either be a retryable write or inside a transaction.
+    //
+    // If this node is a replica set secondary node, we can skip validation.
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Must run update to shard key field "
                           << " in a multi-statement transaction or"
                              " with retryWrites: true.",
-            getOpCtx()->getTxnNumber());
+            getOpCtx()->getTxnNumber() || !getOpCtx()->writesAreReplicated());
 
     if (!metadata->keyBelongsToMe(newShardKey)) {
         if (MONGO_FAIL_POINT(hangBeforeThrowWouldChangeOwningShard)) {
