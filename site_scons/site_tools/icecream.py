@@ -182,13 +182,14 @@ def exists(env):
 
     pipe = SCons.Action._subproc(env,
                                  SCons.Util.CLVar(icecc) + ['--version'], stdin='devnull',
-                                 stderr='devnull', stdout=subprocess.PIPE, text=True)
+                                 stderr='devnull', stdout=subprocess.PIPE)
 
     if pipe.wait() != 0:
         return False
 
     validated = False
     for line in pipe.stdout:
+        line = line.decode('utf-8')
         if validated:
             continue  # consume all data
         version_banner = re.search(r'^ICECC ', line)
