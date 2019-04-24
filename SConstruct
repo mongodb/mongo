@@ -757,6 +757,12 @@ env_vars.Add('ICECC_CREATE_ENV',
 env_vars.Add('ICECC_SCHEDULER',
     help='Tell ICECC where the sceduler daemon is running')
 
+env_vars.Add('ICECC_VERSION',
+    help='Tell ICECC where the compiler package is')
+
+env_vars.Add('ICECC_VERSION_ARCH',
+    help='Tell ICECC the target archicture for the compiler package, if non-native')
+
 env_vars.Add('LIBPATH',
     help='Adds paths to the linker search path',
     converter=variable_shlex_converter)

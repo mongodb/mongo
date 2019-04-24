@@ -48,71 +48,115 @@ def generate(env):
     env['CC'] = env.WhereIs('$CC')
     env['CXX'] = env.WhereIs('$CXX')
 
-    # Make a predictable name for the toolchain
-    icecc_version_target_filename = env.subst('$CC$CXX').replace('/', '_')
-    icecc_version = env.Dir('$BUILD_ROOT/scons/icecc').File(icecc_version_target_filename)
+    if 'ICECC_VERSION' in env:
+        # TODO:
+        #
+        # If ICECC_VERSION is a file, we are done. If it is a file
+        # URL, resolve it to a filesystem path. If it is a remote UTL,
+        # then fetch it to somewhere under $BUILD_ROOT/scons/icecc
+        # with its "correct" name (i.e. the md5 hash), and symlink it
+        # to some other deterministic name to use as icecc_version.
 
-    # Make an isolated environment so that our setting of ICECC_VERSION in the environment
-    # doesn't appear when executing icecc_create_env
-    toolchain_env = env.Clone()
-    if toolchain_env.ToolchainIs('clang'):
-        toolchain = env.Command(
-            target=icecc_version,
-            source=['$ICECC_CREATE_ENV', '$CC', '$CXX'],
-            action=[
-                "${SOURCES[0]} --clang ${SOURCES[1].abspath} /bin/true $TARGET",
-            ],
-        )
+        pass
+    else:
+        # Make a predictable name for the toolchain
+        icecc_version_target_filename = env.subst('$CC$CXX').replace('/', '_')
+        icecc_version = env.Dir('$BUILD_ROOT/scons/icecc').File(icecc_version_target_filename)
+
+        # Make an isolated environment so that our setting of ICECC_VERSION in the environment
+        # doesn't appear when executing icecc_create_env
+        toolchain_env = env.Clone()
+        if toolchain_env.ToolchainIs('clang'):
+            toolchain = env.Command(
+                target=icecc_version,
+                source=[
+                    '$ICECC_CREATE_ENV',
+                    '$CC',
+                    '$CXX'
+                ],
+                action=[
+                    "${SOURCES[0]} --clang ${SOURCES[1].abspath} /bin/true $TARGET",
+                ],
+            )
+        else:
+            toolchain = toolchain_env.Command(
+                target=icecc_version,
+                source=[
+                    '$ICECC_CREATE_ENV',
+                    '$CC',
+                    '$CXX'
+                ],
+                action=[
+                    "${SOURCES[0]} --gcc ${SOURCES[1].abspath} ${SOURCES[2].abspath} $TARGET",
+                ],
+            )
+
+        # Create an emitter that makes all of the targets depend on the
+        # icecc_version_target (ensuring that we have read the link), which in turn
+        # depends on the toolchain (ensuring that we have packaged it).
+        def icecc_toolchain_dependency_emitter(target, source, env):
+            env.Requires(target, toolchain)
+            return target, source
+
+        # Cribbed from Tool/cc.py and Tool/c++.py. It would be better if
+        # we could obtain this from SCons.
+        _CSuffixes = ['.c']
+        if not SCons.Util.case_sensitive_suffixes('.c', '.C'):
+            _CSuffixes.append('.C')
+
+        _CXXSuffixes = ['.cpp', '.cc', '.cxx', '.c++', '.C++']
+        if SCons.Util.case_sensitive_suffixes('.c', '.C'):
+            _CXXSuffixes.append('.C')
+
+        suffixes = _CSuffixes + _CXXSuffixes
+        for object_builder in SCons.Tool.createObjBuilders(env):
+            emitterdict = object_builder.builder.emitter
+            for suffix in emitterdict.keys():
+                if not suffix in suffixes:
+                    continue
+                base = emitterdict[suffix]
+                emitterdict[suffix] = SCons.Builder.ListEmitter([
+                    base,
+                    icecc_toolchain_dependency_emitter
+                ])
+
+        # Add ICECC_VERSION to the environment, pointed at the generated
+        # file so that we can expand it in the realpath expressions for
+        # CXXCOM and friends below.
+        env['ICECC_VERSION'] = icecc_version
+
+    if env.ToolchainIs('clang'):
         env['ENV']['ICECC_CLANG_REMOTE_CPP'] = 1
     else:
-        toolchain = toolchain_env.Command(
-            target=icecc_version, source=['$ICECC_CREATE_ENV', '$CC', '$CXX'], action=[
-                "${SOURCES[0]} --gcc ${SOURCES[1].abspath} ${SOURCES[2].abspath} $TARGET",
-            ])
-        env.AppendUnique(CCFLAGS=['-fdirectives-only'])
-
-    # Add ICECC_VERSION to the environment, pointed at the generated
-    # file so that we can expand it in the realpath expressions for
-    # CXXCOM and friends below.
-    env['ICECC_VERSION'] = icecc_version
+        env.AppendUnique(
+            CCFLAGS=[
+                '-fdirectives-only'
+            ]
+        )
 
     if 'ICECC_SCHEDULER' in env:
         env['ENV']['USE_SCHEDULER'] = env['ICECC_SCHEDULER']
 
-    # Create an emitter that makes all of the targets depend on the
-    # icecc_version_target (ensuring that we have read the link), which in turn
-    # depends on the toolchain (ensuring that we have packaged it).
-    def icecc_toolchain_dependency_emitter(target, source, env):
-        env.Requires(target, toolchain)
-        return target, source
+    # Not all platforms have the readlink utility, so create our own
+    # generator for that.
+    def icecc_version_gen(target, source, env, for_signature):
+        f = env.File('$ICECC_VERSION')
+        if not f.islink():
+            return f
+        return env.File(os.path.realpath(f.abspath))
+    env['ICECC_VERSION_GEN'] = icecc_version_gen
 
-    # Cribbed from Tool/cc.py and Tool/c++.py. It would be better if
-    # we could obtain this from SCons.
-    _CSuffixes = ['.c']
-    if not SCons.Util.case_sensitive_suffixes('.c', '.C'):
-        _CSuffixes.append('.C')
-
-    _CXXSuffixes = ['.cpp', '.cc', '.cxx', '.c++', '.C++']
-    if SCons.Util.case_sensitive_suffixes('.c', '.C'):
-        _CXXSuffixes.append('.C')
-
-    suffixes = _CSuffixes + _CXXSuffixes
-    for object_builder in SCons.Tool.createObjBuilders(env):
-        emitterdict = object_builder.builder.emitter
-        for suffix in emitterdict.keys():
-            if not suffix in suffixes:
-                continue
-            base = emitterdict[suffix]
-            emitterdict[suffix] = SCons.Builder.ListEmitter([
-                base,
-                icecc_toolchain_dependency_emitter
-            ])
+    def icecc_version_arch_gen(target, source, env, for_signature):
+        if 'ICECC_VERSION_ARCH' in env:
+            return "${ICECC_VERSION_ARCH}:"
+        return str()
+    env['ICECC_VERSION_ARCH_GEN'] = icecc_version_arch_gen
 
     # Make compile jobs flow through icecc
-    env['CCCOM'] = '$( ICECC_VERSION=$$(realpath $ICECC_VERSION) $ICECC $) ' + env['CCCOM']
-    env['CXXCOM'] = '$( ICECC_VERSION=$$(realpath $ICECC_VERSION) $ICECC $) ' + env['CXXCOM']
-    env['SHCCCOM'] = '$( ICECC_VERSION=$$(realpath $ICECC_VERSION) $ICECC $) ' + env['SHCCCOM']
-    env['SHCXXCOM'] = '$( ICECC_VERSION=$$(realpath $ICECC_VERSION) $ICECC $) ' + env['SHCXXCOM']
+    env['CCCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['CCCOM']
+    env['CXXCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['CXXCOM']
+    env['SHCCCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['SHCCCOM']
+    env['SHCXXCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['SHCXXCOM']
 
     # Make link like jobs flow through icerun so we don't kill the
     # local machine.
