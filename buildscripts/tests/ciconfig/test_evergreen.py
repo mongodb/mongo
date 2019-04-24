@@ -40,14 +40,6 @@ class TestEvergreenProjectConfig(unittest.TestCase):
         self.assertEqual(1, len(self.conf.task_group_names))
         self.assertIn("tg_1", self.conf.task_group_names)
 
-    def test_list_lifecycle_task_names(self):
-        self.assertEqual(5, len(self.conf.lifecycle_task_names))
-        self.assertIn("compile", self.conf.task_names)
-        self.assertIn("passing_test", self.conf.task_names)
-        self.assertIn("failing_test", self.conf.task_names)
-        self.assertIn("timeout_test", self.conf.task_names)
-        self.assertIn("resmoke_task", self.conf.task_names)
-
     def test_list_variants(self):
         self.assertEqual(4, len(self.conf.variants))
         self.assertEqual(4, len(self.conf.variant_names))

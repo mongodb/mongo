@@ -9,7 +9,6 @@ selector:
   - buildscripts/tests/resmokelib/test_selector.py # Test assumes POSIX path.
   - buildscripts/tests/test_aws_ec2.py # Requires boto3.
   - buildscripts/tests/test_remote_operations.py # Requires ssh to be enabled locally.
-  - buildscripts/tests/test_update_test_lifecycle.py # Test assumes POSIX path.
 
 
 executor: {}

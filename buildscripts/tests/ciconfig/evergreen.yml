@@ -68,10 +68,6 @@ post:
     params:
       file_location: src/results.json
 
-test_lifecycle_excluded_tasks:
-- burn_in_tests
-- no_lifecycle*
-
 task_groups:
 - name: tg_1
   max_hosts: 1

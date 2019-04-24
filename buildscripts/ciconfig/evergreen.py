@@ -79,19 +79,6 @@ class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attri
         return self._task_groups_by_name.get(task_group_name)
 
     @property
-    def lifecycle_task_names(self):
-        """Get the list of names of the tasks that have not been excluded from test lifecycle."""
-        excluded = self._get_test_lifecycle_excluded_task_names()
-        return [name for name in self.task_names if name not in excluded]
-
-    def _get_test_lifecycle_excluded_task_names(self):
-        excluded_patterns = self._conf.get("test_lifecycle_excluded_tasks", [])
-        excluded = []
-        for pattern in excluded_patterns:
-            excluded.extend(fnmatch.filter(self.task_names, pattern))
-        return excluded
-
-    @property
     def variant_names(self):
         """Get the list of build variant names."""
         return self._variants_by_name.keys()
