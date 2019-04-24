@@ -156,6 +156,53 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
         readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern;
 }
 
+BSONObj sendCommitDirectlyToShards(OperationContext* opCtx, const std::vector<ShardId>& shardIds) {
+    // Assemble requests.
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (const auto& shardId : shardIds) {
+        CommitTransaction commitCmd;
+        commitCmd.setDbName(NamespaceString::kAdminDb);
+        const auto commitCmdObj = commitCmd.toBSON(
+            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
+        requests.emplace_back(shardId, commitCmdObj);
+    }
+
+    // Send the requests.
+    MultiStatementTransactionRequestsSender ars(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        NamespaceString::kAdminDb,
+        requests,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kIdempotent);
+
+    BSONObj lastResult;
+
+    // Receive the responses.
+    while (!ars.done()) {
+        auto response = ars.next();
+
+        uassertStatusOK(response.swResponse);
+        lastResult = response.swResponse.getValue().data;
+
+        // If any shard returned an error, return the error immediately.
+        const auto commandStatus = getStatusFromCommandResult(lastResult);
+        if (!commandStatus.isOK()) {
+            return lastResult;
+        }
+
+        // If any participant had a writeConcern error, return the participant's writeConcern
+        // error immediately.
+        const auto writeConcernStatus = getWriteConcernStatusFromCommandResult(lastResult);
+        if (!writeConcernStatus.isOK()) {
+            return lastResult;
+        }
+    }
+
+    // If all the responses were ok, return the last response.
+    return lastResult;
+}
+
 }  // unnamed namespace
 
 TransactionRouter::Participant::Participant(bool inIsCoordinator,
@@ -612,88 +659,7 @@ const LogicalSessionId& TransactionRouter::_sessionId() const {
     return owningSession->getSessionId();
 }
 
-BSONObj TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx) {
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-    const auto citer = _participants.cbegin();
-
-    const auto& shardId(citer->first);
-    const auto& participant = citer->second;
-
-    auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-
-    _commitType = CommitType::kDirectCommit;
-
-    LOG(3) << txnIdToString()
-           << " Committing single-shard transaction, single participant: " << shardId;
-
-    CommitTransaction commitCmd;
-    commitCmd.setDbName(NamespaceString::kAdminDb);
-
-    return uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-                               opCtx,
-                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                               "admin",
-                               participant.attachTxnFieldsIfNeeded(
-                                   commitCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                                         << opCtx->getWriteConcern().toBSON())),
-                                   false),
-                               Shard::RetryPolicy::kIdempotent))
-        .response;
-}
-
-BSONObj TransactionRouter::_commitReadOnlyTransaction(OperationContext* opCtx) {
-    // Assemble requests.
-    std::vector<AsyncRequestsSender::Request> requests;
-    for (const auto& participant : _participants) {
-        CommitTransaction commitCmd;
-        commitCmd.setDbName(NamespaceString::kAdminDb);
-        const auto commitCmdObj = commitCmd.toBSON(
-            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
-        requests.emplace_back(participant.first, commitCmdObj);
-    }
-
-    _commitType = CommitType::kDirectCommit;
-
-    LOG(3) << txnIdToString() << " Committing read-only transaction on " << requests.size()
-           << " shards";
-
-    // Send the requests.
-    MultiStatementTransactionRequestsSender ars(
-        opCtx,
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        NamespaceString::kAdminDb,
-        requests,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        Shard::RetryPolicy::kIdempotent);
-
-    // Receive the responses.
-    while (!ars.done()) {
-        auto response = ars.next();
-
-        uassertStatusOK(response.swResponse);
-        const auto result = response.swResponse.getValue().data;
-
-        // If any shard returned an error, return the error immediately.
-        const auto commandStatus = getStatusFromCommandResult(result);
-        if (!commandStatus.isOK()) {
-            return result;
-        }
-
-        // If any participant had a writeConcern error, return the participant's writeConcern
-        // error immediately.
-        const auto writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
-        if (!writeConcernStatus.isOK()) {
-            return result;
-        }
-    }
-
-    // If all the responses were ok, return empty BSON, which the commitTransaction command will
-    // interpret as success.
-    return BSONObj();
-}
-
-BSONObj TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
+BSONObj TransactionRouter::_handOffCommitToCoordinator(OperationContext* opCtx) {
     invariant(_coordinatorId);
     auto coordinatorIter = _participants.find(*_coordinatorId);
     invariant(coordinatorIter != _participants.end());
@@ -715,7 +681,7 @@ BSONObj TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx)
     _commitType = CommitType::kTwoPhaseCommit;
 
     LOG(3) << txnIdToString()
-           << " Committing multi-shard transaction, coordinator: " << *_coordinatorId;
+           << " Committing using two-phase commit, coordinator: " << *_coordinatorId;
 
     return uassertStatusOK(
                coordinatorShard->runCommandWithFixedRetryAttempts(
@@ -749,27 +715,52 @@ BSONObj TransactionRouter::commitTransaction(
         return BSON("ok" << 1);
     }
 
-    bool allParticipantsReadOnly = true;
+    std::vector<ShardId> readOnlyShards;
+    std::vector<ShardId> writeShards;
     for (const auto& participant : _participants) {
-        uassert(ErrorCodes::NoSuchTransaction,
-                "Can't send commit unless all previous statements were successful",
-                participant.second.readOnly != Participant::ReadOnly::kUnset);
-        if (participant.second.readOnly == Participant::ReadOnly::kNotReadOnly) {
-            allParticipantsReadOnly = false;
+        switch (participant.second.readOnly) {
+            case Participant::ReadOnly::kUnset:
+                uasserted(ErrorCodes::NoSuchTransaction,
+                          "Can't send commit unless all previous statements were successful");
+            case Participant::ReadOnly::kReadOnly:
+                readOnlyShards.push_back(participant.first);
+                break;
+            case Participant::ReadOnly::kNotReadOnly:
+                writeShards.push_back(participant.first);
+                break;
         }
     }
 
-    // Make the single-shard commit path take precedence. The read-only optimization is only to skip
-    // two-phase commit for a read-only multi-shard transaction.
     if (_participants.size() == 1) {
-        return _commitSingleShardTransaction(opCtx);
+        ShardId shardId = _participants.cbegin()->first;
+        LOG(3) << txnIdToString()
+               << " Committing single-shard transaction, single participant: " << shardId;
+        _commitType = CommitType::kDirectCommit;
+        return sendCommitDirectlyToShards(opCtx, {shardId});
     }
 
-    if (allParticipantsReadOnly) {
-        return _commitReadOnlyTransaction(opCtx);
+    if (writeShards.size() == 0) {
+        LOG(3) << txnIdToString() << " Committing read-only transaction on "
+               << readOnlyShards.size() << " shards";
+        _commitType = CommitType::kDirectCommit;
+        return sendCommitDirectlyToShards(opCtx, readOnlyShards);
     }
 
-    return _commitMultiShardTransaction(opCtx);
+    if (writeShards.size() == 1) {
+        LOG(3) << txnIdToString() << " Committing single-write-shard transaction with "
+               << readOnlyShards.size()
+               << " read-only shards, write shard: " << writeShards.front();
+        _commitType = CommitType::kDirectCommit;
+        const auto readOnlyShardsResponse = sendCommitDirectlyToShards(opCtx, readOnlyShards);
+
+        if (!getStatusFromCommandResult(readOnlyShardsResponse).isOK() ||
+            !getWriteConcernStatusFromCommandResult(readOnlyShardsResponse).isOK()) {
+            return readOnlyShardsResponse;
+        }
+        return sendCommitDirectlyToShards(opCtx, writeShards);
+    }
+
+    return _handOffCommitToCoordinator(opCtx);
 }
 
 std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(

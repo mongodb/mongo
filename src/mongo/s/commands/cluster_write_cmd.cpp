@@ -42,6 +42,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_explain.h"
@@ -252,12 +253,9 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             auto commitResponse = documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(
                 opCtx, txnRouterForShardKeyChange);
 
-            // TODO SERVER-40666: Check the commit response returned success for all shards
-            if (commitResponse.hasField("ok") && !commitResponse["ok"].trueValue()) {
-                // TODO SERVER-40646: Change the error we report to something more useful to a user
-                uassertStatusOK(Status{ErrorCodes::Error(commitResponse.getIntField("code")),
-                                       commitResponse.getStringField("errmsg")});
-            }
+            // TODO SERVER-40784: Handle a writeConcern error.
+            // TODO SERVER-40646: Change the error we report to something more useful to a user
+            uassertStatusOK(getStatusFromCommandResult(commitResponse));
         } catch (const DBException& e) {
             // Set the error status to the status of the failed command and abort the transaction.
             auto status = e.toStatus();

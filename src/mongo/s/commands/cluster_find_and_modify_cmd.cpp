@@ -291,13 +291,10 @@ private:
                         documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(
                             opCtx, txnRouterForShardKeyChange);
 
-                    // TODO SERVER-40666: Check the commit response returned success for all shards
-                    if (commitResponse.hasField("ok") && !commitResponse["ok"].trueValue()) {
-                        // TODO SERVER-40646: Change error reported to something more useful to user
-                        uassertStatusOK(
-                            Status{ErrorCodes::Error(commitResponse.getIntField("code")),
-                                   commitResponse.getStringField("errmsg")});
-                    }
+                    // TODO SERVER-40784: Handle a writeConcern error.
+                    // TODO SERVER-40646: Change the error we report to something more useful to a
+                    // user.
+                    uassertStatusOK(getStatusFromCommandResult(commitResponse));
                 } catch (const DBException& e) {
                     auto txnRouterForAbort = TransactionRouter::get(opCtx);
                     if (txnRouterForAbort)

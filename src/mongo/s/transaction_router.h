@@ -230,8 +230,8 @@ public:
     const boost::optional<ShardId>& getCoordinatorId() const;
 
     /**
-     * Commits the transaction. For transactions with multiple participants, this will initiate
-     * the two phase commit procedure.
+     * Commits the transaction. For transactions that performed writes to multiple shards, this will
+     * hand off the participant list to the coordinator to do two-phase commit.
      */
     BSONObj commitTransaction(OperationContext* opCtx,
                               const boost::optional<TxnRecoveryToken>& recoveryToken);
@@ -286,23 +286,15 @@ private:
     const LogicalSessionId& _sessionId() const;
 
     /**
-     * Run basic commit for transactions that touched a single shard.
+     * Retrieves the transaction's outcome from the shard specified in the recovery token.
      */
-    BSONObj _commitSingleShardTransaction(OperationContext* opCtx);
-
-    /**
-     * Skips explicit commit and instead waits for participants' read Timestamps to reach the level
-     * of durability specified by the writeConcern on 'opCtx'.
-     */
-    BSONObj _commitReadOnlyTransaction(OperationContext* opCtx);
-
     BSONObj _commitWithRecoveryToken(OperationContext* opCtx,
                                      const TxnRecoveryToken& recoveryToken);
 
     /**
-     * Run two phase commit for transactions that touched multiple shards.
+     * Hands off coordinating a two-phase commit across all participants to the coordinator shard.
      */
-    BSONObj _commitMultiShardTransaction(OperationContext* opCtx);
+    BSONObj _handOffCommitToCoordinator(OperationContext* opCtx);
 
     /**
      * Sets the given logical time as the atClusterTime for the transaction to be the greater of the

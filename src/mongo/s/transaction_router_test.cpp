@@ -815,7 +815,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
-       SendCoordinateCommitForMultipleParticipantsOnlyOneDidAWrite) {
+       SendCommitDirectlyToReadOnlyShardsThenWriteShardForMultipleParticipantsOnlyOneDidAWrite) {
     TxnNumber txnNum{3};
 
     auto& txnRouter(*TransactionRouter::get(operationContext()));
@@ -842,28 +842,31 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         ASSERT_EQ("admin", request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
-        ASSERT_EQ(cmdName, "coordinateCommitTransaction");
-
-        std::set<std::string> expectedParticipants = {shard1.toString(), shard2.toString()};
-        auto participantElements = request.cmdObj["participants"].Array();
-        ASSERT_EQ(expectedParticipants.size(), participantElements.size());
-
-        for (const auto& element : participantElements) {
-            auto shardId = element["shardId"].valuestr();
-            ASSERT_EQ(1ull, expectedParticipants.count(shardId));
-            expectedParticipants.erase(shardId);
-        }
+        ASSERT_EQ(cmdName, "commitTransaction");
 
         checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
 
         return BSON("ok" << 1);
     });
 
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(hostAndPort2, request.target);
+        ASSERT_EQ("admin", request.dbname);
+
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "commitTransaction");
+
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, false);
+
+        return BSON("ok" << 1);
+    });
+
+
     future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
-       SendCoordinateCommitForMultipleParticipantsAllDidWrites) {
+       SendCoordinateCommitForMultipleParticipantsMoreThanOneDidAWrite) {
     TxnNumber txnNum{3};
 
     auto& txnRouter(*TransactionRouter::get(operationContext()));

@@ -1,6 +1,6 @@
 /**
- * Tests that the appropriate commit path (single-shard, read-only, multi-shard) is taken for a
- * variety of transaction types.
+ * Tests that the appropriate commit path (single-shard, read-only, single-write-shard, two-phase
+ * commit) is taken for a variety of transaction types.
  *
  * Checks that the response formats are correct across each type for several scenarios, including
  * no failures, a participant having failed over, a participant being unable to satisfy the client's
@@ -25,13 +25,16 @@
         }, 'Failed to find "' + logLine + '" logged ' + times + ' times');
     }
 
-    const addTxnFields = function(command, lsid, txnNumber) {
-        const txnFields = {
+    const addTxnFields = function(command, lsid, txnNumber, startTransaction) {
+        let txnFields = {
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             stmtId: NumberInt(0),
             autocommit: false,
         };
+        if (startTransaction) {
+            txnFields.startTransaction = true;
+        }
         return Object.assign({}, command, txnFields);
     };
 
@@ -45,14 +48,22 @@
     const collName = "foo";
     const ns = dbName + "." + collName;
 
-    let lsid = {id: UUID()};
-    let txnNumber = 0;
+    // TODO (SERVER-37364): Uncomment this line; otherwise, the coordinator will wait too long to
+    // time out waiting for votes and the test will time out.
+    // Lower the transaction timeout, since this test exercises cases where the coordinator should
+    // time out collecting prepare votes.
+    // TestData.transactionLifetimeLimitSeconds = 30;
 
     let st = new ShardingTest({
-        rs0: {nodes: [{}, {rsConfig: {priority: 0}}]},
-        rs1: {nodes: [{}, {rsConfig: {priority: 0}}]},
+        shards: 3,
+        // Create shards with more than one node because we test for writeConcern majority failing.
         config: 1,
-        other: {mongosOptions: {verbose: 3}},
+        other: {
+            mongosOptions: {verbose: 3},
+            rs0: {nodes: [{}, {rsConfig: {priority: 0}}]},
+            rs1: {nodes: [{}, {rsConfig: {priority: 0}}]},
+            rs2: {nodes: [{}, {rsConfig: {priority: 0}}]},
+        },
     });
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -61,113 +72,130 @@
     // Create a "dummy" collection for doing noop writes to advance shard's last applied OpTimes.
     assert.commandWorked(st.s.getDB(dbName).getCollection("dummy").insert({dummy: 1}));
 
+    // The test uses three shards with one chunk each in order to control which shards are targeted
+    // for each statement:
+    //
+    // (-inf, 0):                   shard key = txnNumber * -1
+    // (0, MAX_TRANSACTIONS):       shard key = txnNumber
+    // (MAX_TRANSACTIONS, +inf):    shard key = txnNumber + MAX_TRANSACTIONS
+    //
+    // So, if the test ever exceeds txnNumber transactions, statements that are meant to target the
+    // middle chunk will instead target the highest chunk. To fix this, increase MAX_TRANSACTIONS.
+    const MAX_TRANSACTIONS = 10000;
+
     // Create a sharded collection with a chunk on each shard:
-    // shard0: [-inf, 0)
-    // shard1: [0, 10)
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: MAX_TRANSACTIONS}}));
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {_id: -1}, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: MAX_TRANSACTIONS}, to: st.shard2.shardName}));
 
-    flushRoutersAndRefreshShardMetadata(st, {ns});
+    // Insert something into each chunk so that a multi-update actually results in a write on each
+    // shard (otherwise the shard may remain read-only). This also ensures all the routers and
+    // shards have fresh routing table caches, so they do not need to be refreshed separately.
+    assert.commandWorked(st.s.getDB(dbName).runCommand({
+        insert: collName,
+        documents: [{_id: -1 * MAX_TRANSACTIONS}, {_id: 0}, {_id: MAX_TRANSACTIONS}]
+    }));
+
+    let lsid = {id: UUID()};
+    let txnNumber = 1;
+
+    const readShard0 = txnNumber => {
+        return {find: collName, filter: {_id: (-1 * txnNumber)}};
+    };
+
+    const readShard1 = txnNumber => {
+        return {find: collName, filter: {_id: txnNumber}};
+    };
+
+    const readShard2 = txnNumber => {
+        return {find: collName, filter: {_id: (MAX_TRANSACTIONS + txnNumber)}};
+    };
+
+    const readAllShards = () => {
+        return {find: collName};
+    };
+
+    const writeShard0 = txnNumber => {
+        return {
+            update: collName,
+            updates: [
+                {q: {_id: (txnNumber * -1)}, u: {_id: (txnNumber * -1), updated: 1}, upsert: true}
+            ],
+        };
+    };
+
+    const writeShard1 = txnNumber => {
+        return {
+            update: collName,
+            updates: [{q: {_id: txnNumber}, u: {_id: txnNumber, updated: 1}, upsert: true}],
+        };
+    };
+
+    const writeShard2 = txnNumber => {
+        return {
+            update: collName,
+            updates: [{
+                q: {_id: (txnNumber + MAX_TRANSACTIONS)},
+                u: {_id: (txnNumber + MAX_TRANSACTIONS), updated: 1},
+                upsert: true
+            }],
+        };
+    };
+
+    const writeAllShards = () => {
+        return {
+            update: collName,
+            updates: [{q: {}, u: {$inc: {updated: 1}}, multi: true}],
+        };
+    };
 
     // For each transaction type, contains the list of statements for that type.
     const transactionTypes = {
-        readOnlySingleShardSingleStatement: txnNumber => {
-            return [{
-                find: collName,
-                filter: {_id: txnNumber},
-                startTransaction: true,
-            }];
+        readOnlySingleShardSingleStatementExpectSingleShardCommit: txnNumber => {
+            return [readShard0(txnNumber)];
         },
-        readOnlySingleShardMultiStatement: txnNumber => {
-            return [
-                {
-                  find: collName,
-                  filter: {_id: txnNumber},
-                  startTransaction: true,
-                },
-                {distinct: collName, key: "_id", query: {_id: txnNumber}},
-            ];
+        readOnlySingleShardMultiStatementExpectSingleShardCommit: txnNumber => {
+            return [readShard0(txnNumber), readShard0(txnNumber)];
         },
-        readOnlyMultiShardSingleStatement: txnNumber => {
-            return [{find: collName, startTransaction: true}];
+        readOnlyMultiShardSingleStatementExpectReadOnlyCommit: txnNumber => {
+            return [readAllShards(txnNumber)];
         },
-        readOnlyMultiShardMultiStatement: txnNumber => {
-            return [
-                {
-                  find: collName,
-                  filter: {_id: txnNumber},
-                  startTransaction: true,
-                },
-                {distinct: collName, key: "_id", query: {_id: (txnNumber * -1)}},
-            ];
+        readOnlyMultiShardMultiStatementExpectReadOnlyCommit: txnNumber => {
+            return [readShard0(txnNumber), readShard1(txnNumber), readShard2(txnNumber)];
         },
-        writeOnlySingleShardSingleStatement: txnNumber => {
-            return [{
-                insert: collName,
-                documents: [{_id: txnNumber}],
-                startTransaction: true,
-            }];
+        writeSingleShardSingleStatementExpectSingleShardCommit: txnNumber => {
+            return [writeShard0(txnNumber)];
         },
-        writeOnlySingleShardMultiStatement: txnNumber => {
-            return [
-                {
-                  insert: collName,
-                  documents: [{_id: txnNumber}],
-                  startTransaction: true,
-                },
-                {
-                  update: collName,
-                  updates: [{q: {_id: txnNumber}, u: {$set: {updated: 1}}}],
-                }
-            ];
+        writeSingleShardMultiStatementExpectSingleShardCommit: txnNumber => {
+            return [writeShard0(txnNumber), writeShard0(txnNumber)];
         },
-        writeOnlyMultiShardSingleStatement: txnNumber => {
-            return [{
-                insert: collName,
-                documents: [{_id: (txnNumber * -1)}, {_id: txnNumber}],
-                startTransaction: true,
-            }];
+        writeMultiShardSingleStatementExpectTwoPhaseCommit: txnNumber => {
+            return [writeAllShards(txnNumber)];
         },
-        writeOnlyMultiShardMultiStatement: txnNumber => {
-            return [
-                {
-                  insert: collName,
-                  documents: [{_id: txnNumber}],
-                  startTransaction: true,
-                },
-                {
-                  insert: collName,
-                  documents: [{_id: (txnNumber * -1)}],
-                }
-            ];
+        writeMultiShardMultiStatementExpectTwoPhaseCommit: txnNumber => {
+            return [writeShard0(txnNumber), writeShard1(txnNumber), writeShard2(txnNumber)];
         },
-        readWriteSingleShard: txnNumber => {
-            return [
-                {
-                  find: collName,
-                  filter: {_id: txnNumber},
-                  startTransaction: true,
-                },
-                {
-                  insert: collName,
-                  documents: [{_id: txnNumber}],
-                }
-            ];
+        readWriteSingleShardExpectSingleShardCommit: txnNumber => {
+            return [readShard0(txnNumber), writeShard0(txnNumber)];
         },
-        readWriteMultiShard: txnNumber => {
-            return [
-                {
-                  find: collName,
-                  filter: {_id: txnNumber},
-                  startTransaction: true,
-                },
-                {
-                  insert: collName,
-                  documents: [{_id: (txnNumber * -1)}],
-                }
-            ];
+        writeReadSingleShardExpectSingleShardCommit: txnNumber => {
+            return [writeShard0(txnNumber), readShard0(txnNumber)];
+        },
+        readOneShardWriteOtherShardExpectSingleWriteShardCommit: txnNumber => {
+            return [readShard0(txnNumber), writeShard1(txnNumber)];
+        },
+        writeOneShardReadOtherShardExpectSingleWriteShardCommit: txnNumber => {
+            return [writeShard0(txnNumber), readShard1(txnNumber)];
+        },
+        readOneShardWriteTwoOtherShardsExpectTwoPhaseCommit: txnNumber => {
+            return [readShard0(txnNumber), writeShard1(txnNumber), writeShard2(txnNumber)];
+        },
+        writeTwoShardsReadOneOtherShardExpectTwoPhaseCommit: txnNumber => {
+            return [writeShard0(txnNumber), writeShard1(txnNumber), readShard2(txnNumber)];
         },
     };
 
@@ -190,7 +218,7 @@
             beforeCommit: () => {
                 // Participant primary steps down.
                 assert.commandWorked(
-                    st.shard1.adminCommand({replSetStepDown: 1 /* stepDownSecs */, force: true}));
+                    st.shard0.adminCommand({replSetStepDown: 1 /* stepDownSecs */, force: true}));
             },
             getCommitCommand: (lsid, txnNumber) => {
                 return addTxnFields(defaultCommitCommand, lsid, txnNumber);
@@ -201,15 +229,15 @@
                 assert.eq(["TransientTransactionError"], res.errorLabels);
             },
             cleanUp: () => {
-                st.rs1.awaitNodesAgreeOnPrimary();
+                st.rs0.awaitNodesAgreeOnPrimary();
             },
         },
         participantCannotMajorityCommitWritesClientSendsWriteConcernMajority: {
             beforeStatements: () => {
                 // Participant cannot majority commit writes.
-                stopServerReplication(st.rs1.getSecondaries());
+                stopServerReplication(st.rs0.getSecondaries());
 
-                // Do a write on rs1 through the router outside the transaction to ensure the
+                // Do a write on rs0 through the router outside the transaction to ensure the
                 // transaction will choose a read time that has not been majority committed.
                 assert.commandWorked(st.s.getDB(dbName).getCollection("dummy").insert({dummy: 1}));
             },
@@ -224,15 +252,15 @@
                 assert.eq(null, res.errorLabels);
             },
             cleanUp: () => {
-                restartServerReplication(st.rs1.getSecondaries());
+                restartServerReplication(st.rs0.getSecondaries());
             },
         },
         participantCannotMajorityCommitWritesClientSendsWriteConcern1: {
             beforeStatements: () => {
                 // Participant cannot majority commit writes.
-                stopServerReplication(st.rs1.getSecondaries());
+                stopServerReplication(st.rs0.getSecondaries());
 
-                // Do a write on rs1 through the router outside the transaction to ensure the
+                // Do a write on rs0 through the router outside the transaction to ensure the
                 // transaction will choose a read time that has not been majority committed.
                 assert.commandWorked(st.s.getDB(dbName).getCollection("dummy").insert({dummy: 1}));
             },
@@ -246,7 +274,7 @@
                 assert.eq(null, res.errorLabels);
             },
             cleanUp: () => {
-                restartServerReplication(st.rs1.getSecondaries());
+                restartServerReplication(st.rs0.getSecondaries());
             },
         },
         clientSendsInvalidWriteConcernOnCommit: {
@@ -271,26 +299,36 @@
 
     for (const failureModeName in failureModes) {
         for (const type in transactionTypes) {
-            // TODO (SERVER-37881): Unblacklist these test cases once the coordinator times out
-            // waiting for votes.
+            // TODO (SERVER-37364): Unblacklist these test cases once the coordinator returns the
+            // decision as soon as the decision is made. At the moment, the coordinator makes an
+            // abort decision after timing out waiting for votes, but coordinateCommitTransaction
+            // hangs because it waits for the decision to be majority-ack'd by all participants,
+            // which can't happen while a participant can't majority commit writes.
             if (failureModeName.includes("participantCannotMajorityCommitWrites") &&
-                (type === "writeOnlyMultiShardSingleStatement" ||
-                 type === "writeOnlyMultiShardMultiStatement" || type === "readWriteMultiShard")) {
+                type.includes("ExpectTwoPhaseCommit")) {
                 jsTest.log(
-                    `Testing ${failureModeName} with ${type} is skipped until SERVER-37881 is implemented`);
+                    `${failureModeName} with ${type} is skipped until SERVER-37364 is implemented`);
                 continue;
             }
 
             txnNumber++;
+            assert.lt(txnNumber,
+                      MAX_TRANSACTIONS,
+                      "Test exceeded maximum number of transactions allowable by the test's chunk" +
+                          " distribution created during the test setup. Please increase" +
+                          " MAX_TRANSACTIONS in the test.");
+
             jsTest.log(`Testing ${failureModeName} with ${type} at txnNumber ${txnNumber}`);
 
             const failureMode = failureModes[failureModeName];
 
             // Run the statements.
             failureMode.beforeStatements();
+            let startTransaction = true;
             transactionTypes[type](txnNumber).forEach(command => {
-                assert.commandWorked(
-                    st.s.getDB(dbName).runCommand(addTxnFields(command, lsid, txnNumber)));
+                assert.commandWorked(st.s.getDB(dbName).runCommand(
+                    addTxnFields(command, lsid, txnNumber, startTransaction)));
+                startTransaction = false;
             });
 
             // Run commit.
@@ -303,12 +341,14 @@
             const commitRetryRes = st.s.adminCommand(commitCmd);
             failureMode.checkCommitResult(commitRetryRes);
 
-            if (type.includes("SingleShard")) {
+            if (type.includes("ExpectSingleShardCommit")) {
                 waitForLog("Committing single-shard transaction", 2);
-            } else if (type.includes("readOnly")) {
+            } else if (type.includes("ExpectReadOnlyCommit")) {
                 waitForLog("Committing read-only transaction", 2);
-            } else if (type.includes("MultiShard")) {
-                waitForLog("Committing multi-shard transaction", 2);
+            } else if (type.includes("ExpectSingleWriteShardCommit")) {
+                waitForLog("Committing single-write-shard transaction", 2);
+            } else if (type.includes("ExpectTwoPhaseCommit")) {
+                waitForLog("Committing using two-phase commit", 2);
             } else {
                 assert(false, `Unknown transaction type: ${type}`);
             }
