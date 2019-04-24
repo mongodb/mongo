@@ -1361,12 +1361,6 @@ functions:
           path_value="$path_value:${task_path_suffix}"
         fi
 
-        if [ "${is_patch}" = "true" ]; then
-          extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
-        else
-          extra_args="$extra_args --tagFile=etc/test_retrial.yml"
-        fi
-
         resmoke_cmd_args="${resmoke_args}"
 
         # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
@@ -2152,29 +2146,6 @@ functions:
 
         kitchen destroy "${packager_distro}"\$ || true
         test "$verified" = "true"
-
-  "fetch test_lifecycle.yml":
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o verbose
-
-        ${activate_virtualenv}
-        $python buildscripts/fetch_test_lifecycle.py                      \
-            --metadataRepo git@github.com:mongodb/mongo-test-metadata.git \
-            --lifecycleFile etc/test_lifecycle.yml                        \
-            --referencesFile references.yml                               \
-            --destinationFile etc/test_lifecycle.yml                      \
-            --revision ${revision}                                        \
-            ${project}
-        exit_code=$?
-        if [ ${fail_task_on_error|false} = true ]; then
-          exit $exit_code
-        else
-          exit 0
-        fi
 
   "copy ec2 monitor files": &copy_ec2_monitor_files
     command: shell.exec
@@ -3348,26 +3319,6 @@ timeout:
 #               Tasks                 #
 #######################################
 
-## The test_lifecycle_excluded_tasks are a list of tasks names which include:
-##   - Non jstests, i.e., compile, unittests
-##   - Non standard jstests, i.e., jstestfuzz
-## Note that the task name supports glob patterns.
-test_lifecycle_excluded_tasks:
-- burn_in_tests*
-- compile*
-- benchmarks*
-- dbtest*
-- "*fuzzer*"
-- idl_tests
-- integration*
-- jepsen*
-- jstestfuzz*
-- lint
-- mongos*
-- package
-- push
-- unittests*
-
 tasks:
 
 ## compile - build all scons targets except unittests ##
@@ -3465,12 +3416,6 @@ tasks:
           fi
           cd ..
 
-  # Test lifecycle is temporarily disabled to reduce load on Evergreen API.
-  # - func: "fetch test_lifecycle.yml"
-  #   vars:
-  #     # Do not fail the task if we fail to fetch the test_lifecycle.yml file
-  #     fail_task_on_error: false
-
     - command: archive.targz_pack
       params:
         target: "artifacts.tgz"
@@ -3497,8 +3442,6 @@ tasks:
           - "./etc/scons/**"
           - "./etc/*san.suppressions"
           - "./etc/repo_config.yaml"
-          - "./etc/test_lifecycle.yml"
-          - "./etc/test_retrial.yml"
           - "./build/**.gcno"
           - "repo/**"
           - "src/mongo/util/options_parser/test_config_files/**"
@@ -7631,67 +7574,6 @@ tasks:
             #MD5 for debugsymbols
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
-
-- name: fetch_test_lifecycle
-  depends_on: []
-  commands:
-  - command: manifest.load
-  - func: "git get project"
-  - func: "fetch test_lifecycle.yml"
-    vars:
-      # This task is meant to fail if there is an error while fetching test_lifecycle.yml since
-      # the compile task won't fail.
-      fail_task_on_error: true
-
-- name: update_test_lifecycle
-  exec_timeout_secs: 21600 # 6 hour timeout for the task overall
-  depends_on: []
-  commands:
-  - command: manifest.load
-  - func: "git get project"
-  - func: "configure evergreen api credentials"
-  - command: shell.exec
-    timeout_secs: 14400 # Timeout if there is no output for 4 hours
-    type: test
-    params:
-      working_dir: src
-      silent: true
-      script: |
-        set -o errexit
-
-        # Set up the git ssh private key
-        mkdir -p ~/.ssh
-        echo -n "${testlifecycle_ssh_key}" > ~/.ssh/test_lifecycle.pem
-        chmod 0600 ~/.ssh/test_lifecycle.pem
-        export GIT_SSH_COMMAND="ssh -i ~/.ssh/test_lifecycle.pem"
-
-        # Create the jira credentials configuration file
-        cat > .jira.yml <<END_OF_CREDS
-        server: "https://jira.mongodb.org"
-        access_token: "${testlifecycle_jira_access_token}"
-        access_token_secret: "${testlifecycle_jira_access_token_secret}"
-        consumer_key: "${testlifecycle_jira_consumer_key}"
-        key_cert: |
-        $(echo "${testlifecycle_jira_key_certificate}" | sed  's/^/  /')
-        END_OF_CREDS
-
-        set -o verbose
-
-        ${activate_virtualenv}
-
-        # We use a small batch size to avoid hitting the load balancer timeout if the Evergreen
-        # API query is not fast enough.
-        # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/update_test_lifecycle.py  \
-            --project ${project}                                        \
-            --requestBatchSize 20                                       \
-            --commit                                                    \
-            --resmokeTagFile "etc/test_lifecycle.yml"                   \
-            --metadataRepo "git@github.com:mongodb/mongo-test-metadata" \
-            --referencesFile "references.yml"                           \
-            --gitUserName "Test Lifecycle"                              \
-            --gitUserEmail "build+testlifecycle@mongodb.com"            \
-            --jiraConfig .jira.yml
 
 - name: shared_scons_cache_pruning
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -14289,19 +14171,6 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-build
-
-- name: tig-daily-cron
-  display_name: "~ TIG Daily Cron"
-  run_on:
-  - rhel62-large
-  batchtime: 1440 # 1 day
-  stepback: false
-  tasks:
-  # Test lifecycle is temporarily disabled to reduce load on Evergreen API.
-  # - name: update_test_lifecycle
-  - name: fetch_test_lifecycle
-    distros:
-    - rhel62-small
 
 - name: shared-scons-cache-pruning
   display_name: "Shared SCons Cache Pruning"
