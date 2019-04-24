@@ -7731,8 +7731,8 @@ task_groups:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
-    - func: "set up virtualenv"
     - func: "set task expansion macros"
+    - func: "set up virtualenv"
     - func: "generate compile expansions"
   teardown_group:
     - func: "scons cache pruning"
