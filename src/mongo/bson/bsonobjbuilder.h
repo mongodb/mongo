@@ -165,15 +165,7 @@ public:
         other.abandon();
     }
 
-    ~BSONObjBuilder() {
-        // If 'done' has not already been called, and we have a reference to an owning
-        // BufBuilder but do not own it ourselves, then we must call _done to write in the
-        // length. Otherwise, we own this memory and its lifetime ends with us, therefore
-        // we can elide the write.
-        if (!_doneCalled && _b.buf() && _buf.getSize() == 0) {
-            _done();
-        }
-    }
+    ~BSONObjBuilder();
 
     /**
      * The start offset of the object being built by this builder within its buffer.

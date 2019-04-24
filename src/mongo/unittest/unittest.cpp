@@ -520,5 +520,28 @@ std::vector<std::string> getAllSuiteNames() {
     return result;
 }
 
+template <ComparisonOp op>
+ComparisonAssertion<op> ComparisonAssertion<op>::make(const char* theFile,
+                                                      unsigned theLine,
+                                                      StringData aExpression,
+                                                      StringData bExpression,
+                                                      StringData a,
+                                                      StringData b) {
+    return ComparisonAssertion(theFile, theLine, aExpression, bExpression, a, b);
+}
+
+template <ComparisonOp op>
+ComparisonAssertion<op> ComparisonAssertion<op>::make(const char* theFile,
+                                                      unsigned theLine,
+                                                      StringData aExpression,
+                                                      StringData bExpression,
+                                                      const void* a,
+                                                      const void* b) {
+    return ComparisonAssertion(theFile, theLine, aExpression, bExpression, a, b);
+}
+
+// Provide definitions for common instantiations of ComparisonAssertion.
+INSTANTIATE_COMPARISON_ASSERTION_CTORS();
+
 }  // namespace unittest
 }  // namespace mongo

@@ -228,6 +228,17 @@ bool BSONObjBuilder::hasField(StringData name) const {
     return false;
 }
 
+BSONObjBuilder::~BSONObjBuilder() {
+    // If 'done' has not already been called, and we have a reference to an owning
+    // BufBuilder but do not own it ourselves, then we must call _done to write in the
+    // length. Otherwise, we own this memory and its lifetime ends with us, therefore
+    // we can elide the write.
+    if (!_doneCalled && _b.buf() && _buf.getSize() == 0) {
+        _done();
+    }
+}
+
+
 const string BSONObjBuilder::numStrs[] = {
     "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",  "10", "11", "12", "13", "14",
     "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
@@ -243,5 +254,26 @@ const string BSONObjBuilder::numStrs[] = {
 // constructing the strings each time was too high numStrsReady will be 0 until after
 // numStrs is initialized because it is a static variable
 bool BSONObjBuilder::numStrsReady = (numStrs[0].size() > 0);
+
+template <typename Alloc>
+void _BufBuilder<Alloc>::grow_reallocate(int minSize) {
+    if (minSize > BufferMaxSize) {
+        std::stringstream ss;
+        ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
+        msgasserted(13548, ss.str().c_str());
+    }
+
+    int a = 64;
+    while (a < minSize)
+        a = a * 2;
+
+    _buf.realloc(a);
+    size = a;
+}
+
+template class _BufBuilder<SharedBufferAllocator>;
+template class _BufBuilder<StackAllocator>;
+template class StringBuilderImpl<SharedBufferAllocator>;
+template class StringBuilderImpl<StackAllocator>;
 
 }  // namespace mongo

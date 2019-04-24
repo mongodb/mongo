@@ -32,9 +32,9 @@
 #include <cfloat>
 #include <cinttypes>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <sstream>
-#include <stdio.h>
-#include <string.h>
 #include <string>
 
 #include <boost/optional.hpp>
@@ -49,6 +49,7 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concepts.h"
 #include "mongo/util/itoa.h"
 #include "mongo/util/shared_buffer.h"
 
@@ -199,6 +200,7 @@ public:
     }
 
     /* assume ownership of the buffer */
+    REQUIRES_FOR_NON_TEMPLATE(std::is_same_v<BufferAllocator, SharedBufferAllocator>)
     SharedBuffer release() {
         return _buf.release();
     }
@@ -246,10 +248,8 @@ public:
         appendNumImpl(high);
     }
 
-    template <typename Int64_t,
-              typename = stdx::enable_if_t<std::is_same<Int64_t, int64_t>::value &&
-                                           !std::is_same<int64_t, long long>::value>>
-    void appendNum(Int64_t j) {
+    REQUIRES_FOR_NON_TEMPLATE(!std::is_same_v<int64_t, long long>)
+    void appendNum(int64_t j) {
         appendNumImpl(j);
     }
 
@@ -322,8 +322,8 @@ public:
      * Replaces the buffer backing this BufBuilder with the passed in SharedBuffer.
      * Only legal to call when this builder is empty and when the SharedBuffer isn't shared.
      */
+    REQUIRES_FOR_NON_TEMPLATE(std::is_same_v<BufferAllocator, SharedBufferAllocator>)
     void useSharedBuffer(SharedBuffer buf) {
-        MONGO_STATIC_ASSERT(std::is_same<BufferAllocator, SharedBufferAllocator>());
         invariant(l == 0);  // Can only do this while empty.
         invariant(reservedBytes == 0);
         size = buf.capacity();
@@ -340,20 +340,7 @@ private:
         DataView(grow(sizeof(t))).write(tagLittleEndian(t));
     }
     /* "slow" portion of 'grow()'  */
-    void NOINLINE_DECL grow_reallocate(int minSize) {
-        if (minSize > BufferMaxSize) {
-            std::stringstream ss;
-            ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
-            msgasserted(13548, ss.str().c_str());
-        }
-
-        int a = 64;
-        while (a < minSize)
-            a = a * 2;
-
-        _buf.realloc(a);
-        size = a;
-    }
+    void grow_reallocate(int minSize);
 
     BufferAllocator _buf;
     int l;
@@ -536,4 +523,10 @@ private:
 
 typedef StringBuilderImpl<SharedBufferAllocator> StringBuilder;
 typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
+
+extern template class _BufBuilder<SharedBufferAllocator>;
+extern template class _BufBuilder<StackAllocator>;
+extern template class StringBuilderImpl<SharedBufferAllocator>;
+extern template class StringBuilderImpl<StackAllocator>;
+
 }  // namespace mongo
