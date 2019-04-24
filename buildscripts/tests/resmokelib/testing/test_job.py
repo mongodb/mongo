@@ -52,12 +52,12 @@ class TestJob(unittest.TestCase):
         return time_repeat_tests_secs / test_time_secs
 
     def test__run_num_repeat(self):
-        num_repeat_tests = 3
+        num_repeat_tests = 1
         queue = _queue.Queue()
         suite_options = self.get_suite_options(num_repeat_tests=num_repeat_tests)
         mock_time = MockTime(1)
         job_object = UnitJob(suite_options)
-        self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatNum, suite_options)
+        self.queue_tests(self.TESTS, queue, queue_element.QueueElem, suite_options)
         job_object._get_time = mock_time.time
         job_object._run(queue, self.mock_interrupt_flag())
         self.assertEqual(job_object.total_test_num, num_repeat_tests * len(self.TESTS))
