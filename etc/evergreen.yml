@@ -3452,7 +3452,6 @@ tasks:
           - "artifacts.json"
         exclude_files:
           - "*_test.pdb"
-    - func: "upload debugsymbols"
     - command: s3.put
       params:
         optional: true
@@ -3539,6 +3538,10 @@ tasks:
         ignore_artifacts_for_spawn: false
         files:
           - src/artifacts.json
+
+- name: upload_debug_symbols
+  commands:
+    - func: "upload debugsymbols"
 
 ## compile_all - build all scons targets ##
 - name: compile_all
@@ -6968,6 +6971,7 @@ tasks:
 - name: package
   depends_on:
   - name: compile
+  - name: upload_debug_symbols
   commands:
     - func: "fetch artifacts"
     - func: "set up remote credentials"
@@ -6986,6 +6990,7 @@ tasks:
   # Same dependencies as "push" below
   depends_on:
   - name: compile
+  - name: upload_debug_symbols
   - name: jsCore
   - name: dbtest
   - name: replica_sets_jscore_passthrough
@@ -7014,6 +7019,7 @@ tasks:
 - name: push
   patchable: false
   depends_on:
+  - name: upload_debug_symbols
   - name: jsCore
   - name: dbtest
   - name: replica_sets_jscore_passthrough
@@ -7591,20 +7597,25 @@ task_groups:
   name: compile_TG
   tasks:
   - compile
+  - upload_debug_symbols
+
 - <<: *compile_task_group_template
   name: dbtest_TG
   tasks:
   - compile_dbtest
   - dbtest
+
 - <<: *compile_task_group_template
   name: compile_all_run_unittests_TG
   tasks:
   - compile
+  - upload_debug_symbols
   - compile_unittests
   - unittests
   - compile_dbtest
   - dbtest
   - compile_all
+
 - name: embedded_sdk_build_and_test
   setup_group_can_fail_task: true
   setup_group:
@@ -7632,10 +7643,12 @@ task_groups:
   - "embedded_sdk_run_tests"
   - "embedded_sdk_s3_put_latest"
   - "embedded_sdk_tests_s3_put_latest"
+
 - <<: *stitch_support_task_group_template
   name: stitch_support_lib_build_and_archive
   tasks:
     - "stitch_support_create_lib"
+
 - <<: *stitch_support_task_group_template
   name: stitch_support_lib_build_and_test
   tasks:
