@@ -20,80 +20,157 @@
     // transaction coordinator being canceled after a timeout happen in a reasonable amount of time.
     TestData.transactionLifetimeLimitSeconds = 15;
 
-    const startNewReadOnlyTransactionThroughMongos = function() {
-        let res = assert.commandWorked(testDB.runCommand({
+    const readFromShard0 = function({lsid, txnNumber, startTransaction}) {
+        let findDocumentOnShard0Command = {
             find: 'user',
+            filter: {x: -1},
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             autocommit: false,
-            startTransaction: true
-        }));
+        };
 
+        if (startTransaction) {
+            findDocumentOnShard0Command.startTransaction = true;
+        }
+
+        let res = assert.commandWorked(testDB.runCommand(findDocumentOnShard0Command));
         assert.neq(null, res.recoveryToken);
-        assert.eq(null, res.recoveryToken.shardId);
         return res.recoveryToken;
     };
 
-    const startNewSingleShardTransactionThroughMongos = function() {
+    const readFromShard1 = function({lsid, txnNumber, startTransaction}) {
+        let findDocumentOnShard1Command = {
+            find: 'user',
+            filter: {x: 1},
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        };
+
+        if (startTransaction) {
+            findDocumentOnShard1Command.startTransaction = true;
+        }
+
+        let res = assert.commandWorked(testDB.runCommand(findDocumentOnShard1Command));
+        assert.neq(null, res.recoveryToken);
+        return res.recoveryToken;
+    };
+
+    const writeToShard0 = function({lsid, txnNumber, startTransaction}) {
         const updateDocumentOnShard0 = {
             q: {x: -1},
             u: {"$set": {lastTxnNumber: txnNumber}},
             upsert: true
         };
 
-        let res = assert.commandWorked(testDB.runCommand({
+        let updateDocumentOnShard0Command = {
             update: 'user',
             updates: [updateDocumentOnShard0],
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             autocommit: false,
-            startTransaction: true
-        }));
+        };
 
+        if (startTransaction) {
+            updateDocumentOnShard0Command.startTransaction = true;
+        }
+
+        let res = assert.commandWorked(testDB.runCommand(updateDocumentOnShard0Command));
         assert.neq(null, res.recoveryToken);
-        assert.neq(null, res.recoveryToken.shardId);
         return res.recoveryToken;
     };
 
-    const startNewCrossShardTransactionThroughMongos = function() {
-        const updateDocumentOnShard0 = {
-            q: {x: -1},
-            u: {"$set": {lastTxnNumber: txnNumber}},
-            upsert: true
-        };
+    const writeToShard1 = function({lsid, txnNumber, startTransaction}) {
         const updateDocumentOnShard1 = {
             q: {x: 1},
             u: {"$set": {lastTxnNumber: txnNumber}},
             upsert: true
         };
 
-        let res = assert.commandWorked(testDB.runCommand({
+        let updateDocumentOnShard1Command = {
             update: 'user',
-            updates: [updateDocumentOnShard0, updateDocumentOnShard1],
+            updates: [updateDocumentOnShard1],
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             autocommit: false,
-            startTransaction: true
-        }));
+        };
 
+        if (startTransaction) {
+            updateDocumentOnShard1Command.startTransaction = true;
+        }
+
+        let res = assert.commandWorked(testDB.runCommand(updateDocumentOnShard1Command));
         assert.neq(null, res.recoveryToken);
-        assert.neq(null, res.recoveryToken.shardId);
         return res.recoveryToken;
     };
 
-    const runCoordinateCommit = function(txnNumber, participantList, writeConcern) {
-        writeConcern = writeConcern || {};
-        return coordinatorPrimaryConn.adminCommand(Object.merge({
-            coordinateCommitTransaction: 1,
-            participants: participantList,
+    const startNewSingleShardReadOnlyTransaction = function() {
+        const recoveryToken = readFromShard0({lsid, txnNumber, startTransaction: true});
+        assert.eq(null, recoveryToken.recoveryShardId);
+        return recoveryToken;
+    };
+
+    const startNewSingleShardWriteTransaction = function() {
+        const recoveryToken = writeToShard0({lsid, txnNumber, startTransaction: true});
+        assert.neq(null, recoveryToken.recoveryShardId);
+        return recoveryToken;
+    };
+
+    const startNewMultiShardReadOnlyTransaction = function() {
+        let recoveryToken = readFromShard0({lsid, txnNumber, startTransaction: true});
+        assert.eq(null, recoveryToken.recoveryShardId);
+
+        recoveryToken = readFromShard1({lsid, txnNumber});
+        assert.eq(null, recoveryToken.recoveryShardId);
+
+        return recoveryToken;
+    };
+
+    const startNewSingleWriteShardTransaction = function() {
+        let recoveryToken = readFromShard0({lsid, txnNumber, startTransaction: true});
+        assert.eq(null, recoveryToken.recoveryShardId);
+
+        recoveryToken = writeToShard1({lsid, txnNumber});
+        assert.neq(null, recoveryToken.recoveryShardId);
+
+        return recoveryToken;
+    };
+
+    const startNewMultiShardWriteTransaction = function() {
+        let recoveryToken = readFromShard0({lsid, txnNumber, startTransaction: true});
+        assert.eq(null, recoveryToken.recoveryShardId);
+
+        // Write to shard 1, not shard 0, otherwise the recovery shard will still be the same as the
+        // coordinator shard.
+        recoveryToken = writeToShard1({lsid, txnNumber});
+        assert.neq(null, recoveryToken.recoveryShardId);
+
+        recoveryToken = writeToShard0({lsid, txnNumber});
+        assert.neq(null, recoveryToken.recoveryShardId);
+
+        return recoveryToken;
+    };
+
+    const abortTransactionOnShardDirectly = function(shardPrimaryConn, lsid, txnNumber) {
+        assert.commandWorked(shardPrimaryConn.adminCommand({
+            abortTransaction: 1,
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             autocommit: false
-        },
-                                                                writeConcern));
+        }));
     };
 
-    const sendCommitViaOtherMongos = function(lsid, txnNumber, recoveryToken, writeConcern) {
+    const sendCommitViaOriginalMongos = function(lsid, txnNumber, recoveryToken) {
+        return st.s0.getDB('admin').runCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            recoveryToken: recoveryToken
+        });
+    };
+
+    const sendCommitViaRecoveryMongos = function(lsid, txnNumber, recoveryToken, writeConcern) {
         writeConcern = writeConcern || {};
         return st.s1.getDB('admin').runCommand(Object.merge({
             commitTransaction: 1,
@@ -105,8 +182,8 @@
                                                             writeConcern));
     };
 
-    let st =
-        new ShardingTest({shards: 2, rs: {nodes: 2}, mongos: 2, other: {rsOptions: {verbose: 2}}});
+    let st = new ShardingTest(
+        {shards: 2, rs: {nodes: 2}, mongos: 2, other: {mongosOptions: {verbose: 3}}});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard0.name);
@@ -119,311 +196,310 @@
     let testDB = st.s0.getDB('test');
     assert.commandWorked(testDB.runCommand({insert: 'user', documents: [{x: -10}, {x: 10}]}));
 
-    let coordinatorReplSetTest = st.rs0;
-    let coordinatorPrimaryConn = coordinatorReplSetTest.getPrimary();
-
     const lsid = {id: UUID()};
     let txnNumber = 0;
-    const participantList = [{shardId: st.shard0.shardName}, {shardId: st.shard1.shardName}];
+
+    //
+    // Generic test cases that are agnostic as to the transaction type
+    //
 
     (function() {
-        jsTest.log("coordinator's participant has never heard of the session.");
-        assert.commandFailedWithCode(runCoordinateCommit(txnNumber, participantList),
-                                     ErrorCodes.NoSuchTransaction);
-    })();
-
-    (function() {
-        jsTest.log("coordinator finished coordinating an abort decision.");
-
-        txnNumber++;
-
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
-        assert.commandWorked(st.rs0.getPrimary().adminCommand({
-            abortTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        }));
-        assert.commandFailedWithCode(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        }),
-                                     ErrorCodes.NoSuchTransaction);
-
-        assert.commandFailedWithCode(runCoordinateCommit(txnNumber, participantList),
-                                     ErrorCodes.NoSuchTransaction);
-        assert.commandFailedWithCode(runCoordinateCommit(txnNumber, []),
-                                     ErrorCodes.NoSuchTransaction);
-
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
-                                     ErrorCodes.NoSuchTransaction);
-
-    })();
-
-    (function() {
-        jsTest.log("coordinator finished coordinating a commit decision.");
-
-        txnNumber++;
-
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
-        assert.commandWorked(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        }));
-
-        assert.commandWorked(runCoordinateCommit(txnNumber, participantList));
-        assert.commandWorked(runCoordinateCommit(txnNumber, []));
-
-        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
-    })();
-
-    (function() {
-        jsTest.log(
-            "coordinator finished coordinating a commit decision but coordinator node can't majority commit writes");
-
-        txnNumber++;
-
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
-        assert.commandWorked(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-            writeConcern: {w: "majority"}
-        }));
-
-        stopReplicationOnSecondaries(coordinatorReplSetTest);
-
-        // Do a write on the coordinator to bump the coordinator node's system last OpTime.
-        coordinatorPrimaryConn.getDB("dummy").getCollection("dummy").insert({dummy: 1});
-
-        // While the coordinator primary cannot majority commit writes, coordinateCommitTransaction
-        // returns ok:1 with a writeConcern error.
-
-        let res = runCoordinateCommit(
-            txnNumber, participantList, {writeConcern: {w: "majority", wtimeout: 500}});
-        assert.eq(1, res.ok, tojson(res));
-        checkWriteConcernTimedOut(res);
-
-        res = runCoordinateCommit(txnNumber, [], {writeConcern: {w: "majority", wtimeout: 500}});
-        assert.eq(1, res.ok, tojson(res));
-        checkWriteConcernTimedOut(res);
-
-        res = sendCommitViaOtherMongos(
-            lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority", wtimeout: 500}});
-        assert.eq(1, res.ok, tojson(res));
-        checkWriteConcernTimedOut(res);
-
-        // Once the coordinator primary can majority commit writes again,
-        // coordinateCommitTransaction returns ok:1 without a writeConcern error.
-
-        restartReplicationOnSecondaries(coordinatorReplSetTest);
-
-        assert.commandWorked(
-            runCoordinateCommit(txnNumber, participantList, {writeConcern: {w: "majority"}}));
-        assert.commandWorked(runCoordinateCommit(txnNumber, [], {writeConcern: {w: "majority"}}));
-        assert.commandWorked(sendCommitViaOtherMongos(
-            lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority"}}));
-    })();
-
-    (function() {
-        jsTest.log(
-            "try to recover decision for lower transaction number than last number participant saw.");
-
+        jsTest.log("Testing recovering transaction with lower number than latest");
         ++txnNumber;
 
         const oldTxnNumber = txnNumber;
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
-        assert.commandWorked(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-        }));
+        const oldRecoveryToken = startNewMultiShardWriteTransaction();
 
         txnNumber++;
+        const newRecoveryToken = startNewMultiShardWriteTransaction();
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, newRecoveryToken));
 
-        startNewCrossShardTransactionThroughMongos();
-        assert.commandWorked(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-        }));
+        assert.commandFailedWithCode(
+            sendCommitViaRecoveryMongos(lsid, oldTxnNumber, oldRecoveryToken),
+            ErrorCodes.TransactionTooOld);
 
-        assert.commandFailedWithCode(runCoordinateCommit(oldTxnNumber, participantList),
-                                     ErrorCodes.TransactionTooOld);
-        assert.commandFailedWithCode(runCoordinateCommit(oldTxnNumber, []),
-                                     ErrorCodes.TransactionTooOld);
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, oldTxnNumber, recoveryToken),
-                                     ErrorCodes.TransactionTooOld);
-
-        // Can still recover decision for current transaction number.
-        assert.commandWorked(runCoordinateCommit(txnNumber, participantList));
-        assert.commandWorked(runCoordinateCommit(txnNumber, []));
-        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
+        // The client can still the recover decision for current transaction number.
+        assert.commandWorked(sendCommitViaRecoveryMongos(lsid, txnNumber, newRecoveryToken));
     })();
 
     (function() {
-        jsTest.log("session has been reaped.");
-
+        jsTest.log("Testing recovering transaction with higher number than latest");
         txnNumber++;
 
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
-        assert.commandWorked(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-            writeConcern: {w: "majority"}
-        }));
+        const oldTxnNumber = txnNumber;
+        const oldRecoveryToken = startNewMultiShardWriteTransaction();
+
+        txnNumber++;
+        const fakeRecoveryToken = {recoveryShardId: st.shard0.shardName};
+        assert.commandFailedWithCode(
+            sendCommitViaRecoveryMongos(lsid, txnNumber, fakeRecoveryToken),
+            ErrorCodes.NoSuchTransaction);
+
+        // The active transaction can still be committed.
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, oldTxnNumber, oldRecoveryToken));
+    })();
+
+    (function() {
+        jsTest.log("Testing recovering transaction whose recovery shard forgot the transaction");
+        txnNumber++;
+
+        const recoveryToken = startNewMultiShardWriteTransaction();
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
 
         assert.writeOK(
-            coordinatorPrimaryConn.getDB("config").transactions.remove({}, false /* justOne */));
+            st.rs1.getPrimary().getDB("config").transactions.remove({}, false /* justOne */));
 
-        assert.commandFailedWithCode(runCoordinateCommit(txnNumber, participantList),
-                                     ErrorCodes.NoSuchTransaction);
-        assert.commandFailedWithCode(runCoordinateCommit(txnNumber, []),
-                                     ErrorCodes.NoSuchTransaction);
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();
 
     (function() {
-        jsTest.log(
-            "try to recover decision for higher transaction number than participant has seen.");
+        jsTest.log("Testing that a recovery node does a noop write before returning 'aborted'");
 
         txnNumber++;
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
 
-        txnNumber++;
-        assert.commandFailedWithCode(runCoordinateCommit(txnNumber, participantList),
-                                     ErrorCodes.NoSuchTransaction);
-        assert.commandFailedWithCode(runCoordinateCommit(txnNumber, []),
-                                     ErrorCodes.NoSuchTransaction);
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        const recoveryToken = startNewMultiShardWriteTransaction();
+        abortTransactionOnShardDirectly(st.rs0.getPrimary(), lsid, txnNumber);
+        assert.commandFailedWithCode(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
 
-        // We can still commit the active transaction with the lower transaction number.
-        assert.commandWorked(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber - 1),
-            autocommit: false
-        }));
+        const recoveryShardReplSetTest = st.rs1;
+
+        stopReplicationOnSecondaries(recoveryShardReplSetTest);
+
+        // Do a write on the recovery node to bump the recovery node's system last OpTime.
+        recoveryShardReplSetTest.getPrimary().getDB("dummy").getCollection("dummy").insert(
+            {dummy: 1});
+
+        // While the recovery shard primary cannot majority commit writes, commitTransaction returns
+        // NoSuchTransaction with a writeConcern error.
+        let res = sendCommitViaRecoveryMongos(
+            lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority", wtimeout: 500}});
+        assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+        checkWriteConcernTimedOut(res);
+
+        // Once the recovery shard primary can majority commit writes again, commitTransaction
+        // returns NoSuchTransaction without a writeConcern error.
+        restartReplicationOnSecondaries(recoveryShardReplSetTest);
+        res = sendCommitViaRecoveryMongos(
+            lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority"}});
+        assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+        assert.eq(null, res.writeConcernError);
     })();
 
     (function() {
-        jsTest.log("commit was never sent");
+        jsTest.log("Testing that a recovery node does a noop write before returning 'committed'");
 
         txnNumber++;
 
-        // Start transaction and run CRUD ops on several shards.
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
+        const recoveryToken = startNewMultiShardWriteTransaction();
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
 
-        // Try to recover decision from other mongos. This should preemptively cancel the
-        // coordinator, after which it should abort the local participant and return
-        // NoSuchTransaction.
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
-                                     ErrorCodes.NoSuchTransaction);
+        const recoveryShardReplSetTest = st.rs1;
+
+        stopReplicationOnSecondaries(recoveryShardReplSetTest);
+
+        // Do a write on the recovery node to bump the recovery node's system last OpTime.
+        recoveryShardReplSetTest.getPrimary().getDB("dummy").getCollection("dummy").insert(
+            {dummy: 1});
+
+        // While the recovery shard primary cannot majority commit writes, commitTransaction returns
+        // ok with a writeConcern error.
+        let res = sendCommitViaRecoveryMongos(
+            lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority", wtimeout: 500}});
+        assert.commandWorkedIgnoringWriteConcernErrors(res);
+        checkWriteConcernTimedOut(res);
+
+        // Once the recovery shard primary can majority commit writes again, commitTransaction
+        // returns ok without a writeConcern error.
+        restartReplicationOnSecondaries(recoveryShardReplSetTest);
+        assert.commandWorked(sendCommitViaRecoveryMongos(
+            lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority"}}));
     })();
 
+    //
+    // Single-shard read-only transactions
+    //
+
     (function() {
-        jsTest.log(
-            "try to recover decision for single-shard transaction that has already committed");
-
+        jsTest.log("Testing recovering single-shard read-only transaction that is in progress");
         txnNumber++;
+        const recoveryToken = startNewSingleShardReadOnlyTransaction();
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
 
-        const recoveryToken = startNewSingleShardTransactionThroughMongos();
-
-        // Commit the transaction from the first mongos.
-        assert.commandWorked(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-            recoveryToken: recoveryToken
-        }));
-
-        // Try to recover decision from other mongos.
-        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
+        // A read-only transaction can still commit after reporting an abort decision.
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
     }());
 
     (function() {
-        jsTest.log("try to recover decision for single-shard transaction that has already aborted");
-
+        jsTest.log("Testing recovering single-shard read-only transaction that aborted");
         txnNumber++;
-
-        const recoveryToken = startNewSingleShardTransactionThroughMongos();
-        assert.commandWorked(st.rs0.getPrimary().adminCommand({
-            abortTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        }));
-
-        // Commit the transaction from the first mongos.
-        assert.commandFailedWithCode(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-            recoveryToken: recoveryToken
-        }),
-                                     ErrorCodes.NoSuchTransaction);
-
-        // Try to recover the decision from other mongos.
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        const recoveryToken = startNewSingleShardReadOnlyTransaction();
+        abortTransactionOnShardDirectly(st.rs0.getPrimary(), lsid, txnNumber);
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     }());
 
     (function() {
-        jsTest.log("try to recover decision for read-only transaction that's in progress");
-
+        jsTest.log("Testing recovering single-shard read-only transaction that committed");
         txnNumber++;
+        const recoveryToken = startNewSingleShardReadOnlyTransaction();
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    }());
 
-        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
+    //
+    // Single-shard write transactions
+    //
 
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+    (function() {
+        jsTest.log("Testing recovering single-shard write transaction that in progress");
+        txnNumber++;
+        const recoveryToken = startNewSingleShardWriteTransaction();
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+
+        // A write transaction fails to commit after having reported an abort decision.
+        assert.commandFailedWithCode(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    }());
+
+    (function() {
+        jsTest.log("Testing recovering single-shard write transaction that aborted");
+        txnNumber++;
+        const recoveryToken = startNewSingleShardWriteTransaction();
+        abortTransactionOnShardDirectly(st.rs0.getPrimary(), lsid, txnNumber);
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    }());
+
+    (function() {
+        jsTest.log("Testing recovering single-shard write transaction that committed");
+        txnNumber++;
+        const recoveryToken = startNewSingleShardWriteTransaction();
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
+        assert.commandWorked(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken));
+    }());
+
+    //
+    // Multi-shard read-only transactions
+    //
+
+    (function() {
+        jsTest.log("Testing recovering multi-shard read-only transaction that is in progress");
+        txnNumber++;
+        const recoveryToken = startNewMultiShardReadOnlyTransaction();
+
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+
+        // A read-only transaction can still commit after reporting an abort decision.
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
+    })();
+
+    (function() {
+        jsTest.log("Testing recovering multi-shard read-only transaction that aborted");
+        txnNumber++;
+        const recoveryToken = startNewMultiShardReadOnlyTransaction();
+        abortTransactionOnShardDirectly(st.rs0.getPrimary(), lsid, txnNumber);
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();
 
     (function() {
-        jsTest.log("try to recover decision for read-only transaction that aborted");
+        jsTest.log("Testing recovering multi-shard read-only transaction that committed");
+        txnNumber++;
+        const recoveryToken = startNewMultiShardReadOnlyTransaction();
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    })();
 
+    //
+    // Single-write-shard transactions (there are multiple participants but only one did a write)
+    //
+
+    (function() {
+        jsTest.log("Testing recovering single-write-shard transaction that is in progress");
+        txnNumber++;
+        const recoveryToken = startNewSingleWriteShardTransaction();
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+
+        // A write transaction fails to commit after having reported an abort decision.
+        assert.commandFailedWithCode(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    }());
+
+    (function() {
+        jsTest.log(
+            "Testing recovering single-write-shard transaction that aborted on read-only shard" +
+            " but is in progress on write shard");
+        txnNumber++;
+        const recoveryToken = startNewSingleWriteShardTransaction();
+        abortTransactionOnShardDirectly(st.rs1.getPrimary(), lsid, txnNumber);
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    }());
+
+    (function() {
+        jsTest.log("Testing recovering single-write-shard transaction that aborted on write" +
+                   " shard but is in progress on read-only shard");
+        txnNumber++;
+        const recoveryToken = startNewSingleWriteShardTransaction();
+        abortTransactionOnShardDirectly(st.rs1.getPrimary(), lsid, txnNumber);
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    }());
+
+    (function() {
+        jsTest.log("Testing recovering single-write-shard transaction that committed");
+        txnNumber++;
+        const recoveryToken = startNewSingleWriteShardTransaction();
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
+        assert.commandWorked(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken));
+    }());
+
+    //
+    // Multi-write-shard transactions (there are multiple participants and more than one did writes)
+    //
+
+    (function() {
+        jsTest.log("Testing recovering multi-write-shard transaction that is in progress");
         txnNumber++;
 
-        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
-        assert.commandWorked(st.rs0.getPrimary().adminCommand({
-            abortTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        }));
+        const recoveryToken = startNewMultiShardWriteTransaction();
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
 
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        // A write transaction fails to commit after having reported an abort decision.
+        assert.commandFailedWithCode(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();
 
     (function() {
-        jsTest.log("try to recover decision for read-only transaction that committed");
-
+        jsTest.log("Testing recovering multi-write-shard transaction after coordinator finished" +
+                   " coordinating an abort decision.");
         txnNumber++;
 
-        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
-        assert.commandWorked(testDB.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        }));
-
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        const recoveryToken = startNewMultiShardWriteTransaction();
+        abortTransactionOnShardDirectly(st.rs0.getPrimary(), lsid, txnNumber);
+        assert.commandFailedWithCode(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    })();
+
+    (function() {
+        jsTest.log("Testing recovering multi-write-shard transaction after coordinator finished" +
+                   " coordinating a commit decision.");
+        txnNumber++;
+
+        const recoveryToken = startNewMultiShardWriteTransaction();
+        assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
+        assert.commandWorked(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken));
     })();
 
     st.stop();

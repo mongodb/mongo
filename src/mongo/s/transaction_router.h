@@ -225,9 +225,14 @@ public:
     const boost::optional<AtClusterTime>& getAtClusterTime() const;
 
     /**
-     * If a coordinator has been selected for the current transaction, returns its identifier
+     * If a coordinator has been selected for the current transaction, returns its id.
      */
     const boost::optional<ShardId>& getCoordinatorId() const;
+
+    /**
+     * If a recovery shard has been selected for the current transaction, returns its id.
+     */
+    const boost::optional<ShardId>& getRecoveryShardId() const;
 
     /**
      * Commits the transaction. For transactions that performed writes to multiple shards, this will
@@ -346,8 +351,18 @@ private:
     // Map of current participants of the current transaction.
     StringMap<Participant> _participants;
 
-    // The id of coordinator participant, used to construct prepare requests.
+    // The id of participant chosen as the two-phase commit coordinator. If, at commit time,
+    // two-phase commit is required, the participant list is handed off to this shard. Is unset
+    // until the transaction has targeted a participant, and is set to the first participant
+    // targeted. Is reset if the first participant targeted returns a "needs retargeting" error.
     boost::optional<ShardId> _coordinatorId;
+
+    // The id of the recovery participant. Passed in the recoveryToken that is included on responses
+    // to the client. Is unset until the transaction has done a write, and is set to the first
+    // participant that reports having done a write. Is reset if that participant is removed from
+    // the participant list because another participant targeted in the same statement returned a
+    // "needs retargeting" error.
+    boost::optional<ShardId> _recoveryShardId;
 
     // The read concern the current transaction was started with.
     repl::ReadConcernArgs _readConcernArgs;

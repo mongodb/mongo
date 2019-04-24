@@ -47,7 +47,7 @@ structs:
     TxnRecoveryToken:
         description: "Contains info for retrying the commit of a sharded transaction"
         fields:
-            shardId:
+            recoveryShardId:
                 description: "The id of the shard that can make progress committing the transaction"
                 type: shard_id
                 optional: true

@@ -317,6 +317,11 @@ void TransactionRouter::processParticipantResponse(const ShardId& shardId,
     if (participant->readOnly != Participant::ReadOnly::kNotReadOnly) {
         LOG(3) << txnIdToString() << " Marking " << shardId << " as having done a write";
         participant->readOnly = Participant::ReadOnly::kNotReadOnly;
+
+        if (!_recoveryShardId) {
+            LOG(3) << txnIdToString() << " Choosing " << shardId << " as recovery shard";
+            _recoveryShardId = shardId;
+        }
     }
 }
 
@@ -356,6 +361,10 @@ const boost::optional<TransactionRouter::AtClusterTime>& TransactionRouter::getA
 
 const boost::optional<ShardId>& TransactionRouter::getCoordinatorId() const {
     return _coordinatorId;
+}
+
+const boost::optional<ShardId>& TransactionRouter::getRecoveryShardId() const {
+    return _recoveryShardId;
 }
 
 BSONObj TransactionRouter::attachTxnFieldsIfNeeded(const ShardId& shardId, const BSONObj& cmdObj) {
@@ -465,6 +474,12 @@ void TransactionRouter::_clearPendingParticipants(OperationContext* opCtx) {
     // Remove each aborted participant from the participant list. Remove after sending abort, so
     // they are not added back to the participant list by the transaction tracking inside the ARS.
     for (const auto& participant : pendingParticipants) {
+        // If the participant being removed was chosen as the recovery shard, reset the recovery
+        // shard. This is safe because this participant is a pending participant, meaning it
+        // cannot have been returned in the recoveryToken on an earlier statement.
+        if (_recoveryShardId && *_recoveryShardId == participant) {
+            _recoveryShardId.reset();
+        }
         invariant(_participants.erase(participant));
     }
 
@@ -639,6 +654,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     _txnNumber = txnNumber;
     _participants.clear();
     _coordinatorId.reset();
+    _recoveryShardId.reset();
     _atClusterTime.reset();
     _commitType = CommitType::kNotInitiated;
 
@@ -821,21 +837,16 @@ std::string TransactionRouter::txnIdToString() const {
 }
 
 void TransactionRouter::appendRecoveryToken(BSONObjBuilder* builder) const {
-    if (!_coordinatorId)
-        return;
-
     BSONObjBuilder recoveryTokenBuilder(
         builder->subobjStart(CommitTransaction::kRecoveryTokenFieldName));
-
     TxnRecoveryToken recoveryToken;
 
-    // Only return a populated recovery token if the transaction has done a write (transactions that
-    // only did reads do not need to be recovered; they can just be retried).
-    for (const auto& participant : _participants) {
-        if (participant.second.readOnly == Participant::ReadOnly::kNotReadOnly) {
-            recoveryToken.setShardId(*_coordinatorId);
-            break;
-        }
+    // The recovery shard is chosen on the first statement that did a write (transactions that only
+    // did reads do not need to be recovered; they can just be retried).
+    if (_recoveryShardId) {
+        invariant(_participants.find(*_recoveryShardId)->second.readOnly ==
+                  Participant::ReadOnly::kNotReadOnly);
+        recoveryToken.setRecoveryShardId(*_recoveryShardId);
     }
 
     recoveryToken.serialize(&recoveryTokenBuilder);
@@ -847,8 +858,8 @@ BSONObj TransactionRouter::_commitWithRecoveryToken(OperationContext* opCtx,
     uassert(ErrorCodes::NoSuchTransaction,
             "Recovery token is empty, meaning the transaction only performed reads and can be "
             "safely retried",
-            recoveryToken.getShardId());
-    const auto& coordinatorId = *recoveryToken.getShardId();
+            recoveryToken.getRecoveryShardId());
+    const auto& recoveryShardId = *recoveryToken.getRecoveryShardId();
 
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
@@ -860,16 +871,16 @@ BSONObj TransactionRouter::_commitWithRecoveryToken(OperationContext* opCtx,
         auto rawCoordinateCommit = coordinateCommitCmd.toBSON(
             BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
 
-        auto existingParticipant = getParticipant(coordinatorId);
-        auto coordinatorParticipant =
-            existingParticipant ? existingParticipant : &_createParticipant(coordinatorId);
-        return coordinatorParticipant->attachTxnFieldsIfNeeded(rawCoordinateCommit, false);
+        auto existingParticipant = getParticipant(recoveryShardId);
+        auto recoveryParticipant =
+            existingParticipant ? existingParticipant : &_createParticipant(recoveryShardId);
+        return recoveryParticipant->attachTxnFieldsIfNeeded(rawCoordinateCommit, false);
     }();
 
     _commitType = CommitType::kRecoverWithToken;
 
-    auto coordinatorShard = uassertStatusOK(shardRegistry->getShard(opCtx, coordinatorId));
-    return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
+    auto recoveryShard = uassertStatusOK(shardRegistry->getShard(opCtx, recoveryShardId));
+    return uassertStatusOK(recoveryShard->runCommandWithFixedRetryAttempts(
                                opCtx,
                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                "admin",
