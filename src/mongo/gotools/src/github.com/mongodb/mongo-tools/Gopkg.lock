@@ -104,7 +104,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:34fd703595b17e19c3025578b7de549c8fb043995309506921df4ffc87eb9ce7"
+  digest = "1:64629229e2ed5c7af1cb1629b8b85ef8d1b3b7c949e6d96dfd19afa383e9030f"
   name = "github.com/mongodb/mongo-tools-common"
   packages = [
     "archive",
@@ -125,7 +125,7 @@
     "util",
   ]
   pruneopts = "T"
-  revision = "cf9a7970421213e06e0f745fa2adeb861fa12f4a"
+  revision = "f450824d00a780709a0175633d91b50ffb766c8c"
 
 [[projects]]
   digest = "1:f363c75e8cac5653bc5c0c2b90cbd8a522fdc48c13a5f8d85078750f82d1a009"

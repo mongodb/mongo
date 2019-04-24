@@ -7,7 +7,7 @@
 package mongoreplay
 
 import (
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools/legacy/testtype"
 	"sync"
 	"testing"
 	"time"

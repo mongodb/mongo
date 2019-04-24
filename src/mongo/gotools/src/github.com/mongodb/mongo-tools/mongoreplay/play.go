@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/lldb"
-	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/legacy/lldb"
+	"github.com/mongodb/mongo-tools/legacy/options"
 )
 
 // PlayCommand stores settings for the mongoreplay 'play' subcommand

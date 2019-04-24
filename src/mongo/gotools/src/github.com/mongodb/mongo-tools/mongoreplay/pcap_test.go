@@ -14,7 +14,7 @@ import (
 
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/llmgo/bson"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools/legacy/testtype"
 )
 
 type verifyFunc func(*testing.T, *mgo.Session, *BufferedStatRecorder, *preprocessCursorManager)

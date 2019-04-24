@@ -407,14 +407,6 @@ func (mf *MongoFiles) handlePut() error {
 func (mf *MongoFiles) Run(displayHost bool) (output string, finalErr error) {
 	var err error
 
-	connURL := mf.ToolOptions.Host
-	if connURL == "" {
-		connURL = util.DefaultHost
-	}
-	if mf.ToolOptions.Port != "" {
-		connURL = fmt.Sprintf("%s:%s", connURL, mf.ToolOptions.Port)
-	}
-
 	// check type of node we're connected to, and fall back to w=1 if standalone (for <= 2.4)
 	nodeType, err := mf.SessionProvider.GetNodeType()
 	if err != nil {
@@ -440,7 +432,7 @@ func (mf *MongoFiles) Run(displayHost bool) (output string, finalErr error) {
 	}
 
 	if displayHost {
-		log.Logvf(log.Always, "connected to: %v", connURL)
+		log.Logvf(log.Always, "connected to: %v", mf.ToolOptions.URI.ConnectionString)
 	}
 
 	// first validate the namespaces we'll be using: <db>.<prefix>.files and <db>.<prefix>.chunks

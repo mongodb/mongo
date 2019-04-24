@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/10gen/llmgo/bson"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools/legacy/testtype"
 )
 
 func TestRemoveDriverOpsFromFile(t *testing.T) {

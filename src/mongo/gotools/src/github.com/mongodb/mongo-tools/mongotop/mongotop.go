@@ -103,15 +103,6 @@ func (mt *MongoTop) runServerStatusDiff() (outDiff FormattableDiff, err error) {
 
 // Run executes the mongotop program.
 func (mt *MongoTop) Run() error {
-
-	connURL := mt.Options.Host
-	if connURL == "" {
-		connURL = "127.0.0.1"
-	}
-	if mt.Options.Port != "" {
-		connURL = connURL + ":" + mt.Options.Port
-	}
-
 	hasData := false
 	numPrinted := 0
 
@@ -135,7 +126,7 @@ func (mt *MongoTop) Run() error {
 		// if this is the first time and the connection is successful, print
 		// the connection message
 		if !hasData && !mt.OutputOptions.Json {
-			log.Logvf(log.Always, "connected to: %v\n", connURL)
+			log.Logvf(log.Always, "connected to: %v\n", mt.Options.URI.ConnectionString)
 		}
 
 		hasData = true

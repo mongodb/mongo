@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools/legacy/testtype"
 )
 
 func TestRepeatGeneration(t *testing.T) {

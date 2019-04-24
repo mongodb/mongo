@@ -281,7 +281,7 @@ mongo_tools_variables:
       mongod_args: ""
       mongod_port: 33333
     ssl: &mongod_ssl_startup_args
-      mongod_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem"
+      mongod_args: "--sslMode requireSSL --sslCAFile testdata/certs/ca.pem --sslPEMKeyFile testdata/certs/server.pem"
       mongod_port: 33333
     # Set storage engine as mmapv1 for 32 bit variants because WiredTiger requires 64 bit support.
     win32: &mongod_win32_startup_args
@@ -293,7 +293,7 @@ mongo_tools_variables:
       mongo_args: &mongo_default_startup_args_string "--port 33333"
       mongod_port: 33333
     ssl: &mongo_ssl_startup_args
-      mongo_args: "--port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates"
+      mongo_args: "--port 33333 --ssl --sslCAFile ./testdata/certs/ca.pem --sslPEMKeyFile ./testdata/certs/server.pem --sslAllowInvalidCertificates"
       mongod_port: 33333
 
 functions:
@@ -1053,7 +1053,7 @@ tasks:
           set -e
           . ./set_goenv.sh
           GOROOT="" set_goenv || exit
-          retVal=$(go run vendor/github.com/3rf/mongo-lint/golint/golint.go mongo* bson* common/*);
+          retVal=$(go run vendor/github.com/3rf/mongo-lint/golint/golint.go mongo* bson* legacy/*);
           if [ "$retVal" = "" ]; then exit 0; else echo $retVal; exit 1; fi;
 
 - name: lint-js
@@ -1453,7 +1453,7 @@ tasks:
           set -x
           set -v
           set -e
-          go tool vet bsondump common mongo*
+          go tool vet bsondump legacy mongo*
 
 - name: replay-dist
   commands:

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/10gen/llmgo/bson"
-	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools/legacy/util"
 )
 
 const PlaybackFileVersion = 1

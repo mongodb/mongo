@@ -359,6 +359,14 @@ func (auth *Auth) ShouldAskForPassword() bool {
 		!(auth.Mechanism == "MONGODB-X509" || auth.Mechanism == "GSSAPI")
 }
 
+func NewURI(unparsed string) (*URI, error) {
+	cs, err := connstring.Parse(unparsed)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing URI from %v: %v", unparsed, err)
+	}
+	return &URI{ConnectionString: cs.String(), connString: cs}, nil
+}
+
 func (uri *URI) GetConnectionAddrs() []string {
 	return uri.connString.Hosts
 }
@@ -463,7 +471,11 @@ func (opts *ToolOptions) NormalizeHostPortURI() error {
 	} else {
 		// If URI not provided, get replica set name and generate connection string
 		_, opts.ReplicaSetName = util.SplitHostArg(opts.Host)
-		opts.URI = &URI{ConnectionString: util.BuildURI(opts.Host, opts.Port)}
+		uri, err := NewURI(util.BuildURI(opts.Host, opts.Port))
+		if err != nil {
+			return err
+		}
+		opts.URI = uri
 	}
 
 	// connect directly, unless a replica set name is explicitly specified

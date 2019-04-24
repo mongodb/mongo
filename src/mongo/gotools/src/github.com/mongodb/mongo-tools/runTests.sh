@@ -24,7 +24,7 @@ ec=0
 # Run all tests depending on what flags are set in the environment
 # TODO: mongotop needs a test
 # Note: Does not test mongoreplay
-for i in common/db common/archive common/bsonutil common/db/tlsgo common/failpoint common/intents common/json common/log common/options common/progress common/text common/util mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop bsondump ; do
+for i in legacy/failpoint legacy/json legacy/log legacy/options legacy/util mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop bsondump ; do
         echo "Testing ${i}..."
         COMMON_SUBPKG=$(basename $i)
         COVERAGE_ARGS="";

@@ -123,6 +123,8 @@ func New(opts Options) (*MongoExport, error) {
 		}
 	}
 
+	log.Logvf(log.Always, "connected to: %v", opts.URI.ConnectionString)
+
 	isMongos, err := provider.IsMongos()
 	if err != nil {
 		provider.Close()
@@ -420,15 +422,6 @@ func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
 		return 0, err
 	}
 	defer cursor.Close(nil)
-
-	connURL := exp.ToolOptions.Host
-	if connURL == "" {
-		connURL = util.DefaultHost
-	}
-	if exp.ToolOptions.Port != "" {
-		connURL = connURL + ":" + exp.ToolOptions.Port
-	}
-	log.Logvf(log.Always, "connected to: %v", connURL)
 
 	// Write headers
 	err = exportOutput.WriteHeader()

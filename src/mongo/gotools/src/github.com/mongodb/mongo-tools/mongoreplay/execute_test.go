@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	mgo "github.com/10gen/llmgo"
-	"github.com/mongodb/mongo-tools/common/testtype"
+	"github.com/mongodb/mongo-tools/legacy/testtype"
 )
 
 func TestCompleteReply(t *testing.T) {
