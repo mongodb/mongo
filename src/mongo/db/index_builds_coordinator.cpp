@@ -569,11 +569,15 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
                                     << "' because the collection no longer exists");
     }
 
+    // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not have
+    // downstream impact.
+    /*
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->canAcceptWritesFor(opCtx, nss)) {
         // TODO: Put in a well-defined initialization function within the coordinator.
         ensureIndexBuildEntriesNamespaceExists(opCtx);
     }
+    */
 
     // Lock from when we ascertain what indexes to build through to when the build is registered
     // on the Coordinator and persistedly set up in the catalog. This serializes setting up an
@@ -611,6 +615,9 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     // writes a no-op just to generate an optime.
     if (IndexBuildProtocol::kTwoPhase == replIndexBuildState->protocol) {
         onInitFn = [&](std::vector<BSONObj>& specs) {
+            // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not
+            // have downstream impact.
+            /*
             // Only the primary node writes an index build entry to the collection as the
             // secondaries will replicate it.
             if (replCoord->canAcceptWritesFor(opCtx, nss)) {
@@ -629,6 +636,7 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
                     return status;
                 }
             }
+            */
 
             opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
                 opCtx,
@@ -791,6 +799,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         replState->stats.numIndexesAfter = replState->stats.numIndexesBefore;
         status = Status::OK();
     } else if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+        // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not
+        // have downstream impact.
+        /*
         // Only the primary node removes the index build entry, as the secondaries will
         // replicate.
         if (!replSetAndNotPrimary) {
@@ -801,6 +812,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                 MONGO_UNREACHABLE;
             }
         }
+        */
     }
 
     _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);

@@ -295,8 +295,12 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
 
     // Persist the new commit quorum for the index build and write it to the collection.
     buildState->commitQuorum = newCommitQuorum;
-    const UUID buildUUID = buildState->buildUUID;
-    return indexbuildentryhelpers::setCommitQuorum(opCtx, buildUUID, newCommitQuorum);
+    // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not have
+    // downstream impact.
+    /*
+    return indexbuildentryhelpers::setCommitQuorum(opCtx, buildState->buildUUID, newCommitQuorum);
+    */
+    return Status::OK();
 }
 
 Status IndexBuildsCoordinatorMongod::_finishScanningPhase() {
