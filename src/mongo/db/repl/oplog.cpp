@@ -840,15 +840,6 @@ void createOplog(OperationContext* opCtx) {
     createOplog(opCtx, localOplogInfo(opCtx->getServiceContext()).oplogName.ns(), isReplSet);
 }
 
-OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx) {
-    auto oplog = localOplogInfo(opCtx->getServiceContext()).oplog;
-    invariant(oplog);
-    OplogSlot os;
-    bool persist = false;  // Don't update the storage engine with the allocated OpTime.
-    _getNextOpTimes(opCtx, oplog, 1, &os, persist);
-    return os;
-}
-
 MONGO_REGISTER_SHIM(GetNextOpTimeClass::getNextOpTimes)
 (OperationContext* opCtx, std::size_t count)->std::vector<OplogSlot> {
     // The local oplog collection pointer must already be established by this point.
