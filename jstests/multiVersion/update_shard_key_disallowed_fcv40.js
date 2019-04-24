@@ -8,7 +8,7 @@
     load("jstests/sharding/libs/update_shard_key_helpers.js");
 
     let st = new ShardingTest({
-        shards: [{binVersion: "latest"}, {binVersion: "latest"}],
+        shards: {rs0: {nodes: 3, binVersion: "latest"}, rs1: {nodes: 3, binVersion: "latest"}},
         mongos: 1,
         other: {mongosOptions: {binVersion: "latest"}, configOptions: {binVersion: "latest"}}
     });
@@ -52,11 +52,8 @@
 
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates
-
-        // TODO SERVER-40225: Uncomment the assertions below
-        // assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
-        // assert.writeError(sessionDB.foo.update({x: 30}, {x: 5}));
-
+        assert.writeError(sessionDB.foo.update({x: 80}, {$set: {x: 100}}));
+        assert.writeError(sessionDB.foo.update({x: 80}, {x: 100}));
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: {x: 80}, update: {$set: {x: 100}}});
         });
@@ -94,11 +91,8 @@
 
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates
-
-        // TODO SERVER-40225: Uncomment the assertions below
-        // assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
-        // assert.writeError(sessionDB.foo.update({x: 30}, {x: 5}));
-
+        assert.writeError(sessionDB.foo.update({x: 80}, {$set: {x: 100}}));
+        assert.writeError(sessionDB.foo.update({x: 80}, {x: 100}));
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: {x: 80}, update: {$set: {x: 100}}});
         });
@@ -133,8 +127,6 @@
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates
         session.startTransaction();
-        // TODO SERVER-40225: Uncomment the assertions below
-        // assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
         assert.writeError(sessionDB.foo.update({x: 80}, {$set: {x: 100}}));
         session.abortTransaction();
 
@@ -161,10 +153,41 @@
                 st, kDbName, ns, {x: 1}, [{x: 30}, {x: 50}, {x: 80}], {x: 50}, {x: 80});
             cleanupOrphanedDocs(st, ns);
 
+            // Doc will move shards
             assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 100}}));
             assert.throws(function() {
                 sessionDB.foo.findAndModify({query: {x: 30}, update: {$set: {x: 100}}});
             });
+
+            // Doc will remain on the same shard. Because shard 0 is on FCV 4.2, these should
+            // complete successfully.
+            sessionDB.foo.findAndModify({query: {x: 30}, update: {$set: {x: 5}}});
+            st.rs0.awaitReplication();
+            assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 5}).itcount());
+            assert.eq(1, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 5}).itcount());
+            assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 30}).itcount());
+            assert.eq(0, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 30}).itcount());
+
+            sessionDB.foo.findAndModify({query: {x: 5}, update: {x: 10}});
+            st.rs0.awaitReplication();
+            assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 5}).itcount());
+            assert.eq(0, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 5}).itcount());
+            assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 10}).itcount());
+            assert.eq(1, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 10}).itcount());
+
+            assert.commandWorked(sessionDB.foo.update({x: 10}, {$set: {x: 25}}));
+            st.rs0.awaitReplication();
+            assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 25}).itcount());
+            assert.eq(1, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 25}).itcount());
+            assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 10}).itcount());
+            assert.eq(0, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 10}).itcount());
+
+            assert.commandWorked(sessionDB.foo.update({x: 25}, {x: 3}));
+            st.rs0.awaitReplication();
+            assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 25}).itcount());
+            assert.eq(0, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 25}).itcount());
+            assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 3}).itcount());
+            assert.eq(1, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 3}).itcount());
 
             mongos.getDB(kDbName).foo.drop();
 
@@ -190,7 +213,7 @@
             sessionDB = session.getDatabase(kDbName);
 
             shardCollectionMoveChunks(
-                st, kDbName, ns, {x: 1}, [{x: 30}, {x: 50}, {x: 80}], {x: 50}, {x: 80});
+                st, kDbName, ns, {x: 1}, [{x: 10}, {x: 30}, {x: 50}, {x: 80}], {x: 50}, {x: 80});
             cleanupOrphanedDocs(st, ns);
 
             session.startTransaction();
@@ -206,6 +229,23 @@
 
             assert.eq(1, mongos.getDB(kDbName).foo.find({x: 30}).itcount());
             assert.eq(0, mongos.getDB(kDbName).foo.find({x: 100}).itcount());
+
+            // Doc will remain on the same shard. Because shard 0 is on FCV 4.2, this should
+            // complete successfully.
+            session.startTransaction();
+            sessionDB.foo.findAndModify({query: {x: 10}, update: {x: 1}});
+            assert.commandWorked(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
+            assert.commandWorked(session.commitTransaction_forTesting());
+            st.rs0.awaitReplication();
+
+            assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 30}).itcount());
+            assert.eq(0, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 30}).itcount());
+            assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 10}).itcount());
+            assert.eq(0, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 10}).itcount());
+            assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 5}).itcount());
+            assert.eq(1, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 5}).itcount());
+            assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find({x: 1}).itcount());
+            assert.eq(1, st.rs0.getSecondaries()[0].getDB(kDbName).foo.find({x: 1}).itcount());
 
             mongos.getDB(kDbName).foo.drop();
         }
