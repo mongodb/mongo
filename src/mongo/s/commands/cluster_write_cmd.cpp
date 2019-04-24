@@ -276,7 +276,11 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
                     "Update operation was converted into a distributed transaction because the "
                     "document being updated would move shards and that transaction failed");
             }
-
+            if (!response->isErrDetailsSet() || !response->getErrDetails().back()) {
+                auto error = stdx::make_unique<WriteErrorDetail>();
+                error->setIndex(0);
+                response->addToErrDetails(error.release());
+            }
             response->getErrDetails().back()->setStatus(status);
 
             auto txnRouterForAbort = TransactionRouter::get(opCtx);
