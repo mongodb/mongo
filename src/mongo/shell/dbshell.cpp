@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <pcrecpp.h>

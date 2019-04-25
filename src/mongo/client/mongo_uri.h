@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/algorithm/string.hpp>
 #include <map>
 #include <sstream>
 #include <string>
@@ -105,8 +104,7 @@ class MongoURI {
 public:
     class CaseInsensitiveString {
     public:
-        CaseInsensitiveString(std::string str)
-            : _original(std::move(str)), _lowercase(boost::algorithm::to_lower_copy(_original)) {}
+        CaseInsensitiveString(std::string str);
 
         CaseInsensitiveString(StringData sd) : CaseInsensitiveString(std::string(sd)) {}
         CaseInsensitiveString(const char* str) : CaseInsensitiveString(std::string(str)) {}

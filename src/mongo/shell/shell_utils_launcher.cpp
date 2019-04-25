@@ -39,6 +39,7 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/iostreams/tee.hpp>
+#include <cctype>
 #include <fcntl.h>
 #include <iostream>
 #include <iterator>

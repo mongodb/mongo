@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
+#include <cctype>
 #include <cerrno>
 #include <fstream>
 #include <stdio.h>

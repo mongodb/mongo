@@ -298,6 +298,9 @@ URIParts::URIParts(StringData uri) {
 }
 }  // namespace
 
+MongoURI::CaseInsensitiveString::CaseInsensitiveString(std::string str)
+    : _original(std::move(str)), _lowercase(boost::algorithm::to_lower_copy(_original)) {}
+
 bool MongoURI::isMongoURI(StringData uri) {
     return (uri.startsWith(kURIPrefix) || uri.startsWith(kURISRVPrefix));
 }
