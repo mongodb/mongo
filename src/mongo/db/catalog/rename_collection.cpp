@@ -333,7 +333,17 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     invariant(source.db() == target.db());
     DisableDocumentValidation validationDisabler(opCtx);
 
-    Lock::DBLock dbWriteLock(opCtx, source.db(), MODE_X);
+    Lock::DBLock dbWriteLock(opCtx, source.db(), MODE_IX);
+    boost::optional<Lock::CollectionLock> sourceLock;
+    boost::optional<Lock::CollectionLock> targetLock;
+    if (ResourceId(RESOURCE_COLLECTION, source.ns()) <
+        ResourceId(RESOURCE_COLLECTION, target.ns())) {
+        sourceLock.emplace(opCtx, source, MODE_X);
+        targetLock.emplace(opCtx, target, MODE_X);
+    } else {
+        targetLock.emplace(opCtx, target, MODE_X);
+        sourceLock.emplace(opCtx, source, MODE_X);
+    }
 
     auto status = checkSourceAndTargetNamespaces(opCtx, source, target, options);
     if (!status.isOK())

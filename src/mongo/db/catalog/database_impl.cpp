@@ -468,7 +468,10 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     log() << "dropCollection: " << nss << " (" << uuidString
           << ") - renaming to drop-pending collection: " << dpns << " with drop optime "
           << dropOpTime;
-    fassert(40464, renameCollection(opCtx, nss, dpns, stayTemp));
+    {
+        Lock::CollectionLock(opCtx, dpns, MODE_X);
+        fassert(40464, renameCollection(opCtx, nss, dpns, stayTemp));
+    }
 
     // Register this drop-pending namespace with DropPendingCollectionReaper to remove when the
     // committed optime reaches the drop optime.
@@ -511,10 +514,9 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                       NamespaceString toNss,
                                       bool stayTemp) const {
     audit::logRenameCollection(&cc(), fromNss.ns(), toNss.ns());
-    // TODO SERVER-39518 : Temporarily comment this out because dropCollection uses
-    // this function and now it only takes a database IX lock. We can change
-    // this invariant to IX once renameCollection only MODE_IX as well.
-    // invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+
+    invariant(opCtx->lockState()->isCollectionLockedForMode(fromNss, MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(toNss, MODE_X));
 
     invariant(fromNss.db() == _name);
     invariant(toNss.db() == _name);

@@ -798,10 +798,8 @@ Status KVCatalog::renameCollection(OperationContext* opCtx,
                                    const NamespaceString& fromNss,
                                    const NamespaceString& toNss,
                                    bool stayTemp) {
-    // TODO SERVER-39518 : Temporarily comment this out because dropCollection uses
-    // this function and now it only takes a database IX lock. We can change
-    // this invariant to IX once renameCollection only MODE_IX as well.
-    // invariant(opCtx->lockState()->isDbLockedForMode(fromNss.db(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(fromNss, MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(toNss, MODE_X));
 
     const std::string identFrom = _engine->getCatalog()->getCollectionIdent(fromNss);
 
