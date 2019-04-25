@@ -1693,6 +1693,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/saslauth',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/query_exec',
+        "$BUILD_DIR/mongo/util/fail_point",
         'oplog',
         'oplogreader',
         'repl_coordinator_interface',

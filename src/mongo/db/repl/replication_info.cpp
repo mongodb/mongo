@@ -58,9 +58,13 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
 
 using std::unique_ptr;
 using std::list;
@@ -236,6 +240,10 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
+        // TODO Unwind after SERVER-41070
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, waitInIsMaster);
+
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
            authenticated.
         */
