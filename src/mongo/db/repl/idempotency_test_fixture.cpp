@@ -546,7 +546,7 @@ std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
     for (auto& db : dbs) {
         // Skip local database.
         if (db != "local") {
-            for (const auto& nss : uuidCatalog.getAllCollectionNamesFromDb(_opCtx.get(), db)) {
+            for (const auto& nss : uuidCatalog.getAllCollectionNamesFromDb(db)) {
                 collStates.push_back(validate(nss));
             }
         }
@@ -582,7 +582,8 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
 
     Lock::DBLock lk(_opCtx.get(), nss.db(), MODE_IX);
     auto lock = stdx::make_unique<Lock::CollectionLock>(_opCtx.get(), nss, MODE_X);
-    ASSERT_OK(collection->validate(_opCtx.get(), kValidateFull, false, &validateResults, &bob));
+    ASSERT_OK(collection->validate(
+        _opCtx.get(), kValidateFull, false, std::move(lock), &validateResults, &bob));
     ASSERT_TRUE(validateResults.valid);
 
     std::string dataHash = computeDataHash(collection);

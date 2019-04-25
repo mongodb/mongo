@@ -94,6 +94,7 @@ protected:
                       ->validate(&_opCtx,
                                  _full ? kValidateFull : kValidateIndex,
                                  _background,
+                                 std::move(lock),
                                  &results,
                                  &output));
 

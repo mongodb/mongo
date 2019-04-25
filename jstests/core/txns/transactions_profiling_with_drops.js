@@ -7,17 +7,20 @@
 
     const dbName = "test";
     const collName = "transactions_profiling_with_drops";
+    const otherCollName = "other";
     const adminDB = db.getSiblingDB("admin");
     const testDB = db.getSiblingDB(dbName);
+    const otherColl = testDB[otherCollName];
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
 
     sessionDb.runCommand({dropDatabase: 1, writeConcern: {w: "majority"}});
     assert.commandWorked(sessionColl.insert({_id: "doc"}, {w: "majority"}));
+    assert.commandWorked(otherColl.insert({_id: "doc"}, {w: "majority"}));
     assert.commandWorked(sessionDb.runCommand({profile: 1, slowms: 1}));
 
-    jsTest.log("Test read profiling with operation holding database X lock.");
+    jsTest.log("Test read profiling with drops.");
 
     jsTest.log("Start transaction.");
     session.startTransaction();
@@ -29,50 +32,39 @@
     profilerHasSingleMatchingEntryOrThrow(
         {profileDB: testDB, filter: {"command.comment": "read success"}});
 
-    // Lock 'test' database in X mode.
-    let lockShell = startParallelShell(function() {
-        assert.commandFailed(db.adminCommand({
-            sleep: 1,
-            secs: 500,
-            lock: "w",
-            lockTarget: "test",
-            $comment: "transaction_profiling_with_drops lock sleep"
-        }));
+    jsTest.log("Start a drop, which will hang.");
+    let awaitDrop = startParallelShell(function() {
+        db.getSiblingDB("test").runCommand({drop: "other", writeConcern: {w: "majority"}});
     });
 
-    const waitForCommand = function(opFilter) {
-        let opId = -1;
-        assert.soon(function() {
-            const curopRes = testDB.currentOp();
-            assert.commandWorked(curopRes);
-            const foundOp = curopRes["inprog"].filter(opFilter);
-
-            if (foundOp.length == 1) {
-                opId = foundOp[0]["opid"];
-            }
-            return (foundOp.length == 1);
+    // Wait for the drop to have a pending MODE_X lock on the database.
+    assert.soon(
+        function() {
+            return adminDB
+                       .aggregate([
+                           {$currentOp: {}},
+                           {$match: {"command.drop": otherCollName, waitingForLock: true}}
+                       ])
+                       .itcount() === 1;
+        },
+        function() {
+            return "Failed to find drop in currentOp output: " +
+                tojson(adminDB.aggregate([{$currentOp: {}}]));
         });
-        return opId;
-    };
-
-    // Wait for sleep to appear in currentOp
-    let opId = waitForCommand(
-        op => (op["ns"] == "admin.$cmd" &&
-               op["command"]["$comment"] == "transaction_profiling_with_drops lock sleep"));
 
     jsTest.log("Run a slow read. Profiling in the transaction should fail.");
     assert.sameMembers(
         [{_id: "doc"}],
         sessionColl.find({$where: "sleep(1000); return true;"}).comment("read failure").toArray());
     session.commitTransaction();
-
-    assert.commandWorked(testDB.killOp(opId));
-    lockShell();
-
+    awaitDrop();
     profilerHasZeroMatchingEntriesOrThrow(
         {profileDB: testDB, filter: {"command.comment": "read failure"}});
 
-    jsTest.log("Test write profiling with operation holding database X lock.");
+    jsTest.log("Test write profiling with drops.");
+
+    // Recreate the "other" collection so it can be dropped again.
+    assert.commandWorked(otherColl.insert({_id: "doc"}, {w: "majority"}));
 
     jsTest.log("Start transaction.");
     session.startTransaction();
@@ -83,24 +75,31 @@
     profilerHasSingleMatchingEntryOrThrow(
         {profileDB: testDB, filter: {"command.collation": {locale: "en"}}});
 
-    // Lock 'test' database in X mode.
-    lockShell = startParallelShell(function() {
-        assert.commandFailed(db.getSiblingDB("test").adminCommand(
-            {sleep: 1, secs: 500, lock: "w", lockTarget: "test", $comment: "lock sleep"}));
+    jsTest.log("Start a drop, which will hang.");
+    awaitDrop = startParallelShell(function() {
+        db.getSiblingDB("test").runCommand({drop: "other", writeConcern: {w: "majority"}});
     });
 
-    // Wait for sleep to appear in currentOp
-    opId = waitForCommand(
-        op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "lock sleep"));
+    // Wait for the drop to have a pending MODE_X lock on the database.
+    assert.soon(
+        function() {
+            return adminDB
+                       .aggregate([
+                           {$currentOp: {}},
+                           {$match: {"command.drop": otherCollName, waitingForLock: true}}
+                       ])
+                       .itcount() === 1;
+        },
+        function() {
+            return "Failed to find drop in currentOp output: " +
+                tojson(adminDB.aggregate([{$currentOp: {}}]));
+        });
 
     jsTest.log("Run a slow write. Profiling in the transaction should fail.");
     assert.commandWorked(sessionColl.update(
         {$where: "sleep(1000); return true;"}, {$inc: {bad: 1}}, {collation: {locale: "fr"}}));
     session.commitTransaction();
-
-    assert.commandWorked(testDB.killOp(opId));
-    lockShell();
-
+    awaitDrop();
     profilerHasZeroMatchingEntriesOrThrow(
         {profileDB: testDB, filter: {"command.collation": {locale: "fr"}}});
 

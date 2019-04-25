@@ -73,35 +73,16 @@
 
         jsTest.log(
             "If the noop write for NoSuchTransaction cannot occur, the error is not transient");
-
-        // Lock 'local' database in X mode.
-        let lockShell = startParallelShell(function() {
-            assert.commandFailed(db.adminCommand({
-                sleep: 1,
-                secs: 500,
-                lock: "w",
-                lockTarget: "local",
-                $comment: "transient_txn_error_labels_with_write_concern lock sleep"
-            }));
-        }, rst.ports[0]);
-
-        // Wait for sleep to appear in currentOp
-        let opId = -1;
-        assert.soon(function() {
-            const curopRes = testDB.currentOp();
-            assert.commandWorked(curopRes);
-            const foundOp = curopRes["inprog"].filter(
-                op => (op["ns"] == "admin.$cmd" &&
-                       op["command"]["$comment"] ==
-                           "transient_txn_error_labels_with_write_concern lock sleep"));
-            if (foundOp.length == 1) {
-                opId = foundOp[0]["opid"];
-            }
-            return (foundOp.length == 1);
-        });
-
+        assert.commandWorked(testDB.getSiblingDB("local").createCollection("todrop"));
+        assert.commandWorked(testDB.adminCommand(
+            {configureFailPoint: "hangDuringDropCollection", mode: "alwaysOn"}));
+        // Create a pending drop on a collection in the local database. This will hold an X lock on
+        // the local database.
+        let awaitDrop = startParallelShell(() => assert(db.getSiblingDB("local")["todrop"].drop()),
+                                           rst.ports[0]);
+        checkLog.contains(testDB.getMongo(), "hangDuringDropCollection fail point enabled");
         // The server will attempt to perform a noop write, since the command returns
-        // NoSuchTransaction. The noop write will time out acquiring a lock on the 'local' database.
+        // NoSuchTransaction. The noop write will time out acquiring a lock on the local database.
         // This should not be a TransientTransactionError, since the server has not successfully
         // replicated a write to confirm that it is primary.
         // Use a txnNumber that is one higher than the server has tracked.
@@ -113,10 +94,9 @@
         }));
         assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
         assert(!res.hasOwnProperty("errorLabels"));
-
-        assert.commandWorked(testDB.killOp(opId));
-        lockShell();
-
+        assert.commandWorked(
+            testDB.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "off"}));
+        awaitDrop();
         rst.awaitReplication();
     }
 

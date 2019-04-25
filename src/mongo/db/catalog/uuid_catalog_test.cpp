@@ -740,7 +740,7 @@ TEST_F(UUIDCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     }
 
     std::vector<NamespaceString> dCollList = {d1Coll, d2Coll, d3Coll};
-    auto res = catalog.getAllCollectionNamesFromDb(&opCtx, "dbD");
+    auto res = catalog.getAllCollectionNamesFromDb("dbD");
     std::sort(res.begin(), res.end());
     ASSERT(res == dCollList);
 

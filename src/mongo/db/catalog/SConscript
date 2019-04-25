@@ -325,17 +325,6 @@ env.Library(
     ]
 )
 
-env.Library(
-    target='uuid_catalog_helper',
-    source=[
-        'uuid_catalog_helper.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        'uuid_catalog',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-    ]
-)
-
 env.CppUnitTest(
     target='namespace_uuid_cache_test',
     source=[
@@ -353,6 +342,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'uuid_catalog',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
     ],
@@ -427,7 +417,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views_mongod',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/uuid_catalog_helper',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/index/index_build_interceptor',
         '$BUILD_DIR/mongo/db/logical_clock',

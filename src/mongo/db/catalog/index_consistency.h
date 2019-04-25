@@ -90,6 +90,7 @@ public:
                      Collection* collection,
                      NamespaceString nss,
                      RecordStore* recordStore,
+                     std::unique_ptr<Lock::CollectionLock> collLk,
                      const bool background);
 
     /**
@@ -168,6 +169,7 @@ private:
     Collection* _collection;
     const NamespaceString _nss;
     const RecordStore* _recordStore;
+    std::unique_ptr<Lock::CollectionLock> _collLk;
     ElapsedTracker _tracker;
 
     // We map the hashed KeyString values to a bucket which contain the count of how many
