@@ -50,6 +50,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/catalog/uuid_catalog_helper.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -169,7 +170,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
     }
 
     auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    for (const auto& nss : uuidCatalog.getAllCollectionNamesFromDb(_name)) {
+    for (const auto& nss : uuidCatalog.getAllCollectionNamesFromDb(opCtx, _name)) {
         auto ownedCollection = _createCollectionInstance(opCtx, nss);
         invariant(ownedCollection);
 
@@ -196,7 +197,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
-    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(_name)) {
+    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, _name)) {
         CollectionCatalogEntry* coll =
             UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
         CollectionOptions options = coll->getCollectionOptions(opCtx);
@@ -278,24 +279,24 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
 
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
 
-    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(_name)) {
-        Lock::CollectionLock colLock(opCtx, nss, MODE_IS);
-        Collection* collection = getCollection(opCtx, nss);
+    catalog::forEachCollectionFromDb(
+        opCtx,
+        name(),
+        MODE_IS,
+        [&](Collection* collection, CollectionCatalogEntry* catalogEntry) -> bool {
+            nCollections += 1;
+            objects += collection->numRecords(opCtx);
+            size += collection->dataSize(opCtx);
 
-        if (!collection)
-            continue;
+            BSONObjBuilder temp;
+            storageSize += collection->getRecordStore()->storageSize(opCtx, &temp);
+            numExtents += temp.obj()["numExtents"].numberInt();  // XXX
 
-        nCollections += 1;
-        objects += collection->numRecords(opCtx);
-        size += collection->dataSize(opCtx);
+            indexes += collection->getIndexCatalog()->numIndexesTotal(opCtx);
+            indexSize += collection->getIndexSize(opCtx);
 
-        BSONObjBuilder temp;
-        storageSize += collection->getRecordStore()->storageSize(opCtx, &temp);
-        numExtents += temp.obj()["numExtents"].numberInt();  // XXX
-
-        indexes += collection->getIndexCatalog()->numIndexesTotal(opCtx);
-        indexSize += collection->getIndexSize(opCtx);
-    }
+            return true;
+        });
 
     ViewCatalog::get(this)->iterate(opCtx, [&](const ViewDefinition& view) { nViews += 1; });
 
@@ -369,7 +370,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                                                 const NamespaceString& fullns,
                                                 repl::OpTime dropOpTime) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(fullns, MODE_X));
 
     LOG(1) << "dropCollection: " << fullns;
 
@@ -514,9 +515,10 @@ Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const Namespace
     }
 
     NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
-    auto uuid = coll->uuid();
-    invariant(uuid);
-    cache.ensureNamespaceInCache(nss, uuid.get());
+    auto uuid = UUIDCatalog::get(opCtx).lookupUUIDByNSS(nss);
+    if (uuid) {
+        cache.ensureNamespaceInCache(nss, uuid.get());
+    }
     return coll;
 }
 
@@ -525,7 +527,10 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                       StringData toNS,
                                       bool stayTemp) const {
     audit::logRenameCollection(&cc(), fromNS, toNS);
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    // TODO SERVER-39518 : Temporarily comment this out because dropCollection uses
+    // this function and now it only takes a database IX lock. We can change
+    // this invariant to IX once renameCollection only MODE_IX as well.
+    // invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
     const NamespaceString fromNSS(fromNS);
     const NamespaceString toNSS(toNS);
@@ -816,7 +821,7 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         return;
     }
 
-    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(_name)) {
+    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, _name)) {
         if (nss.isDropPendingNamespace()) {
             auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
             log() << "Found drop-pending namespace " << nss << " with drop optime " << dropOpTime;

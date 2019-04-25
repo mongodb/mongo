@@ -60,6 +60,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+        '$BUILD_DIR/mongo/db/catalog/uuid_catalog_helper',
     ],
 )
 

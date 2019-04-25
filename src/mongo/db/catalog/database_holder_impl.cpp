@@ -137,7 +137,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     // different databases for the same name.
     lk.unlock();
 
-    if (UUIDCatalog::get(opCtx).getAllCatalogEntriesFromDb(dbname).empty()) {
+    if (UUIDCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty()) {
         audit::logCreateDatabase(opCtx->getClient(), dbname);
         if (justCreated)
             *justCreated = true;
@@ -202,6 +202,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
 namespace {
 void evictDatabaseFromUUIDCatalog(OperationContext* opCtx, Database* db) {
+    invariant(opCtx->lockState()->isW());
     for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
         auto coll = *collIt;
         if (!coll) {
@@ -210,7 +211,7 @@ void evictDatabaseFromUUIDCatalog(OperationContext* opCtx, Database* db) {
 
         NamespaceUUIDCache::get(opCtx).evictNamespace(coll->ns());
     }
-    UUIDCatalog::get(opCtx).onCloseDatabase(db);
+    UUIDCatalog::get(opCtx).onCloseDatabase(opCtx, db);
 }
 }  // namespace
 

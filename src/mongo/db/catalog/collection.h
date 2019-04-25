@@ -328,7 +328,6 @@ public:
     virtual Status validate(OperationContext* const opCtx,
                             const ValidateCmdLevel level,
                             bool background,
-                            std::unique_ptr<Lock::CollectionLock> collLk,
                             ValidateResults* const results,
                             BSONObjBuilder* const output) = 0;
 

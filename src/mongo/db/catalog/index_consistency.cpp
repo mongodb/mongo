@@ -62,13 +62,11 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    Collection* collection,
                                    NamespaceString nss,
                                    RecordStore* recordStore,
-                                   std::unique_ptr<Lock::CollectionLock> collLk,
                                    const bool background)
     : _opCtx(opCtx),
       _collection(collection),
       _nss(nss),
       _recordStore(recordStore),
-      _collLk(std::move(collLk)),
       _tracker(opCtx->getServiceContext()->getFastClockSource(),
                internalQueryExecYieldIterations.load(),
                Milliseconds(internalQueryExecYieldPeriodMS.load())) {

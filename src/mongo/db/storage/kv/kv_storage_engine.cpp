@@ -37,6 +37,7 @@
 
 #include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/catalog/uuid_catalog_helper.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_clock.h"
@@ -532,7 +533,8 @@ Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
         }
     }
 
-    std::vector<NamespaceString> toDrop = UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(db);
+    std::vector<NamespaceString> toDrop =
+        UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, db);
 
     // Do not timestamp any of the following writes. This will remove entries from the catalog as
     // well as drop any underlying tables. It's not expected for dropping tables to be reversible
@@ -911,20 +913,22 @@ void KVStorageEngine::TimestampMonitor::removeListener(TimestampListener* listen
 
 int64_t KVStorageEngine::sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {
     int64_t size = 0;
-    auto catalogEntries = UUIDCatalog::get(opCtx).getAllCatalogEntriesFromDb(dbName);
 
-    for (auto catalogEntry : catalogEntries) {
-        size += catalogEntry->getRecordStore()->storageSize(opCtx);
+    catalog::forEachCollectionFromDb(
+        opCtx, dbName, MODE_IS, [&](Collection* collection, CollectionCatalogEntry* catalogEntry) {
+            size += catalogEntry->getRecordStore()->storageSize(opCtx);
 
-        std::vector<std::string> indexNames;
-        catalogEntry->getAllIndexes(opCtx, &indexNames);
+            std::vector<std::string> indexNames;
+            catalogEntry->getAllIndexes(opCtx, &indexNames);
 
-        for (size_t i = 0; i < indexNames.size(); i++) {
-            std::string ident =
-                _catalog->getIndexIdent(opCtx, catalogEntry->ns().ns(), indexNames[i]);
-            size += _engine->getIdentSize(opCtx, ident);
-        }
-    }
+            for (size_t i = 0; i < indexNames.size(); i++) {
+                std::string ident =
+                    _catalog->getIndexIdent(opCtx, catalogEntry->ns().ns(), indexNames[i]);
+                size += _engine->getIdentSize(opCtx, ident);
+            }
+
+            return true;
+        });
 
     return size;
 }
