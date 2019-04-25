@@ -44,9 +44,8 @@ namespace mongo {
  * A JSON Pointer to the key id or an array of UUIDs identifying a set of keys.
  */
 class EncryptSchemaKeyId {
-    friend class EncryptionInfoNormalized;
-    friend class EncryptionMetadata;
     friend class EncryptionInfo;
+    friend class EncryptionMetadata;
 
 public:
     enum class Type {
@@ -88,6 +87,10 @@ public:
         }
 
         return _type == Type::kUUIDs ? _uuids == other.uuids() : _pointer == other.jsonPointer();
+    }
+
+    bool operator!=(const EncryptSchemaKeyId& other) const {
+        return !(*this == other);
     }
 
     /**
