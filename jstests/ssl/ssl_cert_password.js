@@ -39,6 +39,10 @@ requireSSLProvider('openssl', function() {
     // 1 is the exit code for failure
     assert(exit_code == 1);
 
+    /**
+     * SERVER-40840 Disable due to nodejs certificates not using minimal encoding for DER integers
+     *
+
     // Test that mongodump and mongorestore support ssl
     c = md.getDB("dumprestore_ssl").getCollection("foo");
     assert.eq(0, c.count(), "dumprestore_ssl.foo collection is not initially empty");
@@ -170,6 +174,7 @@ requireSSLProvider('openssl', function() {
 
     md5 = md5sumFile(external_scratch_dir + filename);
     assert.eq(md5, md5_stored, "hash of stored file does not match the expected value");
+    */
 
     if (!_isWindows()) {
         // Stop the server
