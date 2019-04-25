@@ -108,7 +108,7 @@ selector:
   - jstests/sharding/txn_two_phase_commit_killop.js
   - jstests/sharding/txn_two_phase_commit_recover_decision.js
   - jstests/sharding/txn_two_phase_commit_wait_for_majority_commit_after_stepup.js
-  - jstests/sharding/txn_read_only_transactions.js
+  - jstests/sharding/txn_commit_optimizations_for_read_only_shards.js
   - jstests/sharding/txn_being_applied_to_secondary_cannot_be_killed.js
   - jstests/sharding/txn_with_several_routers.js
   - jstests/sharding/txn_writes_during_movechunk.js
