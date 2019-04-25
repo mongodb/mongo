@@ -6,7 +6,14 @@
 (function() {
     "use strict";
 
-    const st = new ShardingTest({shards: 1, rs0: {nodes: 3}, mongos: 1});
+    // TODO ShardingTaskExecutorPoolMinSize is set to 0 so that we can clearly observe
+    // dropConnections. This will no longer be necessary with SERVER-41460
+    const st = new ShardingTest({
+        config: {nodes: 1},
+        shards: 1,
+        rs0: {nodes: 3},
+        mongos: [{setParameter: {ShardingTaskExecutorPoolMinSize: 0}}]
+    });
     const mongos = st.s0;
     const rst = st.rs0;
     const primary = rst.getPrimary();
