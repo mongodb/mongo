@@ -280,18 +280,5 @@ inline OplogSlot getNextOpTime(OperationContext* opCtx) {
     return slots.back();
 }
 
-/**
- * Allocates an OpTime, but does not update the storage engine with the timestamp. This is used to
- * test prepare support for transactions. It is necessary to do this because a transaction in
- * WiredTiger cannot be prepared if a timestamp has already been set (by a call to getNextOpTime),
- * but a timestamp is required to call prepare_transaction. The circular nature of this behavior
- * requires that an optime be allocated without updating the storage engine.
- *
- * TODO: This is a temporary workaround for prepared transactions that allows generating an
- * optime without setting the commit timestamp on the storage engine. This can be removed once
- * prepare generates an oplog entry in a separate unit of work.
- */
-OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx);
-
 }  // namespace repl
 }  // namespace mongo
