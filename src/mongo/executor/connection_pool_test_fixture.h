@@ -139,8 +139,27 @@ private:
 class InlineOutOfLineExecutor : public OutOfLineExecutor {
 public:
     void schedule(Task task) override {
-        std::move(task)(Status::OK());
+        // Add the task to our queue
+        _taskQueue.emplace_back(std::move(task));
+
+        // Make sure we're not already inline executing
+        if (std::exchange(_inSchedule, true)) {
+            return;
+        }
+
+        // Clear out our queue
+        while (!_taskQueue.empty()) {
+            auto task = std::move(_taskQueue.front());
+            std::move(task)(Status::OK());
+            _taskQueue.pop_front();
+        }
+
+        // Admit we're not working on the queue anymore
+        _inSchedule = false;
     }
+
+    bool _inSchedule;
+    std::deque<Task> _taskQueue;
 };
 
 /**
@@ -150,6 +169,7 @@ class PoolImpl final : public ConnectionPool::DependentTypeFactoryInterface {
     friend class ConnectionImpl;
 
 public:
+    PoolImpl() = default;
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort,
         transport::ConnectSSLMode sslMode,
@@ -157,10 +177,7 @@ public:
 
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
 
-    OutOfLineExecutor& getExecutor() override {
-        static InlineOutOfLineExecutor _executor;
-        return _executor;
-    }
+    const std::shared_ptr<OutOfLineExecutor>& getExecutor() override;
 
     Date_t now() override;
 
@@ -175,6 +192,7 @@ public:
 
 private:
     ConnectionPool* _pool = nullptr;
+    std::shared_ptr<OutOfLineExecutor> _executor = std::make_shared<InlineOutOfLineExecutor>();
 
     static boost::optional<Date_t> _now;
 };

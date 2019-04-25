@@ -327,10 +327,14 @@ void TLConnection::cancelAsync() {
         _client->cancel();
 }
 
+auto TLTypeFactory::reactor() {
+    return checked_pointer_cast<transport::Reactor>(_executor);
+}
+
 std::shared_ptr<ConnectionPool::ConnectionInterface> TLTypeFactory::makeConnection(
     const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode, size_t generation) {
     auto conn = std::make_shared<TLConnection>(shared_from_this(),
-                                               _reactor,
+                                               reactor(),
                                                getGlobalServiceContext(),
                                                hostAndPort,
                                                sslMode,
@@ -342,13 +346,13 @@ std::shared_ptr<ConnectionPool::ConnectionInterface> TLTypeFactory::makeConnecti
 }
 
 std::shared_ptr<ConnectionPool::TimerInterface> TLTypeFactory::makeTimer() {
-    auto timer = std::make_shared<TLTimer>(shared_from_this(), _reactor);
+    auto timer = std::make_shared<TLTimer>(shared_from_this(), reactor());
     fasten(timer.get());
     return timer;
 }
 
 Date_t TLTypeFactory::now() {
-    return _reactor->now();
+    return checked_cast<transport::Reactor*>(_executor.get())->now();
 }
 
 }  // namespace connection_pool_tl

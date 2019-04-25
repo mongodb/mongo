@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
@@ -94,15 +93,8 @@ class ConnectionPool::SpecificPool final
     : public std::enable_shared_from_this<ConnectionPool::SpecificPool> {
 public:
     /**
-     * Whenever a function enters a specific pool, the function needs to be guarded.
-     * The presence of one of these guards will bump a counter on the specific pool
-     * which will prevent the pool from removing itself from the map of pools.
-     *
-     * The complexity comes from the need to hold a lock when writing to the
-     * _activeClients param on the specific pool.  Because the code beneath the client needs to lock
-     * and unlock the parent mutex (and can leave unlocked), we want to start the client with the
-     * lock acquired, move it into the client, then re-acquire to decrement the counter on the way
-     * out.
+     * Whenever a function enters a specific pool,
+     * the function needs to be guarded by the pool lock.
      *
      * This callback also (perhaps overly aggressively) binds a shared pointer to the guard.
      * It is *always* safe to reference the original specific pool in the guarded function object.
@@ -116,19 +108,12 @@ public:
     template <typename Callback>
     auto guardCallback(Callback&& cb) {
         return [ cb = std::forward<Callback>(cb), anchor = shared_from_this() ](auto&&... args) {
-            stdx::unique_lock<stdx::mutex> lk(anchor->_parent->_mutex);
-            ++(anchor->_activeClients);
-
-            ON_BLOCK_EXIT([anchor]() {
-                stdx::unique_lock<stdx::mutex> lk(anchor->_parent->_mutex);
-                --(anchor->_activeClients);
-            });
-
-            return cb(std::move(lk), std::forward<decltype(args)>(args)...);
+            return cb(stdx::unique_lock(anchor->_parent->_mutex),
+                      std::forward<decltype(args)>(args)...);
         };
     }
 
-    SpecificPool(ConnectionPool* parent,
+    SpecificPool(std::shared_ptr<ConnectionPool> parent,
                  const HostAndPort& hostAndPort,
                  transport::ConnectSSLMode sslMode);
     ~SpecificPool();
@@ -247,7 +232,7 @@ private:
     void updateStateInLock();
 
 private:
-    ConnectionPool* const _parent;
+    const std::shared_ptr<ConnectionPool> _parent;
 
     const transport::ConnectSSLMode _sslMode;
     const HostAndPort _hostAndPort;
@@ -261,7 +246,6 @@ private:
 
     std::shared_ptr<TimerInterface> _requestTimer;
     Date_t _requestTimerExpiration;
-    size_t _activeClients;
     size_t _generation;
     bool _inFulfillRequests;
     bool _inSpawnConnections;
@@ -408,7 +392,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPort& 
     auto iter = _pools.find(hostAndPort);
 
     if (iter == _pools.end()) {
-        pool = stdx::make_unique<SpecificPool>(this, hostAndPort, sslMode);
+        pool = std::make_shared<SpecificPool>(shared_from_this(), hostAndPort, sslMode);
         _pools[hostAndPort] = pool;
     } else {
         pool = iter->second;
@@ -445,33 +429,21 @@ size_t ConnectionPool::getNumConnectionsPerHost(const HostAndPort& hostAndPort) 
     return 0;
 }
 
-void ConnectionPool::returnConnection(ConnectionInterface* conn) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    auto iter = _pools.find(conn->getHostAndPort());
-
-    invariant(iter != _pools.end(),
-              str::stream() << "Tried to return connection but no pool found for "
-                            << conn->getHostAndPort());
-
-    auto pool = iter->second;
-    pool->returnConnection(conn, std::move(lk));
-}
-
-ConnectionPool::SpecificPool::SpecificPool(ConnectionPool* parent,
+ConnectionPool::SpecificPool::SpecificPool(std::shared_ptr<ConnectionPool> parent,
                                            const HostAndPort& hostAndPort,
                                            transport::ConnectSSLMode sslMode)
-    : _parent(parent),
+    : _parent(std::move(parent)),
       _sslMode(sslMode),
       _hostAndPort(hostAndPort),
       _readyPool(std::numeric_limits<size_t>::max()),
-      _requestTimer(parent->_factory->makeTimer()),
-      _activeClients(0),
       _generation(0),
       _inFulfillRequests(false),
       _inSpawnConnections(false),
       _created(0),
-      _state(State::kRunning) {}
+      _state(State::kRunning) {
+    invariant(_parent);
+    _requestTimer = _parent->_factory->makeTimer();
+}
 
 ConnectionPool::SpecificPool::~SpecificPool() {
     DESTRUCTOR_GUARD(_requestTimer->cancelTimeout();)
@@ -527,7 +499,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     updateStateInLock();
 
     lk.unlock();
-    _parent->_factory->getExecutor().schedule(guardCallback([this](auto lk, auto schedStatus) {
+    _parent->_factory->getExecutor()->schedule(guardCallback([this](auto lk, auto schedStatus) {
         fassert(51169, schedStatus);
 
         spawnConnections(lk);
@@ -615,7 +587,7 @@ void ConnectionPool::SpecificPool::finishRefresh(stdx::unique_lock<stdx::mutex> 
     addToReady(lk, std::move(conn));
 
     lk.unlock();
-    _parent->_factory->getExecutor().schedule(guardCallback([this](auto lk, auto schedStatus) {
+    _parent->_factory->getExecutor()->schedule(guardCallback([this](auto lk, auto schedStatus) {
         fassert(51170, schedStatus);
         fulfillRequests(lk);
     }));
@@ -669,7 +641,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
         addToReady(lk, std::move(conn));
 
         lk.unlock();
-        _parent->_factory->getExecutor().schedule(guardCallback([this](auto lk, auto schedStatus) {
+        _parent->_factory->getExecutor()->schedule(guardCallback([this](auto lk, auto schedStatus) {
             fassert(51171, schedStatus);
             fulfillRequests(lk);
         }));
@@ -886,7 +858,7 @@ ConnectionPool::SpecificPool::OwnedConnection ConnectionPool::SpecificPool::take
 void ConnectionPool::SpecificPool::updateStateInLock() {
     if (_state == State::kInShutdown) {
         // If we're in shutdown, there is nothing to update. Our clients are all gone.
-        if (_processingPool.empty() && !_activeClients) {
+        if (_processingPool.empty()) {
             // If we have no more clients that require access to us, delist from the parent pool
             LOG(2) << "Delisting connection pool for " << _hostAndPort;
             _parent->_pools.erase(_hostAndPort);
@@ -958,16 +930,16 @@ void ConnectionPool::SpecificPool::updateStateInLock() {
         auto timeout = _parent->_options.hostTimeout;
 
         // Set the shutdown timer, this gets reset on any request
-        _requestTimer->setTimeout(timeout, [ this, anchor = shared_from_this() ]() {
-            stdx::unique_lock<stdx::mutex> lk(anchor->_parent->_mutex);
-            if (_state != State::kIdle)
-                return;
+        _requestTimer->setTimeout(
+            timeout, guardCallback([this](auto lk) {
+                if (_state != State::kIdle)
+                    return;
 
-            triggerShutdown(
-                Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
-                       "Connection pool has been idle for longer than the host timeout"),
-                std::move(lk));
-        });
+                triggerShutdown(
+                    Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                           "Connection pool has been idle for longer than the host timeout"),
+                    std::move(lk));
+            }));
     }
 }
 

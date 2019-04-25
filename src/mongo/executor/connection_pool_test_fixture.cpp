@@ -226,6 +226,10 @@ std::shared_ptr<ConnectionPool::TimerInterface> PoolImpl::makeTimer() {
     return stdx::make_unique<TimerImpl>(this);
 }
 
+const std::shared_ptr<OutOfLineExecutor>& PoolImpl::getExecutor() {
+    return _executor;
+}
+
 Date_t PoolImpl::now() {
     return _now.get_value_or(Date_t::now());
 }

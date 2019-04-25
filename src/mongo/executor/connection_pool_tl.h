@@ -50,7 +50,7 @@ public:
                   transport::TransportLayer* tl,
                   std::unique_ptr<NetworkConnectionHook> onConnectHook,
                   const ConnectionPool::Options& connPoolOptions)
-        : _reactor(std::move(reactor)),
+        : _executor(std::move(reactor)),
           _tl(tl),
           _onConnectHook(std::move(onConnectHook)),
           _connPoolOptions(connPoolOptions) {}
@@ -60,8 +60,8 @@ public:
         transport::ConnectSSLMode sslMode,
         size_t generation) override;
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
-    OutOfLineExecutor& getExecutor() override {
-        return *_reactor;
+    const std::shared_ptr<OutOfLineExecutor>& getExecutor() override {
+        return _executor;
     }
 
     Date_t now() override;
@@ -72,7 +72,9 @@ public:
     void release(Type* type);
 
 private:
-    transport::ReactorHandle _reactor;
+    auto reactor();
+
+    std::shared_ptr<OutOfLineExecutor> _executor;  // This is always a transport::Reactor
     transport::TransportLayer* _tl;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     const ConnectionPool::Options _connPoolOptions;

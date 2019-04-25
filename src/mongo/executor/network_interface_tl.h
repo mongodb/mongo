@@ -141,7 +141,7 @@ private:
     mutable stdx::mutex _mutex;
     ConnectionPool::Options _connPoolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
-    std::unique_ptr<ConnectionPool> _pool;
+    std::shared_ptr<ConnectionPool> _pool;
     Counters _counters;
 
     std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;

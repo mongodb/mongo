@@ -70,8 +70,7 @@ public:
      */
     virtual void schedule(Task func) = 0;
 
-protected:
-    ~OutOfLineExecutor() noexcept {}
+    virtual ~OutOfLineExecutor() = default;
 };
 
 using ExecutorPtr = std::shared_ptr<OutOfLineExecutor>;

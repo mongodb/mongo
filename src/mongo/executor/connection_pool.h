@@ -62,7 +62,7 @@ struct ConnectionPoolStats;
  * The overall workflow here is to manage separate pools for each unique
  * HostAndPort. See comments on the various Options for how the pool operates.
  */
-class ConnectionPool : public EgressTagCloser {
+class ConnectionPool : public EgressTagCloser, public std::enable_shared_from_this<ConnectionPool> {
     class SpecificPool;
 
 public:
@@ -167,8 +167,6 @@ public:
     size_t getNumConnectionsPerHost(const HostAndPort& hostAndPort) const;
 
 private:
-    void returnConnection(ConnectionInterface* connection);
-
     std::string _name;
 
     // Options are set at startup and never changed at run time, so these are
@@ -347,7 +345,7 @@ public:
     /**
      *  Return the executor for use with this factory
      */
-    virtual OutOfLineExecutor& getExecutor() = 0;
+    virtual const std::shared_ptr<OutOfLineExecutor>& getExecutor() = 0;
 
     /**
      * Makes a new timer
