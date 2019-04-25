@@ -13028,7 +13028,6 @@ buildvariants:
   - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: parallel_gen
@@ -13042,12 +13041,6 @@ buildvariants:
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
-    distros:
-    - rhel62-large
-  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
     distros:
     - rhel62-large
   - name: retryable_writes_jscore_passthrough_gen
