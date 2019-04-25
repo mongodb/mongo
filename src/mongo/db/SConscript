@@ -742,7 +742,6 @@ env.Library(
         'commands/txn_cmd_request',
         'repl/local_oplog_info',
         'repl/oplog_entry',
-        'repl/oplog_shim',
         'session_catalog',
     ],
     LIBDEPS_PRIVATE=[

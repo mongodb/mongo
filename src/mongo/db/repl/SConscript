@@ -60,16 +60,6 @@ env.Library(
 )
 
 env.Library(
-    target="oplog_shim",
-    source=[
-        "oplog_shim.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='oplogreader',
     source=[
         'oplogreader.cpp',

@@ -768,8 +768,7 @@ void createOplog(OperationContext* opCtx) {
     createOplog(opCtx, LocalOplogInfo::get(opCtx)->getOplogCollectionName().ns(), isReplSet);
 }
 
-MONGO_REGISTER_SHIM(GetNextOpTimeClass::getNextOpTimes)
-(OperationContext* opCtx, std::size_t count)->std::vector<OplogSlot> {
+std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) {
     return LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, count);
 }
 
