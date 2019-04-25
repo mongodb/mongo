@@ -55,6 +55,9 @@ Status _dropView(OperationContext* opCtx,
                  std::unique_ptr<AutoGetDb>& autoDb,
                  const NamespaceString& collectionName,
                  BSONObjBuilder& result) {
+    // TODO(SERVER-39520): No need to relock once createCollection doesn't need X lock.
+    autoDb.reset();
+    autoDb = std::make_unique<AutoGetDb>(opCtx, collectionName.db(), MODE_IX);
     Database* db = autoDb->getDb();
     if (!db) {
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
@@ -97,16 +100,11 @@ Status _dropView(OperationContext* opCtx,
 
 Status _dropCollection(OperationContext* opCtx,
                        Database* db,
+                       Collection* coll,
                        const NamespaceString& collectionName,
                        const repl::OpTime& dropOpTime,
                        DropCollectionSystemCollectionMode systemCollectionMode,
                        BSONObjBuilder& result) {
-    Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
-    Collection* coll = db->getCollection(opCtx, collectionName);
-    if (!coll) {
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
-    }
-
     if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
         log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "
                  "disabled.";
@@ -157,7 +155,7 @@ Status dropCollection(OperationContext* opCtx,
 
     return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
         // TODO(SERVER-39520): Get rid of database MODE_X lock.
-        auto autoDb = std::make_unique<AutoGetDb>(opCtx, collectionName.db(), MODE_IX);
+        auto autoDb = std::make_unique<AutoGetDb>(opCtx, collectionName.db(), MODE_X);
 
         Database* db = autoDb->getDb();
         if (!db) {
@@ -169,7 +167,7 @@ Status dropCollection(OperationContext* opCtx,
             return _dropView(opCtx, autoDb, collectionName, result);
         } else {
             return _dropCollection(
-                opCtx, db, collectionName, dropOpTime, systemCollectionMode, result);
+                opCtx, db, coll, collectionName, dropOpTime, systemCollectionMode, result);
         }
     });
 }

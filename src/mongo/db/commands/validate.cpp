@@ -123,7 +123,7 @@ public:
         }
 
         AutoGetDb ctx(opCtx, nss.db(), MODE_IX);
-        Lock::CollectionLock collLk(opCtx, nss, MODE_X);
+        auto collLk = stdx::make_unique<Lock::CollectionLock>(opCtx, nss, MODE_X);
         Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : NULL;
         if (!collection) {
             if (ctx.getDb() && ViewCatalog::get(ctx.getDb())->lookup(opCtx, nss.ns())) {
@@ -163,7 +163,8 @@ public:
         const bool background = false;
 
         ValidateResults results;
-        Status status = collection->validate(opCtx, level, background, &results, &result);
+        Status status =
+            collection->validate(opCtx, level, background, std::move(collLk), &results, &result);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }

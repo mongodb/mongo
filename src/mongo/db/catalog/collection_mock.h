@@ -171,6 +171,7 @@ public:
     Status validate(OperationContext* opCtx,
                     ValidateCmdLevel level,
                     bool background,
+                    std::unique_ptr<Lock::CollectionLock> collLk,
                     ValidateResults* results,
                     BSONObjBuilder* output) {
         std::abort();

@@ -142,7 +142,7 @@ Status repairCollections(OperationContext* opCtx,
                          const std::string& dbName,
                          stdx::function<void(const std::string& dbName)> onRecordStoreRepair) {
 
-    auto colls = UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
+    auto colls = UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(dbName);
 
     for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
@@ -183,7 +183,7 @@ Status repairDatabase(OperationContext* opCtx,
     DisableDocumentValidation validationDisabler(opCtx);
 
     // We must hold some form of lock here
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isLocked());
     invariant(dbName.find('.') == std::string::npos);
 
     log() << "repairDatabase " << dbName;

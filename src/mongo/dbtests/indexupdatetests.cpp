@@ -111,20 +111,22 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
+            db->dropCollection(&_opCtx, _ns).transitional_ignore();
             coll = db->createCollection(&_opCtx, _ns);
 
             OpDebug* const nullOpDebug = nullptr;
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << 1 << "a"
-                                                                      << "dup")),
-                                           nullOpDebug,
-                                           true));
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << 2 << "a"
-                                                                      << "dup")),
-                                           nullOpDebug,
-                                           true));
+            coll->insertDocument(&_opCtx,
+                                 InsertStatement(BSON("_id" << 1 << "a"
+                                                            << "dup")),
+                                 nullOpDebug,
+                                 true)
+                .transitional_ignore();
+            coll->insertDocument(&_opCtx,
+                                 InsertStatement(BSON("_id" << 2 << "a"
+                                                            << "dup")),
+                                 nullOpDebug,
+                                 true)
+                .transitional_ignore();
             wunit.commit();
         }
 
@@ -166,7 +168,7 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
+            db->dropCollection(&_opCtx, _ns).transitional_ignore();
             coll = db->createCollection(&_opCtx, _ns);
 
             OpDebug* const nullOpDebug = nullptr;
@@ -223,7 +225,7 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
+            db->dropCollection(&_opCtx, _ns).transitional_ignore();
             coll = db->createCollection(&_opCtx, _ns);
             // Drop all indexes including id index.
             coll->getIndexCatalog()->dropAllIndexes(&_opCtx, true);
@@ -231,8 +233,8 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                ASSERT_OK(
-                    coll->insertDocument(&_opCtx, InsertStatement(BSON("a" << i)), nullOpDebug));
+                coll->insertDocument(&_opCtx, InsertStatement(BSON("a" << i)), nullOpDebug)
+                    .transitional_ignore();
             }
             wunit.commit();
         }
@@ -265,7 +267,11 @@ public:
         Collection* coll;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
+            {
+                // TODO SERVER-39520: Remove this DBLock
+                Lock::DBLock lock(&_opCtx, db->name(), MODE_X);
+                db->dropCollection(&_opCtx, _ns).transitional_ignore();
+            }
             CollectionOptions options;
             options.capped = true;
             options.cappedSize = 10 * 1024;
@@ -275,8 +281,8 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                ASSERT_OK(coll->insertDocument(
-                    &_opCtx, InsertStatement(BSON("_id" << i)), nullOpDebug, true));
+                coll->insertDocument(&_opCtx, InsertStatement(BSON("_id" << i)), nullOpDebug, true)
+                    .transitional_ignore();
             }
             wunit.commit();
         }

@@ -41,7 +41,6 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog_helper.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
@@ -187,6 +186,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
         return b.obj();
     }
 
+    Lock::CollectionLock clk(opCtx, nss, MODE_IS);
     CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
 
     // While the UUID is stored as a collection option, from the user's perspective it is an
@@ -311,7 +311,6 @@ public:
                             continue;
                         }
 
-                        Lock::CollectionLock clk(opCtx, nss, MODE_IS);
                         Collection* collection = db->getCollection(opCtx, nss);
                         BSONObj collBson =
                             buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
@@ -321,25 +320,25 @@ public:
                         }
                     }
                 } else {
-                    mongo::catalog::forEachCollectionFromDb(
-                        opCtx,
-                        dbname,
-                        MODE_IS,
-                        [&](Collection* collection, CollectionCatalogEntry* catalogEntry) {
-                            if (authorizedCollections &&
-                                (collection->ns().coll().startsWith("system.") ||
-                                 !as->isAuthorizedForAnyActionOnResource(
-                                     ResourcePattern::forExactNamespace(collection->ns())))) {
-                                return true;
-                            }
-                            BSONObj collBson = buildCollectionBson(
-                                opCtx, collection, includePendingDrops, nameOnly);
-                            if (!collBson.isEmpty()) {
-                                _addWorkingSetMember(
-                                    opCtx, collBson, matcher.get(), ws.get(), root.get());
-                            }
-                            return true;
-                        });
+                    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+                        auto collection = *collIt;
+                        if (!collection) {
+                            break;
+                        }
+
+                        if (authorizedCollections &&
+                            (collection->ns().coll().startsWith("system.") ||
+                             !as->isAuthorizedForAnyActionOnResource(
+                                 ResourcePattern::forExactNamespace(collection->ns())))) {
+                            continue;
+                        }
+                        BSONObj collBson =
+                            buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
+                        if (!collBson.isEmpty()) {
+                            _addWorkingSetMember(
+                                opCtx, collBson, matcher.get(), ws.get(), root.get());
+                        }
+                    }
                 }
 
                 // Skipping views is only necessary for internal cloning operations.

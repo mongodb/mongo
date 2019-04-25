@@ -170,7 +170,7 @@ public:
                 b.append("sizeOnDisk", static_cast<double>(size));
 
                 b.appendBool("empty",
-                             UUIDCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty());
+                             UUIDCatalog::get(opCtx).getAllCatalogEntriesFromDb(dbname).empty());
             }
             BSONObj curDbObj = b.obj();
 
