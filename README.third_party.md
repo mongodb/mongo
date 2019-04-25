@@ -23,24 +23,24 @@ a notice will be included in
 | ---------------------------| ----------------- | ---------------- | ------------------| :------------------: | :-----------------------------: |
 | [abseil-cpp]               | Apache-2.0        |                  | 070f6e47b3        |                      |                ✗                |
 | Aladdin MD5                | Zlib              |                  | Unknown           |          ✗           |                ✗                |
-| [ASIO]                     | BSL-1.0           |                  | b0926b61b0        |                      |                ✗                |
+| [ASIO]                     | BSL-1.0           | 1.13.0           | b0926b61b0        |                      |                ✗                |
 | [benchmark]                | Apache-2.0        | 1.4.1            | 1.4.1             |                      |                                 |
-| [Boost]                    | BSL-1.0           | 1.69.0           | 1.69.0            |                      |                ✗                |
+| [Boost]                    | BSL-1.0           | 1.70.0           | 1.69.0            |                      |                ✗                |
 | [fmt]                      | BSD-2-Clause      |                  | 018d8b57f6        |                      |                ✗                |
-| [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.5, 2.7          |                      |                ✗                |
-| [ICU4]                     | ICU               | 63.1             | 57.1              |          ✗           |                ✗                |
+| [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.7               |                      |                ✗                |
+| [ICU4]                     | ICU               | 64.2             | 57.1              |          ✗           |                ✗                |
 | [Intel Decimal FP Library] | BSD-3-Clause      | 2.0 Update 2     | 2.0 Update 1      |                      |                ✗                |
 | [JSON-Schema-Test-Suite]   | MIT               |                  | 728066f9c5        |                      |                                 |
-| [kms-message]              |                   |                  | 8d91fa28cf        |                      |                ✗                |
+| [kms-message]              |                   |                  | 75e391a037        |                      |                ✗                |
 | [libstemmer]               | BSD-3-Clause      |                  | Unknown           |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      |                  | Unknown + changes |                      |                ✗                |
-| [MozJS]                    | MPL-2.0           | ESR 60.5.1       | ESR 60.3.0        |                      |                ✗                |
+| [MozJS]                    | MPL-2.0           | ESR 60.6.1       | ESR 60.3.0        |                      |                ✗                |
 | [MurmurHash3]              | Public Domain     |                  | Unknown + changes |          ✗           |                ✗                |
 | [Pcre]                     | BSD-3-Clause      | 8.43             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
 | [scons]                    | MIT               | 3.0.4            | 3.0.4             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.7            | 1.1.7             |          ✗           |                ✗                |
-| [sqlite]                   | Public Domain     | 3270200          | 3260000           |          ✗           |                ✗                |
+| [sqlite]                   | Public Domain     | 3280000          | 3260000           |          ✗           |                ✗                |
 | [timelib]                  | MIT               | 2018.01          | 2018.01           |                      |                ✗                |
 | [TomCrypt]                 | Public Domain     | 1.18.2           | 1.18.2            |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015  | 12.0.0           | 8.0.0             |          ✗           |                ✗                |
@@ -49,7 +49,7 @@ a notice will be included in
 | [wiredtiger]               |                   |                  | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
 | [yaml-cpp]                 | MIT               | 0.6.2            | 0.6.2             |                      |                ✗                |
 | [Zlib]                     | Zlib              | 1.2.11           | 1.2.11            |          ✗           |                ✗                |
-| [Zstandard]                | BSD-3-Clause      | 1.3.8            | 1.3.7             |          ✗           |                ✗                |
+| [Zstandard]                | BSD-3-Clause      | 1.4.0            | 1.3.7             |          ✗           |                ✗                |
 
 [abseil-cpp]: https://github.com/abseil/abseil-cpp
 [ASIO]: https://github.com/chriskohlhoff/asio
