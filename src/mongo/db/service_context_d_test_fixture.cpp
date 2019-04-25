@@ -81,15 +81,6 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
 
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
-
-    // Set up UUID Catalog observer. This is necessary because the Collection destructor contains an
-    // invariant to ensure the UUID corresponding to that Collection object is no longer associated
-    // with that Collection object in the UUIDCatalog. UUIDs may be registered in the UUIDCatalog
-    // directly in certain code paths, but they can only be removed from the UUIDCatalog via a
-    // UUIDCatalogObserver. It is therefore necessary to install the observer to ensure the
-    // invariant in the Collection destructor is not triggered.
-    auto observerRegistry = checked_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
-    observerRegistry->addObserver(std::make_unique<UUIDCatalogObserver>());
 }
 
 ServiceContextMongoDTest::~ServiceContextMongoDTest() {

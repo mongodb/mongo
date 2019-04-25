@@ -46,44 +46,6 @@ const ServiceContext::Decoration<UUIDCatalog> getCatalog =
     ServiceContext::declareDecoration<UUIDCatalog>();
 }  // namespace
 
-void UUIDCatalogObserver::onCollMod(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    OptionalCollectionUUID uuid,
-                                    const BSONObj& collModCmd,
-                                    const CollectionOptions& oldCollOptions,
-                                    boost::optional<TTLCollModInfo> ttlInfo) {
-    if (!uuid)
-        return;
-    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-    Collection* catalogColl = catalog.lookupCollectionByUUID(uuid.get());
-    invariant(
-        catalogColl->uuid() == uuid,
-        str::stream() << (uuid ? uuid->toString() : "<no uuid>") << ","
-                      << (catalogColl->uuid() ? catalogColl->uuid()->toString() : "<no uuid>"));
-}
-
-repl::OpTime UUIDCatalogObserver::onDropCollection(OperationContext* opCtx,
-                                                   const NamespaceString& collectionName,
-                                                   OptionalCollectionUUID uuid,
-                                                   std::uint64_t numRecords,
-                                                   const CollectionDropType dropType) {
-
-    invariant(uuid);
-
-    // Replicated drops are two-phase, meaning that the collection is first renamed into a "drop
-    // pending" state and reaped later. This op observer is only called for the rename phase, which
-    // means the UUID mapping is still valid.
-    //
-    // On the other hand, if the drop is not replicated, it takes effect immediately. In this case,
-    // the UUID mapping must be removed from the UUID catalog.
-    if (dropType == CollectionDropType::kOnePhase) {
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        catalog.onDropCollection(opCtx, uuid.get());
-    }
-
-    return {};
-}
-
 class UUIDCatalog::FinishDropChange : public RecoveryUnit::Change {
 public:
     FinishDropChange(UUIDCatalog& catalog, std::unique_ptr<Collection> coll, CollectionUUID uuid)

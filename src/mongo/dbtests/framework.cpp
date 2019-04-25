@@ -109,7 +109,6 @@ int runDbTests(int argc, char** argv) {
     IndexBuildsCoordinator::set(globalServiceContext,
                                 std::make_unique<IndexBuildsCoordinatorMongod>());
     auto registry = stdx::make_unique<OpObserverRegistry>();
-    registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     globalServiceContext->setOpObserver(std::move(registry));
 
     int ret = unittest::Suite::run(frameworkGlobalParams.suites,

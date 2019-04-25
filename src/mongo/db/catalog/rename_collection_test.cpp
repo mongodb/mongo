@@ -295,7 +295,6 @@ void RenameCollectionTest::setUp() {
     auto mockObserver = stdx::make_unique<OpObserverMock>();
     _opObserver = mockObserver.get();
     opObserver->addObserver(std::move(mockObserver));
-    opObserver->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     service->setOpObserver(std::move(opObserver));
 
     _sourceNss = NamespaceString("test.foo");

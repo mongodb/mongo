@@ -494,7 +494,12 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
 Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& fullns,
                                            Collection* collection) const {
-    log() << "Finishing collection drop for " << fullns << " (" << collection->uuid() << ").";
+    UUID uuid = *collection->uuid();
+    log() << "Finishing collection drop for " << fullns << " (" << uuid << ").";
+
+    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    catalog.onDropCollection(opCtx, uuid);
+
     auto storageEngine =
         checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
     return storageEngine->getCatalog()->dropCollection(opCtx, fullns.toString());

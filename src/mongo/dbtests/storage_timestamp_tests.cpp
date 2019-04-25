@@ -197,7 +197,6 @@ public:
         repl::ReplClientInfo::forClient(_opCtx->getClient()).clearLastOp_forTest();
 
         auto registry = stdx::make_unique<OpObserverRegistry>();
-        registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
         registry->addObserver(stdx::make_unique<OpObserverShardingImpl>());
         _opCtx->getServiceContext()->setOpObserver(std::move(registry));
 

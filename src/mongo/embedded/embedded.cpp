@@ -208,7 +208,6 @@ ServiceContext* initialize(const char* yaml_config) {
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-    opObserverRegistry->addObserver(std::make_unique<UUIDCatalogObserver>());
     serviceContext->setOpObserver(std::move(opObserverRegistry));
 
     DBDirectClientFactory::get(serviceContext).registerImplementation([](OperationContext* opCtx) {
