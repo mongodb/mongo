@@ -410,7 +410,5 @@ executor:
           transaction: 4
         enableTestCommands: 1
         numInitialSyncAttempts: 1
-        # TODO SERVER-38302: Disable the no-op writer.
-        writePeriodicNoops: true
     num_rs_nodes_per_shard: 2
     num_shards: 2
