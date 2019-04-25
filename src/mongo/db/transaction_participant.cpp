@@ -635,32 +635,14 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
 
     // We must lock the Client to change the Locker on the OperationContext.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-
-    // The new transaction should have an empty locker, and thus we do not need to save it.
-    invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
-    _locker = opCtx->swapLockState(stdx::make_unique<LockerImpl>());
-    // Inherit the locking setting from the original one.
-    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(
-        _locker->shouldConflictWithSecondaryBatchApplication());
-    _locker->unsetThreadId();
-    if (opCtx->getLogicalSessionId()) {
-        _locker->setDebugInfo("lsid: " + opCtx->getLogicalSessionId()->toBSON().toString());
-    }
-
-    // OplogSlotReserver is only used by primary, so always set max transaction lock timeout.
-    invariant(opCtx->writesAreReplicated());
-    // This thread must still respect the transaction lock timeout, since it can prevent the
-    // transaction from making progress.
-    auto maxTransactionLockMillis = gMaxTransactionLockRequestTimeoutMillis.load();
-    if (maxTransactionLockMillis >= 0) {
-        opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
-    }
-
     // Save the RecoveryUnit from the new transaction and replace it with an empty one.
     _recoveryUnit = opCtx->releaseRecoveryUnit();
     opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
                                opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+    // End two-phase locking on locker manually since the WUOW has been released.
+    _opCtx->lockState()->endWriteUnitOfWork();
 }
 
 TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
@@ -676,8 +658,6 @@ TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
         // We should be at WUOW nesting level 1, only the top level WUOW for the oplog reservation
         // side transaction.
         _recoveryUnit->abortUnitOfWork();
-        _locker->endWriteUnitOfWork();
-        invariant(!_locker->inAWriteUnitOfWork());
     }
 
     // After releasing the oplog hole, the "all committed timestamp" can advance past
@@ -701,9 +681,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     // Inherit the locking setting from the original one.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(
         _locker->shouldConflictWithSecondaryBatchApplication());
-    if (stashStyle != StashStyle::kSideTransaction) {
-        _locker->releaseTicket();
-    }
+    _locker->releaseTicket();
     _locker->unsetThreadId();
     if (opCtx->getLogicalSessionId()) {
         _locker->setDebugInfo("lsid: " + opCtx->getLogicalSessionId()->toBSON().toString());
@@ -712,13 +690,13 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     // On secondaries, we yield the locks for transactions.
     if (stashStyle == StashStyle::kSecondary) {
         _lockSnapshot = std::make_unique<Locker::LockSnapshot>();
-        _locker->releaseWriteUnitOfWork(_lockSnapshot.get());
+        _locker->releaseWriteUnitOfWorkAndUnlock(_lockSnapshot.get());
     }
 
     // This thread must still respect the transaction lock timeout, since it can prevent the
     // transaction from making progress.
     auto maxTransactionLockMillis = gMaxTransactionLockRequestTimeoutMillis.load();
-    if (stashStyle != StashStyle::kSecondary && maxTransactionLockMillis >= 0) {
+    if (stashStyle == StashStyle::kPrimary && maxTransactionLockMillis >= 0) {
         opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
     }
 
@@ -754,7 +732,7 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     if (_lockSnapshot) {
         invariant(!_locker->isLocked());
         // opCtx is passed in to enable the restoration to be interrupted.
-        _locker->restoreWriteUnitOfWork(opCtx, *_lockSnapshot);
+        _locker->restoreWriteUnitOfWorkAndLock(opCtx, *_lockSnapshot);
         _lockSnapshot.reset(nullptr);
     }
     _locker->reacquireTicket(opCtx);
@@ -784,18 +762,43 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
 
 TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx)
     : _opCtx(opCtx) {
-    if (_opCtx->getWriteUnitOfWork()) {
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
-        _txnResources = TransactionParticipant::TxnResources(
-            lk, _opCtx, TxnResources::StashStyle::kSideTransaction);
+    if (!_opCtx->getWriteUnitOfWork()) {
+        return;
     }
+
+    // Release WUOW.
+    _ruState = opCtx->getWriteUnitOfWork()->release();
+    opCtx->setWriteUnitOfWork(nullptr);
+
+    // Remember the locking state of WUOW, opt out two-phase locking, but don't release locks.
+    opCtx->lockState()->releaseWriteUnitOfWork(&_WUOWLockSnapshot);
+
+    // Release recovery unit, saving the recovery unit off to the side, keeping open the storage
+    // transaction.
+    _recoveryUnit = opCtx->releaseRecoveryUnit();
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
+                               opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 }
 
 TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
-    if (_txnResources) {
-        _txnResources->release(_opCtx);
+    if (!_recoveryUnit) {
+        return;
     }
+
+    // Restore locker's state about WUOW.
+    _opCtx->lockState()->restoreWriteUnitOfWork(_WUOWLockSnapshot);
+
+    // Restore recovery unit.
+    auto oldState = _opCtx->setRecoveryUnit(std::move(_recoveryUnit),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+              str::stream() << "RecoveryUnit state was " << oldState);
+
+    // Restore WUOW.
+    _opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(_opCtx, _ruState));
 }
+
 void TransactionParticipant::Participant::_stashActiveTransaction(OperationContext* opCtx) {
     if (p().inShutdown) {
         return;
@@ -893,6 +896,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     // yield and restore all locks on state transition. Otherwise, we'd have to remember
     // which locks are managed by WUOW.
     invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->lockState()->isRSTLLocked());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // Stashed transaction resources do not exist for this in-progress multi-document
     // transaction. Set up the transaction resources on the opCtx.

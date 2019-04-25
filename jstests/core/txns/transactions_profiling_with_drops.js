@@ -93,19 +93,20 @@
     opId = waitForCommand(
         op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "lock sleep"));
 
-    jsTest.log("Run a slow write. Profiling in the transaction should fail.");
+    jsTest.log("Run a slow write. Profiling in the transaction should still succeed " +
+               "since the transaction already has an IX DB lock.");
     assert.commandWorked(sessionColl.update(
-        {$where: "sleep(1000); return true;"}, {$inc: {bad: 1}}, {collation: {locale: "fr"}}));
+        {$where: "sleep(1000); return true;"}, {$inc: {good: 1}}, {collation: {locale: "fr"}}));
     session.commitTransaction();
 
     assert.commandWorked(testDB.killOp(opId));
     lockShell();
 
-    profilerHasZeroMatchingEntriesOrThrow(
+    profilerHasSingleMatchingEntryOrThrow(
         {profileDB: testDB, filter: {"command.collation": {locale: "fr"}}});
 
-    jsTest.log("Both writes should succeed, even if profiling failed.");
-    assert.docEq({_id: "doc", good: 1, bad: 1}, sessionColl.findOne());
+    jsTest.log("Both writes should succeed");
+    assert.docEq({_id: "doc", good: 2}, sessionColl.findOne());
 
     session.endSession();
 }());

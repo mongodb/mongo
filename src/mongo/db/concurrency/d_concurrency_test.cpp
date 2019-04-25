@@ -983,6 +983,36 @@ TEST_F(DConcurrencyTestFixture,
               MODE_NONE);
 }
 
+TEST_F(DConcurrencyTestFixture, FailedGlobalLockShouldUnlockRSTLOnlyOnce) {
+    auto clients = makeKClientsWithLockers(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    auto resourceRSTL = resourceIdReplicationStateTransitionLock;
+
+    // Take the exclusive lock with the first caller.
+    Lock::GlobalLock globalLock(opCtx1, MODE_X);
+
+    opCtx2->lockState()->beginWriteUnitOfWork();
+    // Set a max timeout on the second caller that will override provided lock request
+    // deadlines.
+    // Then requesting a lock with Date_t::max() should cause a LockTimeout error to be thrown.
+    opCtx2->lockState()->setMaxLockTimeout(Milliseconds(100));
+
+    ASSERT_THROWS_CODE(
+        Lock::GlobalLock(opCtx2, MODE_IX, Date_t::max(), Lock::InterruptBehavior::kThrow),
+        DBException,
+        ErrorCodes::LockTimeout);
+    auto opCtx2Locker = static_cast<LockerImpl*>(opCtx2->lockState());
+    // GlobalLock failed, but the RSTL should be successfully acquired and pending unlocked.
+    ASSERT(opCtx2Locker->getRequestsForTest().find(resourceIdGlobal).finished());
+    ASSERT_EQ(opCtx2Locker->getRequestsForTest().find(resourceRSTL).objAddr()->unlockPending, 1U);
+    ASSERT_EQ(opCtx2Locker->getRequestsForTest().find(resourceRSTL).objAddr()->recursiveCount, 1U);
+    opCtx2->lockState()->endWriteUnitOfWork();
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceRSTL), MODE_IX);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceRSTL), MODE_NONE);
+}
+
 TEST_F(DConcurrencyTestFixture, DBLockWaitIsInterruptible) {
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();

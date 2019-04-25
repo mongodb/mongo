@@ -197,7 +197,7 @@ public:
      */
     class TxnResources {
     public:
-        enum class StashStyle { kPrimary, kSecondary, kSideTransaction };
+        enum class StashStyle { kPrimary, kSecondary };
 
         /**
          * Stashes transaction state from 'opCtx' in the newly constructed TxnResources.
@@ -241,8 +241,10 @@ public:
     };
 
     /**
-     *  An RAII object that stashes `TxnResouces` from the `opCtx` onto the stack. At destruction
-     *  it unstashes the `TxnResources` back onto the `opCtx`.
+     *  An RAII object that stashes the recovery unit from the `opCtx` onto the stack and keeps
+     *  using the same locker of `opCtx`. The locker opts out of two-phase locking of the
+     *  current WUOW. At destruction it unstashes the recovery unit back onto the `opCtx` and
+     *  restores the locker state relevant to the original WUOW.
      */
     class SideTransactionBlock {
     public:
@@ -250,7 +252,9 @@ public:
         ~SideTransactionBlock();
 
     private:
-        boost::optional<TxnResources> _txnResources;
+        Locker::WUOWLockSnapshot _WUOWLockSnapshot;
+        std::unique_ptr<RecoveryUnit> _recoveryUnit;
+        WriteUnitOfWork::RecoveryUnitState _ruState;
         OperationContext* _opCtx;
     };
 
@@ -850,7 +854,6 @@ private:
 
     private:
         OperationContext* _opCtx;
-        std::unique_ptr<Locker> _locker;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         std::vector<OplogSlot> _oplogSlots;
     };

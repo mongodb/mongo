@@ -197,12 +197,20 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool releaseWriteUnitOfWork(LockSnapshot* stateOut) override {
+    bool releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override {
         MONGO_UNREACHABLE;
     }
 
-    void restoreWriteUnitOfWork(OperationContext* opCtx,
-                                const LockSnapshot& stateToRestore) override {
+    void restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
+                                       const LockSnapshot& stateToRestore) override {
+        MONGO_UNREACHABLE;
+    };
+
+    void releaseWriteUnitOfWork(WUOWLockSnapshot* stateOut) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) override {
         MONGO_UNREACHABLE;
     };
 

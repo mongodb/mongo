@@ -204,9 +204,12 @@ public:
         restoreLockState(nullptr, stateToRestore);
     }
 
-    bool releaseWriteUnitOfWork(LockSnapshot* stateOut) override;
-    void restoreWriteUnitOfWork(OperationContext* opCtx,
-                                const LockSnapshot& stateToRestore) override;
+    bool releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override;
+    void restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
+                                       const LockSnapshot& stateToRestore) override;
+
+    void releaseWriteUnitOfWork(WUOWLockSnapshot* stateOut) override;
+    void restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) override;
 
     virtual void releaseTicket();
     virtual void reacquireTicket(OperationContext* opCtx);

@@ -220,6 +220,8 @@ public:
                    EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
+            // Preserve the original lock result which will be overridden by unlock().
+            auto lockResult = _result;
             if (isLocked()) {
                 // Abandon our snapshot if destruction of the GlobalLock object results in actually
                 // unlocking the global lock. Recursive locking and the two-phase locking protocol
@@ -231,7 +233,9 @@ public:
                 }
                 _unlock();
             }
-            _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+            if (lockResult == LOCK_OK || lockResult == LOCK_WAITING) {
+                _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+            }
         }
 
         /**

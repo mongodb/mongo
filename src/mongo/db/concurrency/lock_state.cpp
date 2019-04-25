@@ -433,8 +433,43 @@ void LockerImpl::endWriteUnitOfWork() {
     }
 }
 
-bool LockerImpl::releaseWriteUnitOfWork(LockSnapshot* stateOut) {
-    // Only the global WUOW can be released.
+void LockerImpl::releaseWriteUnitOfWork(WUOWLockSnapshot* stateOut) {
+    stateOut->wuowNestingLevel = _wuowNestingLevel;
+    _wuowNestingLevel = 0;
+
+    for (auto it = _requests.begin(); _numResourcesToUnlockAtEndUnitOfWork > 0; it.next()) {
+        if (it->unlockPending) {
+            while (it->unlockPending) {
+                it->unlockPending--;
+                stateOut->unlockPendingLocks.push_back({it.key(), it->mode});
+            }
+            _numResourcesToUnlockAtEndUnitOfWork--;
+        }
+    }
+}
+
+void LockerImpl::restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) {
+    invariant(_numResourcesToUnlockAtEndUnitOfWork == 0);
+    invariant(!inAWriteUnitOfWork());
+
+    for (auto& lock : stateToRestore.unlockPendingLocks) {
+        auto it = _requests.begin();
+        while (it && !(it.key() == lock.resourceId && it->mode == lock.mode)) {
+            it.next();
+        }
+        invariant(!it.finished());
+        if (!it->unlockPending) {
+            _numResourcesToUnlockAtEndUnitOfWork++;
+        }
+        it->unlockPending++;
+    }
+    // Equivalent to call beginWriteUnitOfWork() multiple times.
+    _wuowNestingLevel = stateToRestore.wuowNestingLevel;
+}
+
+bool LockerImpl::releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) {
+    // Only the global WUOW can be released, since we never need to release and restore
+    // nested WUOW's. Thus we don't have to remember the nesting level.
     invariant(_wuowNestingLevel == 1);
     --_wuowNestingLevel;
     invariant(!isGlobalLockedRecursively());
@@ -444,14 +479,15 @@ bool LockerImpl::releaseWriteUnitOfWork(LockSnapshot* stateOut) {
     for (auto it = _requests.begin(); it; it.next()) {
         // No converted lock so we don't need to unlock more than once.
         invariant(it->unlockPending == 1);
+        it->unlockPending--;
     }
     _numResourcesToUnlockAtEndUnitOfWork = 0;
 
     return saveLockStateAndUnlock(stateOut);
 }
 
-void LockerImpl::restoreWriteUnitOfWork(OperationContext* opCtx,
-                                        const LockSnapshot& stateToRestore) {
+void LockerImpl::restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
+                                               const LockSnapshot& stateToRestore) {
     if (stateToRestore.globalMode != MODE_NONE) {
         restoreLockState(opCtx, stateToRestore);
     }
@@ -498,10 +534,9 @@ bool LockerImpl::unlock(ResourceId resId) {
             _numResourcesToUnlockAtEndUnitOfWork++;
         }
         it->unlockPending++;
-        // unlockPending will only be incremented if a lock is converted and unlock() is called
-        // multiple times on one ResourceId.
-        invariant(it->unlockPending < LockModesCount);
-
+        // unlockPending will be incremented if a lock is converted or acquired in the same mode
+        // recursively, and unlock() is called multiple times on one ResourceId.
+        invariant(it->unlockPending <= it->recursiveCount);
         return false;
     }
 
@@ -518,6 +553,7 @@ bool LockerImpl::unlockRSTLforPrepare() {
     // If the RSTL is 'unlockPending' and we are fully unlocking it, then we do not want to
     // attempt to unlock the RSTL when the WUOW ends, since it will already be unlocked.
     if (rstlRequest->unlockPending) {
+        rstlRequest->unlockPending = 0;
         _numResourcesToUnlockAtEndUnitOfWork--;
     }
 

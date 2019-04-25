@@ -391,6 +391,18 @@ public:
     };
 
     /**
+     * WUOWLockSnapshot captures all resources that have pending unlocks when releasing the write
+     * unit of work. If a lock has more than one pending unlock, it appears more than once here.
+     */
+    struct WUOWLockSnapshot {
+        // Nested WUOW can be released and restored all together.
+        int wuowNestingLevel = 0;
+
+        // The order of locks doesn't matter in this vector.
+        std::vector<OneLock> unlockPendingLocks;
+    };
+
+    /**
      * Retrieves all locks held by this transaction, other than RESOURCE_MUTEX locks, and what mode
      * they're held in.
      * Stores these locks in 'stateOut', destroying any previous state.  Unlocks all locks
@@ -417,13 +429,22 @@ public:
     virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
 
     /**
-     * releaseWriteUnitOfWork opts out two-phase locking and yield the locks after a WUOW
-     * has been released. restoreWriteUnitOfWork reaquires the locks and resume the two-phase
-     * locking behavior of WUOW.
+     * releaseWriteUnitOfWorkAndUnlock opts out of two-phase locking and yields the locks after a
+     * WUOW has been released. restoreWriteUnitOfWorkAndLock reacquires the locks and resumes the
+     * two-phase locking behavior of WUOW.
      */
-    virtual bool releaseWriteUnitOfWork(LockSnapshot* stateOut) = 0;
-    virtual void restoreWriteUnitOfWork(OperationContext* opCtx,
-                                        const LockSnapshot& stateToRestore) = 0;
+    virtual bool releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) = 0;
+    virtual void restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
+                                               const LockSnapshot& stateToRestore) = 0;
+
+
+    /**
+     * releaseWriteUnitOfWork opts out of two-phase locking of the current locks held but keeps
+     * holding these locks.
+     * restoreWriteUnitOfWork resumes the two-phase locking behavior of WUOW.
+     */
+    virtual void releaseWriteUnitOfWork(WUOWLockSnapshot* stateOut) = 0;
+    virtual void restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) = 0;
 
     /**
      * Releases the ticket associated with the Locker. This allows locks to be held without
