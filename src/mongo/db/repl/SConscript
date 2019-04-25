@@ -15,6 +15,20 @@ env.Library(
 )
 
 env.Library(
+    target='local_oplog_info',
+    source=[
+        'local_oplog_info.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'optime',
+        'repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/logical_time',
+        '$BUILD_DIR/mongo/db/storage/flow_control',
+    ],
+)
+
+env.Library(
     target='oplog',
     source=[
         'apply_ops.cpp',
@@ -25,6 +39,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'dbcheck',
+        'local_oplog_info',
         'repl_coordinator_interface',
         'repl_settings',
         'timestamp_block',
@@ -39,7 +54,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/op_observer',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
-        '$BUILD_DIR/mongo/db/storage/flow_control',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],

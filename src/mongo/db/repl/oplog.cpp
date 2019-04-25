@@ -66,8 +66,6 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
@@ -75,6 +73,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/dbcheck.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -83,7 +82,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
-#include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_participant.h"
@@ -118,133 +116,9 @@ MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 // are visible, but before we have advanced 'lastApplied' for the write.
 MONGO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);
 
-/**
- * This structure contains per-service-context state related to the oplog.
- */
-class LocalOplogInfo {
-public:
-    static LocalOplogInfo* get(ServiceContext& service);
-    static LocalOplogInfo* get(ServiceContext* service);
-    static LocalOplogInfo* get(OperationContext* opCtx);
-
-    LocalOplogInfo(const LocalOplogInfo&) = delete;
-    LocalOplogInfo& operator=(const LocalOplogInfo&) = delete;
-    LocalOplogInfo() = default;
-
-    /**
-     * Returns namespace of the local oplog collection.
-     */
-    const NamespaceString& getOplogCollectionName() const;
-
-    /**
-     * Detects the current replication mode and sets the "_oplogName" accordingly.
-     */
-    void setOplogCollectionName(ServiceContext* service);
-
-    Collection* getCollection() const;
-    void setCollection(Collection* oplog);
-    void resetCollection();
-
-    /**
-     * Sets the global Timestamp to be 'newTime'.
-     */
-    void setNewTimestamp(ServiceContext* opCtx, const Timestamp& newTime);
-
-    /**
-     * Allocates optimes for new entries in the oplog. Stores results in 'slotsOut', which
-     * contain the new optimes along with their terms and newly calculated hash fields.
-     */
-    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count);
-
-private:
-    // Name of the oplog collection.
-    NamespaceString _oplogName;
-
-    // The "oplog" pointer is always valid (or null) because an operation must take the global
-    // exclusive lock to set the pointer to null when the Collection instance is destroyed. See
-    // "oplogCheckCloseDatabase".
-    Collection* _oplog = nullptr;
-
-    // Synchronizes the section where a new Timestamp is generated and when it is registered in the
-    // storage engine.
-    mutable stdx::mutex _newOpMutex;
-};
-
-const auto localOplogInfo = ServiceContext::declareDecoration<LocalOplogInfo>();
-
-// static
-LocalOplogInfo* LocalOplogInfo::get(ServiceContext& service) {
-    return get(&service);
-}
-
-// static
-LocalOplogInfo* LocalOplogInfo::get(ServiceContext* service) {
-    return &localOplogInfo(service);
-}
-
-// static
-LocalOplogInfo* LocalOplogInfo::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
-}
-
-const NamespaceString& LocalOplogInfo::getOplogCollectionName() const {
-    return _oplogName;
-}
-
-Collection* LocalOplogInfo::getCollection() const {
-    return _oplog;
-}
-
-void LocalOplogInfo::setCollection(Collection* oplog) {
-    _oplog = oplog;
-}
-
-void LocalOplogInfo::resetCollection() {
-    _oplog = nullptr;
-}
-
 // so we can fail the same way
 void checkOplogInsert(Status result) {
     massert(17322, str::stream() << "write to oplog failed: " << result.toString(), result.isOK());
-}
-
-std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, std::size_t count) {
-    auto replCoord = ReplicationCoordinator::get(opCtx);
-    long long term = OpTime::kUninitializedTerm;
-
-    // Fetch term out of the newOpMutex.
-    if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet) {
-        // Current term. If we're not a replset of pv=1, it remains kOldProtocolVersionTerm.
-        term = replCoord->getTerm();
-    }
-
-    Timestamp ts;
-    // Provide a sample to FlowControl after the `oplogInfo.newOpMutex` is released.
-    ON_BLOCK_EXIT([opCtx, &ts, count] {
-        auto flowControl = FlowControl::get(opCtx);
-        if (flowControl) {
-            flowControl->sample(ts, count);
-        }
-    });
-
-    // Allow the storage engine to start the transaction outside the critical section.
-    opCtx->recoveryUnit()->preallocateSnapshot();
-    stdx::lock_guard<stdx::mutex> lk(_newOpMutex);
-
-    ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
-    const bool orderedCommit = false;
-
-    // The local oplog collection pointer must already be established by this point.
-    // We can't establish it here because that would require locking the local database, which would
-    // be a lock order violation.
-    invariant(_oplog);
-    fassert(28560, _oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
-
-    std::vector<OplogSlot> oplogSlots(count);
-    for (std::size_t i = 0; i < count; i++) {
-        oplogSlots[i] = {Timestamp(ts.asULL() + i), term};
-    }
-    return oplogSlots;
 }
 
 /**
@@ -316,17 +190,6 @@ bool shouldBuildInForeground(OperationContext* opCtx,
 
 
 }  // namespace
-
-void LocalOplogInfo::setOplogCollectionName(ServiceContext* service) {
-    switch (ReplicationCoordinator::get(service)->getReplicationMode()) {
-        case ReplicationCoordinator::modeReplSet:
-            _oplogName = NamespaceString::kRsOplogNamespace;
-            break;
-        case ReplicationCoordinator::modeNone:
-            // leave empty.
-            break;
-    }
-}
 
 void setOplogCollectionName(ServiceContext* service) {
     LocalOplogInfo::get(service)->setOplogCollectionName(service);
@@ -2118,11 +1981,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
     AuthorizationManager::get(opCtx->getServiceContext())->logOp(opCtx, opType, nss, o, nullptr);
     return Status::OK();
-}
-
-void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
-    stdx::lock_guard<stdx::mutex> lk(_newOpMutex);
-    LogicalClock::get(service)->setClusterTimeFromTrustedSource(LogicalTime(newTime));
 }
 
 void setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
