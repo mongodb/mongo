@@ -52,6 +52,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/retryable_writes_stats.h"
@@ -606,7 +607,8 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
 
     // Begin a new WUOW and reserve a slot in the oplog.
     WriteUnitOfWork wuow(opCtx);
-    _oplogSlots = repl::getNextOpTimes(opCtx, numSlotsToReserve);
+    auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
+    _oplogSlots = oplogInfo->getNextOpTimes(opCtx, numSlotsToReserve);
 
     // Release the WUOW state since this WUOW is no longer in use.
     wuow.release();
