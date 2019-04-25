@@ -50,12 +50,13 @@ if mobile_se:
         target='mobile_options_mongod',
         source=[
             'mobile_options_mongod.cpp',
-            ],
+        ],
         PROGDEPS_DEPENDENTS=serveronlyProgDepsDependents,
         LIBDEPS=[
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
-            ],
+        ],
         LIBDEPS_PRIVATE=[
+            'storage_mobile_core',
         ],
     )
 
