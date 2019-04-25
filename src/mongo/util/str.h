@@ -302,8 +302,7 @@ inline std::string toLower(StringData input) {
 
     for (std::string::size_type i = 0; i < sz; i++) {
         char c = input[i];
-        // See https://en.cppreference.com/w/cpp/string/byte/tolower
-        copy[i] = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        copy[i] = (char)tolower((int)c);
     }
     copy[sz] = 0;
     return copy;

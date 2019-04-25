@@ -113,11 +113,6 @@
 #define ASSERT_APPROX_EQUAL(a, b, ABSOLUTE_ERR) ASSERT_LTE(std::abs((a) - (b)), ABSOLUTE_ERR)
 
 /**
- * ASCII case-insensitive comparison.
- */
-#define ASSERT_EQUALS_CI(a, b) ASSERT_EQUALS(str::toLower(a), str::toLower(b))
-
-/**
  * Assert a function call returns its input unchanged.
  */
 #define ASSERT_IDENTITY(INPUT, FUNCTION)                                                      \

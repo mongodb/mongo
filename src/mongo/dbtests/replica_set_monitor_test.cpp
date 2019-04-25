@@ -29,6 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <set>
+#include <vector>
+
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
@@ -37,11 +40,6 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
-
-#include <boost/algorithm/string/case_conv.hpp>
-
-#include <set>
-#include <vector>
 
 namespace mongo {
 namespace {
@@ -375,27 +373,5 @@ TEST_F(TwoNodeWithTags, SecDownRetryExpiredTimeout) {
     monitor.reset();
 }
 
-// Tests that hostnames with different capitalization are considered equal.
-TEST_F(TwoNodeWithTags, CaseInsensitive) {
-    const auto primaryOnly = mongo::ReadPreference::PrimaryOnly;
-    const auto secondaryOnly = mongo::ReadPreference::SecondaryOnly;
-
-    MockReplicaSet* replSet = getReplSet();
-
-    // Initialize with upcased primary hostname.
-    set<HostAndPort> seedList;
-    seedList.insert(HostAndPort(boost::algorithm::to_lower_copy(replSet->getPrimary())));
-    auto monitor = ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
-    monitor->runScanForMockReplicaSet();
-
-    auto selectMember = [&](mongo::ReadPreference pref) {
-        return monitor->getHostOrRefresh(ReadPreferenceSetting(pref, TagSet()), Milliseconds(1))
-            .get()
-            .toString();
-    };
-
-    ASSERT_EQ(selectMember(primaryOnly), replSet->getPrimary());
-    ASSERT_EQ(selectMember(secondaryOnly), replSet->getSecondaries()[0]);
-}
 }  // namespace
 }  // namespace mongo

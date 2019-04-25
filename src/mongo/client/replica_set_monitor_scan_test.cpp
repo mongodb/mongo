@@ -1023,44 +1023,6 @@ TEST_F(CoreScanTest, TwoPrimaries2ndHasOlderConfigVersion) {
     ASSERT_EQUALS(state->configVersion, 2);
 }
 
-// U+2603, Snowman, encoded as UTF-8.
-#define SNOWMAN "\xe2\x98\x83"
-
-TEST_F(CoreScanTest, CaseInsensitive) {
-    const auto host0 = "a";
-    const auto host1 = SNOWMAN "B";
-    const auto host2 = "c" SNOWMAN;
-    const std::vector<HostAndPort> seeds = {
-        HostAndPort(host0), HostAndPort(host1), HostAndPort(host2)};
-    const MongoURI uri(ConnectionString::forReplicaSet("name", seeds));
-    auto state = makeState(basicUri);
-    Refresher refresher(state);
-
-    // mock all replies
-    for (size_t i = 0; i != basicSeeds.size(); ++i) {
-        refresher.receivedIsMaster(HostAndPort(seeds[i]),
-                                   -1,
-                                   BSON("setName"
-                                        << "name"
-                                        << "ismaster"
-                                        << (i == 0)
-                                        << "secondary"
-                                        << (i != 0)
-                                        << "hosts"
-                                        // Different order and capitalization.
-                                        << BSON_ARRAY("A"
-                                                      << "C" SNOWMAN
-                                                      << SNOWMAN "b")
-                                        << "ok"
-                                        << true));
-    }
-
-    ASSERT_EQUALS(state->nodes.size(), static_cast<size_t>(3));
-    for (const auto& seed : seeds) {
-        ASSERT(state->findNode(HostAndPort(seed)));
-    }
-}
-
 using MaxStalenessMSTest = ReplicaSetMonitorTest;
 
 /**
