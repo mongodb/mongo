@@ -146,6 +146,7 @@ protected:
     Status runOpsSteadyState(std::vector<OplogEntry> ops);
     Status runOpInitialSync(const OplogEntry& entry);
     Status runOpsInitialSync(std::vector<OplogEntry> ops);
+    Status runOpPtrsInitialSync(MultiApplier::OperationPtrs ops);
 
     UUID kUuid{UUID::gen()};
 };
@@ -174,6 +175,8 @@ void checkTxnTable(OperationContext* opCtx,
                    Date_t expectedWallClock,
                    boost::optional<repl::OpTime> expectedStartOpTime,
                    boost::optional<DurableTxnStateEnum> expectedState);
+
+bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc);
 
 }  // namespace repl
 }  // namespace mongo

@@ -1238,10 +1238,10 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
     }
 }
 
-void SyncTail::_fillWriterVectors(OperationContext* opCtx,
-                                  MultiApplier::Operations* ops,
-                                  std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                                  std::vector<MultiApplier::Operations>* derivedOps) {
+void SyncTail::fillWriterVectors(OperationContext* opCtx,
+                                 MultiApplier::Operations* ops,
+                                 std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                                 std::vector<MultiApplier::Operations>* derivedOps) {
     SessionUpdateTracker sessionUpdateTracker;
     _fillWriterVectors(opCtx, ops, writerVectors, derivedOps, &sessionUpdateTracker);
 
@@ -1318,7 +1318,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         std::vector<MultiApplier::Operations> derivedOps;
 
         std::vector<MultiApplier::OperationPtrs> writerVectors(_writerPool->getStats().numThreads);
-        _fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
+        fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for writes to finish before applying ops.
         _writerPool->waitForIdle();

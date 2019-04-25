@@ -230,6 +230,11 @@ public:
      */
     StatusWith<OpTime> multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
+    void fillWriterVectors(OperationContext* opCtx,
+                           MultiApplier::Operations* ops,
+                           std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                           std::vector<MultiApplier::Operations>* derivedOps);
+
 private:
     class OpQueueBatcher;
 
@@ -240,11 +245,6 @@ private:
                             std::vector<MultiApplier::OperationPtrs>* writerVectors,
                             std::vector<MultiApplier::Operations>* derivedOps,
                             SessionUpdateTracker* sessionUpdateTracker);
-
-    void _fillWriterVectors(OperationContext* opCtx,
-                            MultiApplier::Operations* ops,
-                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                            std::vector<MultiApplier::Operations>* derivedOps);
 
     /**
      * Doles out all the work to the writer pool threads. Does not modify writerVectors, but passes

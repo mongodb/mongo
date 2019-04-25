@@ -2347,11 +2347,10 @@ TEST_F(SyncTailTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable) {
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp, deleteOp}));
 
-    DBDirectClient client(_opCtx.get());
-    auto result = client.findOne(
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        {BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON())});
-    ASSERT_TRUE(result.isEmpty());
+    ASSERT_FALSE(docExists(
+        _opCtx.get(),
+        NamespaceString::kSessionTransactionsTableNamespace,
+        BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON())));
 }
 
 TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectDeleteToTxnTable) {
@@ -2577,11 +2576,10 @@ TEST_F(SyncTailTxnTableTest, PreImageNoOpEntriesShouldNotUpdateTxnTable) {
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {preImageOplog}));
 
-    DBDirectClient client(_opCtx.get());
-    auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                                 {BSON(SessionTxnRecord::kSessionIdFieldName
-                                       << preImageSessionInfo.getSessionId()->toBSON())});
-    ASSERT_TRUE(result.isEmpty());
+    ASSERT_FALSE(docExists(_opCtx.get(),
+                           NamespaceString::kSessionTransactionsTableNamespace,
+                           BSON(SessionTxnRecord::kSessionIdFieldName
+                                << preImageSessionInfo.getSessionId()->toBSON())));
 }
 
 TEST_F(SyncTailTxnTableTest, NonMigrateNoOpEntriesShouldNotUpdateTxnTable) {
@@ -2603,11 +2601,10 @@ TEST_F(SyncTailTxnTableTest, NonMigrateNoOpEntriesShouldNotUpdateTxnTable) {
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {oplog}));
 
-    DBDirectClient client(_opCtx.get());
-    auto result = client.findOne(
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        {BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON())});
-    ASSERT_TRUE(result.isEmpty());
+    ASSERT_FALSE(docExists(
+        _opCtx.get(),
+        NamespaceString::kSessionTransactionsTableNamespace,
+        BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON())));
 }
 
 TEST_F(IdempotencyTest, EmptyCappedNamespaceNotFound) {
@@ -2644,6 +2641,162 @@ TEST_F(IdempotencyTest, ConvertToCappedNamespaceNotFound) {
     ASSERT_FALSE(autoColl.getDb());
 }
 
+// Document used by transaction idempotency tests.
+const BSONObj doc = fromjson("{_id: 1}");
+
+TEST_F(IdempotencyTest, CommitUnpreparedTransaction) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum(0);
+
+    auto commitOp = commitUnprepared(
+        lsid, txnNum, StmtId(0), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)));
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    testOpsAreIdempotent({commitOp});
+    repl::checkTxnTable(_opCtx.get(),
+                        lsid,
+                        txnNum,
+                        commitOp.getOpTime(),
+                        *commitOp.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kCommitted);
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+}
+
+TEST_F(IdempotencyTest, CommitUnpreparedTransactionDataPartiallyApplied) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum(0);
+
+    NamespaceString nss2("test.coll2");
+    auto uuid2 = createCollectionWithUuid(_opCtx.get(), nss2);
+
+    auto commitOp = commitUnprepared(lsid,
+                                     txnNum,
+                                     StmtId(0),
+                                     BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)
+                                                << makeInsertApplyOpsEntry(nss2, uuid2, doc)));
+
+    // Manually insert one of the documents so that the data will partially reflect the transaction
+    // when the commitTransaction oplog entry is applied during initial sync.
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(),
+                                                    nss,
+                                                    {doc, commitOp.getOpTime().getTimestamp()},
+                                                    commitOp.getOpTime().getTerm()));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+    ASSERT_FALSE(docExists(_opCtx.get(), nss2, doc));
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    testOpsAreIdempotent({commitOp});
+    repl::checkTxnTable(_opCtx.get(),
+                        lsid,
+                        txnNum,
+                        commitOp.getOpTime(),
+                        *commitOp.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kCommitted);
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss2, doc));
+}
+
+TEST_F(IdempotencyTest, CommitPreparedTransaction) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum(0);
+
+    auto prepareOp =
+        prepare(lsid, txnNum, StmtId(0), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)));
+
+    auto commitOp = commitPrepared(lsid, txnNum, StmtId(1), prepareOp.getOpTime());
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    testOpsAreIdempotent({prepareOp, commitOp});
+    repl::checkTxnTable(_opCtx.get(),
+                        lsid,
+                        txnNum,
+                        commitOp.getOpTime(),
+                        *commitOp.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kCommitted);
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+}
+
+TEST_F(IdempotencyTest, CommitPreparedTransactionDataPartiallyApplied) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum(0);
+
+    NamespaceString nss2("test.coll2");
+    auto uuid2 = createCollectionWithUuid(_opCtx.get(), nss2);
+
+    auto prepareOp = prepare(lsid,
+                             txnNum,
+                             StmtId(0),
+                             BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)
+                                        << makeInsertApplyOpsEntry(nss2, uuid2, doc)));
+
+    auto commitOp = commitPrepared(lsid, txnNum, StmtId(1), prepareOp.getOpTime());
+
+    // Manually insert one of the documents so that the data will partially reflect the transaction
+    // when the commitTransaction oplog entry is applied during initial sync.
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(),
+                                                    nss,
+                                                    {doc, commitOp.getOpTime().getTimestamp()},
+                                                    commitOp.getOpTime().getTerm()));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+    ASSERT_FALSE(docExists(_opCtx.get(), nss2, doc));
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    testOpsAreIdempotent({prepareOp, commitOp});
+    repl::checkTxnTable(_opCtx.get(),
+                        lsid,
+                        txnNum,
+                        commitOp.getOpTime(),
+                        *commitOp.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kCommitted);
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss2, doc));
+}
+
+TEST_F(IdempotencyTest, AbortPreparedTransaction) {
+    // TODO: SERVER-36492 Fix this test
+    return;
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum(0);
+
+    auto prepareOp =
+        prepare(lsid, txnNum, StmtId(0), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)));
+    auto abortOp = abortPrepared(lsid, txnNum, StmtId(1), prepareOp.getOpTime());
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    testOpsAreIdempotent({prepareOp, abortOp});
+    repl::checkTxnTable(_opCtx.get(),
+                        lsid,
+                        txnNum,
+                        abortOp.getOpTime(),
+                        *abortOp.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kAborted);
+    ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
+}
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

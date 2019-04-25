@@ -97,6 +97,22 @@ protected:
     OplogEntry update(IdType _id, const BSONObj& obj);
     OplogEntry buildIndex(const BSONObj& indexSpec, const BSONObj& options, const UUID& uuid);
     OplogEntry dropIndex(const std::string& indexName, const UUID& uuid);
+    OplogEntry prepare(LogicalSessionId lsid,
+                       TxnNumber txnNum,
+                       StmtId stmtId,
+                       const BSONArray& ops);
+    OplogEntry commitUnprepared(LogicalSessionId lsid,
+                                TxnNumber txnNum,
+                                StmtId stmtId,
+                                const BSONArray& ops);
+    OplogEntry commitPrepared(LogicalSessionId lsid,
+                              TxnNumber txnNum,
+                              StmtId stmtId,
+                              OpTime prepareOpTime);
+    OplogEntry abortPrepared(LogicalSessionId lsid,
+                             TxnNumber txnNum,
+                             StmtId stmtId,
+                             OpTime prepareOpTime);
     virtual Status resetState();
 
     /**
@@ -120,10 +136,15 @@ protected:
     virtual std::string getStateString(const CollectionState& state1,
                                        const CollectionState& state2,
                                        const std::vector<OplogEntry>& ops);
+
+    virtual std::string getStateVectorString(std::vector<CollectionState>& state1,
+                                             std::vector<CollectionState>& state2,
+                                             const std::vector<OplogEntry>& ops);
     /**
      * Validate data and indexes. Return the MD5 hash of the documents ordered by _id.
      */
-    CollectionState validate();
+    CollectionState validate(const NamespaceString& nss = NamespaceString("test.foo"));
+    std::vector<CollectionState> validateAllCollections();
 
     NamespaceString nss{"test.foo"};
 };
@@ -179,5 +200,7 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
     TxnNumber txnNum,
     StmtId stmtId,
     boost::optional<OpTime> prevOpTime = boost::none);
+
+BSONObj makeInsertApplyOpsEntry(const NamespaceString& nss, const UUID& uuid, const BSONObj& doc);
 }  // namespace repl
 }  // namespace mongo

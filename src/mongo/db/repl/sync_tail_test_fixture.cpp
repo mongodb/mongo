@@ -250,6 +250,28 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
     return Status::OK();
 }
 
+Status SyncTailTest::runOpPtrsInitialSync(MultiApplier::OperationPtrs ops) {
+    auto options = makeInitialSyncOptions();
+    SyncTail syncTail(nullptr,
+                      getConsistencyMarkers(),
+                      getStorageInterface(),
+                      SyncTail::MultiSyncApplyFunc(),
+                      nullptr,
+                      options);
+    // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
+    // operations provided by idempotency tests.
+    for (auto& op : ops) {
+        MultiApplier::OperationPtrs opsPtrs;
+        opsPtrs.push_back(op);
+        WorkerMultikeyPathInfo pathInfo;
+        auto status = multiSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 void checkTxnTable(OperationContext* opCtx,
                    const LogicalSessionId& lsid,
                    const TxnNumber& txnNum,
@@ -299,6 +321,12 @@ StatusWith<BSONObj> CollectionReader::next() {
     // PlanExecutors that do not yield should only return ADVANCED or EOF.
     invariant(state == PlanExecutor::ADVANCED);
     return obj;
+}
+
+bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
+    DBDirectClient client(opCtx);
+    auto result = client.findOne(nss.ns(), {doc});
+    return !result.isEmpty();
 }
 
 }  // namespace repl
