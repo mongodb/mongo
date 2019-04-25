@@ -1872,6 +1872,10 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         log() << "WTCursor::next -- c->next_key ( " << id
               << ") was not greater than _lastReturnedId (" << _lastReturnedId
               << ") which is a bug.";
+
+        // Crash when test commands are enabled.
+        invariant(!getTestCommandsEnabled());
+
         // Force a retry of the operation from our last known position by acting as-if
         // we received a WT_ROLLBACK error.
         throw WriteConflictException();
