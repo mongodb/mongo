@@ -53,6 +53,9 @@ MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForCommitAfterExecutingComm
 MONGO_FAIL_POINT_DEFINE(hangBeforeCommitingTxn);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingTxn);
 MONGO_FAIL_POINT_DEFINE(skipCommitTxnCheckPrepareMajorityCommitted);
+// TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
+// on stale version and snapshot errors.
+MONGO_FAIL_POINT_DEFINE(dontRemoveTxnCoordinatorOnAbort);
 
 class CmdCommitTxn : public BasicCommand {
 public:
@@ -193,6 +196,13 @@ public:
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");
+
+        if (!MONGO_FAIL_POINT(dontRemoveTxnCoordinatorOnAbort) &&
+            (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
+             serverGlobalParams.clusterRole == ClusterRole::ConfigServer)) {
+            TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
+                opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
+        }
 
         txnParticipant.abortActiveTransaction(opCtx);
 

@@ -70,6 +70,13 @@
             stmtId: NumberInt(0),
             startTransaction: true,
             autocommit: false,
+            // Because ordered writes are done serially for different shard targets and abort early
+            // on first error, this can leave the transaction on the other shards open.
+            // To ensure this router implicitly aborts the transaction on all participants (so
+            // that the next test case does not encounter an open transaction), make this
+            // router do an *unordered* write that touches all the same participants as the
+            // first router touched.
+            ordered: false,
         }),
                                      50911);
 

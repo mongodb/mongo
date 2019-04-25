@@ -98,6 +98,13 @@ function enableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
         configureFailPoint: "enableStaleVersionAndSnapshotRetriesWithinTransactions",
         mode: "alwaysOn"
     }));
+
+    st._rs.forEach(function(replTest) {
+        replTest.nodes.forEach(function(node) {
+            assert.commandWorked(node.getDB('admin').runCommand(
+                {configureFailPoint: "dontRemoveTxnCoordinatorOnAbort", mode: "alwaysOn"}));
+        });
+    });
 }
 
 // TODO SERVER-39704: Remove this function.
@@ -106,6 +113,13 @@ function disableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
         configureFailPoint: "enableStaleVersionAndSnapshotRetriesWithinTransactions",
         mode: "off"
     }));
+
+    st._rs.forEach(function(replTest) {
+        replTest.nodes.forEach(function(node) {
+            assert.commandWorked(node.getDB('admin').runCommand(
+                {configureFailPoint: "dontRemoveTxnCoordinatorOnAbort", mode: "off"}));
+        });
+    });
 }
 
 // Flush each router's metadata and force refreshes on each shard for the given namespace and/or
