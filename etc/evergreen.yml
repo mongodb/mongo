@@ -12156,7 +12156,7 @@ buildvariants:
   expansions:
     lang_environment: LANG=C
     # We need --allocator=system here solely due to SERVER-27675
-    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --mobile-se=on
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
