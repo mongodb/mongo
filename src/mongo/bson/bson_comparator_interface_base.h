@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/container/flat_set.hpp>
 #include <initializer_list>
 #include <map>
 #include <set>
@@ -161,8 +160,6 @@ public:
 
     using Set = std::set<T, LessThan>;
 
-    using FlatSet = boost::container::flat_set<T, LessThan>;
-
     using UnorderedSet = stdx::unordered_set<T, Hasher, EqualTo>;
 
     template <typename ValueType>
@@ -246,17 +243,6 @@ protected:
 
     Set makeSet(std::initializer_list<T> init = {}) const {
         return Set(init, LessThan(this));
-    }
-
-    FlatSet makeFlatSet(const std::vector<T>& elements) const {
-        return FlatSet(elements.begin(), elements.end(), LessThan(this));
-    }
-
-    template <typename InputIterator>
-    FlatSet makeFlatSetFromSortedUnique(InputIterator begin, InputIterator end) const {
-        dassert(std::is_sorted(begin, end, LessThan(this)));
-        dassert(std::adjacent_find(begin, end, EqualTo(this)) == end);
-        return FlatSet(boost::container::ordered_unique_range_t(), begin, end, LessThan(this));
     }
 
     UnorderedSet makeUnorderedSet(std::initializer_list<T> init = {}) const {

@@ -364,8 +364,7 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 
 InMatchExpression::InMatchExpression(StringData path)
     : LeafMatchExpression(MATCH_IN, path),
-      _eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator),
-      _equalitySet(_eltCmp.makeBSONEltFlatSet(_originalEqualityVector)) {}
+      _eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator) {}
 
 std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
     auto next = stdx::make_unique<InMatchExpression>(path());
@@ -385,11 +384,15 @@ std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
     return std::move(next);
 }
 
+bool InMatchExpression::contains(const BSONElement& e) const {
+    return std::binary_search(_equalitySet.begin(), _equalitySet.end(), e, _eltCmp.makeLessThan());
+}
+
 bool InMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     if (_hasNull && e.eoo()) {
         return true;
     }
-    if (_equalitySet.find(e) != _equalitySet.end()) {
+    if (contains(e)) {
         return true;
     }
     for (auto&& regex : _regexes) {
@@ -482,17 +485,17 @@ void InMatchExpression::_doSetCollator(const CollatorInterface* collator) {
     if (!std::is_sorted(_originalEqualityVector.begin(),
                         _originalEqualityVector.end(),
                         _eltCmp.makeLessThan())) {
-        // Re-sort the list of equalities according to our current comparator. This is necessary to
-        // work around https://svn.boost.org/trac10/ticket/13140.
         std::sort(
             _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeLessThan());
     }
 
     // We need to re-compute '_equalitySet', since our set comparator has changed.
-    _equalitySet = _eltCmp.makeBSONEltFlatSetFromSortedUniqueRange(
-        _originalEqualityVector.begin(),
-        std::unique(
-            _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeEqualTo()));
+    _equalitySet.clear();
+    _equalitySet.reserve(_originalEqualityVector.size());
+    std::unique_copy(_originalEqualityVector.begin(),
+                     _originalEqualityVector.end(),
+                     std::back_inserter(_equalitySet),
+                     _eltCmp.makeEqualTo());
 }
 
 Status InMatchExpression::setEqualities(std::vector<BSONElement> equalities) {
@@ -516,15 +519,16 @@ Status InMatchExpression::setEqualities(std::vector<BSONElement> equalities) {
     if (!std::is_sorted(_originalEqualityVector.begin(),
                         _originalEqualityVector.end(),
                         _eltCmp.makeLessThan())) {
-        // Sort the list of equalities to work around https://svn.boost.org/trac10/ticket/13140.
         std::sort(
             _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeLessThan());
     }
 
-    _equalitySet = _eltCmp.makeBSONEltFlatSetFromSortedUniqueRange(
-        _originalEqualityVector.begin(),
-        std::unique(
-            _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeEqualTo()));
+    _equalitySet.clear();
+    _equalitySet.reserve(_originalEqualityVector.size());
+    std::unique_copy(_originalEqualityVector.begin(),
+                     _originalEqualityVector.end(),
+                     std::back_inserter(_equalitySet),
+                     _eltCmp.makeEqualTo());
 
     return Status::OK();
 }

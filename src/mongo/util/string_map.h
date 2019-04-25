@@ -113,4 +113,9 @@ using StringMap = absl::flat_hash_map<std::string, V, StringMapHasher, StringMap
 
 using StringSet = absl::flat_hash_set<std::string, StringMapHasher, StringMapEq>;
 
+template <typename V>
+using StringDataMap = absl::flat_hash_map<StringData, V, StringMapHasher, StringMapEq>;
+
+using StringDataSet = absl::flat_hash_set<StringData, StringMapHasher, StringMapEq>;
+
 }  // namespace mongo

@@ -426,9 +426,11 @@ public:
 
     Status addRegex(std::unique_ptr<RegexMatchExpression> expr);
 
-    const BSONEltFlatSet& getEqualities() const {
+    const std::vector<BSONElement>& getEqualities() const {
         return _equalitySet;
     }
+
+    bool contains(const BSONElement& e) const;
 
     const std::vector<std::unique_ptr<RegexMatchExpression>>& getRegexes() const {
         return _regexes;
@@ -465,15 +467,16 @@ private:
     // '_equalitySet' in case '_collator' changes after elements have been added.
     //
     // We keep the equalities in sorted order according to the current BSON element comparator. This
-    // list of equalities will be used to construct a boost::flat_set, which maintains the set of
-    // elements in sorted order within a contiguous region of memory. Sorting and then constructing
-    // a flat_set is O(n log n), whereas the boost::flat_set constructor is O(n ^ 2) due to
-    // https://svn.boost.org/trac10/ticket/13140.
+    // enables a fast-path to avoid re-sorting if the expression is serialized and re-parsed.
     std::vector<BSONElement> _originalEqualityVector;
 
-    // Set of equality elements associated with this expression. '_eltCmp' is used as a comparator
-    // for this set.
-    BSONEltFlatSet _equalitySet;
+    // Deduped set of equality elements associated with this expression. Kept in sorted order to
+    // support std::binary_search. Because we need to sort the elements anyway for things like index
+    // bounds building, using binary search avoids the overhead of inserting into a hash table which
+    // doesn't pay for itself in the common case where lookups are done a few times if ever.
+    // TODO It may be worth dynamically creating a hashset after matchesSingleElement() has been
+    // called "many" times.
+    std::vector<BSONElement> _equalitySet;
 
     // Container of regex elements this object owns.
     std::vector<std::unique_ptr<RegexMatchExpression>> _regexes;

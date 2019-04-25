@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/container/flat_set.hpp>
 #include <pcrecpp.h>
 #include <utility>
 #include <vector>
@@ -110,7 +109,7 @@ public:
     static constexpr StringData kName = "$_internalSchemaAllowedProperties"_sd;
 
     explicit InternalSchemaAllowedPropertiesMatchExpression(
-        boost::container::flat_set<StringData> properties,
+        StringDataSet properties,
         StringData namePlaceholder,
         std::vector<PatternSchema> patternProperties,
         std::unique_ptr<ExpressionWithPlaceholder> otherwise);
@@ -171,7 +170,7 @@ private:
 
     // The names of the properties are owned by the BSONObj used to create this match expression.
     // Since that BSONObj must outlive this object, we can safely store StringData.
-    boost::container::flat_set<StringData> _properties;
+    StringDataSet _properties;
 
     // The placeholder used in both '_patternProperties' and '_otherwise'.
     StringData _namePlaceholder;

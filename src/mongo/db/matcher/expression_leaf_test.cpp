@@ -1366,8 +1366,8 @@ TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualitie
     ASSERT(in.getEqualities().size() == 1);
     in.setCollator(&collatorReverseString);
     ASSERT(in.getEqualities().size() == 2);
-    ASSERT(in.getEqualities().count(obj1.firstElement()));
-    ASSERT(in.getEqualities().count(obj2.firstElement()));
+    ASSERT(in.contains(obj1.firstElement()));
+    ASSERT(in.contains(obj2.firstElement()));
 }
 
 std::vector<uint32_t> bsonArrayToBitPositions(const BSONArray& ba) {

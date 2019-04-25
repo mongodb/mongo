@@ -31,7 +31,6 @@
 
 #include "mongo/db/matcher/expression_parser.h"
 
-#include <boost/container/flat_set.hpp>
 #include <pcrecpp.h>
 
 #include "mongo/base/init.h"
@@ -889,7 +888,7 @@ parsePatternProperties(BSONElement patternPropertiesElem,
     return std::move(patternProperties);
 }
 
-StatusWith<boost::container::flat_set<StringData>> parseProperties(BSONElement propertiesElem) {
+StatusWith<StringDataSet> parseProperties(BSONElement propertiesElem) {
     if (!propertiesElem) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
@@ -901,7 +900,7 @@ StatusWith<boost::container::flat_set<StringData>> parseProperties(BSONElement p
                               << propertiesElem.type()};
     }
 
-    std::vector<StringData> properties;
+    StringDataSet properties;
     for (auto property : propertiesElem.embeddedObject()) {
         if (property.type() != BSONType::String) {
             return {
@@ -910,10 +909,10 @@ StatusWith<boost::container::flat_set<StringData>> parseProperties(BSONElement p
                               << " requires 'properties' to be an array of strings, but found a "
                               << property.type()};
         }
-        properties.push_back(property.valueStringData());
+        properties.insert(property.valueStringData());
     }
 
-    return boost::container::flat_set<StringData>(properties.begin(), properties.end());
+    return std::move(properties);
 }
 
 StatusWithMatchExpression parseInternalSchemaAllowedProperties(

@@ -31,7 +31,6 @@
 
 #include "mongo/db/commands/current_op_common.h"
 
-#include <boost/container/flat_set.hpp>
 #include <string>
 
 #include "mongo/db/command_generic_argument.h"
@@ -43,7 +42,7 @@ namespace {
 static constexpr auto kAll = "$all"_sd;
 static constexpr auto kOwnOps = "$ownOps"_sd;
 static constexpr auto kTruncateOps = "$truncateOps"_sd;
-static const boost::container::flat_set<StringData> kCurOpCmdParams = {kAll, kOwnOps, kTruncateOps};
+static const StringDataSet kCurOpCmdParams = {kAll, kOwnOps, kTruncateOps};
 }  // namespace
 
 bool CurrentOpCommandBase::run(OperationContext* opCtx,
