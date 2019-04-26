@@ -188,7 +188,7 @@ if (${ canYield }) {
         {distinct: collName, key: "_id", query: {a: {$gte: 0}}}, {usesIndex: true});
 
     assertCommandPropogatesPlanExecutorKillReason(
-        {findAndModify: collName, query: {fakeField: {$gt: 0}}, update: {$inc: {a: 1}}});
+        {findAndModify: collName, filter: {fakeField: {$gt: 0}}, update: {$inc: {a: 1}}});
 
     assertCommandPropogatesPlanExecutorKillReason(
         {

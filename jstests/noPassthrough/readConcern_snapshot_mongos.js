@@ -88,7 +88,7 @@
     // readConcern 'snapshot' is supported by findAndModify on mongos in a transaction.
     expectSuccessInTxnThenAbort(session, sessionDb, {
         findAndModify: collName,
-        query: {},
+        filter: {},
         update: {$set: {a: 1}},
         readConcern: {level: "snapshot"},
     });
