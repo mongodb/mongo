@@ -49,6 +49,7 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(hangDropCollectionBeforeLockAcquisition);
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 
 Status _dropView(OperationContext* opCtx,
@@ -155,6 +156,10 @@ Status dropCollection(OperationContext* opCtx,
         log() << "CMD: drop " << collectionName;
     }
 
+    if (MONGO_FAIL_POINT(hangDropCollectionBeforeLockAcquisition)) {
+        log() << "Hanging drop collection before lock acquisition while fail point is set";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDropCollectionBeforeLockAcquisition);
+    }
     return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
         // TODO(SERVER-39520): Get rid of database MODE_X lock.
         auto autoDb = std::make_unique<AutoGetDb>(opCtx, collectionName.db(), MODE_IX);
