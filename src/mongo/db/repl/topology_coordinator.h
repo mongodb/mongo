@@ -292,7 +292,7 @@ public:
     struct ReplSetStatusArgs {
         const Date_t now;
         const unsigned selfUptime;
-        const OpTime readConcernMajorityOpTime;
+        const OpTimeAndWallTime readConcernMajorityOpTime;
         const BSONObj initialSyncStatus;
 
         // boost::none if the storage engine does not support RTT, or if it does but does not

@@ -157,6 +157,10 @@ protected:
         getReplCoord()->advanceCommitPoint({opTime, wallTime}, fromSyncSource);
     }
 
+    void replCoordAdvanceCommitPoint(const OpTimeAndWallTime& opTime, bool fromSyncSource = false) {
+        getReplCoord()->advanceCommitPoint(opTime, fromSyncSource);
+    }
+
     /**
      * Gets the storage interface.
      */
