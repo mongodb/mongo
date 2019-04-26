@@ -15,6 +15,11 @@ selector:
   # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
   - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
+  # convertToCapped requires a global lock and any background operations on the database causes it
+  # to fail due to not finishing quickly enough.
+  - jstests/concurrency/fsm_workloads/convert_to_capped_collection.js
+  - jstests/concurrency/fsm_workloads/convert_to_capped_collection_index.js
+
   # This workload kills random cursors which takes a collection lock.
   # TODO: SERVER-35567.
   - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js

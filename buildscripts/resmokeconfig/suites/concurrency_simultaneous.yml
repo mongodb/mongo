@@ -13,6 +13,11 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_group_external.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
+  # convertToCapped requires a global lock and any background operations on the database causes it
+  # to fail due to not finishing quickly enough.
+  - jstests/concurrency/fsm_workloads/convert_to_capped_collection.js
+  - jstests/concurrency/fsm_workloads/convert_to_capped_collection_index.js
+
   # SERVER-30644 These tests create/drop/modify views which can deadlock on the ViewCatalog mutex if
   # there's a concurrent operation which acquires a MODE_X lock.
   - jstests/concurrency/fsm_workloads/view_catalog*.js
