@@ -39,7 +39,8 @@ namespace mongo {
 class Client;
 
 /**
- * An interface for objects that run work items at specified intervals.
+ * An interface for objects that run work items at specified intervals. Each individually scheduled
+ * job will be called in series.
  *
  * Implementations may use whatever internal threading and eventing
  * model they wish. Implementations may choose when to stop running

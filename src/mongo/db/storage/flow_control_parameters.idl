@@ -31,8 +31,8 @@ global:
 server_parameters:
     enableFlowControl:
         description: 'Enable flow control'
-        set_at: startup
-        cpp_vartype: 'bool'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<bool>'
         cpp_varname: 'gFlowControlEnabled'
         default: false
     flowControlTargetLagSeconds:
@@ -41,6 +41,7 @@ server_parameters:
         cpp_vartype: 'AtomicWord<std::int32_t>'
         cpp_varname: 'gFlowControlTargetLagSeconds'
         default: 10
+        validator: { gt: 0 }
     flowControlThresholdLagPercentage:
         description: 'Threshold percentage of target lag where flow control will become engaged'
         set_at: [ startup, runtime ]
@@ -48,3 +49,24 @@ server_parameters:
         cpp_varname: 'gFlowControlThresholdLagPercentage'
         default: 0.5
         validator: { gte: 0.0, lte: 1.0 }
+    flowControlMaxSamples:
+        description: 'The maximum number of samples the flow control algorithm will hold onto.'
+        set_at: [ startup ]
+        cpp_vartype: 'int'
+        cpp_varname: 'gFlowControlMaxSamples'
+        default: 1000000
+        validator: { gt: 0 }
+    flowControlSamplePeriod:
+        description: 'How often flow control samples optimes. Smaller periods have higher resolution, but will suffer degredation sooner in the event of commit point lag.'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<int>'
+        cpp_varname: 'gFlowControlSamplePeriod'
+        default: 1000
+        validator: { gt: 0 }
+    flowControlMinTicketsPerSecond:
+        description: 'The minimum number of tickets flow control will hand out per second. A smaller value will have better resolution on batch-write workloads, but may unintentionally delay system operations.'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<int>'
+        cpp_varname: 'gFlowControlMinTicketsPerSecond'
+        default: 100
+        validator: { gte: 0 }

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <deque>
+
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -79,29 +81,40 @@ public:
                             const BSONElement& configElement) const override;
 
 private:
-    int64_t getLocksUsedLastPeriod();
+    std::int64_t _getLocksUsedLastPeriod();
+    double _getLocksPerOp();
 
-    std::int64_t _approximateOpsBetween(std::uint64_t prevTs, std::uint64_t currTs);
-    double _getMyLocksPerOp();
+    std::int64_t _approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
+
+    void _updateTopologyData();
+    int _calculateNewTicketsForLag(const std::vector<repl::MemberData>& prevMemberData,
+                                   const std::vector<repl::MemberData>& currMemberData,
+                                   std::int64_t locksUsedLastPeriod,
+                                   double locksPerOp);
+    void _trimSamples(const Timestamp trimSamplesTo);
 
     repl::ReplicationCoordinator* _replCoord;
 
-    AtomicWord<int> _lastTargetTicketsPermitted;
-    AtomicWord<double> _lastLocksPerOp;
-    AtomicWord<int> _lastSustainerAppliedCount;
+    // These values are updated with each flow control computation that are also surfaced in server
+    // status.
+    AtomicWord<int> _lastTargetTicketsPermitted{0};
+    AtomicWord<double> _lastLocksPerOp{0.0};
+    AtomicWord<int> _lastSustainerAppliedCount{0};
 
     mutable stdx::mutex _sampledOpsMutex;
     // Sample of (timestamp, ops, lock acquisitions) where ops and lock acquisitions are
     // observations of the corresponding counter at (roughly) <timestamp>.
     typedef std::tuple<std::uint64_t, std::uint64_t, std::int64_t> Sample;
-    std::vector<Sample> _sampledOpsApplied;
-    std::int64_t _lastPollLockAcquisitions = 0;
+    std::deque<Sample> _sampledOpsApplied;
+
+    // These values are used in the sampling process.
     std::uint64_t _numOpsSinceStartup = 0;
     std::uint64_t _lastSample = 0;
 
-    std::vector<repl::MemberData> _prevMemberData;
+    std::int64_t _lastPollLockAcquisitions = 0;
 
-    long long _prevLagMillis = 0;
+    std::vector<repl::MemberData> _currMemberData;
+    std::vector<repl::MemberData> _prevMemberData;
 };
 
 }  // namespace mongo
