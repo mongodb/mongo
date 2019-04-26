@@ -134,12 +134,13 @@ FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* 
     // cause a slow start on start up.
     FlowControlTicketholder::set(service, std::make_unique<FlowControlTicketholder>(_kMaxTickets));
 
-    service->getPeriodicRunner()->scheduleJob(
+    _jobAnchor = service->getPeriodicRunner()->makeJob(
         {"FlowControlRefresher",
          [this](Client* client) {
              FlowControlTicketholder::get(client->getServiceContext())->refreshTo(getNumTickets());
          },
          Seconds(1)});
+    _jobAnchor.start();
 }
 
 FlowControl* FlowControl::get(ServiceContext* service) {

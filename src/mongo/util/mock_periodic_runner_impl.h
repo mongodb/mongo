@@ -40,25 +40,23 @@ namespace mongo {
  */
 class MockPeriodicRunnerImpl final : public PeriodicRunner {
 public:
-    class MockPeriodicJobHandleImpl final : public PeriodicRunner::PeriodicJobHandle {
+    class Job final : public ControllableJob {
     public:
-        ~MockPeriodicJobHandleImpl() = default;
+        ~Job() = default;
 
-        void start() override{};
-        void stop() override{};
-        void pause() override{};
-        void resume() override{};
+        void start() final{};
+        void stop() final{};
+        void pause() final{};
+        void resume() final{};
+        Milliseconds getPeriod() final{};
+        void setPeriod(Milliseconds ms) final{};
     };
 
     ~MockPeriodicRunnerImpl() = default;
 
-    std::unique_ptr<PeriodicRunner::PeriodicJobHandle> makeJob(PeriodicRunner::PeriodicJob job) {
-        return std::make_unique<MockPeriodicJobHandleImpl>();
+    PeriodicAnchor makeJob(PeriodicJob job) final {
+        return std::weak_ptr<Job>{};
     }
-
-    void scheduleJob(PeriodicRunner::PeriodicJob job) {}
-    void startup() {}
-    void shutdown() {}
 };
 
 }  // namespace mongo

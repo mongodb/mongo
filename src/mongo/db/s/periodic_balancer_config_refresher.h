@@ -80,6 +80,6 @@ private:
     bool _isPrimary{false};
 
     // Periodic job for refreshing the balancer configuration
-    std::unique_ptr<PeriodicRunner::PeriodicJobHandle> _balancerConfigRefresher;
+    PeriodicJobAnchor _balancerConfigRefresher;
 };
 }  // namespace mongo

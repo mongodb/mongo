@@ -141,6 +141,8 @@ private:
 
     // This value is used for calculating server status metrics.
     std::uint64_t _startWaitTime = 0;
+
+    PeriodicJobAnchor _jobAnchor;
 };
 
 }  // namespace mongo

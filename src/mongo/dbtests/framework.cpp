@@ -75,11 +75,6 @@ int runDbTests(int argc, char** argv) {
         // the memory and makes leak sanitizer happy.
         ScriptEngine::dropScopeCache();
 
-        // Shut down the background periodic task runner, before the storage engine.
-        if (auto runner = getGlobalServiceContext()->getPeriodicRunner()) {
-            runner->shutdown();
-        }
-
         // We may be shut down before we have a global storage
         // engine.
         if (!getGlobalServiceContext()->getStorageEngine())
@@ -103,7 +98,6 @@ int runDbTests(int argc, char** argv) {
     // Set up the periodic runner for background job execution, which is required by the storage
     // engine to be running beforehand.
     auto runner = makePeriodicRunner(globalServiceContext);
-    runner->startup();
     globalServiceContext->setPeriodicRunner(std::move(runner));
 
     initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);

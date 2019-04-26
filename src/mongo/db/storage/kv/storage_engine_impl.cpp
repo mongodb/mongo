@@ -877,7 +877,7 @@ void StorageEngineImpl::TimestampMonitor::startup() {
 
             // Take a global lock in MODE_IS while fetching timestamps to guarantee that
             // rollback-to-stable isn't running concurrently.
-            {
+            try {
                 auto opCtx = client->getOperationContext();
                 mongo::ServiceContext::UniqueOperationContext uOpCtx;
                 if (!opCtx) {
@@ -894,6 +894,9 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 checkpoint = _engine->getCheckpointTimestamp();
                 oldest = _engine->getOldestTimestamp();
                 stable = _engine->getStableTimestamp();
+            } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
+                // If we're interrupted at shutdown, it's fine to give up on future notifications
+                return;
             }
 
             Timestamp minOfCheckpointAndOldest =
@@ -922,7 +925,8 @@ void StorageEngineImpl::TimestampMonitor::startup() {
         },
         Seconds(1));
 
-    _periodicRunner->scheduleJob(std::move(job));
+    _job = _periodicRunner->makeJob(std::move(job));
+    _job.start();
     _running = true;
 }
 

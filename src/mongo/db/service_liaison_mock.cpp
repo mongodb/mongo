@@ -40,7 +40,6 @@ namespace mongo {
 MockServiceLiaisonImpl::MockServiceLiaisonImpl() {
     _timerFactory = std::make_unique<executor::AsyncTimerFactoryMock>();
     _runner = makePeriodicRunner(getGlobalServiceContext());
-    _runner->startup();
 }
 
 LogicalSessionIdSet MockServiceLiaisonImpl::getActiveOpSessions() const {
@@ -53,9 +52,7 @@ LogicalSessionIdSet MockServiceLiaisonImpl::getOpenCursorSessions(OperationConte
     return _cursorSessions;
 }
 
-void MockServiceLiaisonImpl::join() {
-    _runner->shutdown();
-}
+void MockServiceLiaisonImpl::join() {}
 
 Date_t MockServiceLiaisonImpl::now() const {
     return _timerFactory->now();

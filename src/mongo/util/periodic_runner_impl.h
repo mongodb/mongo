@@ -36,6 +36,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/future.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -50,17 +51,11 @@ class ServiceContext;
 class PeriodicRunnerImpl : public PeriodicRunner {
 public:
     PeriodicRunnerImpl(ServiceContext* svc, ClockSource* clockSource);
-    ~PeriodicRunnerImpl();
 
-    std::unique_ptr<PeriodicRunner::PeriodicJobHandle> makeJob(PeriodicJob job) override;
-    void scheduleJob(PeriodicJob job) override;
-
-    void startup() override;
-
-    void shutdown() override;
+    JobAnchor makeJob(PeriodicJob job) override;
 
 private:
-    class PeriodicJobImpl {
+    class PeriodicJobImpl : public ControllableJob {
         PeriodicJobImpl(const PeriodicJobImpl&) = delete;
         PeriodicJobImpl& operator=(const PeriodicJobImpl&) = delete;
 
@@ -68,12 +63,12 @@ private:
         friend class PeriodicRunnerImpl;
         PeriodicJobImpl(PeriodicJob job, ClockSource* source, ServiceContext* svc);
 
-        void start();
-        void pause();
-        void resume();
-        void stop();
-        Milliseconds getPeriod();
-        void setPeriod(Milliseconds ms);
+        void start() override;
+        void pause() override;
+        void resume() override;
+        void stop() override;
+        Milliseconds getPeriod() override;
+        void setPeriod(Milliseconds ms) override;
 
         enum class ExecutionStatus { NOT_SCHEDULED, RUNNING, PAUSED, CANCELED };
 
@@ -83,7 +78,9 @@ private:
         PeriodicJob _job;
         ClockSource* _clockSource;
         ServiceContext* _serviceContext;
+
         stdx::thread _thread;
+        SharedPromise<void> _stopPromise;
 
         stdx::mutex _mutex;
         stdx::condition_variable _condvar;
@@ -95,28 +92,8 @@ private:
 
     std::shared_ptr<PeriodicRunnerImpl::PeriodicJobImpl> createAndAddJob(PeriodicJob job);
 
-    class PeriodicJobHandleImpl : public PeriodicJobHandle {
-    public:
-        explicit PeriodicJobHandleImpl(std::weak_ptr<PeriodicJobImpl> jobImpl)
-            : _jobWeak(jobImpl) {}
-        void start() override;
-        void stop() override;
-        void pause() override;
-        void resume() override;
-        Milliseconds getPeriod() override;
-        void setPeriod(Milliseconds ms) override;
-
-    private:
-        std::weak_ptr<PeriodicJobImpl> _jobWeak;
-    };
-
     ServiceContext* _svc;
     ClockSource* _clockSource;
-
-    std::vector<std::shared_ptr<PeriodicJobImpl>> _jobs;
-
-    stdx::mutex _mutex;
-    bool _running = false;
 };
 
 }  // namespace mongo

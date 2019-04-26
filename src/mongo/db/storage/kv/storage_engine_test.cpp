@@ -391,10 +391,6 @@ public:
     }
 
     ~TimestampKVEngineTest() {
-        // Shut down the background periodic task runner, before the storage engine.
-        auto runner = getServiceContext()->getPeriodicRunner();
-        runner->shutdown();
-
         _storageEngine->cleanShutdown();
         _storageEngine.reset();
     }

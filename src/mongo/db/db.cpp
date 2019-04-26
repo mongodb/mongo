@@ -326,7 +326,6 @@ ExitCode _initAndListen(int listenPort) {
     // Set up the periodic runner for background job execution. This is required to be running
     // before the storage engine is initialized.
     auto runner = makePeriodicRunner(serviceContext);
-    runner->startup();
     serviceContext->setPeriodicRunner(std::move(runner));
     FlowControl::set(serviceContext,
                      std::make_unique<FlowControl>(
@@ -603,8 +602,8 @@ ExitCode _initAndListen(int listenPort) {
     // Only do this on storage engines supporting snapshot reads, which hold resources we wish to
     // release periodically in order to avoid storage cache pressure build up.
     if (storageEngine->supportsReadConcernSnapshot()) {
-        startPeriodicThreadToAbortExpiredTransactions(serviceContext);
-        startPeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded(serviceContext);
+        PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
+        PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::get(serviceContext)->start();
     }
 
     // Set up the logical session cache
@@ -919,13 +918,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         flowControlTicketholder->setInShutdown();
     }
 
-    // Shut down the background periodic task runner. This must be done before shutting down the
-    // storage engine.
-    if (auto runner = serviceContext->getPeriodicRunner()) {
-        runner->shutdown();
-    }
+    if (auto storageEngine = serviceContext->getStorageEngine()) {
+        if (storageEngine->supportsReadConcernSnapshot()) {
+            PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
+            PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::get(serviceContext)->stop();
+        }
 
-    if (serviceContext->getStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;
         OperationContext* opCtx = client->getOperationContext();
         if (!opCtx) {
