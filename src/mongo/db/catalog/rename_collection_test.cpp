@@ -578,19 +578,6 @@ TEST_F(
     ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
 }
 
-TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseWithTargetUuid) {
-    _createCollection(_opCtx.get(), _sourceNss);
-    auto dbName = _sourceNss.db().toString();
-    auto uuid = UUID::gen();
-    auto uuidDoc = BSON("ui" << uuid);
-    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNssDifferentDb.ns()
-                                       << "dropTarget"
-                                       << true);
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
-    ASSERT_EQUALS(uuid, _getCollectionUuid(_opCtx.get(), _targetNssDifferentDb));
-}
-
 TEST_F(RenameCollectionTest, RenameCollectionToItselfByNsForApplyOps) {
     auto dbName = _sourceNss.db().toString();
     auto uuid = _createCollectionWithUUID(_opCtx.get(), _sourceNss);
@@ -1002,7 +989,7 @@ void _checkOplogEntries(const std::vector<std::string>& actualOplogEntries,
 }
 
 /**
- * Runs a rename across database operation and checks oplog entries writtent to the oplog.
+ * Runs a rename across database operation and checks oplog entries written to the oplog.
  */
 void _testRenameCollectionAcrossDatabaseOplogEntries(
     OperationContext* opCtx,
@@ -1039,56 +1026,9 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntries) {
         {"create", "index", "inserts", "rename", "drop"});
 }
 
-TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntries) {
-    bool forApplyOps = true;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesDropTarget) {
-    _createCollection(_opCtx.get(), _targetNssDifferentDb);
-    bool forApplyOps = false;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntriesDropTarget) {
-    _createCollection(_opCtx.get(), _targetNssDifferentDb);
-    bool forApplyOps = true;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
-}
-
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesWritesNotReplicated) {
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     bool forApplyOps = false;
-    _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
-                                                    _sourceNss,
-                                                    _targetNssDifferentDb,
-                                                    &_opObserver->oplogEntries,
-                                                    forApplyOps,
-                                                    {});
-}
-
-TEST_F(RenameCollectionTest,
-       RenameCollectionForApplyOpsAcrossDatabaseOplogEntriesWritesNotReplicated) {
-    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-    bool forApplyOps = true;
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
                                                     _targetNssDifferentDb,

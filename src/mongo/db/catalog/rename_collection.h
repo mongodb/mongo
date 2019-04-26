@@ -34,6 +34,7 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
 class NamespaceString;
 class OperationContext;
 
@@ -42,15 +43,15 @@ class OpTime;
 }  // namespace repl
 
 /**
- * Renames the collection from "source" to "target" and drops the existing collection with UUID
- * dropTargetUUID iff "dropTarget" is true. "stayTemp" indicates whether a collection should
- * maintain its temporariness.
+ * Renames the collection from "source" to "target" and drops the existing collection iff
+ * "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
+ * temporariness.
  */
 struct RenameCollectionOptions {
     bool dropTarget = false;
-    OptionalCollectionUUID dropTargetUUID;
     bool stayTemp = false;
 };
+
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target,
