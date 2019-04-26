@@ -45,17 +45,21 @@
         assert.commandWorked(bulk.execute());
     };
 
-    let buildIndexInBackground = function(expectDuplicateKeyError) {
-        if (expectDuplicateKeyError) {
-            return startParallelShell(function() {
-                assert.commandFailedWithCode(
-                    db.hybrid.createIndex({i: 1}, {background: true, unique: true}),
-                    ErrorCodes.DuplicateKey);
-            }, conn.port);
-        }
-        return startParallelShell(function() {
-            assert.commandWorked(db.hybrid.createIndex({i: 1}, {background: true, unique: true}));
-        }, conn.port);
+    let buildIndexInBackground = function(coll, expectDuplicateKeyError) {
+        const createIndexFunction = function(collFullName) {
+            const coll = db.getMongo().getCollection(collFullName);
+            return coll.createIndex({i: 1}, {background: true, unique: true});
+        };
+        const assertFunction = expectDuplicateKeyError ? function(collFullName) {
+            assert.commandFailedWithCode(createIndexFunction(collFullName),
+                                         ErrorCodes.DuplicateKey);
+        } : function(collFullName) {
+            assert.commandWorked(createIndexFunction(collFullName));
+        };
+        return startParallelShell('const createIndexFunction = ' + createIndexFunction + ';\n' +
+                                      'const assertFunction = ' + assertFunction + ';\n' +
+                                      'assertFunction("' + coll.getFullName() + '")',
+                                  conn.port);
     };
 
     /**
@@ -76,7 +80,9 @@
     let runTest = function(config) {
         jsTestLog("running test with config: " + tojson(config));
 
-        setUp(testDB.hybrid);
+        const collName = 'hybrid';
+        const coll = testDB.getCollection(collName);
+        setUp(coll);
 
         // Expect the build to fail with a duplicate key error if we insert a duplicate key and
         // don't resolve it.
@@ -84,7 +90,7 @@
 
         let awaitBuild;
         let buildIndex = function() {
-            awaitBuild = buildIndexInBackground(expectDuplicate);
+            awaitBuild = buildIndexInBackground(coll, expectDuplicate);
         };
 
         // Introduce a duplicate key, either from an insert or update. Optionally, follow-up with an
@@ -92,14 +98,14 @@
         const dup = {i: 0};
         let doOperation = function() {
             if ("insert" == config.operation) {
-                assert.commandWorked(testDB.hybrid.insert(dup));
+                assert.commandWorked(coll.insert(dup));
                 if (config.resolve) {
-                    assert.commandWorked(testDB.hybrid.deleteOne(dup));
+                    assert.commandWorked(coll.deleteOne(dup));
                 }
             } else if ("update" == config.operation) {
-                assert.commandWorked(testDB.hybrid.update(dup, {i: 1}));
+                assert.commandWorked(coll.update(dup, {i: 1}));
                 if (config.resolve) {
-                    assert.commandWorked(testDB.hybrid.update({i: 1}, dup));
+                    assert.commandWorked(coll.update({i: 1}, dup));
                 }
             }
         };
@@ -157,9 +163,9 @@
         let expectedDocs = docsToInsert;
         expectedDocs += (config.operation == "insert" && config.resolve === false) ? 1 : 0;
 
-        assert.eq(expectedDocs, testDB.hybrid.count());
-        assert.eq(expectedDocs, testDB.hybrid.find().itcount());
-        assert.commandWorked(testDB.hybrid.validate({full: true}));
+        assert.eq(expectedDocs, coll.count());
+        assert.eq(expectedDocs, coll.find().itcount());
+        assert.commandWorked(coll.validate({full: true}));
     };
 
     runTest({});
