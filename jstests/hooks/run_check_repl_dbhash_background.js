@@ -177,6 +177,8 @@
                         // 'clusterTime'.
                         const readConcernMajorityOpTime =
                             rsStatus.optimes.readConcernMajorityOpTime;
+                        if (typeof rsStatus.optimes.readConcernMajorityOpTime === 'undefined')
+                            return false;
                         if (bsonWoCompare(readConcernMajorityOpTime.ts, clusterTime) >= 0) {
                             debugInfo.push({
                                 "node": db.getMongo(),
