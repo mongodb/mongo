@@ -80,7 +80,9 @@
     let runTest = function(config) {
         jsTestLog("running test with config: " + tojson(config));
 
-        const collName = 'hybrid';
+        const collName = Object.keys(config).length
+            ? 'hybrid_' + config.operation[0] + '_r' + Number(config.resolve) + '_p' + config.phase
+            : 'hybrid';
         const coll = testDB.getCollection(collName);
         setUp(coll);
 
