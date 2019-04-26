@@ -58,13 +58,32 @@ Milliseconds getPeriod(const Argument& transactionLifetimeLimitSeconds) {
 
     return period;
 }
+
 }  // namespace
 
-void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContext) {
-    // Enforce calling this function once, and only once.
-    static bool firstCall = true;
-    invariant(firstCall);
-    firstCall = false;
+auto PeriodicThreadToAbortExpiredTransactions::get(ServiceContext* serviceContext)
+    -> PeriodicThreadToAbortExpiredTransactions& {
+    auto& jobContainer = _serviceDecoration(serviceContext);
+    jobContainer._init(serviceContext);
+
+    return jobContainer;
+}
+
+auto PeriodicThreadToAbortExpiredTransactions::operator*() const noexcept -> PeriodicJobAnchor& {
+    stdx::lock_guard lk(_mutex);
+    return *_anchor;
+}
+
+auto PeriodicThreadToAbortExpiredTransactions::operator-> () const noexcept -> PeriodicJobAnchor* {
+    stdx::lock_guard lk(_mutex);
+    return _anchor.get();
+}
+
+void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceContext) {
+    stdx::lock_guard lk(_mutex);
+    if (_anchor) {
+        return;
+    }
 
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
@@ -87,18 +106,17 @@ void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContex
                                     },
                                     getPeriod(gTransactionLifetimeLimitSeconds.load()));
 
-    auto handle = periodicRunner->makeJob(std::move(job));
-    handle->start();
+    _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 
-    TransactionParticipant::observeTransactionLifetimeLimitSeconds
-        .addObserver([handle = std::move(handle)](const Argument& secs) {
-            try {
-                handle->setPeriod(getPeriod(secs));
-            } catch (const DBException& ex) {
-                log() << "Failed to update period of thread which aborts expired transactions "
-                      << ex.toStatus();
-            }
-        });
+    TransactionParticipant::observeTransactionLifetimeLimitSeconds.addObserver([anchor = _anchor](
+        const Argument& secs) {
+        try {
+            anchor->setPeriod(getPeriod(secs));
+        } catch (const DBException& ex) {
+            log() << "Failed to update period of thread which aborts expired transactions "
+                  << ex.toStatus();
+        }
+    });
 }
 
 }  // namespace mongo

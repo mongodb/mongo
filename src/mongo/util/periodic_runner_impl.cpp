@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/periodic_runner_impl.h"
@@ -34,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -41,57 +44,11 @@ namespace mongo {
 PeriodicRunnerImpl::PeriodicRunnerImpl(ServiceContext* svc, ClockSource* clockSource)
     : _svc(svc), _clockSource(clockSource) {}
 
-PeriodicRunnerImpl::~PeriodicRunnerImpl() {
-    PeriodicRunnerImpl::shutdown();
-}
-
-std::shared_ptr<PeriodicRunnerImpl::PeriodicJobImpl> PeriodicRunnerImpl::createAndAddJob(
-    PeriodicJob job) {
+auto PeriodicRunnerImpl::makeJob(PeriodicJob job) -> JobAnchor {
     auto impl = std::make_shared<PeriodicJobImpl>(std::move(job), this->_clockSource, this->_svc);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _jobs.push_back(impl);
-    return impl;
-}
-
-std::unique_ptr<PeriodicRunner::PeriodicJobHandle> PeriodicRunnerImpl::makeJob(PeriodicJob job) {
-    auto handle = std::make_unique<PeriodicJobHandleImpl>(createAndAddJob(job));
-    return std::move(handle);
-}
-
-void PeriodicRunnerImpl::scheduleJob(PeriodicJob job) {
-    auto impl = createAndAddJob(job);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_running) {
-        impl->start();
-    }
-}
-
-void PeriodicRunnerImpl::startup() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_running) {
-        return;
-    }
-
-    _running = true;
-
-    // schedule any jobs that we have
-    for (auto& job : _jobs) {
-        job->start();
-    }
-}
-
-void PeriodicRunnerImpl::shutdown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_running) {
-        _running = false;
-
-        for (auto& job : _jobs) {
-            job->stop();
-        }
-        _jobs.clear();
-    }
+    JobAnchor anchor(std::move(impl));
+    return anchor;
 }
 
 PeriodicRunnerImpl::PeriodicJobImpl::PeriodicJobImpl(PeriodicJob job,
@@ -100,12 +57,28 @@ PeriodicRunnerImpl::PeriodicJobImpl::PeriodicJobImpl(PeriodicJob job,
     : _job(std::move(job)), _clockSource(source), _serviceContext(svc) {}
 
 void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::NOT_SCHEDULED);
-    _thread = stdx::thread([this] {
+    auto[startPromise, startFuture] = makePromiseFuture<void>();
+
+    {
+        stdx::lock_guard lk(_mutex);
+        invariant(_execStatus == ExecutionStatus::NOT_SCHEDULED);
+    }
+
+
+    _thread = stdx::thread([ this, startPromise = std::move(startPromise) ]() mutable {
+        auto guard = makeGuard([this] { _stopPromise.emplaceValue(); });
+
         Client::initThread(_job.name, _serviceContext, nullptr);
-        while (true) {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+        // Let start() know we're running
+        {
+            stdx::lock_guard lk(_mutex);
+            _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
+        }
+        startPromise.emplaceValue();
+
+        stdx::unique_lock lk(_mutex);
+        while (_execStatus != ExecutionStatus::CANCELED) {
             // Wait until it's unpaused or canceled
             _condvar.wait(lk, [&] { return _execStatus != ExecutionStatus::PAUSED; });
             if (_execStatus == ExecutionStatus::CANCELED) {
@@ -135,10 +108,14 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
             } while (_clockSource->now() < getDeadlineFromInterval());
         }
     });
-    _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
+
+    // Wait for the thread to actually start
+    startFuture.get();
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::start() {
+    LOG(2) << "Starting periodic job " << _job.name;
+
     _run();
 }
 
@@ -158,17 +135,26 @@ void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
-    {
+    auto lastExecStatus = [&] {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (_execStatus != ExecutionStatus::RUNNING && _execStatus != ExecutionStatus::PAUSED)
-            return;
 
-        invariant(_thread.joinable());
+        return std::exchange(_execStatus, ExecutionStatus::CANCELED);
+    }();
 
-        _execStatus = PeriodicJobImpl::ExecutionStatus::CANCELED;
+    // If we never started, then nobody should wait
+    if (lastExecStatus == ExecutionStatus::NOT_SCHEDULED) {
+        return;
     }
-    _condvar.notify_one();
-    _thread.join();
+
+    // Only join once
+    if (lastExecStatus != ExecutionStatus::CANCELED) {
+        LOG(2) << "Stopping periodic job " << _job.name;
+
+        _condvar.notify_one();
+        _thread.join();
+    }
+
+    _stopPromise.getFuture().get();
 }
 
 Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() {
@@ -183,52 +169,6 @@ void PeriodicRunnerImpl::PeriodicJobImpl::setPeriod(Milliseconds ms) {
     if (_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING) {
         _condvar.notify_one();
     }
-}
-
-namespace {
-
-template <typename T>
-std::shared_ptr<T> lockAndAssertExists(std::weak_ptr<T> ptr, StringData errMsg) {
-    if (auto p = ptr.lock()) {
-        return p;
-    } else {
-        uasserted(ErrorCodes::InternalError, errMsg);
-    }
-}
-
-constexpr auto kPeriodicJobHandleLifetimeErrMsg =
-    "The PeriodicRunner job for this handle no longer exists"_sd;
-
-}  // namespace
-
-void PeriodicRunnerImpl::PeriodicJobHandleImpl::start() {
-    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
-    job->start();
-}
-
-void PeriodicRunnerImpl::PeriodicJobHandleImpl::stop() {
-    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
-    job->stop();
-}
-
-void PeriodicRunnerImpl::PeriodicJobHandleImpl::pause() {
-    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
-    job->pause();
-}
-
-void PeriodicRunnerImpl::PeriodicJobHandleImpl::resume() {
-    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
-    job->resume();
-}
-
-Milliseconds PeriodicRunnerImpl::PeriodicJobHandleImpl::getPeriod() {
-    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
-    return job->getPeriod();
-}
-
-void PeriodicRunnerImpl::PeriodicJobHandleImpl::setPeriod(Milliseconds ms) {
-    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
-    job->setPeriod(ms);
 }
 
 }  // namespace mongo

@@ -101,7 +101,7 @@ MobileKVEngine::MobileKVEngine(const std::string& path,
                                             maybeVacuum(client, Date_t::max());
                                         },
                                         Minutes(options.vacuumCheckIntervalMinutes)));
-        _vacuumJob->start();
+        _vacuumJob.start();
     }
 }
 

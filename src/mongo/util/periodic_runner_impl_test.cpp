@@ -51,10 +51,6 @@ public:
         _runner = stdx::make_unique<PeriodicRunnerImpl>(getServiceContext(), _clockSource.get());
     }
 
-    void tearDown() override {
-        _runner->shutdown();
-    }
-
     ClockSourceMock& clockSource() {
         return *_clockSource;
     }
@@ -72,7 +68,6 @@ class PeriodicRunnerImplTest : public PeriodicRunnerImplTestNoSetup {
 public:
     void setUp() override {
         PeriodicRunnerImplTestNoSetup::setUp();
-        runner().startup();
     }
 };
 
@@ -94,7 +89,8 @@ TEST_F(PeriodicRunnerImplTest, OneJobTest) {
                                     },
                                     interval);
 
-    runner().scheduleJob(std::move(job));
+    auto jobAnchor = runner().makeJob(std::move(job));
+    jobAnchor.start();
 
     // Fast forward ten times, we should run all ten times.
     for (int i = 0; i < 10; i++) {
@@ -126,7 +122,7 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobDoesNotRunWithoutStart) {
                                     },
                                     interval);
 
-    auto handle = runner().makeJob(std::move(job));
+    auto jobAnchor = runner().makeJob(std::move(job));
     clockSource().advance(interval);
     ASSERT_EQ(count, 0);
 
@@ -151,8 +147,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobRunsCorrectlyWithStart) {
                                     },
                                     interval);
 
-    auto handle = runner().makeJob(std::move(job));
-    handle->start();
+    auto jobAnchor = runner().makeJob(std::move(job));
+    jobAnchor.start();
     // Fast forward ten times, we should run all ten times.
     for (int i = 0; i < 10; i++) {
         {
@@ -186,8 +182,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
                                     },
                                     interval);
 
-    auto handle = runner().makeJob(std::move(job));
-    handle->start();
+    auto jobAnchor = runner().makeJob(std::move(job));
+    jobAnchor.start();
     // Wait for the first execution.
     {
         stdx::unique_lock<stdx::mutex> lk(mutex);
@@ -197,7 +193,7 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
     {
         stdx::unique_lock<stdx::mutex> lk(mutex);
         isPaused = true;
-        handle->pause();
+        jobAnchor.pause();
     }
 
     // Fast forward ten times, we shouldn't run anymore. If we do, the assert inside the job will
@@ -228,8 +224,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
                                     },
                                     interval);
 
-    auto handle = runner().makeJob(std::move(job));
-    handle->start();
+    auto jobAnchor = runner().makeJob(std::move(job));
+    jobAnchor.start();
     // Wait for the first execution.
     {
         stdx::unique_lock<stdx::mutex> lk(mutex);
@@ -252,7 +248,7 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
         }
     }
 
-    handle->pause();
+    jobAnchor.pause();
 
     // Fast forward ten times, we shouldn't run anymore.
     for (int i = 0; i < 10; i++) {
@@ -262,7 +258,7 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
     // Make sure we didn't run anymore while paused.
     ASSERT_EQ(count, numIterationsBeforePause);
 
-    handle->resume();
+    jobAnchor.resume();
     // Fast forward, we should run at least once.
     clockSource().advance(interval);
 
@@ -270,39 +266,6 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
     {
         stdx::unique_lock<stdx::mutex> lk(mutex);
         cv.wait(lk, [&] { return count > numIterationsBeforePause; });
-    }
-
-    tearDown();
-}
-
-TEST_F(PeriodicRunnerImplTestNoSetup, ScheduleBeforeStartupTest) {
-    int count = 0;
-    Milliseconds interval{5};
-
-    stdx::mutex mutex;
-    stdx::condition_variable cv;
-
-    // Schedule a job before startup
-    PeriodicRunner::PeriodicJob job("job",
-                                    [&count, &mutex, &cv](Client*) {
-                                        {
-                                            stdx::unique_lock<stdx::mutex> lk(mutex);
-                                            count++;
-                                        }
-                                        cv.notify_all();
-                                    },
-                                    interval);
-
-    runner().scheduleJob(std::move(job));
-
-    // Start the runner, job should still run
-    runner().startup();
-
-    clockSource().advance(interval);
-
-    {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
-        cv.wait(lk, [&count] { return count > 0; });
     }
 
     tearDown();
@@ -338,8 +301,11 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
                                      },
                                      intervalB);
 
-    runner().scheduleJob(std::move(jobA));
-    runner().scheduleJob(std::move(jobB));
+    auto jobAnchorA = runner().makeJob(std::move(jobA));
+    auto jobAnchorB = runner().makeJob(std::move(jobB));
+
+    jobAnchorA.start();
+    jobAnchorB.start();
 
     // Fast forward and wait for both jobs to run the right number of times
     for (int i = 0; i <= 10; i++) {
@@ -382,8 +348,11 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
                                      },
                                      Milliseconds(1));
 
-    runner().scheduleJob(std::move(jobA));
-    runner().scheduleJob(std::move(jobB));
+    auto jobAnchorA = runner().makeJob(std::move(jobA));
+    auto jobAnchorB = runner().makeJob(std::move(jobB));
+
+    jobAnchorA.start();
+    jobAnchorB.start();
 
     clockSource().advance(Milliseconds(1));
 
@@ -415,16 +384,16 @@ TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
                                     },
                                     Milliseconds(5));
 
-    auto handle = runner().makeJob(std::move(job));
-    handle->start();
+    auto jobAnchor = runner().makeJob(std::move(job));
+    jobAnchor.start();
     // Wait for the first execution.
     {
         stdx::unique_lock<stdx::mutex> lk(mutex);
         cv.wait(lk, [&] { return timesCalled; });
     }
 
-    handle->setPeriod(Milliseconds(10));
-    ASSERT_EQ(handle->getPeriod(), Milliseconds(10));
+    jobAnchor.setPeriod(Milliseconds(10));
+    ASSERT_EQ(jobAnchor.getPeriod(), Milliseconds(10));
 
     // if we change the period to a longer duration, that doesn't trigger a run
     {
@@ -456,8 +425,8 @@ TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
         ASSERT_EQ(timesCalled, 2ul);
     }
 
-    handle->setPeriod(Milliseconds(4));
-    ASSERT_EQ(handle->getPeriod(), Milliseconds(4));
+    jobAnchor.setPeriod(Milliseconds(4));
+    ASSERT_EQ(jobAnchor.getPeriod(), Milliseconds(4));
 
     // shortening triggers the period
     {

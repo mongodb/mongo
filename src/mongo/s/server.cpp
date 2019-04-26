@@ -280,12 +280,6 @@ void cleanupTask(ServiceContext* serviceContext) {
 
         if (serviceContext) {
             serviceContext->setKillAllOperations();
-
-            // Shut down the background periodic task runner.
-            auto runner = serviceContext->getPeriodicRunner();
-            if (runner) {
-                runner->shutdown();
-            }
         }
 
         // Perform all shutdown operations after setKillAllOperations is called in order to ensure
@@ -564,7 +558,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     // Set up the periodic runner for background job execution
     {
         auto runner = makePeriodicRunner(serviceContext);
-        runner->startup();
         serviceContext->setPeriodicRunner(std::move(runner));
     }
 

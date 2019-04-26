@@ -73,7 +73,6 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 
     // Set up the periodic runner to allow background job execution for tests that require it.
     auto runner = makePeriodicRunner(getServiceContext());
-    runner->startup();
     getServiceContext()->setPeriodicRunner(std::move(runner));
 
     storageGlobalParams.dbpath = _tempDir.path();

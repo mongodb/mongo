@@ -29,14 +29,19 @@
 
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <string>
 
-#include "mongo/stdx/functional.h"
+#include <boost/optional.hpp>
+
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class Client;
+class PeriodicJobAnchor;
 
 /**
  * An interface for objects that run work items at specified intervals. Each individually scheduled
@@ -51,7 +56,8 @@ class Client;
  */
 class PeriodicRunner {
 public:
-    using Job = stdx::function<void(Client* client)>;
+    using Job = std::function<void(Client* client)>;
+    using JobAnchor = PeriodicJobAnchor;
 
     struct PeriodicJob {
         PeriodicJob(std::string name, Job callable, Milliseconds period)
@@ -73,9 +79,12 @@ public:
         Milliseconds interval;
     };
 
-    class PeriodicJobHandle {
+    /**
+     * A ControllableJob allows a user to reschedule the execution of a Job
+     */
+    class ControllableJob {
     public:
-        virtual ~PeriodicJobHandle() = default;
+        virtual ~ControllableJob() = default;
 
         /**
          * Starts running the job
@@ -115,39 +124,70 @@ public:
 
     virtual ~PeriodicRunner();
 
-
     /**
      * Creates a new job and adds it to the runner, but does not schedule it.
      * The caller is responsible for calling 'start' on the resulting handle in
      * order to begin the job running. This API should be used when the caller
      * is interested in observing and controlling the job execution state.
      */
-    virtual std::unique_ptr<PeriodicJobHandle> makeJob(PeriodicJob job) = 0;
+    virtual JobAnchor makeJob(PeriodicJob job) = 0;
+};
+
+/**
+ * A PeriodicJobAnchor allows the holder to control the scheduling of a job for the lifetime of the
+ * anchor. When an anchor is destructed, it stops its underlying job.
+ *
+ * The underlying weak_ptr for this class is not synchronized. In essence, treat use of this class
+ * as if it were a raw pointer to a ControllableJob.
+ *
+ * Each wrapped PeriodicRunner::ControllableJob function on this object throws
+ * if the underlying job is gone (e.g. in shutdown).
+ */
+class[[nodiscard]] PeriodicJobAnchor {
+public:
+    using Job = PeriodicRunner::ControllableJob;
+
+public:
+    // Note that this constructor is only intended for use with PeriodicRunner::makeJob()
+    explicit PeriodicJobAnchor(std::shared_ptr<Job> handle);
+
+    PeriodicJobAnchor() = default;
+    PeriodicJobAnchor(PeriodicJobAnchor &&) = default;
+    PeriodicJobAnchor& operator=(PeriodicJobAnchor&&) = default;
+
+    PeriodicJobAnchor(const PeriodicJobAnchor&) = delete;
+    PeriodicJobAnchor& operator=(const PeriodicJobAnchor&) = delete;
+
+    ~PeriodicJobAnchor();
+
+    void start();
+    void pause();
+    void resume();
+    void stop();
+    void setPeriod(Milliseconds ms);
+    Milliseconds getPeriod();
 
     /**
-     * Schedules a job to be run at periodic intervals.
+     * Abandon responsibility for scheduling the execution of this job
      *
-     * If the runner is not running when a job is scheduled, that job should
-     * be saved so that it may run in the future once startup() is called.
+     * This effectively invalidates the anchor.
      */
-    virtual void scheduleJob(PeriodicJob job) = 0;
+    void detach();
 
     /**
-     * Starts up this periodic runner.
+     * Returns if this PeriodicJobAnchor is associated with a PeriodicRunner::ControllableJob
      *
-     * This method may safely be called multiple times, either with or without
-     * calls to shutdown() in between.
+     * This function is useful to see if a PeriodicJobAnchor is initialized. It does not necessarily
+     * inform whether a PeriodicJobAnchor will throw from a control function above.
      */
-    virtual void startup() = 0;
+    bool isValid() const noexcept;
 
-    /**
-     * Shuts down this periodic runner. Stops all jobs from running.
-     *
-     * This method may safely be called multiple times, either with or without
-     * calls to startup() in between. Any jobs that have been scheduled on this
-     * runner should no longer execute once shutdown() is called.
-     */
-    virtual void shutdown() = 0;
+    explicit operator bool() const noexcept {
+        return isValid();
+    }
+
+private:
+    std::shared_ptr<Job> _handle;
 };
 
 }  // namespace mongo

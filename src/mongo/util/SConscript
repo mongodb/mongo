@@ -324,6 +324,7 @@ env.Library(
         "periodic_runner.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
     ],
 )
 

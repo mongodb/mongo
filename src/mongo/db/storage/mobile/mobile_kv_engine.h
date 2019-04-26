@@ -156,7 +156,7 @@ private:
     std::string _path;
     embedded::MobileOptions _options;
 
-    std::unique_ptr<PeriodicRunner::PeriodicJobHandle> _vacuumJob;
+    PeriodicJobAnchor _vacuumJob;
 };
 
 }  // namespace mongo

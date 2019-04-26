@@ -169,11 +169,6 @@ void shutdown(ServiceContext* srvContext) {
 
             LogicalSessionCache::set(serviceContext, nullptr);
 
-            // Shut down the background periodic task runner, before the storage engine.
-            if (auto runner = serviceContext->getPeriodicRunner()) {
-                runner->shutdown();
-            }
-
             repl::ReplicationCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
             IndexBuildsCoordinator::get(serviceContext)->shutdown();
 
@@ -236,7 +231,6 @@ ServiceContext* initialize(const char* yaml_config) {
     // The periodic runner is required by the storage engine to be running beforehand.
     auto periodicRunner = std::make_unique<PeriodicRunnerEmbedded>(
         serviceContext, serviceContext->getPreciseClockSource());
-    periodicRunner->startup();
     serviceContext->setPeriodicRunner(std::move(periodicRunner));
 
     setUpCatalog(serviceContext);

@@ -280,6 +280,7 @@ public:
 
         KVEngine* _engine;
         bool _running;
+        PeriodicJobAnchor _job;
 
         // The set of timestamps that were last reported to the listeners by the monitor.
         MonitoredTimestamps _currentTimestamps;

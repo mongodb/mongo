@@ -29,9 +29,13 @@
 
 #pragma once
 
-namespace mongo {
+#include <memory>
 
-class ServiceContext;
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/periodic_runner.h"
+
+namespace mongo {
 
 /**
  * Periodically checks for storage engine cache pressure to determine whether the maintained
@@ -41,6 +45,21 @@ class ServiceContext;
  * This function should only ever be called once, during mongod server startup (db.cpp).
  * The PeriodicRunner will handle shutting down the job on shutdown, no extra handling necessary.
  */
-void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* serviceContext);
+class PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded {
+public:
+    static PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded& get(ServiceContext* serviceContext);
+
+    PeriodicJobAnchor* operator->() const noexcept;
+    PeriodicJobAnchor& operator*() const noexcept;
+
+private:
+    void _init(ServiceContext* serviceContext);
+
+    inline static const auto _serviceDecoration =
+        ServiceContext::declareDecoration<PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded>();
+
+    mutable stdx::mutex _mutex;
+    std::shared_ptr<PeriodicJobAnchor> _anchor;
+};
 
 }  // namespace mongo

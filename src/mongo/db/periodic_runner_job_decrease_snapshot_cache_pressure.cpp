@@ -43,11 +43,30 @@
 
 namespace mongo {
 
-void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* serviceContext) {
-    // Enforce calling this function once, and only once.
-    static bool firstCall = true;
-    invariant(firstCall);
-    firstCall = false;
+auto PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::get(ServiceContext* serviceContext)
+    -> PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded& {
+    auto& jobContainer = _serviceDecoration(serviceContext);
+    jobContainer._init(serviceContext);
+    return jobContainer;
+}
+
+auto PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::operator-> () const noexcept
+    -> PeriodicJobAnchor* {
+    stdx::lock_guard lk(_mutex);
+    return _anchor.get();
+}
+
+auto PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::operator*() const noexcept
+    -> PeriodicJobAnchor& {
+    stdx::lock_guard lk(_mutex);
+    return *_anchor;
+}
+
+void PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::_init(ServiceContext* serviceContext) {
+    stdx::lock_guard lk(_mutex);
+    if (_anchor) {
+        return;
+    }
 
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
@@ -71,19 +90,18 @@ void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* s
         },
         Seconds(snapshotWindowParams.checkCachePressurePeriodSeconds.load()));
 
-    auto handle = periodicRunner->makeJob(std::move(job));
-    handle->start();
+    _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 
-    SnapshotWindowParams::observeCheckCachePressurePeriodSeconds
-        .addObserver([handle = std::move(handle)](const auto& secs) {
-            try {
-                handle->setPeriod(Seconds(secs));
-            } catch (const DBException& ex) {
-                log() << "Failed to update the period of the thread which decreases data history "
-                         "target window size if there is cache pressure."
-                      << ex.toStatus();
-            }
-        });
+    SnapshotWindowParams::observeCheckCachePressurePeriodSeconds.addObserver([anchor = _anchor](
+        const auto& secs) {
+        try {
+            anchor->setPeriod(Seconds(secs));
+        } catch (const DBException& ex) {
+            log() << "Failed to update the period of the thread which decreases data history "
+                     "target window size if there have been no new SnapshotTooOld errors."
+                  << ex.toStatus();
+        }
+    });
 }
 
 }  // namespace mongo

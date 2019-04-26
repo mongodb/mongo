@@ -29,18 +29,34 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/periodic_runner.h"
+
 namespace mongo {
 
-class ServiceContext;
-
 /**
- * Defines and starts a periodic background job to check for and abort expired transactions.
+ * Defines a periodic background job to check for and abort expired transactions.
  * The job will run every (transactionLifetimeLimitSeconds/2) seconds, or at most once per second
  * and at least once per minute.
- *
- * This function should only ever be called once, during mongod server startup (db.cpp).
- * The PeriodicRunner will handle shutting down the job on shutdown, no extra handling necessary.
  */
-void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContext);
+class PeriodicThreadToAbortExpiredTransactions {
+public:
+    static PeriodicThreadToAbortExpiredTransactions& get(ServiceContext* serviceContext);
+
+    PeriodicJobAnchor& operator*() const noexcept;
+    PeriodicJobAnchor* operator->() const noexcept;
+
+private:
+    void _init(ServiceContext* serviceContext);
+
+    inline static const auto _serviceDecoration =
+        ServiceContext::declareDecoration<PeriodicThreadToAbortExpiredTransactions>();
+
+    mutable stdx::mutex _mutex;
+    std::shared_ptr<PeriodicJobAnchor> _anchor;
+};
 
 }  // namespace mongo
