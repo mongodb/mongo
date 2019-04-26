@@ -325,8 +325,13 @@
                 if (isTransientError(e)) {
                     if (performNoopWrite) {
                         const primarySession = sessions[0];
-                        assert.commandWorked(primarySession.getDatabase(dbName).adminCommand(
-                            {appendOplogNote: 1, data: {}}));
+
+                        // If the no-op write fails due to the global lock not being able to be
+                        // acquired within 1 millisecond, retry the operation again at a later time.
+                        assert.commandWorkedOrFailedWithCode(
+                            primarySession.getDatabase(dbName).adminCommand(
+                                {appendOplogNote: 1, data: {}}),
+                            ErrorCodes.LockFailed);
                     }
 
                     debugInfo.push({"transientError": e, "performNoopWrite": performNoopWrite});
