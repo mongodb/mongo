@@ -167,7 +167,7 @@ DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 StatusWith<LockpingsType> DistLockCatalogImpl::getPing(OperationContext* opCtx,
                                                        StringData processID) {
     auto findResult = _findOnConfig(
-        opCtx, kReadPref, _lockPingNS, BSON(LockpingsType::process() << processID), BSONObj(), 1);
+        opCtx, kReadPref, _lockPingNS, BSON(LockpingsType::process() << processID), {}, 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -204,7 +204,7 @@ Status DistLockCatalogImpl::ping(OperationContext* opCtx, StringData processID, 
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
-        request.toBSON(),
+        request.toBSON({}),
         Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNotIdempotent);
 
@@ -242,7 +242,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
-        request.toBSON(),
+        request.toBSON({}),
         Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNoRetry);  // Dist lock manager is handling own retries
 
@@ -300,7 +300,7 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
-        request.toBSON(),
+        request.toBSON({}),
         Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNotIdempotent);
 
@@ -346,7 +346,7 @@ Status DistLockCatalogImpl::_unlock(OperationContext* opCtx, const FindAndModify
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
-        request.toBSON(),
+        request.toBSON({}),
         Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kIdempotent);
 
@@ -448,8 +448,8 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* opCtx,
                                                        const OID& lockSessionID) {
-    auto findResult = _findOnConfig(
-        opCtx, kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), BSONObj(), 1);
+    auto findResult =
+        _findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), {}, 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -475,7 +475,7 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* opCtx,
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByName(OperationContext* opCtx, StringData name) {
     auto findResult =
-        _findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::name() << name), BSONObj(), 1);
+        _findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::name() << name), {}, 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -509,7 +509,7 @@ Status DistLockCatalogImpl::stopPing(OperationContext* opCtx, StringData process
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
-        request.toBSON(),
+        request.toBSON({}),
         Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNotIdempotent);
 
