@@ -53,10 +53,11 @@ __directory_list_worker(WT_FILE_SYSTEM *file_system,
 	findhandle = FindFirstFileW(pathbuf_wide->data, &finddata);
 	if (findhandle == INVALID_HANDLE_VALUE) {
 		windows_error = __wt_getlasterror();
-		__wt_errx(session,
+		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret,
 		    "%s: directory-list: FindFirstFile: %s",
 		    pathbuf->data, __wt_formatmessage(session, windows_error));
-		WT_ERR(__wt_map_windows_error(windows_error));
+		WT_ERR(ret);
 	}
 
 	for (count = 0;;) {
@@ -89,10 +90,11 @@ skip:		if (FindNextFileW(findhandle, &finddata) != 0)
 		windows_error = __wt_getlasterror();
 		if (windows_error == ERROR_NO_MORE_FILES)
 			break;
-		__wt_errx(session,
+		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret,
 		    "%s: directory-list: FindNextFileW: %s",
 		    pathbuf->data, __wt_formatmessage(session, windows_error));
-		WT_ERR(__wt_map_windows_error(windows_error));
+		WT_ERR(ret);
 	}
 
 	*dirlistp = entries;
@@ -101,12 +103,12 @@ skip:		if (FindNextFileW(findhandle, &finddata) != 0)
 err:	if (findhandle != INVALID_HANDLE_VALUE)
 		if (FindClose(findhandle) == 0) {
 			windows_error = __wt_getlasterror();
-			__wt_errx(session,
+			if (ret == 0)
+				ret = __wt_map_windows_error(windows_error);
+			__wt_err(session, ret,
 			    "%s: directory-list: FindClose: %s",
 			    pathbuf->data,
 			    __wt_formatmessage(session, windows_error));
-			if (ret == 0)
-				ret = __wt_map_windows_error(windows_error);
 		}
 
 	__wt_free(session, dir_copy);

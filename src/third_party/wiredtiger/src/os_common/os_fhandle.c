@@ -301,7 +301,6 @@ __handle_close(WT_SESSION_IMPL *session, WT_FH *fh, bool locked)
 	if (fh->ref != 0) {
 		__wt_errx(session,
 		    "Closing a file handle with open references: %s", fh->name);
-		WT_TRET(EBUSY);
 	}
 
 	/* Remove from the list. */

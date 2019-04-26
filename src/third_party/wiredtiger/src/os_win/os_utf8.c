@@ -16,6 +16,7 @@ int
 __wt_to_utf16_string(
     WT_SESSION_IMPL *session, const char *utf8, WT_ITEM **outbuf)
 {
+	WT_DECL_RET;
 	DWORD windows_error;
 	int bufferSize;
 
@@ -23,9 +24,10 @@ __wt_to_utf16_string(
 	windows_error = __wt_getlasterror();
 
 	if (bufferSize == 0 && windows_error != ERROR_INSUFFICIENT_BUFFER) {
-		__wt_errx(session, "MultiByteToWideChar: %s",
+		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret, "MultiByteToWideChar: %s",
 		    __wt_formatmessage(session, windows_error));
-		return (__wt_map_windows_error(windows_error));
+		return (ret);
 	}
 
 	WT_RET(__wt_scr_alloc(session, bufferSize * sizeof(wchar_t), outbuf));
@@ -35,9 +37,10 @@ __wt_to_utf16_string(
 	if (bufferSize == 0) {
 		windows_error = __wt_getlasterror();
 		__wt_scr_free(session, outbuf);
-		__wt_errx(session, "MultiByteToWideChar: %s",
+		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret, "MultiByteToWideChar: %s",
 		    __wt_formatmessage(session, windows_error));
-		return (__wt_map_windows_error(windows_error));
+		return (ret);
 	}
 
 	(*outbuf)->size = bufferSize;
@@ -52,6 +55,7 @@ int
 __wt_to_utf8_string(
     WT_SESSION_IMPL *session, const wchar_t *wide, WT_ITEM **outbuf)
 {
+	WT_DECL_RET;
 	DWORD windows_error;
 	int bufferSize;
 
@@ -60,9 +64,10 @@ __wt_to_utf8_string(
 	windows_error = __wt_getlasterror();
 
 	if (bufferSize == 0 && windows_error != ERROR_INSUFFICIENT_BUFFER) {
-		__wt_errx(session, "WideCharToMultiByte: %s",
+		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret, "WideCharToMultiByte: %s",
 		    __wt_formatmessage(session, windows_error));
-		return (__wt_map_windows_error(windows_error));
+		return (ret);
 	}
 
 	WT_RET(__wt_scr_alloc(session, bufferSize, outbuf));
@@ -72,9 +77,10 @@ __wt_to_utf8_string(
 	if (bufferSize == 0) {
 		windows_error = __wt_getlasterror();
 		__wt_scr_free(session, outbuf);
-		__wt_errx(session, "WideCharToMultiByte: %s",
+		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret, "WideCharToMultiByte: %s",
 		    __wt_formatmessage(session, windows_error));
-		return (__wt_map_windows_error(windows_error));
+		return (ret);
 	}
 
 	(*outbuf)->size = bufferSize;

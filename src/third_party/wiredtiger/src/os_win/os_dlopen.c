@@ -28,10 +28,11 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 		if (GetModuleHandleExW(
 		    0, NULL, (HMODULE *)&dlh->handle) == FALSE) {
 			windows_error = __wt_getlasterror();
-			__wt_errx(session,
+			ret = __wt_map_windows_error(windows_error);
+			__wt_err(session, ret,
 			    "GetModuleHandleExW: %s: %s",
 			    path, __wt_formatmessage(session, windows_error));
-			WT_ERR(__wt_map_windows_error(windows_error));
+			WT_ERR(ret);
 		}
 	} else {
 		// TODO: load dll here
@@ -54,6 +55,7 @@ int
 __wt_dlsym(WT_SESSION_IMPL *session,
     WT_DLH *dlh, const char *name, bool fail, void *sym_ret)
 {
+	WT_DECL_RET;
 	DWORD windows_error;
 	void *sym;
 
@@ -62,11 +64,12 @@ __wt_dlsym(WT_SESSION_IMPL *session,
 	sym = GetProcAddress(dlh->handle, name);
 	if (sym == NULL && fail) {
 		windows_error = __wt_getlasterror();
-		__wt_errx(session,
+		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret,
 		    "GetProcAddress: %s in %s: %s",
 		    name, dlh->name,
 		    __wt_formatmessage(session, windows_error));
-		WT_RET(__wt_map_windows_error(windows_error));
+		WT_RET(ret);
 	}
 
 	*(void **)sym_ret = sym;
@@ -85,9 +88,9 @@ __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh)
 
 	if (FreeLibrary(dlh->handle) == FALSE) {
 		windows_error = __wt_getlasterror();
-		__wt_errx(session, "FreeLibrary: %s: %s",
-		    dlh->name, __wt_formatmessage(session, windows_error));
 		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret, "FreeLibrary: %s: %s",
+		    dlh->name, __wt_formatmessage(session, windows_error));
 	}
 
 	__wt_free(session, dlh->name);

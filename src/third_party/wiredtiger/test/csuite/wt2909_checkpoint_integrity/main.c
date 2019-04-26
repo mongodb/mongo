@@ -79,7 +79,8 @@
 #define	MAX_OP_RANGE			1000
 #define	STDERR_FILE			"stderr.txt"
 #define	STDOUT_FILE			"stdout.txt"
-#define	TESTS_PER_OP_VALUE		3
+#define	TESTS_PER_CALIBRATION		2
+#define	TESTS_WITH_RECALIBRATION	5
 #define	VERBOSE_PRINT			10000
 
 static int check_results(TEST_OPTS *, uint64_t *);
@@ -93,7 +94,8 @@ static void generate_value(uint32_t, uint64_t, char *, int *, int *, int *,
     char **);
 static void run_check_subtest(TEST_OPTS *, const char *, uint64_t, bool,
     uint64_t *);
-static void run_check_subtest_range(TEST_OPTS *, const char *, bool);
+static int run_check_subtest_range(TEST_OPTS *, const char *, bool);
+static void run_check_subtest_range_retry(TEST_OPTS *, const char *, bool);
 static int run_process(TEST_OPTS *, const char *, char *[], int *);
 static void subtest_main(int, char *[], bool);
 static void subtest_populate(TEST_OPTS *, bool);
@@ -353,17 +355,16 @@ run_check_subtest(TEST_OPTS *opts, const char *debugger, uint64_t nops,
 
 /*
  * run_check_subtest_range --
+ *	Run successive tests via binary search that determines the approximate
+ *	crossover point between when data is recoverable or not. Once that is
+ *	determined, run the subtest in a range near that crossover point.
  *
- * Run successive tests via binary search that determines the approximate
- * crossover point between when data is recoverable or not. Once that is
- * determined, run the subtest in a range near that crossover point.
- *
- * The theory is that running at the crossover point will tend to trigger
- * "interesting" failures at the borderline when the checkpoint is about to,
- * or has, succeeded.  If any of those failures creates a WT home directory
- * that cannot be recovered, the top level test will fail.
- */
-static void
+ *	The theory is that running at the crossover point will tend to trigger
+ *	"interesting" failures at the borderline when the checkpoint is about
+ *	to, or has, succeeded.  If any of those failures creates a WiredTiger
+ *	home directory that cannot be recovered, the top level test will fail.
+  */
+static int
 run_check_subtest_range(TEST_OPTS *opts, const char *debugger, bool close_test)
 {
 	uint64_t cutoff, high, low, mid, nops, nresults;
@@ -402,7 +403,7 @@ run_check_subtest_range(TEST_OPTS *opts, const char *debugger, bool close_test)
 	got_failure = false;
 	got_success = false;
 	for (i = 0;
-	    i < TESTS_PER_OP_VALUE && (!got_failure || !got_success); i++)
+	    i < TESTS_PER_CALIBRATION && (!got_failure || !got_success); i++)
 		for (nops = mid - 10; nops < mid + 10; nops++) {
 			run_check_subtest(opts, debugger, nops,
 			    close_test, &nresults);
@@ -414,9 +415,51 @@ run_check_subtest_range(TEST_OPTS *opts, const char *debugger, bool close_test)
 
 	/*
 	 * Check that it really ran with a crossover point.
+	 * If not, perhaps we calibrated the range incorrectly.
+	 * Tell caller to try again.
 	 */
-	testutil_assert(got_failure);
-	testutil_assert(got_success);
+	if (!got_failure || !got_success) {
+		fprintf(stderr, "Warning: did not find a reliable test range.\n"
+		    "midpoint=%" PRIu64 ", close_test=%d, got_failure=%d, "
+		    "got_success=%d\n", mid, (int)close_test, (int)got_failure,
+		    (int)got_success);
+		return (EAGAIN);
+	}
+	return (0);
+}
+
+/*
+ * run_check_subtest_range_retry --
+ *	Repeatedly run the subtest range test, retrying some number of times
+ *	as long as EBUSY is returned, a warning that the test did not
+ *	adequately cover "both sides" of the test threshold.  Such warning
+ *	returns should be rare and are not hard failures, no WiredTiger bug
+ *	is demonstrated. Rerunning the subtest range test will determine
+ *	a new calibration for the range.
+ */
+static void
+run_check_subtest_range_retry(TEST_OPTS *opts, const char *debugger,
+    bool close_test)
+{
+	WT_DECL_RET;
+	int tries;
+
+	for (tries = 0; tries < TESTS_WITH_RECALIBRATION; tries++) {
+		if (tries != 0) {
+			fprintf(stderr, "Retrying after sleep...\n");
+			sleep(5);
+		}
+		if ((ret = run_check_subtest_range(
+		    opts, debugger, close_test)) == 0)
+			break;
+		testutil_assert(ret == EAGAIN);
+	}
+	if (tries == TESTS_WITH_RECALIBRATION)
+		/*
+		 * If we couldn't successfully perform the test,
+		 * we want to know about it.
+		 */
+		testutil_die(ret, "too many retries");
 }
 
 /*
@@ -679,8 +722,8 @@ main(int argc, char *argv[])
 		    "  (change with -n N)\n", opts->nrecords);
 	}
 	if (opts->nops == 0) {
-		run_check_subtest_range(opts, debugger, false);
-		run_check_subtest_range(opts, debugger, true);
+		run_check_subtest_range_retry(opts, debugger, false);
+		run_check_subtest_range_retry(opts, debugger, true);
 	} else
 		run_check_subtest(opts, debugger, opts->nops,
 		    opts->nrecords, &nresults);

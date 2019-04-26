@@ -127,8 +127,12 @@ for line in open(f, 'r'):
 
     w = textwrap.TextWrapper(width=80-len(prefix.expandtabs()),
             break_on_hyphens=False,
+            break_long_words=False,
             replace_whitespace=False,
             fix_sentence_endings=True)
+    # Separate at spaces, and after a set of non-breaking space indicators.
+    w.wordsep_re = w.wordsep_simple_re = \
+        re.compile(r'(\s+|(?<=&nbsp;)[\w_,.;:]*)')
     for c in api_data.methods[config_name].config:
         if 'undoc' in c.flags:
             continue

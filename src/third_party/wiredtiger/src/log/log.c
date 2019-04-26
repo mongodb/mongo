@@ -2602,12 +2602,12 @@ err:	WT_STAT_CONN_INCR(session, log_scans);
 	 * a helpful failure message.
 	 */
 	if (ret != 0 && firstrecord && LF_ISSET(WT_LOGSCAN_RECOVER)) {
-		__wt_errx(session,
+		__wt_err(session, ret,
 		    "WiredTiger is unable to read the recovery log.");
-		__wt_errx(session, "This may be due to the log"
+		__wt_err(session, ret, "This may be due to the log"
 		    " files being encrypted, being from an older"
 		    " version or due to corruption on disk");
-		__wt_errx(session, "You should confirm that you have"
+		__wt_err(session, ret, "You should confirm that you have"
 		    " opened the database with the correct options including"
 		    " all encryption and compression options");
 	}

@@ -40,6 +40,7 @@ __wt_thread_create(WT_SESSION_IMPL *session,
 int
 __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t *tid)
 {
+	WT_DECL_RET;
 	DWORD windows_error;
 
 	/* Only attempt to join if thread was created successfully */
@@ -58,7 +59,8 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t *tid)
 	    WaitForSingleObject(tid->id, INFINITE)) != WAIT_OBJECT_0) {
 		if (windows_error == WAIT_FAILED)
 			windows_error = __wt_getlasterror();
-		__wt_errx(session, "thread join: WaitForSingleObject: %s",
+		__wt_err(session, __wt_map_windows_error(windows_error),
+		    "thread join: WaitForSingleObject: %s",
 		    __wt_formatmessage(session, windows_error));
 
 		/* If we fail to wait, we will leak handles, do not continue. */
@@ -67,9 +69,10 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t *tid)
 
 	if (CloseHandle(tid->id) == 0) {
 		windows_error = __wt_getlasterror();
-		__wt_errx(session, "thread join: CloseHandle: %s",
+		ret = __wt_map_windows_error(windows_error);
+		__wt_err(session, ret, "thread join: CloseHandle: %s",
 		    __wt_formatmessage(session, windows_error));
-		return (__wt_map_windows_error(windows_error));
+		return (ret);
 	}
 
 	return (0);

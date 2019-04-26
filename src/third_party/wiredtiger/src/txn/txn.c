@@ -532,11 +532,6 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.val)
 		F_SET(txn, WT_TXN_IGNORE_PREPARE);
 
-	/* Check if read timestamp to be rounded up to the oldest timestamp. */
-	WT_RET(__wt_config_gets_def(session, cfg, "round_to_oldest", 0, &cval));
-	if (cval.val)
-		F_SET(txn, WT_TXN_TS_ROUND_READ);
-
 	/*
 	 * Check if the prepare timestamp and the commit timestamp of a
 	 * prepared transaction need to be rounded up.

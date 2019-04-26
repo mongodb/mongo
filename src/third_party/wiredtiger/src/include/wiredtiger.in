@@ -1349,9 +1349,9 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_bit_count,
 	 * the number of bits used per item for LSM bloom filters., an integer
 	 * between 2 and 1000; default \c 16.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_config, config string used when
-	 * creating Bloom filter files\, passed to WT_SESSION::create., a
-	 * string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * bloom_config, config string used when creating Bloom filter files\,
+	 * passed to WT_SESSION::create., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_hash_count, the number of hash
 	 * values per item used for LSM bloom filters., an integer between 2 and
 	 * 100; default \c 8.}
@@ -1379,10 +1379,10 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prefix,
 	 * custom data source prefix instead of \c "file"., a string; default
 	 * empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;start
-	 * _generation, merge generation at which the custom data source is used
-	 * (zero indicates no custom data source)., an integer between 0 and 10;
-	 * default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+	 * start_generation, merge generation at which the custom data source is
+	 * used (zero indicates no custom data source)., an integer between 0
+	 * and 10; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;suffix,
 	 * custom data source suffix instead of \c ".lsm"., a string; default
 	 * empty.}
@@ -1390,10 +1390,10 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_max, the
 	 * maximum number of chunks to include in a merge operation., an integer
 	 * between 2 and 100; default \c 15.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_min, the minimum number of
-	 * chunks to include in a merge operation.  If set to 0 or 1 half the
-	 * value of merge_max is used., an integer no more than 100; default \c
-	 * 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * merge_min, the minimum number of chunks to include in a merge
+	 * operation.  If set to 0 or 1 half the value of merge_max is used., an
+	 * integer no more than 100; default \c 0.}
 	 * @config{ ),,}
 	 * @config{memory_page_image_max, the maximum in-memory page image
 	 * represented by a single storage block.  Depending on compression
@@ -2017,12 +2017,14 @@ struct __wt_session {
 	 * related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;all, drop all named snapshots., a
 	 * boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;before, drop all snapshots up to but
-	 * not including the specified name., a string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names, drop specific named
-	 * snapshots., a list of strings; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to and
-	 * including the specified name., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * before, drop all snapshots up to but not including the specified
+	 * name., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * names, drop specific named snapshots., a list of strings; default
+	 * empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to
+	 * and including the specified name., a string; default empty.}
 	 * @config{
 	 * ),,}
 	 * @config{include_updates, make updates from the current transaction
@@ -2333,8 +2335,9 @@ struct __wt_connection {
 	 * integer between 0 and 100; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a
 	 * boolean flag; default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into
-	 * log files., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * zero_fill, manually write zeroes into log files., a boolean flag;
+	 * default \c false.}
 	 * @config{ ),,}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree
 	 * management.  The LSM manager is started automatically the first time
@@ -2802,11 +2805,11 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;ops_max,
  * maximum number of expected simultaneous asynchronous operations., an integer
  * between 1 and 4096; default \c 1024.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number of worker threads to
- * service asynchronous requests.  Each worker thread uses a session from the
- * configured session_max., an integer between 1 and 20; default \c 2.}
- * @config{
- * ),,}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * threads, the number of worker threads to service asynchronous requests.  Each
+ * worker thread uses a session from the configured session_max., an integer
+ * between 1 and 20; default \c 2.}
+ * @config{ ),,}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
  * I/O. The default value of -1 indicates a platform-specific alignment value
  * should be used (4KB on Linux systems when direct I/O is configured\, zero
@@ -2856,10 +2859,10 @@ struct __wt_connection {
  * below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;release, compatibility release
  * version string., a string; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;require_max, required maximum compatibility
- * version of existing data files.  Must be greater than or equal to any release
- * version set in the \c release setting.  Has no effect if creating the
- * database., a string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * require_max, required maximum compatibility version of existing data files.
+ * Must be greater than or equal to any release version set in the \c release
+ * setting.  Has no effect if creating the database., a string; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;require_min, required minimum compatibility
  * version of existing data files.  Must be less than or equal to any release
  * version set in the \c release setting.  Has no effect if creating the
@@ -2908,17 +2911,16 @@ struct __wt_connection {
  * empty.}
  * @config{eviction = (, eviction configuration options., a set of related
  * configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * threads_max, maximum number of threads WiredTiger will start to help evict
+ * pages from cache.  The number of threads started will vary depending on the
+ * current eviction load.  Each eviction worker thread uses a session from the
+ * configured session_max., an integer between 1 and 20; default \c 8.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads
  * WiredTiger will start to help evict pages from cache.  The number of threads
- * started will vary depending on the current eviction load.  Each eviction
- * worker thread uses a session from the configured session_max., an integer
- * between 1 and 20; default \c 8.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min,
- * minimum number of threads WiredTiger will start to help evict pages from
- * cache.  The number of threads currently running will vary depending on the
- * current eviction load., an integer between 1 and 20; default \c 1.}
- * @config{
- * ),,}
+ * currently running will vary depending on the current eviction load., an
+ * integer between 1 and 20; default \c 1.}
+ * @config{ ),,}
  * @config{eviction_checkpoint_target, perform eviction at the beginning of
  * checkpoints to bring the dirty content in cache to this level.  It is a
  * percentage of the cache size if the value is within the range of 0 to 100 or
@@ -2967,13 +2969,13 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_handle_minimum, number of handles open
  * before the file manager will look for handles to close., an integer greater
  * than or equal to 0; default \c 250.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_idle_time, amount of time in seconds a
- * file handle needs to be idle before attempting to close it.  A setting of 0
- * means that idle handles are not closed., an integer between 0 and 100000;
- * default \c 30.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval
- * in seconds at which to check for files that are inactive and close them., an
- * integer between 1 and 100000; default \c 10.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * close_idle_time, amount of time in seconds a file handle needs to be idle
+ * before attempting to close it.  A setting of 0 means that idle handles are
+ * not closed., an integer between 0 and 100000; default \c 30.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval in seconds at
+ * which to check for files that are inactive and close them., an integer
+ * between 1 and 100000; default \c 10.}
  * @config{ ),,}
  * @config{in_memory, keep data in-memory only.  See @ref in_memory for more
  * information., a boolean flag; default \c false.}
@@ -3025,10 +3027,10 @@ struct __wt_connection {
  * session_max., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where possible., a
  * boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of threads
- * to manage merging LSM trees in the database.  Each worker thread uses a
- * session handle from the configured session_max., an integer between 3 and 20;
- * default \c 4.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * worker_thread_max, Configure a set of threads to manage merging LSM trees in
+ * the database.  Each worker thread uses a session handle from the configured
+ * session_max., an integer between 3 and 20; default \c 4.}
  * @config{ ),,}
  * @config{mmap, Use memory mapping to access files when possible., a boolean
  * flag; default \c true.}

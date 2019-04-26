@@ -253,6 +253,16 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	buf->size = size;
 
 	/*
+	 * Ensure we don't read information that isn't there. It shouldn't ever
+	 * happen, but it's a cheap test.
+	 */
+	if (size < block->allocsize)
+		WT_RET_MSG(session, EINVAL,
+		"%s: impossibly small block size of %" PRIu32 "B, less than "
+		"allocation size of %" PRIu32,
+		block->name, size, block->allocsize);
+
+	/*
 	 * We incrementally read through the structure before doing a checksum,
 	 * do little- to big-endian handling early on, and then select from the
 	 * original or swapped structure as needed.

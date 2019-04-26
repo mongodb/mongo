@@ -950,15 +950,9 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	WT_TXN *txn = &session->txn;
 	wt_timestamp_t ts;
 
 	WT_TRET(__wt_txn_context_check(session, true));
-
-	/* Look for round_to_oldest configuration. */
-	ret = __wt_config_gets_def(session, cfg, "round_to_oldest", 0, &cval);
-	if (cval.val)
-		F_SET(txn, WT_TXN_TS_ROUND_READ);
 
 	/* Look for a commit timestamp. */
 	ret = __wt_config_gets_def(session, cfg, "commit_timestamp", 0, &cval);

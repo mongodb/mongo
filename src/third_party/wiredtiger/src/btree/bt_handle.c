@@ -639,12 +639,12 @@ __wt_btree_tree_open(
 	 * Try to provide a helpful failure message.
 	 */
 	if (ret != 0 && WT_IS_METADATA(session->dhandle)) {
-		__wt_errx(session,
+		__wt_err(session, ret,
 		    "WiredTiger has failed to open its metadata");
-		__wt_errx(session, "This may be due to the database"
+		__wt_err(session, ret, "This may be due to the database"
 		    " files being encrypted, being from an older"
 		    " version or due to corruption on disk");
-		__wt_errx(session, "You should confirm that you have"
+		__wt_err(session, ret, "You should confirm that you have"
 		    " opened the database with the correct options including"
 		    " all encryption and compression options");
 	}

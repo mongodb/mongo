@@ -15,6 +15,7 @@
 int
 __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp)
 {
+	WT_DECL_RET;
 	DWORD size, windows_error;
 
 	*envp = NULL;
@@ -29,8 +30,9 @@ __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp)
 		return (0);
 
 	windows_error = __wt_getlasterror();
-	__wt_errx(session,
+	ret = __wt_map_windows_error(windows_error);
+	__wt_err(session, ret,
 	    "GetEnvironmentVariableA: %s: %s",
 	    variable, __wt_formatmessage(session, windows_error));
-	return (__wt_map_windows_error(windows_error));
+	return (ret);
 }
