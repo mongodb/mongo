@@ -48,9 +48,23 @@ std::unique_ptr<DBClientBase> connect(StringData appName) {
     return conn;
 }
 
-void setFailpoint(DBClientBase* conn, StringData failPoint, bool enable) {
-    auto cmdObj = BSON("configureFailPoint" << failPoint.toString() << "mode"
-                                            << (enable ? "alwaysOn" : "off"));
+void setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(DBClientBase* conn, bool enable) {
+    auto cmdObj = BSON("configureFailPoint"
+                       << "waitWithPinnedCursorDuringGetMoreBatch"
+                       << "mode"
+                       << (enable ? "alwaysOn" : "off")
+                       << "data"
+                       << BSON("shouldNotdropLock" << true));
+    auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
+    ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
+}
+
+void setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(DBClientBase* conn,
+                                                                      bool enable) {
+    auto cmdObj = BSON("configureFailPoint"
+                       << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch"
+                       << "mode"
+                       << (enable ? "alwaysOn" : "off"));
     auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
 }
@@ -99,7 +113,7 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
     }
 
     // Enable a failpoint to block getMore during execution.
-    setFailpoint(conn.get(), "waitWithPinnedCursorDuringGetMoreBatch", true);
+    setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), true);
 
     // Execute a query on a separate thread, with the 'exhaust' flag set.
     std::unique_ptr<DBClientBase> queryConnection;
@@ -124,8 +138,8 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
 
     // Ensure that, regardless of whether the test completes or fails, we release all failpoints.
     ON_BLOCK_EXIT([&conn, &queryThread] {
-        setFailpoint(conn.get(), "waitWithPinnedCursorDuringGetMoreBatch", false);
-        setFailpoint(conn.get(), "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch", false);
+        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
+        setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn.get(), false);
         queryThread.wait();
     });
 
@@ -156,8 +170,8 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
 
         // Airlock the failpoint by releasing it only after we enable a post-getMore failpoint. This
         // ensures that no subsequent getMores can run before we re-enable the original failpoint.
-        setFailpoint(conn.get(), "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch", true);
-        setFailpoint(conn.get(), "waitWithPinnedCursorDuringGetMoreBatch", false);
+        setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn.get(), true);
+        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
         // Confirm that the getMore completed its batch and hit the post-getMore failpoint.
         ASSERT(confirmCurrentOpContents(
             conn.get(),
@@ -165,8 +179,8 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
                                    << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch"),
             parallelWaitTimeoutMS));
         // Re-enable the original failpoint to catch the next getMore, and release the current one.
-        setFailpoint(conn.get(), "waitWithPinnedCursorDuringGetMoreBatch", true);
-        setFailpoint(conn.get(), "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch", false);
+        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), true);
+        setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn.get(), false);
     }
 }
 }  // namespace mongo
