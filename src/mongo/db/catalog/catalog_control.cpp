@@ -177,7 +177,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         LOG_FOR_RECOVERY(1) << "openCatalog: dbholder reopening database " << dbName;
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
-        for (auto&& collNss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(dbName)) {
+        for (auto&& collNss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
             auto collection = db->getCollection(opCtx, collNss.ns());
             invariant(collection,

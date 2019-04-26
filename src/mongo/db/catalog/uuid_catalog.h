@@ -132,7 +132,7 @@ public:
     /**
      * Implies onDropCollection for all collections in db, but is not transactional.
      */
-    void onCloseDatabase(Database* db);
+    void onCloseDatabase(OperationContext* opCtx, Database* db);
 
     /**
      * Register the collection catalog entry with `uuid`. The collection object with `uuid` must not
@@ -218,14 +218,10 @@ public:
     boost::optional<CollectionUUID> lookupUUIDByNSS(const NamespaceString& nss) const;
 
     /**
-     * This function gets the pointers of all the CollectionCatalogEntries from `dbName`.
-     *
-     * Returns empty vector if the 'dbName' is not known.
-     */
-    std::vector<CollectionCatalogEntry*> getAllCatalogEntriesFromDb(StringData dbName) const;
-
-    /**
      * This function gets the UUIDs of all collections from `dbName`.
+     *
+     * If the caller does not take a strong database lock, some of UUIDs might no longer exist (due
+     * to collection drop) after this function returns.
      *
      * Returns empty vector if the 'dbName' is not known.
      */
@@ -234,9 +230,13 @@ public:
     /**
      * This function gets the ns of all collections from `dbName`. The result is not sorted.
      *
+     * Caller must take a strong database lock; otherwise, collections returned could be dropped or
+     * renamed.
+     *
      * Returns empty vector if the 'dbName' is not known.
      */
-    std::vector<NamespaceString> getAllCollectionNamesFromDb(StringData dbName) const;
+    std::vector<NamespaceString> getAllCollectionNamesFromDb(OperationContext* opCtx,
+                                                             StringData dbName) const;
 
     /**
      * This functions gets all the database names. The result is sorted in alphabetical ascending

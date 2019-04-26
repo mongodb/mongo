@@ -188,6 +188,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                                   const std::vector<std::string>& dbNames) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto downgradeError = Status{ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
+    invariant(opCtx->lockState()->isW());
 
     for (const auto& dbName : dbNames) {
         auto db = databaseHolder->openDb(opCtx, dbName);
