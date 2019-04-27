@@ -37,7 +37,8 @@ namespace repl {
 TaskExecutorMock::TaskExecutorMock(executor::TaskExecutor* executor)
     : unittest::TaskExecutorProxy(executor) {}
 
-StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWork(CallbackFn work) {
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWork(
+    CallbackFn&& work) {
     if (shouldFailScheduleWorkRequest()) {
         return Status(ErrorCodes::OperationFailed, "failed to schedule work");
     }
@@ -49,7 +50,7 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWor
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWorkAt(
-    Date_t when, CallbackFn work) {
+    Date_t when, CallbackFn&& work) {
     if (shouldFailScheduleWorkAtRequest()) {
         return Status(ErrorCodes::OperationFailed,
                       str::stream() << "failed to schedule work at " << when.toString());

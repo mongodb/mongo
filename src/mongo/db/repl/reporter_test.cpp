@@ -582,7 +582,7 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
         TaskExecutorWithFailureInScheduleWork(executor::TaskExecutor* executor)
             : unittest::TaskExecutorProxy(executor) {}
         virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWork(
-            CallbackFn work) override {
+            CallbackFn&& override) {
             return Status(ErrorCodes::OperationFailed, "failed to schedule work");
         }
     };
@@ -634,7 +634,7 @@ TEST_F(ReporterTest, FailingToScheduleTimeoutShouldMakeReporterInactive) {
         TaskExecutorWithFailureInScheduleWorkAt(executor::TaskExecutor* executor)
             : unittest::TaskExecutorProxy(executor) {}
         virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWorkAt(
-            Date_t when, CallbackFn work) override {
+            Date_t when, CallbackFn&&) override {
             return Status(ErrorCodes::OperationFailed, "failed to schedule work");
         }
     };

@@ -42,6 +42,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/future.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -71,7 +72,7 @@ struct ConnectionPoolStats;
  * If an event is unsignaled when shutdown is called, the executor will ensure that any threads
  * blocked in waitForEvent() eventually return.
  */
-class TaskExecutor {
+class TaskExecutor : public OutOfLineExecutor {
     TaskExecutor(const TaskExecutor&) = delete;
     TaskExecutor& operator=(const TaskExecutor&) = delete;
 
@@ -168,12 +169,19 @@ public:
      * Schedules a callback, "work", to run after "event" is signaled.  If "event"
      * has already been signaled, marks "work" as immediately runnable.
      *
+     * On success, returns a handle for waiting on or canceling the callback. The provided "work"
+     * argument is moved from and invalid for use in the caller. On error, returns
+     * ErrorCodes::ShutdownInProgress, and "work" is still valid. If you intend to call "work" after
+     * error, make sure it is an actual CallbackFn, not a lambda or other value that implicitly
+     * converts to CallbackFn, since such a value would be moved from and invalidated during
+     * conversion with no way to recover it.
+     *
      * If "event" has yet to be signaled when "shutdown()" is called, "work" will
      * be scheduled with a status of ErrorCodes::CallbackCanceled.
      *
      * May be called by client threads or callbacks running in the executor.
      */
-    virtual StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn work) = 0;
+    virtual StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn&& work) = 0;
 
     /**
      * Blocks the calling thread until "event" is signaled. Also returns if the event is never
@@ -195,33 +203,44 @@ public:
                                                      const EventHandle& event,
                                                      Date_t deadline = Date_t::max()) = 0;
 
+
+    void schedule(OutOfLineExecutor::Task func) final override;
+
     /**
      * Schedules "work" to be run by the executor ASAP.
      *
-     * Returns a handle for waiting on or canceling the callback, or
-     * ErrorCodes::ShutdownInProgress.
+     * On success, returns a handle for waiting on or canceling the callback. The provided "work"
+     * argument is moved from and invalid for use in the caller. On error, returns
+     * ErrorCodes::ShutdownInProgress, and "work" is still valid. If you intend to call "work" after
+     * error, make sure it is an actual CallbackFn, not a lambda or other value that implicitly
+     * converts to CallbackFn, since such a value would be moved from and invalidated during
+     * conversion with no way to recover it.
      *
      * May be called by client threads or callbacks running in the executor.
      *
      * Contract: Implementations should guarantee that callback should be called *after* doing any
      * processing related to the callback.
      */
-    virtual StatusWith<CallbackHandle> scheduleWork(CallbackFn work) = 0;
+    virtual StatusWith<CallbackHandle> scheduleWork(CallbackFn&& work) = 0;
 
     /**
      * Schedules "work" to be run by the executor no sooner than "when".
      *
      * If "when" is <= now(), then it schedules the "work" to be run ASAP.
      *
-     * Returns a handle for waiting on or canceling the callback, or
-     * ErrorCodes::ShutdownInProgress.
+     * On success, returns a handle for waiting on or canceling the callback. The provided "work"
+     * argument is moved from and invalid for use in the caller. On error, returns
+     * ErrorCodes::ShutdownInProgress, and "work" is still valid. If you intend to call "work" after
+     * error, make sure it is an actual CallbackFn, not a lambda or other value that implicitly
+     * converts to CallbackFn, since such a value would be moved from and invalidated during
+     * conversion with no way to recover it.
      *
      * May be called by client threads or callbacks running in the executor.
      *
      * Contract: Implementations should guarantee that callback should be called *after* doing any
      * processing related to the callback.
      */
-    virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) = 0;
+    virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) = 0;
 
     /**
      * Schedules "cb" to be run by the executor with the result of executing the remote command

@@ -98,13 +98,15 @@ public:
 
     // Update the shard identy config string
     void onConfirmedSet(const State& state) final {
-        auto connStr = state.connStr;
-
-        auto fun = [ serviceContext = _serviceContext, connStr ](auto args) {
-            if (ErrorCodes::isCancelationError(args.status.code())) {
+        Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor()->schedule([
+            serviceContext = _serviceContext,
+            connStr = state.connStr
+        ](Status status) {
+            if (ErrorCodes::isCancelationError(status.code())) {
+                LOG(2) << "Unable to schedule confirmed set update due to " << status;
                 return;
             }
-            uassertStatusOK(args.status);
+            uassertStatusOK(status);
 
             LOG(0) << "Updating config server with confirmed set " << connStr;
             Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
@@ -125,15 +127,7 @@ public:
             auto opCtx = tc->makeOperationContext();
 
             ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), connStr);
-        };
-
-        auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-        auto schedStatus = executor->scheduleWork(std::move(fun)).getStatus();
-        if (ErrorCodes::isCancelationError(schedStatus.code())) {
-            LOG(2) << "Unable to schedule confirmed set update due to " << schedStatus;
-            return;
-        }
-        uassertStatusOK(schedStatus);
+        });
     }
     void onPossibleSet(const State& state) final {
         Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(state.connStr);

@@ -37,6 +37,17 @@ namespace executor {
 TaskExecutor::TaskExecutor() = default;
 TaskExecutor::~TaskExecutor() = default;
 
+void TaskExecutor::schedule(OutOfLineExecutor::Task func) {
+    auto cb = CallbackFn([func = std::move(func)](const CallbackArgs& args) { func(args.status); });
+    auto statusWithCallback = scheduleWork(std::move(cb));
+    if (!statusWithCallback.isOK()) {
+        // The callback was not scheduled or moved from, it is still valid. Run it inline to inform
+        // it of the error. Construct a CallbackArgs for it, only CallbackArgs::status matters here.
+        CallbackArgs args(this, {}, statusWithCallback.getStatus(), nullptr);
+        cb(args);
+    }
+}
+
 TaskExecutor::CallbackState::CallbackState() = default;
 TaskExecutor::CallbackState::~CallbackState() = default;
 

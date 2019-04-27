@@ -46,8 +46,8 @@ public:
 
     explicit TaskExecutorMock(executor::TaskExecutor* executor);
 
-    StatusWith<CallbackHandle> scheduleWork(CallbackFn work) override;
-    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) override;
+    StatusWith<CallbackHandle> scheduleWork(CallbackFn&& work) override;
+    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) override;
     StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
                                                      const RemoteCommandCallbackFn& cb,
                                                      const BatonHandle& baton = nullptr) override;

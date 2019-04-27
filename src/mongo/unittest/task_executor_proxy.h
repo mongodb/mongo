@@ -58,13 +58,13 @@ public:
     Date_t now() override;
     StatusWith<EventHandle> makeEvent() override;
     void signalEvent(const EventHandle& event) override;
-    StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn work) override;
+    StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn&& work) override;
     void waitForEvent(const EventHandle& event) override;
     StatusWith<stdx::cv_status> waitForEvent(OperationContext* opCtx,
                                              const EventHandle& event,
                                              Date_t deadline) override;
-    StatusWith<CallbackHandle> scheduleWork(CallbackFn work) override;
-    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) override;
+    StatusWith<CallbackHandle> scheduleWork(CallbackFn&& work) override;
+    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) override;
     StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
                                                      const RemoteCommandCallbackFn& cb,
                                                      const BatonHandle& baton = nullptr) override;

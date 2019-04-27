@@ -75,6 +75,63 @@ TEST_F(ThreadPoolExecutorTest, TimelyCancelationOfScheduleWorkAt) {
     ASSERT_EQUALS(startTime + Milliseconds(200), net->now());
 }
 
+TEST_F(ThreadPoolExecutorTest, Schedule) {
+    auto& executor = getExecutor();
+    launchExecutorThread();
+    auto status1 = getDetectableErrorStatus();
+    unittest::Barrier barrier{2};
+    executor.schedule([&](Status status) {
+        status1 = status;
+        barrier.countDownAndWait();
+    });
+    barrier.countDownAndWait();
+    ASSERT_OK(status1);
+}
+
+TEST_F(ThreadPoolExecutorTest, ScheduleAfterShutdown) {
+    auto& executor = getExecutor();
+    auto status1 = getDetectableErrorStatus();
+    executor.shutdown();
+    executor.schedule([&](Status status) { status1 = status; });
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status1);
+}
+
+TEST_F(ThreadPoolExecutorTest, OnEvent) {
+    auto& executor = getExecutor();
+    launchExecutorThread();
+    auto status1 = getDetectableErrorStatus();
+    auto event = executor.makeEvent().getValue();
+    unittest::Barrier barrier{2};
+    TaskExecutor::CallbackFn cb = [&](const TaskExecutor::CallbackArgs& args) {
+        status1 = args.status;
+        barrier.countDownAndWait();
+    };
+    ASSERT_OK(executor.onEvent(event, std::move(cb)).getStatus());
+    // Callback was moved from.
+    ASSERT(!cb);
+    executor.signalEvent(event);
+    barrier.countDownAndWait();
+    ASSERT_OK(status1);
+}
+
+TEST_F(ThreadPoolExecutorTest, OnEventAfterShutdown) {
+    auto& executor = getExecutor();
+    auto status1 = getDetectableErrorStatus();
+    auto event = executor.makeEvent().getValue();
+    TaskExecutor::CallbackFn cb = [&](const TaskExecutor::CallbackArgs& args) {
+        status1 = args.status;
+    };
+    executor.shutdown();
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress,
+                  executor.onEvent(event, std::move(cb)).getStatus());
+
+    // Callback was not moved from, it is still valid and we can call it to set status1.
+    ASSERT(static_cast<bool>(cb));
+    TaskExecutor::CallbackArgs args(&executor, {}, Status::OK());
+    cb(args);
+    ASSERT_OK(status1);
+}
+
 bool sharedCallbackStateDestroyed = false;
 class SharedCallbackState {
     SharedCallbackState(const SharedCallbackState&) = delete;
@@ -121,7 +178,7 @@ TEST_F(ThreadPoolExecutorTest,
 
 thread_local bool amRunningRecursively = false;
 
-TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
+TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleWorkRaceDoesNotCrash) {
     // This test works by scheduling a work item in the ThreadPoolTaskExecutor that blocks waiting
     // to be signaled by this thread. Once that work item is scheduled, this thread enables a
     // FailPoint that causes future calls of ThreadPoolTaskExecutor::scheduleIntoPool_inlock to spin
@@ -156,6 +213,38 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
                       amRunningRecursively = false;
                   })
                   .getStatus());
+
+    auto fpTPTE1 = getGlobalFailPointRegistry()->getFailPoint(
+        "scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown");
+    fpTPTE1->setMode(FailPoint::alwaysOn);
+    barrier.countDownAndWait();
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fpTPTE1));
+    executor.shutdown();
+    executor.join();
+    ASSERT_OK(status1);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status2);
+}
+
+TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
+    // Same as above, with schedule() instead of scheduleWork().
+    unittest::Barrier barrier{2};
+    auto status1 = getDetectableErrorStatus();
+    auto status2 = getDetectableErrorStatus();
+    auto& executor = getExecutor();
+    launchExecutorThread();
+
+    executor.schedule([&](Status status) {
+        status1 = status;
+        if (!status1.isOK())
+            return;
+        barrier.countDownAndWait();
+        amRunningRecursively = true;
+        executor.schedule([&status2](Status status) {
+            ASSERT_FALSE(amRunningRecursively);
+            status2 = status;
+        });
+        amRunningRecursively = false;
+    });
 
     auto fpTPTE1 = getGlobalFailPointRegistry()->getFailPoint(
         "scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown");

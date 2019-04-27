@@ -278,17 +278,20 @@ void ThreadPoolTaskExecutor::signalEvent(const EventHandle& event) {
 }
 
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::onEvent(const EventHandle& event,
-                                                                         CallbackFn work) {
+                                                                         CallbackFn&& work) {
     if (!event.isValid()) {
         return {ErrorCodes::BadValue, "Passed invalid event handle to onEvent"};
     }
-    auto wq = makeSingletonWorkQueue(std::move(work), nullptr);
+    // Unsure if we'll succeed yet, so pass an empty CallbackFn.
+    auto wq = makeSingletonWorkQueue({}, nullptr);
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
     auto cbHandle = enqueueCallbackState_inlock(&eventState->waiters, &wq);
     if (!cbHandle.isOK()) {
         return cbHandle;
     }
+    // Success, invalidate "work" by moving it into the queue.
+    eventState->waiters.back()->callback = std::move(work);
     if (eventState->isSignaledFlag) {
         scheduleIntoPool_inlock(&eventState->waiters, std::move(lk));
     }
@@ -327,20 +330,23 @@ void ThreadPoolTaskExecutor::waitForEvent(const EventHandle& event) {
     }
 }
 
-StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWork(CallbackFn work) {
-    auto wq = makeSingletonWorkQueue(std::move(work), nullptr);
+StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWork(CallbackFn&& work) {
+    // Unsure if we'll succeed yet, so pass an empty CallbackFn.
+    auto wq = makeSingletonWorkQueue({}, nullptr);
     WorkQueue temp;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto cbHandle = enqueueCallbackState_inlock(&temp, &wq);
     if (!cbHandle.isOK()) {
         return cbHandle;
     }
+    // Success, invalidate "work" by moving it into the queue.
+    temp.back()->callback = std::move(work);
     scheduleIntoPool_inlock(&temp, std::move(lk));
     return cbHandle;
 }
 
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(Date_t when,
-                                                                                CallbackFn work) {
+                                                                                CallbackFn&& work) {
     if (when <= now()) {
         return scheduleWork(std::move(work));
     }

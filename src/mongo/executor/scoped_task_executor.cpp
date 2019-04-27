@@ -105,7 +105,7 @@ public:
         return _executor->signalEvent(event);
     }
 
-    StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn work) override {
+    StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn&& work) override {
         return _wrapCallback([&](auto&& x) { return _executor->onEvent(event, std::move(x)); },
                              std::move(work));
     }
@@ -120,12 +120,12 @@ public:
         return _executor->waitForEvent(opCtx, event, deadline);
     }
 
-    StatusWith<CallbackHandle> scheduleWork(CallbackFn work) override {
+    StatusWith<CallbackHandle> scheduleWork(CallbackFn&& work) override {
         return _wrapCallback([&](auto&& x) { return _executor->scheduleWork(std::move(x)); },
                              std::move(work));
     }
 
-    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) override {
+    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) override {
         return _wrapCallback(
             [&](auto&& x) { return _executor->scheduleWorkAt(when, std::move(x)); },
             std::move(work));

@@ -75,7 +75,7 @@ void TaskExecutorProxy::signalEvent(const EventHandle& event) {
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::onEvent(
-    const EventHandle& event, CallbackFn work) {
+    const EventHandle& event, CallbackFn&& work) {
     return _executor->onEvent(event, std::move(work));
 }
 
@@ -90,12 +90,12 @@ StatusWith<stdx::cv_status> TaskExecutorProxy::waitForEvent(OperationContext* op
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWork(
-    CallbackFn work) {
+    CallbackFn&& work) {
     return _executor->scheduleWork(std::move(work));
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWorkAt(
-    Date_t when, CallbackFn work) {
+    Date_t when, CallbackFn&& work) {
     return _executor->scheduleWorkAt(when, std::move(work));
 }
 
