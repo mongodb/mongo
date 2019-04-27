@@ -26,6 +26,12 @@
         shardsvr: "",
     };
     const replSetName = jsTestName();
+
+    // Note that we include {chainingAllowed: false} in the replica set settings, because this test
+    // assumes that both secondaries sync from the primary. Without this setting, the
+    // TopologyCoordinator would sometimes chain one of the secondaries off the other. The test
+    // later disables replication on one secondary, but with chaining, that would effectively
+    // disable replication on both secondaries, deadlocking the test.
     const rst = new ReplSetTest({
         name: replSetName,
         nodes: [
@@ -34,6 +40,7 @@
             {rsConfig: {priority: 0, tags: {tag: "fartherSecondary"}}}
         ],
         nodeOptions: rsNodeOptions,
+        settings: {chainingAllowed: false},
     });
 
     if (!startSetIfSupportsReadMajority(rst)) {
