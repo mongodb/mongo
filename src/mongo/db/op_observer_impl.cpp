@@ -1196,8 +1196,9 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
     StmtId stmtId = 0;
     writeConflictRetry(
         opCtx, "logOplogEntriesForTransaction", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            // Writes to the oplog only require a Global intent lock.
-            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+            // Writes to the oplog only require a Global intent lock. Guaranteed by
+            // OplogSlotReserver.
+            invariant(opCtx->lockState()->isWriteLocked());
 
             WriteUnitOfWork wuow(opCtx);
 
@@ -1289,8 +1290,9 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
 
-            // Writes to the oplog only require a Global intent lock.
-            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+            // Writes to the oplog only require a Global intent lock. Guaranteed by
+            // OplogSlotReserver.
+            invariant(opCtx->lockState()->isWriteLocked());
 
             WriteUnitOfWork wuow(opCtx);
             const auto oplogOpTime = logOperation(opCtx,
@@ -1513,8 +1515,9 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
 
         writeConflictRetry(
             opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                // Writes to the oplog only require a Global intent lock.
-                Lock::GlobalLock globalLock(opCtx, MODE_IX);
+                // Writes to the oplog only require a Global intent lock. Guaranteed by
+                // OplogSlotReserver.
+                invariant(opCtx->lockState()->isWriteLocked());
 
                 WriteUnitOfWork wuow(opCtx);
                 auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -1544,8 +1547,9 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
 
         writeConflictRetry(
             opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                // Writes to the oplog only require a Global intent lock.
-                Lock::GlobalLock globalLock(opCtx, MODE_IX);
+                // Writes to the oplog only require a Global intent lock. Guaranteed by
+                // OplogSlotReserver.
+                invariant(opCtx->lockState()->isWriteLocked());
 
                 WriteUnitOfWork wuow(opCtx);
                 // It is possible that the transaction resulted in no changes, In that case, we

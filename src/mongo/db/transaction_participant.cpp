@@ -620,7 +620,7 @@ void TransactionParticipant::Participant::_setSpeculativeTransactionReadTimestam
 
 TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx,
                                                              int numSlotsToReserve)
-    : _opCtx(opCtx) {
+    : _opCtx(opCtx), _globalLock(opCtx, MODE_IX) {
     // Stash the transaction on the OperationContext on the stack. At the end of this function it
     // will be unstashed onto the OperationContext.
     TransactionParticipant::SideTransactionBlock sideTxn(opCtx);

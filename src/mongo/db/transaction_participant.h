@@ -34,6 +34,7 @@
 #include <map>
 
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/multi_key_path_tracker.h"
@@ -854,6 +855,11 @@ private:
 
     private:
         OperationContext* _opCtx;
+        // We must hold a global lock in IX mode for the lifetime of the recovery unit.
+        // The global lock is also used to protect oplog writes. The lock acquisition must be
+        // before reserving oplogSlots to avoid deadlocks involving the callers of
+        // waitForAllEarlierOplogWritesToBeVisible().
+        Lock::GlobalLock _globalLock;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         std::vector<OplogSlot> _oplogSlots;
     };
