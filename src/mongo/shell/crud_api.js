@@ -456,6 +456,11 @@ DBCollection.prototype.deleteMany = function(filter, options) {
 DBCollection.prototype.replaceOne = function(filter, replacement, options) {
     var opts = Object.extend({}, options || {});
 
+    // Cannot use pipeline-style updates in a replacement operation.
+    if (Array.isArray(replacement)) {
+        throw new Error('Cannot use pipeline-style updates in a replacement operation');
+    }
+
     // Check if first key in update statement contains a $
     var keys = Object.keys(replacement);
     // Check if first key does not have the $
@@ -531,15 +536,18 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
 DBCollection.prototype.updateOne = function(filter, update, options) {
     var opts = Object.extend({}, options || {});
 
-    // Check if first key in update statement contains a $
-    var keys = Object.keys(update);
-    if (keys.length == 0) {
-        throw new Error("the update operation document must contain at least one atomic operator");
-    }
-
-    // Check if first key does not have the $
-    if (keys[0][0] != "$") {
-        throw new Error('the update operation document must contain atomic operators');
+    // Pipeline updates are always permitted. Otherwise, we validate the update object.
+    if (!Array.isArray(update)) {
+        // Check if first key in update statement contains a $
+        var keys = Object.keys(update);
+        if (keys.length == 0) {
+            throw new Error(
+                "the update operation document must contain at least one atomic operator");
+        }
+        // Check if first key does not have the $
+        if (keys[0][0] != "$") {
+            throw new Error('the update operation document must contain atomic operators');
+        }
     }
 
     // Get the write concern
@@ -747,6 +755,11 @@ DBCollection.prototype.findOneAndDelete = function(filter, options) {
 DBCollection.prototype.findOneAndReplace = function(filter, replacement, options) {
     var opts = Object.extend({}, options || {});
 
+    // Cannot use pipeline-style updates in a replacement operation.
+    if (Array.isArray(replacement)) {
+        throw new Error('Cannot use pipeline-style updates in a replacement operation');
+    }
+
     // Check if first key in update statement contains a $
     var keys = Object.keys(replacement);
     // Check if first key does not have the $
@@ -808,15 +821,18 @@ DBCollection.prototype.findOneAndReplace = function(filter, replacement, options
 DBCollection.prototype.findOneAndUpdate = function(filter, update, options) {
     var opts = Object.extend({}, options || {});
 
-    // Check if first key in update statement contains a $
-    var keys = Object.keys(update);
-    if (keys.length == 0) {
-        throw new Error("the update operation document must contain at least one atomic operator");
-    }
-
-    // Check if first key does not have the $
-    if (keys[0][0] != "$") {
-        throw new Error("the update operation document must contain atomic operators");
+    // Pipeline updates are always permitted. Otherwise, we validate the update object.
+    if (!Array.isArray(update)) {
+        // Check if first key in update statement contains a $
+        var keys = Object.keys(update);
+        if (keys.length == 0) {
+            throw new Error(
+                "the update operation document must contain at least one atomic operator");
+        }
+        // Check if first key does not have the $
+        if (keys[0][0] != "$") {
+            throw new Error("the update operation document must contain atomic operators");
+        }
     }
 
     // Set up the command

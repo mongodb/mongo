@@ -83,7 +83,7 @@ DBCollection.prototype.help = function() {
         ".findOneAndReplace( filter, replacement, <optional params> ) - replace first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
     print(
         "\tdb." + shortName +
-        ".findOneAndUpdate( filter, update, <optional params> ) - update first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
+        ".findOneAndUpdate( filter, <update object or pipeline>, <optional params> ) - update first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
     print("\tdb." + shortName + ".getDB() get DB object associated with collection");
     print("\tdb." + shortName + ".getPlanCache() get query plan cache associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
@@ -120,13 +120,13 @@ DBCollection.prototype.help = function() {
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
     print(
         "\tdb." + shortName +
-        ".update( query, object[, upsert_bool, multi_bool] ) - instead of two flags, you can pass an object with fields: upsert, multi");
+        ".update( query, <update object or pipeline>[, upsert_bool, multi_bool] ) - instead of two flags, you can pass an object with fields: upsert, multi");
     print(
         "\tdb." + shortName +
-        ".updateOne( filter, update, <optional params> ) - update the first matching document, optional parameters are: upsert, w, wtimeout, j");
+        ".updateOne( filter, <update object or pipeline>, <optional params> ) - update the first matching document, optional parameters are: upsert, w, wtimeout, j");
     print(
         "\tdb." + shortName +
-        ".updateMany( filter, update, <optional params> ) - update all matching documents, optional parameters are: upsert, w, wtimeout, j");
+        ".updateMany( filter, <update object or pipeline>, <optional params> ) - update all matching documents, optional parameters are: upsert, w, wtimeout, j");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName +
@@ -435,17 +435,16 @@ DBCollection.prototype.remove = function(t, justOne) {
 };
 
 /**
- * Does validation of the update args. Throws if the parse is not successful, otherwise
- * returns a document containing fields for query, obj, upsert, multi, wc, collation, and
- * arrayFilters.
+ * Does validation of the update args. Throws if the parse is not successful, otherwise returns a
+ * document containing fields for query, updateSpec, upsert, multi, wc, collation, and arrayFilters.
  *
  * Throws if the arguments are invalid.
  */
-DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
+DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi) {
     if (!query)
         throw Error("need a query");
-    if (!obj)
-        throw Error("need an object");
+    if (!updateSpec)
+        throw Error("need an update object or pipeline");
 
     var wc = undefined;
     var collation = undefined;
@@ -475,7 +474,7 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
 
     return {
         "query": query,
-        "obj": obj,
+        "updateSpec": updateSpec,
         "upsert": upsert,
         "multi": multi,
         "wc": wc,
@@ -486,10 +485,10 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
 
 // Returns a WriteResult if write command succeeded, but may contain write errors.
 // Returns a WriteCommandError if the write command responded with ok:0.
-DBCollection.prototype.update = function(query, obj, upsert, multi) {
-    var parsed = this._parseUpdate(query, obj, upsert, multi);
+DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
+    var parsed = this._parseUpdate(query, updateSpec, upsert, multi);
     var query = parsed.query;
-    var obj = parsed.obj;
+    var updateSpec = parsed.updateSpec;
     var upsert = parsed.upsert;
     var multi = parsed.multi;
     var wc = parsed.wc;
@@ -517,9 +516,9 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
         }
 
         if (multi) {
-            updateOp.update(obj);
+            updateOp.update(updateSpec);
         } else {
-            updateOp.updateOne(obj);
+            updateOp.updateOne(updateSpec);
         }
 
         try {
@@ -543,7 +542,7 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
             throw new Error("arrayFilters requires use of write commands");
         }
 
-        this.getMongo().update(this._fullName, query, obj, upsert, multi);
+        this.getMongo().update(this._fullName, query, updateSpec, upsert, multi);
 
         // Enforce write concern, if required
         if (wc) {

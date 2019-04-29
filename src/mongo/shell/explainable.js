@@ -186,7 +186,7 @@ var Explainable = (function() {
         this.update = function() {
             var parsed = this._collection._parseUpdate.apply(this._collection, arguments);
             var query = parsed.query;
-            var obj = parsed.obj;
+            var updateSpec = parsed.updateSpec;
             var upsert = parsed.upsert;
             var multi = parsed.multi;
             var collation = parsed.collation;
@@ -208,9 +208,9 @@ var Explainable = (function() {
             }
 
             if (multi) {
-                updateOp.update(obj);
+                updateOp.update(updateSpec);
             } else {
-                updateOp.updateOne(obj);
+                updateOp.updateOne(updateSpec);
             }
 
             var explainCmd = bulk.convertToExplainCmd(this._verbosity);
