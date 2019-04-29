@@ -107,23 +107,7 @@ UUIDCatalog::iterator::reference UUIDCatalog::iterator::operator*() {
     return _mapIter->second->collectionPtr;
 }
 
-boost::optional<CollectionCatalogEntry*> UUIDCatalog::iterator::catalogEntry() {
-    stdx::lock_guard<stdx::mutex> lock(_uuidCatalog->_catalogLock);
-    _repositionIfNeeded();
-    if (_exhausted()) {
-        return boost::none;
-    }
-
-    return _mapIter->second->collectionCatalogEntry.get();
-}
-
 boost::optional<CollectionUUID> UUIDCatalog::iterator::uuid() {
-    stdx::lock_guard<stdx::mutex> lock(_uuidCatalog->_catalogLock);
-    _repositionIfNeeded();
-    if (_exhausted()) {
-        return boost::none;
-    }
-
     return _uuid;
 }
 

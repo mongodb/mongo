@@ -511,6 +511,16 @@ TEST_F(UUIDCatalogIterationTest, BeginSkipsOverEmptyCollectionObjectButStopsAtDb
     ASSERT(it == catalog.end());
 }
 
+TEST_F(UUIDCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {
+    auto it = catalog.begin("bar");
+    auto collsIt = collsIterator("bar");
+    auto uuid = collsIt->first;
+    catalog.onDropCollection(&opCtx, uuid);
+    dropColl("bar", uuid);
+
+    ASSERT_EQUALS(uuid, it.uuid());
+}
+
 TEST_F(UUIDCatalogTest, OnCreateCollection) {
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == col);
 }

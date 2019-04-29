@@ -69,7 +69,6 @@ public:
         reference operator*();
         iterator operator++();
         iterator operator++(int);
-        boost::optional<CollectionCatalogEntry*> catalogEntry();
         boost::optional<CollectionUUID> uuid();
 
         /*
