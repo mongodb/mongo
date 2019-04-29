@@ -453,6 +453,11 @@ private:
     }
 
 
+    void _logInternalState(OperationContext* opCtx,
+                           long long numIndexesInCollectionCatalogEntry,
+                           const std::vector<std::string>& indexNamesToDrop,
+                           bool haveIdIndex);
+
     int _magic;
     Collection* const _collection;
     const int _maxNumIndexesAllowed;
