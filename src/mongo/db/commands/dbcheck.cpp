@@ -344,8 +344,8 @@ private:
         if (!uuid) {
             return false;
         }
-        auto prev = UUIDCatalog::get(opCtx).prev(_dbName, *uuid);
-        auto next = UUIDCatalog::get(opCtx).next(_dbName, *uuid);
+
+        auto[prev, next] = getPrevAndNextUUIDs(opCtx, collection);
 
         // Find and report collection metadata.
         auto indices = collectionIndexInfo(opCtx, collection);

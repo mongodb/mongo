@@ -79,6 +79,13 @@ struct DbCheckCollectionInformation {
 };
 
 /**
+ * Returns a pair of previous and next UUIDs around the given collections uuid. If there is no
+ * previous or next UUID, return boost::none respectively.
+ */
+std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(OperationContext* opCtx,
+                                                                            Collection* collection);
+
+/**
  * Get a HealthLogEntry for a dbCheck collection.
  */
 std::unique_ptr<HealthLogEntry> dbCheckCollectionEntry(const NamespaceString& nss,

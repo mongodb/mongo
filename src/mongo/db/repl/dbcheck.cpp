@@ -238,6 +238,33 @@ std::string hashCollectionInfo(const DbCheckCollectionInformation& info) {
     return digestToString(digest);
 }
 
+std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
+    OperationContext* opCtx, Collection* collection) {
+    const UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    const UUID uuid = *collection->uuid();
+
+    std::vector<CollectionUUID> collectionUUIDs =
+        catalog.getAllCollectionUUIDsFromDb(collection->ns().db());
+    auto uuidIt = std::find(collectionUUIDs.begin(), collectionUUIDs.end(), uuid);
+    invariant(uuidIt != collectionUUIDs.end());
+
+    auto prevIt = std::prev(uuidIt);
+    auto nextIt = std::next(uuidIt);
+
+    boost::optional<UUID> prevUUID;
+    boost::optional<UUID> nextUUID;
+
+    if (prevIt != collectionUUIDs.end()) {
+        prevUUID = *prevIt;
+    }
+
+    if (nextIt != collectionUUIDs.end()) {
+        nextUUID = *nextIt;
+    }
+
+    return std::make_pair(prevUUID, nextUUID);
+}
+
 std::unique_ptr<HealthLogEntry> dbCheckCollectionEntry(const NamespaceString& nss,
                                                        const UUID& uuid,
                                                        const DbCheckCollectionInformation& expected,
@@ -471,13 +498,15 @@ Status dbCheckDatabaseOnSecondary(OperationContext* opCtx,
     expected.collectionName = entry.getNss().coll().toString();
     found.collectionName = collection->ns().coll().toString();
 
+    auto prevAndNext = getPrevAndNextUUIDs(opCtx, collection);
+
     // found/expected previous UUID,
     expected.prev = entry.getPrev();
-    found.prev = UUIDCatalog::get(opCtx).prev(db, uuid);
+    found.prev = prevAndNext.first;
 
     // found/expected next UUID,
     expected.next = entry.getNext();
-    found.next = UUIDCatalog::get(opCtx).next(db, uuid);
+    found.next = prevAndNext.second;
 
     // found/expected indices,
     expected.indexes = entry.getIndexes();
