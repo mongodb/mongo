@@ -177,9 +177,14 @@ class TransactionParticipant {
 
         static std::string toString(StateFlag state);
 
+        // An optional promise that is non-none while the participant is in prepare. The promise is
+        // fulfilled and the optional is reset when the participant transitions out of prepare.
+        boost::optional<SharedPromise<void>> _exitPreparePromise;
+
     private:
         static bool _isLegalTransition(StateFlag oldState, StateFlag newState);
 
+        // Private because any modifications should go through transitionTo.
         StateFlag _state = kNone;
     };
 
@@ -417,6 +422,17 @@ public:
          */
         void beginOrContinueTransactionUnconditionally(OperationContext* opCtx,
                                                        TxnNumber txnNumber);
+
+        /**
+         * If the participant is in prepare, returns a future whose promise is fulfilled when the
+         * participant transitions out of prepare.
+         *
+         * If the participant is not in prepare, returns an immediately ready future.
+         *
+         * The caller should not wait on the future with the session checked out, since that will
+         * prevent the promise from being able to be fulfilled, i.e., will cause a deadlock.
+         */
+        SharedSemiFuture<void> onExitPrepare() const;
 
         /**
          * Transfers management of transaction resources from the currently checked-out
@@ -839,11 +855,11 @@ private:
         std::vector<OplogSlot> _oplogSlots;
     };
 
-    friend std::ostream& operator<<(std::ostream& s, TransactionState txnState) {
+    friend std::ostream& operator<<(std::ostream& s, const TransactionState& txnState) {
         return (s << txnState.toString());
     }
 
-    friend StringBuilder& operator<<(StringBuilder& s, TransactionState txnState) {
+    friend StringBuilder& operator<<(StringBuilder& s, const TransactionState& txnState) {
         return (s << txnState.toString());
     }
 

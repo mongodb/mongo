@@ -37,6 +37,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
@@ -221,32 +222,29 @@ public:
             const auto& cmd = request();
             const auto tcs = TransactionCoordinatorService::get(opCtx);
 
-            boost::optional<Future<txn::CommitDecision>> commitDecisionFuture;
+            boost::optional<Future<txn::CommitDecision>> coordinatorDecisionFuture;
 
             if (!cmd.getParticipants().empty()) {
-                commitDecisionFuture =
+                coordinatorDecisionFuture =
                     tcs->coordinateCommit(opCtx,
                                           *opCtx->getLogicalSessionId(),
                                           *opCtx->getTxnNumber(),
                                           validateParticipants(opCtx, cmd.getParticipants()));
             } else {
-                LOG(3) << "Coordinator shard received request to recover commit decision for "
-                       << opCtx->getLogicalSessionId()->getId() << ':' << opCtx->getTxnNumber();
-
-                commitDecisionFuture = tcs->recoverCommit(
+                coordinatorDecisionFuture = tcs->recoverCommit(
                     opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
             }
 
             ON_BLOCK_EXIT([opCtx] {
-                // Since a commit decision will have been written from another OperationContext (by
-                // either the coordinator or participant), ensure waiting for the client's
-                // writeConcern of the decision.
+                // A decision will most likely have been written from a different OperationContext
+                // (in all cases except the one where this command aborts the local participant), so
+                // ensure waiting for the client's writeConcern of the decision.
                 repl::ReplClientInfo::forClient(opCtx->getClient())
                     .setLastOpToSystemLastOpTime(opCtx);
             });
 
-            if (commitDecisionFuture) {
-                auto swCommitDecision = commitDecisionFuture->getNoThrow(opCtx);
+            if (coordinatorDecisionFuture) {
+                auto swCommitDecision = coordinatorDecisionFuture->getNoThrow(opCtx);
                 // The coordinator can only return NoSuchTransaction if cancelIfCommitNotYetStarted
                 // was called, which can happen in one of 3 cases:
                 //  1) The deadline to receive coordinateCommit passed
@@ -269,56 +267,50 @@ public:
                 }
             }
 
-            // No coordinator was found in memory. Either the commit coordination already completed,
-            // the original primary on which the coordinator was created stepped down, or this
-            // coordinateCommit request was a byzantine message.
+            // No coordinator was found in memory. Recover the decision from the local participant.
 
-            LOG(3) << "Coordinator shard going to attempt to recover decision from local "
-                      "participant for "
+            LOG(3) << "Going to recover decision from local participant for "
                    << opCtx->getLogicalSessionId()->getId() << ':' << opCtx->getTxnNumber();
 
-            // Recover the decision from the local participant by sending abortTransaction to this
-            // node and inverting the response (i.e., a success response is converted to
-            // NoSuchTransaction; a TransactionCommitted response is converted to success). Do not
-            // pass writeConcern; if the coordinateCommitTransaction command ends up throwing
-            // NoSuchTransaction and the client sent a non-default writeConcern, the
-            // coordinateCommitTransaction command's post-amble will do a no-op write and wait for
-            // the client's writeConcern.
-            AbortTransaction abortTransaction;
-            abortTransaction.setDbName(NamespaceString::kAdminDb);
-            auto abortObj = abortTransaction.toBSON(
-                BSON("lsid" << opCtx->getLogicalSessionId()->toBSON() << "txnNumber"
-                            << *opCtx->getTxnNumber()
-                            << "autocommit"
-                            << false));
+            boost::optional<SharedSemiFuture<void>> participantExitPrepareFuture;
+            {
+                MongoDOperationContextSession sessionTxnState(opCtx);
+                auto txnParticipant = TransactionParticipant::get(opCtx);
 
-            const auto abortStatus = [&] {
-                txn::AsyncWorkScheduler aws(opCtx->getServiceContext());
-                auto future =
-                    aws.scheduleRemoteCommand(txn::getLocalShardId(opCtx->getServiceContext()),
-                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              abortObj);
-                ON_BLOCK_EXIT([&] {
-                    aws.shutdown({ErrorCodes::Interrupted, "Request interrupted due to timeout"});
-                    future.wait();
-                });
-                const auto& responseStatus = future.get(opCtx);
-                uassertStatusOK(responseStatus.status);
+                txnParticipant.beginOrContinue(opCtx,
+                                               *opCtx->getTxnNumber(),
+                                               false /* autocommit */,
+                                               boost::none /* startTransaction */);
 
-                return getStatusFromCommandResult(responseStatus.data);
-            }();
+                try {
+                    txnParticipant.abortTransactionIfNotPrepared(opCtx);
+                } catch (const ExceptionFor<ErrorCodes::TransactionCommitted>&) {
+                    return;
+                }
 
-            LOG(3) << "coordinateCommitTransaction got response " << abortStatus << " for "
-                   << abortObj << " used to recover decision from local participant";
+                participantExitPrepareFuture = txnParticipant.onExitPrepare();
+            }
 
-            // If the abortTransaction succeeded, return that the transaction aborted.
-            if (abortStatus.isOK())
-                uasserted(ErrorCodes::NoSuchTransaction, "Transaction aborted");
+            // Wait for the participant to exit prepare.
+            participantExitPrepareFuture->get(opCtx);
 
-            // If the abortTransaction returned that the transaction committed, return OK, otherwise
-            // return whatever the abortTransaction errored with (which may be NoSuchTransaction).
-            if (abortStatus != ErrorCodes::TransactionCommitted)
-                uassertStatusOK(abortStatus);
+            {
+                MongoDOperationContextSession sessionTxnState(opCtx);
+                auto txnParticipant = TransactionParticipant::get(opCtx);
+
+                // Call beginOrContinue again in case the transaction number has changed.
+                txnParticipant.beginOrContinue(opCtx,
+                                               *opCtx->getTxnNumber(),
+                                               false /* autocommit */,
+                                               boost::none /* startTransaction */);
+
+                invariant(!txnParticipant.inMultiDocumentTransaction(),
+                          "The participant should not be in progress after we waited for the "
+                          "participant to complete");
+                uassert(ErrorCodes::NoSuchTransaction,
+                        "Recovering the transaction's outcome found the transaction aborted",
+                        txnParticipant.transactionIsCommitted());
+            }
         }
 
     private:

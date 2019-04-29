@@ -11,6 +11,7 @@
 (function() {
     "use strict";
 
+    load("jstests/sharding/libs/sharded_transactions_helpers.js");
     load("jstests/libs/write_concern_util.js");
 
     // The test modifies config.transactions, which must be done outside of a session.
@@ -470,6 +471,17 @@
         jsTest.log("Testing recovering multi-write-shard transaction that is in progress");
         txnNumber++;
 
+        // Set the transaction expiry to be very high, so we can ascertain the recovery request
+        // through the alternate router is what causes the transaction to abort.
+        const getParamRes =
+            st.rs1.getPrimary().adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1});
+        assert.commandWorked(getParamRes);
+        assert.neq(null, getParamRes.transactionLifetimeLimitSeconds);
+        const originalTransactionLifetimeLimitSeconds = getParamRes.transactionLifetimeLimitSeconds;
+
+        assert.commandWorked(st.rs1.getPrimary().adminCommand(
+            {setParameter: 1, transactionLifetimeLimitSeconds: 60 * 60 * 1000 /* 1000 hours */}));
+
         const recoveryToken = startNewMultiShardWriteTransaction();
         assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
@@ -477,6 +489,55 @@
         // A write transaction fails to commit after having reported an abort decision.
         assert.commandFailedWithCode(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
+
+        assert.commandWorked(st.rs1.getPrimary().adminCommand({
+            setParameter: 1,
+            transactionLifetimeLimitSeconds: originalTransactionLifetimeLimitSeconds
+        }));
+    })();
+
+    (function() {
+        jsTest.log("Testing recovering multi-write-shard transaction that is in prepare");
+        txnNumber++;
+        const recoveryToken = startNewMultiShardWriteTransaction();
+
+        // Ensure the coordinator will hang after putting the participants into prepare but
+        // before sending the decision to the participants.
+        clearRawMongoProgramOutput();
+        assert.commandWorked(st.rs0.getPrimary().adminCommand(
+            {configureFailPoint: "hangBeforeWritingDecision", mode: "alwaysOn"}));
+
+        assert.commandFailedWithCode(st.s0.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            // Specify maxTimeMS to make the command return so the test can continue.
+            maxTimeMS: 3000,
+        }),
+                                     ErrorCodes.MaxTimeMSExpired);
+
+        waitForFailpoint("Hit hangBeforeWritingDecision failpoint", 1);
+
+        // Trying to recover the decision should block because the recovery shard's participant
+        // is in prepare.
+        assert.commandFailedWithCode(st.s1.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            recoveryToken: recoveryToken,
+            // Specify maxTimeMS to make the command return so the test can continue.
+            maxTimeMS: 3000,
+        }),
+                                     ErrorCodes.MaxTimeMSExpired);
+
+        // Allow the transaction to complete.
+        assert.commandWorked(st.rs0.getPrimary().adminCommand(
+            {configureFailPoint: "hangBeforeWritingDecision", mode: "off"}));
+
+        // Trying to recover the decision should now return that the transaction committed.
+        assert.commandWorked(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken));
     })();
 
     (function() {

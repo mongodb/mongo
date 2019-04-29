@@ -3711,5 +3711,82 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestampTimeout) {
     ASSERT_TRUE(ErrorCodes::isInterruption(statusWith.getStatus().code()));
 };
 
+TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnAbortAfterPrepare) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.beginOrContinue(
+        opCtx(), *opCtx()->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "find");
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+
+    const auto prepareOpTime = repl::OpTime({3, 2}, 0);
+    txnParticipant.prepareTransaction(opCtx(), prepareOpTime);
+    const auto exitPrepareFuture = txnParticipant.onExitPrepare();
+    ASSERT_FALSE(exitPrepareFuture.isReady());
+
+    txnParticipant.abortActiveTransaction(opCtx());
+    ASSERT_TRUE(exitPrepareFuture.isReady());
+
+    // Once the promise has been fulfilled, new callers of onExitPrepare should immediately be
+    // ready.
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+
+    // abortTransaction is retryable, but does not cause the completion promise to be set again.
+    txnParticipant.abortActiveTransaction(opCtx());
+}
+
+TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnCommitAfterPrepare) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.beginOrContinue(
+        opCtx(), *opCtx()->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "find");
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+
+    const auto prepareOpTime = repl::OpTime({3, 2}, 0);
+    const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), prepareOpTime);
+    const auto exitPrepareFuture = txnParticipant.onExitPrepare();
+    ASSERT_FALSE(exitPrepareFuture.isReady());
+
+    const auto commitTimestamp =
+        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    ASSERT_TRUE(exitPrepareFuture.isReady());
+
+    // Once the promise has been fulfilled, new callers of onExitPrepare should immediately be
+    // ready.
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+}
+
+TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnAbortPreparedTransactionForRollback) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.beginOrContinue(
+        opCtx(), *opCtx()->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "find");
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+
+    const auto prepareOpTime = repl::OpTime({3, 2}, 0);
+    txnParticipant.prepareTransaction(opCtx(), prepareOpTime);
+    const auto exitPrepareFuture = txnParticipant.onExitPrepare();
+    ASSERT_FALSE(exitPrepareFuture.isReady());
+
+    txnParticipant.abortPreparedTransactionForRollback(opCtx());
+    ASSERT_TRUE(exitPrepareFuture.isReady());
+
+    // Once the promise has been fulfilled, new callers of onExitPrepare should immediately be
+    // ready.
+    ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
+}
+
 }  // namespace
 }  // namespace mongo

@@ -552,7 +552,7 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
                 str::stream() << "Cannot start a transaction at given transaction number "
                               << txnNumber
                               << " a transaction with the same number is in state "
-                              << o().txnState.toString(),
+                              << o().txnState,
                 o().txnState.isInSet(restartableStates));
     }
 
@@ -569,6 +569,17 @@ void TransactionParticipant::Participant::beginOrContinueTransactionUnconditiona
     if (o().activeTxnNumber != txnNumber) {
         _beginMultiDocumentTransaction(opCtx, txnNumber);
     }
+}
+
+SharedSemiFuture<void> TransactionParticipant::Participant::onExitPrepare() const {
+    if (!o().txnState._exitPreparePromise) {
+        // The participant is not in prepare, so just return a ready future.
+        return Future<void>::makeReady();
+    }
+
+    // The participant is in prepare, so return a future that will be signaled when the participant
+    // transitions out of prepare.
+    return o().txnState._exitPreparePromise->getFuture();
 }
 
 void TransactionParticipant::Participant::_setSpeculativeTransactionOpTime(
@@ -1182,7 +1193,7 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         _commitStorageTransaction(opCtx);
         invariant(o().txnState.isCommittingWithoutPrepare(),
-                  str::stream() << "Current State: " << o().txnState);
+                  str::stream() << "Current state: " << o().txnState);
 
         _finishCommitTransaction(opCtx);
     } catch (...) {
@@ -1443,14 +1454,14 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
             | TransactionState::kCommittingWithoutPrepare           //
             | TransactionState::kCommitted;                         //
         invariant(!o().txnState.isInSet(unabortableStates),
-                  str::stream() << "Cannot abort transaction in " << o().txnState.toString());
+                  str::stream() << "Cannot abort transaction in " << o().txnState);
     } else {
         // If _activeTxnNumber is higher than ours, it means the transaction is already aborted.
         invariant(o().txnState.isInSet(TransactionState::kNone |
                                        TransactionState::kAbortedWithoutPrepare |
                                        TransactionState::kAbortedWithPrepare |
                                        TransactionState::kExecutedRetryableWrite),
-                  str::stream() << "actual state: " << o().txnState.toString());
+                  str::stream() << "actual state: " << o().txnState);
     }
 }
 
@@ -1699,7 +1710,21 @@ void TransactionParticipant::TransactionState::transitionTo(StateFlag newState,
                                 << toString(newState));
     }
 
+    // If we are transitioning out of prepare, signal waiters by fulfilling the completion promise.
+    if (isPrepared()) {
+        invariant(_exitPreparePromise);
+        _exitPreparePromise->emplaceValue();
+        _exitPreparePromise.reset();
+    }
+
     _state = newState;
+
+    // If we have transitioned into prepare, set the completion promise so other threads can wait
+    // on the participant to transition out of prepare.
+    if (isPrepared()) {
+        invariant(!_exitPreparePromise);
+        _exitPreparePromise.emplace();
+    }
 }
 
 void TransactionParticipant::Observer::_reportTransactionStats(
