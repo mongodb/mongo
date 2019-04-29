@@ -254,7 +254,6 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
                 opCtx, txnRouterForShardKeyChange);
 
             // TODO SERVER-40784: Handle a writeConcern error.
-            // TODO SERVER-40646: Change the error we report to something more useful to a user
             uassertStatusOK(getStatusFromCommandResult(commitResponse));
         } catch (const DBException& e) {
             // Set the error status to the status of the failed command and abort the transaction.
@@ -268,7 +267,12 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
                         "Failed to update document's shard key field. There is either an "
                         "orphan for this document or _id for this collection is not globally "
                         "unique.");
+            } else {
+                status = status.withContext(
+                    "Update operation was converted into a distributed transaction because the "
+                    "document being updated would move shards and that transaction failed");
             }
+
             response->getErrDetails().back()->setStatus(status);
 
             auto txnRouterForAbort = TransactionRouter::get(opCtx);

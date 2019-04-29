@@ -292,10 +292,12 @@ private:
                             opCtx, txnRouterForShardKeyChange);
 
                     // TODO SERVER-40784: Handle a writeConcern error.
-                    // TODO SERVER-40646: Change the error we report to something more useful to a
-                    // user.
                     uassertStatusOK(getStatusFromCommandResult(commitResponse));
-                } catch (const DBException& e) {
+                } catch (DBException& e) {
+                    e.addContext(
+                        "Update operation was converted into a distributed transaction because the "
+                        "document being updated would move shards and that transaction failed");
+
                     auto txnRouterForAbort = TransactionRouter::get(opCtx);
                     if (txnRouterForAbort)
                         txnRouterForAbort->implicitlyAbortTransaction(opCtx, e.toStatus());
