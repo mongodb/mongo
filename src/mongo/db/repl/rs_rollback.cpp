@@ -39,12 +39,12 @@
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -710,15 +710,15 @@ void dropIndex(OperationContext* opCtx,
  */
 void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::string> indexNames) {
 
-    boost::optional<NamespaceString> nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    boost::optional<NamespaceString> nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
     invariant(nss);
     Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
-    Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
 
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
         LOG(2) << "Cannot find the collection with uuid: " << uuid.toString()
-               << " in UUID catalog during roll back of a createIndexes command.";
+               << " in CollectionCatalog during roll back of a createIndexes command.";
         return;
     }
 
@@ -751,14 +751,14 @@ void rollbackDropIndexes(OperationContext* opCtx,
                          UUID uuid,
                          std::map<std::string, BSONObj> indexNames) {
 
-    boost::optional<NamespaceString> nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    boost::optional<NamespaceString> nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
     invariant(nss);
     Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
-    Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
         LOG(2) << "Cannot find the collection with uuid: " << uuid.toString()
-               << "in UUID catalog during roll back of a dropIndexes command.";
+               << "in CollectionCatalog during roll back of a dropIndexes command.";
         return;
     }
 
@@ -1040,7 +1040,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     // UUID -> doc id -> doc
     stdx::unordered_map<UUID, std::map<DocID, BSONObj>, UUID::Hash> goodVersions;
-    auto& catalog = UUIDCatalog::get(opCtx);
+    auto& catalog = CollectionCatalog::get(opCtx);
 
     // Fetches all the goodVersions of each document from the current sync source.
     unsigned long long numFetched = 0;
@@ -1166,7 +1166,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         invariant(!fixUpInfo.collectionsToRename.count(uuid));
         invariant(!fixUpInfo.collectionsToResyncMetadata.count(uuid));
 
-        boost::optional<NamespaceString> nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+        boost::optional<NamespaceString> nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
         // Do not attempt to acquire the database lock with an empty namespace. We should survive
         // an attempt to drop a non-existent collection.
         if (!nss) {
@@ -1177,7 +1177,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
             Database* db = dbLock.getDb();
             if (db) {
-                Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+                Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
                 dropCollection(opCtx, *nss, collection, db);
                 LOG(1) << "Dropped collection: " << *nss << ", UUID: " << uuid;
             }
@@ -1224,7 +1224,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         // occurs and then the collection is dropped. If we do not first re-create the
         // collection, we will not be able to retrieve the collection's catalog entries.
         for (auto uuid : fixUpInfo.collectionsToResyncMetadata) {
-            boost::optional<NamespaceString> nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+            boost::optional<NamespaceString> nss =
+                CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
             invariant(nss);
 
             log() << "Resyncing collection metadata for collection: " << *nss << ", UUID: " << uuid;
@@ -1235,7 +1236,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             auto db = databaseHolder->openDb(opCtx, nss->db().toString());
             invariant(db);
 
-            Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+            Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
             invariant(collection);
 
             auto cce = collection->getCatalogEntry();

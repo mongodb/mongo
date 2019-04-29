@@ -31,8 +31,8 @@
 
 #include "mongo/db/catalog_raii.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/fail_point_service.h"
@@ -157,8 +157,8 @@ NamespaceString AutoGetCollection::resolveNamespaceStringOrUUID(OperationContext
         return *nss;
     }
 
-    UUIDCatalog& uuidCatalog = UUIDCatalog::get(opCtx);
-    auto resolvedNss = uuidCatalog.lookupNSSByUUID(*nsOrUUID.uuid());
+    CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
+    auto resolvedNss = catalog.lookupNSSByUUID(*nsOrUUID.uuid());
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Unable to resolve " << nsOrUUID.toString(),
@@ -197,14 +197,14 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
     dss.checkDbVersion(opCtx, dssLock);
 }
 
-ConcealUUIDCatalogChangesBlock::ConcealUUIDCatalogChangesBlock(OperationContext* opCtx)
+ConcealCollectionCatalogChangesBlock::ConcealCollectionCatalogChangesBlock(OperationContext* opCtx)
     : _opCtx(opCtx) {
-    UUIDCatalog::get(_opCtx).onCloseCatalog(_opCtx);
+    CollectionCatalog::get(_opCtx).onCloseCatalog(_opCtx);
 }
 
-ConcealUUIDCatalogChangesBlock::~ConcealUUIDCatalogChangesBlock() {
+ConcealCollectionCatalogChangesBlock::~ConcealCollectionCatalogChangesBlock() {
     invariant(_opCtx);
-    UUIDCatalog::get(_opCtx).onOpenCatalog(_opCtx);
+    CollectionCatalog::get(_opCtx).onOpenCatalog(_opCtx);
 }
 
 ReadSourceScope::ReadSourceScope(OperationContext* opCtx)

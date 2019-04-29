@@ -32,9 +32,9 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -160,7 +160,8 @@ private:
 protected:
     /**
      * Creates a new mock collection with name 'nss' via the StorageInterface and associates 'uuid'
-     * with the new collection in the UUIDCatalog. There must not already exist a collection with
+     * with the new collection in the CollectionCatalog. There must not already exist a collection
+     * with
      * name 'nss'.
      */
     std::unique_ptr<Collection> _initializeCollection(OperationContext* opCtx,
@@ -1179,7 +1180,7 @@ TEST_F(RollbackImplTest, RollbackStopsWritingRollbackFilesWhenShutdownIsInProgre
 
 DEATH_TEST_F(RollbackImplTest,
              InvariantFailureIfNamespaceIsMissingWhenWritingRollbackFiles,
-             "unexpectedly missing in the UUIDCatalog") {
+             "unexpectedly missing in the CollectionCatalog") {
     const auto commonOp = makeOpAndRecordId(1);
     _remoteOplog->setOperations({commonOp});
     ASSERT_OK(_insertOplogEntry(commonOp.first));
@@ -1207,7 +1208,7 @@ DEATH_TEST_F(RollbackImplTest,
 
 DEATH_TEST_F(RollbackImplTest,
              InvariantFailureIfNamespaceIsMissingWhenGettingCollectionSizes,
-             "unexpectedly missing in the UUIDCatalog") {
+             "unexpectedly missing in the CollectionCatalog") {
     const auto commonOp = makeOpAndRecordId(1);
     _remoteOplog->setOperations({commonOp});
     ASSERT_OK(_insertOplogEntry(commonOp.first));

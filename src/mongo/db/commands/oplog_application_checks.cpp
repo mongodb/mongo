@@ -30,8 +30,8 @@
 
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/oplog_application_checks.h"
 
@@ -65,9 +65,9 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 
     if (oplogEntry.hasField("ui"_sd)) {
         // ns by UUID overrides the ns specified if they are different.
-        auto& uuidCatalog = UUIDCatalog::get(opCtx);
+        auto& catalog = CollectionCatalog::get(opCtx);
         boost::optional<NamespaceString> uuidCollNS =
-            uuidCatalog.lookupNSSByUUID(getUUIDFromOplogEntry(oplogEntry));
+            catalog.lookupNSSByUUID(getUUIDFromOplogEntry(oplogEntry));
         if (uuidCollNS && *uuidCollNS != ns)
             ns = *uuidCollNS;
     }

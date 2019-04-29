@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
@@ -134,7 +134,7 @@ public:
             stdx::make_unique<IndexDescriptor>(coll, IndexNames::findPluginName(spec), spec);
 
         CollectionCatalogEntry* cce =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
         const auto protocol = IndexBuildProtocol::kTwoPhase;
         auto ret = cce->prepareForIndexBuild(
             opCtx, descriptor.get(), protocol, isBackgroundSecondaryBuild);
@@ -147,19 +147,19 @@ public:
                         std::string sideWritesIdent,
                         std::string constraintViolationsIdent) {
         CollectionCatalogEntry* cce =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
         cce->setIndexBuildScanning(opCtx, key, sideWritesIdent, constraintViolationsIdent);
     }
 
     void indexBuildDrain(OperationContext* opCtx, NamespaceString collNs, std::string key) {
         CollectionCatalogEntry* cce =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
         cce->setIndexBuildDraining(opCtx, key);
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
         CollectionCatalogEntry* cce =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
         cce->indexBuildSuccess(opCtx, key);
     }
 

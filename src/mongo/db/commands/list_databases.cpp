@@ -169,8 +169,9 @@ public:
                 });
                 b.append("sizeOnDisk", static_cast<double>(size));
 
-                b.appendBool("empty",
-                             UUIDCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty());
+                b.appendBool(
+                    "empty",
+                    CollectionCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty());
             }
             BSONObj curDbObj = b.obj();
 

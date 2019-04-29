@@ -36,9 +36,9 @@
 
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
@@ -79,14 +79,15 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
         }
     }
 
-    // Need to mark the UUIDCatalog as open if we our closeAll fails, dismissed if successful.
-    auto reopenOnFailure = makeGuard([opCtx] { UUIDCatalog::get(opCtx).onOpenCatalog(opCtx); });
-    // Closing UUID Catalog: only lookupNSSByUUID will fall back to using pre-closing state to
+    // Need to mark the CollectionCatalog as open if we our closeAll fails, dismissed if successful.
+    auto reopenOnFailure =
+        makeGuard([opCtx] { CollectionCatalog::get(opCtx).onOpenCatalog(opCtx); });
+    // Closing CollectionCatalog: only lookupNSSByUUID will fall back to using pre-closing state to
     // allow authorization for currently unknown UUIDs. This is needed because authorization needs
     // to work before acquiring locks, and might otherwise spuriously regard a UUID as unknown
     // while reloading the catalog.
-    UUIDCatalog::get(opCtx).onCloseCatalog(opCtx);
-    LOG(1) << "closeCatalog: closing UUID catalog";
+    CollectionCatalog::get(opCtx).onCloseCatalog(opCtx);
+    LOG(1) << "closeCatalog: closing collection catalog";
 
     // Close all databases.
     log() << "closeCatalog: closing all databases";
@@ -120,7 +121,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         auto indexName = indexNamespace.second;
 
         auto collCatalogEntry =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
         invariant(collCatalogEntry,
                   str::stream() << "couldn't get collection catalog entry for collection "
                                 << collNss.toString());
@@ -155,7 +156,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         NamespaceString collNss(entry.first);
 
         auto collCatalogEntry =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
         invariant(collCatalogEntry,
                   str::stream() << "couldn't get collection catalog entry for collection "
                                 << collNss.toString());
@@ -169,7 +170,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         fassert(40690, rebuildIndexesOnCollection(opCtx, collCatalogEntry, indexSpecs));
     }
 
-    // Open all databases and repopulate the UUID catalog.
+    // Open all databases and repopulate the CollectionCatalog.
     log() << "openCatalog: reopening all databases";
     auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
@@ -177,7 +178,8 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         LOG_FOR_RECOVERY(1) << "openCatalog: dbholder reopening database " << dbName;
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
-        for (auto&& collNss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName)) {
+        for (auto&& collNss :
+             CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
             auto collection = db->getCollection(opCtx, collNss);
             invariant(collection,
@@ -199,10 +201,10 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
             }
         }
     }
-    // Opening UUID Catalog: The UUID catalog is now in sync with the storage engine catalog. Clear
-    // the pre-closing state.
-    UUIDCatalog::get(opCtx).onOpenCatalog(opCtx);
-    log() << "openCatalog: finished reloading UUID catalog";
+    // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
+    // catalog. Clear the pre-closing state.
+    CollectionCatalog::get(opCtx).onOpenCatalog(opCtx);
+    log() << "openCatalog: finished reloading collection catalog";
 }
 }  // namespace catalog
 }  // namespace mongo

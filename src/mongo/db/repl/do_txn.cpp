@@ -34,10 +34,10 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -135,7 +135,7 @@ Status _doTxn(OperationContext* opCtx,
             auto uuidStatus = UUID::parse(opObj["ui"]);
             uassertStatusOK(uuidStatus.getStatus());
             // If "ui" is present, it overrides "nss" for the collection name.
-            nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuidStatus.getValue());
+            nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuidStatus.getValue());
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "cannot find collection uuid " << uuidStatus.getValue(),
                     nss);

@@ -37,7 +37,7 @@
 
 namespace mongo {
 class IndexConsistency;
-class UUIDCatalog;
+class CollectionCatalog;
 class CollectionImpl final : public Collection, public CappedCallback {
 private:
     static const int kMagicNumber = 1357924;

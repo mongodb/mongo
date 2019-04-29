@@ -35,7 +35,7 @@
 namespace mongo {
 
 /**
- * This class comprises a mock Collection for use by UUIDCatalog unit tests.
+ * This class comprises a mock Collection for use by CollectionCatalog unit tests.
  */
 class CollectionMock : public Collection {
 public:

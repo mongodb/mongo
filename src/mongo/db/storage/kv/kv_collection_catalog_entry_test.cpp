@@ -33,8 +33,8 @@
 #include <iostream>
 #include <string>
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -90,7 +90,7 @@ public:
     }
 
     CollectionCatalogEntry* getCollectionCatalogEntry() {
-        return UUIDCatalog::get(getGlobalServiceContext())
+        return CollectionCatalog::get(getGlobalServiceContext())
             .lookupCollectionCatalogEntryByNamespace(_nss);
     }
 

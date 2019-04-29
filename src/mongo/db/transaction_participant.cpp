@@ -1023,7 +1023,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         transactionOperationUuids.insert(transactionOp.getUuid().get());
     }
     for (const auto& uuid : transactionOperationUuids) {
-        auto collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "prepareTransaction failed because one of the transaction "
                                  "operations was done against a temporary collection '"

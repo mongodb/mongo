@@ -33,12 +33,12 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -387,7 +387,7 @@ CollectionUUID _getCollectionUuid(OperationContext* opCtx, const NamespaceString
  * Get collection namespace by UUID.
  */
 NamespaceString _getCollectionNssFromUUID(OperationContext* opCtx, const UUID& uuid) {
-    Collection* source = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    Collection* source = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
     return source ? source->ns() : NamespaceString();
 }
 
@@ -626,7 +626,7 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetDo
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collC));
     // B (originally A) should exist
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
-    // collAUUID should be associated with collB's NamespaceString in the UUIDCatalog.
+    // collAUUID should be associated with collB's NamespaceString in the CollectionCatalog.
     auto newCollNS = _getCollectionNssFromUUID(_opCtx.get(), collAUUID);
     ASSERT_TRUE(newCollNS.isValid());
     ASSERT_EQUALS(newCollNS, collB);
@@ -652,7 +652,7 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetEx
     // B (originally A) should exist
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
-    const auto& tmpB = UUIDCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
+    const auto& tmpB = CollectionCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
     ASSERT(tmpB);
     ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
     ASSERT_TRUE(*tmpB != collB);
@@ -685,7 +685,7 @@ TEST_F(RenameCollectionTest,
     // B (originally A) should exist
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
-    const auto& tmpB = UUIDCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
+    const auto& tmpB = CollectionCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
     ASSERT(tmpB);
     ASSERT_TRUE(*tmpB != collB);
     ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
@@ -711,7 +711,7 @@ TEST_F(RenameCollectionTest,
     // B (originally A) should exist
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
-    const auto& tmpB = UUIDCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
+    const auto& tmpB = CollectionCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
     ASSERT(tmpB);
     ASSERT_TRUE(*tmpB != collB);
     ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
@@ -1168,15 +1168,15 @@ TEST_F(RenameCollectionTest, RenameAcrossDatabasesDoesNotPreserveCatalogPointers
     ASSERT_NE(targetCatalogEntry, sourceCatalogEntry);
 }
 
-TEST_F(RenameCollectionTest, UUIDCatalogMappingRemainsIntactThroughRename) {
+TEST_F(RenameCollectionTest, CollectionCatalogMappingRemainsIntactThroughRename) {
     _createCollection(_opCtx.get(), _sourceNss);
     Lock::GlobalWrite globalWrite(_opCtx.get());
-    auto& uuidCatalog = UUIDCatalog::get(_opCtx.get());
+    auto& catalog = CollectionCatalog::get(_opCtx.get());
     Collection* sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
     ASSERT(sourceColl);
-    ASSERT_EQ(sourceColl, uuidCatalog.lookupCollectionByUUID(*sourceColl->uuid()));
+    ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(*sourceColl->uuid()));
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
-    ASSERT_EQ(sourceColl, uuidCatalog.lookupCollectionByUUID(*sourceColl->uuid()));
+    ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(*sourceColl->uuid()));
 }
 
 TEST_F(RenameCollectionTest, FailRenameCollectionFromReplicatedToUnreplicatedDB) {

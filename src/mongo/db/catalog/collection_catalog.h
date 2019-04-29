@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include <map>
 #include <set>
 #include <unordered_map>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/op_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/uuid.h"
@@ -48,9 +48,9 @@ namespace mongo {
 using CollectionUUID = UUID;
 class Database;
 
-class UUIDCatalog {
-    UUIDCatalog(const UUIDCatalog&) = delete;
-    UUIDCatalog& operator=(const UUIDCatalog&) = delete;
+class CollectionCatalog {
+    CollectionCatalog(const CollectionCatalog&) = delete;
+    CollectionCatalog& operator=(const CollectionCatalog&) = delete;
 
     friend class iterator;
     struct CollectionInfo;
@@ -62,9 +62,9 @@ public:
         using pointer = const value_type*;
         using reference = const value_type&;
 
-        iterator(StringData dbName, uint64_t genNum, const UUIDCatalog& uuidCatalog);
+        iterator(StringData dbName, uint64_t genNum, const CollectionCatalog& catalog);
         iterator(std::map<std::pair<std::string, CollectionUUID>,
-                          UUIDCatalog::CollectionInfo*>::const_iterator mapIter);
+                          CollectionCatalog::CollectionInfo*>::const_iterator mapIter);
         pointer operator->();
         reference operator*();
         iterator operator++();
@@ -94,16 +94,16 @@ public:
         boost::optional<CollectionUUID> _uuid;
         uint64_t _genNum;
         std::map<std::pair<std::string, CollectionUUID>, CollectionInfo*>::const_iterator _mapIter;
-        const UUIDCatalog* _uuidCatalog;
+        const CollectionCatalog* _catalog;
         static constexpr Collection* _nullCollection = nullptr;
     };
 
-    static UUIDCatalog& get(ServiceContext* svcCtx);
-    static UUIDCatalog& get(OperationContext* opCtx);
-    UUIDCatalog() = default;
+    static CollectionCatalog& get(ServiceContext* svcCtx);
+    static CollectionCatalog& get(OperationContext* opCtx);
+    CollectionCatalog() = default;
 
     /**
-     * This function inserts the entry for uuid, coll into the UUID Collection. It is called by
+     * This function inserts the entry for uuid, coll into the collection catalog. It is called by
      * the op observer when a collection is created.
      */
     void onCreateCollection(OperationContext* opCtx,
@@ -111,7 +111,7 @@ public:
                             CollectionUUID uuid);
 
     /**
-     * This function removes the entry for uuid from the UUID catalog. It is called by the op
+     * This function removes the entry for uuid from the collection catalog. It is called by the op
      * observer when a collection is dropped.
      */
     void onDropCollection(OperationContext* opCtx, CollectionUUID uuid);
@@ -131,11 +131,11 @@ public:
     /**
      * Implies onDropCollection for all collections in db, but is not transactional.
      */
-    void onCloseDatabase(OperationContext* opCtx, Database* db);
+    void onCloseDatabase(OperationContext* opCtx, std::string dbName);
 
     /**
      * Register the collection catalog entry with `uuid`. The collection object with `uuid` must not
-     * exist in the UUIDCatalog yet.
+     * exist in the CollectionCatalog yet.
      */
     void registerCatalogEntry(CollectionUUID uuid,
                               std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry);
@@ -148,7 +148,7 @@ public:
 
     /**
      * Register the collection object with `uuid`. The collection catalog entry with `uuid` already
-     * exists in the UUIDCatalog.
+     * exists in the CollectionCatalog.
      */
     void registerCollectionObject(CollectionUUID uuid, std::unique_ptr<Collection> coll);
 
@@ -211,7 +211,7 @@ public:
     boost::optional<NamespaceString> lookupNSSByUUID(CollectionUUID uuid) const;
 
     /**
-     * Returns the UUID if `nss` exists in UUIDCatalog. The time complexity of
+     * Returns the UUID if `nss` exists in CollectionCatalog. The time complexity of
      * this function is linear to the number of collections in `nss.db()`.
      */
     boost::optional<CollectionUUID> lookupUUIDByNSS(const NamespaceString& nss) const;
@@ -282,7 +282,7 @@ public:
 
 private:
     class FinishDropChange;
-    friend class UUIDCatalog::iterator;
+    friend class CollectionCatalog::iterator;
 
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
                                                            const stdx::lock_guard<stdx::mutex>&);

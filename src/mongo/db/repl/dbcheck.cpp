@@ -30,12 +30,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
@@ -240,7 +240,7 @@ std::string hashCollectionInfo(const DbCheckCollectionInformation& info) {
 
 std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
     OperationContext* opCtx, Collection* collection) {
-    const UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    const CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
     const UUID uuid = *collection->uuid();
 
     std::vector<CollectionUUID> collectionUUIDs =
@@ -479,7 +479,7 @@ Status dbCheckDatabaseOnSecondary(OperationContext* opCtx,
                                   const DbCheckOplogCollection& entry) {
     // dbCheckCollectionResult-specific stuff.
     auto uuid = uassertStatusOK(UUID::parse(entry.getUuid().toString()));
-    auto collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
 
     if (!collection) {
         Status status(ErrorCodes::NamespaceNotFound, "Could not find collection for dbCheck");

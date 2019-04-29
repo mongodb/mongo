@@ -527,7 +527,7 @@ void updateUniqueIndexesOnUpgrade(OperationContext* opCtx) {
     std::vector<std::string> dbNames;
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
-        dbNames = UUIDCatalog::get(opCtx).getAllDbNames();
+        dbNames = CollectionCatalog::get(opCtx).getAllDbNames();
     }
 
     for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
@@ -561,7 +561,7 @@ Status updateNonReplicatedUniqueIndexes(OperationContext* opCtx) {
     std::vector<std::string> dbNames;
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
-        dbNames = UUIDCatalog::get(opCtx).getAllDbNames();
+        dbNames = CollectionCatalog::get(opCtx).getAllDbNames();
     }
     for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
         auto dbName = *it;

@@ -128,12 +128,12 @@ public:
 
     void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const final;
 
-    UUIDCatalog::iterator begin(OperationContext* opCtx) const final {
-        return UUIDCatalog::get(opCtx).begin(_name);
+    CollectionCatalog::iterator begin(OperationContext* opCtx) const final {
+        return CollectionCatalog::get(opCtx).begin(_name);
     }
 
-    UUIDCatalog::iterator end(OperationContext* opCtx) const final {
-        return UUIDCatalog::get(opCtx).end();
+    CollectionCatalog::iterator end(OperationContext* opCtx) const final {
+        return CollectionCatalog::get(opCtx).end();
     }
 
     uint64_t epoch() const {

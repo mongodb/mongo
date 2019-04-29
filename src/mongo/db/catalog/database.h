@@ -36,8 +36,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/string_map.h"
@@ -74,8 +74,8 @@ public:
     inline Database(Database&&) = delete;
     inline Database& operator=(Database&&) = delete;
 
-    virtual UUIDCatalog::iterator begin(OperationContext* opCtx) const = 0;
-    virtual UUIDCatalog::iterator end(OperationContext* opCtx) const = 0;
+    virtual CollectionCatalog::iterator begin(OperationContext* opCtx) const = 0;
+    virtual CollectionCatalog::iterator end(OperationContext* opCtx) const = 0;
 
     /**
      * Sets up internal memory structures.

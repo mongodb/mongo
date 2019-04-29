@@ -34,9 +34,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry_mock.h"
 #include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -374,11 +374,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
 
-    // Need to put the collection in the UUID catalog so the resume token is valid.
+    // Need to put the collection in the collection catalog so the resume token is valid.
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(testUuid(), std::move(catalogEntry));
-    UUIDCatalog::get(expCtx->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx)
+        .registerCatalogEntry(testUuid(), std::move(catalogEntry));
+    CollectionCatalog::get(expCtx->opCtx)
         .onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
 
     ASSERT_THROWS_CODE(
@@ -398,12 +399,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAfterAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
     auto opCtx = expCtx->opCtx;
 
-    // Need to put the collection in the UUID catalog so the resume token is valid.
+    // Need to put the collection in the collection catalog so the resume token is validcollection
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    uuidCatalog.registerCatalogEntry(testUuid(), std::move(catalogEntry));
-    uuidCatalog.onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
+    auto& catalog = CollectionCatalog::get(opCtx);
+    catalog.registerCatalogEntry(testUuid(), std::move(catalogEntry));
+    catalog.onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -422,12 +423,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndStartAfterO
     auto expCtx = getExpCtx();
     auto opCtx = expCtx->opCtx;
 
-    // Need to put the collection in the UUID catalog so the resume token is valid.
+    // Need to put the collection in the collection catalog so the resume token is valid.
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    uuidCatalog.registerCatalogEntry(testUuid(), std::move(catalogEntry));
-    uuidCatalog.onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
+    auto& catalog = CollectionCatalog::get(opCtx);
+    catalog.registerCatalogEntry(testUuid(), std::move(catalogEntry));
+    catalog.onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -446,12 +447,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectResumeAfterWithResumeTokenMissingUUID)
     auto expCtx = getExpCtx();
     auto opCtx = expCtx->opCtx;
 
-    // Need to put the collection in the UUID catalog so the resume token is valid.
+    // Need to put the collection in the collection catalog so the resume token is valid.
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    uuidCatalog.registerCatalogEntry(testUuid(), std::move(catalogEntry));
-    uuidCatalog.onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
+    auto& catalog = CollectionCatalog::get(opCtx);
+    catalog.registerCatalogEntry(testUuid(), std::move(catalogEntry));
+    catalog.onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -1182,8 +1183,8 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {
 
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
-    UUIDCatalog::get(getExpCtx()->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
+    CollectionCatalog::get(getExpCtx()->opCtx)
         .onCreateCollection(getExpCtx()->opCtx, std::move(collection), uuid);
 
     BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
@@ -1230,8 +1231,8 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPres
 
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
-    UUIDCatalog::get(getExpCtx()->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
+    CollectionCatalog::get(getExpCtx()->opCtx)
         .onCreateCollection(getExpCtx()->opCtx, std::move(collection), uuid);
 
     BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
@@ -1275,8 +1276,8 @@ TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
 
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
-    UUIDCatalog::get(getExpCtx()->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
+    CollectionCatalog::get(getExpCtx()->opCtx)
         .onCreateCollection(getExpCtx()->opCtx, std::move(collection), uuid);
 
     // Create a resume token from only the timestamp.
@@ -1328,11 +1329,12 @@ TEST_F(ChangeStreamStageTest, RenameFromUserToSystemCollectionShouldIncludeNotif
 TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
     auto expCtx = getExpCtx();
 
-    // Need to put the collection in the UUID catalog so the resume token is valid.
+    // Need to put the collection in the collection catalog so the resume token is valid.
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(testUuid(), std::move(catalogEntry));
-    UUIDCatalog::get(expCtx->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx)
+        .registerCatalogEntry(testUuid(), std::move(catalogEntry));
+    CollectionCatalog::get(expCtx->opCtx)
         .onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
 
     const auto resumeTokenInvalidate =
@@ -1746,8 +1748,8 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldIncludeShardKeyFromResumeToken)
 
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
-    UUIDCatalog::get(getExpCtx()->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
+    CollectionCatalog::get(getExpCtx()->opCtx)
         .onCreateCollection(getExpCtx()->opCtx, std::move(collection), uuid);
 
     BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
@@ -1785,8 +1787,8 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPr
 
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
-    UUIDCatalog::get(getExpCtx()->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
+    CollectionCatalog::get(getExpCtx()->opCtx)
         .onCreateCollection(getExpCtx()->opCtx, std::move(collection), uuid);
 
     BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
@@ -1825,8 +1827,8 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyIfResumeToken
 
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
-    UUIDCatalog::get(getExpCtx()->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
+    CollectionCatalog::get(getExpCtx()->opCtx)
         .onCreateCollection(getExpCtx()->opCtx, std::move(collection), uuid);
 
     // Create a resume token from only the timestamp.
@@ -1861,11 +1863,12 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyIfResumeToken
 TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
     auto expCtx = getExpCtx();
 
-    // Need to put the collection in the UUID catalog so the resume token is valid.
+    // Need to put the collection in the collection catalog so the resume token is valid.
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(testUuid(), std::move(catalogEntry));
-    UUIDCatalog::get(expCtx->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx)
+        .registerCatalogEntry(testUuid(), std::move(catalogEntry));
+    CollectionCatalog::get(expCtx->opCtx)
         .onCreateCollection(expCtx->opCtx, std::move(collection), testUuid());
 
     const auto resumeTokenInvalidate =
@@ -1888,8 +1891,8 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabase) {
 
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
-    UUIDCatalog::get(getExpCtx()->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
+    CollectionCatalog::get(getExpCtx()->opCtx)
         .onCreateCollection(getExpCtx()->opCtx, std::move(collection), uuid);
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
@@ -1920,8 +1923,8 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
 
     auto collection = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
-    UUIDCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
-    UUIDCatalog::get(getExpCtx()->opCtx)
+    CollectionCatalog::get(getExpCtx()->opCtx).registerCatalogEntry(uuid, std::move(catalogEntry));
+    CollectionCatalog::get(getExpCtx()->opCtx)
         .onCreateCollection(getExpCtx()->opCtx, std::move(collection), uuid);
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.

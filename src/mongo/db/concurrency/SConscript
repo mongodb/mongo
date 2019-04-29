@@ -54,7 +54,7 @@ env.Library(
         '$BUILD_DIR/third_party/shim_boost',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
     ],
 )

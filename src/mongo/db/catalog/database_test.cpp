@@ -33,9 +33,9 @@
 #include <pcrecpp.h>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -352,14 +352,14 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
 
         auto fromUuid = UUID::gen();
 
-        auto&& uuidCatalog = UUIDCatalog::get(opCtx);
-        ASSERT_EQUALS(boost::none, uuidCatalog.lookupNSSByUUID(fromUuid));
+        auto&& catalog = CollectionCatalog::get(opCtx);
+        ASSERT_EQUALS(boost::none, catalog.lookupNSSByUUID(fromUuid));
 
         WriteUnitOfWork wuow(opCtx);
         CollectionOptions fromCollectionOptions;
         fromCollectionOptions.uuid = fromUuid;
         ASSERT_TRUE(db->createCollection(opCtx, fromNss, fromCollectionOptions));
-        ASSERT_EQUALS(fromNss, *uuidCatalog.lookupNSSByUUID(fromUuid));
+        ASSERT_EQUALS(fromNss, *catalog.lookupNSSByUUID(fromUuid));
 
         auto stayTemp = false;
         ASSERT_OK(db->renameCollection(opCtx, fromNss, toNss, stayTemp));
@@ -375,7 +375,7 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         ASSERT_TRUE(toUuid);
         ASSERT_EQUALS(fromUuid, *toUuid);
 
-        ASSERT_EQUALS(toNss, *uuidCatalog.lookupNSSByUUID(*toUuid));
+        ASSERT_EQUALS(toNss, *catalog.lookupNSSByUUID(*toUuid));
 
         wuow.commit();
     });

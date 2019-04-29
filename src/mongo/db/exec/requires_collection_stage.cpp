@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/requires_collection_stage.h"
 
-#include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/catalog/collection_catalog.h"
 
 namespace mongo {
 
@@ -47,7 +47,7 @@ template <typename CollectionT>
 void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     invariant(!_collection);
 
-    const UUIDCatalog& catalog = UUIDCatalog::get(getOpCtx());
+    const CollectionCatalog& catalog = CollectionCatalog::get(getOpCtx());
     _collection = catalog.lookupCollectionByUUID(_collectionUUID);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "collection dropped. UUID " << _collectionUUID,

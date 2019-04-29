@@ -41,13 +41,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -141,7 +141,7 @@ Status repairCollections(OperationContext* opCtx,
                          const std::string& dbName,
                          stdx::function<void(const std::string& dbName)> onRecordStoreRepair) {
 
-    auto colls = UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
+    auto colls = CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
 
     for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
@@ -159,7 +159,7 @@ Status repairCollections(OperationContext* opCtx,
         opCtx->checkForInterrupt();
 
         CollectionCatalogEntry* cce =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
         auto swIndexNameObjs = getIndexNameObjs(opCtx, cce);
         if (!swIndexNameObjs.isOK())
             return swIndexNameObjs.getStatus();

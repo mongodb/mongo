@@ -33,10 +33,10 @@
 
 #include "mongo/db/index_builds_coordinator.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
@@ -546,7 +546,7 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     const UUID& buildUUID,
     IndexBuildProtocol protocol,
     boost::optional<CommitQuorumOptions> commitQuorum) {
-    auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(collectionUUID);
+    auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(collectionUUID);
     if (!nss) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Cannot create index on collection '" << collectionUUID
@@ -742,7 +742,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     Status status{ErrorCodes::InternalError,
                   "Uninitialized status value in IndexBuildsCoordinator"};
     boost::optional<NamespaceString> nss =
-        UUIDCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
+        CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
 
     invariant(nss,
               str::stream() << "Collection '" << replState->collectionUUID
@@ -759,7 +759,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     // not allow locks or re-locks to be interrupted.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-    auto collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+    auto collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
     invariant(collection,
               str::stream() << "Collection " << *nss
                             << " should exist because an index build is in progress.");

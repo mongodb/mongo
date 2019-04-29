@@ -37,8 +37,8 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
@@ -500,13 +500,13 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
 void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
     // This function explicitly does not check for shutdown since a clean shutdown post oplog
     // truncation is not allowed to occur until the record store counts are corrected.
-    const auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    const auto& catalog = CollectionCatalog::get(opCtx);
     for (const auto& uiCount : _newCounts) {
         const auto uuid = uiCount.first;
-        const auto coll = uuidCatalog.lookupCollectionByUUID(uuid);
+        const auto coll = catalog.lookupCollectionByUUID(uuid);
         invariant(coll,
                   str::stream() << "The collection with UUID " << uuid
-                                << " is unexpectedly missing in the UUIDCatalog");
+                                << " is unexpectedly missing in the CollectionCatalog");
         const auto nss = coll->ns();
         invariant(!nss.isEmpty(),
                   str::stream() << "The collection with UUID " << uuid << " has no namespace.");
@@ -576,7 +576,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
     if (_isInShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
-    const auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    const auto& catalog = CollectionCatalog::get(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     log() << "finding record store counts";
@@ -587,7 +587,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
             continue;
         }
 
-        auto nss = uuidCatalog.lookupNSSByUUID(uuid);
+        auto nss = catalog.lookupNSSByUUID(uuid);
         StorageInterface::CollectionCount oldCount = 0;
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
@@ -595,7 +595,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
         if (!nss) {
             invariant(storageEngine->supportsPendingDrops(),
                       str::stream() << "The collection with UUID " << uuid
-                                    << " is unexpectedly missing in the UUIDCatalog");
+                                    << " is unexpectedly missing in the CollectionCatalog");
             auto it = _pendingDrops.find(uuid);
             if (it == _pendingDrops.end()) {
                 _newCounts[uuid] = kCollectionScanRequired;
@@ -1006,25 +1006,25 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
 }
 
 Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
-    const auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    const auto& catalog = CollectionCatalog::get(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     for (auto&& entry : _observerInfo.rollbackDeletedIdsMap) {
         const auto& uuid = entry.first;
-        const auto nss = uuidCatalog.lookupNSSByUUID(uuid);
+        const auto nss = catalog.lookupNSSByUUID(uuid);
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
         // managed by the storage engine. See StorageEngine::supportsPendingDrops().
         if (!nss && storageEngine->supportsPendingDrops()) {
             log() << "The collection with UUID " << uuid
-                  << " is missing in the UUIDCatalog. This could be due to a dropped collection. "
-                     "Not writing rollback file for uuid "
+                  << " is missing in the CollectionCatalog. This could be due to a dropped "
+                     " collection. Not writing rollback file for uuid "
                   << uuid;
             continue;
         }
 
         invariant(nss,
                   str::stream() << "The collection with UUID " << uuid
-                                << " is unexpectedly missing in the UUIDCatalog");
+                                << " is unexpectedly missing in the CollectionCatalog");
 
         if (_isInShutdown()) {
             log() << "Rollback shutting down; not writing rollback file for namespace " << nss->ns()

@@ -38,7 +38,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
-#include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/util/assert_util.h"
@@ -965,8 +965,8 @@ std::string ResourceId::toString() const {
     }
 
     if (getType() == RESOURCE_DATABASE || getType() == RESOURCE_COLLECTION) {
-        UUIDCatalog& uuidCatalog = UUIDCatalog::get(getGlobalServiceContext());
-        boost::optional<std::string> resourceName = uuidCatalog.lookupResourceName(*this);
+        CollectionCatalog& catalog = CollectionCatalog::get(getGlobalServiceContext());
+        boost::optional<std::string> resourceName = catalog.lookupResourceName(*this);
         if (resourceName) {
             ss << ", " << *resourceName;
         }

@@ -27,27 +27,42 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 
 namespace mongo {
-
-class Collection;
-class CollectionCatalogEntry;
-
 namespace catalog {
 
-/**
- * Looping through all the collections in the database and run callback function on each one of
- * them. The return value of the callback decides whether we should continue the loop.
- */
 void forEachCollectionFromDb(
     OperationContext* opCtx,
     StringData dbName,
     LockMode collLockMode,
-    std::function<bool(Collection* collection, CollectionCatalogEntry* catalogEntry)> callback);
+    std::function<bool(Collection* collection, CollectionCatalogEntry* catalogEntry)> callback) {
+
+    CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
+    for (auto collectionIt = catalog.begin(dbName); collectionIt != catalog.end(); ++collectionIt) {
+        auto uuid = collectionIt.uuid().get();
+        auto nss = catalog.lookupNSSByUUID(uuid);
+
+        // If the NamespaceString can't be resolved from the uuid, then the collection was dropped.
+        if (!nss) {
+            continue;
+        }
+
+        Lock::CollectionLock clk(opCtx, *nss, collLockMode);
+
+        auto collection = catalog.lookupCollectionByUUID(uuid);
+        auto catalogEntry = catalog.lookupCollectionCatalogEntryByUUID(uuid);
+        if (!collection || !catalogEntry || catalogEntry->ns() != *nss)
+            continue;
+
+        if (!callback(collection, catalogEntry))
+            break;
+    }
+}
 
 }  // namespace catalog
 }  // namespace mongo

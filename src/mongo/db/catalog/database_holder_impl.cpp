@@ -35,9 +35,9 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_impl.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -136,7 +136,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     // different databases for the same name.
     lk.unlock();
 
-    if (UUIDCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty()) {
+    if (CollectionCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty()) {
         audit::logCreateDatabase(opCtx->getClient(), dbname);
         if (justCreated)
             *justCreated = true;
@@ -213,7 +213,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
 
     auto db = it->second;
     repl::oplogCheckCloseDatabase(opCtx, db);
-    UUIDCatalog::get(opCtx).onCloseDatabase(opCtx, db);
+    CollectionCatalog::get(opCtx).onCloseDatabase(opCtx, dbName.toString());
 
     db->close(opCtx);
     delete db;
@@ -254,7 +254,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
 
         Database* db = _dbs[name];
         repl::oplogCheckCloseDatabase(opCtx, db);
-        UUIDCatalog::get(opCtx).onCloseDatabase(opCtx, db);
+        CollectionCatalog::get(opCtx).onCloseDatabase(opCtx, name);
         db->close(opCtx);
         delete db;
 

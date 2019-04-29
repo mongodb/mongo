@@ -307,13 +307,12 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='uuid_catalog',
+    target='collection_catalog',
     source=[
-        'uuid_catalog.cpp',
+        'collection_catalog.cpp',
     ],
     LIBDEPS=[
         'collection',
-        'database_holder',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/service_context',
@@ -324,23 +323,23 @@ env.Library(
 )
 
 env.Library(
-    target='uuid_catalog_helper',
+    target='collection_catalog_helper',
     source=[
-        'uuid_catalog_helper.cpp',
+        'collection_catalog_helper.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        'uuid_catalog',
+        'collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
     ]
 )
 
 env.CppUnitTest(
-    target='uuid_catalog_test',
+    target='collection_catalog_test',
     source=[
-        'uuid_catalog_test.cpp',
+        'collection_catalog_test.cpp',
     ],
     LIBDEPS=[
-        'uuid_catalog',
+        'collection_catalog',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
     ],
@@ -353,7 +352,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'collection',
-        'uuid_catalog',
+        'collection_catalog',
+        'database_holder',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/repair_database',
         '$BUILD_DIR/mongo/db/service_context',
@@ -415,7 +415,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views_mongod',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/uuid_catalog_helper',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/index/index_build_interceptor',
         '$BUILD_DIR/mongo/db/logical_clock',
@@ -452,6 +452,9 @@ env.Library(
         'index_key_validate',
         'multi_index_block',
     ],
+    LIBDEPS_PRIVATE=[
+        'database_holder',
+    ],
 )
 
 env.CppUnitTest(
@@ -478,7 +481,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
-        'uuid_catalog',
+        'collection_catalog',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
@@ -496,6 +499,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
+        'database_holder',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
@@ -516,6 +520,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
+        'database_holder',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',

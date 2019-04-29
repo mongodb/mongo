@@ -192,29 +192,31 @@ private:
 };
 
 /**
- * RAII-style class. Hides changes to the UUIDCatalog For the life of the object so that calls to
- * UUIDCatalog::lookupNSSByUUID will return results as before the RAII object was instantiated.
+ * RAII-style class. Hides changes to the CollectionCatalog for the life of the object, so that
+ * calls to CollectionCatalog::lookupNSSByUUID will return results as before the RAII object was
+ * instantiated.
  *
  * The caller must hold the global exclusive lock for the life of the instance.
  */
-class ConcealUUIDCatalogChangesBlock {
-    ConcealUUIDCatalogChangesBlock(const ConcealUUIDCatalogChangesBlock&) = delete;
-    ConcealUUIDCatalogChangesBlock& operator=(const ConcealUUIDCatalogChangesBlock&) = delete;
+class ConcealCollectionCatalogChangesBlock {
+    ConcealCollectionCatalogChangesBlock(const ConcealCollectionCatalogChangesBlock&) = delete;
+    ConcealCollectionCatalogChangesBlock& operator=(const ConcealCollectionCatalogChangesBlock&) =
+        delete;
 
 public:
     /**
-     * Conceals future UUIDCatalog changes and stashes a pointer to the opCtx for the destructor to
-     * use.
+     * Conceals future CollectionCatalog changes and stashes a pointer to the opCtx for the
+     * destructor to use.
      */
-    ConcealUUIDCatalogChangesBlock(OperationContext* opCtx);
+    ConcealCollectionCatalogChangesBlock(OperationContext* opCtx);
 
     /**
-     * Reveals UUIDCatalog changes.
+     * Reveals CollectionCatalog changes.
      */
-    ~ConcealUUIDCatalogChangesBlock();
+    ~ConcealCollectionCatalogChangesBlock();
 
 private:
-    // Needed for the destructor to access the UUIDCatalog in order to call onOpenCatalog.
+    // Needed for the destructor to access the CollectionCatalog in order to call onOpenCatalog.
     OperationContext* _opCtx;
 };
 

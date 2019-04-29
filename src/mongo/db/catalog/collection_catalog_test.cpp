@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/catalog/collection_catalog.h"
 
 #include <algorithm>
 #include <boost/optional/optional_io.hpp>
@@ -41,11 +41,11 @@
 using namespace mongo;
 
 /**
- * A test fixture that creates a UUID Catalog and Collection* pointer to store in it.
+ * A test fixture that creates a CollectionCatalog and Collection* pointer to store in it.
  */
-class UUIDCatalogTest : public unittest::Test {
+class CollectionCatalogTest : public unittest::Test {
 public:
-    UUIDCatalogTest()
+    CollectionCatalogTest()
         : nss("testdb", "testcol"),
           col(nullptr),
           colUUID(CollectionUUID::gen()),
@@ -69,7 +69,7 @@ public:
     }
 
 protected:
-    UUIDCatalog catalog;
+    CollectionCatalog catalog;
     OperationContextNoop opCtx;
     NamespaceString nss;
     CollectionMock* col;
@@ -78,7 +78,7 @@ protected:
     CollectionUUID prevUUID;
 };
 
-class UUIDCatalogIterationTest : public unittest::Test {
+class CollectionCatalogIterationTest : public unittest::Test {
 public:
     void setUp() {
         for (int counter = 0; counter < 5; ++counter) {
@@ -144,12 +144,12 @@ public:
     }
 
 protected:
-    UUIDCatalog catalog;
+    CollectionCatalog catalog;
     OperationContextNoop opCtx;
     std::map<std::string, std::map<CollectionUUID, CollectionMock*>> dbMap;
 };
 
-class UUIDCatalogResourceMapTest : public unittest::Test {
+class CollectionCatalogResourceMapTest : public unittest::Test {
 public:
     void setUp() {
         // The first and second collection namespaces map to the same ResourceId.
@@ -175,10 +175,10 @@ protected:
     std::string thirdCollection;
     ResourceId thirdResourceId;
 
-    UUIDCatalog catalog;
+    CollectionCatalog catalog;
 };
 
-TEST_F(UUIDCatalogResourceMapTest, EmptyTest) {
+TEST_F(CollectionCatalogResourceMapTest, EmptyTest) {
     boost::optional<std::string> resource = catalog.lookupResourceName(firstResourceId);
     ASSERT_EQ(boost::none, resource);
 
@@ -187,7 +187,7 @@ TEST_F(UUIDCatalogResourceMapTest, EmptyTest) {
     ASSERT_EQ(boost::none, resource);
 }
 
-TEST_F(UUIDCatalogResourceMapTest, InsertTest) {
+TEST_F(CollectionCatalogResourceMapTest, InsertTest) {
     catalog.addResource(firstResourceId, firstCollection);
     boost::optional<std::string> resource = catalog.lookupResourceName(thirdResourceId);
     ASSERT_EQ(boost::none, resource);
@@ -201,7 +201,7 @@ TEST_F(UUIDCatalogResourceMapTest, InsertTest) {
     ASSERT_EQ(thirdCollection, resource);
 }
 
-TEST_F(UUIDCatalogResourceMapTest, RemoveTest) {
+TEST_F(CollectionCatalogResourceMapTest, RemoveTest) {
     catalog.addResource(firstResourceId, firstCollection);
     catalog.addResource(thirdResourceId, thirdCollection);
 
@@ -221,7 +221,7 @@ TEST_F(UUIDCatalogResourceMapTest, RemoveTest) {
     ASSERT_EQ(boost::none, resource);
 }
 
-TEST_F(UUIDCatalogResourceMapTest, CollisionTest) {
+TEST_F(CollectionCatalogResourceMapTest, CollisionTest) {
     // firstCollection and secondCollection map to the same ResourceId.
     catalog.addResource(firstResourceId, firstCollection);
     catalog.addResource(secondResourceId, secondCollection);
@@ -267,7 +267,7 @@ TEST_F(UUIDCatalogResourceMapTest, CollisionTest) {
     ASSERT_EQ(boost::none, resource);
 }
 
-class UUIDCatalogResourceTest : public unittest::Test {
+class CollectionCatalogResourceTest : public unittest::Test {
 public:
     void setUp() {
         for (int i = 0; i < 5; i++) {
@@ -313,12 +313,12 @@ public:
 
 protected:
     OperationContextNoop opCtx;
-    UUIDCatalog catalog;
+    CollectionCatalog catalog;
 };
 
 namespace {
 
-TEST_F(UUIDCatalogResourceTest, RemoveAllResources) {
+TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
     catalog.deregisterAllCatalogEntriesAndCollectionObjects();
 
     const std::string dbName = "resourceDb";
@@ -332,7 +332,7 @@ TEST_F(UUIDCatalogResourceTest, RemoveAllResources) {
     }
 }
 
-TEST_F(UUIDCatalogResourceTest, LookupDatabaseResource) {
+TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
     const std::string dbName = "resourceDb";
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     boost::optional<std::string> ridStr = catalog.lookupResourceName(rid);
@@ -341,13 +341,13 @@ TEST_F(UUIDCatalogResourceTest, LookupDatabaseResource) {
     ASSERT(ridStr->find(dbName) != std::string::npos);
 }
 
-TEST_F(UUIDCatalogResourceTest, LookupMissingDatabaseResource) {
+TEST_F(CollectionCatalogResourceTest, LookupMissingDatabaseResource) {
     const std::string dbName = "missingDb";
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     ASSERT(!catalog.lookupResourceName(rid));
 }
 
-TEST_F(UUIDCatalogResourceTest, LookupCollectionResource) {
+TEST_F(CollectionCatalogResourceTest, LookupCollectionResource) {
     const std::string collNs = "resourceDb.coll1";
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
     boost::optional<std::string> ridStr = catalog.lookupResourceName(rid);
@@ -356,13 +356,13 @@ TEST_F(UUIDCatalogResourceTest, LookupCollectionResource) {
     ASSERT(ridStr->find(collNs) != std::string::npos);
 }
 
-TEST_F(UUIDCatalogResourceTest, LookupMissingCollectionResource) {
+TEST_F(CollectionCatalogResourceTest, LookupMissingCollectionResource) {
     const std::string dbName = "resourceDb.coll5";
     auto rid = ResourceId(RESOURCE_COLLECTION, dbName);
     ASSERT(!catalog.lookupResourceName(rid));
 }
 
-TEST_F(UUIDCatalogResourceTest, RemoveCollection) {
+TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
     const std::string collNs = "resourceDb.coll1";
     auto coll = catalog.lookupCollectionByNamespace(NamespaceString(collNs));
     auto uniqueColl = catalog.deregisterCollectionObject(coll->uuid().get());
@@ -371,20 +371,21 @@ TEST_F(UUIDCatalogResourceTest, RemoveCollection) {
     ASSERT(!catalog.lookupResourceName(rid));
 }
 
-// Create an iterator over the UUIDCatalog and assert that all collections are present.
+// Create an iterator over the CollectionCatalog and assert that all collections are present.
 // Iteration ends when the end of the catalog is reached.
-TEST_F(UUIDCatalogIterationTest, EndAtEndOfCatalog) {
+TEST_F(CollectionCatalogIterationTest, EndAtEndOfCatalog) {
     checkCollections("foo");
 }
 
-// Create an iterator over the UUIDCatalog and test that all collections are present. Iteration ends
+// Create an iterator over the CollectionCatalog and test that all collections are present.
+// Iteration ends
 // when the end of a database-specific section of the catalog is reached.
-TEST_F(UUIDCatalogIterationTest, EndAtEndOfSection) {
+TEST_F(CollectionCatalogIterationTest, EndAtEndOfSection) {
     checkCollections("bar");
 }
 
 // Delete an entry in the catalog while iterating.
-TEST_F(UUIDCatalogIterationTest, InvalidateEntry) {
+TEST_F(CollectionCatalogIterationTest, InvalidateEntry) {
     auto it = catalog.begin("bar");
 
     // Invalidate bar.coll1.
@@ -404,7 +405,7 @@ TEST_F(UUIDCatalogIterationTest, InvalidateEntry) {
 }
 
 // Delete the entry pointed to by the iterator and dereference the iterator.
-TEST_F(UUIDCatalogIterationTest, InvalidateAndDereference) {
+TEST_F(CollectionCatalogIterationTest, InvalidateAndDereference) {
     auto it = catalog.begin("bar");
     auto collsIt = collsIterator("bar");
     auto uuid = collsIt->first;
@@ -420,7 +421,7 @@ TEST_F(UUIDCatalogIterationTest, InvalidateAndDereference) {
 }
 
 // Delete the last entry for a database while pointing to it and dereference the iterator.
-TEST_F(UUIDCatalogIterationTest, InvalidateLastEntryAndDereference) {
+TEST_F(CollectionCatalogIterationTest, InvalidateLastEntryAndDereference) {
     auto it = catalog.begin("bar");
     NamespaceString lastNs;
     boost::optional<CollectionUUID> uuid;
@@ -444,7 +445,7 @@ TEST_F(UUIDCatalogIterationTest, InvalidateLastEntryAndDereference) {
 }
 
 // Delete the last entry in the map while pointing to it and dereference the iterator.
-TEST_F(UUIDCatalogIterationTest, InvalidateLastEntryInMapAndDereference) {
+TEST_F(CollectionCatalogIterationTest, InvalidateLastEntryInMapAndDereference) {
     auto it = catalog.begin("foo");
     NamespaceString lastNs;
     boost::optional<CollectionUUID> uuid;
@@ -467,7 +468,7 @@ TEST_F(UUIDCatalogIterationTest, InvalidateLastEntryInMapAndDereference) {
     ASSERT(*it == nullptr);
 }
 
-TEST_F(UUIDCatalogIterationTest, BeginSkipsOverEmptyCollectionObject) {
+TEST_F(CollectionCatalogIterationTest, BeginSkipsOverEmptyCollectionObject) {
     NamespaceString a1("a", "coll1");
     NamespaceString a2("a", "coll2");
 
@@ -491,7 +492,7 @@ TEST_F(UUIDCatalogIterationTest, BeginSkipsOverEmptyCollectionObject) {
     ASSERT(coll->ns().ns() == a2.ns());
 }
 
-TEST_F(UUIDCatalogIterationTest, BeginSkipsOverEmptyCollectionObjectButStopsAtDbBoundary) {
+TEST_F(CollectionCatalogIterationTest, BeginSkipsOverEmptyCollectionObjectButStopsAtDbBoundary) {
     NamespaceString a("a", "coll1");
     NamespaceString b("b", "coll1");
 
@@ -511,7 +512,7 @@ TEST_F(UUIDCatalogIterationTest, BeginSkipsOverEmptyCollectionObjectButStopsAtDb
     ASSERT(it == catalog.end());
 }
 
-TEST_F(UUIDCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {
+TEST_F(CollectionCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {
     auto it = catalog.begin("bar");
     auto collsIt = collsIterator("bar");
     auto uuid = collsIt->first;
@@ -521,11 +522,11 @@ TEST_F(UUIDCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {
     ASSERT_EQUALS(uuid, it.uuid());
 }
 
-TEST_F(UUIDCatalogTest, OnCreateCollection) {
+TEST_F(CollectionCatalogTest, OnCreateCollection) {
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == col);
 }
 
-TEST_F(UUIDCatalogTest, LookupCollectionByUUID) {
+TEST_F(CollectionCatalogTest, LookupCollectionByUUID) {
     // Ensure the string value of the NamespaceString of the obtained Collection is equal to
     // nss.ns().
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(colUUID)->ns().ns(), nss.ns());
@@ -533,14 +534,14 @@ TEST_F(UUIDCatalogTest, LookupCollectionByUUID) {
     ASSERT(catalog.lookupCollectionByUUID(CollectionUUID::gen()) == nullptr);
 }
 
-TEST_F(UUIDCatalogTest, LookupNSSByUUID) {
+TEST_F(CollectionCatalogTest, LookupNSSByUUID) {
     // Ensure the string value of the obtained NamespaceString is equal to nss.ns().
     ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID)->ns(), nss.ns());
     // Ensure namespace lookups of unknown UUIDs result in empty NamespaceStrings.
     ASSERT_EQUALS(catalog.lookupNSSByUUID(CollectionUUID::gen()), boost::none);
 }
 
-TEST_F(UUIDCatalogTest, InsertAfterLookup) {
+TEST_F(CollectionCatalogTest, InsertAfterLookup) {
     auto newUUID = CollectionUUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
     auto newCollUnique = std::make_unique<CollectionMock>(newNss);
@@ -556,13 +557,13 @@ TEST_F(UUIDCatalogTest, InsertAfterLookup) {
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 }
 
-TEST_F(UUIDCatalogTest, OnDropCollection) {
+TEST_F(CollectionCatalogTest, OnDropCollection) {
     catalog.onDropCollection(&opCtx, colUUID);
     // Ensure the lookup returns a null pointer upon removing the colUUID entry.
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
 }
 
-TEST_F(UUIDCatalogTest, RenameCollection) {
+TEST_F(CollectionCatalogTest, RenameCollection) {
     auto uuid = CollectionUUID::gen();
     NamespaceString oldNss(nss.db(), "oldcol");
     auto collUnique = std::make_unique<CollectionMock>(oldNss);
@@ -578,7 +579,7 @@ TEST_F(UUIDCatalogTest, RenameCollection) {
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(uuid), collection);
 }
 
-TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
+TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
     catalog.onCloseCatalog(&opCtx);
     catalog.onDropCollection(&opCtx, colUUID);
     catalog.deregisterCatalogEntry(colUUID);
@@ -588,7 +589,7 @@ TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
     ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), boost::none);
 }
 
-TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
+TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
     auto newUUID = CollectionUUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
     auto newCollUnique = std::make_unique<CollectionMock>(newNss);
@@ -610,7 +611,7 @@ TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 }
 
-TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
+TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
     NamespaceString newNss(nss.db(), "newcol");
     auto newCollUnique = std::make_unique<CollectionMock>(newNss);
     auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(newNss.ns());
@@ -632,12 +633,12 @@ TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), newNss);
 }
 
-DEATH_TEST_F(UUIDCatalogResourceTest, AddInvalidResourceType, "invariant") {
+DEATH_TEST_F(CollectionCatalogResourceTest, AddInvalidResourceType, "invariant") {
     auto rid = ResourceId(RESOURCE_GLOBAL, 0);
     catalog.addResource(rid, "");
 }
 
-TEST_F(UUIDCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
+TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     NamespaceString aColl("dbA", "collA");
     NamespaceString b1Coll("dbB", "collB1");
     NamespaceString b2Coll("dbB", "collB2");

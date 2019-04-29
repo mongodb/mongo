@@ -42,14 +42,14 @@
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/catalog/uuid_catalog_helper.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -87,7 +87,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 std::unique_ptr<Collection> _createCollectionInstance(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
 
-    auto cce = UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
+    auto cce = CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
     auto rs = cce->getRecordStore();
     auto uuid = cce->getCollectionOptions(opCtx).uuid;
     invariant(rs,
@@ -168,20 +168,20 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
         uasserted(10028, status.toString());
     }
 
-    auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    for (const auto& nss : uuidCatalog.getAllCollectionNamesFromDb(opCtx, _name)) {
+    auto& catalog = CollectionCatalog::get(opCtx);
+    for (const auto& nss : catalog.getAllCollectionNamesFromDb(opCtx, _name)) {
         auto ownedCollection = _createCollectionInstance(opCtx, nss);
         invariant(ownedCollection);
 
         // Call registerCollectionObject directly because we're not in a WUOW.
         auto uuid = *(ownedCollection->uuid());
-        uuidCatalog.registerCollectionObject(uuid, std::move(ownedCollection));
+        catalog.registerCollectionObject(uuid, std::move(ownedCollection));
     }
 
-    // At construction time of the viewCatalog, the UUIDCatalog map wasn't initialized yet, so no
-    // system.views collection would be found. Now we're sufficiently initialized, signal a version
-    // change. Also force a reload, so if there are problems with the catalog contents as might be
-    // caused by incorrect mongod versions or similar, they are found right away.
+    // At construction time of the viewCatalog, the CollectionCatalog map wasn't initialized yet,
+    // so no system.views collection would be found. Now we're sufficiently initialized, signal a
+    // version change. Also force a reload, so if there are problems with the catalog contents as
+    // might be caused by incorrect mongod versions or similar, they are found right away.
     auto views = ViewCatalog::get(this);
     views->invalidate();
     Status reloadStatus = views->reloadIfNeeded(opCtx);
@@ -196,9 +196,10 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
-    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, _name)) {
+    for (const auto& nss :
+         CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, _name)) {
         CollectionCatalogEntry* coll =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
         CollectionOptions options = coll->getCollectionOptions(opCtx);
 
         if (!options.temp)
@@ -497,7 +498,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     UUID uuid = *collection->uuid();
     log() << "Finishing collection drop for " << nss << " (" << uuid << ").";
 
-    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
     catalog.onDropCollection(opCtx, uuid);
 
     auto storageEngine =
@@ -506,7 +507,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
 }
 
 Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const NamespaceString& nss) const {
-    return UUIDCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
 }
 
 Status DatabaseImpl::renameCollection(OperationContext* opCtx,
@@ -553,10 +554,11 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
     Status status = storageEngine->getCatalog()->renameCollection(opCtx, fromNss, toNss, stayTemp);
 
-    // Set the namespace of 'collToRename' from within the UUIDCatalog. This is necessary because
-    // the UUIDCatalog mutex synchronizes concurrent access to the collection's namespace for
+    // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
+    // because
+    // the CollectionCatalog mutex synchronizes concurrent access to the collection's namespace for
     // callers that may not hold a collection lock.
-    UUIDCatalog::get(opCtx).setCollectionNamespace(opCtx, collToRename, fromNss, toNss);
+    CollectionCatalog::get(opCtx).setCollectionNamespace(opCtx, collToRename, fromNss, toNss);
 
     opCtx->recoveryUnit()->onCommit([collToRename](auto commitTime) {
         // Ban reading from this collection on committed reads on snapshots before now.
@@ -684,10 +686,10 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
 
     // Create Collection object
-    auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    auto& catalog = CollectionCatalog::get(opCtx);
     auto ownedCollection = _createCollectionInstance(opCtx, nss);
     Collection* collection = ownedCollection.get();
-    uuidCatalog.onCreateCollection(opCtx, std::move(ownedCollection), *(collection->uuid()));
+    catalog.onCreateCollection(opCtx, std::move(ownedCollection), *(collection->uuid()));
     opCtx->recoveryUnit()->onCommit([collection](auto commitTime) {
         // Ban reading from this collection on committed reads on snapshots before now.
         if (commitTime)
@@ -803,7 +805,8 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         return;
     }
 
-    for (const auto& nss : UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, _name)) {
+    for (const auto& nss :
+         CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, _name)) {
         if (nss.isDropPendingNamespace()) {
             auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
             log() << "Found drop-pending namespace " << nss << " with drop optime " << dropOpTime;

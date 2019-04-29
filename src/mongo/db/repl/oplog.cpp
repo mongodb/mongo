@@ -46,6 +46,7 @@
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -53,7 +54,6 @@
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
@@ -795,7 +795,7 @@ std::pair<OptionalCollectionUUID, NamespaceString> parseCollModUUIDAndNss(Operat
         return std::pair<OptionalCollectionUUID, NamespaceString>(boost::none, parseNs(ns, cmd));
     }
     CollectionUUID uuid = uassertStatusOK(UUID::parse(ui));
-    auto& catalog = UUIDCatalog::get(opCtx);
+    auto& catalog = CollectionCatalog::get(opCtx);
     const auto nsByUUID = catalog.lookupNSSByUUID(uuid);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to apply operation due to missing collection (" << uuid
@@ -809,7 +809,7 @@ NamespaceString parseUUID(OperationContext* opCtx, const BSONElement& ui) {
     auto statusWithUUID = UUID::parse(ui);
     uassertStatusOK(statusWithUUID);
     auto uuid = statusWithUUID.getValue();
-    auto& catalog = UUIDCatalog::get(opCtx);
+    auto& catalog = CollectionCatalog::get(opCtx);
     auto nss = catalog.lookupNSSByUUID(uuid);
     uassert(ErrorCodes::NamespaceNotFound, "No namespace with UUID " + uuid.toString(), nss);
     return *nss;
@@ -1363,7 +1363,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     NamespaceString requestNss;
     Collection* collection = nullptr;
     if (fieldUI) {
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+        CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
         auto uuid = uassertStatusOK(UUID::parse(fieldUI));
         collection = catalog.lookupCollectionByUUID(uuid);
         uassert(ErrorCodes::NamespaceNotFound,

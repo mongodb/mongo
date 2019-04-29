@@ -268,7 +268,7 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         const std::string& indexName = indexNamespace.second;
 
         CollectionCatalogEntry* cce =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
         invariant(cce,
                   str::stream() << "couldn't get collection catalog entry for collection "
                                 << collNss.toString());
@@ -297,7 +297,7 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         NamespaceString collNss(entry.first);
 
         auto collCatalogEntry =
-            UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
+            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
         for (const auto& indexName : entry.second.first) {
             log() << "Rebuilding index. Collection: " << collNss << " Index: " << indexName;
         }

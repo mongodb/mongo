@@ -34,12 +34,12 @@
 #include "mongo/db/catalog/rename_collection.h"
 
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -48,6 +48,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -66,7 +67,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(writeConfilctInRenameCollCopyToTmp);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
-    return UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    return CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
 }
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
@@ -762,7 +763,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     OptionalCollectionUUID uuidToRename;
     if (!ui.eoo()) {
         uuidToRename = uassertStatusOK(UUID::parse(ui));
-        auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuidToRename.get());
+        auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuidToRename.get());
         if (nss)
             sourceNss = *nss;
     }

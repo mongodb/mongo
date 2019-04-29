@@ -63,8 +63,8 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
 }
 bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, const string& ns) {
     auto nss = NamespaceString(ns);
-    std::vector<NamespaceString> collections =
-        UUIDCatalog::get(getGlobalServiceContext()).getAllCollectionNamesFromDb(opCtx, nss.db());
+    std::vector<NamespaceString> collections = CollectionCatalog::get(getGlobalServiceContext())
+                                                   .getAllCollectionNamesFromDb(opCtx, nss.db());
     return std::count(collections.begin(), collections.end(), nss) > 0;
 }
 

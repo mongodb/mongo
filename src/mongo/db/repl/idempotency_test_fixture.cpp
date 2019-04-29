@@ -36,11 +36,11 @@
 #include <vector>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -541,15 +541,15 @@ std::string IdempotencyTest::computeDataHash(Collection* collection) {
 
 std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
     std::vector<CollectionState> collStates;
-    auto& uuidCatalog = UUIDCatalog::get(_opCtx.get());
-    auto dbs = uuidCatalog.getAllDbNames();
+    auto& catalog = CollectionCatalog::get(_opCtx.get());
+    auto dbs = catalog.getAllDbNames();
     for (auto& db : dbs) {
         // Skip local database.
         if (db != "local") {
             std::vector<NamespaceString> collectionNames;
             {
                 Lock::DBLock lk(_opCtx.get(), db, MODE_S);
-                collectionNames = uuidCatalog.getAllCollectionNamesFromDb(_opCtx.get(), db);
+                collectionNames = catalog.getAllCollectionNamesFromDb(_opCtx.get(), db);
             }
             for (const auto& nss : collectionNames) {
                 collStates.push_back(validate(nss));

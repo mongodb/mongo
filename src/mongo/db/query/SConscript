@@ -209,7 +209,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/repl/read_concern_args",
-        "$BUILD_DIR/mongo/db/catalog/uuid_catalog"
+        "$BUILD_DIR/mongo/db/catalog/collection_catalog"
     ],
 )
 

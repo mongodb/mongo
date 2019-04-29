@@ -36,8 +36,8 @@
 #include <algorithm>
 
 #include "mongo/db/catalog/catalog_control.h"
-#include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/catalog/uuid_catalog_helper.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_clock.h"
@@ -241,7 +241,7 @@ void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
         LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
         _dumpCatalog(opCtx);
     }
-    UUIDCatalog::get(opCtx).deregisterAllCatalogEntriesAndCollectionObjects();
+    CollectionCatalog::get(opCtx).deregisterAllCatalogEntriesAndCollectionObjects();
 
     _catalog.reset();
     _catalogRecordStore.reset();
@@ -485,7 +485,8 @@ void KVStorageEngine::cleanShutdown() {
         _timestampMonitor->removeListener(&_minOfCheckpointAndOldestTimestampListener);
     }
 
-    UUIDCatalog::get(getGlobalServiceContext()).deregisterAllCatalogEntriesAndCollectionObjects();
+    CollectionCatalog::get(getGlobalServiceContext())
+        .deregisterAllCatalogEntriesAndCollectionObjects();
 
     _catalog.reset();
     _catalogRecordStore.reset();
@@ -516,7 +517,7 @@ RecoveryUnit* KVStorageEngine::newRecoveryUnit() {
 }
 
 std::vector<std::string> KVStorageEngine::listDatabases() const {
-    return UUIDCatalog::get(getGlobalServiceContext()).getAllDbNames();
+    return CollectionCatalog::get(getGlobalServiceContext()).getAllDbNames();
 }
 
 Status KVStorageEngine::closeDatabase(OperationContext* opCtx, StringData db) {
@@ -526,14 +527,14 @@ Status KVStorageEngine::closeDatabase(OperationContext* opCtx, StringData db) {
 
 Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
     {
-        auto dbs = UUIDCatalog::get(opCtx).getAllDbNames();
+        auto dbs = CollectionCatalog::get(opCtx).getAllDbNames();
         if (std::count(dbs.begin(), dbs.end(), db.toString()) == 0) {
             return Status(ErrorCodes::NamespaceNotFound, "db not found to drop");
         }
     }
 
     std::vector<NamespaceString> toDrop =
-        UUIDCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, db);
+        CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, db);
 
     // Do not timestamp any of the following writes. This will remove entries from the catalog as
     // well as drop any underlying tables. It's not expected for dropping tables to be reversible

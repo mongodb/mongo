@@ -34,7 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
@@ -117,7 +117,7 @@ QueryRequest::QueryRequest(NamespaceStringOrUUID nssOrUuid)
 
 void QueryRequest::refreshNSS(OperationContext* opCtx) {
     if (_uuid) {
-        const UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+        const CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
         auto foundColl = catalog.lookupCollectionByUUID(_uuid.get());
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "UUID " << _uuid.get() << " specified in query request not found",
