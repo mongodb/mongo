@@ -848,7 +848,8 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
     # Probably need to add RHEL 8 to this when we start building for it
     if distro.name() == "suse" and distro.repo_os_version(build_os) == "15":
         flags.extend([
-            "--buildroot", os.path.join(topdir, "BUILDROOT"),
+            "--buildroot",
+            os.path.join(topdir, "BUILDROOT"),
         ])
 
     sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags +
