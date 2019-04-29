@@ -528,6 +528,9 @@ Status renameBetweenDBs(OperationContext* opCtx,
     }
     const auto& tmpName = tmpNameResult.getValue();
 
+    log() << "Attempting to create temporary collection: " << tmpName
+          << " with the contents of collection: " << source;
+
     // Check if all the source collection's indexes can be recreated in the temporary collection.
     status = checkAllIndexesCanBeRecreatedInNewNS(opCtx, sourceColl, tmpName);
     if (!status.isOK())
