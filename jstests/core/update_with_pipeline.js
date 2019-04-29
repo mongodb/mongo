@@ -132,12 +132,6 @@
         coll.update({_id: 1}, [{$addFields: {x: 1}}], {arrayFilters: [{x: {$eq: 1}}]}),
         ErrorCodes.FailedToParse);
 
-    // The 'collation' option is not yet supported for pipeline updates.
-    // TODO SERVER-40398: Remove once collation is supported and tested.
-    assert.commandFailedWithCode(
-        coll.update({_id: 1}, [{$addFields: {x: 1}}], {collation: {locale: "fr", strength: 1}}),
-        ErrorCodes.NotImplemented);
-
     // The 'bypassDocumentValidation' option is not yet supported for pipeline updates.
     // TODO SERVER-40400: Remove once bypassDocumentValidation is supported and tested.
     assert.commandFailedWithCode(db.runCommand({
