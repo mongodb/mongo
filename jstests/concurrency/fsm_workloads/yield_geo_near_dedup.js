@@ -56,17 +56,22 @@ var $config = extendWorkload($config, function($config, $super) {
         // aggregation may fail if we don't have exactly one 2d index to use.
         assertWhenOwnColl(function verifyResults() {
             const seenObjs = [];
+            const seenObjsOriginals = [];
             while (cursor.hasNext()) {
                 const doc = cursor.next();
 
                 // The pair (_id, timesInserted) is the smallest set of attributes that uniquely
                 // identifies a document.
                 const objToSearch = {_id: doc._id, timesInserted: doc.timesInserted};
-                const found = seenObjs.some(obj => bsonWoCompare(obj, objToSearch) === 0);
-                assertWhenOwnColl(!found,
-                                  `$geoNear returned document ${tojson(doc)} multiple ` +
-                                      `times: ${tojson(seenObjs)}`);
+                for (let i = 0; i < seenObjs.length; ++i) {
+                    assertWhenOwnColl.neq(
+                        bsonWoCompare(seenObjs[i], objToSearch),
+                        0,
+                        () => `$geoNear returned document ${tojson(doc)} multiple ` +
+                            `times: first occurence was ${tojson(seenObjsOriginals[i])}`);
+                }
                 seenObjs.push(objToSearch);
+                seenObjsOriginals.push(doc);
             }
         });
     };
