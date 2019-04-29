@@ -309,8 +309,6 @@ env.CppUnitTest(
 env.Library(
     target='uuid_catalog',
     source=[
-        'namespace_uuid_cache.cpp',
-        env.Idlc('namespace_uuid_cache.idl')[0],
         'uuid_catalog.cpp',
     ],
     LIBDEPS=[
@@ -334,16 +332,6 @@ env.Library(
         'uuid_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
     ]
-)
-
-env.CppUnitTest(
-    target='namespace_uuid_cache_test',
-    source=[
-        'namespace_uuid_cache_test.cpp'
-    ],
-    LIBDEPS=[
-        'uuid_catalog',
-    ],
 )
 
 env.CppUnitTest(

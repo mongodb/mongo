@@ -48,7 +48,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/catalog/uuid_catalog_helper.h"
 #include "mongo/db/clientcursor.h"
@@ -504,18 +503,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
 }
 
 Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const NamespaceString& nss) const {
-    dassert(!cc().getOperationContext() || opCtx == cc().getOperationContext());
-    auto coll = UUIDCatalog::get(opCtx).lookupCollectionByNamespace(nss);
-    if (!coll) {
-        return nullptr;
-    }
-
-    NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
-    auto uuid = UUIDCatalog::get(opCtx).lookupUUIDByNSS(nss);
-    if (uuid) {
-        cache.ensureNamespaceInCache(nss, uuid.get());
-    }
-    return coll;
+    return UUIDCatalog::get(opCtx).lookupCollectionByNamespace(nss);
 }
 
 Status DatabaseImpl::renameCollection(OperationContext* opCtx,

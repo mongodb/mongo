@@ -37,7 +37,6 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_impl.h"
-#include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
@@ -200,21 +199,6 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     });
 }
 
-namespace {
-void evictDatabaseFromUUIDCatalog(OperationContext* opCtx, Database* db) {
-    invariant(opCtx->lockState()->isW());
-    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
-        auto coll = *collIt;
-        if (!coll) {
-            break;
-        }
-
-        NamespaceUUIDCache::get(opCtx).evictNamespace(coll->ns());
-    }
-    UUIDCatalog::get(opCtx).onCloseDatabase(opCtx, db);
-}
-}  // namespace
-
 void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
     invariant(opCtx->lockState()->isW());
 
@@ -229,7 +213,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
 
     auto db = it->second;
     repl::oplogCheckCloseDatabase(opCtx, db);
-    evictDatabaseFromUUIDCatalog(opCtx, db);
+    UUIDCatalog::get(opCtx).onCloseDatabase(opCtx, db);
 
     db->close(opCtx);
     delete db;
@@ -270,7 +254,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
 
         Database* db = _dbs[name];
         repl::oplogCheckCloseDatabase(opCtx, db);
-        evictDatabaseFromUUIDCatalog(opCtx, db);
+        UUIDCatalog::get(opCtx).onCloseDatabase(opCtx, db);
         db->close(opCtx);
         delete db;
 

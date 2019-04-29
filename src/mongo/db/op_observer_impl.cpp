@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -739,12 +738,6 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                      false /* inTxn */,
                      createOpTime);
     }
-
-    if (options.uuid) {
-        opCtx->recoveryUnit()->onRollback([opCtx, collectionName]() {
-            NamespaceUUIDCache::get(opCtx).evictNamespace(collectionName);
-        });
-    }
 }
 
 void OpObserverImpl::onCollMod(OperationContext* opCtx,
@@ -828,8 +821,6 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
     if (dbName == NamespaceString::kSessionTransactionsTableNamespace.db()) {
         MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
     }
-
-    NamespaceUUIDCache::get(opCtx).evictNamespacesInDatabase(dbName);
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
@@ -868,9 +859,6 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
         MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
     }
-
-    // Evict namespace entry from the namespace/uuid cache if it exists.
-    NamespaceUUIDCache::get(opCtx).evictNamespace(collectionName);
 
     return {};
 }
@@ -953,13 +941,6 @@ void OpObserverImpl::postRenameCollection(OperationContext* const opCtx,
         DurableViewCatalog::onExternalChange(opCtx, fromCollection);
     if (toCollection.isSystemDotViews())
         DurableViewCatalog::onExternalChange(opCtx, toCollection);
-
-    // Evict namespace entry from the namespace/uuid cache if it exists.
-    NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
-    cache.evictNamespace(fromCollection);
-    cache.evictNamespace(toCollection);
-    opCtx->recoveryUnit()->onRollback(
-        [&cache, toCollection]() { cache.evictNamespace(toCollection); });
 }
 
 void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
