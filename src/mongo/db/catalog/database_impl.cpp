@@ -675,7 +675,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     audit::logCreateCollection(&cc(), nss.ns());
 
     log() << "createCollection: " << nss << " with " << (generatedUUID ? "generated" : "provided")
-          << " UUID: " << optionsWithUUID.uuid.get();
+          << " UUID: " << optionsWithUUID.uuid.get() << " and options: " << options.toBSON();
 
     // Create CollectionCatalogEntry
     auto storageEngine =
