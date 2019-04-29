@@ -291,8 +291,10 @@ private:
                         documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(
                             opCtx, txnRouterForShardKeyChange);
 
-                    // TODO SERVER-40784: Handle a writeConcern error.
                     uassertStatusOK(getStatusFromCommandResult(commitResponse));
+                    if (auto wcErrorElem = commitResponse["writeConcernError"]) {
+                        appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
+                    }
                 } catch (DBException& e) {
                     e.addContext(
                         "Update operation was converted into a distributed transaction because the "

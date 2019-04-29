@@ -35,6 +35,7 @@
 
 #include "mongo/s/cluster_commands_helpers.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/logical_clock.h"
@@ -58,9 +59,7 @@
 
 namespace mongo {
 
-void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
-                                          const BSONElement& wcErrorElem,
-                                          BSONObjBuilder& responseBuilder) {
+WriteConcernErrorDetail getWriteConcernErrorDetail(const BSONElement& wcErrorElem) {
     WriteConcernErrorDetail wcError;
     std::string errMsg;
     auto wcErrorObj = wcErrorElem.Obj();
@@ -70,10 +69,34 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
                            "Failed to parse writeConcernError: " + wcErrorObj.toString() +
                                ", Received error: " + errMsg});
     }
+
+    return wcError;
+}
+
+void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
+                                          const BSONElement& wcErrorElem,
+                                          BSONObjBuilder& responseBuilder) {
+    WriteConcernErrorDetail wcError = getWriteConcernErrorDetail(wcErrorElem);
+
     auto status = wcError.toStatus();
     wcError.setStatus(
         status.withReason(str::stream() << status.reason() << " at " << shardId.toString()));
+
     responseBuilder.append("writeConcernError", wcError.toBSON());
+}
+
+std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(const BSONObj& obj) {
+    BSONElement wcErrorElem;
+    Status status = bsonExtractTypedField(obj, "writeConcernError", Object, &wcErrorElem);
+    if (!status.isOK()) {
+        if (status == ErrorCodes::NoSuchKey) {
+            return nullptr;
+        } else {
+            uassertStatusOK(status);
+        }
+    }
+
+    return stdx::make_unique<WriteConcernErrorDetail>(getWriteConcernErrorDetail(wcErrorElem));
 }
 
 namespace {

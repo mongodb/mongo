@@ -44,6 +44,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
@@ -253,8 +254,11 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             auto commitResponse = documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(
                 opCtx, txnRouterForShardKeyChange);
 
-            // TODO SERVER-40784: Handle a writeConcern error.
             uassertStatusOK(getStatusFromCommandResult(commitResponse));
+
+            auto writeConcernDetail = getWriteConcernErrorDetailFromBSONObj(commitResponse);
+            if (writeConcernDetail && !writeConcernDetail->toStatus().isOK())
+                response->setWriteConcernError(writeConcernDetail.release());
         } catch (const DBException& e) {
             // Set the error status to the status of the failed command and abort the transaction.
             auto status = e.toStatus();

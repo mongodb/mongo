@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/strategy.h"
@@ -49,6 +50,11 @@ namespace mongo {
 void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
                                           const BSONElement& wcErrorElem,
                                           BSONObjBuilder& responseBuilder);
+
+/**
+ * Creates and returns a WriteConcernErrorDetail object from a BSONObj.
+ */
+std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(const BSONObj& obj);
 
 /**
  * Dispatches all the specified requests in parallel and waits until all complete, returning a

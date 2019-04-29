@@ -687,29 +687,30 @@ BSONObj TransactionRouter::_handOffCommitToCoordinator(OperationContext* opCtx) 
         participantList.push_back(std::move(commitParticipant));
     }
 
-    auto coordinatorShard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, *_coordinatorId));
-
     CoordinateCommitTransaction coordinateCommitCmd;
     coordinateCommitCmd.setDbName("admin");
     coordinateCommitCmd.setParticipants(participantList);
+    const auto coordinateCommitCmdObj = coordinateCommitCmd.toBSON(
+        BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
 
     _commitType = CommitType::kTwoPhaseCommit;
 
     LOG(3) << txnIdToString()
            << " Committing using two-phase commit, coordinator: " << *_coordinatorId;
 
-    return uassertStatusOK(
-               coordinatorShard->runCommandWithFixedRetryAttempts(
-                   opCtx,
-                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                   "admin",
-                   coordinatorIter->second.attachTxnFieldsIfNeeded(
-                       coordinateCommitCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                                       << opCtx->getWriteConcern().toBSON())),
-                       false),
-                   Shard::RetryPolicy::kIdempotent))
-        .response;
+    MultiStatementTransactionRequestsSender ars(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        NamespaceString::kAdminDb,
+        {{*_coordinatorId, coordinateCommitCmdObj}},
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kIdempotent);
+
+    auto response = ars.next();
+    invariant(ars.done());
+    uassertStatusOK(response.swResponse);
+
+    return response.swResponse.getValue().data;
 }
 
 BSONObj TransactionRouter::commitTransaction(
