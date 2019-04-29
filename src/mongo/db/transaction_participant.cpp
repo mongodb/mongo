@@ -488,6 +488,15 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
         uassert(ErrorCodes::NotMaster,
                 "Not primary so we cannot begin or continue a transaction",
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+        // Disallow multi-statement transactions on shard servers that have
+        // writeConcernMajorityJournalDefault=false unless enableTestCommands=true. But allow
+        // retryable writes (autocommit == boost::none).
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                "Transactions are not allowed on shard servers when "
+                "writeConcernMajorityJournalDefault=false",
+                replCoord->getWriteConcernMajorityShouldJournal() ||
+                    serverGlobalParams.clusterRole != ClusterRole::ShardServer || !autocommit ||
+                    getTestCommandsEnabled());
     }
 
     uassert(ErrorCodes::TransactionTooOld,
