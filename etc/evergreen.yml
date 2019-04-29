@@ -757,50 +757,53 @@ functions:
         # If the android toolchain has not been setup the android sdk will not
         # be available and we should not build the android version of mongodb
         # embedded.
-        if [ "${setup_android_toolchain|}" = "true" ]; then
-            export ANDROID_HOME=$(pwd)/android_sdk
+        if [ "${setup_android_toolchain|}" != "true" ]; then
+            echo "Android toolchain has not been setup, skipping \"build java embedded sdk\""
+            exit 0
+        fi
 
-            cd src/src/mongo/embedded/mongo_embedded/java
+        export ANDROID_HOME=$(pwd)/android_sdk
+        MINOR_VER=$(echo "${version}" | awk -F. '{print $(NF-1)}')
+        if [ $(($MINOR_VER % 2)) != 0 ]; then
+            EMBEDDED_RELEASE_VERSION="${version}-SNAPSHOT"
+        else
+            EMBEDDED_RELEASE_VERSION="${version}"
+        fi
 
-            # TODO: Clean this up later where we can remove duplication
-            if [ ${package_type|embedded-android} = "embedded-jar" ]; then
-                tar zxvf ../../../../../../embedded-sdk-java-linux-x86-64.tgz
-                mkdir -p jniLibs/linux-x86-64
-                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/linux-x86-64
+        cd src/src/mongo/embedded/mongo_embedded/java
+
+        # TODO: Clean this up later where we can remove duplication
+        if [ "${package_type|embedded-android}" = "embedded-jar" ]; then
+            tar zxvf ../../../../../../embedded-sdk-java-linux-x86-64.tgz
+            mkdir -p jniLibs/linux-x86-64
+            cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/linux-x86-64
+            rm -rf ./mongo-embedded-sdk-${version}
+
+            tar zxvf ../../../../../../embedded-sdk-java-darwin.tgz
+            mkdir -p jniLibs/darwin
+            cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.dylib jniLibs/darwin
+            rm -rf ./mongo-embedded-sdk-${version}
+
+            ./gradlew clean :embedded-jar:build :embedded-jar:publishMavenPublicationToLocalRepository
+
+            mkdir -p ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/java
+            cp -r embedded-jar/build/repo/* ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/java
+        else
+            for arch in arm64-v8a armeabi-v7a x86_64 ; do
+                tar zxvf ../../../../../../embedded-sdk-android-$arch.tgz
+                mkdir -p jniLibs/$arch
+                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/$arch
                 rm -rf ./mongo-embedded-sdk-${version}
+            done
 
-                tar zxvf ../../../../../../embedded-sdk-java-darwin.tgz
-                mkdir -p jniLibs/darwin
-                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.dylib jniLibs/darwin
-                rm -rf ./mongo-embedded-sdk-${version}
-
-                ./gradlew clean :embedded-jar:build :embedded-jar:publishMavenPublicationToLocalRepository
-
-                # Is this a release?
-                if [ "${is_release|false}" = "true" ]; then
-                    source ./artifactory_mobile_creds.sh
-                    ./gradlew --info :embedded-jar:artifactoryPublish
-                fi
-
-                mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/java
-                cp -r embedded-jar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/java
-            else
-                for arch in arm64-v8a armeabi-v7a x86_64 ; do
-                    tar zxvf ../../../../../../embedded-sdk-android-$arch.tgz
-                    mkdir -p jniLibs/$arch
-                    cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/$arch
-                    rm -rf ./mongo-embedded-sdk-${version}
-                done
-
-                ./gradlew clean :embedded-android:build
-                # Is this a release?
-                if [ "${is_release|false}" = "true" ]; then
-                    ./gradlew :embedded-android:uploadArchives closeAndReleaseRepository
-                fi
-
-                mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/android
-                cp -r embedded-android/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/android
+            ./gradlew clean :embedded-android:build
+            # Is this a release?
+            if [ "${is_release|false}" = "true" ]; then
+                ./gradlew :embedded-android:uploadArchives closeAndReleaseRepository
             fi
+
+            mkdir -p ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/android
+            cp -r embedded-android/build/outputs/aar/* ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/android
         fi
 
   "scons cache pruning" :
@@ -3751,6 +3754,8 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
     - command: s3.get
@@ -3782,9 +3787,16 @@ tasks:
           set -o errexit
           set -o verbose
 
+          MINOR_VER=$(echo "${version}" | awk -F. '{print $(NF-1)}')
+          if [ $(($MINOR_VER % 2)) != 0 ]; then
+            EMBEDDED_RELEASE_VERSION="${version}-SNAPSHOT"
+          else
+            EMBEDDED_RELEASE_VERSION="${version}"
+          fi
+
           if [ "${setup_android_toolchain|}" = "true" ]; then
             cd src/build
-            tar zcvf mongo-embedded-sdk-${version}.tgz mongo-embedded-sdk-${version}
+            tar zcvf mongo-embedded-sdk-${version}.tgz mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION
           fi
     - command: s3.put
       params:
@@ -3860,9 +3872,16 @@ tasks:
           set -o errexit
           set -o verbose
 
+          MINOR_VER=$(echo "${version}" | awk -F. '{print $(NF-1)}')
+          if [ $(($MINOR_VER % 2)) != 0 ]; then
+            EMBEDDED_RELEASE_VERSION="${version}-SNAPSHOT"
+          else
+            EMBEDDED_RELEASE_VERSION="${version}"
+          fi
+
           if [ "${setup_android_toolchain|}" = "true" ]; then
             cd src/build
-            tar zcvf mongo-embedded-sdk-${version}.tgz mongo-embedded-sdk-${version}
+            tar zcvf mongo-embedded-sdk-${version}.tgz mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION
           fi
     - command: s3.put
       params:
