@@ -187,6 +187,11 @@ public:
         virtual void onCommonPointFound(Timestamp commonPoint) noexcept {}
 
         /**
+         * Function called after we have incremented the rollback ID.
+         */
+        virtual void onRollbackIDIncremented() noexcept {}
+
+        /**
          * Function called after a rollback file has been written for each namespace with inserts or
          * updates that are being rolled back.
          */
@@ -194,8 +199,9 @@ public:
 
         /**
          * Function called after we recover to the stable timestamp.
+         * NOTE: This may throw, for testing purposes.
          */
-        virtual void onRecoverToStableTimestamp(Timestamp stableTimestamp) noexcept {}
+        virtual void onRecoverToStableTimestamp(Timestamp stableTimestamp) {}
 
         /**
          * Function called after we set the oplog truncate after point.
@@ -206,6 +212,11 @@ public:
          * Function called after we recover from the oplog.
          */
         virtual void onRecoverFromOplog() noexcept {}
+
+        /**
+         * Function called after we reconstruct prepared transactions.
+         */
+        virtual void onPreparedTransactionsReconstructed() noexcept {}
 
         /**
          * Function called after we have triggered the 'onRollback' OpObserver method.
@@ -373,6 +384,13 @@ private:
      * by each UUID. It then saves the post-rollback counts to the _newCounts map.
      */
     Status _findRecordStoreCounts(OperationContext* opCtx);
+
+    /**
+     * Executes the critical section in rollback, defined as the window between aborting and
+     * reconstructing prepared transactions.
+     */
+    Status _runRollbackCriticalSection(
+        OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) noexcept;
 
     /**
      * Sets the record store counts to be the values stored in _newCounts.

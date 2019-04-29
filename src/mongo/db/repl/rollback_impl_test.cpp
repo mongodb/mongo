@@ -258,6 +258,14 @@ protected:
     bool _recoveredFromOplog = false;
     stdx::function<void()> _onRecoverFromOplogFn = [this]() { _recoveredFromOplog = true; };
 
+    bool _incrementedRollbackID = false;
+    stdx::function<void()> _onRollbackIDIncrementedFn = [this]() { _incrementedRollbackID = true; };
+
+    bool _reconstructedPreparedTransactions = false;
+    stdx::function<void()> _onPreparedTransactionsReconstructedFn = [this]() {
+        _reconstructedPreparedTransactions = true;
+    };
+
     Timestamp _commonPointFound;
     stdx::function<void(Timestamp commonPoint)> _onCommonPointFoundFn =
         [this](Timestamp commonPoint) { _commonPointFound = commonPoint; };
@@ -318,11 +326,15 @@ public:
         _test->_onCommonPointFoundFn(commonPoint);
     }
 
+    void onRollbackIDIncremented() noexcept override {
+        _test->_onRollbackIDIncrementedFn();
+    }
+
     void onRollbackFileWrittenForNamespace(UUID uuid, NamespaceString nss) noexcept final {
         _test->_onRollbackFileWrittenForNamespaceFn(std::move(uuid), std::move(nss));
     }
 
-    void onRecoverToStableTimestamp(Timestamp stableTimestamp) noexcept override {
+    void onRecoverToStableTimestamp(Timestamp stableTimestamp) override {
         _test->_onRecoverToStableTimestampFn(stableTimestamp);
     }
 
@@ -332,6 +344,10 @@ public:
 
     void onRecoverFromOplog() noexcept override {
         _test->_onRecoverFromOplogFn();
+    }
+
+    void onPreparedTransactionsReconstructed() noexcept override {
+        _test->_onPreparedTransactionsReconstructedFn();
     }
 
     void onRollbackOpObserver(const OpObserver::RollbackObserverInfo& rbInfo) noexcept override {
@@ -584,7 +600,9 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
     ASSERT_EQUALS(stableTimestamp, _stableTimestamp);
 }
 
-TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails) {
+DEATH_TEST_F(RollbackImplTest,
+             RollbackFassertsIfRecoverToStableTimestampFails,
+             "Fatal assertion 31049") {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
@@ -609,24 +627,8 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
     ASSERT_EQUALS(currTimestamp, _storageInterface->getCurrentTimestamp());
     ASSERT_EQUALS(Timestamp(), _stableTimestamp);
 
-    // Run rollback.
-    auto rollbackStatus = _rollback->runRollback(_opCtx.get());
-
-    // Make sure rollback failed with an UnrecoverableRollbackError, and didn't execute the
-    // recover to timestamp logic.
-    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, rollbackStatus.code());
-    ASSERT_EQUALS(currTimestamp, _storageInterface->getCurrentTimestamp());
-    ASSERT_EQUALS(Timestamp(), _stableTimestamp);
-
-    // Make sure we transitioned back to SECONDARY state.
-    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
-
-    // Don't set the truncate after point if we fail early.
-    _assertDocsInOplog(_opCtx.get(), {1, 2});
-    truncateAfterPoint =
-        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
-    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
-    ASSERT_EQUALS(_truncatePoint, Timestamp());
+    // Run rollback. It should fassert.
+    _rollback->runRollback(_opCtx.get()).ignore();
 }
 
 TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
@@ -676,41 +678,61 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
     ASSERT(_recoveredFromOplog);
 }
 
-TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownDuringRTT) {
+TEST_F(RollbackImplTest,
+       RollbackCannotBeShutDownBetweenAbortingAndReconstructingPreparedTransactions) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
 
     _assertDocsInOplog(_opCtx.get(), {1, 2});
-    auto truncateAfterPoint =
-        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
-    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
 
-    _onRecoverToStableTimestampFn = [this](Timestamp stableTimestamp) {
-        _recoveredToStableTimestamp = true;
-        _stableTimestamp = stableTimestamp;
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    // Called before aborting prepared transactions. We request the shutdown here.
+    _onRollbackIDIncrementedFn = [this]() {
+        _incrementedRollbackID = true;
         _rollback->shutdown();
     };
 
-    // Run rollback.
-    auto status = _rollback->runRollback(_opCtx.get());
+    // Called after reconstructing prepared transactions.
+    _onPreparedTransactionsReconstructedFn = [this]() {
+        ASSERT(_incrementedRollbackID);
+        _reconstructedPreparedTransactions = true;
+    };
 
-    // Make sure shutdown occurred before oplog recovery.
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
-    ASSERT(_recoveredToStableTimestamp);
-    ASSERT_FALSE(_recoveredFromOplog);
-    ASSERT_FALSE(_coordinator->lastOpTimesWereReset());
+    // Shutting down is still allowed but it must occur after that window.
+    ASSERT_EQ(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
+    ASSERT(_incrementedRollbackID);
+    ASSERT(_reconstructedPreparedTransactions);
+}
 
-    // Make sure we transitioned back to SECONDARY state.
-    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
-    ASSERT(_stableTimestamp.isNull());
+DEATH_TEST_F(RollbackImplTest,
+             RollbackUassertsAreFatalBetweenAbortingAndReconstructingPreparedTransactions,
+             "Caught exception during critical section in rollback") {
+    auto op = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({op});
+    ASSERT_OK(_insertOplogEntry(op.first));
+    ASSERT_OK(_insertOplogEntry(makeOp(2)));
 
     _assertDocsInOplog(_opCtx.get(), {1, 2});
-    truncateAfterPoint =
-        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
-    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
-    ASSERT_EQUALS(_truncatePoint, Timestamp());
+
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    // Called before aborting prepared transactions.
+    _onRollbackIDIncrementedFn = [this]() { _incrementedRollbackID = true; };
+
+    // Called during the critical section.
+    _onRecoverToStableTimestampFn = [this](Timestamp stableTimestamp) {
+        _recoveredToStableTimestamp = true;
+        uasserted(ErrorCodes::UnknownError, "error for test");
+    };
+
+    // Called after reconstructing prepared transactions. We should not be getting here.
+    _onPreparedTransactionsReconstructedFn = [this]() { ASSERT(false); };
+
+    // We expect to crash when we hit the exception.
+    _rollback->runRollback(_opCtx.get()).ignore();
 }
 
 TEST_F(RollbackImplTest,
@@ -1139,43 +1161,6 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCreateCollAndInsertsAreRo
                                objs.begin(),
                                objs.end(),
                                SimpleBSONObjComparator::kInstance.makeEqualTo()));
-}
-
-TEST_F(RollbackImplTest, RollbackStopsWritingRollbackFilesWhenShutdownIsInProgress) {
-    const auto commonOp = makeOpAndRecordId(1);
-    _remoteOplog->setOperations({commonOp});
-    ASSERT_OK(_insertOplogEntry(commonOp.first));
-    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
-
-    const auto nss1 = NamespaceString("db.people");
-    const auto uuid1 = UUID::gen();
-    const auto coll1 = _initializeCollection(_opCtx.get(), uuid1, nss1);
-    const auto obj1 = BSON("_id" << 0 << "name"
-                                 << "kyle");
-    _insertDocAndGenerateOplogEntry(obj1, uuid1, nss1);
-
-    const auto nss2 = NamespaceString("db.persons");
-    const auto uuid2 = UUID::gen();
-    const auto coll2 = _initializeCollection(_opCtx.get(), uuid2, nss2);
-    const auto obj2 = BSON("_id" << 0 << "name"
-                                 << "jungsoo");
-    _insertDocAndGenerateOplogEntry(obj2, uuid2, nss2);
-
-    // Register a listener that sends rollback into shutdown.
-    std::vector<UUID> collsWithSuccessfullyWrittenDataFiles;
-    _onRollbackFileWrittenForNamespaceFn =
-        [this, &collsWithSuccessfullyWrittenDataFiles](UUID uuid, NamespaceString nss) {
-            collsWithSuccessfullyWrittenDataFiles.emplace_back(std::move(uuid));
-            _rollback->shutdown();
-        };
-
-    ASSERT_EQ(_rollback->runRollback(_opCtx.get()), ErrorCodes::ShutdownInProgress);
-
-    ASSERT_EQ(collsWithSuccessfullyWrittenDataFiles.size(), 1UL);
-    const auto& uuid = collsWithSuccessfullyWrittenDataFiles.front();
-    ASSERT(uuid == uuid1 || uuid == uuid2) << "wrote out a data file for unknown uuid " << uuid
-                                           << "; expected it to be either " << uuid1 << " or "
-                                           << uuid2;
 }
 
 DEATH_TEST_F(RollbackImplTest,
