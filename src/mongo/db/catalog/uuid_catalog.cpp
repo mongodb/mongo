@@ -396,50 +396,6 @@ std::vector<std::string> UUIDCatalog::getAllDbNames() const {
     return ret;
 }
 
-boost::optional<CollectionUUID> UUIDCatalog::prev(StringData db, CollectionUUID uuid) {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-    auto dbIdPair = std::make_pair(db.toString(), uuid);
-    auto entry = _orderedCollections.find(dbIdPair);
-
-    // If the element does not appear or is the first element.
-    if (entry == _orderedCollections.end() || entry == _orderedCollections.begin()) {
-        return boost::none;
-    }
-
-    auto prevEntry = std::prev(entry, 1);
-    while (prevEntry->first.first == db && prevEntry->second->collectionPtr == nullptr) {
-        prevEntry = std::prev(prevEntry, 1);
-    }
-
-    // If the entry is from a different database, there is no previous entry.
-    if (prevEntry->first.first != db) {
-        return boost::none;
-    }
-    return prevEntry->first.second;
-}
-
-boost::optional<CollectionUUID> UUIDCatalog::next(StringData db, CollectionUUID uuid) {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-    auto dbIdPair = std::make_pair(db.toString(), uuid);
-    auto entry = _orderedCollections.find(dbIdPair);
-
-    // If the element does not appear.
-    if (entry == _orderedCollections.end()) {
-        return boost::none;
-    }
-
-    auto nextEntry = std::next(entry, 1);
-    while (nextEntry != _orderedCollections.end() && nextEntry->first.first == db &&
-           nextEntry->second->collectionPtr == nullptr) {
-        nextEntry = std::next(nextEntry, 1);
-    }
-    // If the element was the last entry or is from a different database.
-    if (nextEntry == _orderedCollections.end() || nextEntry->first.first != db) {
-        return boost::none;
-    }
-    return nextEntry->first.second;
-}
-
 void UUIDCatalog::registerCatalogEntry(
     CollectionUUID uuid, std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);

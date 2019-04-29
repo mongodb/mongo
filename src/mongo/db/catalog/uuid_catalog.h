@@ -261,20 +261,6 @@ public:
      */
     void onOpenCatalog(OperationContext* opCtx);
 
-    /**
-     * Return the UUID lexicographically preceding `uuid` in the database named by `db`.
-     *
-     * Return `boost::none` if `uuid` is not found, or is the first UUID in that database.
-     */
-    boost::optional<CollectionUUID> prev(StringData db, CollectionUUID uuid);
-
-    /**
-     * Return the UUID lexicographically following `uuid` in the database named by `db`.
-     *
-     * Return `boost::none` if `uuid` is not found, or is the last UUID in that database.
-     */
-    boost::optional<CollectionUUID> next(StringData db, CollectionUUID uuid);
-
     iterator begin(StringData db) const;
     iterator end() const;
 
