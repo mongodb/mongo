@@ -368,6 +368,11 @@ selector:
   - operations_longer_than_stepdown_interval_in_txns
 
 executor:
+  archive:
+    hooks:
+      - CheckReplOplogs
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       eval: >-

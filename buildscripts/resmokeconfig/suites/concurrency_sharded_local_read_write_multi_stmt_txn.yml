@@ -166,6 +166,7 @@ selector:
 executor:
   archive:
     hooks:
+      - CheckReplDBHashInBackground
       - CheckReplDBHash
       - ValidateCollections
     tests: true
@@ -190,6 +191,7 @@ executor:
           traceExceptions: false
           usingReplicaSetShards: true
   hooks:
+  - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanupConcurrencyWorkloads

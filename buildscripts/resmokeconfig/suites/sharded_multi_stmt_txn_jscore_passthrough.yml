@@ -320,6 +320,11 @@ selector:
   - requires_capped
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       eval: >-
@@ -337,6 +342,7 @@ executor:
             causalConsistency: false
       readMode: commands
   hooks:
+  - class: CheckReplDBHashInBackground
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.

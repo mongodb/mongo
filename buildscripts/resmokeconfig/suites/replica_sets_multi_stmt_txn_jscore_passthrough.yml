@@ -278,6 +278,11 @@ selector:
   - assumes_write_concern_unchanged
 
 executor:
+  archive:
+    hooks:
+      - CheckReplOplogs
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       eval: >-

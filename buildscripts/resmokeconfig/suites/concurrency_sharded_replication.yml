@@ -118,6 +118,7 @@ selector:
 executor:
   archive:
     hooks:
+      - CheckReplDBHashInBackground
       - CheckReplDBHash
       - ValidateCollections
     tests: true
@@ -130,6 +131,7 @@ executor:
           runningWithAutoSplit: false
           runningWithBalancer: false
   hooks:
+  - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanupConcurrencyWorkloads

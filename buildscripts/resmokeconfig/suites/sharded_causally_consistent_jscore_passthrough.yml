@@ -155,6 +155,7 @@ selector:
 executor:
   archive:
     hooks:
+      - CheckReplDBHashInBackground
       - CheckReplDBHash
       - ValidateCollections
   config:
@@ -164,6 +165,7 @@ executor:
          load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
       readMode: commands
   hooks:
+  - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN

@@ -207,6 +207,7 @@ executor:
     use_stepping_down_file: true
     wait_for_mongos_retarget: true
   - class: CheckReplDBHash
+  - class: ValidateCollections
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture

@@ -404,6 +404,10 @@ selector:
   - requires_fastcount
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       eval: >-

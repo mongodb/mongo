@@ -28,12 +28,16 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
     def before_suite(self, test_report):
         """Start the background thread."""
         client = self.fixture.mongo_client()
-        server_status = client.admin.command("serverStatus")
-        if not server_status["storageEngine"].get("supportsSnapshotReadConcern", False):
-            self.logger.info(
-                "Not enabling the background thread because '%s' storage engine"
-                " doesn't support snapshot reads.", server_status["storageEngine"]["name"])
-            return
+        # mongos does not provide storageEngine information. And the hook
+        # run_check_repl_dbhash_background.js will check whether the storage engine of the CSRS and
+        # replica set shards supports snapshot reads.
+        if not client.is_mongos:
+            server_status = client.admin.command("serverStatus")
+            if not server_status["storageEngine"].get("supportsSnapshotReadConcern", False):
+                self.logger.info(
+                    "Not enabling the background thread because '%s' storage engine"
+                    " doesn't support snapshot reads.", server_status["storageEngine"]["name"])
+                return
 
         self._background_job = _BackgroundJob()
         self.logger.info("Starting the background thread.")
