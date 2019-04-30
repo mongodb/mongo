@@ -76,6 +76,7 @@ scratch
 /loadgen
 /mongo
 /mongobridge
+/mongocryptd
 /mongod
 /mongoed
 /mongogrid
