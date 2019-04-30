@@ -17,8 +17,7 @@
         assert.eq(res.valid, valid, tojson(res));
         // Verify that the top level response object is consistent with the index-specific one.
         if (full) {
-            assert.eq(
-                res.valid, res.indexDetails[coll.getFullName() + '.$_id_'].valid, tojson(res));
+            assert.eq(res.valid, res.indexDetails['_id_'].valid, tojson(res));
         }
     }
 
