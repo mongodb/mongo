@@ -239,6 +239,8 @@ public:
         result.appendBool("valid", results.valid);
         result.append("warnings", results.warnings);
         result.append("errors", results.errors);
+        result.append("extraIndexEntries", results.extraIndexEntries);
+        result.append("missingIndexEntries", results.missingIndexEntries);
 
         if (!results.valid) {
             result.append("advice",

@@ -69,8 +69,8 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
 
     while (i.more()) {
         const IndexDescriptor* descriptor = i.next();
-        const std::string indexNs = descriptor->indexNamespace();
-        int indexNumber = _indexConsistency->getIndexNumber(indexNs);
+        const std::string indexName = descriptor->indexName();
+        int indexNumber = _indexConsistency->getIndexNumber(indexName);
         ValidateResults curRecordResults;
 
         const IndexAccessMethod* iam = _indexCatalog->getIndex(descriptor);
@@ -78,7 +78,7 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         if (descriptor->isPartial()) {
             const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
             if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
-                (*_indexNsResultsMap)[indexNs] = curRecordResults;
+                (*_indexNsResultsMap)[indexName] = curRecordResults;
                 continue;
             }
         }
@@ -112,9 +112,9 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
 
             // We want to use the latest version of KeyString here.
             KeyString ks(KeyString::kLatestVersion, key, ord, recordId);
-            _indexConsistency->addDocKey(ks, indexNumber);
+            _indexConsistency->addDocKey(ks, indexNumber, recordId, key);
         }
-        (*_indexNsResultsMap)[indexNs] = curRecordResults;
+        (*_indexNsResultsMap)[indexName] = curRecordResults;
     }
     return status;
 }
@@ -123,8 +123,8 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
                                                const IndexDescriptor* descriptor,
                                                ValidateResults* results,
                                                int64_t* numTraversedKeys) {
-    auto indexNs = descriptor->indexNamespace();
-    int indexNumber = _indexConsistency->getIndexNumber(indexNs);
+    auto indexName = descriptor->indexName();
+    int indexNumber = _indexConsistency->getIndexNumber(indexName);
     int64_t numKeys = 0;
 
     const auto& key = descriptor->keyPattern();
@@ -142,22 +142,28 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
             stdx::make_unique<KeyString>(version, indexEntry->key, ord, indexEntry->loc);
         // Ensure that the index entries are in increasing or decreasing order.
         if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
-            if (results->valid) {
+            if (results && results->valid) {
                 results->errors.push_back(
                     "one or more indexes are not in strictly ascending or descending "
                     "order");
             }
-            results->valid = false;
+
+            if (results) {
+                results->valid = false;
+            }
         }
 
-        _indexConsistency->addIndexKey(*indexKeyString, indexNumber);
+        _indexConsistency->addIndexKey(
+            *indexKeyString, indexNumber, indexEntry->loc, indexEntry->key);
 
         numKeys++;
         isFirstEntry = false;
         prevIndexKeyString.swap(indexKeyString);
     }
 
-    *numTraversedKeys = numKeys;
+    if (numTraversedKeys) {
+        *numTraversedKeys = numKeys;
+    }
 }
 
 void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
@@ -217,8 +223,8 @@ void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
 void RecordStoreValidateAdaptor::validateIndexKeyCount(IndexDescriptor* idx,
                                                        int64_t numRecs,
                                                        ValidateResults& results) {
-    const std::string indexNs = idx->indexNamespace();
-    int indexNumber = _indexConsistency->getIndexNumber(indexNs);
+    const std::string indexName = idx->indexName();
+    int indexNumber = _indexConsistency->getIndexNumber(indexName);
     int64_t numIndexedKeys = _indexConsistency->getNumKeys(indexNumber);
     int64_t numLongKeys = _indexConsistency->getNumLongKeys(indexNumber);
     auto totalKeys = numLongKeys + numIndexedKeys;
