@@ -131,7 +131,7 @@ Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
         onShardVersionMismatch(opCtx, nss, shardVersionReceived, forceRefreshFromThisThread);
         return Status::OK();
     } catch (const DBException& ex) {
-        log() << "Failed to refresh metadata for collection" << nss << causedBy(redact(ex));
+        log() << "Failed to refresh metadata for collection " << nss << causedBy(redact(ex));
         return ex.toStatus();
     }
 }
