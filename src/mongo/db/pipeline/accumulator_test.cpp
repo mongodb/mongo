@@ -64,6 +64,7 @@ static void assertExpectedResults(
                     accum->process(val, false);
                 }
                 Value result = accum->getValue(false);
+
                 ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
@@ -80,7 +81,7 @@ static void assertExpectedResults(
                 ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
-
+            
             // Asserts that result equals expected result when each input is on a separate shard.
             {
                 boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
@@ -92,7 +93,7 @@ static void assertExpectedResults(
                 Value result = accum->getValue(false);
                 ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
-            }
+            } 
         } catch (...) {
             log() << "failed with arguments: " << Value(op.first);
             throw;
@@ -107,11 +108,23 @@ TEST(Accumulators, Percentile) {
         "$percentile",
         expCtx,
         {
-         {{Value(Document({{"perc", 20.00}, {"digest_size", 100},{"value", 10}})),
-           Value(Document({{"perc", 20.00}, {"digest_size", 100},{"value", 20}})),
-           Value(Document({{"perc", 20.00}, {"digest_size", 100},{"value", 30}})),
-           Value(Document({{"perc", 20.00}, {"digest_size", 100},{"value", 40}})),
-           }, Value(13.00)}});
+           {{Value(Document({{"percentile", 0.20}, {"digest_size", 150},{"value", 10}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 150},{"value", 20}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 150},{"value", 30}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 150},{"value", 40}})),
+           }, Value(13.00)},
+
+           {{
+            Value(Document({{"percentile", 0.50}, {"digest_size", 300},{"value", 10}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 300},{"value", 20}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 300},{"value", 30}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 300},{"value", 40}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 300},{"value", 42}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 300},{"value", 43}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 300},{"value", 44}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 300},{"value", 45}})),
+           }, Value(41.25)},  
+           });
 }
 
 TEST(Accumulators, Avg) {

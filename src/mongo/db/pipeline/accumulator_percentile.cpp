@@ -54,15 +54,51 @@ const char* AccumulatorPercentile::getOpName() const {
 namespace {
 const char subTotalName[] = "subTotal";
 const char subTotalErrorName[] = "subTotalError";  // Used for extra precision
+
+// for sharding tests - temp
+const char sumName[] = "sum";
 const char countName[] = "count";
+const char maxName[] = "max";
+const char minName[] = "min";
+const char percentileName[] = "percentile";
+const char digestSizeName[] = "digest_size";
+const char centroidsName[] = "centroids";
+
+const char meanName[] = "mean";
+const char weightName[] = "weight";
 }  // namespace
 
 void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
 
+    if (merging) {
+        verify(input.getType() == Object);
+
+        Value digest_centroids = input[centroidsName];
+        double digest_sum = input[sumName].getDouble();
+        double digest_count = input[countName].getDouble();
+        double digest_max = input[maxName].getDouble();
+        double digest_min = input[minName].getDouble();
+        double digest_size = input[digestSizeName].getDouble();
+
+        std::vector<mongo::TDigest::Centroid> centroids;
+        for (const auto& centroid: digest_centroids.getArray()) {
+            centroids.push_back(mongo::TDigest::Centroid(centroid[meanName].getDouble(), centroid[weightName].getDouble()));
+        };
+
+
+        // ToDo: might need to destroy it after filling to the vector
+        mongo::TDigest digest_temp(centroids, digest_sum, digest_count, digest_max, digest_min, digest_size);
+
+        this->digest_vector.push_back(digest_temp);
+        this->percentile = input[percentileName].getDouble();
+
+        return;
+    }
+
     // Determining 'digest_size'
     if (this->digest_size == 0){
-        
-        if (input.getDocument()["digest_size"].missing()){
+        if (input.getDocument()["digest_size"].missing())
+            {
             this->digest_size = 1000;
             }
         else
@@ -73,56 +109,41 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
 
     // ToDo: error codes are not accurate. Set better numbers later
     // ToDo: It might be better evaluations for this part.
-    uassert(6677, "The 'perc' should be present in the input document.",
-    !input.getDocument()["perc"].missing());
+    uassert(6677, "The 'percentile' should be present in the input document.",
+    !input.getDocument()["percentile"].missing());
 
     uassert(6678, "The 'value' should be present in the input document.",
     !input.getDocument()["value"].missing());
 
-    this->perc_val = input.getDocument()["perc"].getDouble() / 100;  // Converting Percentile to Quantile - [0:100] to [0:1]
+    this->percentile = input.getDocument()["percentile"].getDouble();
 
-    // ToDo: Choose a better name for perc_input and refactor later
-    Value perc_input = input.getDocument()["value"];
+    // ToDo: Choose a better name for input_value and refactor later
+    Value input_value = input.getDocument()["value"];
 
-
-    if (merging) {
-        // We expect an object that contains both a subtotal and a count. Additionally there may
-        // be an error value, that allows for additional precision.
-        // 'input' is what getValue(true) produced below.
-        verify(perc_input.getType() == Object);
-        // We're recursively adding the subtotal to get the proper type treatment, but this only
-        // increments the count by one, so adjust the count afterwards. Similarly for 'error'.
-        processInternal(perc_input[subTotalName], false);
-        _count += perc_input[countName].getLong() - 1;
-        Value error = perc_input[subTotalErrorName];
-        if (!error.missing()) {
-            processInternal(error, false);
-            _count--;  // The error correction only adjusts the total, not the number of items.
-        }
-        return;
-    }
-
-    // ToDo: Not sure 1) Is it important for TDigest to distinguish?  2) Is it important for MongoDB to distinguish?
     // ToDo: Going to cover all Decimal, Long and Double as a temporary, need to decide on this.
-    switch (perc_input.getType()) {
-
+    switch (input_value.getType()) {
         case NumberDecimal:
         case NumberLong:
         case NumberInt:
         case NumberDouble:
-            values.push_back(perc_input.getDouble());
+            values.push_back(input_value.getDouble());
             break;
         default:
-            dassert(!perc_input.numeric());
+            dassert(!input_value.numeric());
             return;
     }
+    
+    // ToDo: I am thinking to replace this with other checks and get rid of "_count" variable
+    if (_count == 0)
+    {
+        digest = mongo::TDigest(this->digest_size);
+    }
+
     _count++;
 
     if (values.size() == this->chunk_size){
         _add_to_tdigest(values);
         }
-    else
-        return;
 }
 
 intrusive_ptr<Accumulator> AccumulatorPercentile::create(
@@ -130,47 +151,55 @@ intrusive_ptr<Accumulator> AccumulatorPercentile::create(
     return new AccumulatorPercentile(expCtx);
 }
 
-Decimal128 AccumulatorPercentile::_getDecimalTotal() const {
-    return _decimalTotal.add(_nonDecimalTotal.getDecimal());
-}
-
 Value AccumulatorPercentile::getValue(bool toBeMerged) {
 
     // To add remainders left over a chunk
-    if (values.size() > 0){
+    if (not values.empty()){
         _add_to_tdigest(values);
         }
 
-    // ToDo: Unchanged copy from 'avg' module, need to change this for Percentile
     if (toBeMerged) {
-        if (_isDecimal)
-            return Value(Document{{subTotalName, _getDecimalTotal()}, {countName, _count}});
+        std::vector<Document> centroids;
 
-        double total, error;
-        std::tie(total, error) = _nonDecimalTotal.getDoubleDouble();
+        for (const auto& centroid: this->digest.getCentroids()) {
+            centroids.push_back(Document{
+                    {"mean", centroid.mean()},
+                    {"weight", centroid.weight()}
+                });
+        };
+
         return Value(
-            Document{{subTotalName, total}, {countName, _count}, {subTotalErrorName, error}});
+            Document{
+                {"centroids", Value(centroids)},
+                {"sum", digest.sum()},
+                {"count", digest.count()},
+                {"max", digest.max()},
+                {"min", digest.min()},
+                {"percentile", this->percentile},
+                {"digest_size", this->digest_size}               
+            }
+        );
     }
 
-    if (_count == 0){
-        return Value(BSONNULL);
-        }
+    // getValue(False) reaches here
+    // This line helps to still keep the tdigest values when there is no sharding. In case of Sharding, 'this->digest' is empty.
+    this->digest_vector.push_back(this->digest);
 
-    return Value(this->digest.estimateQuantile(this->perc_val));
+    // Regardless of using sharding, the percentile is calculated on a vector of tdigest objects
+    mongo::TDigest new_digest;
+    new_digest = mongo::TDigest::merge(this->digest_vector);
+
+    return Value(new_digest.estimateQuantile(this->percentile));
 }
 
 AccumulatorPercentile::AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : Accumulator(expCtx), _isDecimal(false), _count(0) {
-
-    // Higher 'digest_size' results in higher memory consumption and better precision
-    mongo::TDigest digest(this->digest_size);
-
+    : Accumulator(expCtx), _count(0) {
+    
     // This is a fixed size Accumulator so we never need to update this
     _memUsageBytes = sizeof(*this);
 }
 
 void AccumulatorPercentile::_add_to_tdigest(std::vector<double> & values){
-
     // Sort, Push and Clear the "values" vector in each chunk
     std::sort(values.begin(), values.end());
     digest = digest.merge(values);
@@ -178,9 +207,6 @@ void AccumulatorPercentile::_add_to_tdigest(std::vector<double> & values){
 }
 
 void AccumulatorPercentile::reset() {
-    _isDecimal = false;
-    _nonDecimalTotal = {};
-    _decimalTotal = {};
     _count = 0;
 }
 }
