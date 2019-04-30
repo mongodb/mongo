@@ -291,6 +291,14 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                               << " does not have a UUID, but local op has a transaction number: "
                               << redact(oplogEntry.toBSON()));
         }
+        if (oplogEntry.isPartialTransaction()) {
+            // If this is a transaction which did not commit, we need do nothing more than
+            // rollback the transaction table entry.  If it did commit, we will have rolled it
+            // back when we rolled back the commit.
+            //
+            // TODO(SERVER-39797): Roll back partial transactions when they commit.
+            return Status::OK();
+        }
     }
 
     if (oplogEntry.getOpType() == OpTypeEnum::kCommand) {
@@ -557,7 +565,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 }
                 return Status::OK();
             }
-            // TODO(SERVER-39797): Remove commitTransaction handling for unprepared transactions.
+            case OplogEntry::CommandType::kAbortTransaction: {
+                return Status::OK();
+            }
+            // TODO(SERVER-40728): Remove commitTransaction handling for unprepared transactions.
             case OplogEntry::CommandType::kCommitTransaction: {
                 IDLParserErrorContext ctx("commitTransaction");
                 auto commitCommand = CommitTransactionOplogObject::parse(ctx, obj);

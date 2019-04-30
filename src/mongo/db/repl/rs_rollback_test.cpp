@@ -2212,6 +2212,138 @@ TEST_F(RSRollbackTest, LocalEntryWithTxnNumberAddsTransactionTableDocToBeRefetch
     ASSERT_TRUE(fui.docsToRefetch.find(expectedTxnDoc) != fui.docsToRefetch.end());
 }
 
+TEST_F(RSRollbackTest, LocalEntryWithPartialTxnAddsTransactionTableDocToBeRefetched) {
+    FixUpInfo fui;
+
+    // If txnNumber is present, and the transaction table exists and has a UUID, the session
+    // transactions table document corresponding to the oplog entry's sessionId also needs to be
+    // refetched.  This is true even if "partialTxn" is set indicating this is part of a transaction
+    // that may not have been committed.
+    UUID uuid = UUID::gen();
+    auto lsid = makeLogicalSessionIdForTest();
+    auto entryWithTxnNumber =
+        BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ui"
+                                                        << uuid
+                                                        << "ns"
+                                                        << "test.t"
+                                                        << "o"
+                                                        << BSON("_id" << 1 << "a" << 1)))
+                                     << "partialTxn"
+                                     << true)
+                  << "txnNumber"
+                  << 1LL
+                  << "stmtId"
+                  << 1
+                  << "lsid"
+                  << lsid.toBSON());
+    UUID transactionTableUUID = UUID::gen();
+    fui.transactionTableUUID = transactionTableUUID;
+
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber, false));
+    ASSERT_EQ(fui.docsToRefetch.size(), 1U);
+
+    auto expectedObj = BSON("_id" << lsid.toBSON());
+    DocID expectedTxnDoc(expectedObj, expectedObj.firstElement(), transactionTableUUID);
+    ASSERT_TRUE(fui.docsToRefetch.find(expectedTxnDoc) != fui.docsToRefetch.end());
+}
+
+TEST_F(RSRollbackTest, LocalAbortTxnRefetchesTransactionTableEntry) {
+    // A rolled back abort, even if we rolled back no transaction operations, should refetch the
+    // transaction table entry.
+    FixUpInfo fui;
+
+    auto lsid = makeLogicalSessionIdForTest();
+    auto abortTxnEntry = BSON("ts" << Timestamp(Seconds(1), 1) << "t" << 1LL << "op"
+                                   << "c"
+                                   << "ns"
+                                   << "admin.$cmd"
+                                   << "o"
+                                   << BSON("abortTransaction" << 1)
+                                   << "txnNumber"
+                                   << 1LL
+                                   << "stmtId"
+                                   << 1
+                                   << "lsid"
+                                   << lsid.toBSON()
+                                   << "prevOpTime"
+                                   << BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL));
+
+    UUID transactionTableUUID = UUID::gen();
+    fui.transactionTableUUID = transactionTableUUID;
+
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, abortTxnEntry, false));
+    ASSERT_EQ(fui.docsToRefetch.size(), 1U);
+
+    auto expectedObj = BSON("_id" << lsid.toBSON());
+    DocID expectedTxnDoc(expectedObj, expectedObj.firstElement(), transactionTableUUID);
+    ASSERT_TRUE(fui.docsToRefetch.find(expectedTxnDoc) != fui.docsToRefetch.end());
+}
+
+TEST_F(RSRollbackTest, LocalEntryWithAbortedInTxnRefetchesOnlyTransactionTableEntry) {
+    FixUpInfo fui;
+
+    // If txnNumber is present, and the transaction table exists and has a UUID, the session
+    // transactions table document corresponding to the oplog entry's sessionId also needs to be
+    // refetched.  This is true even if "partialTxn" is set indicating this is part of a transaction
+    // that may not have been committed, and even if it is known that the transaction aborted.
+    UUID uuid = UUID::gen();
+    auto lsid = makeLogicalSessionIdForTest();
+    auto abortTxnEntry = BSON("ts" << Timestamp(Seconds(1), 2) << "t" << 1LL << "op"
+                                   << "c"
+                                   << "ns"
+                                   << "admin.$cmd"
+                                   << "o"
+                                   << BSON("abortTransaction" << 1)
+                                   << "txnNumber"
+                                   << 1LL
+                                   << "stmtId"
+                                   << 1
+                                   << "lsid"
+                                   << lsid.toBSON()
+                                   << "prevOpTime"
+                                   << BSON("ts" << Timestamp(Seconds(1), 1) << "t" << 1LL));
+
+    auto entryWithTxnNumber =
+        BSON("ts" << Timestamp(Seconds(1), 1) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ui"
+                                                        << uuid
+                                                        << "ns"
+                                                        << "test.t"
+                                                        << "o"
+                                                        << BSON("_id" << 1 << "a" << 1)))
+                                     << "partialTxn"
+                                     << true)
+                  << "txnNumber"
+                  << 1LL
+                  << "stmtId"
+                  << 1
+                  << "lsid"
+                  << lsid.toBSON());
+    UUID transactionTableUUID = UUID::gen();
+    fui.transactionTableUUID = transactionTableUUID;
+
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, abortTxnEntry, false));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber, false));
+    ASSERT_EQ(fui.docsToRefetch.size(), 1U);
+
+    auto expectedObj = BSON("_id" << lsid.toBSON());
+    DocID expectedTxnDoc(expectedObj, expectedObj.firstElement(), transactionTableUUID);
+    ASSERT_TRUE(fui.docsToRefetch.find(expectedTxnDoc) != fui.docsToRefetch.end());
+}
+
 TEST_F(RSRollbackTest, RollbackFailsIfTransactionDocumentRefetchReturnsDifferentNamespace) {
     createOplog(_opCtx.get());
 
@@ -2219,7 +2351,7 @@ TEST_F(RSRollbackTest, RollbackFailsIfTransactionDocumentRefetchReturnsDifferent
     // transaction number and session id.
     FixUpInfo fui;
 
-    auto entryWithTxnNumber = BSON("ts" << Timestamp(Seconds(2), 0) << "t" << 1LL << "op"
+    auto entryWithTxnNumber = BSON("ts" << Timestamp(Seconds(2), 1) << "t" << 1LL << "op"
                                         << "i"
                                         << "ui"
                                         << UUID::gen()
@@ -2238,7 +2370,7 @@ TEST_F(RSRollbackTest, RollbackFailsIfTransactionDocumentRefetchReturnsDifferent
     fui.transactionTableUUID = transactionTableUUID;
 
     auto commonOperation = makeOpAndRecordId(1);
-    fui.commonPoint = OpTime(Timestamp(Seconds(1), 0), 1LL);
+    fui.commonPoint = OpTime(Timestamp(Seconds(1), 1), 1LL);
     fui.commonPointOurDiskloc = RecordId(1);
 
     fui.rbid = 1;
