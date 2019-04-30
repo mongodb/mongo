@@ -36,14 +36,14 @@
 namespace mongo {
 
 template <typename F>
-class ScopeGuard {
+class[[nodiscard]] ScopeGuard {
 public:
     explicit ScopeGuard(const F& f) : _func(f) {}
-    explicit ScopeGuard(F&& f) : _func(std::move(f)) {}
+    explicit ScopeGuard(F && f) : _func(std::move(f)) {}
 
     // Can only be move-constructed, to support being returned from a function.
     ScopeGuard(const ScopeGuard&) = delete;
-    ScopeGuard(ScopeGuard&& o) : _func(std::move(o._func)), _dismissed(o._dismissed) {
+    ScopeGuard(ScopeGuard && o) : _func(std::move(o._func)), _dismissed(o._dismissed) {
         o._dismissed = true;
     }
     ScopeGuard& operator=(const ScopeGuard&) = delete;
@@ -52,11 +52,7 @@ public:
     ~ScopeGuard() {
         if (_dismissed)
             return;
-        try {
-            _func();
-        } catch (...) {
-            std::terminate();
-        }
+        _func();
     }
 
     void dismiss() noexcept {
