@@ -15,7 +15,7 @@
         } else {
             kpi = res.keysPerIndex;
         }
-        return kpi[coll.getFullName() + ".$" + idxName];
+        return kpi[idxName];
     };
 
     coll.drop();

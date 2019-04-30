@@ -184,7 +184,6 @@ StatusWith<CollectionImpl::ValidationAction> _parseValidationAction(StringData n
 
 }  // namespace
 
-using std::endl;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -412,8 +411,8 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
             string whenFirst =
                 firstIdElem ? (string(" when first _id is ") + firstIdElem.str()) : "";
             while (MONGO_FAIL_POINT(hangAfterCollectionInserts)) {
-                log() << "hangAfterCollectionInserts fail point enabled for " << _ns.toString()
-                      << whenFirst << ". Blocking until fail point is disabled.";
+                log() << "hangAfterCollectionInserts fail point enabled for " << _ns << whenFirst
+                      << ". Blocking until fail point is disabled.";
                 mongo::sleepsecs(1);
                 opCtx->checkForInterrupt();
             }
@@ -1095,8 +1094,9 @@ void _validateIndexes(OperationContext* opCtx,
         const IndexDescriptor* descriptor = entry->descriptor();
         const IndexAccessMethod* iam = entry->accessMethod();
 
-        log(LogComponent::kIndex) << "validating index " << descriptor->indexNamespace() << endl;
-        ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexNamespace()];
+        log(LogComponent::kIndex) << "validating index " << descriptor->indexName()
+                                  << " on collection " << descriptor->parentNS();
+        ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
         bool checkCounts = false;
         int64_t numTraversedKeys;
         int64_t numValidatedKeys;
@@ -1120,7 +1120,7 @@ void _validateIndexes(OperationContext* opCtx,
             }
 
             if (curIndexResults.valid) {
-                keysPerIndex->appendNumber(descriptor->indexNamespace(),
+                keysPerIndex->appendNumber(descriptor->indexName(),
                                            static_cast<long long>(numTraversedKeys));
             } else {
                 results->valid = false;
@@ -1131,19 +1131,54 @@ void _validateIndexes(OperationContext* opCtx,
     }
 }
 
-void _markIndexEntriesInvalid(ValidateResultsMap* indexNsResultsMap, ValidateResults* results) {
+/**
+ * Executes the second phase of validation for improved error reporting. This is only done if
+ * any index inconsistencies are found during the first phase of validation.
+ */
+void _gatherIndexEntryErrors(OperationContext* opCtx,
+                             RecordStore* recordStore,
+                             IndexCatalog* indexCatalog,
+                             IndexConsistency* indexConsistency,
+                             RecordStoreValidateAdaptor* indexValidator,
+                             ValidateResultsMap* indexNsResultsMap,
+                             ValidateResults* result) {
+    indexConsistency->setSecondPhase();
 
-    // The error message can't be more specific because even though the index is
-    // invalid, we won't know if the corruption occurred on the index entry or in
-    // the document.
-    for (auto& it : *indexNsResultsMap) {
-        // Marking all indexes as invalid since we don't know which one failed.
-        ValidateResults& r = it.second;
-        r.valid = false;
+    log(LogComponent::kIndex) << "Starting to traverse through all the document key sets.";
+
+    // During the second phase of validation, iterate through each documents key set and only record
+    // the keys that were inconsistent during the first phase of validation.
+    std::unique_ptr<SeekableRecordCursor> cursor = recordStore->getCursor(opCtx, true);
+    while (auto record = cursor->next()) {
+        opCtx->checkForInterrupt();
+
+        // We can ignore the status of validate as it was already checked during the first phase.
+        size_t validatedSize;
+        indexValidator->validate(record->id, record->data, &validatedSize).ignore();
     }
-    string msg = "one or more indexes contain invalid index entries.";
-    results->errors.push_back(msg);
-    results->valid = false;
+
+    log(LogComponent::kIndex) << "Finished traversing through all the document key sets.";
+    log(LogComponent::kIndex) << "Starting to traverse through all the indexes.";
+
+    // Iterate through all the indexes in the collection and only record the index entry keys that
+    // had inconsistencies during the first phase.
+    std::unique_ptr<IndexCatalog::IndexIterator> it = indexCatalog->getIndexIterator(opCtx, false);
+    while (it->more()) {
+        opCtx->checkForInterrupt();
+
+        const IndexCatalogEntry* entry = it->next();
+        const IndexDescriptor* descriptor = entry->descriptor();
+        const IndexAccessMethod* iam = entry->accessMethod();
+
+        log(LogComponent::kIndex) << "Traversing through the index entries for index "
+                                  << descriptor->indexName() << ".";
+        indexValidator->traverseIndex(
+            iam, descriptor, /*ValidateResults=*/nullptr, /*numTraversedKeys=*/nullptr);
+    }
+
+    log(LogComponent::kIndex) << "Finished traversing through all the indexes.";
+
+    indexConsistency->addIndexEntryErrors(indexNsResultsMap, result);
 }
 
 void _validateIndexKeyCount(OperationContext* opCtx,
@@ -1156,7 +1191,7 @@ void _validateIndexKeyCount(OperationContext* opCtx,
         indexCatalog->getIndexIterator(opCtx, false);
     while (indexIterator->more()) {
         const IndexDescriptor* descriptor = indexIterator->next()->descriptor();
-        ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexNamespace()];
+        ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
         if (curIndexResults.valid) {
             indexValidator->validateIndexKeyCount(
@@ -1277,8 +1312,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
         // Validate the record store
         std::string uuidString = str::stream()
             << " (UUID: " << (uuid() ? uuid()->toString() : "none") << ")";
-        log(LogComponent::kIndex) << "validating collection " << ns().toString() << uuidString
-                                  << endl;
+        log(LogComponent::kIndex) << "validating collection " << ns() << uuidString;
         _validateRecordStore(
             opCtx, _recordStore, level, background, &indexValidator, results, output);
 
@@ -1296,7 +1330,16 @@ Status CollectionImpl::validate(OperationContext* opCtx,
                              results);
 
             if (indexConsistency.haveEntryMismatch()) {
-                _markIndexEntriesInvalid(&indexNsResultsMap, results);
+                log(LogComponent::kIndex)
+                    << "Index inconsistencies were detected on collection " << ns()
+                    << ". Starting the second phase of index validation to gather concise errors.";
+                _gatherIndexEntryErrors(opCtx,
+                                        _recordStore,
+                                        _indexCatalog.get(),
+                                        &indexConsistency,
+                                        &indexValidator,
+                                        &indexNsResultsMap,
+                                        results);
             }
         }
 

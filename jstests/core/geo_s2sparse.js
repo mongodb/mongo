@@ -7,7 +7,7 @@
     var coll = db.geo_s2sparse;
     var point = {type: "Point", coordinates: [5, 5]};
     var indexSpec = {geo: "2dsphere", nonGeo: 1};
-    var indexName = 'test.geo_s2sparse.$geo_2dsphere_nonGeo_1';
+    var indexName = 'geo_2dsphere_nonGeo_1';
 
     //
     // V2 indices are "geo sparse" always.
@@ -103,7 +103,7 @@
     coll.drop();
     coll.ensureIndex({geo: "2dsphere", otherGeo: "2dsphere"});
 
-    indexName = 'test.geo_s2sparse.$geo_2dsphere_otherGeo_2dsphere';
+    indexName = 'geo_2dsphere_otherGeo_2dsphere';
 
     // Insert N documents with the first geo field.
     bulkInsertDocs(coll, N, function(i) {
