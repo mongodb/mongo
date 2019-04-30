@@ -38,10 +38,10 @@
 namespace mongo {
 
 GlobalInitializerRegisterer::GlobalInitializerRegisterer(std::string name,
-                                                         std::vector<std::string> prerequisites,
-                                                         std::vector<std::string> dependents,
                                                          InitializerFunction initFn,
-                                                         DeinitializerFunction deinitFn) {
+                                                         DeinitializerFunction deinitFn,
+                                                         std::vector<std::string> prerequisites,
+                                                         std::vector<std::string> dependents) {
     Status status = getGlobalInitializer().getInitializerDependencyGraph().addInitializer(
         std::move(name),
         std::move(initFn),
@@ -54,5 +54,15 @@ GlobalInitializerRegisterer::GlobalInitializerRegisterer(std::string name,
         ::abort();
     }
 }
+
+const std::string& defaultInitializerName() {
+    static const auto& s = *new std::string("default");  // Leaked to be shutdown-safe.
+    return s;
+}
+
+namespace {
+GlobalInitializerRegisterer defaultInitializerRegisterer(
+    defaultInitializerName(), [](auto) { return Status::OK(); }, nullptr, {}, {});
+}  // namespace
 
 }  // namespace mongo

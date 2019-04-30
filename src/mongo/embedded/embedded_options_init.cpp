@@ -41,8 +41,6 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(EmbeddedOptions)(InitializerContext* cont
 
 GlobalInitializerRegisterer embeddedOptionsInitializer(
     "EmbeddedOptions",
-    {"BeginStartupOptionValidation", "AllFailPointsRegistered"},
-    {"EndStartupOptionValidation"},
     [](InitializerContext* context) {
         // Run validation, but tell the Environment that we don't want it to be set as "valid",
         // since we may be making it invalid in the canonicalization process.
@@ -60,11 +58,11 @@ GlobalInitializerRegisterer embeddedOptionsInitializer(
         }
         return Status::OK();
     },
-    [](DeinitializerContext* context) { return Status::OK(); });
+    [](DeinitializerContext* context) { return Status::OK(); },
+    {"BeginStartupOptionValidation", "AllFailPointsRegistered"},
+    {"EndStartupOptionValidation"});
 
 GlobalInitializerRegisterer embeddedOptionsStore("EmbeddedOptions_Store",
-                                                 {"BeginStartupOptionStorage"},
-                                                 {"EndStartupOptionStorage"},
                                                  [](InitializerContext* context) {
                                                      return storeOptions(
                                                          optionenvironment::startupOptionsParsed);
@@ -72,7 +70,9 @@ GlobalInitializerRegisterer embeddedOptionsStore("EmbeddedOptions_Store",
                                                  [](DeinitializerContext* context) {
                                                      resetOptions();
                                                      return Status::OK();
-                                                 });
+                                                 },
+                                                 {"BeginStartupOptionStorage"},
+                                                 {"EndStartupOptionStorage"});
 
 }  // namespace embedded
 }  // namespace mongo

@@ -344,8 +344,6 @@ private:
 
 GlobalInitializerRegisterer sslManagerInitializer(
     "SSLManager",
-    {"EndStartupOptionHandling"},
-    {},
     [](InitializerContext*) {
         if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
             theSSLManager = new SSLManagerWindows(sslGlobalParams, isSSLServer);
@@ -359,7 +357,9 @@ GlobalInitializerRegisterer sslManagerInitializer(
         }
 
         return Status::OK();
-    });
+    },
+    {"EndStartupOptionHandling"},
+    {});
 
 SSLConnectionWindows::SSLConnectionWindows(SCHANNEL_CRED* cred,
                                            Socket* sock,

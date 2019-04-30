@@ -43,8 +43,6 @@ namespace optionenvironment {
 
 GlobalInitializerRegisterer startupOptionsInitializer(
     "StartupOptions",
-    {"BeginStartupOptionParsing"},
-    {"EndStartupOptionParsing"},
     [](InitializerContext* context) {
         // Embedded uses a YAML config passed in argv to reuse the existing interface, extract it
         // from the first element otherwise use empty string.
@@ -60,7 +58,9 @@ GlobalInitializerRegisterer startupOptionsInitializer(
     [](DeinitializerContext* context) {
         startupOptionsParsed = Environment();
         return Status::OK();
-    });
+    },
+    {"BeginStartupOptionParsing"},
+    {"EndStartupOptionParsing"});
 
 }  // namespace optionenvironment
 }  // namespace mongo

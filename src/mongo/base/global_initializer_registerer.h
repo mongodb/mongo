@@ -35,218 +35,66 @@
 #include "mongo/base/initializer_function.h"
 #include "mongo/base/status.h"
 
-/**
-* Convenience parameter representing the default set of dependents for initializer functions. Should
-* just be used internally, for MONGO_INITIALIZER macros, use MONGO_DEFAULT_PREREQUISITES from init.h
-* instead.
-*/
-#define MONGO_DEFAULT_PREREQUISITES_STR "default"
-
 namespace mongo {
 
+// The name of the "default" global initializer.
+// Global initializers with no explicit prerequisites depends on it by default.
+extern const std::string& defaultInitializerName();
+
 /**
- * Type representing the act of registering a process-global intialization function.
+ * Type representing the registration of a global intialization function.
  *
- * Create a module-global instance of this type to register a new initializer, to be run by a
- * call to a variant of mongo::runGlobalInitializers().  See mongo/base/initializer.h,
- * mongo/base/init.h and mongo/base/initializer_dependency_graph.h for details.
+ * Create a nonlocal static storage duration instance of this type to register a new initializer, to
+ * be run by a call to a variant of mongo::runGlobalInitializers().  See "mongo/base/initializer.h",
+ * "mongo/base/init.h', and "mongo/base/initializer_dependency_graph.h" for details.
  */
 class GlobalInitializerRegisterer {
-    GlobalInitializerRegisterer(const GlobalInitializerRegisterer&) = delete;
-    GlobalInitializerRegisterer& operator=(const GlobalInitializerRegisterer&) = delete;
-
 public:
     /**
-    * Defines an initializer function that depends on default prerequisites and has no explicit
-    * dependents.
+    * Constructor parameters:
     *
-    * Does not support deinitialization and will never be re-initialized.
+    *     - std::string name
     *
-    * Usage:
-    *    GlobalInitializerRegisterer myRegsisterer(
-    *            "myInitializer",
+    *     - InitializerFunction initFn
+    *         Must be nonnull.
+    *         Example expression:
+    *
     *            [](InitializerContext* context) {
     *                // initialization code
     *                return Status::OK();
     *            }
-    *    );
-    */
-    GlobalInitializerRegisterer(std::string name, InitializerFunction initFn);
-
-    /**
-    * Defines an initializer function that depends on PREREQUISITES and has no explicit dependents.
     *
-    * At run time, the full set of prerequisites for NAME will be computed as the union of the
-    * explicit PREREQUISITES.
+    *     - DeinitializerFunction deinitFn
+    *         A deinitialization that will execute in reverse order from initialization and
+    *         support re-initialization. If not specified, defaults to the `nullptr` function.
+    *         Example expression:
     *
-    * Does not support deinitialization and will never be re-initialized.
-    *
-    * Usage:
-    *    GlobalInitializerRegisterer myRegsisterer(
-    *            "myInitializer",
-    *            {"myPrereq1", "myPrereq2", ...},
-    *            [](InitializerContext* context) {
-    *                // initialization code
-    *                return Status::OK();
-    *            }
-    *    );
-    */
-    GlobalInitializerRegisterer(std::string name,
-                                std::vector<std::string> prerequisites,
-                                InitializerFunction initFn);
-
-    /**
-    * Defines an initializer function that depends on PREREQUISITES and has DEPENDENTS as explicit
-    * dependents.
-    *
-    * At run time, the full set of prerequisites for NAME will be computed as the union of the
-    * explicit PREREQUISITES and the set of all other mongo initializers that name NAME in their
-    * list of dependents.
-    *
-    * Does not support deinitialization and will never be re-initialized.
-    *
-    * Usage:
-    *    GlobalInitializerRegisterer myRegsisterer(
-    *            "myInitializer",
-    *            {"myPrereq1", "myPrereq2", ...},
-    *            {"myDependent1", "myDependent2", ...},
-    *            [](InitializerContext* context) {
-    *                // initialization code
-    *                return Status::OK();
-    *            }
-    *    );
-    */
-    GlobalInitializerRegisterer(std::string name,
-                                std::vector<std::string> prerequisites,
-                                std::vector<std::string> dependents,
-                                InitializerFunction initFn);
-
-    /**
-    * Defines an initializer function that depends on default prerequisites and has no explicit
-    * dependents.
-    * It also provides a deinitialization that will execute in reverse order from initialization and
-    * support re-initialization.
-    *
-    * Usage:
-    *    GlobalInitializerRegisterer myRegsisterer(
-    *            "myInitializer",
-    *            [](InitializerContext* context) {
-    *                // initialization code
-    *                return Status::OK();
-    *            },
     *            [](DeinitializerContext* context) {
     *                // deinitialization code
     *                return Status::OK();
     *            }
-    *    );
+    *
+    *     - std::vector<std::string> prerequisites
+    *         If not specified, defaults to {"default"}.
+    *
+    *     - std::vector<std::string> dependents
+    *         If not specified, defaults to {} (no dependents).
+    *
+    *
+    * At run time, the full set of prerequisites for `name` will be computed as the union of the
+    * `prerequisites` (which can be defaulted) and all other mongo initializers that list `name` in
+    * their `dependents`.
+    *
+    * A non-null `deinitFn` will tag the initializer as supporting re-initialization.
     */
     GlobalInitializerRegisterer(std::string name,
                                 InitializerFunction initFn,
-                                DeinitializerFunction deinitFn);
+                                DeinitializerFunction deinitFn = nullptr,
+                                std::vector<std::string> prerequisites = {defaultInitializerName()},
+                                std::vector<std::string> dependents = {});
 
-    /**
-    * Defines an initializer function that depends on PREREQUISITES and has no explicit dependents.
-    *
-    * At run time, the full set of prerequisites for NAME will be computed as the union of the
-    * explicit PREREQUISITES.
-    *
-    * It also provides a deinitialization that will execute in reverse order from initialization and
-    * support re-initialization.
-    *
-    * Usage:
-    *    GlobalInitializerRegisterer myRegsisterer(
-    *            "myInitializer",
-    *            {"myPrereq1", "myPrereq2", ...},
-    *            [](InitializerContext* context) {
-    *                // initialization code
-    *                return Status::OK();
-    *            },
-    *            [](DeinitializerContext* context) {
-    *                // deinitialization code
-    *                return Status::OK();
-    *            }
-    *    );
-    */
-    GlobalInitializerRegisterer(std::string name,
-                                std::vector<std::string> prerequisites,
-                                InitializerFunction initFn,
-                                DeinitializerFunction deinitFn);
-
-    /**
-    * Defines an initializer function that depends on PREREQUISITES and has DEPENDENTS as explicit
-    * dependents.
-    *
-    * At run time, the full set of prerequisites for NAME will be computed as the union of the
-    * explicit PREREQUISITES and the set of all other mongo initializers that name NAME in their
-    * list of dependents.
-    *
-    * It also provides a deinitialization that will execute in reverse order from initialization and
-    * support re-initialization.
-    *
-    * Usage:
-    *    GlobalInitializerRegisterer myRegsisterer(
-    *            "myInitializer",
-    *            {"myPrereq1", "myPrereq2", ...},
-    *            {"myDependent1", "myDependent2", ...},
-    *            [](InitializerContext* context) {
-    *                // initialization code
-    *                return Status::OK();
-    *            },
-    *            [](DeinitializerContext* context) {
-    *                // deinitialization code
-    *                return Status::OK();
-    *            }
-    *    );
-    */
-    GlobalInitializerRegisterer(std::string name,
-                                std::vector<std::string> prerequisites,
-                                std::vector<std::string> dependents,
-                                InitializerFunction initFn,
-                                DeinitializerFunction deinitFn);
+    GlobalInitializerRegisterer(const GlobalInitializerRegisterer&) = delete;
+    GlobalInitializerRegisterer& operator=(const GlobalInitializerRegisterer&) = delete;
 };
-
-inline GlobalInitializerRegisterer::GlobalInitializerRegisterer(std::string name,
-                                                                InitializerFunction initFn)
-    : GlobalInitializerRegisterer(std::move(name),
-                                  {MONGO_DEFAULT_PREREQUISITES_STR},
-                                  {},
-                                  std::move(initFn),
-                                  DeinitializerFunction()) {}
-
-inline GlobalInitializerRegisterer::GlobalInitializerRegisterer(
-    std::string name, std::vector<std::string> prerequisites, InitializerFunction initFn)
-    : GlobalInitializerRegisterer(std::move(name),
-                                  std::move(prerequisites),
-                                  {},
-                                  std::move(initFn),
-                                  DeinitializerFunction()) {}
-
-inline GlobalInitializerRegisterer::GlobalInitializerRegisterer(
-    std::string name,
-    std::vector<std::string> prerequisites,
-    std::vector<std::string> dependents,
-    InitializerFunction initFn)
-    : GlobalInitializerRegisterer(std::move(name),
-                                  std::move(prerequisites),
-                                  std::move(dependents),
-                                  std::move(initFn),
-                                  DeinitializerFunction()) {}
-
-inline GlobalInitializerRegisterer::GlobalInitializerRegisterer(std::string name,
-                                                                InitializerFunction initFn,
-                                                                DeinitializerFunction deinitFn)
-    : GlobalInitializerRegisterer(std::move(name),
-                                  {MONGO_DEFAULT_PREREQUISITES_STR},
-                                  {},
-                                  std::move(initFn),
-                                  std::move(deinitFn)) {}
-
-inline GlobalInitializerRegisterer::GlobalInitializerRegisterer(
-    std::string name,
-    std::vector<std::string> prerequisites,
-    InitializerFunction initFn,
-    DeinitializerFunction deinitFn)
-    : GlobalInitializerRegisterer(
-          std::move(name), std::move(prerequisites), {}, std::move(initFn), std::move(deinitFn)) {}
 
 }  // namespace mongo

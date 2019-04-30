@@ -64,7 +64,7 @@
 /**
  * Convenience parameter representing the default set of dependents for initializer functions.
  */
-#define MONGO_DEFAULT_PREREQUISITES (MONGO_DEFAULT_PREREQUISITES_STR)
+#define MONGO_DEFAULT_PREREQUISITES (::mongo::defaultInitializerName().c_str())
 
 /**
  * Macro to define an initializer function named "NAME" with the default prerequisites, and
@@ -123,9 +123,10 @@
     namespace {                                                                           \
     ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer_##NAME(              \
         std::string(#NAME),                                                               \
+        mongo::InitializerFunction(MONGO_INITIALIZER_FUNCTION_NAME_(NAME)),               \
+        mongo::DeinitializerFunction(nullptr),                                            \
         MONGO_MAKE_STRING_VECTOR PREREQUISITES,                                           \
-        MONGO_MAKE_STRING_VECTOR DEPENDENTS,                                              \
-        mongo::InitializerFunction(MONGO_INITIALIZER_FUNCTION_NAME_(NAME)));              \
+        MONGO_MAKE_STRING_VECTOR DEPENDENTS);                                             \
     }                                                                                     \
     ::mongo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)
 

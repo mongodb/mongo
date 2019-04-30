@@ -220,9 +220,10 @@ const bool checkShimsViaTUHook = false;
         }                                                                                     \
         ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer(                     \
             std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__)),                                  \
+            mongo::InitializerFunction(initializerGroupStartup),                              \
+            mongo::DeinitializerFunction(nullptr),                                            \
             {},                                                                               \
-            {MONGO_SHIM_DEPENDENTS},                                                          \
-            mongo::InitializerFunction(initializerGroupStartup));                             \
+            {MONGO_SHIM_DEPENDENTS});                                                         \
     } /*namespace shim_namespace*/                                                            \
     } /*namespace*/                                                                           \
     shim_namespace##LN::ShimType::MongoShimImplGuts::LibTUHookTypeBase::LibTUHookTypeBase() = \
@@ -256,9 +257,10 @@ const bool checkShimsViaTUHook = false;
                                                                                                 \
         const ::mongo::GlobalInitializerRegisterer registrationHook{                            \
             std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__) "_registration"),                    \
+            mongo::InitializerFunction(createInitializerRegistration),                          \
+            mongo::DeinitializerFunction(nullptr),                                              \
             {},                                                                                 \
-            {MONGO_SHIM_DEPENDENCY(__VA_ARGS__), MONGO_SHIM_DEPENDENTS},                        \
-            mongo::InitializerFunction(createInitializerRegistration)};                         \
+            {MONGO_SHIM_DEPENDENCY(__VA_ARGS__), MONGO_SHIM_DEPENDENTS}};                       \
     } /*namespace shim_namespace*/                                                              \
     } /*namespace*/                                                                             \
                                                                                                 \
@@ -299,11 +301,13 @@ const bool checkShimsViaTUHook = false;
                                                                                                  \
         const ::mongo::GlobalInitializerRegisterer overrideHook{                                 \
             std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__) "_override"),                         \
+            mongo::InitializerFunction(createInitializerOverride),                               \
+            mongo::DeinitializerFunction(nullptr),                                               \
             {MONGO_SHIM_DEPENDENCY(                                                              \
                 __VA_ARGS__) "_registration"},   /* Override happens after first registration */ \
             {MONGO_SHIM_DEPENDENCY(__VA_ARGS__), /* Provides impl for this shim */               \
-             MONGO_SHIM_DEPENDENTS},             /* Still a shim registration */                 \
-            mongo::InitializerFunction(createInitializerOverride)};                              \
+             MONGO_SHIM_DEPENDENTS}              /* Still a shim registration */                 \
+        };                                                                                       \
     } /*namespace shim_namespace*/                                                               \
     } /*namespace*/                                                                              \
                                                                                                  \

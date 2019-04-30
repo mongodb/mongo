@@ -127,8 +127,6 @@ MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
 
 GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
     "FilterAllowedIndexFieldNamesEmbedded",
-    {},
-    {"FilterAllowedIndexFieldNames"},
     [](InitializerContext* service) {
         index_key_validate::filterAllowedIndexFieldNames =
             [](std::set<StringData>& allowedIndexFieldNames) {
@@ -136,7 +134,10 @@ GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
                 allowedIndexFieldNames.erase(IndexDescriptor::kExpireAfterSecondsFieldName);
             };
         return Status::OK();
-    });
+    },
+    DeinitializerFunction(nullptr),
+    {},
+    {"FilterAllowedIndexFieldNames"});
 }  // namespace
 
 using logger::LogComponent;
