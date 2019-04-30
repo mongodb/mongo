@@ -26,7 +26,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
             self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
             stepdown_interval_ms=8000, terminate=False, kill=False,
             use_stepdown_permitted_file=False, use_stepping_down_file=False,
-            wait_for_mongos_retarget=False):
+            wait_for_mongos_retarget=False, stepdown_via_heartbeats=True):
         """Initialize the ContinuousStepdown.
 
         Args:
@@ -41,6 +41,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
             use_stepping_down_file: use a file to denote when stepdown is active.
             wait_for_mongos_retarget: whether to run validate on all mongoses for each collection
                 in each database, after pausing the stepdown thread.
+            stepdown_via_heartbeats: step up secondaries instead of stepping down primary.
 
         Note that the "terminate" and "kill" arguments are named after the "SIGTERM" and
         "SIGKILL" signals that are used to stop the process. On Windows, there are no signals,
@@ -53,6 +54,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._shard_stepdown = shard_stepdown
         self._stepdown_interval_secs = float(stepdown_interval_ms) / 1000
         self._wait_for_mongos_retarget = wait_for_mongos_retarget
+        self._stepdown_via_heartbeats = stepdown_via_heartbeats
 
         self._rs_fixtures = []
         self._mongos_fixtures = []
@@ -86,7 +88,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._stepdown_thread = _StepdownThread(
             self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
             self._terminate, self._kill, self._stepdown_permitted_file, self._stepping_down_file,
-            self._wait_for_mongos_retarget)
+            self._wait_for_mongos_retarget, self._stepdown_via_heartbeats)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -140,7 +142,8 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate, kill,
-            stepdown_permitted_file, stepping_down_file, wait_for_mongos_retarget):
+            stepdown_permitted_file, stepping_down_file, wait_for_mongos_retarget,
+            stepdown_via_heartbeats):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -157,6 +160,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._stepdown_permitted_file = stepdown_permitted_file
         self._stepping_down_file = stepping_down_file
         self._should_wait_for_mongos_retarget = wait_for_mongos_retarget
+        self._stepdown_via_heartbeats = stepdown_via_heartbeats
 
         self._last_exec = time.time()
         # Event set when the thread has been stopped using the 'stop()' method.
@@ -272,8 +276,9 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         # Check that the fixture is still running before stepping down or killing the primary.
         # This ensures we still detect some cases in which the fixture has already crashed.
         if not rs_fixture.is_running():
-            raise errors.ServerFailure("ReplicaSetFixture expected to be running in"
-                                       " ContinuousStepdown, but wasn't.")
+            raise errors.ServerFailure("ReplicaSetFixture {} expected to be running in"
+                                       " ContinuousStepdown, but wasn't.".format(
+                                           rs_fixture.replset_name))
 
         if self._terminate:
             should_kill = self._kill and random.choice([True, False])
@@ -285,7 +290,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             # exit because clean shutdown may take a while and we want to restore write availability
             # as quickly as possible.
             primary.mongod.stop(kill=should_kill)
-        else:
+        elif not self._stepdown_via_heartbeats:
             self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
                              primary.port, rs_fixture.replset_name)
             try:
@@ -304,6 +309,11 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                     primary.port, rs_fixture.replset_name)
                 raise
 
+        # We have skipped stepping down the primary if we want to step up secondaries instead. Here,
+        # we simply need to pick an arbitrary secondary to run for election which will lead to
+        # unconditional stepdown on the primary.
+        #
+        # If we have terminated/killed/stepped down the primary above, write availability has lost.
         # We pick an arbitrary secondary to run for election immediately in order to avoid a long
         # period where the replica set doesn't have write availability. If none of the secondaries
         # are eligible, or their election attempt fails, then we'll run the replSetStepUp command on
@@ -346,11 +356,36 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                 primary.await_ready()
             finally:
                 primary.preserve_dbpath = original_preserve_dbpath
-        else:
-            # We always run the {replSetFreeze: 0} command to ensure the former primary is electable
-            # in the next round of _step_down().
+        elif not self._stepdown_via_heartbeats:
+            # If we chose to step up a secondary instead, the primary was never stepped down via the
+            # replSetStepDown command and thus will not have a stepdown period. So we can skip
+            # running {replSetFreeze: 0}. Otherwise, the replSetStepDown command run earlier
+            # introduced a stepdown period on the former primary and so we have to run the
+            # {replSetFreeze: 0} command to ensure the former primary is electable in the next
+            # round of _step_down().
             client = primary.mongo_client()
             client.admin.command({"replSetFreeze": 0})
+        elif secondaries:
+            # We successfully stepped up a secondary, wait for the former primary to step down via
+            # heartbeats. We need to wait for the former primary to step down to complete this step
+            # down round and to avoid races between the ContinuousStepdown hook and other test hooks
+            # that may depend on the health of the replica set.
+            self.logger.info(
+                "Successfully stepped up the secondary on port %d of replica set '%s'.",
+                chosen.port, rs_fixture.replset_name)
+            while True:
+                try:
+                    client = primary.mongo_client()
+                    is_secondary = client.admin.command("isMaster")["secondary"]
+                    if is_secondary:
+                        break
+                except pymongo.errors.AutoReconnect:
+                    pass
+                self.logger.info("Waiting for primary on port %d of replica set '%s' to step down.",
+                                 primary.port, rs_fixture.replset_name)
+                time.sleep(0.2)  # Wait a little bit before trying again.
+            self.logger.info("Primary on port %d of replica set '%s' stepped down.", primary.port,
+                             rs_fixture.replset_name)
 
         if not secondaries:
             # If we failed to step up one of the secondaries, then we run the replSetStepUp to try
