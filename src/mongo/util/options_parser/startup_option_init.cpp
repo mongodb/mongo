@@ -29,72 +29,70 @@
 
 #include "mongo/util/options_parser/startup_option_init.h"
 
+#include <stack>
+
+#include "mongo/util/assert_util.h"
+
 /*
  * These are the initializer groups for command line and config file option registration, parsing,
  * validation, and storage
  */
 
-/* Groups for all of option handling */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionHandling,
-                        ("GlobalLogManager", "ValidateLocale"),
-                        ("EndStartupOptionHandling"))
+namespace mongo {
+namespace {
 
-/* Groups for option registration */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionRegistration,
-                        ("BeginStartupOptionHandling"),
-                        ("EndStartupOptionRegistration"))
+std::string makeInitializer(const std::string& name,
+                            const std::vector<std::string>& after,
+                            const std::vector<std::string>& before) {
+    uassertStatusOK(getGlobalInitializer().getInitializerDependencyGraph().addInitializer(
+        name,
+        [](InitializerContext*) { return Status::OK(); },
+        [](DeinitializerContext*) { return Status::OK(); },
+        after,
+        before));
+    return name;
+}
 
-/* Groups for general option registration (useful for controlling the order in which options are
- * registered for modules, which affects the order in which they are printed in help output) */
-MONGO_INITIALIZER_GROUP(BeginGeneralStartupOptionRegistration,
-                        ("BeginStartupOptionRegistration"),
-                        ("EndGeneralStartupOptionRegistration"))
-MONGO_INITIALIZER_GROUP(EndGeneralStartupOptionRegistration,
-                        ("BeginGeneralStartupOptionRegistration"),
-                        ("EndStartupOptionRegistration"))
+// Initializer groups for general option registration. Useful for controlling the order in which
+// options are registered for modules, which affects the order in which they are printed in help
+// output.
+void StaticInit() {
+    struct NestedStages {
+        std::string name;
+        std::vector<NestedStages> children;
+    };
+    struct StackEntry {
+        const NestedStages* n;
+        std::vector<std::string> after;
+        std::vector<std::string> before;
+    };
+    const NestedStages stages{"StartupOptionHandling",
+                              {
+                                  {"StartupOptionRegistration",
+                                   {
+                                       {"GeneralStartupOptionRegistration"},  //
+                                       {"ModuleStartupOptionRegistration"},   //
+                                   }},
+                                  {"StartupOptionParsing"},
+                                  {"StartupOptionValidation"},
+                                  {"StartupOptionSetup"},
+                                  {"StartupOptionStorage"},
+                                  {"PostStartupOptionStorage"},
+                              }};
+    std::stack<StackEntry> stack{{{&stages, {"GlobalLogManager", "ValidateLocale"}, {"default"}}}};
+    while (!stack.empty()) {
+        auto top = stack.top();
+        stack.pop();
+        std::string tail = makeInitializer("Begin" + top.n->name, top.after, {});
+        for (const auto& child : top.n->children) {
+            stack.push({&child, {tail}, {}});
+            tail = "End" + child.name;
+        }
+        tail = makeInitializer("End" + top.n->name, {tail}, {top.before});
+    }
+}
 
-MONGO_INITIALIZER_GROUP(EndStartupOptionRegistration,
-                        ("BeginStartupOptionRegistration"),
-                        ("BeginStartupOptionParsing"))
+const int dummy = (StaticInit(), 0);
 
-/* Groups for option parsing */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionParsing,
-                        ("EndStartupOptionRegistration"),
-                        ("EndStartupOptionParsing"))
-MONGO_INITIALIZER_GROUP(EndStartupOptionParsing,
-                        ("BeginStartupOptionParsing"),
-                        ("BeginStartupOptionValidation"))
-
-/* Groups for option validation */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionValidation,
-                        ("EndStartupOptionParsing"),
-                        ("EndStartupOptionValidation"))
-MONGO_INITIALIZER_GROUP(EndStartupOptionValidation,
-                        ("BeginStartupOptionValidation"),
-                        ("BeginStartupOptionSetup"))
-
-/* Groups for option setup */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionSetup,
-                        ("EndStartupOptionValidation"),
-                        ("EndStartupOptionSetup"))
-MONGO_INITIALIZER_GROUP(EndStartupOptionSetup,
-                        ("BeginStartupOptionSetup"),
-                        ("BeginStartupOptionStorage"))
-
-/* Groups for option storage */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionStorage,
-                        ("EndStartupOptionSetup"),
-                        ("EndStartupOptionStorage"))
-MONGO_INITIALIZER_GROUP(EndStartupOptionStorage,
-                        ("BeginStartupOptionStorage"),
-                        ("BeginPostStartupOptionStorage"))
-
-/* Groups for post option storage */
-MONGO_INITIALIZER_GROUP(BeginPostStartupOptionStorage,
-                        ("EndStartupOptionStorage"),
-                        ("EndPostStartupOptionStorage"))
-MONGO_INITIALIZER_GROUP(EndPostStartupOptionStorage,
-                        ("BeginPostStartupOptionStorage"),
-                        ("EndStartupOptionHandling"))
-
-MONGO_INITIALIZER_GROUP(EndStartupOptionHandling, ("BeginStartupOptionHandling"), ("default"))
+}  // namespace
+}  // namespace mongo

@@ -30,114 +30,75 @@
 /**
  * Utility macros for declaring global initializers for startup options.
  *
- * Should NOT be included by other header files.  Include only in source files.
+ * Should NOT be included by other header files. Include only in source files.
  *
- * Initializer functions take a parameter of type ::mongo::InitializerContext*, and return
- * a Status.  Any status other than Status::OK() is considered a failure that will stop further
- * intializer processing.
+ * Initializer functions take a parameter of type InitializerContext*, and return
+ * a Status. Any status other than Status::OK() is considered a failure that will stop further
+ * intializer processing. See src/mongo/base/init.h for details.
  *
  * Note that currently storage and validation are done in the same stage, so do not try to do things
  * that depend on your initializer being between these two stages
  *
- * See comments in the included init.h file for more details.
+ * Note that you should only need these if you are working with options or are using an initializer
+ * before the "default" group, which is set to happen after all the option initialization is done.
+ *
+ * All of these use the same syntax. A typical example of usage:
+ *
+ *     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
+ *         return addMongodOptions(&moe::startupOptions);
+ *     }
+ *
+ * MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(fname):
+ *     Produces: "<fname>_Register".
+ *     Registers general startup options that are always in the executable.
+ *
+ * MONGO_MODULE_STARTUP_OPTIONS_REGISTER(fname):
+ *     Produces: "<fname>_Register".
+ *     Registers module startup options that are conditionally linked into the executable.
+ *     This will get run after the general startup options, and thus options registered in these
+ *     will appear after those in help output.
+ *
+ * MONGO_STARTUP_OPTIONS_PARSE(fname):
+ *     Produces: "<fname>_Parse".
+ *     Defines an initializer function to parse the command line and config file options. This
+ *     should only be defined once per binary.
+ *
+ * MONGO_STARTUP_OPTIONS_VALIDATE(fname):
+ *     Produces: "<fname>_Validate".
+ *     Defines an initializer function to validate the command line and config file options.
+ *     Warning:  Validation still currently happens in the storage stage, so do not write an
+ *     initializer that depends on them being separate.
+ *
+ * MONGO_STARTUP_OPTIONS_STORE(fname):
+ *     Produces: "<fname>_Store".
+ *     Defines an initializer function to store the command line and config file options.  This
+ *     includes setting the values of global variables and configuring global state.
+ *     Warning:  Validation still currently happens in the storage stage, so do not write an
+ *     initializer that depends on them being separate.
+ *
+ * MONGO_STARTUP_OPTIONS_POST(fname):
+ *     Produces: "<fname>_Post".
+ *     Defines an initializer function to set internal values after storing the command line and
+ *     config file options. This includes setting the values of global variables and configuring
+ *     global state.
  */
 
 #pragma once
 
 #include "mongo/base/init.h"
 
-/**
- * Helper macros to use when handling startup options
- * Note that you should only need these if you are working with options or are using an initializer
- * before the "default" group, which is set to happen after all the option initialization is done
- */
-
-/**
- * Macro to define an initializer function named "<fname>_Register" to register general startup
- * options that are always in the executable
- *
- * Usage:
- *     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
- *         return Status::OK();
- *     }
- */
-#define MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(fname)                    \
-    MONGO_INITIALIZER_GENERAL(fname##_Register,                          \
-                              ("BeginGeneralStartupOptionRegistration"), \
-                              ("EndGeneralStartupOptionRegistration"))
-
-/**
- * Macro to define an initializer function named "<fname>_Register" to register module startup
- * options that are conditionally linked into the executable.  This will get run after the general
- * startup options, and thus options registered in these will appear after those in help output.
- *
- * Usage:
- *     MONGO_MODULE_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
- *         return Status::OK();
- *     }
- */
-#define MONGO_MODULE_STARTUP_OPTIONS_REGISTER(fname)                   \
-    MONGO_INITIALIZER_GENERAL(fname##_Register,                        \
-                              ("EndGeneralStartupOptionRegistration"), \
-                              ("EndStartupOptionRegistration"))
-
-/**
- * Macro to define an initializer function named "<fname>_Parse" to parse the command line and
- * config file options.
- * This should only be defined once per binary.
- *
- * Usage:
- *     MONGO_STARTUP_OPTIONS_PARSE(MongodOptions)(InitializerContext* context) {
- *         return Status::OK();
- *     }
- */
+#define MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(fname) \
+    MONGO_STARTUP_OPTION_IN_GROUP_(fname, _Register, GeneralStartupOptionRegistration)
+#define MONGO_MODULE_STARTUP_OPTIONS_REGISTER(fname) \
+    MONGO_STARTUP_OPTION_IN_GROUP_(fname, _Register, ModuleStartupOptionRegistration)
 #define MONGO_STARTUP_OPTIONS_PARSE(fname) \
-    MONGO_INITIALIZER_GENERAL(             \
-        fname##_Parse, ("BeginStartupOptionParsing"), ("EndStartupOptionParsing"))
-
-/**
- * Macro to define an initializer function named "<fname>_Validate" to validate the command line and
- * config file options.
- *
- * Warning:  Validation still currently happens in the storage stage, so do not write an initializer
- * that depends on them being separate.
- *
- * Usage:
- *     MONGO_STARTUP_OPTIONS_PARSE(MongodOptions)(InitializerContext* context) {
- *         return Status::OK();
- *     }
- */
+    MONGO_STARTUP_OPTION_IN_GROUP_(fname, _Parse, StartupOptionParsing)
 #define MONGO_STARTUP_OPTIONS_VALIDATE(fname) \
-    MONGO_INITIALIZER_GENERAL(                \
-        fname##_Validate, ("BeginStartupOptionValidation"), ("EndStartupOptionValidation"))
-
-/**
- * Macro to define an initializer function named "<fname>_Store" to store the command line and
- * config file options.  This includes setting the values of global variables and configuring global
- * state.
- *
- * Warning:  Validation still currently happens in the storage stage, so do not write an initializer
- * that depends on them being separate.
- *
- * Usage:
- *     MONGO_STARTUP_OPTIONS_STORE(MongodOptions)(InitializerContext* context) {
- *         return Status::OK();
- *     }
- */
+    MONGO_STARTUP_OPTION_IN_GROUP_(fname, _Validate, StartupOptionValidation)
 #define MONGO_STARTUP_OPTIONS_STORE(fname) \
-    MONGO_INITIALIZER_GENERAL(             \
-        fname##_Store, ("BeginStartupOptionStorage"), ("EndStartupOptionStorage"))
-
-/**
- * Macro to define an initializer function named "<fname>_Post" to set internal values after storing
- * the command line and config file options.  This includes setting the values of global variables
- * and configuring global state.
- *
- * Usage:
- *     MONGO_STARTUP_OPTIONS_POST(MongodOptions)(InitializerContext* context) {
- *         return Status::OK();
- *     }
- */
+    MONGO_STARTUP_OPTION_IN_GROUP_(fname, _Store, StartupOptionStorage)
 #define MONGO_STARTUP_OPTIONS_POST(fname) \
-    MONGO_INITIALIZER_GENERAL(            \
-        fname##_Store, ("BeginPostStartupOptionStorage"), ("EndPostStartupOptionStorage"))
+    MONGO_STARTUP_OPTION_IN_GROUP_(fname, _Post, PostStartupOptionStorage)
+
+#define MONGO_STARTUP_OPTION_IN_GROUP_(fname, suffix, group) \
+    MONGO_INITIALIZER_GENERAL(fname##suffix, ("Begin" #group), ("End" #group))

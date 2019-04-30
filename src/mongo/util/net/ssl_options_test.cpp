@@ -89,7 +89,7 @@ Status storeSSLServerOptions() {
         return status;
     }
 
-    return executeInitializer("SSLServerOptions_Store");
+    return executeInitializer("SSLServerOptions_Post");
 }
 
 namespace test {
