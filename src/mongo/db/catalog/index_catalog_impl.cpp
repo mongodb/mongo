@@ -392,8 +392,24 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
         return status;
     }
 
-    status = _doesSpecConflictWithExisting(opCtx, swValidatedAndFixed.getValue());
+    // First check against only the ready indexes for conflicts.
+    status = _doesSpecConflictWithExisting(opCtx, swValidatedAndFixed.getValue(), false);
     if (!status.isOK()) {
+        return status;
+    }
+
+    // Now we will check against all indexes, in-progress included.
+    //
+    // The index catalog cannot currently iterate over only in-progress indexes. So by previously
+    // checking against only ready indexes without error, we know that any errors encountered
+    // checking against all indexes occurred due to an in-progress index.
+    status = _doesSpecConflictWithExisting(opCtx, swValidatedAndFixed.getValue(), true);
+    if (!status.isOK()) {
+        if (ErrorCodes::IndexAlreadyExists == status.code()) {
+            // Callers need to be able to distinguish conflicts against ready indexes versus
+            // in-progress indexes.
+            return {ErrorCodes::IndexBuildAlreadyInProgress, status.reason()};
+        }
         return status;
     }
 
@@ -413,7 +429,8 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
 
         // _doesSpecConflictWithExisting currently does more work than we require here: we are only
         // interested in the index already exists error.
-        if (ErrorCodes::IndexAlreadyExists == _doesSpecConflictWithExisting(opCtx, spec)) {
+        if (ErrorCodes::IndexAlreadyExists ==
+            _doesSpecConflictWithExisting(opCtx, spec, true /*includeUnfinishedIndexes*/)) {
             continue;
         }
 
@@ -423,11 +440,14 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
 }
 
 std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexes(
-    OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const {
+    OperationContext* const opCtx,
+    const std::vector<BSONObj>& indexSpecsToBuild,
+    const bool removeIndexBuildsToo) const {
     std::vector<BSONObj> result;
     for (const auto& spec : indexSpecsToBuild) {
         auto prepareResult = prepareSpecForCreate(opCtx, spec);
-        if (prepareResult == ErrorCodes::IndexAlreadyExists) {
+        if (prepareResult == ErrorCodes::IndexAlreadyExists ||
+            (removeIndexBuildsToo && prepareResult == ErrorCodes::IndexBuildAlreadyInProgress)) {
             continue;
         }
         uassertStatusOK(prepareResult);
@@ -756,7 +776,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 }
 
 Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
-                                                       const BSONObj& spec) const {
+                                                       const BSONObj& spec,
+                                                       const bool includeUnfinishedIndexes) const {
     const char* name = spec.getStringField("name");
     invariant(name[0]);
 
@@ -764,8 +785,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     const BSONObj collation = spec.getObjectField("collation");
 
     {
-        const IndexDescriptor* desc =
-            findIndexByName(opCtx, name, true /*includeUnfinishedIndexes*/);
+        const IndexDescriptor* desc = findIndexByName(opCtx, name, includeUnfinishedIndexes);
         if (desc) {
             // index already exists with same name
 
@@ -809,8 +829,8 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     }
 
     {
-        const IndexDescriptor* desc = findIndexByKeyPatternAndCollationSpec(
-            opCtx, key, collation, true /*includeUnfinishedIndexes*/);
+        const IndexDescriptor* desc =
+            findIndexByKeyPatternAndCollationSpec(opCtx, key, collation, includeUnfinishedIndexes);
         if (desc) {
             LOG(2) << "Index already exists with a different name: " << name << " pattern: " << key
                    << " collation: " << collation;

@@ -44,6 +44,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 /* these are administrative operations / jobs
    for a namespace running in the background, and that if in progress,
    you aren't allowed to do other NamespaceDetails major manipulations
@@ -77,6 +79,15 @@ public:
     static void awaitNoBgOpInProgForNs(const NamespaceString& ns) {
         awaitNoBgOpInProgForNs(ns.ns());
     }
+
+    /**
+     * Waits until an index build on collection 'ns' finishes. If there are no index builds in
+     * progress, returns immediately.
+     *
+     * Note: a collection lock should not be held when calling this, as that would block index
+     * builds from finishing and this function ever returning.
+     */
+    static void waitUntilAnIndexBuildFinishes(OperationContext* opCtx, StringData ns);
 
     /* check for in progress before instantiating */
     BackgroundOperation(StringData ns);

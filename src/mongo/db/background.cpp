@@ -34,6 +34,7 @@
 #include <iostream>
 #include <string>
 
+#include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -44,8 +45,6 @@
 
 namespace mongo {
 
-using std::shared_ptr;
-
 namespace {
 
 class BgInfo {
@@ -53,7 +52,7 @@ class BgInfo {
     BgInfo& operator=(const BgInfo&) = delete;
 
 public:
-    BgInfo() : _opsInProgCount(0) {}
+    BgInfo() : _opsInProgCount(0), _opRemovalsCount(0) {}
 
     void recordBegin();
     int recordEnd();
@@ -63,9 +62,13 @@ public:
         return _opsInProgCount;
     }
 
+    void waitForAnOpRemoval(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
+
 private:
     int _opsInProgCount;
     stdx::condition_variable _noOpsInProg;
+    int _opRemovalsCount;
+    stdx::condition_variable _waitForOpRemoval;
 };
 
 typedef StringMap<std::shared_ptr<BgInfo>> BgInfoMap;
@@ -83,6 +86,8 @@ void BgInfo::recordBegin() {
 int BgInfo::recordEnd() {
     dassert(_opsInProgCount > 0);
     --_opsInProgCount;
+    ++_opRemovalsCount;
+    _waitForOpRemoval.notify_all();
     if (0 == _opsInProgCount) {
         _noOpsInProg.notify_all();
     }
@@ -92,6 +97,14 @@ int BgInfo::recordEnd() {
 void BgInfo::awaitNoBgOps(stdx::unique_lock<stdx::mutex>& lk) {
     while (_opsInProgCount > 0)
         _noOpsInProg.wait(lk);
+}
+
+void BgInfo::waitForAnOpRemoval(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx) {
+    int startOpRemovalsCount = _opRemovalsCount;
+
+    // Wait for an index build to finish.
+    opCtx->waitForConditionOrInterrupt(
+        _waitForOpRemoval, lk, [&] { return startOpRemovalsCount != _opRemovalsCount; });
 }
 
 void recordBeginAndInsert(BgInfoMap& bgiMap, StringData key) {
@@ -117,6 +130,16 @@ void awaitNoBgOps(stdx::unique_lock<stdx::mutex>& lk, BgInfoMap* bgiMap, StringD
 }
 
 }  // namespace
+
+void BackgroundOperation::waitUntilAnIndexBuildFinishes(OperationContext* opCtx, StringData ns) {
+    stdx::unique_lock<stdx::mutex> lk(m);
+    std::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(nsInProg, ns, std::shared_ptr<BgInfo>());
+    if (!bgInfo) {
+        // There are no index builds in progress on the collection, so no need to wait.
+        return;
+    }
+    bgInfo->waitForAnOpRemoval(lk, opCtx);
+}
 
 bool BackgroundOperation::inProgForDb(StringData db) {
     stdx::lock_guard<stdx::mutex> lk(m);

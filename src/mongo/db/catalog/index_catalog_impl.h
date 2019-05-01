@@ -191,9 +191,9 @@ public:
     StatusWith<BSONObj> prepareSpecForCreate(OperationContext* opCtx,
                                              const BSONObj& original) const override;
 
-    std::vector<BSONObj> removeExistingIndexes(
-        OperationContext* const opCtx,
-        const std::vector<BSONObj>& indexSpecsToBuild) const override;
+    std::vector<BSONObj> removeExistingIndexes(OperationContext* const opCtx,
+                                               const std::vector<BSONObj>& indexSpecsToBuild,
+                                               const bool removeIndexBuildsToo) const override;
 
     std::vector<BSONObj> removeExistingIndexesNoChecks(
         OperationContext* const opCtx,
@@ -446,9 +446,15 @@ private:
     /**
      * Checks whether there are any spec conflicts with existing ready indexes or in-progress index
      * builds. Also checks whether any limits set on this server would be exceeded by building the
-     * index.
+     * index. 'includeUnfinishedIndexes' dictates whether in-progress index builds are checked for
+     * conflicts, along with ready indexes.
+     *
+     * Returns IndexAlreadyExists for both ready and in-progress index builds. Can also return other
+     * errors.
      */
-    Status _doesSpecConflictWithExisting(OperationContext* opCtx, const BSONObj& spec) const;
+    Status _doesSpecConflictWithExisting(OperationContext* opCtx,
+                                         const BSONObj& spec,
+                                         const bool includeUnfinishedIndexes) const;
 
     /**
      * Returns true if the replica set member's config has {buildIndexes:false} set, which means
