@@ -360,7 +360,9 @@ private:
  * rolling back node from after the common point. "ourObj" is the oplog document that needs
  * to be reverted.
  */
-Status updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo,
+Status updateFixUpInfoFromLocalOplogEntry(OperationContext* opCtx,
+                                          const OplogInterface& localOplog,
+                                          FixUpInfo& fixUpInfo,
                                           const BSONObj& ourObj,
                                           bool isNestedApplyOpsCommand);
 
