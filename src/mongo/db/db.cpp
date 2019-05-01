@@ -1355,7 +1355,7 @@ void shutdownTask() {
 
     // Shutdown and wait for the service executor to exit
     if (auto svcExec = serviceContext->getServiceExecutor()) {
-        Status status = svcExec->shutdown(Seconds(5));
+        Status status = svcExec->shutdown(Seconds(10));
         if (!status.isOK()) {
             log(LogComponent::kNetwork) << "Service executor failed to shutdown within timelimit: "
                                         << status.reason();
