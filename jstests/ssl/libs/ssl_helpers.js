@@ -225,7 +225,20 @@ function detectDefaultTLSProtocol() {
         sslDisabledProtocols: 'none',
         useLogFiles: true,
         tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
+        waitForConnect: true,
     });
+
+    assert.eq(0,
+              runMongoProgram('mongo',
+                              '--ssl',
+                              '--port',
+                              conn.port,
+                              '--sslPEMKeyFile',
+                              'jstests/libs/client.pem',
+                              '--sslCAFile',
+                              'jstests/libs/ca.pem',
+                              '--eval',
+                              ';'));
 
     const res = conn.getDB("admin").serverStatus().transportSecurity;
 

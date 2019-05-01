@@ -41,39 +41,35 @@
             sslMode: 'allowSSL',
             sslPEMKeyFile: 'jstests/libs/server.pem',
             sslCAFile: 'jstests/libs/ca.pem',
-            waitForConnect: false
+            waitForConnect: true
         };
         if (serverDP !== null) {
             serverOpts.sslDisabledProtocols = serverDP;
         }
         clearRawMongoProgramOutput();
         const mongod = MongoRunner.runMongod(serverOpts);
-        assert(mongod);
+        if (!mongod) {
+            assert(!shouldSucceed);
+            return;
+        }
 
         let clientOpts = [];
         if (clientDP !== null) {
             clientOpts = ['--sslDisabledProtocols', clientDP];
         }
-        const didSucceed = (function() {
-            try {
-                assert.soon(function() {
-                    return 0 == runMongoProgram('mongo',
-                                                '--ssl',
-                                                '--port',
-                                                mongod.port,
-                                                '--sslPEMKeyFile',
-                                                'jstests/libs/client.pem',
-                                                '--sslCAFile',
-                                                'jstests/libs/ca.pem',
-                                                ...clientOpts,
-                                                '--eval',
-                                                ';');
-                }, "Connecting to mongod", 30 * 1000);
-                return true;
-            } catch (e) {
-                return false;
-            }
-        })();
+        const didSucceed = (0 == runMongoProgram('mongo',
+                                                 '--ssl',
+                                                 '--port',
+                                                 mongod.port,
+                                                 '--sslPEMKeyFile',
+                                                 'jstests/libs/client.pem',
+                                                 '--sslCAFile',
+                                                 'jstests/libs/ca.pem',
+                                                 ...clientOpts,
+                                                 '--eval',
+                                                 ';'));
+
+        MongoRunner.stopMongod(mongod);
 
         // Exit code based success/failure.
         assert.eq(
