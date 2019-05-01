@@ -997,8 +997,13 @@ TEST_F(ExpressionRoundOneArgTest, DoubleArg1) {
     assertEval(-2.0, -2.0);
     assertEval(0.9, 1.0);
     assertEval(0.1, 0.0);
+    assertEval(1.5, 2.0);
+    assertEval(2.5, 2.0);
+    assertEval(3.5, 4.0);
     assertEval(-1.2, -1.0);
     assertEval(-1.7, -2.0);
+    assertEval(-1.5, -2.0);
+    assertEval(-2.5, -2.0);
 
     // Outside the range of long longs (there isn't enough precision for decimals in this range, so
     // should just preserve the number).
@@ -1013,8 +1018,13 @@ TEST_F(ExpressionRoundTwoArgTest, DoubleArg2) {
     assertEval(-2.0, 2.0, -2.0);
     assertEval(0.9, 0, 1.0);
     assertEval(0.1, 0, 0.0);
+    assertEval(1.5, 0, 2.0);
+    assertEval(2.5, 0, 2.0);
+    assertEval(3.5, 0, 4.0);
     assertEval(-1.2, 0, -1.0);
     assertEval(-1.7, 0, -2.0);
+    assertEval(-1.5, 0, -2.0);
+    assertEval(-2.5, 0, -2.0);
 
     assertEval(-3.14159265, 0, -3.0);
     assertEval(-3.14159265, 1, -3.1);
@@ -1044,6 +1054,9 @@ TEST_F(ExpressionRoundOneArgTest, DecimalArg1) {
     assertEval(Decimal128("-2"), Decimal128("-2.0"));
     assertEval(Decimal128("0.9"), Decimal128("1.0"));
     assertEval(Decimal128("0.1"), Decimal128("0.0"));
+    assertEval(Decimal128("0.5"), Decimal128("0.0"));
+    assertEval(Decimal128("1.5"), Decimal128("2.0"));
+    assertEval(Decimal128("2.5"), Decimal128("2.0"));
     assertEval(Decimal128("-1.2"), Decimal128("-1.0"));
     assertEval(Decimal128("-1.7"), Decimal128("-2.0"));
     assertEval(Decimal128("123456789.9999999999999999999999999"), Decimal128("123456790"));
@@ -1057,6 +1070,9 @@ TEST_F(ExpressionRoundTwoArgTest, DecimalArg2) {
     assertEval(Decimal128("-2"), 0, Decimal128("-2.0"));
     assertEval(Decimal128("0.9"), 0, Decimal128("1.0"));
     assertEval(Decimal128("0.1"), 0, Decimal128("0.0"));
+    assertEval(Decimal128("0.5"), 0, Decimal128("0.0"));
+    assertEval(Decimal128("1.5"), 0, Decimal128("2.0"));
+    assertEval(Decimal128("2.5"), 0, Decimal128("2.0"));
     assertEval(Decimal128("-1.2"), 0, Decimal128("-1.0"));
     assertEval(Decimal128("-1.7"), 0, Decimal128("-2.0"));
     assertEval(Decimal128("123456789.9999999999999999999999999"), 0, Decimal128("123456790"));
@@ -1120,6 +1136,7 @@ public:
 
 TEST_F(ExpressionTruncOneArgTest, IntArg1) {
     assertEval(0, 0);
+    assertEval(0, 0);
     assertEval(numeric_limits<int>::min(), numeric_limits<int>::min());
     assertEval(numeric_limits<int>::max(), numeric_limits<int>::max());
 }
@@ -1151,8 +1168,14 @@ TEST_F(ExpressionTruncOneArgTest, DoubleArg1) {
     assertEval(-2.0, -2.0);
     assertEval(0.9, 0.0);
     assertEval(0.1, 0.0);
+    assertEval(0.5, 0.0);
+    assertEval(1.5, 1.0);
+    assertEval(2.5, 2.0);
     assertEval(-1.2, -1.0);
     assertEval(-1.7, -1.0);
+    assertEval(-0.5, -0.0);
+    assertEval(-1.5, -1.0);
+    assertEval(-2.5, -2.0);
 
     // Outside the range of long longs (there isn't enough precision for decimals in this range, so
     // should just preserve the number).
@@ -1167,9 +1190,14 @@ TEST_F(ExpressionTruncTwoArgTest, DoubleArg2) {
     assertEval(-2.0, 2.0, -2.0);
     assertEval(0.9, 0, 0.0);
     assertEval(0.1, 0, 0.0);
+    assertEval(0.5, 0, 0.0);
+    assertEval(1.5, 0, 1.0);
+    assertEval(2.5, 0, 2.0);
     assertEval(-1.2, 0, -1.0);
     assertEval(-1.7, 0, -1.0);
-
+    assertEval(-0.5, 0, -0.0);
+    assertEval(-1.5, 0, -1.0);
+    assertEval(-2.5, 0, -2.0);
 
     assertEval(-3.14159265, 0, -3.0);
     assertEval(-3.14159265, 1, -3.1);

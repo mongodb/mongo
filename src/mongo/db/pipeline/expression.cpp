@@ -4843,32 +4843,24 @@ static Value evaluateRoundOrTrunc(const Document& root,
             str::stream() << opName << " only supports numeric types, not "
                           << typeName(numericArg.getType()),
             numericArg.numeric());
-    if (children.size() == 1) {
-        switch (numericArg.getType()) {
-            case BSONType::NumberDecimal:
-                return Value(
-                    numericArg.getDecimal().quantize(Decimal128::kNormalizedZero, roundingMode));
-            case BSONType::NumberDouble:
-                return Value(doubleOp(numericArg.getDouble()));
-            // There's no point to round/trunc integers or longs without precision argument, it will
-            // have no effect.
-            default:
-                return numericArg;
+
+    long long precisionValue = 0;
+    if (children.size() > 1) {
+        auto precisionArg = Value(children[1]->evaluate(root));
+        if (precisionArg.nullish()) {
+            return Value(BSONNULL);
         }
+        precisionValue = precisionArg.coerceToLong();
+        uassert(51082,
+                str::stream() << "precision argument to  " << opName << " must be a integral value",
+                precisionArg.integral());
+        uassert(51083,
+                str::stream() << "cannot apply " << opName << " with precision value "
+                              << precisionValue
+                              << " value must be in [-20, 100]",
+                minPrecision <= precisionValue && precisionValue <= maxPrecision);
     }
-    // Else, if precision is specified, round to the specified precision.
-    auto precisionArg = Value(children[1]->evaluate(root));
-    if (precisionArg.nullish()) {
-        return Value(BSONNULL);
-    }
-    uassert(51082,
-            str::stream() << "precision argument to  " << opName << " must be a integral value",
-            precisionArg.integral());
-    auto precisionValue = precisionArg.coerceToLong();
-    uassert(51083,
-            str::stream() << "cannot apply " << opName << " with precision value " << precisionValue
-                          << " value must be in [-20, 100]",
-            minPrecision <= precisionValue && precisionValue <= maxPrecision);
+
     // Construct 10^-precisionValue, which will be used as the quantize reference.
     auto quantum = Decimal128(0LL, Decimal128::kExponentBias - precisionValue, 0LL, 1LL);
     switch (numericArg.getType()) {
