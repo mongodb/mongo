@@ -165,15 +165,6 @@ selector:
   # TODO: SERVER-38207 Cannot insert document with MaxKey shard key.
   - jstests/core/type8.js
 
-  # TODO: SERVER-38326 mapReduce cleanup doesn't obey writeConcern, rendering
-  # txn_passthrough_cmd_massage.js ineffective for preventing 2 phase drops
-  # from contesting db/coll locks.
-  - jstests/core/function_string_representations.js
-  - jstests/core/geo_mapreduce2.js
-  - jstests/core/mr*.js
-  - jstests/core/or4.js
-  - jstests/core/temp_cleanup.js
-
   ##
   ## Some aggregation stages don't support snapshot readconcern.
   ##

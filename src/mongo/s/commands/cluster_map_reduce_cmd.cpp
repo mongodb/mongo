@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/mr.h"
 #include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -347,7 +348,8 @@ public:
 
         // Now that the output collections of the first phase ("tmp.mrs.<>") have been created, make
         // a best effort to drop them if any part of the second phase fails.
-        ON_BLOCK_EXIT([&]() { cleanUp(servers, dbname, shardResultCollection); });
+        ON_BLOCK_EXIT(
+            [&]() { cleanUp(servers, dbname, shardResultCollection, opCtx->getWriteConcern()); });
 
         {
             bool ok = true;
@@ -722,13 +724,24 @@ private:
      */
     static void cleanUp(const std::set<std::string>& servers,
                         const std::string& dbName,
-                        const std::string& shardResultCollection) {
+                        const std::string& shardResultCollection,
+                        const WriteConcernOptions& writeConcern) {
+        BSONObjBuilder dropCmdBuilder;
+        dropCmdBuilder.append("drop", shardResultCollection);
+        dropCmdBuilder.append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
+
+        auto dropCmd = dropCmdBuilder.obj();
+
         try {
             // drop collections with tmp results on each shard
             for (const auto& server : servers) {
+                BSONObj result;
                 ScopedDbConnection conn(server);
-                conn->dropCollection(dbName + "." + shardResultCollection);
+                conn->runCommand(dbName, dropCmd, result);
                 conn.done();
+
+                uassertStatusOK(getStatusFromCommandResult(result));
+                uassertStatusOK(getWriteConcernStatusFromCommandResult(result));
             }
         } catch (const DBException& e) {
             warning() << "Cannot cleanup shard results" << redact(e);
