@@ -70,6 +70,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
@@ -517,7 +518,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     // Read the last op from the oplog after cleaning up any partially applied batches.
     const auto stableTimestamp = boost::none;
     _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
-    _replicationProcess->getReplicationRecovery()->reconstructPreparedTransactions(opCtx);
+    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 
     const auto lastOpTimeAndWallTimeResult = _externalState->loadLastOpTimeAndWallTime(opCtx);
 
@@ -791,7 +792,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
             // for the recoveryTimestamp just like on replica set recovery.
             const auto stableTimestamp = boost::none;
             _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
-            _replicationProcess->getReplicationRecovery()->reconstructPreparedTransactions(opCtx);
+            reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 
             warning() << "Setting mongod to readOnly mode as a result of specifying "
                          "'recoverFromOplogAsStandalone'.";

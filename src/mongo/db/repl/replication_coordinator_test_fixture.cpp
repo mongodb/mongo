@@ -171,6 +171,10 @@ void ReplCoordTest::init(const std::string& replSet) {
 }
 
 void ReplCoordTest::start() {
+    // Skip reconstructing prepared transactions at the end of startup because ReplCoordTest doesn't
+    // construct ServiceEntryPoint and this causes a segmentation fault when
+    // reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
+    FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
     invariant(!_callShutdown);
     // if we haven't initialized yet, do that first.
     if (!_repl) {

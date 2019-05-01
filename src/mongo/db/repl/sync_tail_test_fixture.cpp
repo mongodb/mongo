@@ -107,17 +107,18 @@ OplogApplier::Options SyncTailTest::makeRecoveryOptions() {
 void SyncTailTest::setUp() {
     ServiceContextMongoDTest::setUp();
 
-    auto service = getServiceContext();
+    serviceContext = getServiceContext();
     _opCtx = cc().makeOperationContext();
 
-    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
+    ReplicationCoordinator::set(serviceContext,
+                                stdx::make_unique<ReplicationCoordinatorMock>(serviceContext));
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
 
-    _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
+    StorageInterface::set(serviceContext, stdx::make_unique<StorageInterfaceImpl>());
 
     DropPendingCollectionReaper::set(
-        service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface.get()));
-    repl::setOplogCollectionName(service);
+        serviceContext, stdx::make_unique<DropPendingCollectionReaper>(getStorageInterface()));
+    repl::setOplogCollectionName(serviceContext);
     repl::createOplog(_opCtx.get());
 
     _consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
@@ -125,7 +126,7 @@ void SyncTailTest::setUp() {
     // Set up an OpObserver to track the documents SyncTail inserts.
     auto opObserver = std::make_unique<SyncTailOpObserver>();
     _opObserver = opObserver.get();
-    auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
+    auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
     opObserverRegistry->addObserver(std::move(opObserver));
 
     // Initialize the featureCompatibilityVersion server parameter. This is necessary because this
@@ -136,12 +137,10 @@ void SyncTailTest::setUp() {
 }
 
 void SyncTailTest::tearDown() {
-    auto service = getServiceContext();
     _opCtx.reset();
-    _storageInterface = {};
     _consistencyMarkers = {};
-    DropPendingCollectionReaper::set(service, {});
-    StorageInterface::set(service, {});
+    DropPendingCollectionReaper::set(serviceContext, {});
+    StorageInterface::set(serviceContext, {});
     ServiceContextMongoDTest::tearDown();
 }
 
@@ -150,7 +149,7 @@ ReplicationConsistencyMarkers* SyncTailTest::getConsistencyMarkers() const {
 }
 
 StorageInterface* SyncTailTest::getStorageInterface() const {
-    return _storageInterface.get();
+    return StorageInterface::get(serviceContext);
 }
 
 void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,

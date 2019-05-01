@@ -19,23 +19,28 @@
     load("jstests/libs/check_log.js");
     load("jstests/core/txns/libs/prepare_helpers.js");
 
-    const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
+    const replTest = new ReplSetTest({nodes: 2});
     replTest.startSet();
-    replTest.initiate();
+
+    const config = replTest.getReplSetConfig();
+    // Increase the election timeout so that we do not accidentally trigger an election while the
+    // secondary is restarting.
+    config.settings = {"electionTimeoutMillis": 12 * 60 * 60 * 1000};
+    replTest.initiate(config);
 
     const primary = replTest.getPrimary();
     let secondary = replTest.getSecondary();
 
     const dbName = "test";
     const collName = "initial_sync_fetch_from_oldest_active_transaction_timestamp";
-    const testDB = primary.getDB(dbName);
-    const testColl = testDB.getCollection(collName);
+    let testDB = primary.getDB(dbName);
+    let testColl = testDB.getCollection(collName);
 
     assert.commandWorked(testColl.insert({_id: 1}));
 
     jsTestLog("Preparing a transaction that will later be committed");
 
-    const session1 = primary.startSession({causalConsistency: false});
+    const session1 = primary.startSession();
     const sessionDB1 = session1.getDatabase(dbName);
     const sessionColl1 = sessionDB1.getCollection(collName);
     session1.startTransaction();
@@ -47,12 +52,15 @@
     // Prepare a transaction so that there is an active transaction with an oplog entry. The
     // timestamp of the first oplog entry of this transaction will become the beginFetchingTimestamp
     // during initial sync.
-    const session2 = primary.startSession({causalConsistency: false});
-    const sessionDB2 = session2.getDatabase(dbName);
+    let session2 = primary.startSession();
+    let sessionDB2 = session2.getDatabase(dbName);
     const sessionColl2 = sessionDB2.getCollection(collName);
     session2.startTransaction();
-    assert.commandWorked(sessionColl2.insert({_id: 3}));
-    const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
+    assert.commandWorked(sessionColl2.update({_id: 1}, {_id: 1, a: 1}));
+    let prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
+
+    const lsid2 = session2.getSessionId();
+    const txnNumber2 = session2.getTxnNumber_forTesting();
 
     const oplog = primary.getDB("local").getCollection("oplog.rs");
     const txnNum = session2.getTxnNumber_forTesting();
@@ -121,6 +129,7 @@
 
     // Wait for the secondary to complete initial sync.
     replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+    replTest.awaitReplication();
 
     jsTestLog("Initial sync completed");
 
@@ -133,12 +142,64 @@
     let res = secondary.getDB(dbName).getCollection(collName).findOne({_id: 2});
     assert.docEq(res, {_id: 2}, res);
 
-    // TODO SERVER-36492: Step up the secondary, make sure that we get the prepare conflicts and
-    // lock conflicts we expect, make sure we can commit the second transaction after initial sync
-    // is done and that we can successfully run another transaction.
+    jsTestLog("Stepping up the secondary");
 
-    jsTestLog("Aborting the second transaction");
-    session2.abortTransaction_forTesting();
+    // Step up the secondary after initial sync is done and make sure the transaction is properly
+    // prepared.
+    replTest.stepUp(secondary);
+    replTest.waitForState(secondary, ReplSetTest.State.PRIMARY);
+    const newPrimary = replTest.getPrimary();
+    testDB = newPrimary.getDB(dbName);
+    testColl = testDB.getCollection(collName);
+
+    // Force the second session to use the same lsid and txnNumber as from before the restart. This
+    // ensures that we're working with the same session and transaction.
+    session2 = PrepareHelpers.createSessionWithGivenId(newPrimary, lsid2);
+    session2.setTxnNumber_forTesting(txnNumber2);
+    sessionDB2 = session2.getDatabase(dbName);
+
+    jsTestLog("Checking that the second transaction is properly prepared");
+
+    // Make sure that we can't read changes to the document from the second prepared transaction
+    // after initial sync.
+    assert.eq(testColl.find({_id: 1}).toArray(), [{_id: 1}]);
+
+    // Make sure that another write on the same document from the second transaction causes a write
+    // conflict.
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+        ErrorCodes.MaxTimeMSExpired);
+
+    // Make sure that we cannot add other operations to the second transaction since it is prepared.
+    assert.commandFailedWithCode(sessionDB2.runCommand({
+        insert: collName,
+        documents: [{_id: 3}],
+        txnNumber: NumberLong(txnNumber2),
+        stmtId: NumberInt(2),
+        autocommit: false
+    }),
+                                 ErrorCodes.PreparedTransactionInProgress);
+
+    jsTestLog("Committing the second transaction");
+
+    // Make sure we can successfully commit the second transaction after recovery.
+    assert.commandWorked(sessionDB2.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepareTimestamp2,
+        txnNumber: NumberLong(txnNumber2),
+        autocommit: false
+    }));
+    assert.eq(testColl.find({_id: 1}).toArray(), [{_id: 1, a: 1}]);
+
+    jsTestLog("Attempting to run another transaction");
+
+    // Make sure that we can run another conflicting transaction without any problems.
+    session2.startTransaction();
+    assert.commandWorked(sessionDB2[collName].update({_id: 1}, {_id: 1, a: 2}));
+    prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
+    assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp2));
+    assert.eq(testColl.findOne({_id: 1}), {_id: 1, a: 2});
 
     replTest.stopSet();
 })();

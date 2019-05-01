@@ -33,6 +33,7 @@
 
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_document.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -53,6 +54,15 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
         }
 
         originalSize = _cache.size();
+    }
+
+    // Don't allow this to read during initial sync because it will read at the initialDataTimestamp
+    // and that could conflict with reconstructing prepared transactions using the
+    // initialDataTimestamp as the prepareTimestamp.
+    if (repl::ReplicationCoordinator::get(opCtx) &&
+        repl::ReplicationCoordinator::get(opCtx)->getMemberState().startup2()) {
+        return {ErrorCodes::InitialSyncActive,
+                "Cannot refresh keys collection cache during initial sync"};
     }
 
     auto refreshStatus = _client->getNewKeys(opCtx, _purpose, newerThanThis);

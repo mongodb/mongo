@@ -56,7 +56,6 @@ StorageInterface* StorageInterface::get(OperationContext* opCtx) {
     return get(opCtx->getClient()->getServiceContext());
 }
 
-
 void StorageInterface::set(ServiceContext* service, std::unique_ptr<StorageInterface> storage) {
     auto& storageInterface = getStorageInterface(service);
     storageInterface = std::move(storage);

@@ -276,50 +276,6 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     std::terminate();
 }
 
-void ReplicationRecoveryImpl::reconstructPreparedTransactions(OperationContext* opCtx) {
-    DBDirectClient client(opCtx);
-    const auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                     {BSON("state"
-                                           << "prepared")});
-
-    // Iterate over each entry in the transactions table that has a prepared transaction.
-    while (cursor->more()) {
-        const auto txnRecordObj = cursor->next();
-        const auto txnRecord = SessionTxnRecord::parse(
-            IDLParserErrorContext("recovering prepared transaction"), txnRecordObj);
-
-        invariant(txnRecord.getState() == DurableTxnStateEnum::kPrepared);
-
-        // Get the prepareTransaction oplog entry corresponding to this transactions table entry.
-        invariant(!opCtx->recoveryUnit()->getPointInTimeReadTimestamp());
-        const auto prepareOpTime = txnRecord.getLastWriteOpTime();
-        invariant(!prepareOpTime.isNull());
-        TransactionHistoryIterator iter(prepareOpTime);
-        invariant(iter.hasNext());
-        const auto prepareOplogEntry = iter.next(opCtx);
-
-        {
-            // Make a new opCtx so that we can set the lsid when applying the prepare transaction
-            // oplog entry.
-            auto newClient =
-                opCtx->getServiceContext()->makeClient("reconstruct-prepared-transactions");
-            AlternativeClientRegion acr(newClient);
-            const auto newOpCtx = cc().makeOperationContext();
-            repl::UnreplicatedWritesBlock uwb(newOpCtx.get());
-
-            // Snapshot transaction can never conflict with the PBWM lock.
-            newOpCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-
-            // TODO: SERVER-40177 This should be removed once it is guaranteed operations applied on
-            // recovering nodes cannot encounter unnecessary prepare conflicts.
-            newOpCtx->recoveryUnit()->setIgnorePrepared(true);
-
-            // Checks out the session, applies the operations and prepares the transactions.
-            uassertStatusOK(applyRecoveredPrepareTransaction(newOpCtx.get(), prepareOplogEntry));
-        }
-    }
-}
-
 void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCtx,
                                                           Timestamp stableTimestamp,
                                                           OpTime appliedThrough,

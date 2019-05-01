@@ -1790,6 +1790,7 @@ env.Library(
         'keys_collection_document',
         'logical_time',
         'keys_collection_client_sharded',
+        'repl/repl_coordinator_interface',
     ],
 )
 

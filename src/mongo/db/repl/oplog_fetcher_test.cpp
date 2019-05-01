@@ -930,8 +930,9 @@ TEST_F(OplogFetcherTest, ValidateDocumentsReturnsOutOfOrderIfTimestampInThirdEnt
                       .getStatus());
 }
 
-TEST_F(OplogFetcherTest,
-       ValidateDocumentsExcludesFirstDocumentInApplyCountAndBytesIfProcessingFirstBatch) {
+TEST_F(
+    OplogFetcherTest,
+    ValidateDocumentsExcludesFirstDocumentInApplyCountAndBytesIfProcessingFirstBatchAndSkipFirstDoc) {
     auto firstEntry = makeNoopOplogEntry(Seconds(123));
     auto secondEntry = makeNoopOplogEntry(Seconds(456));
     auto thirdEntry = makeNoopOplogEntry(Seconds(789));
@@ -939,11 +940,37 @@ TEST_F(OplogFetcherTest,
     auto info = unittest::assertGet(OplogFetcher::validateDocuments(
         {firstEntry, secondEntry, thirdEntry},
         true,
-        unittest::assertGet(OpTime::parseFromOplogEntry(firstEntry)).getTimestamp()));
+        unittest::assertGet(OpTime::parseFromOplogEntry(firstEntry)).getTimestamp(),
+        mongo::repl::OplogFetcher::StartingPoint::kSkipFirstDoc));
 
     ASSERT_EQUALS(3U, info.networkDocumentCount);
+    ASSERT_EQUALS(2U, info.toApplyDocumentCount);
     ASSERT_EQUALS(size_t(firstEntry.objsize() + secondEntry.objsize() + thirdEntry.objsize()),
                   info.networkDocumentBytes);
+    ASSERT_EQUALS(size_t(secondEntry.objsize() + thirdEntry.objsize()), info.toApplyDocumentBytes);
+
+    ASSERT_EQUALS(unittest::assertGet(OpTime::parseFromOplogEntry(thirdEntry)), info.lastDocument);
+}
+
+TEST_F(
+    OplogFetcherTest,
+    ValidateDocumentsIncludesFirstDocumentInApplyCountAndBytesIfProcessingFirstBatchAndEnqueueFirstDoc) {
+    auto firstEntry = makeNoopOplogEntry(Seconds(123));
+    auto secondEntry = makeNoopOplogEntry(Seconds(456));
+    auto thirdEntry = makeNoopOplogEntry(Seconds(789));
+
+    auto info = unittest::assertGet(OplogFetcher::validateDocuments(
+        {firstEntry, secondEntry, thirdEntry},
+        true,
+        unittest::assertGet(OpTime::parseFromOplogEntry(firstEntry)).getTimestamp(),
+        mongo::repl::OplogFetcher::StartingPoint::kEnqueueFirstDoc));
+
+    ASSERT_EQUALS(3U, info.networkDocumentCount);
+    ASSERT_EQUALS(3U, info.toApplyDocumentCount);
+    ASSERT_EQUALS(size_t(firstEntry.objsize() + secondEntry.objsize() + thirdEntry.objsize()),
+                  info.networkDocumentBytes);
+    ASSERT_EQUALS(size_t(firstEntry.objsize() + secondEntry.objsize() + thirdEntry.objsize()),
+                  info.toApplyDocumentBytes);
 
     ASSERT_EQUALS(unittest::assertGet(OpTime::parseFromOplogEntry(thirdEntry)), info.lastDocument);
 }

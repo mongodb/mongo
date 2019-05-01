@@ -55,13 +55,6 @@ public:
      */
     virtual void recoverFromOplog(OperationContext* opCtx,
                                   boost::optional<Timestamp> stableTimestamp) = 0;
-
-    /**
-     * Reconstruct prepared transactions by iterating over the transactions table to see which
-     * transactions should be in the prepared state, getting the corresponding oplog entry and
-     * applying the operations.
-     */
-    virtual void reconstructPreparedTransactions(OperationContext* opCtx) = 0;
 };
 
 class ReplicationRecoveryImpl : public ReplicationRecovery {
@@ -74,8 +67,6 @@ public:
 
     void recoverFromOplog(OperationContext* opCtx,
                           boost::optional<Timestamp> stableTimestamp) override;
-
-    void reconstructPreparedTransactions(OperationContext* opCtx) override;
 
 private:
     /**

@@ -478,10 +478,12 @@ Status applyApplyOpsOplogEntry(OperationContext* opCtx,
                     &resultWeDontCareAbout);
 }
 
-Status applyRecoveredPrepareApplyOpsOplogEntry(OperationContext* opCtx, const OplogEntry& entry) {
+Status applyRecoveredPrepareApplyOpsOplogEntry(OperationContext* opCtx,
+                                               const OplogEntry& entry,
+                                               repl::OplogApplication::Mode mode) {
     // We might replay a prepared transaction behind oldest timestamp.
     opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
-    return _applyPrepareTransaction(opCtx, entry, OplogApplication::Mode::kRecovering);
+    return _applyPrepareTransaction(opCtx, entry, mode);
 }
 
 Status applyOps(OperationContext* opCtx,

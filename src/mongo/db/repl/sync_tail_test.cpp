@@ -1685,7 +1685,7 @@ DEATH_TEST_F(SyncTailTest,
     OplogApplier::Options options;
     SyncTail syncTail(nullptr,  // observer. not required by oplogApplication().
                       _consistencyMarkers.get(),
-                      _storageInterface.get(),
+                      getStorageInterface(),
                       applyOperationFn,
                       writerPool.get(),
                       options);
@@ -2769,8 +2769,6 @@ TEST_F(IdempotencyTest, CommitPreparedTransactionDataPartiallyApplied) {
 }
 
 TEST_F(IdempotencyTest, AbortPreparedTransaction) {
-    // TODO: SERVER-36492 Fix this test
-    return;
     createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto lsid = makeLogicalSessionId(_opCtx.get());

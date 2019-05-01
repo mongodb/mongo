@@ -61,7 +61,7 @@
     res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
     assert(res.initialSyncStatus, "Response should have an 'initialSyncStatus' field.");
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
-    assert.eq(res.initialSyncStatus.appliedOps, 2);
+    assert.eq(res.initialSyncStatus.appliedOps, 3);
     assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 0);
     assert.eq(res.initialSyncStatus.maxFailedInitialSyncAttempts, 10);
     assert.eq(res.initialSyncStatus.databases.databasesCloned, 3);

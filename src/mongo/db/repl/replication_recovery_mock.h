@@ -44,8 +44,6 @@ public:
 
     void recoverFromOplog(OperationContext* opCtx,
                           boost::optional<Timestamp> stableTimestamp) override {}
-
-    void reconstructPreparedTransactions(OperationContext* opCtx) override {}
 };
 
 }  // namespace repl

@@ -114,9 +114,11 @@ public:
      * query.
      * On success, returns statistics on operations.
      */
-    static StatusWith<DocumentsInfo> validateDocuments(const Fetcher::Documents& documents,
-                                                       bool first,
-                                                       Timestamp lastTS);
+    static StatusWith<DocumentsInfo> validateDocuments(
+        const Fetcher::Documents& documents,
+        bool first,
+        Timestamp lastTS,
+        StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
 
     /**
      * Invariants if validation fails on any of the provided arguments.

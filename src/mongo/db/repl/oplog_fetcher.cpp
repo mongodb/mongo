@@ -252,7 +252,10 @@ StatusWith<boost::optional<rpc::OplogQueryMetadata>> parseOplogQueryMetadata(
 }  // namespace
 
 StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
-    const Fetcher::Documents& documents, bool first, Timestamp lastTS) {
+    const Fetcher::Documents& documents,
+    bool first,
+    Timestamp lastTS,
+    StartingPoint startingPoint) {
     if (first && documents.empty()) {
         return Status(ErrorCodes::OplogStartMissing,
                       str::stream() << "The first batch of oplog entries is empty, but expected at "
@@ -300,7 +303,7 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
     // These numbers are for the documents we will apply.
     info.toApplyDocumentCount = documents.size();
     info.toApplyDocumentBytes = info.networkDocumentBytes;
-    if (first) {
+    if (first && startingPoint == StartingPoint::kSkipFirstDoc) {
         // The count is one less since the first document found was already applied ($gte $ts query)
         // and we will not apply it again.
         --info.toApplyDocumentCount;
@@ -466,8 +469,8 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
         }
     }
 
-    auto validateResult =
-        OplogFetcher::validateDocuments(documents, queryResponse.first, lastFetched.getTimestamp());
+    auto validateResult = OplogFetcher::validateDocuments(
+        documents, queryResponse.first, lastFetched.getTimestamp(), _startingPoint);
     if (!validateResult.isOK()) {
         return validateResult.getStatus();
     }

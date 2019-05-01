@@ -120,7 +120,7 @@ protected:
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
-    std::unique_ptr<StorageInterface> _storageInterface;
+    ServiceContext* serviceContext;
     SyncTailOpObserver* _opObserver = nullptr;
 
     // Implements the SyncTail::MultiSyncApplyFn interface and does nothing.

@@ -58,6 +58,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -433,19 +434,22 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
         return;
     }
     const auto lastAppliedOpTime = lastApplied.getValue().opTime;
+    auto initialDataTimestamp = lastAppliedOpTime.getTimestamp();
 
     // A node coming out of initial sync must guarantee at least one oplog document is visible
-    // such that others can sync from this node. Oplog visibility is not rigorously advanced
-    // during initial sync. Correct the visibility to match the initial sync time before
-    // transitioning to steady state replication.
+    // such that others can sync from this node. Oplog visibility is only advanced when applying
+    // oplog entries during initial sync. Correct the visibility to match the initial sync time
+    // before transitioning to steady state replication.
     const bool orderedCommit = true;
-    _storage->oplogDiskLocRegister(opCtx, lastAppliedOpTime.getTimestamp(), orderedCommit);
+    _storage->oplogDiskLocRegister(opCtx, initialDataTimestamp, orderedCommit);
+
+    reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
 
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
 
     // All updates that represent initial sync must be completed before setting the initial data
     // timestamp.
-    _storage->setInitialDataTimestamp(opCtx->getServiceContext(), lastAppliedOpTime.getTimestamp());
+    _storage->setInitialDataTimestamp(opCtx->getServiceContext(), initialDataTimestamp);
 
     auto currentLastAppliedOpTime = _opts.getMyLastOptime();
     if (currentLastAppliedOpTime.isNull()) {
