@@ -59,7 +59,7 @@
             [ErrorCodes.InterruptedAtShutdown, ErrorCodes.InterruptedDueToStepDown],
             "parallel shell drop cmd completed in an unexpected way: " + tojson(res));
         jsTest.log("Done dropping collection in parallel shell");
-    };
+    }
 
     // Use a failpoint to wait for the drop operation to get as close as possible to a lock request
     // before we release it and wait 1 second more for it to hopefully have time to enqueue a lock
