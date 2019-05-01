@@ -41,13 +41,19 @@
         // requests that may be sent to shards.
     ];
 
-    function runTest(st, collName, errorCode) {
+    function runTest(st, collName, errorCode, isSharded) {
         const session = st.s.startSession();
         const sessionDB = session.getDatabase(dbName);
 
         for (let commandTestCase of kCommandTestCases) {
             const commandName = commandTestCase.name;
             const commandBody = commandTestCase.command;
+
+            if (isSharded && commandName === "distinct") {
+                // Distinct isn't allowed on sharded collections in a multi-document transaction.
+                print("Skipping distinct test case for sharded collections");
+                continue;
+            }
 
             // Successfully start a transaction on one shard.
             session.startTransaction({readConcern: {level: "snapshot"}});
@@ -76,7 +82,7 @@
 
     // Single shard case simulates the storage engine discarding an in-use snapshot.
     for (let errorCode of kSnapshotErrors) {
-        runTest(st, collName, errorCode);
+        runTest(st, collName, errorCode, false /* isSharded */);
     }
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -94,7 +100,7 @@
     assert.eq(0, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
 
     for (let errorCode of kSnapshotErrors) {
-        runTest(st, collName, errorCode);
+        runTest(st, collName, errorCode, true /* isSharded */);
     }
 
     jsTestLog("Two shard transaction");
@@ -107,7 +113,7 @@
     // Multi shard case simulates adding a new participant that can no longer support the already
     // chosen read timestamp.
     for (let errorCode of kSnapshotErrors) {
-        runTest(st, collName, errorCode);
+        runTest(st, collName, errorCode, true /* isSharded */);
     }
 
     disableStaleVersionAndSnapshotRetriesWithinTransactions(st);

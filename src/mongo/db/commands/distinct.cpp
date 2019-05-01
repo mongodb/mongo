@@ -53,6 +53,8 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -179,6 +181,14 @@ public:
                     CommandHelpers::parseNsOrUUID(dbname, cmdObj),
                     AutoGetCollection::ViewMode::kViewsPermitted);
         const auto& nss = ctx->getNss();
+
+        // Distinct doesn't filter orphan documents so it is not allowed to run on sharded
+        // collections in multi-document transactions.
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                "Cannot run 'distinct' on a sharded collection in a multi-document transaction.",
+                !txnParticipant || !txnParticipant.inMultiDocumentTransaction() ||
+                    !CollectionShardingState::get(opCtx, nss)->getCurrentMetadata()->isSharded());
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         auto defaultCollation =

@@ -90,6 +90,7 @@ selector:
   - jstests/sharding/single_shard_transaction_without_majority_reads_lagged.js
   - jstests/sharding/snapshot_cursor_commands_mongos.js
   - jstests/sharding/transactions_causal_consistency.js
+  - jstests/sharding/transactions_distinct_not_allowed_on_sharded_collections.js
   - jstests/sharding/transactions_error_labels.js
   - jstests/sharding/transactions_expiration.js
   - jstests/sharding/transactions_implicit_abort.js

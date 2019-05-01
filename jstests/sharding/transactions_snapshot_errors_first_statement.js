@@ -43,13 +43,19 @@
     ];
 
     // Verify that all commands that can start a transaction are able to retry on snapshot errors.
-    function runTest(st, collName, numShardsToError, errorCode) {
+    function runTest(st, collName, numShardsToError, errorCode, isSharded) {
         const session = st.s.startSession();
         const sessionDB = session.getDatabase(dbName);
 
         for (let commandTestCase of kCommandTestCases) {
             const commandName = commandTestCase.name;
             const commandBody = commandTestCase.command;
+
+            if (isSharded && commandName === "distinct") {
+                // Distinct isn't allowed on sharded collections in a multi-document transaction.
+                print("Skipping distinct test case for sharded collection");
+                continue;
+            }
 
             //
             // Retry on a single error.
@@ -117,7 +123,7 @@
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
     for (let errorCode of kSnapshotErrors) {
-        runTest(st, collName, 1, errorCode, false);
+        runTest(st, collName, 1, errorCode, false /* isSharded */);
     }
 
     // Enable sharding and set up 2 chunks, [minKey, 10), [10, maxKey), each with one document
@@ -135,7 +141,7 @@
     assert.eq(0, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
 
     for (let errorCode of kSnapshotErrors) {
-        runTest(st, collName, 1, errorCode, false);
+        runTest(st, collName, 1, errorCode, true /* isSharded */);
     }
 
     jsTestLog("Two shard sharded transaction");
@@ -146,12 +152,12 @@
     assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
 
     for (let errorCode of kSnapshotErrors) {
-        runTest(st, collName, 2, errorCode, true);
+        runTest(st, collName, 2, errorCode, true /* isSharded */);
     }
 
     // Test only one shard throwing the error when more than one are targeted.
     for (let errorCode of kSnapshotErrors) {
-        runTest(st, collName, 1, errorCode, true);
+        runTest(st, collName, 1, errorCode, true /* isSharded */);
     }
 
     disableStaleVersionAndSnapshotRetriesWithinTransactions(st);

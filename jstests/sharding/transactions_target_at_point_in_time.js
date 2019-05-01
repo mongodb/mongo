@@ -58,13 +58,6 @@
           ]
         },
         {
-          name: "distinct",
-          commandFuncs: [
-              (coll) => coll.distinct("_id", {_id: -5}).length,
-              (coll) => coll.distinct("_id", {_id: 5}).length,
-          ]
-        },
-        {
           name: "find",
           commandFuncs: [
               (coll) => coll.find({_id: -5}).itcount(),
