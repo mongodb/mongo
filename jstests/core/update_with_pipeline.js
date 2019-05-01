@@ -132,15 +132,6 @@
         coll.update({_id: 1}, [{$addFields: {x: 1}}], {arrayFilters: [{x: {$eq: 1}}]}),
         ErrorCodes.FailedToParse);
 
-    // The 'bypassDocumentValidation' option is not yet supported for pipeline updates.
-    // TODO SERVER-40400: Remove once bypassDocumentValidation is supported and tested.
-    assert.commandFailedWithCode(db.runCommand({
-        update: collName,
-        updates: [{q: {_id: 1}, u: [{$addFields: {x: 1}}]}],
-        bypassDocumentValidation: true
-    }),
-                                 ErrorCodes.NotImplemented);
-
     // The 'writeConcern' option is not yet supported for pipeline updates.
     // TODO SERVER-40402: Remove once writeConcern is supported and tested.
     assert.commandFailedWithCode(db.runCommand({

@@ -1,4 +1,6 @@
-// @tags: [does_not_support_stepdowns, requires_non_retryable_commands, requires_fastcount]
+// TODO SERVER-40402: Remove 'assumes_write_concern_unchanged' tag.
+// @tags: [does_not_support_stepdowns, requires_non_retryable_commands, requires_fastcount,
+// assumes_write_concern_unchanged]
 
 /**
  * Tests that various database commands respect the 'bypassDocumentValidation' flag:
@@ -144,6 +146,24 @@
         });
         assert.writeOK(res);
         assert.eq(1, coll.count({update: 1}));
+
+        // We restrict testing pipeline-style update to commands as they are not supported for
+        // OP_UPDATE which cannot differentiate between an update object and an array.
+        if (myDb.getMongo().writeMode() === "commands") {
+            res = myDb.runCommand({
+                update: collName,
+                updates: [{q: {}, u: [{$addFields: {pipeline: 1}}]}],
+                bypassDocumentValidation: false
+            });
+            assertFailsValidation(BulkWriteResult(res));
+            assert.eq(0, coll.count({pipeline: 1}));
+            res = assert.commandWorked(myDb.runCommand({
+                update: collName,
+                updates: [{q: {}, u: [{$addFields: {pipeline: 1}}]}],
+                bypassDocumentValidation: true
+            }));
+            assert.eq(1, coll.count({pipeline: 1}));
+        }
     }
 
     // Run the test using a normal validator.
