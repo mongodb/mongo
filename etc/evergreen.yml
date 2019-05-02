@@ -3275,6 +3275,7 @@ functions:
     command: attach.artifacts
     params:
       optional: true
+      ignore_artifacts_for_spawn: false
       files:
         - ${archive_file|src/archive.json}
 
@@ -3452,22 +3453,6 @@ tasks:
           - "artifacts.json"
         exclude_files:
           - "*_test.pdb"
-    - command: shell.exec
-      params:
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${activate_virtualenv}
-          $python -c 'import json; print(json.dumps([{
-            "name": "mongo-debugsymbols.tgz",
-            "link": "https://s3.amazonaws.com/mciuploads/${mongo_debugsymbols}",
-            "visibility": "public"
-          }]))' > debugsymbols_location.json
-    - command: attach.artifacts
-      params:
-        files:
-          - debugsymbols_location.json
     - command: s3.put
       params:
         optional: true
@@ -3551,6 +3536,7 @@ tasks:
     - command: attach.artifacts
       params:
         optional: true
+        ignore_artifacts_for_spawn: false
         files:
           - src/artifacts.json
 
