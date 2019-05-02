@@ -91,42 +91,51 @@
 
         const session = db.getMongo().startSession({causalConsistency: false});
         const sessionDB = session.getDatabase(TestData.dbName);
-        session.startTransaction({readConcern: {level: 'snapshot'}});
 
         const oplogVisibility = function() {
             jsTestLog("Snapshot reads should not block on oplog visibility.");
+            session.startTransaction({readConcern: {level: 'snapshot'}});
             let cursor = assert.commandWorked(sessionDB.runCommand({
                 find: _collName,
                 filter: TestData.txnDocFilter,
                 maxTimeMS: TestData.successTimeout
             }));
             assert.sameMembers(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
+            assert.commandWorked(session.abortTransaction_forTesting());
+
+            session.startTransaction({readConcern: {level: 'snapshot'}});
             cursor = assert.commandWorked(sessionDB.runCommand({
                 find: _collName,
                 filter: TestData.otherDocFilter,
                 maxTimeMS: TestData.successTimeout
             }));
             assert.sameMembers(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
+            assert.commandWorked(session.abortTransaction_forTesting());
         };
 
         const prepareConflict = function() {
-            jsTestLog("Snapshot reads should succeed on prepared transactions for " +
+            jsTestLog("Snapshot reads should block on prepared transactions for " +
                       "conflicting documents.");
-            let cursor = assert.commandWorked(sessionDB.runCommand({
+            session.startTransaction({readConcern: {level: 'snapshot'}});
+            let cursor = assert.commandFailedWithCode(sessionDB.runCommand({
                 find: _collName,
                 filter: TestData.txnDocFilter,
-                maxTimeMS: TestData.successTimeout
-            }));
-            assert.sameMembers(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
+                maxTimeMS: TestData.failureTimeout
+            }),
+                                                      ErrorCodes.MaxTimeMSExpired);
+            assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                         ErrorCodes.NoSuchTransaction);
 
             jsTestLog("Snapshot reads should succeed on non-conflicting documents while a " +
                       "transaction is in prepare.");
+            session.startTransaction({readConcern: {level: 'snapshot'}});
             cursor = assert.commandWorked(sessionDB.runCommand({
                 find: _collName,
                 filter: TestData.otherDocFilter,
                 maxTimeMS: TestData.successTimeout
             }));
             assert.sameMembers(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
+            assert.commandWorked(session.abortTransaction_forTesting());
         };
 
         return {oplogVisibility: oplogVisibility, prepareConflict: prepareConflict};
