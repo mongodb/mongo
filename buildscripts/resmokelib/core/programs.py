@@ -119,6 +119,9 @@ def mongod_program(  # pylint: disable=too-many-branches
     if "replSet" in kwargs and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters:
         suite_set_parameters["waitForStepDownOnNonCommandShutdown"] = False
 
+    if "enableFlowControl" not in suite_set_parameters:
+        suite_set_parameters["enableFlowControl"] = config.FLOW_CONTROL
+
     _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {
@@ -271,6 +274,10 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     mongod_set_parameters.setdefault("logComponentVerbosity",
                                      default_mongod_log_component_verbosity())
 
+    # If the 'enableFlowControl' setParameter for mongod was not already specified, we set its value
+    # to a default.
+    mongod_set_parameters.setdefault("enableFlowControl", config.FLOW_CONTROL)
+
     # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
     # value to a default.
     mongos_set_parameters.setdefault("logComponentVerbosity",
@@ -381,6 +388,8 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
     kwargs["enableMajorityReadConcern"] = config.MAJORITY_READ_CONCERN
     if config.STORAGE_ENGINE is not None:
         kwargs["storageEngine"] = config.STORAGE_ENGINE
+
+    kwargs["flowControl"] = config.FLOW_CONTROL
 
     return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 

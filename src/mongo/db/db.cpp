@@ -127,6 +127,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/encryption_hooks.h"
+#include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
@@ -434,6 +435,10 @@ ExitCode _initAndListen(int listenPort) {
     // featureCompatibilityVersion parameter to still be uninitialized until after startup.
     if (canCallFCVSetIfCleanStartup && (!replSettings.usingReplSets() || nonLocalDatabases)) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
+    }
+
+    if (gFlowControlEnabled.load()) {
+        log() << "Flow Control is enabled on this deployment.";
     }
 
     if (storageGlobalParams.upgrade) {

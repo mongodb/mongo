@@ -248,6 +248,11 @@ def _make_parser():  # pylint: disable=too-many-statements
                  "off"), metavar="ON|OFF", help=("Enable or disable majority read concern support."
                                                  " Defaults to %default."))
 
+    parser.add_option("--flowControl", type="choice", action="store", dest="flow_control",
+                      choices=("on",
+                               "off"), metavar="ON|OFF", help=("Enable or disable flow control."
+                                                               " Defaults to %default."))
+
     parser.add_option("--storageEngine", dest="storage_engine", metavar="ENGINE",
                       help="The storage engine used by dbtests and jstests.")
 
@@ -377,7 +382,8 @@ def _make_parser():  # pylint: disable=too-many-statements
 
     parser.set_defaults(benchrun_device="Desktop", dry_run="off", find_suites=False,
                         list_suites=False, logger_file="console", shuffle="auto",
-                        stagger_jobs="off", suite_files="with_server", majority_read_concern="on")
+                        stagger_jobs="off", suite_files="with_server", majority_read_concern="on",
+                        flow_control="on")
     return parser
 
 
@@ -565,6 +571,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.EXCLUDE_WITH_ANY_TAGS.extend(
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
     _config.FAIL_FAST = not config.pop("continue_on_failure")
+    _config.FLOW_CONTROL = config.pop("flow_control") == "on"
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")

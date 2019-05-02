@@ -54,6 +54,7 @@ DEFAULTS = {
     "dbtest_executable": None,
     "dry_run": None,
     "exclude_with_any_tags": None,
+    "flow_control": None,
     "genny_executable": None,
     "include_with_any_tags": None,
     "jobs": 1,
@@ -371,6 +372,9 @@ STAGGER_JOBS = None
 
 # If set to true, it enables read concern majority. Else, read concern majority is disabled.
 MAJORITY_READ_CONCERN = None
+
+# If set to true, it enables flow control. Else, flow control is disabled.
+FLOW_CONTROL = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine.

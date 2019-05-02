@@ -388,6 +388,7 @@ variables:
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-62-64-bit-coverage
   - enterprise-rhel-62-64-bit-inmem
+  - enterprise-rhel-62-64-bit-flow-control-off
   - enterprise-rhel-62-64-bit-majority-read-concern-off
   - enterprise-rhel-62-64-bit-required-inmem
   - enterprise-rhel-62-64-bit-required-majority-read-concern-off
@@ -11074,6 +11075,247 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
   - name: sharded_jscore_txns_without_snapshot
   - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_op_query_passthrough
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
+  - name: serial_run
+  - name: snmp
+  - name: ssl_gen
+  - name: sslSpecial_gen
+  - name: tool
+  - name: update_fuzzer_gen
+  - name: update_fuzzer_replication_gen
+  - name: write_concern_majority_passthrough
+    distros:
+    - rhel62-large
+  - name: secondary_reads_passthrough_gen
+
+- name: enterprise-rhel-62-64-bit-flow-control-off
+  display_name: "Enterprise RHEL 6.2 (flow control off)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions: &enterprise-rhel-62-64-bit-flow-control-off
+    test_flags: >-
+      --flowControl=off
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --ssl
+      --release
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      MONGO_DISTMOD=rhel62
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+    large_distro_name: rhel62-large
+  display_tasks:
+  - *dbtest
+  tasks:
+  - name: compile_TG
+    distros:
+    - rhel62-large
+  - name: dbtest_TG
+    distros:
+    - rhel62-large
+  - name: rollback_fuzzer_gen
+  - name: rollback_fuzzer_clean_shutdowns_gen
+  - name: rollback_fuzzer_unclean_shutdowns_gen
+  - name: aggregation
+  - name: aggregation_ese
+  - name: aggregation_ese_gcm
+  - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough
+  - name: aggregation_mongos_passthrough
+  - name: aggregation_one_shard_sharded_collections
+  - name: aggregation_read_concern_majority_passthrough
+  - name: aggregation_sharded_collections_passthrough
+  - name: audit
+  - name: auth_gen
+  - name: auth_audit_gen
+  - name: bulk_gle_passthrough
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
+  - name: change_streams
+  - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
+  - name: change_streams_secondary_reads
+  - name: change_streams_sharded_collections_passthrough
+  - name: change_streams_whole_db_passthrough
+  - name: change_streams_whole_db_mongos_passthrough
+  - name: change_streams_whole_db_secondary_reads_passthrough
+  - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_secondary_reads_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
+  - name: concurrency
+  - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
+  - name: concurrency_replication_multi_stmt_txn
+  - name: concurrency_sharded_replication
+  - name: concurrency_sharded_replication_with_balancer
+  - name: concurrency_sharded_causal_consistency_gen
+  - name: concurrency_sharded_causal_consistency_and_balancer
+  - name: concurrency_sharded_local_read_write_multi_stmt_txn
+  - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
+  - name: concurrency_sharded_multi_stmt_txn
+  - name: concurrency_sharded_multi_stmt_txn_with_balancer
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns_and_balancer
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
+  - name: disk_wiredtiger
+  - name: ese
+  - name: failpoints
+  - name: failpoints_auth
+  - name: fle
+  - name: gle_auth
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_write_cmd
+  - name: initial_sync_fuzzer_gen
+  - name: integration_tests_replset
+    distros:
+    - rhel62-large
+  - name: integration_tests_sharded
+    distros:
+    - rhel62-large
+  - name: integration_tests_standalone
+    distros:
+    - rhel62-large
+  - name: integration_tests_standalone_audit
+    distros:
+    - rhel62-large
+  - name: jsCore
+  - name: jsCore_ese
+  - name: jsCore_ese_gcm
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_decimal
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_op_query
+  - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: jsonSchema
+  - name: aggregation_multiversion_fuzzer_gen
+  - name: aggregation_expression_multiversion_fuzzer_gen
+  - name: aggregation_wildcard_fuzzer_gen
+  - name: jstestfuzz_gen
+  - name: jstestfuzz_concurrent_gen
+  - name: jstestfuzz_concurrent_replication_gen
+  - name: jstestfuzz_concurrent_replication_session_gen
+  - name: jstestfuzz_concurrent_sharded_gen
+  - name: jstestfuzz_concurrent_sharded_causal_consistency_gen
+  - name: jstestfuzz_concurrent_sharded_continuous_stepdown_gen
+  - name: jstestfuzz_concurrent_sharded_session_gen
+  - name: jstestfuzz_interrupt_gen
+  - name: jstestfuzz_interrupt_replication_gen
+  - name: jstestfuzz_replication_gen
+  - name: jstestfuzz_replication_initsync_gen
+  - name: jstestfuzz_replication_session_gen
+  - name: jstestfuzz_sharded_gen
+  - name: jstestfuzz_sharded_causal_consistency_gen
+  - name: jstestfuzz_sharded_continuous_stepdown_gen
+  - name: jstestfuzz_sharded_session_gen
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
+  - name: mongosTest
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+  - name: multiversion_auth
+  - name: multiversion
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
+  - name: parallel_compatibility
+  - name: read_concern_linearizable_passthrough
+    distros:
+    - rhel62-large
+  - name: read_concern_majority_passthrough_gen
+  - name: read_only
+  - name: read_only_sharded
+  - name: replica_sets
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_gen
+  - name: replica_sets_ese_gen
+  - name: replica_sets_ese_gcm_gen
+  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_initsync_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_static_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_multi_oplog_txns_gen
+  - name: replica_sets_multi_oplog_txns_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+    distros:
+    - rhel62-large
+  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_kill_primary_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_terminate_primary_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_kill_secondaries_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough
+    distros:
+    - rhel62-large
+  - name: sasl
+  - name: session_jscore_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_jscore_txns
+  - name: sharded_jscore_txns_sharded_collections
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel62-large
   - name: sharding_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen

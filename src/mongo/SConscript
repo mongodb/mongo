@@ -393,6 +393,7 @@ mongod = env.Program(
         'db/storage/devnull/storage_devnull',
         'db/storage/ephemeral_for_test/storage_ephemeral_for_test',
         'db/storage/flow_control',
+        'db/storage/flow_control_parameters',
         'db/storage/storage_engine_lock_file',
         'db/storage/storage_engine_metadata',
         'db/storage/storage_init_d',

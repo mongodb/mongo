@@ -93,6 +93,11 @@ configs:
         arg_vartype: String
         short_name: storageEngine
         default: wiredTiger
+    enableFlowControl:
+        description: 'Whether Flow Control is enabled'
+        arg_vartype: Bool
+        short_name: flowControl
+        default: true
     suites:
         description: 'Test suites to run'
         arg_vartype: StringVector
