@@ -108,6 +108,9 @@ var $config = extendWorkload($config, function($config, $super) {
                 let chosenThread = Random.randInt(this.threadCount);
 
                 choseThisThread = choseThisThread || chosenThread === tid;
+                // If this is the last document being inserted into the partition, and no document
+                // from this partition has yet been assigned to the current thread, assign this
+                // document to the current thread.
                 if (i === partition.upper - 1 && !choseThisThread) {
                     chosenThread = tid;
                 }
