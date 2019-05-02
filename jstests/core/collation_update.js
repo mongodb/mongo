@@ -1,7 +1,6 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// TODO SERVER-40402: Remove 'assumes_write_concern_unchanged' tag.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, assumes_write_concern_unchanged]
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
 
 // Integration tests for collation-aware updates.
 (function() {

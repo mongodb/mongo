@@ -54,6 +54,26 @@
 
     commands.push({
         req: {
+            update: collName,
+            updates: [{
+                q: {type: 'oak'},
+                u: [{$addFields: {type: 'ginkgo'}}],
+            }],
+            writeConcern: {w: 'majority'}
+        },
+        setupFunc: function() {
+            coll.insert({type: 'oak'});
+            assert.eq(coll.count({type: 'ginkgo'}), 0);
+            assert.eq(coll.count({type: 'oak'}), 1);
+        },
+        confirmFunc: function() {
+            assert.eq(coll.count({type: 'ginkgo'}), 1);
+            assert.eq(coll.count({type: 'oak'}), 0);
+        }
+    });
+
+    commands.push({
+        req: {
             findAndModify: collName,
             query: {type: 'oak'},
             update: {$set: {type: 'ginkgo'}},

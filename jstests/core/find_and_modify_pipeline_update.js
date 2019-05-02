@@ -1,7 +1,7 @@
 /**
  * Tests the pipeline-style update is accepted by the findAndModify command.
  *
- * TODO SERVER-40402: Remove 'assumes_write_concern_unchanged' tag.
+ * TODO SERVER-40403: Remove 'assumes_write_concern_unchanged' tag.
  * @tags: [assumes_write_concern_unchanged]
  */
 (function() {

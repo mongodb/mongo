@@ -3,12 +3,14 @@
  *
  * 'requires_find_command' needed to prevent this test from running with 'compatibility' write mode
  * as pipeline-style update is not supported by OP_UPDATE.
- * TODO SERVER-40402: Remove 'assumes_write_concern_unchanged' tag.
  *
- * @tags: [requires_find_command, assumes_write_concern_unchanged]
+ * @tags: [requires_find_command, requires_non_retryable_writes]
  */
 (function() {
     "use strict";
+
+    load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+
     const collName = "update_with_pipeline";
     const coll = db[collName];
 
@@ -76,14 +78,19 @@
         nModified: 2,
         options: {multi: true}
     });
-    testUpdate({
-        query: {_id: {$in: [1, 2]}},
-        initialDocumentList: [{_id: 1, x: 1}, {_id: 2, x: 2}],
-        update: [{$addFields: {bar: 4}}],
-        resultDocList: [{_id: 1, x: 1, bar: 4}, {_id: 2, x: 2, bar: 4}],
-        nModified: 1,
-        options: {multi: false}
-    });
+
+    // This test will fail in a sharded cluster when the 2 initial documents live on different
+    // shards.
+    if (!FixtureHelpers.isMongos(db)) {
+        testUpdate({
+            query: {_id: {$in: [1, 2]}},
+            initialDocumentList: [{_id: 1, x: 1}, {_id: 2, x: 2}],
+            update: [{$addFields: {bar: 4}}],
+            resultDocList: [{_id: 1, x: 1, bar: 4}, {_id: 2, x: 2, bar: 4}],
+            nModified: 1,
+            options: {multi: false}
+        });
+    }
 
     // Upsert performs insert.
     testUpsertDoesInsert({_id: 1, x: 1}, [{$addFields: {foo: 4}}], {_id: 1, x: 1, foo: 4});
@@ -131,14 +138,4 @@
     assert.commandFailedWithCode(
         coll.update({_id: 1}, [{$addFields: {x: 1}}], {arrayFilters: [{x: {$eq: 1}}]}),
         ErrorCodes.FailedToParse);
-
-    // The 'writeConcern' option is not yet supported for pipeline updates.
-    // TODO SERVER-40402: Remove once writeConcern is supported and tested.
-    assert.commandFailedWithCode(db.runCommand({
-        update: collName,
-        updates: [{q: {_id: 1}, u: [{$addFields: {x: 1}}]}],
-        writeConcern: {w: 1}
-    }),
-                                 ErrorCodes.NotImplemented);
-
 })();
