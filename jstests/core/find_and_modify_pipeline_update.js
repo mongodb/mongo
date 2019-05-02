@@ -1,8 +1,5 @@
 /**
  * Tests the pipeline-style update is accepted by the findAndModify command.
- *
- * TODO SERVER-40403: Remove 'assumes_write_concern_unchanged' tag.
- * @tags: [assumes_write_concern_unchanged]
  */
 (function() {
     "use strict";
@@ -38,11 +35,6 @@
     err = assert.throws(() => coll.findAndModify(
                             {query: {_id: 1}, update: [{$addFields: {y: 1}}], sort: {_id: -1}}));
     assert.eq(err.code, ErrorCodes.NotImplemented);
-
-    // SERVER-40403 Add support for writeConcern.
-    err =
-        assert.throws(() => coll.findAndModify(
-                          {query: {_id: 1}, update: [{$addFields: {y: 1}}], writeConcern: {w: 1}}));
 
     // SERVER-40401 Add support for bypassDocumentValidation.
     err = assert.throws(

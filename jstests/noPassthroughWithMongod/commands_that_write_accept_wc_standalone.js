@@ -70,6 +70,24 @@
     });
 
     commands.push({
+        req: {
+            findAndModify: collName,
+            query: {type: 'oak'},
+            update: [{$addFields: {type: 'ginkgo'}}],
+            writeConcern: {w: 'majority'}
+        },
+        setupFunc: function() {
+            coll.insert({type: 'oak'});
+            assert.eq(coll.count({type: 'ginkgo'}), 0);
+            assert.eq(coll.count({type: 'oak'}), 1);
+        },
+        confirmFunc: function() {
+            assert.eq(coll.count({type: 'ginkgo'}), 1);
+            assert.eq(coll.count({type: 'oak'}), 0);
+        }
+    });
+
+    commands.push({
         req: {applyOps: [{op: "i", ns: coll.getFullName(), o: {_id: 1, type: "willow"}}]},
         setupFunc: function() {
             coll.insert({_id: 1, type: 'oak'});

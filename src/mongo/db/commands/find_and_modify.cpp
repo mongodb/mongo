@@ -214,11 +214,7 @@ public:
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
-        const auto request(uassertStatusOK(FindAndModifyRequest::parseFromBSON(
-            CommandHelpers::parseNsCollectionRequired("test", cmd), cmd)));
-        // TODO SERVER-40403 Add testing for write concern.
-        return request.isRemove() ||
-            request.getUpdate()->type() == write_ops::UpdateModification::Type::kClassic;
+        return true;
     }
 
     void addRequiredPrivileges(const std::string& dbname,
