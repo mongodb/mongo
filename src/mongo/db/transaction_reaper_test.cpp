@@ -71,14 +71,10 @@ TEST_F(TransactionReaperTest, ReapSomeExpiredSomeNot) {
     _collectionMock->add(LogicalSessionRecord(makeLogicalSessionIdForTest(), clock()->now()));
 
     DBDirectClient client(_opCtx);
-    SessionTxnRecord txn1(makeLogicalSessionIdForTest(),
-                          100,
-                          repl::OpTime(Timestamp(100), 1),
-                          clock()->now());
-    SessionTxnRecord txn2(makeLogicalSessionIdForTest(),
-                          200,
-                          repl::OpTime(Timestamp(200), 1),
-                          clock()->now());
+    SessionTxnRecord txn1(
+        makeLogicalSessionIdForTest(), 100, repl::OpTime(Timestamp(100), 1), clock()->now());
+    SessionTxnRecord txn2(
+        makeLogicalSessionIdForTest(), 200, repl::OpTime(Timestamp(200), 1), clock()->now());
 
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                   std::vector{txn1.toBSON(), txn2.toBSON()});
