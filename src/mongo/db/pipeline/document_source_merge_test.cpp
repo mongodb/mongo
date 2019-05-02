@@ -47,7 +47,7 @@ constexpr StringData kWhenNotMatchedModeFieldName =
 constexpr StringData kIntoFieldName = DocumentSourceMergeSpec::kTargetNssFieldName;
 constexpr StringData kOnFieldName = DocumentSourceMergeSpec::kOnFieldName;
 const StringData kDefaultWhenMatchedMode =
-    MergeWhenMatchedMode_serializer(MergeWhenMatchedModeEnum::kReplaceWithNew);
+    MergeWhenMatchedMode_serializer(MergeWhenMatchedModeEnum::kMerge);
 const StringData kDefaultWhenNotMatchedMode =
     MergeWhenNotMatchedMode_serializer(MergeWhenNotMatchedModeEnum::kInsert);
 
@@ -600,6 +600,14 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
                                  << "target_collection"
                                  << "whenMatched"
                                  << "merge"
+                                 << "whenNotMatched"
+                                 << "insert"));
+    ASSERT(createMergeStage(spec));
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
+                                 << "keepExisting"
                                  << "whenNotMatched"
                                  << "insert"));
     ASSERT_THROWS_CODE(createMergeStage(spec), DBException, ErrorCodes::BadValue);

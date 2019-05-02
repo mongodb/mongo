@@ -60,10 +60,11 @@ using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
 using BatchTransform = std::function<void(DocumentSourceMerge::BatchedObjects&)>;
 
 constexpr auto kStageName = DocumentSourceMerge::kStageName;
-constexpr auto kDefaultWhenMatched = WhenMatched::kReplaceWithNew;
+constexpr auto kDefaultWhenMatched = WhenMatched::kMerge;
 constexpr auto kDefaultWhenNotMatched = WhenNotMatched::kInsert;
 constexpr auto kReplaceWithNewInsertMode =
     MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kInsert};
+constexpr auto kMergeInsertMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kInsert};
 constexpr auto kFailInsertMode = MergeMode{WhenMatched::kFail, WhenNotMatched::kInsert};
 
 /**
@@ -99,6 +100,19 @@ MergeStrategy makeInsertStrategy() {
 }
 
 /**
+ * Creates a batched objects transformation function which wraps each element of the 'batch.objects'
+ * array into the given 'updateOp' operator.
+ */
+BatchTransform makeUpdateTransform(const std::string& updateOp) {
+    return [updateOp](auto& batch) {
+        std::transform(batch.objects.begin(),
+                       batch.objects.end(),
+                       batch.objects.begin(),
+                       [updateOp](const auto& obj) { return BSON(updateOp << obj); });
+    };
+}
+
+/**
  * Returns a map that contains descriptors for all supported merge strategies for the $merge stage.
  * Each descriptor is constant and stateless and thus, can be shared by all $merge stages. A
  * descriptor is accessed using a pair of whenMatched/whenNotMatched merge modes, which defines the
@@ -118,6 +132,10 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
          {kReplaceWithNewInsertMode,
           {ActionType::insert, ActionType::update},
           makeUpdateStrategy(true, {})}},
+        {kMergeInsertMode,
+         {kMergeInsertMode,
+          {ActionType::insert, ActionType::update},
+          makeUpdateStrategy(true, makeUpdateTransform("$set"))}},
         {kFailInsertMode, {kFailInsertMode, {ActionType::insert}, makeInsertStrategy()}}};
     return mergeStrategyDescriptors;
 }
