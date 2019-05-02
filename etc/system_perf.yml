@@ -534,6 +534,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: genny_overhead
+  priority: 5
+  commands:
+  - func: "prepare environment"
+    vars:
+      test: "genny_overhead"
+  - func: "deploy cluster"
+  - func: "run test"
+  - func: "analyze"
+
 - name: retryable_writes_workloads
   priority: 5
   commands:
@@ -874,6 +884,7 @@ buildvariants:
     - name: crud_workloads
     - name: jasper_smoke
     - name: genny_canaries
+    - name: genny_overhead
     - name: cursor_manager
     - name: insert_remove
     - name: mixed_workloads
