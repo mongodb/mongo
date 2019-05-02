@@ -59,16 +59,16 @@ class TestTestStats(unittest.TestCase):
 
     @staticmethod
     def _make_evg_result(test_file="dir/test1.js", num_pass=0, duration=0):
-        return {
-            "test_file": test_file,
-            "task_name": "task1",
-            "variant": "variant1",
-            "distro": "distro1",
-            "date": _DATE,
-            "num_pass": num_pass,
-            "num_fail": 0,
-            "avg_duration_pass": duration,
-        }
+        return Mock(
+            test_file=test_file,
+            task_name="task1",
+            variant="variant1",
+            distro="distro1",
+            date=_DATE,
+            num_pass=num_pass,
+            num_fail=0,
+            avg_duration_pass=duration,
+        )
 
 
 class DivideRemainingTestsAmongSuitesTest(unittest.TestCase):
@@ -411,13 +411,13 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
         cfg_generator = grt.EvergreenConfigGenerator(suites, options, Mock())
         cfg_generator.build_tasks = [
-            {"display_name": "sharding_gen"},
-            {"display_name": "sharding_0"},
-            {"display_name": "other_task"},
-            {"display_name": "other_task_2"},
-            {"display_name": "sharding_1"},
-            {"display_name": "compile"},
-            {"display_name": "sharding_misc"},
+            Mock(display_name="sharding_gen"),
+            Mock(display_name="sharding_0"),
+            Mock(display_name="other_task"),
+            Mock(display_name="other_task_2"),
+            Mock(display_name="sharding_1"),
+            Mock(display_name="compile"),
+            Mock(display_name="sharding_misc"),
         ]
 
         dependent_tasks = cfg_generator._get_tasks_for_depends_on("sharding")
@@ -434,13 +434,13 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
         cfg_generator = grt.EvergreenConfigGenerator(suites, options, Mock())
         cfg_generator.build_tasks = [
-            {"display_name": "sharding_gen"},
-            {"display_name": "sharding_0"},
-            {"display_name": "other_task"},
-            {"display_name": "other_task_2"},
-            {"display_name": "sharding_1"},
-            {"display_name": "compile"},
-            {"display_name": "sharding_misc"},
+            Mock(display_name="sharding_gen"),
+            Mock(display_name="sharding_0"),
+            Mock(display_name="other_task"),
+            Mock(display_name="other_task_2"),
+            Mock(display_name="sharding_1"),
+            Mock(display_name="compile"),
+            Mock(display_name="sharding_misc"),
         ]
 
         cfg_mock = Mock()
@@ -508,9 +508,10 @@ class MainTest(unittest.TestCase):
 
     def test_calculate_suites(self):
         evg = Mock()
-        evg.test_stats.return_value = [{
-            "test_file": "test{}.js".format(i), "avg_duration_pass": 60, "num_pass": 1
-        } for i in range(100)]
+        evg.test_stats_by_project.return_value = [
+            Mock(test_file="test{}.js".format(i), avg_duration_pass=60, num_pass=1)
+            for i in range(100)
+        ]
 
         main = grt.Main(evg)
         main.options = Mock()
@@ -520,7 +521,7 @@ class MainTest(unittest.TestCase):
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
             suitesconfig_mock.get_suite.return_value.tests = \
-                [stat["test_file"] for stat in evg.test_stats.return_value]
+                [stat.test_file for stat in evg.test_stats_by_project.return_value]
             suites = main.calculate_suites(_DATE, _DATE)
 
             # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
@@ -533,7 +534,7 @@ class MainTest(unittest.TestCase):
         response = Mock()
         response.status_code = requests.codes.SERVICE_UNAVAILABLE
         evg = Mock()
-        evg.test_stats.side_effect = requests.HTTPError(response=response)
+        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
 
         main = grt.Main(evg)
         main.options = Mock()
@@ -552,7 +553,7 @@ class MainTest(unittest.TestCase):
     def test_calculate_suites_uses_fallback_for_no_results(self):
         n_tests = 100
         evg = Mock()
-        evg.test_stats.return_value = []
+        evg.test_stats_by_project.return_value = []
 
         main = grt.Main(evg)
         main.options = Mock()
@@ -569,10 +570,10 @@ class MainTest(unittest.TestCase):
     def test_calculate_suites_uses_fallback_if_only_results_are_filtered(self):
         n_tests = 100
         evg = Mock()
-        evg.test_stats.return_value = [{
-            "test_file": "test{}.js".format(i), "avg_duration_pass": 60, "num_pass": 1
-        } for i in range(100)]
-
+        evg.test_stats_by_project.return_value = [
+            Mock(test_file="test{}.js".format(i), avg_duration_pass=60, num_pass=1)
+            for i in range(100)
+        ]
         main = grt.Main(evg)
         main.options = Mock()
         main.config_options = self.get_mock_options()
@@ -591,7 +592,7 @@ class MainTest(unittest.TestCase):
         response = Mock()
         response.status_code = requests.codes.INTERNAL_SERVER_ERROR
         evg = Mock()
-        evg.test_stats.side_effect = requests.HTTPError(response=response)
+        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
 
         main = grt.Main(evg)
         main.options = Mock()
