@@ -133,15 +133,6 @@ private:
     typedef NodeMap::value_type Node;
 
     /**
-     * Helper function to recursively top-sort a graph.  Used by topSort().
-     */
-    static Status recursiveTopSort(const NodeMap& nodeMap,
-                                   const Node& currentNode,
-                                   std::vector<std::string>* inProgressNodeNames,
-                                   stdx::unordered_set<std::string>* visitedNodeNames,
-                                   std::vector<std::string>* sortedNames);
-
-    /**
      * Map of all named nodes.  Nodes named as prerequisites or dependents but not explicitly
      * added via addInitializer will either be absent from this map or be present with
      * NodeData::fn set to a false-ish value.

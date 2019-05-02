@@ -31,6 +31,10 @@
  * Unit tests of the InitializerDependencyGraph type.
  */
 
+#include <algorithm>
+#include <string>
+#include <vector>
+
 #include "mongo/base/init.h"
 #include "mongo/base/initializer_dependency_graph.h"
 #include "mongo/base/make_string_vector.h"
@@ -292,6 +296,70 @@ TEST(InitializerDependencyGraphTest, TopSortFailsWhenMissingDependent) {
     auto status = graph.topSort(&nodeNames);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "No implementation provided for initializer B");
+}
+
+std::vector<std::vector<std::string>> allPermutations(std::vector<std::string> vec,
+                                                      size_t first,
+                                                      size_t last) {
+    std::vector<std::vector<std::string>> out;
+    auto i1 = vec.begin() + first;
+    auto i2 = vec.begin() + last;
+    std::sort(i1, i2);
+    do {
+        out.push_back(vec);
+    } while (std::next_permutation(i1, i2));
+    return out;
+}
+
+template <typename Expectations, typename F>
+void doUntilAllSeen(const Expectations& expected, F&& f) {
+    std::vector<int> seen(expected.size(), 0);
+    while (std::find(seen.begin(), seen.end(), 0) != seen.end()) {
+        auto found = std::find(expected.begin(), expected.end(), f());
+        ASSERT_TRUE(found != expected.end());
+        ++seen[found - expected.begin()];
+    }
+}
+
+TEST(InitializerDependencyGraphTest, TopSortShufflesNodes) {
+    /*
+     * Make sure all node orderings can appear as outputs.
+     */
+    InitializerDependencyGraph graph;
+    std::vector<std::string> graphNodes;
+    for (int i = 0; i < 5; ++i) {
+        std::string s = "Node" + std::to_string(i);
+        graphNodes.push_back(s);
+        ASSERT_ADD_INITIALIZER(graph, s, doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);
+    }
+    std::vector<std::string> nodeNames;
+    doUntilAllSeen(allPermutations(graphNodes, 0, graphNodes.size()), [&]() -> decltype(auto) {
+        nodeNames.clear();
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
+        return nodeNames;
+    });
+}
+
+TEST(InitializerDependencyGraphTest, TopSortShufflesChildren) {
+    /*
+     * Make sure all child orderings can appear as outputs.
+     */
+    InitializerDependencyGraph graph;
+    std::vector<std::string> graphNodes;
+    graphNodes.push_back("Parent");
+    ASSERT_ADD_INITIALIZER(graph, "Parent", doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);
+    for (int i = 0; i < 5; ++i) {
+        std::string s = "Child" + std::to_string(i);
+        graphNodes.push_back(s);
+        ASSERT_ADD_INITIALIZER(graph, s, doNothing, ("Parent"), MONGO_NO_DEPENDENTS);
+    }
+    std::vector<std::string> nodeNames;
+    // Permute only the children.
+    doUntilAllSeen(allPermutations(graphNodes, 1, graphNodes.size()), [&]() -> decltype(auto) {
+        nodeNames.clear();
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
+        return nodeNames;
+    });
 }
 
 }  // namespace
