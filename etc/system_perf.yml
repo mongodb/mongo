@@ -524,12 +524,12 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: genny_self_tests
+- name: genny_canaries
   priority: 5
   commands:
     - func: "prepare environment"
       vars:
-        test: "genny_self_tests"
+        test: "genny_canaries"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -873,7 +873,7 @@ buildvariants:
     - name: industry_benchmarks
     - name: crud_workloads
     - name: jasper_smoke
-    - name: genny_self_tests
+    - name: genny_canaries
     - name: cursor_manager
     - name: insert_remove
     - name: mixed_workloads
