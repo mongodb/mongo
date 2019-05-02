@@ -97,6 +97,8 @@ public:
      * This is resumable, so subsequent calls will start the scan at the record immediately
      * following the last inserted record from a previous call to drainWritesIntoIndex.
      *
+     * TODO (SERVER-40894): Implement draining while reading at a timestamp. The following comment
+     * does not apply.
      * When 'readSource' is not kUnset, perform the drain by reading at the timestamp described by
      * the ReadSource. This will always reset the ReadSource to its original value before returning.
      * The drain otherwise reads at the pre-existing ReadSource on the RecoveryUnit. This may be

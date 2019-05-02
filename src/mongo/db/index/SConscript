@@ -142,6 +142,7 @@ env.Library(
     target="index_build_interceptor",
     source=[
         "index_build_interceptor.cpp",
+        env.Idlc('index_build_interceptor.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

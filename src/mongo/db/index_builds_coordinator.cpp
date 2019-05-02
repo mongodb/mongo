@@ -870,10 +870,8 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx, nss, MODE_IS);
 
-        // Read at a point in time so that the drain, which will timestamp writes at lastApplied,
-        // can never commit writes earlier than its read timestamp.
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kNoOverlap));
+            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {

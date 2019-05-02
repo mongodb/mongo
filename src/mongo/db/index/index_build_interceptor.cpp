@@ -40,6 +40,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_build_interceptor_gen.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -102,22 +103,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    const InsertDeleteOptions& options,
                                                    RecoveryUnit::ReadSource readSource) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-
-    // Callers may request to read at a specific timestamp so that no drained writes are timestamped
-    // earlier than their original write timestamp. Also ensure that leaving this function resets
-    // the ReadSource to its original value.
-    auto resetReadSourceGuard =
-        makeGuard([ opCtx, prevReadSource = opCtx->recoveryUnit()->getTimestampReadSource() ] {
-            opCtx->recoveryUnit()->abandonSnapshot();
-            opCtx->recoveryUnit()->setTimestampReadSource(prevReadSource);
-        });
-
-    if (readSource != RecoveryUnit::ReadSource::kUnset) {
-        opCtx->recoveryUnit()->abandonSnapshot();
-        opCtx->recoveryUnit()->setTimestampReadSource(readSource);
-    } else {
-        resetReadSourceGuard.dismiss();
-    }
+    // Reading at a timestamp during hybrid index builds is not supported.
+    invariant(readSource == RecoveryUnit::ReadSource::kUnset);
 
     // These are used for logging only.
     int64_t totalDeleted = 0;
@@ -136,116 +123,98 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
     }
 
     // Force the progress meter to log at the end of every batch. By default, the progress meter
-    // only logs after a large number of calls to hit(), but since we batch inserts by up to
-    // 1000 records, progress would rarely be displayed.
+    // only logs after a large number of calls to hit(), but since we use such large batch sizes,
+    // progress would rarely be displayed.
     progress->reset(_sideWritesCounter.load() - appliedAtStart /* total */,
                     3 /* secondsBetween */,
                     1 /* checkInterval */);
 
-    // Buffer operations into batches to insert per WriteUnitOfWork. Impose an upper limit on the
-    // number of documents and the total size of the batch.
-    const int32_t kBatchMaxSize = 1000;
-    const int64_t kBatchMaxBytes = BSONObjMaxInternalSize;
+    // Apply operations in batches per WriteUnitOfWork. The batch size limit allows the drain to
+    // yield at a frequent interval, releasing locks and storage engine resources.
+    const int32_t kBatchMaxSize = maxIndexBuildDrainBatchSize.load();
 
-    int64_t batchSizeBytes = 0;
+    // The batch byte limit restricts the total size of the write transaction, which relieves
+    // pressure on the storage engine cache. This size maximum is enforced by the IDL. It should
+    // never exceed the size limit of a 32-bit signed integer for overflow reasons.
+    const int32_t kBatchMaxMB = maxIndexBuildDrainMemoryUsageMegabytes.load();
+    const int32_t kMB = 1024 * 1024;
+    invariant(kBatchMaxMB <= std::numeric_limits<int32_t>::max() / kMB);
+    const int32_t kBatchMaxBytes = kBatchMaxMB * kMB;
 
-    std::vector<SideWriteRecord> batch;
-    batch.reserve(kBatchMaxSize);
-
-    // Hold on to documents that would exceed the per-batch memory limit. Always insert this first
-    // into the next batch.
-    boost::optional<SideWriteRecord> stashed;
-
-    auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
-
+    // Indicates that there are no more visible records in the side table.
     bool atEof = false;
-    while (!atEof) {
-        opCtx->checkForInterrupt();
 
-        // Stashed records should be inserted into a batch first.
-        if (stashed) {
-            invariant(batch.empty());
-            batch.push_back(std::move(stashed.get()));
-            stashed.reset();
-        }
+    // In a single WriteUnitOfWork, scan the side table up to the batch or memory limit, apply the
+    // keys to the index, and delete the side table records.
+    auto applySingleBatch = [&] {
+        WriteUnitOfWork wuow(opCtx);
 
-        auto record = cursor->next();
+        int32_t batchSize = 0;
+        int64_t batchSizeBytes = 0;
 
-        if (record) {
-            RecordId currentRecordId = record->id;
-            BSONObj docOut = record->data.toBson().getOwned();
+        auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
 
-            // If the total batch size in bytes would be too large, stash this document and let the
-            // current batch insert.
-            int objSize = docOut.objsize();
-            if (batchSizeBytes + objSize > kBatchMaxBytes) {
-                invariant(!stashed);
+        while (!atEof) {
+            opCtx->checkForInterrupt();
 
-                // Stash this document to be inserted in the next batch.
-                stashed.emplace(currentRecordId, std::move(docOut));
-            } else {
-                batchSizeBytes += objSize;
-                batch.emplace_back(currentRecordId, std::move(docOut));
-
-                // Continue if there is more room in the batch.
-                if (batch.size() < kBatchMaxSize) {
-                    continue;
-                }
-            }
-        } else {
-            atEof = true;
-            if (batch.empty())
+            auto record = cursor->next();
+            if (!record) {
+                atEof = true;
                 break;
+            }
+
+            RecordId currentRecordId = record->id;
+            BSONObj unownedDoc = record->data.toBson();
+
+            // Don't apply this record if the total batch size in bytes would be too large.
+            const int objSize = unownedDoc.objsize();
+            if (batchSize > 0 && batchSizeBytes + objSize > kBatchMaxBytes) {
+                break;
+            }
+
+            batchSize += 1;
+            batchSizeBytes += objSize;
+
+            if (auto status =
+                    _applyWrite(opCtx, unownedDoc, options, &totalInserted, &totalDeleted);
+                !status.isOK()) {
+                return status;
+            }
+
+            // Delete the document from the table as soon as it has been inserted into the index.
+            // This ensures that no key is ever inserted twice and no keys are skipped.
+            _sideWritesTable->rs()->deleteRecord(opCtx, currentRecordId);
+
+            // Don't continue if the batch is full. Allow the transaction to commit.
+            if (batchSize == kBatchMaxSize) {
+                break;
+            }
+        }
+        if (batchSize == 0) {
+            invariant(atEof);
+            return Status::OK();
         }
 
-        invariant(!batch.empty());
+        wuow.commit();
 
-        cursor->save();
-
-        // If we are here, either we have reached the end of the table or the batch is full, so
-        // insert everything in one WriteUnitOfWork, and delete each inserted document from the side
-        // writes table.
-        auto status =
-            writeConflictRetry(opCtx, "index build drain", _indexCatalogEntry->ns().ns(), [&] {
-                WriteUnitOfWork wuow(opCtx);
-                for (auto& operation : batch) {
-                    auto status = _applyWrite(
-                        opCtx, operation.second, options, &totalInserted, &totalDeleted);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-
-                    // Delete the document from the table as soon as it has been inserted into the
-                    // index. This ensures that no key is ever inserted twice and no keys are
-                    // skipped.
-                    _sideWritesTable->rs()->deleteRecord(opCtx, operation.first);
-                }
-
-                // For rollback to work correctly, these writes need to be timestamped. The actual
-                // time is not important, as long as it not older than the most recent visible side
-                // write.
-                IndexTimestampHelper::setGhostCommitTimestampForWrite(opCtx,
-                                                                      _indexCatalogEntry->ns());
-
-                wuow.commit();
-                return Status::OK();
-            });
-        if (!status.isOK()) {
-            return status;
-        }
-
-        progress->hit(batch.size());
+        progress->hit(batchSize);
+        _numApplied += batchSize;
 
         // Lock yielding will only happen if we are holding intent locks.
         _tryYield(opCtx);
-        cursor->restore();
 
         // Account for more writes coming in during a batch.
         progress->setTotalWhileRunning(_sideWritesCounter.loadRelaxed() - appliedAtStart);
+        return Status::OK();
+    };
 
-        _numApplied += batch.size();
-        batch.clear();
-        batchSizeBytes = 0;
+    // Apply batches of side writes until the last record in the table is seen.
+    while (!atEof) {
+        if (auto status = writeConflictRetry(
+                opCtx, "index build drain", _indexCatalogEntry->ns().ns(), applySingleBatch);
+            !status.isOK()) {
+            return status;
+        }
     }
 
     progress->finished();
@@ -350,12 +319,20 @@ void IndexBuildInterceptor::_tryYield(OperationContext* opCtx) {
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
     invariant(_sideWritesTable);
-    auto cursor = _sideWritesTable->rs()->getCursor(opCtx, false /* forward */);
+    auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
     auto record = cursor->next();
 
     // The table is empty only when all writes are applied.
-    if (!record)
+    if (!record) {
+        auto writesRecorded = _sideWritesCounter.load();
+        invariant(writesRecorded == _numApplied,
+                  str::stream() << "The number of side writes recorded does not match the number "
+                                   "applied, despite the table appearing empty. Writes recorded: "
+                                << writesRecorded
+                                << ", applied: "
+                                << _numApplied);
         return true;
+    }
 
     return false;
 }

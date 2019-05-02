@@ -100,6 +100,13 @@ def mongod_program(  # pylint: disable=too-many-branches
     if "transactionLifetimeLimitSeconds" not in suite_set_parameters:
         suite_set_parameters["transactionLifetimeLimitSeconds"] = 24 * 60 * 60
 
+    # Hybrid index builds drain writes received during the build process in batches of 1000 writes
+    # by default. Not all tests perform enough writes to exercise the code path where multiple
+    # batches are applied, which means certain bugs are harder to encounter. Set this level lower
+    # so there are more opportunities to drain writes in multiple batches.
+    if "maxIndexBuildDrainBatchSize" not in suite_set_parameters:
+        suite_set_parameters["maxIndexBuildDrainBatchSize"] = 10
+
     # The periodic no-op writer writes an oplog entry of type='n' once every 10 seconds. This has
     # the potential to mask issues such as SERVER-31609 because it allows the operationTime of
     # cluster to advance even if the client is blocked for other reasons. We should disable the

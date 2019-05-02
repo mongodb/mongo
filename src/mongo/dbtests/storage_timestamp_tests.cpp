@@ -3518,8 +3518,9 @@ public:
         // TimestampIndexBuilds<SimulatePrimary>
         add<TimestampIndexBuilds<false>>();
         add<TimestampIndexBuilds<true>>();
-        add<TimestampIndexBuildDrain<false>>();
-        add<TimestampIndexBuildDrain<true>>();
+        // TODO (SERVER-40894): Make index builds timestamp drained writes
+        // add<TimestampIndexBuildDrain<false>>();
+        // add<TimestampIndexBuildDrain<true>>();
         add<TimestampMultiIndexBuilds>();
         add<TimestampMultiIndexBuildsDuringRename>();
         add<TimestampIndexDrops>();
