@@ -221,10 +221,6 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         if (arrayFiltersSet) {
             return {ErrorCodes::FailedToParse, "Cannot specify arrayFilters and a pipeline update"};
         }
-        if (!collation.isEmpty()) {
-            // TODO SERVER-40399
-            return {ErrorCodes::NotImplemented, "No support for collation and pipeline update"};
-        }
         if (!fields.isEmpty()) {
             // TODO SERVER-40404
             return {ErrorCodes::NotImplemented, "No support for fields and pipeline update"};

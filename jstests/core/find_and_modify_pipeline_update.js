@@ -20,11 +20,6 @@
         () => coll.findAndModify(
             {query: {_id: 1}, update: [{$addFields: {y: 1}}], arrayFilters: [{"i.x": 4}]}));
     assert.eq(err.code, ErrorCodes.FailedToParse);
-    // SERVER-40399 Add support for collation
-    err = assert.throws(
-        () => coll.findAndModify(
-            {query: {_id: 1}, update: [{$addFields: {y: 1}}], collation: {locale: "en_US"}}));
-    assert.eq(err.code, ErrorCodes.NotImplemented);
 
     // SERVER-40404 Add support for fields.
     err = assert.throws(() => coll.findAndModify(
