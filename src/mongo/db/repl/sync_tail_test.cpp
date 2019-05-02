@@ -522,14 +522,13 @@ protected:
             _txnNum,
             StmtId(1),
             _insertOp1->getOpTime());
-        _commitOp = makeCommandOplogEntryWithSessionInfoAndStmtId(
-            {Timestamp(Seconds(1), 3), 1LL},
-            cmdNss,
-            BSON("commitTransaction" << 1 << "prepared" << false),
-            _lsid,
-            _txnNum,
-            StmtId(2),
-            _insertOp2->getOpTime());
+        _commitOp = makeCommandOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(1), 3), 1LL},
+                                                                  cmdNss,
+                                                                  BSON("applyOps" << BSONArray()),
+                                                                  _lsid,
+                                                                  _txnNum,
+                                                                  StmtId(2),
+                                                                  _insertOp2->getOpTime());
         _opObserver->onInsertsFn =
             [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
                 stdx::lock_guard<stdx::mutex> lock(_insertMutex);
@@ -689,14 +688,13 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionTwoBatches) {
             StmtId(i),
             i == 0 ? OpTime() : insertOps.back().getOpTime()));
     }
-    auto commitOp = makeCommandOplogEntryWithSessionInfoAndStmtId(
-        {Timestamp(Seconds(1), 5), 1LL},
-        cmdNss,
-        BSON("commitTransaction" << 1 << "prepared" << false),
-        _lsid,
-        _txnNum,
-        StmtId(4),
-        insertOps.back().getOpTime());
+    auto commitOp = makeCommandOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(1), 5), 1LL},
+                                                                  cmdNss,
+                                                                  BSON("applyOps" << BSONArray()),
+                                                                  _lsid,
+                                                                  _txnNum,
+                                                                  StmtId(4),
+                                                                  insertOps.back().getOpTime());
 
     SyncTail syncTail(
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, _writerPool.get());
@@ -815,22 +813,20 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
         txnNum2,
         StmtId(1),
         insertOps2.back().getOpTime()));
-    auto commitOp1 = makeCommandOplogEntryWithSessionInfoAndStmtId(
-        {Timestamp(Seconds(1), 3), 1LL},
-        _nss1,
-        BSON("commitTransaction" << 1 << "prepared" << false),
-        _lsid,
-        txnNum1,
-        StmtId(2),
-        insertOps1.back().getOpTime());
-    auto commitOp2 = makeCommandOplogEntryWithSessionInfoAndStmtId(
-        {Timestamp(Seconds(2), 3), 1LL},
-        _nss1,
-        BSON("commitTransaction" << 1 << "prepared" << false),
-        _lsid,
-        txnNum2,
-        StmtId(2),
-        insertOps2.back().getOpTime());
+    auto commitOp1 = makeCommandOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(1), 3), 1LL},
+                                                                   _nss1,
+                                                                   BSON("applyOps" << BSONArray()),
+                                                                   _lsid,
+                                                                   txnNum1,
+                                                                   StmtId(2),
+                                                                   insertOps1.back().getOpTime());
+    auto commitOp2 = makeCommandOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(2), 3), 1LL},
+                                                                   _nss1,
+                                                                   BSON("applyOps" << BSONArray()),
+                                                                   _lsid,
+                                                                   txnNum2,
+                                                                   StmtId(2),
+                                                                   insertOps2.back().getOpTime());
 
     SyncTail syncTail(
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, _writerPool.get());
