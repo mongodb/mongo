@@ -65,7 +65,7 @@
         // Start a transaction with majority read concern to ensure the orphan will be visible if
         // its shard is targeted and send the multi-write.
         session.startTransaction({readConcern: {level: "majority"}});
-        assert.writeOK(sessionDB.runCommand(writeCmd));
+        assert.commandWorked(sessionDB.runCommand(writeCmd));
 
         // The write shouldn't be visible until the transaction commits.
         assert.sameMembers(st.getDB(dbName)[collName].find().toArray(), [
