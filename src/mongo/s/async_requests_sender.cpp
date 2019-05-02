@@ -61,258 +61,179 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          const ReadPreferenceSetting& readPreference,
                                          Shard::RetryPolicy retryPolicy)
     : _opCtx(opCtx),
-      _executor(executor),
       _db(dbName.toString()),
       _readPreference(readPreference),
-      _retryPolicy(retryPolicy) {
-    for (const auto& request : requests) {
-        auto cmdObj = request.cmdObj;
-        _remotes.emplace_back(request.shardId, cmdObj);
-    }
+      _retryPolicy(retryPolicy),
+      _subExecutor(executor),
+      _subBaton(opCtx->getBaton()->makeSubBaton()) {
+
+    _remotesLeft = requests.size();
 
     // Initialize command metadata to handle the read preference.
     _metadataObj = readPreference.toContainingBSON();
 
-    // Schedule the requests immediately.
-    _scheduleRequests();
-}
-
-AsyncRequestsSender::~AsyncRequestsSender() {
-    _cancelPendingRequests();
-
-    try {
-        // Wait on remaining callbacks to run.
-        while (!done()) {
-            next();
-        }
-    } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
-        // Ignore interrupted at shutdown.  No need to cleanup if we're going into process-wide
-        // shutdown.
+    _remotes.reserve(requests.size());
+    for (const auto& request : requests) {
+        // Kick off requests immediately.
+        _remotes.emplace_back(this, request.shardId, request.cmdObj).executeRequest();
     }
 }
 
-AsyncRequestsSender::Response AsyncRequestsSender::next() {
+AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
     invariant(!done());
 
-    // If needed, schedule requests for all remotes which had retriable errors.
-    // If some remote had success or a non-retriable error, return it.
-    boost::optional<Response> readyResponse;
-    while (!(readyResponse = _ready())) {
-        // Otherwise, wait for some response to be received.
-        if (_interruptStatus.isOK()) {
-            try {
-                _makeProgress();
-            } catch (const AssertionException& ex) {
-                // If the operation is interrupted, we cancel outstanding requests and switch to
-                // waiting for the (canceled) callbacks to finish without checking for interrupts.
-                _interruptStatus = ex.toStatus();
-                _cancelPendingRequests();
-                continue;
-            }
-        } else {
-            _opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { _makeProgress(); });
+    _remotesLeft--;
+
+    // If we've been interrupted, the response queue should be filled with interrupted answers, go
+    // ahead and return one of those
+    if (!_interruptStatus.isOK()) {
+        return _responseQueue.pop(_opCtx);
+    }
+
+    // Try to pop a value from the queue
+    try {
+        return _responseQueue.pop(_opCtx);
+    } catch (const DBException& ex) {
+        // If we're interrupted, save that value and overwrite all outstanding requests (that we're
+        // not going to wait to collect)
+        _interruptStatus = ex.toStatus();
+    }
+
+    // Make failed responses for all outstanding remotes with the interruption status and push them
+    // onto the response queue
+    for (auto& remote : _remotes) {
+        if (!remote) {
+            _responseQueue.push(std::move(remote).makeFailedResponse(_interruptStatus));
         }
     }
-    return *readyResponse;
+
+    // Stop servicing callbacks
+    _subBaton.shutdown();
+
+    // shutdown the scoped task executor
+    _subExecutor->shutdown();
+
+    return _responseQueue.pop(_opCtx);
 }
 
-void AsyncRequestsSender::stopRetrying() {
+void AsyncRequestsSender::stopRetrying() noexcept {
     _stopRetrying = true;
 }
 
-bool AsyncRequestsSender::done() {
-    return std::all_of(
-        _remotes.begin(), _remotes.end(), [](const RemoteData& remote) { return remote.done; });
-}
-
-void AsyncRequestsSender::_cancelPendingRequests() {
-    _stopRetrying = true;
-
-    // Cancel all outstanding requests so they return immediately.
-    for (auto& remote : _remotes) {
-        if (remote.cbHandle.isValid()) {
-            _executor->cancel(remote.cbHandle);
-        }
-    }
-}
-
-boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
-    if (!_stopRetrying) {
-        _scheduleRequests();
-    }
-
-    // Check if any remote is ready.
-    invariant(!_remotes.empty());
-    for (auto& remote : _remotes) {
-        if (remote.swResponse && !remote.done) {
-            remote.done = true;
-            if (remote.swResponse->isOK()) {
-                invariant(remote.shardHostAndPort);
-                return Response(std::move(remote.shardId),
-                                std::move(remote.swResponse->getValue()),
-                                std::move(*remote.shardHostAndPort));
-            } else {
-                // If _interruptStatus is set, promote CallbackCanceled errors to it.
-                if (!_interruptStatus.isOK() &&
-                    ErrorCodes::CallbackCanceled == remote.swResponse->getStatus().code()) {
-                    remote.swResponse = _interruptStatus;
-                }
-                return Response(std::move(remote.shardId),
-                                std::move(remote.swResponse->getStatus()),
-                                std::move(remote.shardHostAndPort));
-            }
-        }
-    }
-    // No remotes were ready.
-    return boost::none;
-}
-
-void AsyncRequestsSender::_scheduleRequests() {
-    invariant(!_stopRetrying);
-    // Schedule remote work on hosts for which we have not sent a request or need to retry.
-    for (size_t i = 0; i < _remotes.size(); ++i) {
-        auto& remote = _remotes[i];
-
-        // First check if the remote had a retriable error, and if so, clear its response field so
-        // it will be retried.
-        if (remote.swResponse && !remote.done) {
-            // We check both the response status and command status for a retriable error.
-            Status status = remote.swResponse->getStatus();
-            if (status.isOK()) {
-                status = getStatusFromCommandResult(remote.swResponse->getValue().data);
-            }
-
-            if (status.isOK()) {
-                status = getWriteConcernStatusFromCommandResult(remote.swResponse->getValue().data);
-            }
-
-            if (!status.isOK()) {
-                // There was an error with either the response or the command.
-                auto shard = remote.getShard();
-                if (!shard) {
-                    remote.swResponse =
-                        Status(ErrorCodes::ShardNotFound,
-                               str::stream() << "Could not find shard " << remote.shardId);
-                } else {
-                    if (remote.shardHostAndPort) {
-                        shard->updateReplSetMonitor(*remote.shardHostAndPort, status);
-                    }
-                    if (shard->isRetriableError(status.code(), _retryPolicy) &&
-                        remote.retryCount < kMaxNumFailedHostRetryAttempts) {
-                        LOG(1) << "Command to remote " << remote.shardId << " at host "
-                               << *remote.shardHostAndPort
-                               << " failed with retriable error and will be retried "
-                               << causedBy(redact(status));
-                        ++remote.retryCount;
-                        remote.swResponse.reset();
-                    }
-                }
-            }
-        }
-
-        // If the remote does not have a response or pending request, schedule remote work for it.
-        if (!remote.swResponse && !remote.cbHandle.isValid()) {
-            auto scheduleStatus = _scheduleRequest(i);
-            if (!scheduleStatus.isOK()) {
-                remote.swResponse = std::move(scheduleStatus);
-
-                // Push a noop response to the queue to indicate that a remote is ready for
-                // re-processing due to failure.
-                _responseQueue.producer.push(boost::none);
-            }
-        }
-    }
-}
-
-Status AsyncRequestsSender::_scheduleRequest(size_t remoteIndex) {
-    auto& remote = _remotes[remoteIndex];
-
-    invariant(!remote.cbHandle.isValid());
-    invariant(!remote.swResponse);
-
-    Status resolveStatus = remote.resolveShardIdToHostAndPort(this, _readPreference);
-    if (!resolveStatus.isOK()) {
-        return resolveStatus;
-    }
-
-    executor::RemoteCommandRequest request(
-        *remote.shardHostAndPort, _db, remote.cmdObj, _metadataObj, _opCtx);
-
-    auto callbackStatus = _executor->scheduleRemoteCommand(
-        request,
-        [ remoteIndex, producer = _responseQueue.producer ](
-            const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-            producer.push(Job{cbData, remoteIndex});
-        },
-        _opCtx->getBaton());
-    if (!callbackStatus.isOK()) {
-        return callbackStatus.getStatus();
-    }
-
-    remote.cbHandle = callbackStatus.getValue();
-    return Status::OK();
-}
-
-// Passing opCtx means you'd like to opt into opCtx interruption.  During cleanup we actually don't.
-void AsyncRequestsSender::_makeProgress() {
-    auto job = _responseQueue.consumer.pop(_opCtx);
-
-    if (!job) {
-        return;
-    }
-
-    auto& remote = _remotes[job->remoteIndex];
-    invariant(!remote.swResponse);
-
-    // Clear the callback handle. This indicates that we are no longer waiting on a response from
-    // 'remote'.
-    remote.cbHandle = executor::TaskExecutor::CallbackHandle();
-
-    // Store the response or error.
-    if (job->cbData.response.status.isOK()) {
-        remote.swResponse = std::move(job->cbData.response);
-    } else {
-        // TODO: call participant.markAsCommandSent on "transaction already started" errors?
-        remote.swResponse = std::move(job->cbData.response.status);
-    }
+bool AsyncRequestsSender::done() noexcept {
+    return !_remotesLeft;
 }
 
 AsyncRequestsSender::Request::Request(ShardId shardId, BSONObj cmdObj)
     : shardId(shardId), cmdObj(cmdObj) {}
 
-AsyncRequestsSender::Response::Response(ShardId shardId,
-                                        executor::RemoteCommandResponse response,
-                                        HostAndPort hp)
-    : shardId(std::move(shardId)),
-      swResponse(std::move(response)),
-      shardHostAndPort(std::move(hp)) {}
-
-AsyncRequestsSender::Response::Response(ShardId shardId,
-                                        Status status,
-                                        boost::optional<HostAndPort> hp)
-    : shardId(std::move(shardId)), swResponse(std::move(status)), shardHostAndPort(std::move(hp)) {}
-
-AsyncRequestsSender::RemoteData::RemoteData(ShardId shardId, BSONObj cmdObj)
-    : shardId(std::move(shardId)), cmdObj(std::move(cmdObj)) {}
-
-Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
-    AsyncRequestsSender* ars, const ReadPreferenceSetting& readPref) {
-    const auto shard = getShard();
-    if (!shard) {
-        return Status(ErrorCodes::ShardNotFound,
-                      str::stream() << "Could not find shard " << shardId);
-    }
-
-    auto findHostStatus = shard->getTargeter()->findHost(ars->_opCtx, readPref);
-    if (findHostStatus.isOK())
-        shardHostAndPort = std::move(findHostStatus.getValue());
-
-    return findHostStatus.getStatus();
-}
+AsyncRequestsSender::RemoteData::RemoteData(AsyncRequestsSender* ars,
+                                            ShardId shardId,
+                                            BSONObj cmdObj)
+    : _ars(ars), _shardId(std::move(shardId)), _cmdObj(std::move(cmdObj)) {}
 
 std::shared_ptr<Shard> AsyncRequestsSender::RemoteData::getShard() {
     // TODO: Pass down an OperationContext* to use here.
-    return Grid::get(getGlobalServiceContext())->shardRegistry()->getShardNoReload(shardId);
+    return Grid::get(getGlobalServiceContext())->shardRegistry()->getShardNoReload(_shardId);
 }
+
+void AsyncRequestsSender::RemoteData::executeRequest() {
+    scheduleRequest()
+        .thenRunOn(*_ars->_subBaton)
+        .getAsync([this](StatusWith<executor::RemoteCommandResponse> rcr) {
+            _done = true;
+            _ars->_responseQueue.push({std::move(_shardId), rcr, std::move(_shardHostAndPort)});
+        });
+}
+
+SemiFuture<executor::RemoteCommandResponse> AsyncRequestsSender::RemoteData::scheduleRequest() {
+    return resolveShardIdToHostAndPort(_ars->_readPreference)
+        .thenRunOn(*_ars->_subBaton)
+        .then([this](auto&& hostAndPort) { return scheduleRemoteCommand(std::move(hostAndPort)); })
+        .then([this](auto&& rcr) { return handleResponse(std::move(rcr)); })
+        .semi();
+}
+
+SemiFuture<HostAndPort> AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
+    const ReadPreferenceSetting& readPref) {
+    const auto shard = getShard();
+    if (!shard) {
+        return Status(ErrorCodes::ShardNotFound,
+                      str::stream() << "Could not find shard " << _shardId);
+    }
+
+    return shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20));
+}
+
+SemiFuture<executor::RemoteCommandResponse> AsyncRequestsSender::RemoteData::scheduleRemoteCommand(
+    HostAndPort&& hostAndPort) {
+    _shardHostAndPort = std::move(hostAndPort);
+
+    executor::RemoteCommandRequest request(
+        *_shardHostAndPort, _ars->_db, _cmdObj, _ars->_metadataObj, _ars->_opCtx);
+
+    // We have to make a promise future pair because the TaskExecutor doesn't currently support a
+    // future returning variant of scheduleRemoteCommand
+    auto[p, f] = makePromiseFuture<executor::RemoteCommandResponse>();
+
+    // Failures to schedule skip the retry loop
+    uassertStatusOK(_ars->_subExecutor->scheduleRemoteCommand(
+        request,
+        // We have to make a shared_ptr<Promise> here because scheduleRemoteCommand requires
+        // copyable callbacks
+        [p = std::make_shared<Promise<executor::RemoteCommandResponse>>(std::move(p))](
+            const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+            p->emplaceValue(cbData.response);
+        },
+        *_ars->_subBaton));
+
+    return std::move(f).semi();
+}
+
+SemiFuture<executor::RemoteCommandResponse> AsyncRequestsSender::RemoteData::handleResponse(
+    executor::RemoteCommandResponse&& rcr) {
+
+    auto status = rcr.status;
+
+    if (status.isOK()) {
+        status = getStatusFromCommandResult(rcr.data);
+    }
+
+    if (status.isOK()) {
+        status = getWriteConcernStatusFromCommandResult(rcr.data);
+    }
+
+    // If we're okay (RemoteCommandResponse, command result and write concern)-wise we're done.
+    // Otherwise check for retryability
+    if (status.isOK()) {
+        return std::move(rcr);
+    }
+
+    // There was an error with either the response or the command.
+    auto shard = getShard();
+    if (!shard) {
+        uasserted(ErrorCodes::ShardNotFound, str::stream() << "Could not find shard " << _shardId);
+    } else {
+        if (_shardHostAndPort) {
+            shard->updateReplSetMonitor(*_shardHostAndPort, status);
+        }
+        if (!_ars->_stopRetrying && shard->isRetriableError(status.code(), _ars->_retryPolicy) &&
+            _retryCount < kMaxNumFailedHostRetryAttempts) {
+            LOG(1) << "Command to remote " << _shardId << " at host " << *_shardHostAndPort
+                   << " failed with retriable error and will be retried "
+                   << causedBy(redact(status));
+            ++_retryCount;
+            _shardHostAndPort.reset();
+            // retry through recursion
+            return scheduleRequest();
+        }
+    }
+
+    // Status' in the response.status field that aren't retried get converted to top level errors
+    uassertStatusOK(rcr.status);
+
+    // We're not okay (on the remote), but still not going to retry
+    return std::move(rcr);
+};
 
 }  // namespace mongo

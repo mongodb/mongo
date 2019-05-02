@@ -128,6 +128,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/executor/scoped_task_executor",
         "$BUILD_DIR/mongo/executor/task_executor_interface",
         "$BUILD_DIR/mongo/s/client/sharding_client",
         "$BUILD_DIR/mongo/s/coreshard",
