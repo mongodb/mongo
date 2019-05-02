@@ -48,7 +48,7 @@ public:
         kSharded,
     };
 
-    virtual ~TransactionReaper();
+    virtual ~TransactionReaper() = 0;
 
     virtual int reap(OperationContext* OperationContext) = 0;
 
