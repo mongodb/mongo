@@ -337,8 +337,12 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     Lock::DBLock dbWriteLock(opCtx, source.db(), MODE_IX);
     boost::optional<Lock::CollectionLock> sourceLock;
     boost::optional<Lock::CollectionLock> targetLock;
-    if (ResourceId(RESOURCE_COLLECTION, source.ns()) <
-        ResourceId(RESOURCE_COLLECTION, target.ns())) {
+    // To prevent deadlock, always lock system.views collection in the end because concurrent
+    // view-related operations always lock system.views in the end.
+    if (!source.isSystemDotViews() && (target.isSystemDotViews() ||
+                                       ResourceId(RESOURCE_COLLECTION, source.ns()) <
+                                           ResourceId(RESOURCE_COLLECTION, target.ns()))) {
+        // To prevent deadlock, always lock source and target in ascending resourceId order.
         sourceLock.emplace(opCtx, source, MODE_X);
         targetLock.emplace(opCtx, target, MODE_X);
     } else {
