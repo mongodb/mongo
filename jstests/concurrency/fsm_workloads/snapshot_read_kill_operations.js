@@ -83,7 +83,7 @@ var $config = (function() {
             const res = assert.commandWorkedOrFailedWithCode(
                 this.sessionDb.adminCommand(
                     {currentOp: 1, ns: {$regex: db.getName() + "\." + collName}, op: "getmore"}),
-                ErrorCodes.Interrupted);
+                [ErrorCodes.CursorNotFound, ErrorCodes.Interrupted]);
             if (res.hasOwnProperty("inprog") && res.inprog.length) {
                 const killOpCmd = {killOp: 1, op: res.inprog[0].opid};
                 const killRes = this.sessionDb.adminCommand(killOpCmd);
