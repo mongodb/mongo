@@ -7,8 +7,9 @@ selector:
   roots:
   - jstests/concurrency/fsm_workloads/**/*.js
   exclude_files:
-  # These workloads use >100MB of data, which can overwhelm test hosts.
+  # These workloads use up to 100MB of memory, which can overwhelm test hosts.
   - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_sort.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
   # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
