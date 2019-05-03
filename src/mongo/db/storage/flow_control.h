@@ -90,7 +90,9 @@ private:
     int _calculateNewTicketsForLag(const std::vector<repl::MemberData>& prevMemberData,
                                    const std::vector<repl::MemberData>& currMemberData,
                                    std::int64_t locksUsedLastPeriod,
-                                   double locksPerOp);
+                                   double locksPerOp,
+                                   std::uint64_t lagMillis,
+                                   std::uint64_t thresholdLagMillis);
     void _trimSamples(const Timestamp trimSamplesTo);
 
     repl::ReplicationCoordinator* _replCoord;

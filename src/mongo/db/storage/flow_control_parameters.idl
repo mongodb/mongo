@@ -70,3 +70,31 @@ server_parameters:
         cpp_varname: 'gFlowControlMinTicketsPerSecond'
         default: 100
         validator: { gte: 0 }
+    flowControlDecayConstant:
+        description: 'The rate at which flow control will throttle based on how lagged the commit point is in time relative to the flow control threshold.'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<double>'
+        cpp_varname: 'gFlowControlDecayConstant'
+        default: 0.5
+        validator: { gt: 0.0, lt: 1.0 }
+    flowControlFudgeFactor:
+        description: 'When commit point lag is close to the threshold lag, the primary should track the sustainer rate, with some small penalty. This value represents that penalty. A value of 1.0 represents no penalty, a value close to 0.0 represents a large penalty. Reducing oscillations should keep this value close to 1.0.'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<double>'
+        cpp_varname: 'gFlowControlFudgeFactor'
+        default: 0.95
+        validator: { gt: 0.0, lte: 1.0 }
+    flowControlTicketAdderConstant:
+        description: 'When the commit point lag is small, flow control will add at least this many tickets per second. This provides meaningful ticket increase when immediately recovering from stalling events.'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<int>'
+        cpp_varname: 'gFlowControlTicketAdderConstant'
+        default: 1000
+        validator: { gt: 0 }
+    flowControlTicketMultiplierConstant:
+        description: 'When the commit point lag is small, flow control will increase its ticket allocation by this factor. This provides meaningful ticket increase in more general recovery scenarios.'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<double>'
+        cpp_varname: 'gFlowControlTicketMultiplierConstant'
+        default: 1.05
+        validator: { gt: 1.0 }
