@@ -5,7 +5,7 @@
  * enableMajorityReadConcern=true.
  * Rollback after restarting with enableMajorityReadConcern=true succeeds if the stable timestamp
  * has been set, i.e. an operation has been majority committed.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_wiredtiger]
  */
 (function() {
     "use strict";
