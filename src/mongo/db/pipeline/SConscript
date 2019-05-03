@@ -634,3 +634,12 @@ env.CppUnitTest(
         'pipeline',
     ],
 )
+
+env.CppUnitTest(
+    target='expression_walker_test',
+    source='expression_walker_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'expression',
+    ],
+)
