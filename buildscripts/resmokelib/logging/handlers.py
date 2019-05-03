@@ -26,7 +26,7 @@ from .. import utils
 _TIMEOUT_SECS = 10
 
 
-class BufferedHandler(logging.Handler):
+class BufferedHandler(logging.Handler):  # pylint: disable=too-many-instance-attributes
     """A handler class that buffers logging records in memory.
 
     Whenever each record is added to the buffer, a check is made to see if the buffer
