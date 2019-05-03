@@ -185,7 +185,7 @@ TDigest TDigest::merge(const std::vector<double> & sortedValues) const {
   return result;
 }
 
-TDigest TDigest::merge(std::vector<TDigest>& digests) {
+TDigest TDigest::merge(const std::vector<TDigest>& digests) {
   size_t nCentroids = 0;
   for (auto it = digests.begin(); it != digests.end(); it++) {
     nCentroids += it->centroids_.size();

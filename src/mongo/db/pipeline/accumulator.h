@@ -330,10 +330,8 @@ public:
 private:
     // to be digested by TDigest algorithm
     std::vector<double> values;
-    
-    std::vector<mongo::TDigest> digest_vector;
 
-    long long _count;
+    bool any_input{false};
     double test_var;
 };
 

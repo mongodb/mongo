@@ -29,7 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
-
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
@@ -46,7 +45,6 @@ using boost::intrusive_ptr;
 REGISTER_ACCUMULATOR(percentile, AccumulatorPercentile::create);
 REGISTER_EXPRESSION(percentile, ExpressionFromAccumulator<AccumulatorPercentile>::parse);
 
-
 const char* AccumulatorPercentile::getOpName() const {
     return "$percentile";
 }
@@ -55,7 +53,6 @@ namespace {
 const char subTotalName[] = "subTotal";
 const char subTotalErrorName[] = "subTotalError";  // Used for extra precision
 
-// for sharding tests - temp
 const char sumName[] = "sum";
 const char countName[] = "count";
 const char maxName[] = "max";
@@ -63,7 +60,6 @@ const char minName[] = "min";
 const char percentileName[] = "percentile";
 const char digestSizeName[] = "digest_size";
 const char centroidsName[] = "centroids";
-
 const char meanName[] = "mean";
 const char weightName[] = "weight";
 }  // namespace
@@ -85,13 +81,8 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
             centroids.push_back(mongo::TDigest::Centroid(centroid[meanName].getDouble(), centroid[weightName].getDouble()));
         };
 
-
-        // ToDo: might need to destroy it after filling to the vector
-        mongo::TDigest digest_temp(centroids, digest_sum, digest_count, digest_max, digest_min, digest_size);
-
-        this->digest_vector.push_back(digest_temp);
+        digest = digest.merge({mongo::TDigest(centroids, digest_sum, digest_count, digest_max, digest_min, digest_size), digest});
         this->percentile = input[percentileName].getDouble();
-
         return;
     }
 
@@ -107,7 +98,7 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
             }
     }
 
-    // ToDo: error codes are not accurate. Set better numbers later
+    // ToDo: Error codes are not accurate. Set better numbers later
     // ToDo: It might be better evaluations for this part.
     uassert(6677, "The 'percentile' should be present in the input document.",
     !input.getDocument()["percentile"].missing());
@@ -120,7 +111,6 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     // ToDo: Choose a better name for input_value and refactor later
     Value input_value = input.getDocument()["value"];
 
-    // ToDo: Going to cover all Decimal, Long and Double as a temporary, need to decide on this.
     switch (input_value.getType()) {
         case NumberDecimal:
         case NumberLong:
@@ -133,13 +123,11 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
             return;
     }
     
-    // ToDo: I am thinking to replace this with other checks and get rid of "_count" variable
-    if (_count == 0)
+    if (any_input == false)
     {
         digest = mongo::TDigest(this->digest_size);
+        any_input = true;
     }
-
-    _count++;
 
     if (values.size() == this->chunk_size){
         _add_to_tdigest(values);
@@ -153,7 +141,7 @@ intrusive_ptr<Accumulator> AccumulatorPercentile::create(
 
 Value AccumulatorPercentile::getValue(bool toBeMerged) {
 
-    // To add remainders left over a chunk
+    // To add the remainders
     if (not values.empty()){
         _add_to_tdigest(values);
         }
@@ -180,21 +168,11 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
             }
         );
     }
-
-    // getValue(False) reaches here
-    // This line helps to still keep the tdigest values when there is no sharding. In case of Sharding, 'this->digest' is empty.
-    this->digest_vector.push_back(this->digest);
-
-    // Regardless of using sharding, the percentile is calculated on a vector of tdigest objects
-    mongo::TDigest new_digest;
-    new_digest = mongo::TDigest::merge(this->digest_vector);
-
-    return Value(new_digest.estimateQuantile(this->percentile));
+    return Value(digest.estimateQuantile(this->percentile));
 }
 
 AccumulatorPercentile::AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : Accumulator(expCtx), _count(0) {
-    
+    : Accumulator(expCtx) {
     // This is a fixed size Accumulator so we never need to update this
     _memUsageBytes = sizeof(*this);
 }
@@ -207,6 +185,6 @@ void AccumulatorPercentile::_add_to_tdigest(std::vector<double> & values){
 }
 
 void AccumulatorPercentile::reset() {
-    _count = 0;
+    return;
 }
 }

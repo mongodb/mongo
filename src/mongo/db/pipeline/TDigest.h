@@ -96,7 +96,7 @@ class TDigest {
    * Returns a new TDigest constructed with values merged from the given
    * digests.
    */
-  static TDigest merge(std::vector<TDigest>& digests);
+  static TDigest merge(const std::vector<TDigest>& digests);
 
   /*
    * Estimates the value of the given quantile.
