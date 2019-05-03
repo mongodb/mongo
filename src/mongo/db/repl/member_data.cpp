@@ -93,7 +93,8 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
     _lastHeartbeatMessage = heartbeatMessage;
 
     if (_lastResponse.getState() != MemberState::RS_DOWN) {
-        log() << "Member " << _hostAndPort.toString() << " is now in state RS_DOWN" << rsLog;
+        log() << "Member " << _hostAndPort.toString() << " is now in state RS_DOWN - "
+              << redact(heartbeatMessage) << rsLog;
     }
 
     _lastResponse = ReplSetHeartbeatResponse();

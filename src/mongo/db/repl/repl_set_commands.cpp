@@ -680,13 +680,15 @@ public:
         ReplSetHeartbeatArgsV1 args;
         uassertStatusOK(args.initialize(cmdObj));
 
+        LOG_FOR_HEARTBEATS(2) << "Processing heartbeat request from "
+                              << cmdObj.getStringField("from") << ", " << cmdObj;
         ReplSetHeartbeatResponse response;
         status = ReplicationCoordinator::get(opCtx)->processHeartbeatV1(args, &response);
         if (status.isOK())
             response.addToBSON(&result);
 
-        LOG_FOR_HEARTBEATS(2) << "Processed heartbeat from " << cmdObj.getStringField("from")
-                              << " and generated response, " << response;
+        LOG_FOR_HEARTBEATS(2) << "Generated heartbeat response to  "
+                              << cmdObj.getStringField("from") << ", " << response;
         uassertStatusOK(status);
         return true;
     }
