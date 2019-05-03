@@ -33,6 +33,8 @@
 
 #include "mongo/db/index/index_build_interceptor.h"
 
+#include <vector>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog_raii.h"
@@ -154,6 +156,10 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 
         auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
 
+        // We use an ordered container because the order of deletion for the records in the side
+        // table matters.
+        std::vector<RecordId> recordsAddedToIndex;
+
         while (!atEof) {
             opCtx->checkForInterrupt();
 
@@ -181,15 +187,22 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                 return status;
             }
 
-            // Delete the document from the table as soon as it has been inserted into the index.
-            // This ensures that no key is ever inserted twice and no keys are skipped.
-            _sideWritesTable->rs()->deleteRecord(opCtx, currentRecordId);
+            // Save the record ids of the documents inserted into the index for deletion later.
+            // We can't delete records while holding a positioned cursor.
+            recordsAddedToIndex.push_back(currentRecordId);
 
             // Don't continue if the batch is full. Allow the transaction to commit.
             if (batchSize == kBatchMaxSize) {
                 break;
             }
         }
+
+        // Delete documents from the side table as soon as they have been inserted into the index.
+        // This ensures that no key is ever inserted twice and no keys are skipped.
+        for (const auto& recordId : recordsAddedToIndex) {
+            _sideWritesTable->rs()->deleteRecord(opCtx, recordId);
+        }
+
         if (batchSize == 0) {
             invariant(atEof);
             return Status::OK();
