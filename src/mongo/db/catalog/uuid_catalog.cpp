@@ -309,7 +309,7 @@ NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
     if (foundIt != _catalog.end())
-        return foundIt->second.collection->ns();
+        return foundIt->second.collectionCatalogEntry->ns();
 
     // Only in the case that the catalog is closed and a UUID is currently unknown, resolve it
     // using the pre-close state. This ensures that any tasks reloading the catalog can see their
