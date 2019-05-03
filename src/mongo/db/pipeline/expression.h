@@ -818,6 +818,7 @@ public:
     explicit ExpressionArrayElemAt(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {}
 
+    boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
@@ -1318,6 +1319,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+    void setLimit(int limit);
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
@@ -1341,6 +1343,9 @@ private:
     boost::intrusive_ptr<Expression> _input;
     // The expression determining whether each element should be present in the result array.
     boost::intrusive_ptr<Expression> _filter;
+    // When $filter is passed as an argument to $arrayElemAt or $slice we can set a limit on $filter
+    // to stop filtering once all the values needed are in the result array.
+    boost::optional<int> _limit;
 };
 
 
@@ -1987,6 +1992,7 @@ public:
         : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx) {}
 
     Value evaluate(const Document& root) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {

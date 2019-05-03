@@ -541,6 +541,34 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
     return array[index];
 }
 
+intrusive_ptr<Expression> ExpressionArrayElemAt::optimize() {
+    // This will optimize all arguments to this expression.
+    auto optimized = ExpressionNary::optimize();
+    if (optimized.get() != this) 
+        return optimized;
+    
+
+    // If ExpressionArrayElemAt is passed an ExpressionFilter as its first arugment set a limit on
+    // the filter so filter returns an array with the last element being the value we want.
+    if (dynamic_cast<ExpressionFilter*>(vpOperand[0].get())) {
+        if (auto expConstant = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
+            auto indexArg = expConstant->getValue();
+
+            uassert(50803,
+                    str::stream() << getOpName() << "'s second argument must be representable as"
+                                  << " a 32-bit integer: "
+                                  << indexArg.coerceToDouble(),
+                    indexArg.integral());
+            auto index = indexArg.coerceToInt();
+            // Can't optimize of the index is less that 0.
+            if (index >= 0) {
+                dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(index + 1);
+            }
+        }
+    }
+    return this;
+};
+
 REGISTER_EXPRESSION(arrayElemAt, ExpressionArrayElemAt::parse);
 const char* ExpressionArrayElemAt::getOpName() const {
     return "$arrayElemAt";
@@ -2198,10 +2226,17 @@ Value ExpressionFilter::evaluate(const Document& root) const {
 
         if (_filter->evaluate(root).coerceToBool()) {
             output.push_back(std::move(elem));
+            if (_limit && static_cast<int>(output.size()) == _limit.get()) {
+                return Value(std::move(output));
+            }
         }
     }
 
     return Value(std::move(output));
+}
+
+void ExpressionFilter::setLimit(int limit) {
+    _limit = boost::optional<int>(limit);
 }
 
 void ExpressionFilter::_doAddDependencies(DepsTracker* deps) const {
@@ -3994,20 +4029,7 @@ Value ExpressionSlice::evaluate(const Document& root) const {
             return Value(BSONNULL);
         }
 
-        uassert(28727,
-                str::stream() << "Third argument to $slice must be numeric, but "
-                              << "is of type: "
-                              << typeName(countVal.getType()),
-                countVal.numeric());
-        uassert(28728,
-                str::stream() << "Third argument to $slice can't be represented"
-                              << " as a 32-bit integer: "
-                              << countVal.coerceToDouble(),
-                countVal.integral());
-        uassert(28729,
-                str::stream() << "Third argument to $slice must be positive: "
-                              << countVal.coerceToInt(),
-                countVal.coerceToInt() > 0);
+        uassertIfNotIntegralAndNonNegative(countVal, "$slice", "third argument");
 
         size_t count = size_t(countVal.coerceToInt());
         end = std::min(start + count, array.size());
@@ -4016,6 +4038,49 @@ Value ExpressionSlice::evaluate(const Document& root) const {
     return Value(vector<Value>(array.begin() + start, array.begin() + end));
 }
 
+intrusive_ptr<Expression> ExpressionSlice::optimize() {
+    // This will optimize all arguments to this expression.
+    auto optimized = ExpressionNary::optimize();
+    if(optimized.get() != this)
+        return optimized;
+
+    // If ExpressionSlice is passed an ExpressionFilter we can stop filtering once the size of
+    // the array returned by the filter is equal to the last arguement passed to ExpressionSlice.
+    if (dynamic_cast<ExpressionFilter*>(vpOperand[0].get())) {
+        if (auto secondArg = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
+            auto secondVal = secondArg->getValue();
+
+            uassert(50798,
+                    str::stream() << "Second argument to $slice can't be represented as"
+                                  << " a 32-bit integer: "
+                                  << secondVal.coerceToDouble(),
+                    secondVal.integral());
+
+            int arg2 = secondVal.coerceToInt();
+            if (vpOperand.size() == 2) {
+                // Can't set a limit if it is negative.
+                if (arg2 >= 0) {
+                    // If slice is given two arguments set limit to the position we want to slice.
+                    dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(arg2);
+                }
+            } else if (vpOperand.size() > 2) {
+                if (auto thirdArg = dynamic_cast<ExpressionConstant*>(vpOperand[2].get())) {
+                    auto thirdVal = thirdArg->getValue();
+
+                    uassertIfNotIntegralAndNonNegative(thirdVal, "$slice", "third argument");
+
+                    int arg3 = thirdVal.coerceToInt();
+                    if (arg2 >= 0) {
+                        // The limit needs to set as the last element we want in this case its
+                        // the position argument + the first n elements argument.
+                        dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(arg2 + arg3);
+                    }
+                }
+            }
+        }
+    }
+    return this;
+}
 REGISTER_EXPRESSION(slice, ExpressionSlice::parse);
 const char* ExpressionSlice::getOpName() const {
     return "$slice";
