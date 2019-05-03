@@ -732,21 +732,22 @@ private:
 
         auto dropCmd = dropCmdBuilder.obj();
 
-        try {
-            // drop collections with tmp results on each shard
-            for (const auto& server : servers) {
-                BSONObj result;
+        // drop collections with tmp results on each shard
+        for (const auto& server : servers) {
+            BSONObj result;
+
+            try {
                 ScopedDbConnection conn(server);
                 conn->runCommand(dbName, dropCmd, result);
                 conn.done();
 
                 uassertStatusOK(getStatusFromCommandResult(result));
                 uassertStatusOK(getWriteConcernStatusFromCommandResult(result));
+            } catch (const DBException& e) {
+                warning() << "Cleanup error on " << server << ": " << redact(e);
+            } catch (const std::exception& e) {
+                severe() << "Cleanup error on " << server << ": " << causedBy(redact(e.what()));
             }
-        } catch (const DBException& e) {
-            warning() << "Cannot cleanup shard results" << redact(e);
-        } catch (const std::exception& e) {
-            severe() << "Cannot cleanup shard results" << causedBy(redact(e.what()));
         }
     }
 
