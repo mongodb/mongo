@@ -278,7 +278,7 @@ env.Library(
 )
 
 env.Library(
-    target='commands_db_s',
+    target='sharding_commands_d',
     source=[
         'add_shard_cmd.cpp',
         'check_sharding_index_command.cpp',
@@ -372,20 +372,25 @@ env.CppUnitTest(
         'migration_chunk_cloner_source_legacy_test.cpp',
         'migration_destination_manager_test.cpp',
         'namespace_metadata_change_notifications_test.cpp',
+        'session_catalog_migration_destination_test.cpp',
+        'session_catalog_migration_source_test.cpp',
         'shard_metadata_util_test.cpp',
         'shard_server_catalog_cache_loader_test.cpp',
         'sharding_initialization_mongod_test.cpp',
         'sharding_initialization_op_observer_test.cpp',
         'split_vector_test.cpp',
     ],
-    LIBDEPS=[
-        'sharding_runtime_d',
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/logical_session_cache_impl',
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
+        'sharding_runtime_d',
     ],
 )
 
@@ -424,32 +429,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
         'transaction_coordinator',
     ],
-)
-
-env.CppUnitTest(
-    target='session_catalog_migration_source_test',
-    source=[
-        'session_catalog_migration_source_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
-        'sharding_runtime_d',
-    ]
-)
-
-env.CppUnitTest(
-    target='session_catalog_migration_destination_test',
-    source=[
-        'session_catalog_migration_destination_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
-        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
-        'sharding_runtime_d',
-    ]
 )
 
 env.CppUnitTest(

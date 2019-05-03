@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include <memory>
-
-#include "mongo/db/logical_session_cache_factory_mongos.h"
-
-#include "mongo/db/logical_session_cache_impl.h"
-#include "mongo/db/service_liaison_mongos.h"
-#include "mongo/db/sessions_collection_sharded.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheS() {
-    auto liaison = stdx::make_unique<ServiceLiaisonMongos>();
-    auto sessionsColl = stdx::make_unique<SessionsCollectionSharded>();
+class SessionsCollection;
+class OperationContext;
 
-    return stdx::make_unique<LogicalSessionCacheImpl>(
-        std::move(liaison), std::move(sessionsColl), nullptr /* reaper */);
-}
+class TransactionReaperD {
+public:
+    static int reapSessionsOlderThan(OperationContext* OperationContext,
+                                     SessionsCollection& sessionsCollection,
+                                     Date_t possiblyExpired);
+};
 
 }  // namespace mongo

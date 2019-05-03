@@ -55,13 +55,15 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_session_cache_factory_mongos.h"
+#include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_liaison_mongos.h"
 #include "mongo/db/session_killer.h"
+#include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -83,7 +85,6 @@
 #include "mongo/s/query/cluster_cursor_cleanup_job.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/service_entry_point_mongos.h"
-#include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_uptime_reporter.h"
@@ -186,6 +187,9 @@ void cleanupTask(ServiceContext* serviceContext) {
         if (!haveClient())
             Client::initThread(getThreadName());
         Client& client = cc();
+
+        // Join the logical session cache before the transport layer
+        LogicalSessionCache::get(serviceContext)->joinOnShutDown();
 
         // Shutdown the TransportLayer so that new connections aren't accepted
         if (auto tl = serviceContext->getTransportLayer()) {
@@ -496,8 +500,13 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsRemote));
 
-    // Set up the logical session cache
-    LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheS());
+    LogicalSessionCache::set(serviceContext,
+                             stdx::make_unique<LogicalSessionCacheImpl>(
+                                 stdx::make_unique<ServiceLiaisonMongos>(),
+                                 stdx::make_unique<SessionsCollectionSharded>(),
+                                 [](OperationContext*, SessionsCollection&, Date_t) {
+                                     return 0; /* No op*/
+                                 }));
 
     status = serviceContext->getServiceExecutor()->start();
     if (!status.isOK()) {

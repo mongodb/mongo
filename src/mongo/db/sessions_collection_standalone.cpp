@@ -100,7 +100,7 @@ Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
                                                      const LogicalSessionRecordSet& sessions) {
     DBDirectClient client(opCtx);
     return doRefresh(NamespaceString::kLogicalSessionsNamespace,
-                     sessions,
+                     std::vector(sessions.begin(), sessions.end()),
                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
@@ -108,16 +108,16 @@ Status SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
                                                    const LogicalSessionIdSet& sessions) {
     DBDirectClient client(opCtx);
     return doRemove(NamespaceString::kLogicalSessionsNamespace,
-                    sessions,
+                    std::vector(sessions.begin(), sessions.end()),
                     makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     DBDirectClient client(opCtx);
-    return doFetch(NamespaceString::kLogicalSessionsNamespace,
-                   sessions,
-                   makeFindFnForCommand(NamespaceString::kLogicalSessionsNamespace, &client));
+    return doFindRemoved(NamespaceString::kLogicalSessionsNamespace,
+                         std::vector(sessions.begin(), sessions.end()),
+                         makeFindFnForCommand(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 }  // namespace mongo

@@ -212,7 +212,7 @@ SessionsCollection::FindBatchFn SessionsCollection::makeFindFnForCommand(const N
 }
 
 Status SessionsCollection::doRefresh(const NamespaceString& ns,
-                                     const LogicalSessionRecordSet& sessions,
+                                     const std::vector<LogicalSessionRecord>& sessions,
                                      SendBatchFn send) {
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("update", ns.coll());
@@ -230,7 +230,7 @@ Status SessionsCollection::doRefresh(const NamespaceString& ns,
 }
 
 Status SessionsCollection::doRemove(const NamespaceString& ns,
-                                    const LogicalSessionIdSet& sessions,
+                                    const std::vector<LogicalSessionId>& sessions,
                                     SendBatchFn send) {
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("delete", ns.coll());
@@ -245,16 +245,15 @@ Status SessionsCollection::doRemove(const NamespaceString& ns,
     return runBulkCmd("deletes", init, add, send, sessions);
 }
 
-StatusWith<LogicalSessionIdSet> SessionsCollection::doFetch(const NamespaceString& ns,
-                                                            const LogicalSessionIdSet& sessions,
-                                                            FindBatchFn send) {
+StatusWith<LogicalSessionIdSet> SessionsCollection::doFindRemoved(
+    const NamespaceString& ns, const std::vector<LogicalSessionId>& sessions, FindBatchFn send) {
     auto makeT = [] { return std::vector<LogicalSessionId>{}; };
 
     auto add = [](std::vector<LogicalSessionId>& batch, const LogicalSessionId& record) {
         batch.push_back(record);
     };
 
-    LogicalSessionIdSet removed = sessions;
+    LogicalSessionIdSet removed{sessions.begin(), sessions.end()};
 
     auto wrappedSend = [&](BSONObj batch) {
         auto swBatchResult = send(batch);

@@ -1,4 +1,4 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2019-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -52,3 +52,24 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: disableLogicalSessionCacheRefresh
     default: false
+
+  TransactionRecordMinimumLifetimeMinutes:
+    # The minimum lifetime for a transaction record is how long it has to have lived on the server
+    # before we'll consider it for cleanup. This is effectively the window for how long it is
+    # permissible for a mongos to hang before we're willing to accept a failure of the retryable
+    # writes subsystem.
+    #
+    # Specifically, we imagine that a client connects to one mongos on a session and performs a
+    # retryable write after which that mongos hangs. Then the client connects to a new mongos on the
+    # same session and successfully executes its write.  After a day passes, the session will time
+    # out, cleaning up the retryable write. Then the original mongos wakes up, vivifies the session
+    # and executes the write (because all records of the session + transaction have been deleted).
+    #
+    # So the write is performed twice, which is unavoidable without losing session vivification
+    # and/or requiring synchronized clocks all the way out to the client.  In lieu of that we
+    # provide a weaker guarantee after the minimum transaction lifetime.
+    description: The minimum lifetime for a transaction record.
+    set_at: startup
+    cpp_vartype: int
+    cpp_varname: gTransactionRecordMinimumLifetimeMinutes
+    default: 30
