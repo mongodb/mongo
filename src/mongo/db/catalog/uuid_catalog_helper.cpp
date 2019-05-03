@@ -47,6 +47,12 @@ void forEachCollectionFromDb(
         auto uuid = collectionIt.uuid().get();
         auto nss = uuidCatalog.lookupNSSByUUID(uuid);
 
+        // If the NamespaceString we resolve by the 'uuid' is empty, the collection was dropped
+        // and we should move onto the next one.
+        if (nss.isEmpty()) {
+            continue;
+        }
+
         Lock::CollectionLock clk(opCtx, nss, collLockMode);
 
         auto collection = uuidCatalog.lookupCollectionByUUID(uuid);
