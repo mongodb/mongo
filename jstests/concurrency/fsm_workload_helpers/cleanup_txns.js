@@ -5,13 +5,20 @@
 /**
  * Abort the transaction on the session and return result.
  */
-function abortTransaction(sessionAwareDB, txnNumber, errorCodes) {
+function abortTransaction(sessionAwareDB, txnNumber) {
     assert(sessionAwareDB.getSession() != null);
 
     // Don't use the given session as it might be in a state we don't want to be and
     // because we are trying to abort with arbitrary txnNumber.
     let rawDB = sessionAwareDB.getSession().getClient().getDB(sessionAwareDB.getName());
 
+    const abortErrorCodes = [
+        ErrorCodes.NoSuchTransaction,
+        ErrorCodes.TransactionCommitted,
+        ErrorCodes.TransactionTooOld,
+        ErrorCodes.Interrupted,
+        ErrorCodes.LockTimeout
+    ];
     const abortCmd = {
         abortTransaction: 1,
         lsid: sessionAwareDB.getSession().getSessionId(),
@@ -19,14 +26,15 @@ function abortTransaction(sessionAwareDB, txnNumber, errorCodes) {
         autocommit: false
     };
     const res = rawDB.adminCommand(abortCmd);
-    return assert.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: ${tojson(abortCmd)}`);
+    return assert.commandWorkedOrFailedWithCode(
+        res, abortErrorCodes, () => `cmd: ${tojson(abortCmd)}`);
 }
 
 /**
  * This function operates on the last iteration of each thread to abort any active transactions.
  */
 var {cleanupOnLastIteration} = (function() {
-    function cleanupOnLastIteration(data, func, abortErrorCodes) {
+    function cleanupOnLastIteration(data, func) {
         let lastIteration = ++data.iteration >= data.iterations;
         let activeException = null;
 
@@ -45,7 +53,7 @@ var {cleanupOnLastIteration} = (function() {
                 // SERVER-36847.
                 for (let i = 0; i <= data.txnNumber; i++) {
                     try {
-                        let res = abortTransaction(data.sessionDb, i, abortErrorCodes);
+                        let res = abortTransaction(data.sessionDb, i);
                         if (res.ok === 1) {
                             break;
                         }

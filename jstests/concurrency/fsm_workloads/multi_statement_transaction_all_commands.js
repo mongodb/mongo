@@ -143,13 +143,8 @@ var $config = (function() {
     // Wrap each state in a cleanupOnLastIteration() invocation.
     for (let stateName of Object.keys(states)) {
         const stateFn = states[stateName];
-        const abortErrorCodes = [
-            ErrorCodes.NoSuchTransaction,
-            ErrorCodes.TransactionCommitted,
-            ErrorCodes.TransactionTooOld
-        ];
         states[stateName] = function(db, collName) {
-            cleanupOnLastIteration(this, () => stateFn.apply(this, arguments), abortErrorCodes);
+            cleanupOnLastIteration(this, () => stateFn.apply(this, arguments));
         };
     }
 

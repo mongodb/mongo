@@ -48,13 +48,7 @@ var $config = (function() {
         },
 
         incrementTxnNumber: function incrementTxnNumber(db, collName) {
-            const abortErrorCodes = [
-                ErrorCodes.NoSuchTransaction,
-                ErrorCodes.TransactionCommitted,
-                ErrorCodes.TransactionTooOld,
-                ErrorCodes.Interrupted
-            ];
-            abortTransaction(this.sessionDb, this.txnNumber, abortErrorCodes);
+            abortTransaction(this.sessionDb, this.txnNumber);
             this.txnNumber++;
         },
 
@@ -106,14 +100,8 @@ var $config = (function() {
     // Wrap each state in a cleanupOnLastIteration() invocation.
     for (let stateName of Object.keys(states)) {
         const stateFn = states[stateName];
-        const abortErrorCodes = [
-            ErrorCodes.NoSuchTransaction,
-            ErrorCodes.TransactionCommitted,
-            ErrorCodes.TransactionTooOld,
-            ErrorCodes.Interrupted
-        ];
         states[stateName] = function(db, collName) {
-            cleanupOnLastIteration(this, () => stateFn.apply(this, arguments), abortErrorCodes);
+            cleanupOnLastIteration(this, () => stateFn.apply(this, arguments));
         };
     }
 
