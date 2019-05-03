@@ -82,7 +82,11 @@ void ViewCatalog::set(Database* db, std::unique_ptr<ViewCatalog> catalog) {
 }
 
 Status ViewCatalog::reloadIfNeeded(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    Lock::CollectionLock systemViewsLock(
+        opCtx,
+        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_IS);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _reloadIfNeeded(lk, opCtx);
 }
 
@@ -133,6 +137,10 @@ Status ViewCatalog::_reloadIfNeeded(WithLock lk, OperationContext* opCtx) {
 }
 
 void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback) {
+    Lock::CollectionLock systemViewsLock(
+        opCtx,
+        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_IS);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     uassertStatusOK(_reloadIfNeeded(lk, opCtx));
     for (auto&& view : _viewMap) {
@@ -459,12 +467,20 @@ std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(WithLock lk,
 }
 
 std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx, StringData ns) {
+    Lock::CollectionLock systemViewsLock(
+        opCtx,
+        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_IS);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _lookup(lk, opCtx, ns);
 }
 
 StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                                                   const NamespaceString& nss) {
+    Lock::CollectionLock systemViewsLock(
+        opCtx,
+        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_IS);
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
     // Keep looping until the resolution completes. If the catalog is invalidated during the

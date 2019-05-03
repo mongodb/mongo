@@ -71,13 +71,12 @@ const std::string& DurableViewCatalogImpl::getName() const {
 }
 
 Status DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {
-    dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IS) ||
-            opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_db->getSystemViewsName(), MODE_IS));
+
     Collection* systemViews = _db->getCollection(opCtx, _db->getSystemViewsName());
     if (!systemViews)
         return Status::OK();
 
-    Lock::CollectionLock lk(opCtx, _db->getSystemViewsName(), MODE_IS);
     auto cursor = systemViews->getCursor(opCtx);
     while (auto record = cursor->next()) {
         RecordData& data = record->data;
