@@ -117,6 +117,8 @@ private:
 
     std::vector<repl::MemberData> _currMemberData;
     std::vector<repl::MemberData> _prevMemberData;
+
+    Date_t _lastTimeSustainerAdvanced;
 };
 
 }  // namespace mongo

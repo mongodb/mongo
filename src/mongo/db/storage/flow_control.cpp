@@ -115,7 +115,9 @@ bool sustainerAdvanced(const std::vector<repl::MemberData>& prevMemberData,
 }  // namespace
 
 FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord)
-    : ServerStatusSection("flowControl"), _replCoord(replCoord) {
+    : ServerStatusSection("flowControl"),
+      _replCoord(replCoord),
+      _lastTimeSustainerAdvanced(Date_t::now()) {
     FlowControlTicketholder::set(service, stdx::make_unique<FlowControlTicketholder>(1000));
 
     service->getPeriodicRunner()->scheduleJob(
@@ -236,6 +238,20 @@ int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>&
     LOG(DEBUG_LOG_LEVEL) << " PrevApplied: " << prevSustainerAppliedTs
                          << " CurrApplied: " << currSustainerAppliedTs
                          << " NumSustainerApplied: " << sustainerAppliedCount;
+    if (sustainerAppliedCount > 0) {
+        _lastTimeSustainerAdvanced = Date_t::now();
+    } else {
+        auto warnThresholdSeconds = gFlowControlWarnThresholdSeconds.load();
+        const auto now = Date_t::now();
+        if (warnThresholdSeconds > 0 &&
+            now - _lastTimeSustainerAdvanced >= Seconds(warnThresholdSeconds)) {
+            warning() << "Flow control is engaged and the sustainer point is not moving. Please "
+                         "check the health of all secondaries.";
+
+            // Log once every `warnThresholdSeconds` seconds.
+            _lastTimeSustainerAdvanced = now;
+        }
+    }
 
     _lastSustainerAppliedCount.store(static_cast<int>(sustainerAppliedCount));
     if (sustainerAppliedCount == -1) {
@@ -316,6 +332,7 @@ int FlowControl::getNumTickets() {
                                             gFlowControlTicketAdderConstant.load(),
                                         gFlowControlTicketMultiplierConstant.load(),
                                         kMaxTickets);
+        _lastTimeSustainerAdvanced = Date_t::now();
     } else if (sustainerAdvanced(_prevMemberData, _currMemberData)) {
         // Expected case where flow control has meaningful data from the last period to make a new
         // calculation.
@@ -330,6 +347,7 @@ int FlowControl::getNumTickets() {
         // Unexpected case where consecutive readings from the topology state don't meet some basic
         // expectations.
         ret = _lastTargetTicketsPermitted.load();
+        _lastTimeSustainerAdvanced = Date_t::now();
     }
 
     ret = std::max(ret, gFlowControlMinTicketsPerSecond.load());

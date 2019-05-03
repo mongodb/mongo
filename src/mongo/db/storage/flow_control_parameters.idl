@@ -98,3 +98,10 @@ server_parameters:
         cpp_varname: 'gFlowControlTicketMultiplierConstant'
         default: 1.05
         validator: { gt: 1.0 }
+    flowControlWarnThresholdSeconds:
+        description: 'If flow control detects the replica set is lagged and the sustainer point is not moving, it will eventually log a warning. This value controls how much time the flow control is in this state before it logs. A value of zero will disable the warnings.'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<int>'
+        cpp_varname: 'gFlowControlWarnThresholdSeconds'
+        default: 10
+        validator: { gte: 0 }
