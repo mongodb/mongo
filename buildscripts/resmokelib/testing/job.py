@@ -84,9 +84,25 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         will be run before this method returns. If an error occurs
         while destroying the fixture, then the 'teardown_flag' will be set.
         """
-        if setup_flag is not None and not self.setup_fixture():
-            self._interrupt_all_jobs(queue, interrupt_flag)
-            return
+        if setup_flag is not None:
+            try:
+                setup_succeeded = self.setup_fixture()
+            except errors.StopExecution as err:
+                # Something went wrong when setting up the fixture. Perhaps we couldn't get a
+                # test_id from logkeeper for where to put the log output. We don't attempt to run
+                # any tests.
+                self.logger.error(
+                    "Received a StopExecution exception when setting up the fixture: %s.", err)
+                setup_succeeded = False
+            except:  # pylint: disable=bare-except
+                # Something unexpected happened when setting up the fixture. We don't attempt to run
+                # any tests.
+                self.logger.exception("Encountered an error when setting up the fixture.")
+                setup_succeeded = False
+
+            if not setup_succeeded:
+                self._interrupt_all_jobs(queue, interrupt_flag)
+                return
 
         try:
             self._run(queue, interrupt_flag)
@@ -99,8 +115,26 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
             self.logger.exception("Encountered an error during test execution.")
             self._interrupt_all_jobs(queue, interrupt_flag)
 
-        if teardown_flag is not None and not self.teardown_fixture():
-            teardown_flag.set()
+        if teardown_flag is not None:
+            try:
+                teardown_succeeded = self.teardown_fixture()
+            except errors.StopExecution as err:
+                # Something went wrong when tearing down the fixture. Perhaps we couldn't get a
+                # test_id from logkeeper for where to put the log output. We indicate back to the
+                # executor thread that teardown has failed. This likely means resmoke.py is exiting
+                # without having terminated all of the child processes it spawned.
+                self.logger.error(
+                    "Received a StopExecution exception when tearing down the fixture: %s.", err)
+                teardown_succeeded = False
+            except:  # pylint: disable=bare-except
+                # Something unexpected happened when tearing down the fixture. We indicate back to
+                # the executor thread that teardown has failed. This may mean resmoke.py is exiting
+                # without having terminated all of the child processes it spawned.
+                self.logger.exception("Encountered an error when tearing down the fixture.")
+                teardown_succeeded = False
+
+            if not teardown_succeeded:
+                teardown_flag.set()
 
     @staticmethod
     def _get_time():
