@@ -564,6 +564,7 @@ TEST_F(StorageInterfaceImplTest, InsertMissingDocFailesIfCollectionIsMissing) {
     ASSERT_EQ(status.code(), ErrorCodes::NamespaceNotFound);
 }
 
+#if 0
 TEST_F(StorageInterfaceImplTest, CreateCollectionWithIDIndexCommits) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
@@ -587,6 +588,7 @@ TEST_F(StorageInterfaceImplTest, CreateCollectionWithIDIndexCommits) {
     auto count = getIndexKeyCount(opCtx, collIdxCat, idIdxDesc);
     ASSERT_EQ(count, 2LL);
 }
+#endif  // 0
 
 void _testDestroyUncommitedCollectionBulkLoader(
     OperationContext* opCtx,
@@ -908,6 +910,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexNotFoundIfIndexIsMissi
                       .getStatus());
 }
 
+#if 0
 TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexOptionsConflictIfIndexIsAPartialIndex) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
@@ -935,6 +938,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexOptionsConflictIfIndex
                                      1U)
                       .getStatus());
 }
+#endif  // 0
 
 TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsEmptyVectorIfCollectionIsEmpty) {
     auto opCtx = getOperationContext();
