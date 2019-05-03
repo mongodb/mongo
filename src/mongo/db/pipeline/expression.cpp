@@ -4532,7 +4532,7 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::optimize() {
         _default = _default->optimize();
     }
 
-    for (auto&& [switchCase, switchThen] : _branches) {
+    for (auto && [ switchCase, switchThen ] : _branches) {
         switchCase = switchCase->optimize();
         switchThen = switchThen->optimize();
     }
