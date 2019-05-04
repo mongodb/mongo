@@ -33,6 +33,19 @@
 
 namespace mongo {
 
+class SessionsCollection;
+
+class RouterSessionCatalog {
+public:
+    /**
+     * Locates session entries from the in-memory catalog  which have not been referenced before
+     * 'possiblyExpired' and deletes them.
+     */
+    static int reapSessionsOlderThan(OperationContext* OperationContext,
+                                     SessionsCollection& sessionsCollection,
+                                     Date_t possiblyExpired);
+};
+
 /**
  * Scoped object, which checks out the session specified in the passed operation context and stores
  * it for later access by the command. The session is installed at construction time and is removed

@@ -85,6 +85,7 @@
 #include "mongo/s/query/cluster_cursor_cleanup_job.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_uptime_reporter.h"
@@ -500,13 +501,11 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsRemote));
 
-    LogicalSessionCache::set(serviceContext,
-                             stdx::make_unique<LogicalSessionCacheImpl>(
-                                 stdx::make_unique<ServiceLiaisonMongos>(),
-                                 stdx::make_unique<SessionsCollectionSharded>(),
-                                 [](OperationContext*, SessionsCollection&, Date_t) {
-                                     return 0; /* No op*/
-                                 }));
+    LogicalSessionCache::set(
+        serviceContext,
+        stdx::make_unique<LogicalSessionCacheImpl>(stdx::make_unique<ServiceLiaisonMongos>(),
+                                                   stdx::make_unique<SessionsCollectionSharded>(),
+                                                   RouterSessionCatalog::reapSessionsOlderThan));
 
     status = serviceContext->getServiceExecutor()->start();
     if (!status.isOK()) {

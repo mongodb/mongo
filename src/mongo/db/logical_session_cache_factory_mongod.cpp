@@ -35,11 +35,11 @@
 
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/service_liaison_mongod.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/sessions_collection_config_server.h"
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/db/sessions_collection_standalone.h"
-#include "mongo/db/transaction_reaper_d.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -64,7 +64,7 @@ std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCach
     }();
 
     return std::make_unique<LogicalSessionCacheImpl>(
-        std::move(liaison), std::move(sessionsColl), TransactionReaperD::reapSessionsOlderThan);
+        std::move(liaison), std::move(sessionsColl), MongoDSessionCatalog::reapSessionsOlderThan);
 }
 
 }  // namespace mongo

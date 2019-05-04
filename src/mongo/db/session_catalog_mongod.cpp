@@ -33,16 +33,23 @@
 
 #include "mongo/db/session_catalog_mongod.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/sessions_collection.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -74,10 +81,9 @@ auto getThreadPool(OperationContext* opCtx) {
     return &sessionTasksExecutor(opCtx->getServiceContext()).threadPool;
 }
 
-void killSessionTokensFunction(
-    OperationContext* opCtx,
-    std::shared_ptr<std::vector<SessionCatalog::KillToken>> sessionKillTokens) {
-    if (sessionKillTokens->empty())
+void killSessionTokens(OperationContext* opCtx,
+                       std::vector<SessionCatalog::KillToken> sessionKillTokens) {
+    if (sessionKillTokens.empty())
         return;
 
     getThreadPool(opCtx)->schedule(
@@ -85,17 +91,70 @@ void killSessionTokensFunction(
           sessionKillTokens = std::move(sessionKillTokens) ](auto status) mutable {
             invariant(status);
 
-            auto uniqueClient = service->makeClient("Kill-Session");
-            auto uniqueOpCtx = uniqueClient->makeOperationContext();
+            ThreadClient tc("Kill-Sessions", service);
+            auto uniqueOpCtx = tc->makeOperationContext();
             const auto opCtx = uniqueOpCtx.get();
             const auto catalog = SessionCatalog::get(opCtx);
 
-            for (auto& sessionKillToken : *sessionKillTokens) {
+            for (auto& sessionKillToken : sessionKillTokens) {
                 auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
-
-                TransactionParticipant::get(session).invalidate(opCtx);
+                auto participant = TransactionParticipant::get(session);
+                participant.invalidate(opCtx);
             }
         });
+}
+
+const auto kIdProjection = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
+const auto kSortById = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
+const auto kLastWriteDateFieldName = SessionTxnRecord::kLastWriteDateFieldName;
+
+/**
+ * Removes the specified set of session ids from the persistent sessions collection and returns the
+ * number of sessions actually removed.
+ */
+int removeSessionsTransactionRecords(OperationContext* opCtx,
+                                     SessionsCollection& sessionsCollection,
+                                     const LogicalSessionIdSet& sessionIdsToRemove) {
+    if (sessionIdsToRemove.empty())
+        return 0;
+
+    // From the passed-in sessions, find the ones which are actually expired/removed
+    auto expiredSessionIds =
+        uassertStatusOK(sessionsCollection.findRemovedSessions(opCtx, sessionIdsToRemove));
+
+    if (expiredSessionIds.empty())
+        return 0;
+
+    write_ops::Delete deleteOp(NamespaceString::kSessionTransactionsTableNamespace);
+    deleteOp.setWriteCommandBase([] {
+        write_ops::WriteCommandBase base;
+        base.setOrdered(false);
+        return base;
+    }());
+    deleteOp.setDeletes([&] {
+        std::vector<write_ops::DeleteOpEntry> entries;
+        for (const auto& lsid : expiredSessionIds) {
+            entries.emplace_back(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
+                                 false /* multi = false */);
+        }
+        return entries;
+    }());
+
+    BSONObj result;
+
+    DBDirectClient client(opCtx);
+    client.runCommand(NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
+                      deleteOp.toBSON({}),
+                      result);
+
+    BatchedCommandResponse response;
+    std::string errmsg;
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "Failed to parse response " << result,
+            response.parseBSON(result, &errmsg));
+    uassertStatusOK(response.getTopLevelStatus());
+
+    return response.getN();
 }
 
 }  // namespace
@@ -104,9 +163,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     // Invalidate sessions that could have a retryable write on it, so that we can refresh from disk
     // in case the in-memory state was out of sync.
     const auto catalog = SessionCatalog::get(opCtx);
-    // The use of shared_ptr here is in order to work around the limitation of stdx::function that
-    // the functor must be copyable.
-    auto sessionKillTokens = std::make_shared<std::vector<SessionCatalog::KillToken>>();
+
+    std::vector<SessionCatalog::KillToken> sessionKillTokens;
 
     // Scan all sessions and reacquire locks for prepared transactions.
     // There may be sessions that are checked out during this scan, but none of them
@@ -119,14 +177,14 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     catalog->scanSessions(matcher, [&](const ObservableSession& session) {
         const auto txnParticipant = TransactionParticipant::get(session);
         if (!txnParticipant.inMultiDocumentTransaction()) {
-            sessionKillTokens->emplace_back(session.kill());
+            sessionKillTokens.emplace_back(session.kill());
         }
 
         if (txnParticipant.transactionIsPrepared()) {
             sessionIdToReacquireLocks.emplace_back(session.getSessionId());
         }
     });
-    killSessionTokensFunction(opCtx, sessionKillTokens);
+    killSessionTokens(opCtx, std::move(sessionKillTokens));
 
     {
         // Create a new opCtx because we need an empty locker to refresh the locks.
@@ -197,9 +255,7 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
 
     const auto catalog = SessionCatalog::get(opCtx);
 
-    // The use of shared_ptr here is in order to work around the limitation of stdx::function that
-    // the functor must be copyable.
-    auto sessionKillTokens = std::make_shared<std::vector<SessionCatalog::KillToken>>();
+    std::vector<SessionCatalog::KillToken> sessionKillTokens;
 
     if (singleSessionDoc) {
         const auto lsid = LogicalSessionId::parse(IDLParserErrorContext("lsid"),
@@ -211,17 +267,50 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
                                   << session.getSessionId().getId()
                                   << " because it is in the prepared state",
                     !participant.transactionIsPrepared());
-            sessionKillTokens->emplace_back(session.kill());
+            sessionKillTokens.emplace_back(session.kill());
         });
     } else {
         SessionKiller::Matcher matcher(
             KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
         catalog->scanSessions(matcher, [&sessionKillTokens](const ObservableSession& session) {
-            sessionKillTokens->emplace_back(session.kill());
+            sessionKillTokens.emplace_back(session.kill());
         });
     }
+    killSessionTokens(opCtx, std::move(sessionKillTokens));
+}
 
-    killSessionTokensFunction(opCtx, sessionKillTokens);
+int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
+                                                SessionsCollection& sessionsCollection,
+                                                Date_t possiblyExpired) {
+    // Scan for records older than the minimum lifetime and uses a sort to walk the '_id' index
+    DBDirectClient client(opCtx);
+    auto cursor =
+        client.query(NamespaceString::kSessionTransactionsTableNamespace,
+                     Query(BSON(kLastWriteDateFieldName << LT << possiblyExpired)).sort(kSortById),
+                     0,
+                     0,
+                     &kIdProjection);
+
+    // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object
+    // size limit
+    LogicalSessionIdSet lsids;
+    const int kMaxBatchSize = 10'000;
+
+    int numReaped = 0;
+    while (cursor->more()) {
+        auto transactionSession = SessionsCollectionFetchResultIndividualResult::parse(
+            "TransactionSession"_sd, cursor->next());
+
+        lsids.insert(transactionSession.get_id());
+        if (lsids.size() > kMaxBatchSize) {
+            numReaped += removeSessionsTransactionRecords(opCtx, sessionsCollection, lsids);
+            lsids.clear();
+        }
+    }
+
+    numReaped += removeSessionsTransactionRecords(opCtx, sessionsCollection, lsids);
+
+    return numReaped;
 }
 
 MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx)

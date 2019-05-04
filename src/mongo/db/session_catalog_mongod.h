@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+class SessionsCollection;
+
 class MongoDSessionCatalog {
 public:
     /**
@@ -62,6 +64,14 @@ public:
      */
     static void invalidateSessions(OperationContext* opCtx,
                                    boost::optional<BSONObj> singleSessionDoc);
+
+    /**
+     * Locates session entries from the in-memory catalog and in 'config.transactions' which have
+     * not been referenced before 'possiblyExpired' and deletes them.
+     */
+    static int reapSessionsOlderThan(OperationContext* OperationContext,
+                                     SessionsCollection& sessionsCollection,
+                                     Date_t possiblyExpired);
 };
 
 /**

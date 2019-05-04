@@ -32,15 +32,15 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection_mock.h"
-#include "mongo/db/transaction_reaper_d.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
 
-class TransactionReaperTest : public ServiceContextMongoDTest {
+class MongoDSessionCatalogTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override {
         const auto service = getServiceContext();
@@ -65,7 +65,7 @@ protected:
         std::make_shared<MockSessionsCollection>(_collectionMock)};
 };
 
-TEST_F(TransactionReaperTest, ReapSomeExpiredSomeNot) {
+TEST_F(MongoDSessionCatalogTest, ReapSomeExpiredSomeNot) {
     // Create some "old" sessions
     DBDirectClient client(_opCtx);
     SessionTxnRecord txn1(
@@ -81,9 +81,8 @@ TEST_F(TransactionReaperTest, ReapSomeExpiredSomeNot) {
     _collectionMock->add(LogicalSessionRecord(makeLogicalSessionIdForTest(), clock()->now()));
     _collectionMock->add(LogicalSessionRecord(makeLogicalSessionIdForTest(), clock()->now()));
 
-
     ASSERT_EQ(2,
-              TransactionReaperD::reapSessionsOlderThan(
+              MongoDSessionCatalog::reapSessionsOlderThan(
                   _opCtx, *_collection, clock()->now() - Minutes{30}));
 }
 

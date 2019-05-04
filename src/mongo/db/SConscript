@@ -1544,28 +1544,10 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='transaction_reaper_d',
-    source=[
-        'transaction_reaper_d.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/s/client/shard_interface',
-        '$BUILD_DIR/mongo/s/coreshard',
-        'dbdirectclient',
-        'logical_session_id',
-        'sessions_collection',
-        'write_ops',
-    ],
-)
-
 envWithAsio.CppUnitTest(
     target='logical_session_cache_test',
     source=[
         'logical_session_cache_test.cpp',
-        'transaction_reaper_d_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/async_timer_mock',
@@ -1582,7 +1564,6 @@ envWithAsio.CppUnitTest(
         'service_context_d_test_fixture',
         'service_liaison_mock',
         'sessions_collection_mock',
-        'transaction_reaper_d',
         'transaction',
     ],
 )
@@ -1602,7 +1583,7 @@ envWithAsio.Library(
         'sessions_collection_standalone',
     ],
     LIBDEPS_PRIVATE=[
-        'transaction_reaper_d',
+        'transaction',
     ],
 )
 
@@ -2083,18 +2064,27 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target='transaction_participant_test',
- source=[
+    source=[
         'transaction_participant_test.cpp',
         'transaction_participant_retryable_writes_test.cpp',
+        'session_catalog_mongod_test.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'auth/authmocks',
+        'dbdirectclient',
+        'logical_session_id',
         'op_observer',
         'query_exec',
         'repl/mock_repl_coord_server_fixture',
+        'repl/repl_coordinator_interface',
+        'service_liaison_mock',
+        'sessions_collection_mock',
+        'sessions_collection',
         'transaction',
+        'write_ops',
     ],
 )
 

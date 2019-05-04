@@ -35,6 +35,12 @@
 
 namespace mongo {
 
+int RouterSessionCatalog::reapSessionsOlderThan(OperationContext* OperationContext,
+                                                SessionsCollection& sessionsCollection,
+                                                Date_t possiblyExpired) {
+    return 0;
+}
+
 RouterOperationContextSession::RouterOperationContextSession(OperationContext* opCtx)
     : _operationContextSession(opCtx) {}
 
