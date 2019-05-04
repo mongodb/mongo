@@ -18,6 +18,8 @@
             var stats = db.serverStatus().locks.Global;
             if (!stats.acquireWaitCount || !stats.acquireWaitCount.W)
                 return false;
+            if (!stats.timeAcquiringMicros || !stats.timeAcquiringMicros.W)
+                return false;
             if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W)
                 return true;
             return stats.acquireWaitCount.W > startStats.acquireWaitCount.W;
