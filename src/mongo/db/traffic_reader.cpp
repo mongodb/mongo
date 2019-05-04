@@ -192,7 +192,8 @@ void addOpType(TrafficReaderPacket& packet, BSONObjBuilder* builder) {
     if (packet.message.getNetworkOp() == dbMsg) {
         Message message;
         message.setData(dbMsg, packet.message.data(), packet.message.dataLen());
-
+        // Some header fields like requestId are missing, so the checksum won't match.
+        OpMsg::removeChecksum(&message);
         auto opMsg = rpc::opMsgRequestFromAnyProtocol(message);
         builder->append("opType", opMsg.getCommandName());
     } else {

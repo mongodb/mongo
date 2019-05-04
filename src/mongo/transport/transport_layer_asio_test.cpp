@@ -259,6 +259,7 @@ public:
         Message msg = builder.finish();
         msg.header().setResponseToMsgId(0);
         msg.header().setId(0);
+        OpMsg::appendChecksum(&msg);
 
         std::error_code ec;
         asio::write(_sock, asio::buffer(msg.buf(), msg.size()), ec);

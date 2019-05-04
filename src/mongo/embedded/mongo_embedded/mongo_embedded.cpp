@@ -410,6 +410,7 @@ void client_wire_protocol_rpc(mongo_embedded_v1_client* const client,
 
     client->response = sep->handleRequest(opCtx.get(), msg);
 
+    // Note that we skip OP_MSG's optional checksum for embedded.
     MsgData::View outMessage(client->response.response.buf());
     outMessage.setId(nextMessageId());
     outMessage.setResponseToMsgId(msg.header().getId());

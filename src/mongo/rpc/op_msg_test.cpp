@@ -41,6 +41,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
+#include "third_party/wiredtiger/wiredtiger.h"
 
 namespace mongo {
 namespace {
@@ -94,13 +95,18 @@ public:
     explicit Sized(T&&... args) {
         buffer.skip(sizeof(int32_t));
         append(args...);
-        DataView(buffer.buf()).write<LittleEndian<int32_t>>(buffer.len());
+        updateSize();
     }
 
     // Adds extra to the stored size. Use this to produce illegal messages.
     Sized&& addToSize(int32_t extra) && {
-        DataView(buffer.buf()).write<LittleEndian<int32_t>>(buffer.len() + extra);
+        updateSize(extra);
         return std::move(*this);
+    }
+
+protected:
+    void updateSize(int32_t extra = 0) {
+        DataView(buffer.buf()).write<LittleEndian<int32_t>>(buffer.len() + extra);
     }
 };
 
@@ -127,7 +133,25 @@ public:
     }
 
     OpMsgBytes&& addToSize(int32_t extra) && {
-        DataView(buffer.buf()).write<LittleEndian<int32_t>>(buffer.len() + extra);
+        updateSize(extra);
+        return std::move(*this);
+    }
+
+    OpMsgBytes&& appendChecksum() && {
+        // Reserve space at the end for the checksum.
+        append<uint32_t>(0);
+        updateSize();
+        // Checksum all bits except the checksum itself.
+        uint32_t checksum = wiredtiger_crc32c_func()(buffer.buf(), buffer.len() - 4);
+        // Write the checksum bits at the end.
+        auto checksumBits = DataView(buffer.buf() + buffer.len() - sizeof(checksum));
+        checksumBits.write<LittleEndian<uint32_t>>(checksum);
+        return std::move(*this);
+    }
+
+    OpMsgBytes&& appendChecksum(uint32_t checksum) && {
+        append(checksum);
+        updateSize();
         return std::move(*this);
     }
 };
@@ -158,9 +182,6 @@ const char kDocSequenceSection = 1;
 const uint32_t kNoFlags = 0;
 const uint32_t kHaveChecksum = 1;
 
-// CRC filler value
-const uint32_t kFakeCRC = 0;  // TODO will need to compute real crc when SERVER-28679 is done.
-
 TEST_F(OpMsgParser, SucceedsWithJustBody) {
     auto msg = OpMsgBytes{
         kNoFlags,  //
@@ -172,13 +193,12 @@ TEST_F(OpMsgParser, SucceedsWithJustBody) {
     ASSERT_EQ(msg.sequences.size(), 0u);
 }
 
-TEST_F(OpMsgParser, IgnoresCrcIfPresent) {  // Until SERVER-28679 is done.
-    auto msg = OpMsgBytes{
-        kHaveChecksum,  //
-        kBodySection,
-        fromjson("{ping: 1}"),
-        kFakeCRC,  // If not ignored, this would be read as a second body.
-    }.parse();
+TEST_F(OpMsgParser, SucceedsWithChecksum) {
+    auto msg = OpMsgBytes{kHaveChecksum,  //
+                          kBodySection,
+                          fromjson("{ping: 1}")}
+                   .appendChecksum()
+                   .parse();
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
     ASSERT_EQ(msg.sequences.size(), 0u);
@@ -422,12 +442,13 @@ TEST_F(OpMsgParser, FailsIfBodyTooBig) {
 }
 
 TEST_F(OpMsgParser, FailsIfBodyTooBigIntoChecksum) {
-    auto msg = OpMsgBytes{
-        kHaveChecksum,  //
-        kBodySection,
-        fromjson("{ping: 1}"),
-        kFakeCRC,
-    }.addToSize(-1);  // Shrink message so body extends past end.
+    auto msg =
+        OpMsgBytes{
+            kHaveChecksum,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
+        }.appendChecksum()
+            .addToSize(-1);  // Shrink message so body extends past end.
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidBSON);
 }
@@ -449,19 +470,19 @@ TEST_F(OpMsgParser, FailsIfDocumentSequenceTooBig) {
 }
 
 TEST_F(OpMsgParser, FailsIfDocumentSequenceTooBigIntoChecksum) {
-    auto msg = OpMsgBytes{
-        kHaveChecksum,  //
-        kBodySection,
-        fromjson("{ping: 1}"),
+    auto msg =
+        OpMsgBytes{
+            kHaveChecksum,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
 
-        kDocSequenceSection,
-        Sized{
-            "docs",  //
-            fromjson("{a: 1}"),
-        },
-
-        kFakeCRC,
-    }.addToSize(-1);  // Shrink message so body extends past end.
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+            },
+        }.appendChecksum()
+            .addToSize(-1);  // Shrink message so body extends past end.
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
 }
@@ -592,6 +613,18 @@ TEST_F(OpMsgParser, SucceedsWithUnknownOptionalFlags) {
             fromjson("{ping: 1}"),
         }.parse();
     }
+}
+
+TEST_F(OpMsgParser, FailsWithChecksumMismatch) {
+    auto msg = OpMsgBytes{kHaveChecksum,  //
+                          kBodySection,
+                          fromjson("{ping: 1}")}
+                   .appendChecksum(123);
+
+    ASSERT_THROWS_WITH_CHECK(msg.parse(), AssertionException, [](const DBException& ex) {
+        ASSERT_EQ(ex.toStatus().code(), ErrorCodes::ChecksumMismatch);
+        ASSERT(ErrorCodes::isConnectionFatalMessageParseError(ex.toStatus().code()));
+    });
 }
 
 void testSerializer(const Message& fromSerializer, OpMsgBytes&& expected) {
@@ -859,6 +892,20 @@ TEST(OpMsgRequest, FromDbAndBodyDoesNotCopy) {
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1, $db: 'db'}"));
     ASSERT_EQ(static_cast<const void*>(msg.body.objdata()), bodyPtr);
+}
+
+TEST(OpMsgTest, ChecksumResizesMessage) {
+    auto msg = OpMsgBytes{kNoFlags,  //
+                          kBodySection,
+                          fromjson("{ping: 1}")}
+                   .done();
+
+    // Test that appendChecksum() resizes the buffer if necessary.
+    const auto capacity = msg.sharedBuffer().capacity();
+    OpMsg::appendChecksum(&msg);
+    ASSERT_EQ(msg.sharedBuffer().capacity(), capacity + 4);
+    // The checksum is correct.
+    OpMsg::parse(msg);
 }
 }  // namespace
 }  // namespace mongo

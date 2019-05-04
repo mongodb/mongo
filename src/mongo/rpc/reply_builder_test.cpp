@@ -151,6 +151,9 @@ TEST(OpMsgReplyBuilder, CommandError) {
     replyBuilder.setCommandReply(status, extraObj);
     replyBuilder.getBodyBuilder().appendElements(metadata);
     auto msg = replyBuilder.done();
+    msg.header().setId(124);
+    msg.header().setResponseToMsgId(123);
+    OpMsg::appendChecksum(&msg);
 
     rpc::OpMsgReply parsed(&msg);
 
@@ -172,7 +175,9 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder, bool unifiedBodyAnd
     replyBuilder.getBodyBuilder().appendElements(metadata);
 
     auto msg = replyBuilder.done();
-
+    msg.header().setId(124);
+    msg.header().setResponseToMsgId(123);
+    OpMsg::appendChecksum(&msg);
     T parsed(&msg);
 
     if (unifiedBodyAndMetadata) {
@@ -197,7 +202,10 @@ void testErrors(rpc::ReplyBuilderInterface& replyBuilder) {
     replyBuilder.setCommandReply(status);
     replyBuilder.getBodyBuilder().appendElements(buildMetadata());
 
-    const auto msg = replyBuilder.done();
+    auto msg = replyBuilder.done();
+    msg.header().setId(124);
+    msg.header().setResponseToMsgId(123);
+    OpMsg::appendChecksum(&msg);
 
     T parsed(&msg);
     const Status result = getStatusFromCommandResult(parsed.getCommandReply());

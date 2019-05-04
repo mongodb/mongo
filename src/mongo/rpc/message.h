@@ -424,6 +424,14 @@ public:
         return size() - sizeof(MSGHEADER::Value);
     }
 
+    size_t capacity() const {
+        return _buf.capacity();
+    }
+
+    void realloc(size_t size) {
+        _buf.reallocOrCopy(size);
+    }
+
     void reset() {
         _buf = {};
     }

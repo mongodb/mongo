@@ -383,6 +383,10 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
         } else {
             dest.setExhaust(false);
         }
+
+        // The original checksum won't be valid once the network layer replaces requestId. Remove it
+        // because the network layer re-checksums the response.
+        OpMsg::removeChecksum(&response);
         return {std::move(response), exhaustNS};
     } else {
         return {Message()};

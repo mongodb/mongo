@@ -202,6 +202,7 @@ Future<Message> AsyncDBClient::_call(Message request, const BatonHandle& baton) 
     auto msgId = nextMessageId();
     request.header().setId(msgId);
     request.header().setResponseToMsgId(0);
+    OpMsg::appendChecksum(&request);
 
     return _session->asyncSinkMessage(request, baton)
         .then([this, baton] { return _session->asyncSourceMessage(baton); })

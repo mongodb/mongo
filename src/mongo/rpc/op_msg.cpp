@@ -42,6 +42,7 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
+#include "third_party/wiredtiger/wiredtiger.h"
 
 namespace mongo {
 namespace {
@@ -58,6 +59,18 @@ enum class Section : uint8_t {
     kDocSequence = 1,
 };
 
+constexpr int kCrc32Size = 4;
+
+// All fields including size, requestId, and responseTo must already be set. The size must already
+// include the final 4-byte checksum.
+uint32_t calculateChecksum(const Message& message) {
+    if (message.operation() != dbMsg) {
+        return 0;
+    }
+
+    invariant(OpMsg::isFlagSet(message, OpMsg::kChecksumPresent));
+    return wiredtiger_crc32c_func()(message.singleData().view2ptr(), message.size() - kCrc32Size);
+}
 }  // namespace
 
 uint32_t OpMsg::flags(const Message& message) {
@@ -76,6 +89,31 @@ void OpMsg::replaceFlags(Message* message, uint32_t flags) {
     DataView(message->singleData().data()).write<LittleEndian<uint32_t>>(flags);
 }
 
+uint32_t OpMsg::getChecksum(const Message& message) {
+    invariant(message.operation() == dbMsg);
+    invariant(isFlagSet(message, kChecksumPresent));
+    return BufReader(message.singleData().view2ptr() + message.size() - kCrc32Size, kCrc32Size)
+        .read<LittleEndian<uint32_t>>();
+}
+
+void OpMsg::appendChecksum(Message* message) {
+    if (message->operation() != dbMsg) {
+        return;
+    }
+
+    invariant(!isFlagSet(*message, kChecksumPresent));
+    setFlag(message, kChecksumPresent);
+    const size_t newSize = message->size() + kCrc32Size;
+    if (message->capacity() < newSize) {
+        message->realloc(newSize);
+    }
+
+    // Everything before the checksum, including the final size, is covered by the checksum.
+    message->header().setLen(newSize);
+    DataView(message->singleData().view2ptr() + newSize - kCrc32Size)
+        .write<LittleEndian<uint32_t>>(calculateChecksum(*message));
+}
+
 OpMsg OpMsg::parse(const Message& message) try {
     // It is the caller's responsibility to call the correct parser for a given message type.
     invariant(!message.empty());
@@ -87,7 +125,6 @@ OpMsg OpMsg::parse(const Message& message) try {
                           << std::bitset<32>(flags).to_string(),
             !containsUnknownRequiredFlags(flags));
 
-    constexpr int kCrc32Size = 4;
     const bool haveChecksum = flags & kChecksumPresent;
     const int checksumSize = haveChecksum ? kCrc32Size : 0;
 
@@ -150,6 +187,12 @@ OpMsg OpMsg::parse(const Message& message) try {
                 str::stream() << "Duplicate field between body and document sequence "
                               << docSeq.name,
                 !inBody);
+    }
+
+    if (haveChecksum) {
+        uassert(ErrorCodes::ChecksumMismatch,
+                "OP_MSG checksum does not match contents",
+                OpMsg::getChecksum(message) == calculateChecksum(message));
     }
 
     return msg;

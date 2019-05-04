@@ -59,12 +59,14 @@ public:
         const auto reqId = nextMessageId();
         toSend.header().setId(reqId);
         toSend.header().setResponseToMsgId(0);
+        OpMsg::appendChecksum(&toSend);
         _lastSent = toSend;
 
         // Mock response.
         response = _mockCallResponse;
         response.header().setId(nextMessageId());
         response.header().setResponseToMsgId(reqId);
+        OpMsg::appendChecksum(&response);
 
         return true;
     }
@@ -164,7 +166,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
     auto m = conn.getLastSentMessage();
     ASSERT(!m.empty());
     auto msg = OpMsg::parse(m);
-    ASSERT_EQ(OpMsg::flags(m), 0U);
+    ASSERT_EQ(OpMsg::flags(m), OpMsg::kChecksumPresent);
     ASSERT_EQ(msg.body.getStringField("find"), nss.coll());
     ASSERT_EQ(msg.body["batchSize"].number(), 0);
 
@@ -433,7 +435,7 @@ TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {
     auto m = conn.getLastSentMessage();
     ASSERT(!m.empty());
     auto msg = OpMsg::parse(m);
-    ASSERT_EQ(OpMsg::flags(m), 0U);
+    ASSERT_EQ(OpMsg::flags(m), OpMsg::kChecksumPresent);
     ASSERT_EQ(msg.body.getStringField("find"), nss.coll());
     ASSERT_EQ(msg.body["batchSize"].number(), 0);
     ASSERT_TRUE(msg.body.getBoolField("readOnce")) << msg.body;

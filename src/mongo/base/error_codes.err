@@ -287,6 +287,7 @@ error_code("IndexBuildAlreadyInProgress", 285)
 error_code("ChangeStreamHistoryLost", 286)
 # The code below is for internal use only and must never be returned in a network response
 error_code("TransactionCoordinatorDeadlineTaskCanceled", 287)
+error_code("ChecksumMismatch", 288)
 
 # Error codes 4000-8999 are reserved.
 
@@ -348,9 +349,9 @@ error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
 # indicates that it cannot be executed as normal and must abort its intended work.
 error_class("CancelationError", ["ShutdownInProgress", "InterruptedAtShutdown", "CallbackCanceled"])
 
-#TODO SERVER-28679 add checksum failure.
 error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
-                                                 "TooManyDocumentSequences"])
+                                                 "TooManyDocumentSequences",
+                                                 "ChecksumMismatch"])
 
 error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "MaxTimeMSExpired", "NetworkInterfaceExceededTimeLimit"])
 

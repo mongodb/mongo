@@ -85,6 +85,7 @@ if not has_option('noshell') and usemozjs:
             'mock_dbclient_conn_test.cpp',
             'mock_replica_set_test.cpp',
             'multikey_paths_test.cpp',
+            'shared_buffer.cpp',
             'pdfiletests.cpp',
             'plan_executor_invalidation_test.cpp',
             'plan_ranking.cpp',

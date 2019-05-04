@@ -85,6 +85,8 @@ using std::endl;
 using std::map;
 using std::string;
 
+MONGO_FAIL_POINT_DEFINE(dbClientConnectionDisableChecksum);
+
 namespace {
 
 /**
@@ -576,6 +578,9 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
+    if (!MONGO_FAIL_POINT(dbClientConnectionDisableChecksum)) {
+        OpMsg::appendChecksum(&toSend);
+    }
     uassertStatusOK(
         _session->sinkMessage(uassertStatusOK(_compressorManager.compressMessage(toSend))));
     killSessionOnError.dismiss();
@@ -619,6 +624,9 @@ bool DBClientConnection::call(Message& toSend,
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
+    if (!MONGO_FAIL_POINT(dbClientConnectionDisableChecksum)) {
+        OpMsg::appendChecksum(&toSend);
+    }
     auto swm = _compressorManager.compressMessage(toSend);
     uassertStatusOK(swm.getStatus());
 

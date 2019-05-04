@@ -74,6 +74,37 @@ struct OpMsg {
     }
 
     /**
+     * Removes a flag from the list of set flags in message.
+     * Only legal on an otherwise valid OP_MSG message.
+     */
+    static void clearFlag(Message* message, uint32_t flag) {
+        replaceFlags(message, flags(*message) & ~flag);
+    }
+
+    /**
+     * Retrieves the checksum stored at the end of the message.
+     */
+    static uint32_t getChecksum(const Message& message);
+
+    /**
+     * Add a checksum at the end of the message. Call this after setting size, requestId, and
+     * responseTo. The checksumPresent flag must *not* already be set.
+     */
+    static void appendChecksum(Message* message);
+
+    /**
+     * If the checksum is present, unsets the checksumPresent flag and shrinks message by 4 bytes.
+     */
+    static void removeChecksum(Message* message) {
+        if (!isFlagSet(*message, kChecksumPresent)) {
+            return;
+        }
+
+        clearFlag(message, kChecksumPresent);
+        message->header().setLen(message->size() - 4);
+    }
+
+    /**
      * Parses and returns an OpMsg containing unowned BSON.
      */
     static OpMsg parse(const Message& message);
