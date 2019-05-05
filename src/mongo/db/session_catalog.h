@@ -122,26 +122,29 @@ private:
         stdx::condition_variable availableCondVar;
     };
 
+    /**
+     * Blocking method, which checks-out the session set on 'opCtx'.
+     */
     ScopedCheckedOutSession _checkOutSession(OperationContext* opCtx);
 
     /**
-     * May release and re-acquire it zero or more times before returning. The returned
-     * 'SessionRuntimeInfo' is guaranteed to be linked on the catalog's _txnTable as long as the
-     * lock is held.
+     * Creates or returns the session runtime info for 'lsid' from the '_sessions' map. The returned
+     * pointer is guaranteed to be linked on the map for as long as the mutex is held.
      */
-    std::shared_ptr<SessionRuntimeInfo> _getOrCreateSessionRuntimeInfo(
-        WithLock, OperationContext* opCtx, const LogicalSessionId& lsid);
+    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(WithLock,
+                                                       OperationContext* opCtx,
+                                                       const LogicalSessionId& lsid);
 
     /**
      * Makes a session, previously checked out through 'checkoutSession', available again.
      */
-    void _releaseSession(std::shared_ptr<SessionRuntimeInfo> sri,
-                         boost::optional<KillToken> killToken);
+    void _releaseSession(SessionRuntimeInfo* sri, boost::optional<KillToken> killToken);
 
+    // Protects the state below
     stdx::mutex _mutex;
 
     // Owns the Session objects for all current Sessions.
-    LogicalSessionIdMap<std::shared_ptr<SessionRuntimeInfo>> _sessions;
+    LogicalSessionIdMap<std::unique_ptr<SessionRuntimeInfo>> _sessions;
 };
 
 /**
@@ -151,18 +154,22 @@ private:
 class SessionCatalog::ScopedCheckedOutSession {
 public:
     ScopedCheckedOutSession(SessionCatalog& catalog,
-                            std::shared_ptr<SessionCatalog::SessionRuntimeInfo> sri,
+                            SessionCatalog::SessionRuntimeInfo* sri,
                             boost::optional<SessionCatalog::KillToken> killToken)
-        : _catalog(catalog), _sri(std::move(sri)), _killToken(std::move(killToken)) {}
+        : _catalog(catalog), _sri(sri), _killToken(std::move(killToken)) {}
 
-    ScopedCheckedOutSession(ScopedCheckedOutSession&&) = default;
+    ScopedCheckedOutSession(ScopedCheckedOutSession&& other)
+        : _catalog(other._catalog), _sri(other._sri), _killToken(std::move(other._killToken)) {
+        other._sri = nullptr;
+    }
+
     ScopedCheckedOutSession& operator=(ScopedCheckedOutSession&&) = delete;
     ScopedCheckedOutSession(const ScopedCheckedOutSession&) = delete;
     ScopedCheckedOutSession& operator=(ScopedCheckedOutSession&) = delete;
 
     ~ScopedCheckedOutSession() {
         if (_sri) {
-            _catalog._releaseSession(std::move(_sri), std::move(_killToken));
+            _catalog._releaseSession(_sri, std::move(_killToken));
         }
     }
 
@@ -178,15 +185,11 @@ public:
         return *get();
     }
 
-    operator bool() const {
-        return bool(_sri);
-    }
-
 private:
     // The owning session catalog into which the session should be checked back
     SessionCatalog& _catalog;
 
-    std::shared_ptr<SessionCatalog::SessionRuntimeInfo> _sri;
+    SessionCatalog::SessionRuntimeInfo* _sri;
     boost::optional<SessionCatalog::KillToken> _killToken;
 };
 
@@ -242,7 +245,9 @@ public:
      * Returns a pointer to the current operation running on this Session, or nullptr if there is no
      * operation currently running on this Session.
      */
-    OperationContext* currentOperation() const;
+    OperationContext* currentOperation() const {
+        return _session->_checkoutOpCtx;
+    }
 
     /**
      * Increments the number of "killers" for this session and returns a 'kill token' to to be

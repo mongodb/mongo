@@ -107,8 +107,9 @@ SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationCo
     invariant(ObservableSession(ul, sri->session)._killed());
 
     // Wait until the session is no longer checked out
-    opCtx->waitForConditionOrInterrupt(sri->availableCondVar, ul, [&ul, &sri]() {
-        return !ObservableSession(ul, sri->session).currentOperation();
+    opCtx->waitForConditionOrInterrupt(sri->availableCondVar, ul, [&ul, &sri] {
+        ObservableSession osession(ul, sri->session);
+        return !osession.currentOperation();
     });
 
     sri->session._checkoutOpCtx = opCtx;
@@ -146,23 +147,23 @@ SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& ls
     return ObservableSession(lg, sri->session).kill();
 }
 
-std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreateSessionRuntimeInfo(
+SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getOrCreateSessionRuntimeInfo(
     WithLock, OperationContext* opCtx, const LogicalSessionId& lsid) {
     auto it = _sessions.find(lsid);
     if (it == _sessions.end()) {
-        it = _sessions.emplace(lsid, std::make_shared<SessionRuntimeInfo>(lsid)).first;
+        it = _sessions.emplace(lsid, std::make_unique<SessionRuntimeInfo>(lsid)).first;
     }
 
-    return it->second;
+    return it->second.get();
 }
 
-void SessionCatalog::_releaseSession(std::shared_ptr<SessionCatalog::SessionRuntimeInfo> sri,
-                                     boost::optional<SessionCatalog::KillToken> killToken) {
+void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
+                                     boost::optional<KillToken> killToken) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     // Make sure we have exactly the same session on the map and that it is still associated with an
     // operation context (meaning checked-out)
-    invariant(_sessions[sri->session.getSessionId()] == sri);
+    invariant(_sessions[sri->session.getSessionId()].get() == sri);
     invariant(sri->session._checkoutOpCtx);
     sri->session._checkoutOpCtx = nullptr;
     sri->availableCondVar.notify_all();
@@ -171,10 +172,6 @@ void SessionCatalog::_releaseSession(std::shared_ptr<SessionCatalog::SessionRunt
         invariant(sri->session._killsRequested > 0);
         --sri->session._killsRequested;
     }
-}
-
-OperationContext* ObservableSession::currentOperation() const {
-    return _session->_checkoutOpCtx;
 }
 
 SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) const {
