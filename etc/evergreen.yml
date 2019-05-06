@@ -6246,9 +6246,10 @@ tasks:
         set -o errexit
         set -o verbose
 
-        ${activate_virtualenv}
         if [ "Windows_NT" = "$OS" ]; then
-          /cygdrive/c/python/python36/python.exe -m pip install -r buildscripts/requirements.txt
+          /cygdrive/c/python/python36/python.exe -m pip install --user -r buildscripts/requirements.txt
+        else
+          /opt/mongodbtoolchain/v2/bin/python3 -m pip install --user -r buildscripts/requirements.txt
         fi
   - func: "run tests"
     vars:
