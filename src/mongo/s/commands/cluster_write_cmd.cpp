@@ -182,28 +182,6 @@ boost::optional<WouldChangeOwningShardInfo> getWouldChangeOwningShardErrorInfo(
 }
 
 /**
- * Called when the response contains a WouldChangeOwningShard error. Deletes the original document
- * and inserts the new one in a transaction. Returns whether or not we match and delete the original
- * document. If the delete and insert succeed, modifies the response object to reflect that we
- * successfully updated one document.
- */
-bool updateShardKeyValue(OperationContext* opCtx,
-                         const BatchedCommandRequest& request,
-                         BatchedCommandResponse* response,
-                         const WouldChangeOwningShardInfo& wouldChangeOwningShardErrorInfo) {
-    auto matchedDoc = documentShardKeyUpdateUtil::updateShardKeyForDocument(
-        opCtx,
-        request.getNS(),
-        wouldChangeOwningShardErrorInfo,
-        request.getWriteCommandBase().getStmtId() ? request.getWriteCommandBase().getStmtId().get()
-                                                  : 0);
-    if (!matchedDoc)
-        return false;
-
-    return true;
-}
-
-/**
  * Changes the shard key for the document if the response object contains a WouldChangeOwningShard
  * error. If the original command was sent as a retryable write, starts a transaction on the same
  * session and txnNum, deletes the original document, inserts the new one, and commits the
@@ -223,6 +201,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
         return false;
 
     bool updatedShardKey = false;
+    boost::optional<BSONObj> upsertedId;
     if (isRetryableWrite) {
         if (MONGO_FAIL_POINT(hangAfterThrowWouldChangeOwningShardRetryableWrite)) {
             log() << "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint";
@@ -246,9 +225,18 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             // If we do not get WouldChangeOwningShard when re-running the update, the document has
             // been modified or deleted concurrently and we do not need to delete it and insert a
             // new one.
-            updatedShardKey = wouldChangeOwningShardErrorInfo &&
-                updateShardKeyValue(
-                                  opCtx, request, response, wouldChangeOwningShardErrorInfo.get());
+            updatedShardKey =
+                wouldChangeOwningShardErrorInfo &&
+                documentShardKeyUpdateUtil::updateShardKeyForDocument(
+                    opCtx,
+                    request.getNS(),
+                    wouldChangeOwningShardErrorInfo.get(),
+                    boost::get_optional_value_or(request.getWriteCommandBase().getStmtId(), 0));
+
+            // If the operation was an upsert, record the _id of the new document.
+            if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
+                upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+            }
 
             // Commit the transaction
             auto commitResponse = documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(
@@ -286,8 +274,16 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
     } else {
         try {
             // Delete the original document and insert the new one
-            updatedShardKey = updateShardKeyValue(
-                opCtx, request, response, wouldChangeOwningShardErrorInfo.get());
+            updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocument(
+                opCtx,
+                request.getNS(),
+                wouldChangeOwningShardErrorInfo.get(),
+                boost::get_optional_value_or(request.getWriteCommandBase().getStmtId(), 0));
+
+            // If the operation was an upsert, record the _id of the new document.
+            if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
+                upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+            }
         } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
             Status status = ex->getKeyPattern().hasField("_id")
                 ? ex.toStatus().withContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext)
@@ -301,7 +297,15 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
         // and inserted the new one, so it is safe to unset the error details.
         response->unsetErrDetails();
         response->setN(response->getN() + 1);
-        response->setNModified(response->getNModified() + 1);
+
+        if (upsertedId) {
+            auto upsertDetail = stdx::make_unique<BatchedUpsertDetail>();
+            upsertDetail->setIndex(0);
+            upsertDetail->setUpsertedID(upsertedId.get());
+            response->addToUpsertDetails(upsertDetail.release());
+        } else {
+            response->setNModified(response->getNModified() + 1);
+        }
     }
 
     return updatedShardKey;

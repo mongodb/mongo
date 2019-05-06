@@ -214,6 +214,12 @@
     let docsToInsert =
         [{"x": 4, "a": 3}, {"x": 78}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
 
+    // ----Assert correct behavior when collection is hash sharded----
+
+    // Non-upsert case
+    assertCanUpdatePrimitiveShardKeyHashedChangeShards(st, kDbName, ns, session, sessionDB, false);
+    assertCanUpdatePrimitiveShardKeyHashedChangeShards(st, kDbName, ns, session, sessionDB, true);
+
     // ----Assert correct error when changing a doc shard key conflicts with an orphan----
 
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
@@ -226,9 +232,6 @@
     assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
     assert(res.getWriteError().errmsg.includes(
         "There is either an orphan for this document or _id for this collection is not globally unique."));
-
-    session = st.s.startSession({retryWrites: true});
-    sessionDB = session.getDatabase(kDbName);
 
     session.startTransaction();
     res = sessionDB.foo.update({"x": 505}, {"$set": {"x": 20}});
@@ -243,9 +246,6 @@
 
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-
-    session = st.s.startSession({retryWrites: true});
-    sessionDB = session.getDatabase(kDbName);
 
     // Turn on failcommand fail point to fail CoordinateCommitTransaction
     assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
@@ -348,6 +348,33 @@
     assert.eq(1, mongos.getDB(kDbName).foo.find({"a": 7}).toArray().length);
     assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 20, "a": 7}).toArray().length);
     assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 1}).toArray().length);
+
+    mongos.getDB(kDbName).foo.drop();
+
+    // ----Assert correct behavior when update is sent directly to a shard----
+
+    // TODO SERVER-39158: Add replacement tests as well
+    shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
+    cleanupOrphanedDocs(st, ns);
+
+    // An update sent directly to a shard cannot change the shard key.
+    assert.commandFailedWithCode(
+        st.rs1.getPrimary().getDB(kDbName).foo.update({"x": 500}, {$set: {"x": 2}}),
+        ErrorCodes.ImmutableField);
+    assert.commandFailedWithCode(st.rs1.getPrimary().getDB(kDbName).foo.update(
+                                     {"x": 1000}, {$set: {"x": 2}}, {upsert: true}),
+                                 ErrorCodes.ImmutableField);
+    assert.commandFailedWithCode(st.rs0.getPrimary().getDB(kDbName).foo.update(
+                                     {"x": 1000}, {$set: {"x": 2}}, {upsert: true}),
+                                 ErrorCodes.ImmutableField);
+
+    // The query will not match a doc and upsert is false, so this will not fail but will be a
+    // no-op.
+    res = assert.commandWorked(
+        st.rs0.getPrimary().getDB(kDbName).foo.update({"x": 500}, {$set: {"x": 2}}));
+    assert.eq(0, res.nMatched);
+    assert.eq(0, res.nModified);
+    assert.eq(0, res.nUpserted);
 
     mongos.getDB(kDbName).foo.drop();
 

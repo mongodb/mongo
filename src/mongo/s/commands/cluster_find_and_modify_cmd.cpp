@@ -92,19 +92,27 @@ void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
         WouldChangeOwningShardInfo::parseFromCommandError(extraInfo);
 
     try {
-        auto matchedDoc = documentShardKeyUpdateUtil::updateShardKeyForDocument(
+        auto matchedDocOrUpserted = documentShardKeyUpdateUtil::updateShardKeyForDocument(
             opCtx, nss, wouldChangeOwningShardExtraInfo, cmdObj.getIntField("stmtId"));
+        auto upserted = matchedDocOrUpserted && wouldChangeOwningShardExtraInfo.getShouldUpsert();
+        auto updatedExistingDocument = matchedDocOrUpserted && !upserted;
 
         BSONObjBuilder lastErrorObjBuilder(result->subobjStart("lastErrorObject"));
-        lastErrorObjBuilder.appendNumber("n", matchedDoc ? 1 : 0);
-        lastErrorObjBuilder.appendBool("updatedExisting", matchedDoc ? true : false);
+        lastErrorObjBuilder.appendNumber("n", matchedDocOrUpserted ? 1 : 0);
+        lastErrorObjBuilder.appendBool("updatedExisting", updatedExistingDocument);
+        if (upserted) {
+            lastErrorObjBuilder.appendAs(wouldChangeOwningShardExtraInfo.getPostImage()["_id"],
+                                         "upserted");
+        }
         lastErrorObjBuilder.doneFast();
 
-        if (matchedDoc) {
+        auto shouldReturnPostImage = cmdObj.getBoolField("new");
+        if (updatedExistingDocument) {
             result->append("value",
-                           cmdObj.getBoolField("new")
-                               ? wouldChangeOwningShardExtraInfo.getPostImage()
-                               : wouldChangeOwningShardExtraInfo.getPreImage());
+                           shouldReturnPostImage ? wouldChangeOwningShardExtraInfo.getPostImage()
+                                                 : wouldChangeOwningShardExtraInfo.getPreImage());
+        } else if (upserted && shouldReturnPostImage) {
+            result->append("value", wouldChangeOwningShardExtraInfo.getPostImage());
         } else {
             result->appendNull("value");
         }

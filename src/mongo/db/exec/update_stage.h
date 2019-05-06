@@ -199,6 +199,12 @@ private:
     StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
 
     /**
+     * Called when update modifies shard key fields. Checks that the updated doc has all required
+     * shard key fields and throws if it does not.
+     */
+    void assertNewDocHasValidShardKeyOptions(const ScopedCollectionMetadata& metadata);
+
+    /**
      * Checks that the updated doc has all required shard key fields and throws if it does not.
      *
      * Also checks if the updated doc still belongs to this node and throws if it does not. If the
@@ -228,6 +234,9 @@ private:
 
     // True if updated documents should be validated with storage_validation::storageValid().
     bool _enforceOkForStorage;
+
+    // True if the request should be checked for an update to the shard key.
+    bool _shouldCheckForShardKeyUpdate;
 
     // If the update was in-place, we may see it again.  This only matters if we're doing
     // a multi-update; if we're not doing a multi-update we stop after one update and we

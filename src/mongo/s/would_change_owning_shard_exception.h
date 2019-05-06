@@ -46,8 +46,12 @@ class WouldChangeOwningShardInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::WouldChangeOwningShard;
 
-    explicit WouldChangeOwningShardInfo(const BSONObj& preImage, const BSONObj& postImage)
-        : _preImage(preImage.getOwned()), _postImage(postImage.getOwned()) {}
+    explicit WouldChangeOwningShardInfo(const BSONObj& preImage,
+                                        const BSONObj& postImage,
+                                        const bool shouldUpsert)
+        : _preImage(preImage.getOwned()),
+          _postImage(postImage.getOwned()),
+          _shouldUpsert(shouldUpsert) {}
 
     const auto& getPreImage() const {
         return _preImage;
@@ -55,6 +59,10 @@ public:
 
     const auto& getPostImage() const {
         return _postImage;
+    }
+
+    const auto& getShouldUpsert() const {
+        return _shouldUpsert;
     }
 
     BSONObj toBSON() const {
@@ -73,6 +81,9 @@ private:
 
     // The post image returned by the update stage
     BSONObj _postImage;
+
+    // True if {upsert: true} and the update stage did not match any docs
+    bool _shouldUpsert;
 };
 using WouldChangeOwningShardException = ExceptionFor<ErrorCodes::WouldChangeOwningShard>;
 

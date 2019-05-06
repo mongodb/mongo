@@ -43,36 +43,55 @@ function cleanupOrphanedDocs(st, ns) {
     });
 }
 
-function runUpdateCmdSuccess(st, kDbName, session, sessionDB, inTxn, queries, updates, upsert) {
+function assertUpdateSucceeds(st, session, sessionDB, inTxn, query, update, upsert) {
     let res;
+    if (inTxn) {
+        session.startTransaction();
+        res = assert.commandWorked(sessionDB.foo.update(query, update, {"upsert": upsert}));
+        assert.commandWorked(session.commitTransaction_forTesting());
+    } else {
+        res = assert.commandWorked(sessionDB.foo.update(query, update, {"upsert": upsert}));
+    }
+
+    if (upsert) {
+        assert.eq(1, res.nUpserted);
+        assert.eq(0, res.nMatched);
+        assert.eq(0, res.nModified);
+    } else {
+        assert.eq(0, res.nUpserted);
+        assert.eq(1, res.nMatched);
+        assert.eq(1, res.nModified);
+    }
+}
+
+function runUpdateCmdSuccess(
+    st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, collectionSplitPoint) {
     for (let i = 0; i < queries.length; i++) {
-        if (inTxn) {
-            session.startTransaction();
-            res = sessionDB.foo.update(queries[i], updates[i], {"upsert": upsert});
-            assert.commandWorked(res);
-            assert.commandWorked(session.commitTransaction_forTesting());
-        } else {
-            res = sessionDB.foo.update(queries[i], updates[i], {"upsert": upsert});
-            assert.commandWorked(res);
-        }
+        assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[i], updates[i], upsert);
 
         let updatedVal = updates[i]["$set"] ? updates[i]["$set"] : updates[i];
         assert.eq(0, st.s.getDB(kDbName).foo.find(queries[i]).itcount());
         assert.eq(1, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
-        if (upsert) {
-            assert.eq(1, res.nUpserted);
-            assert.eq(0, res.nMatched);
-            assert.eq(0, res.nModified);
+        if (bsonWoCompare(updatedVal, collectionSplitPoint) > 0) {
+            assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+            assert.eq(1, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
         } else {
-            assert.eq(0, res.nUpserted);
-            assert.eq(1, res.nMatched);
-            assert.eq(1, res.nModified);
+            assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+            assert.eq(0, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
         }
     }
 }
 
-function runFindAndModifyCmdSuccess(
-    st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, returnNew) {
+function runFindAndModifyCmdSuccess(st,
+                                    kDbName,
+                                    session,
+                                    sessionDB,
+                                    inTxn,
+                                    queries,
+                                    updates,
+                                    upsert,
+                                    returnNew,
+                                    collectionSplitPoint) {
     let res;
     for (let i = 0; i < queries.length; i++) {
         let oldDoc;
@@ -94,6 +113,14 @@ function runFindAndModifyCmdSuccess(
         let newDoc = st.s.getDB(kDbName).foo.find(updatedVal).toArray();
         assert.eq(0, st.s.getDB(kDbName).foo.find(queries[i]).itcount());
         assert.eq(1, newDoc.length);
+        if (bsonWoCompare(updatedVal, collectionSplitPoint) > 0) {
+            assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+            assert.eq(1, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+        } else {
+            assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+            assert.eq(0, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+        }
+
         if (returnNew) {
             assert(resultsEq([res], newDoc));
         } else {
@@ -153,26 +180,28 @@ function runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, 
 
 function assertCanUpdatePrimitiveShardKey(
     st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, queries, updates, upsert) {
-    let docsToInsert = [];
-    if (!upsert) {
-        docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
-    }
-    shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
+    let docsToInsert = upsert
+        ? [{"x": 1}, {"x": 100}]
+        : [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
+    let splitDoc = {"x": 100};
+
+    shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, splitDoc, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
         runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false);
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false, splitDoc);
         sessionDB.foo.drop();
 
-        shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
+        shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, splitDoc, {"x": 300});
         cleanupOrphanedDocs(st, ns);
         runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true, splitDoc);
     } else {
-        runUpdateCmdSuccess(st, kDbName, session, sessionDB, inTxn, queries, updates, upsert);
+        runUpdateCmdSuccess(
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, splitDoc);
     }
 
     sessionDB.foo.drop();
@@ -180,34 +209,32 @@ function assertCanUpdatePrimitiveShardKey(
 
 function assertCanUpdateDottedPath(
     st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, queries, updates, upsert) {
-    let docsToInsert = [];
-    if (!upsert) {
-        docsToInsert = [
-            {"x": {"a": 4, "y": 1}, "a": 3},
-            {"x": {"a": 100, "y": 1}},
-            {"x": {"a": 300, "y": 1}, "a": 3},
-            {"x": {"a": 500, "y": 1}, "a": 6}
-        ];
-    }
-    shardCollectionMoveChunks(
-        st, kDbName, ns, {"x.a": 1}, docsToInsert, {"x.a": 100}, {"x.a": 300});
+    let docsToInsert = upsert ? [{"x": {"a": 1}}, {"x": {"a": 100}}] : [
+        {"x": {"a": 4, "y": 1}, "a": 3},
+        {"x": {"a": 100, "y": 1}},
+        {"x": {"a": 300, "y": 1}, "a": 3},
+        {"x": {"a": 500, "y": 1}, "a": 6}
+    ];
+    let splitDoc = {"x": {"a": 100}};
+    shardCollectionMoveChunks(st, kDbName, ns, {"x.a": 1}, docsToInsert, splitDoc, {"x.a": 300});
     cleanupOrphanedDocs(st, ns);
 
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
         runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false);
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false, splitDoc);
         sessionDB.foo.drop();
 
         shardCollectionMoveChunks(
-            st, kDbName, ns, {"x.a": 1}, docsToInsert, {"x.a": 100}, {"x.a": 300});
+            st, kDbName, ns, {"x.a": 1}, docsToInsert, splitDoc, {"x.a": 300});
         cleanupOrphanedDocs(st, ns);
 
         runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true, splitDoc);
     } else {
-        runUpdateCmdSuccess(st, kDbName, session, sessionDB, inTxn, queries, updates, upsert);
+        runUpdateCmdSuccess(
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, splitDoc);
     }
 
     sessionDB.foo.drop();
@@ -215,20 +242,19 @@ function assertCanUpdateDottedPath(
 
 function assertCanUpdatePartialShardKey(
     st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, queries, updates, upsert) {
-    let docsToInsert = [];
-    if (!upsert) {
-        docsToInsert =
-            [{"x": 4, "y": 3}, {"x": 100, "y": 50}, {"x": 300, "y": 80}, {"x": 500, "y": 600}];
-    }
+    let docsToInsert = upsert
+        ? [{"x": 1, "y": 1}, {"x": 100, "y": 50}]
+        : [{"x": 4, "y": 3}, {"x": 100, "y": 50}, {"x": 300, "y": 80}, {"x": 500, "y": 600}];
+    let splitDoc = {"x": 100, "y": 50};
     shardCollectionMoveChunks(
-        st, kDbName, ns, {"x": 1, "y": 1}, docsToInsert, {"x": 100, "y": 50}, {"x": 300, "y": 80});
+        st, kDbName, ns, {"x": 1, "y": 1}, docsToInsert, splitDoc, {"x": 300, "y": 80});
     cleanupOrphanedDocs(st, ns);
 
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
         runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false);
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false, splitDoc);
         sessionDB.foo.drop();
 
         shardCollectionMoveChunks(st,
@@ -241,9 +267,10 @@ function assertCanUpdatePartialShardKey(
         cleanupOrphanedDocs(st, ns);
 
         runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true, splitDoc);
     } else {
-        runUpdateCmdSuccess(st, kDbName, session, sessionDB, inTxn, queries, updates, upsert);
+        runUpdateCmdSuccess(
+            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, splitDoc);
     }
 
     sessionDB.foo.drop();
@@ -624,4 +651,125 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     }
 
     sessionDB.foo.drop();
+}
+
+function assertHashedShardKeyUpdateCorrect(
+    st, kDbName, query, update, upsert, shouldExistOnShard0) {
+    let updatedVal = update["$set"] ? update["$set"] : update;
+    assert.eq(0, st.s.getDB(kDbName).foo.find(query).itcount());
+    assert.eq(1, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
+    if (shouldExistOnShard0) {
+        assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+        assert.eq(0, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+    } else {
+        assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+        assert.eq(1, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
+    }
+}
+
+// When a collection has a hashed shard key, we do not know which shards will have which documents
+// upon insertion. This test inserts some documents, shards a collection using a hashed shard key,
+// and then checks which of these documents are placed on which shard so that we can craft update
+// commands that will change the shard key value and cause a document to move to a different shard.
+function assertCanUpdatePrimitiveShardKeyHashedChangeShards(
+    st, kDbName, ns, session, sessionDB, inTxn) {
+    let docsToInsert =
+        [{"x": 4, "a": 3}, {"x": 78}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
+    shardCollectionMoveChunks(
+        st, kDbName, ns, {"x": "hashed"}, docsToInsert, {"x": 100}, {"x": 300});
+    cleanupOrphanedDocs(st, ns);
+
+    // Because this collection is hash sharded, we need to figure out which values of x belong to
+    // which shard.
+    let docsOnShard0 = st.rs0.getPrimary().getDB(kDbName).foo.find().toArray();
+    let docsOnShard1 = st.rs1.getPrimary().getDB(kDbName).foo.find().toArray();
+    assert.gte(docsOnShard0.length, 2);
+    assert.gte(docsOnShard1.length, 2);
+
+    // TODO SERVER-39158: Add replacement tests as well. Can change second test to be replacement
+    // rather than modify.
+
+    // Since we now know that the value of x in each of docsOnShard0[1] and docsOnShard1[1] will be
+    // hashed to map to shard0 and shard1 respectively, we can delete these documents and then use
+    // them as values to change the shard key to.
+    st.s.getDB(kDbName).foo.remove({"x": docsOnShard0[1].x});
+    st.s.getDB(kDbName).foo.remove({"x": docsOnShard1[1].x});
+    let queries = [{"x": docsOnShard0[0].x}, {"x": docsOnShard1[0].x}];
+    let updates = [{"$set": {"x": docsOnShard1[1].x}}, {"$set": {"x": docsOnShard0[1].x}}];
+
+    // Non-upsert case. The first update will move a doc from shard0 to shard1 and the second will
+    // move a doc from shard1 to shard 0.
+    let upsert = false;
+    assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
+    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, false);
+
+    assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
+    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, true);
+
+    // Upsert case. The first update will initially target shard0, but insert on shard1. The second
+    // will initially target shard1, but insert on shard0.
+
+    // Remove the docs we know we just inserted and then upsert them
+    st.s.getDB(kDbName).foo.remove({"x": docsOnShard0[1].x});
+    st.s.getDB(kDbName).foo.remove({"x": docsOnShard1[1].x});
+
+    upsert = true;
+    assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
+    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, false);
+    assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
+    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, true);
+
+    st.s.getDB(kDbName).foo.drop();
+}
+
+function assertCanUpdatePrimitiveShardKeyHashedSameShards(
+    st, kDbName, ns, session, sessionDB, inTxn) {
+    let docsToInsert =
+        [{"x": 4, "a": 3}, {"x": 78}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
+    shardCollectionMoveChunks(
+        st, kDbName, ns, {"x": "hashed"}, docsToInsert, {"x": 100}, {"x": 300});
+    cleanupOrphanedDocs(st, ns);
+
+    // Because this collection is hash sharded, we need to figure out which values of x belong to
+    // which shard.
+    let docsOnShard0 = st.rs0.getPrimary().getDB(kDbName).foo.find().toArray();
+    let docsOnShard1 = st.rs1.getPrimary().getDB(kDbName).foo.find().toArray();
+    assert.gte(docsOnShard0.length, 2);
+    assert.gte(docsOnShard1.length, 2);
+
+    // Since we now know that the value of x in each of docsOnShard0[1] and docsOnShard1[1] will be
+    // hashed to map to shard0 and shard1 respectively, we can delete these documents and then use
+    // them as values to change the shard key to.
+    st.s.getDB(kDbName).foo.remove({"x": docsOnShard0[1].x});
+    st.s.getDB(kDbName).foo.remove({"x": docsOnShard1[1].x});
+    let queries = [{"x": docsOnShard0[0].x}, {"x": docsOnShard1[0].x}];
+    let updates = [{"$set": {"x": docsOnShard0[1].x}}, {"x": docsOnShard1[1].x}];
+
+    // Non-upsert case
+    let upsert = false;
+
+    // Op-style modify
+    assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
+    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, true);
+
+    // Replacement style modify
+    assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
+    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, false);
+
+    // Upsert case
+
+    // Remove the docs we know we just inserted and then upsert them
+    st.s.getDB(kDbName).foo.remove({"x": docsOnShard0[1].x});
+    st.s.getDB(kDbName).foo.remove({"x": docsOnShard1[1].x});
+    upsert = true;
+
+    // Op-style upsert
+    assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
+    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, true);
+
+    // Modify style upsert
+    assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
+    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, false);
+
+    st.s.getDB(kDbName).foo.drop();
 }

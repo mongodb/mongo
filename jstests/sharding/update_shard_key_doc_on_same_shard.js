@@ -364,6 +364,10 @@
     assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
         st, kDbName, ns, session, sessionDB, false, true);
 
+    // ----Assert correct behavior when collection is hash sharded----
+
+    assertCanUpdatePrimitiveShardKeyHashedSameShards(st, kDbName, ns, session, sessionDB, true);
+
     // ---------------------------------------
     // Update shard key in multi statement txn
     // ---------------------------------------
@@ -685,6 +689,10 @@
     assertCannotUpdateSKToArray(
         st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"x": [300]});
 
+    // ----Assert correct behavior when collection is hash sharded----
+
+    assertCanUpdatePrimitiveShardKeyHashedSameShards(st, kDbName, ns, session, sessionDB, true);
+
     // ----Multiple writes in txn-----
 
     // Bulk writes in txn
@@ -696,9 +704,6 @@
     // Update two docs, updating one twice
     docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
-
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    mongos.getDB(kDbName).foo.insert({"x": 505});
 
     session.startTransaction();
     let id = mongos.getDB(kDbName).foo.find({"x": 500}).toArray()[0]._id;
@@ -720,9 +725,6 @@
     // once
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    mongos.getDB(kDbName).foo.insert({"x": 505});
-
     session.startTransaction();
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 400}}));
@@ -739,9 +741,6 @@
     // Check that doing findAndModify to update shard key followed by $inc works correctly
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    mongos.getDB(kDbName).foo.insert({"x": 505});
-
     session.startTransaction();
     sessionDB.foo.findAndModify({query: {"x": 500}, update: {$set: {"x": 600}}});
     assert.commandWorked(sessionDB.foo.update({"x": 600}, {"$inc": {"a": 1}}));
@@ -756,9 +755,6 @@
 
     // Check that doing findAndModify followed by and update on a shard key works correctly
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
-
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    mongos.getDB(kDbName).foo.insert({"x": 505});
 
     id = mongos.getDB(kDbName).foo.find({"x": 4}).toArray()[0]._id;
     session.startTransaction();
