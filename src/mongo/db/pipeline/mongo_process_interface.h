@@ -42,6 +42,7 @@
 #include "mongo/db/generic_cursor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -134,7 +135,7 @@ public:
     virtual void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const NamespaceString& ns,
                         std::vector<BSONObj>&& queries,
-                        std::vector<BSONObj>&& updates,
+                        std::vector<write_ops::UpdateModification>&& updates,
                         const WriteConcernOptions& wc,
                         bool upsert,
                         bool multi,

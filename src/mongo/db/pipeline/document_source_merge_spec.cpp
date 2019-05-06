@@ -34,6 +34,7 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 
@@ -44,14 +45,14 @@ NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem) {
     uassert(51178,
             "{} 'into' field  must be either a string or an object, "
             "but found {}"_format(DocumentSourceMerge::kStageName, typeName(elem.type())),
-            elem.type() == String || elem.type() == Object);
+            elem.type() == BSONType::String || elem.type() == BSONType::Object);
 
-    if (elem.type() == String) {
+    if (elem.type() == BSONType::String) {
         return {"", elem.valueStringData()};
-    } else {
-        auto spec = NamespaceSpec::parse({elem.fieldNameStringData()}, elem.embeddedObject());
-        return {spec.getDb().value_or(""), spec.getColl().value_or("")};
     }
+
+    auto spec = NamespaceSpec::parse({elem.fieldNameStringData()}, elem.embeddedObject());
+    return {spec.getDb().value_or(""), spec.getColl().value_or("")};
 }
 
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
@@ -66,18 +67,20 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
     uassert(51186,
             "{} 'into' field  must be either a string or an array of strings, "
             "but found {}"_format(DocumentSourceMerge::kStageName, typeName(elem.type())),
-            elem.type() == String || elem.type() == Array);
+            elem.type() == BSONType::String || elem.type() == BSONType::Array);
 
-    if (elem.type() == String) {
+    if (elem.type() == BSONType::String) {
         fields.push_back(elem.str());
     } else {
+        invariant(elem.type() == BSONType::Array);
+
         BSONObjIterator iter(elem.Obj());
         while (iter.more()) {
             const BSONElement matchByElem = iter.next();
             uassert(51134,
                     "{} 'on' array elements must be strings, but found "_format(
                         DocumentSourceMerge::kStageName, typeName(matchByElem.type())),
-                    matchByElem.type() == String);
+                    matchByElem.type() == BSONType::String);
             fields.push_back(matchByElem.str());
         }
     }
@@ -97,6 +100,42 @@ void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
         bob->append(fieldName, fields.front());
     } else {
         bob->append(fieldName, fields);
+    }
+}
+
+MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem) {
+    uassert(51191,
+            "{} 'whenMatched' field  must be either a string or an array, "
+            "but found {}"_format(DocumentSourceMerge::kStageName, typeName(elem.type())),
+            elem.type() == BSONType::String || elem.type() == BSONType::Array);
+
+    if (elem.type() == BSONType::Array) {
+        return {MergeWhenMatchedModeEnum::kPipeline,
+                uassertStatusOK(AggregationRequest::parsePipelineFromBSON(elem))};
+    }
+
+    invariant(elem.type() == BSONType::String);
+
+    IDLParserErrorContext ctx{DocumentSourceMergeSpec::kWhenMatchedFieldName};
+    auto value = elem.valueStringData();
+    auto mode = MergeWhenMatchedMode_parse(ctx, value);
+
+    // The 'kPipeline' mode cannot be specified explicitly, a custom pipeline definition must be
+    // used instead.
+    if (mode == MergeWhenMatchedModeEnum::kPipeline) {
+        ctx.throwBadEnumValue(value);
+    }
+    return {mode};
+}
+
+void mergeWhenMatchedSerializeToBSON(const MergeWhenMatchedPolicy& policy,
+                                     StringData fieldName,
+                                     BSONObjBuilder* bob) {
+    if (policy.mode == MergeWhenMatchedModeEnum::kPipeline) {
+        invariant(policy.pipeline);
+        bob->append(fieldName, *policy.pipeline);
+    } else {
+        bob->append(fieldName, MergeWhenMatchedMode_serializer(policy.mode));
     }
 }
 }  // namespace mongo

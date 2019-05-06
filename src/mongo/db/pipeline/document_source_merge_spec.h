@@ -29,29 +29,49 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/namespace_string.h"
-
+#include <boost/optional.hpp>
 #include <string>
 #include <vector>
 
-namespace mongo {
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_merge_modes_gen.h"
 
+namespace mongo {
 class BSONObjBuilder;
 class BSONElement;
 
-// Serialize and deserialize functions for the $merge stage 'into' field which can be a single
-// string value, or an object
+// Defines a policy strategy describing what to do when there is a matching document in the target
+// collection. Can hold a value from the MergeWhenMatchedModeEnum, or a custom pipeline definition.
+struct MergeWhenMatchedPolicy {
+    MergeWhenMatchedModeEnum mode;
+    boost::optional<std::vector<BSONObj>> pipeline;
+};
+
+/**
+ * Serialize and deserialize functions for the $merge stage 'into' field which can be a single
+ * string value, or an object.
+ */
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
                                    StringData fieldName,
                                    BSONObjBuilder* bob);
 NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem);
 
-// Serialize and deserialize functions for the $merge stage 'on' field which can be a single string
-// value, or array of strings.
+/**
+ * Serialize and deserialize functions for the $merge stage 'on' field which can be a single string
+ * value, or array of strings.
+ */
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
                                   StringData fieldName,
                                   BSONObjBuilder* bob);
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem);
 
+/**
+ * Serialize and deserialize functions for the $merge stage 'whenMatched' field which can be either
+ * a string value, or an array of objects defining a custom pipeline.
+ */
+void mergeWhenMatchedSerializeToBSON(const MergeWhenMatchedPolicy& policy,
+                                     StringData fieldName,
+                                     BSONObjBuilder* bob);
+MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem);
 }  // namespace mongo

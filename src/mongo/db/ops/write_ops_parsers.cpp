@@ -237,6 +237,9 @@ write_ops::UpdateModification::UpdateModification(const BSONObj& update) {
     _type = Type::kClassic;
 }
 
+write_ops::UpdateModification::UpdateModification(std::vector<BSONObj> pipeline)
+    : _type{Type::kPipeline}, _pipeline{std::move(pipeline)} {}
+
 write_ops::UpdateModification write_ops::UpdateModification::parseFromBSON(BSONElement elem) {
     return UpdateModification(elem);
 }

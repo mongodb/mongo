@@ -63,7 +63,7 @@ public:
 
     UpdateModification() = default;
     UpdateModification(BSONElement update);
-
+    UpdateModification(std::vector<BSONObj> pipeline);
     // This constructor exists only to provide a fast-path for constructing classic-style updates.
     UpdateModification(const BSONObj& update);
 

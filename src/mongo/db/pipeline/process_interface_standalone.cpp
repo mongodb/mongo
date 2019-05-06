@@ -193,7 +193,7 @@ Insert MongoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
 
 Update MongoInterfaceStandalone::buildUpdateOp(const NamespaceString& nss,
                                                std::vector<BSONObj>&& queries,
-                                               std::vector<BSONObj>&& updates,
+                                               std::vector<write_ops::UpdateModification>&& updates,
                                                bool upsert,
                                                bool multi,
                                                bool bypassDocValidation) {
@@ -245,7 +245,7 @@ void MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionConte
 void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& ns,
                                       std::vector<BSONObj>&& queries,
-                                      std::vector<BSONObj>&& updates,
+                                      std::vector<write_ops::UpdateModification>&& updates,
                                       const WriteConcernOptions& wc,
                                       bool upsert,
                                       bool multi,
@@ -257,7 +257,6 @@ void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionConte
                                                      upsert,
                                                      multi,
                                                      expCtx->bypassDocumentValidation));
-
     // Need to check each result in the batch since the writes are unordered.
     uassertStatusOKWithContext(
         [&writeResults]() {

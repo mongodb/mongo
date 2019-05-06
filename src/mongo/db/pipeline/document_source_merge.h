@@ -50,25 +50,29 @@ public:
      * portion of the update or insert.
      */
     struct BatchedObjects {
-        void emplace(BSONObj&& obj, BSONObj&& key) {
-            objects.emplace_back(std::move(obj));
+        void emplace(write_ops::UpdateModification&& mod, BSONObj&& key) {
+            modifications.emplace_back(std::move(mod));
             uniqueKeys.emplace_back(std::move(key));
         }
 
         bool empty() const {
-            return objects.empty();
+            return modifications.empty();
         }
 
         size_t size() const {
-            return objects.size();
+            return modifications.size();
         }
 
         void clear() {
-            objects.clear();
+            modifications.clear();
             uniqueKeys.clear();
         }
 
-        std::vector<BSONObj> objects;
+        // For each element in the batch we store an UpdateModification which is either the new
+        // document we want to upsert or insert into the collection (i.e. a 'classic' replacement
+        // update), or the pipeline to run to compute the new document.
+        std::vector<write_ops::UpdateModification> modifications;
+
         // Store the unique keys as BSON objects instead of Documents for compatibility with the
         // batch update command. (e.g. {q: <array of uniqueKeys>, u: <array of objects>})
         std::vector<BSONObj> uniqueKeys;
@@ -121,6 +125,7 @@ public:
     DocumentSourceMerge(NamespaceString outputNs,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const MergeStrategyDescriptor& descriptor,
+                        boost::optional<std::vector<BSONObj>>&& pipeline,
                         std::set<FieldPath> mergeOnFields,
                         boost::optional<ChunkVersion> targetCollectionVersion,
                         bool serializeAsOutStage);
@@ -199,6 +204,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         MergeStrategyDescriptor::WhenMatched whenMatched,
         MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
+        boost::optional<std::vector<BSONObj>>&& pipeline,
         std::set<FieldPath> mergeOnFields,
         boost::optional<ChunkVersion> targetCollectionVersion,
         bool serializeAsOutStage);
@@ -249,6 +255,9 @@ private:
     // a reference to an element in a static const map 'kMergeStrategyDescriptors', which owns the
     // descriptor.
     const MergeStrategyDescriptor& _descriptor;
+
+    // A custom pipeline to compute a new version of merging documents.
+    boost::optional<std::vector<BSONObj>> _pipeline;
 
     // Holds the fields used for uniquely identifying documents. There must exist a unique index
     // with this key pattern. Default is "_id" for unsharded collections, and "_id" plus the shard

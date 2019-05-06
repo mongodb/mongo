@@ -65,7 +65,7 @@ public:
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
                 std::vector<BSONObj>&& queries,
-                std::vector<BSONObj>&& updates,
+                std::vector<write_ops::UpdateModification>&& updates,
                 const WriteConcernOptions& wc,
                 bool upsert,
                 bool multi,
@@ -155,7 +155,7 @@ protected:
      */
     Update buildUpdateOp(const NamespaceString& nss,
                          std::vector<BSONObj>&& queries,
-                         std::vector<BSONObj>&& updates,
+                         std::vector<write_ops::UpdateModification>&& updates,
                          bool upsert,
                          bool multi,
                          bool bypassDocValidation);

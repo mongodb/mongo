@@ -35,24 +35,9 @@ global:
         - "mongo/db/pipeline/document_source_merge_spec.h"
 
 imports:
+    - "mongo/db/pipeline/document_source_merge_modes.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/s/chunk_version.idl"
-
-enums:
-    MergeWhenMatchedMode:
-        description: "Possible merge mode values for 'whenMatched'."
-        type: string
-        values:
-            kFail: "fail"
-            kMerge: "merge"
-            kKeepExisting: "keepExisting"
-            kReplaceWithNew: "replaceWithNew"
-
-    MergeWhenNotMatchedMode:
-        description: "Possible merge mode values for 'whenNotMatched'."
-        type: string
-        values:
-            kInsert: "insert"
 
 types:
     MergeTargetNss:
@@ -69,6 +54,15 @@ types:
         cpp_type: std::vector<std::string>
         serializer: "::mongo::mergeOnFieldsSerializeToBSON"
         deserializer: "::mongo::mergeOnFieldsParseFromBSON"
+
+    MergeWhenMatchedPolicy:
+        bson_serialization_type: any
+        description: Defines a policy strategy describing what to do when there is a matching
+                     document in the target collection. Can hold a value from the
+                     MergeWhenMatchedMode enum, or a custom pipeline definition.
+        cpp_type: "::mongo::MergeWhenMatchedPolicy"
+        serializer: "::mongo::mergeWhenMatchedSerializeToBSON"
+        deserializer: "::mongo::mergeWhenMatchedParseFromBSON"
 
 structs:
     NamespaceSpec:
@@ -99,7 +93,7 @@ structs:
                 description: A single field or array of fields that uniquely identify a document.
 
             whenMatched:
-                type: MergeWhenMatchedMode
+                type: MergeWhenMatchedPolicy
                 optional: true
                 description: The merge mode for the merge operation when source and target elements
                              match.

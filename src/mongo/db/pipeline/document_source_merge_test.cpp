@@ -130,6 +130,20 @@ TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfIntoIsObject) {
     ASSERT_EQ(mergeStage->getOutputNs().coll(), targetColl);
 }
 
+TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfWhenMatchedIsStringOrArray) {
+    auto spec = BSON("$merge" << BSON("into"
+                                      << "target_collection"
+                                      << "whenMatched"
+                                      << "merge"));
+    ASSERT(createMergeStage(spec));
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
+                                 << BSONArray()));
+    ASSERT(createMergeStage(spec));
+}
+
 TEST_F(DocumentSourceMergeTest, FailsToParseIncorrectMergeSpecType) {
     auto spec = BSON("$merge" << 1);
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51182);
@@ -276,24 +290,24 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfDbIsNotAValidDatabaseName) {
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::InvalidNamespace);
 }
 
-TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenMatchedModeIsNotString) {
+TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenMatchedModeIsNotStringOrArray) {
     auto spec = BSON("$merge" << BSON("into"
                                       << "target_collection"
                                       << "whenMatched"
                                       << true));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51191);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
                                  << "whenMatched"
-                                 << BSONArray()));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
+                                 << 100));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51191);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
                                  << "whenMatched"
                                  << BSON("" << kDefaultWhenMatchedMode)));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51191);
 }
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenNotMatchedModeIsNotString) {
@@ -616,6 +630,22 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
                                  << "target_collection"
                                  << "whenMatched"
                                  << "[{$addFields: {x: 1}}]"
+                                 << "whenNotMatched"
+                                 << "insert"));
+    ASSERT_THROWS_CODE(createMergeStage(spec), DBException, ErrorCodes::BadValue);
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
+                                 << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
+                                 << "whenNotMatched"
+                                 << "insert"));
+    ASSERT(createMergeStage(spec));
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
+                                 << "pipeline"
                                  << "whenNotMatched"
                                  << "insert"));
     ASSERT_THROWS_CODE(createMergeStage(spec), DBException, ErrorCodes::BadValue);
