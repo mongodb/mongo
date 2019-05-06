@@ -30,10 +30,4 @@
     err = assert.throws(() => coll.findAndModify(
                             {query: {_id: 1}, update: [{$addFields: {y: 1}}], sort: {_id: -1}}));
     assert.eq(err.code, ErrorCodes.NotImplemented);
-
-    // SERVER-40401 Add support for bypassDocumentValidation.
-    err = assert.throws(
-        () => coll.findAndModify(
-            {query: {_id: 1}, update: [{$addFields: {y: 1}}], bypassDocumentValidation: true}));
-    assert.eq(err.code, ErrorCodes.NotImplemented);
 }());

@@ -306,11 +306,6 @@ public:
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-            // TODO SERVER-40401 Add support for bypassDocumentValidation.
-            uassert(ErrorCodes::NotImplemented,
-                    "No support for pipeline style updates and bypassDocumentValidation",
-                    !args.getUpdate() ||
-                        args.getUpdate()->type() != write_ops::UpdateModification::Type::kPipeline);
             maybeDisableValidation.emplace(opCtx);
         }
 
