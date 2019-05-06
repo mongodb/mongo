@@ -8,7 +8,7 @@ import sys
 import subprocess
 import unittest
 
-from mock import Mock, mock_open, patch
+from mock import Mock, mock_open, patch, MagicMock
 
 import buildscripts.burn_in_tests as burn_in
 import buildscripts.ciconfig.evergreen as evg
@@ -443,10 +443,17 @@ class TestSetResmokeCmd(unittest.TestCase):
 
 class TestSubTaskName(unittest.TestCase):
     def test__sub_task_name(self):
-        variant = "myvar"
+        options = MagicMock(buildvariant="myvar", run_buildvariant=None)
         task = "mytask"
         task_num = 0
-        self.assertEqual("burn_in:myvar_mytask_0", burn_in._sub_task_name(variant, task, task_num))
+        self.assertEqual("burn_in:myvar_mytask_0", burn_in._sub_task_name(options, task, task_num))
+
+    def test__sub_task_name_with_run_bv(self):
+        options = MagicMock(buildvariant="myvar", run_buildvariant="run_var")
+        task = "mytask"
+        task_num = 0
+        self.assertEqual("burn_in:run_var_mytask_0", burn_in._sub_task_name(
+            options, task, task_num))
 
 
 TESTS_BY_TASK = {
@@ -554,6 +561,31 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
             self.assertEqual(execution_tasks[5], "burn_in:myvariant_task3_0")
             self.assertEqual(execution_tasks[6], "burn_in:myvariant_task3_1")
             self.assertEqual(execution_tasks[7], "burn_in:myvariant_taskmulti_0")
+
+    def test_create_generate_tasks_file_run_variants(self):
+        options = self._options_mock()
+        options.buildvariant = "myvariant"
+        options.run_buildvariant = "run_variant"
+        tests_by_task = TESTS_BY_TASK
+        with patch(BURN_IN + "._write_json_file") as mock_write_json:
+            burn_in.create_generate_tasks_file(options, tests_by_task)
+            evg_config = mock_write_json.call_args_list[0][0][0]
+            self.assertEqual(len(evg_config["buildvariants"]), 1)
+            self.assertEqual(evg_config["buildvariants"][0]["name"], "run_variant")
+            self.assertEqual(len(evg_config["buildvariants"][0]["tasks"]), 7)
+            self.assertEqual(len(evg_config["buildvariants"][0]["display_tasks"]), 1)
+            display_task = evg_config["buildvariants"][0]["display_tasks"][0]
+            self.assertEqual(display_task["name"], burn_in.BURN_IN_TESTS_TASK)
+            execution_tasks = display_task["execution_tasks"]
+            self.assertEqual(len(execution_tasks), 8)
+            self.assertEqual(execution_tasks[0], burn_in.BURN_IN_TESTS_GEN_TASK)
+            self.assertEqual(execution_tasks[1], "burn_in:run_variant_task1_0")
+            self.assertEqual(execution_tasks[2], "burn_in:run_variant_task1_1")
+            self.assertEqual(execution_tasks[3], "burn_in:run_variant_task2_0")
+            self.assertEqual(execution_tasks[4], "burn_in:run_variant_task2_1")
+            self.assertEqual(execution_tasks[5], "burn_in:run_variant_task3_0")
+            self.assertEqual(execution_tasks[6], "burn_in:run_variant_task3_1")
+            self.assertEqual(execution_tasks[7], "burn_in:run_variant_taskmulti_0")
 
     def test_create_generate_tasks_file_distro(self):
         options = self._options_mock()
