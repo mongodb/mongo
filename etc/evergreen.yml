@@ -80,12 +80,15 @@ variables:
       set -o verbose
 
       # We get the raw version string (r1.2.3-45-gabcdef) from git
-      MONGO_VERSION=$(git describe)
+      ### SPLUNK
+      ### MONGO_VERSION=$(git describe)
+      MONGO_VERSION=3.6.17-SERVER-42525-splunk
       # If this is a patch build, we add the patch version id to the version string so we know
       # this build was a patch, and which evergreen task it came from
-      if [ "${is_patch|}" = "true" ]; then
-        MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-      fi
+      ### SPLUNK
+      ### if [ "${is_patch|}" = "true" ]; then
+      ###  MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+      ### fi
 
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
@@ -257,7 +260,10 @@ functions:
         ${activate_virtualenv}
         bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
         # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
-        mongo_ver=$($mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
+        ### SPLUNK
+        ### mongo_ver=$($mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
+        mongo_ver=$(LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/opt/openssl/lib $mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
+
         # The versions must match
         if [ "$bin_ver" != "$mongo_ver" ]; then
           echo "The mongo version is $mongo_ver, expected version is $bin_ver"
@@ -723,6 +729,7 @@ functions:
             extra_args="$extra_args --tagFile=etc/test_retrial.yml"
           fi
 
+          ### SPLUNK Add ${ld_library_path} below
           # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
           # invocation. It doesn't set any environment variables and should therefore come last in
           # this list of expansions.
@@ -734,6 +741,7 @@ functions:
               ${lang_environment}                         \
               ${san_options}                              \
               ${san_symbolizer}                           \
+              ${ld_library_path}                          \
               ${snmp_config_path}                         \
               ${resmoke_wrapper}                          \
               $python buildscripts/evergreen_run_tests.py \
@@ -809,12 +817,15 @@ functions:
         set -o verbose
 
         # We get the raw version string (r1.2.3-45-gabcdef) from git
-        MONGO_VERSION=$(git describe)
+        ### SPLUNK
+        ### MONGO_VERSION=$(git describe)
+        MONGO_VERSION=3.6.17-SERVER-42525-splunk
         # If this is a patch build, we add the patch version id to the version string so we know
         # this build was a patch, and which evergreen task it came from
-        if [ "${is_patch|}" = "true" ]; then
-          MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-        fi
+        ### SPLUNK
+        ### if [ "${is_patch|}" = "true" ]; then
+        ###   MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+        ### fi
 
         # This script converts the generated version string into a sanitized version string for
         # use by scons and uploading artifacts as well as information about for the scons cache.
@@ -1007,7 +1018,8 @@ functions:
 
           ${add_nodejs_to_path}
 
-          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars} --branch ${branch_name}
+          ### SPLUNK
+          LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/opt/openssl/lib npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars} --branch ${branch_name}
 
     - command: archive.targz_pack
       params:
@@ -2404,7 +2416,9 @@ post:
 
         ${activate_virtualenv}
         if [ -d "${scons_cache_path}" ]; then
-            $python buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+            ### SPLUNK - force to use toolchain python
+            ### $python buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+            /opt/mongodbtoolchain/v2/bin/python2 buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
         fi
   - func: "cleanup environment"
 
@@ -2510,7 +2524,8 @@ tasks:
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
-    - func: "fetch and build OpenSSL"
+    ### SPLUNK - we want our own version of openssl
+    #- func: "fetch and build OpenSSL"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
@@ -2674,7 +2689,8 @@ tasks:
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
-    - func: "fetch and build OpenSSL"
+    ### SPLUNK - we want our own version of openssl
+    #- func: "fetch and build OpenSSL"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions.
@@ -2713,7 +2729,8 @@ tasks:
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
-    - func: "fetch and build OpenSSL"
+    ### SPLUNK - we want our own version of openssl
+    #- func: "fetch and build OpenSSL"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
     - func: "apply compile expansions"
@@ -7203,10 +7220,13 @@ buildvariants:
 #             OSX buildvariants           #
 ###########################################
 
+### SPLUNK
 - name: osx-1010-ssl
-  display_name: SSL OS X 10.10
+  display_name: SSL OS X 10.10 Splunk
   run_on:
-  - macos-1012
+  ### SPLUNK
+  ###- macos-1012
+  - macos-1012-splunk
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
@@ -7215,11 +7235,16 @@ buildvariants:
     push_name: osx-ssl
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include"
+    ### SPLUNK
+    ### compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include"
+    ld_library_path: LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/opt/openssl/lib
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" LIBPATH="/usr/local/opt/openssl/lib" CPPPATH="/usr/local/opt/openssl/include /opt/mongodbtoolchain/v2/include" --disable-warnings-as-errors
+    #compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" LIBPATH="/usr/local/opt/openssl/lib" CPPPATH="/usr/local/opt/openssl/include"
+    python: /opt/mongodbtoolchain/v2/bin/python2.7
     multiversion_platform: osx-ssl
     num_jobs_available: 1
     tooltags: "ssl"
-    build_mongoreplay: true
+    build_mongoreplay: false
     build_openssl: true
     openssl_config_flags: "-mmacosx-version-min=10.10"
     openssl_make_flags: "-j$(sysctl -n hw.logicalcpu)"

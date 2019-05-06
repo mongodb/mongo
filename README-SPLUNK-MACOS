@@ -1,0 +1,42 @@
+Splunk Custom Build macOS
+=========================
+
+NOTE: We use 3 separate branches to build and test builds for Splunk:  Linux, Windows, and MacOS.
+
+This is because signficant changes have to be made to build the tools on RHEL 5.5 Linux.  We also need to make some code changes to account for features
+that are not available in the older OS.
+
+Finally, Splunk requires different versions of openssl (and a specific location requirement on macOS requiring its own distro in Evergreen) 
+This would be hard to generalize in a single evergreen.yml in one branch.
+
+Current branches:
+
+splunk-linux-v3.6.17-BACKPORT-6439
+splunk-macos-v3.6.17-BACKPORT-6439
+splunk-windows-v3.6.17-BACKPORT-6439
+
+MacOS
+-----
+
+Note that a patch should only be run for MacOS on the macos-1012-splunk	distro in Evergreen.
+
+Use this variant:
+
+```
+### SPLUNK
+ - name: osx-1010-ssl
+  display_name: SSL OS X 10.10 Splunk
+   run_on:
+-  - macos-1012
+  ### SPLUNK
+  - macos-1012-splunk
+```
+
+ie.
+
+```
+evergreen patch -p "mongodb-mongo-v3.6" -t "compile" -d "BUILD-11420 Splunk MacOS v3.6.17 with golang 1.13" -v "osx-1010-ssl" -u -f -y
+```
+
+Here is the most recent full build
+https://spruce.mongodb.com/version/5ef4e6d3c9ec444db96433e8/tasks
