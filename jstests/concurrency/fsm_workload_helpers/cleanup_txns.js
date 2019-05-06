@@ -26,8 +26,19 @@ function abortTransaction(sessionAwareDB, txnNumber) {
         autocommit: false
     };
     const res = rawDB.adminCommand(abortCmd);
-    return assert.commandWorkedOrFailedWithCode(
-        res, abortErrorCodes, () => `cmd: ${tojson(abortCmd)}`);
+    if (res.hasOwnProperty("raw")) {
+        // For sharded commands, we may get mismatched errors in which case there will be
+        // no top-level code.  Instead, check each code from the shards.
+        for (let shardname in res.raw) {
+            let shardres = res.raw[shardname];
+            assert.commandWorkedOrFailedWithCode(
+                shardres, abortErrorCodes, () => `cmd: ${tojson(abortCmd)}`);
+        }
+        return res;
+    } else {
+        return assert.commandWorkedOrFailedWithCode(
+            res, abortErrorCodes, () => `cmd: ${tojson(abortCmd)}`);
+    }
 }
 
 /**
