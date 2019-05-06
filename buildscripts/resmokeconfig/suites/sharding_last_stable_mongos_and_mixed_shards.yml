@@ -35,6 +35,7 @@ selector:
   - jstests/sharding/now_variable_replset.js
   - jstests/sharding/now_variable_sharding.js
   - jstests/sharding/transaction_ops_fail_against_capped_collection_on_shards.js
+  - jstests/sharding/index_and_collection_option_propagation.js
   # mongos in 4.0 doesn't like an aggregation explain without stages for optimized away pipelines,
   # so blacklisting the test until 4.2 becomes last-stable.
   - jstests/sharding/agg_explain_fmt.js

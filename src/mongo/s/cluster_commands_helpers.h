@@ -163,7 +163,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
 bool appendRawResponses(OperationContext* opCtx,
                         std::string* errmsg,
                         BSONObjBuilder* output,
-                        std::vector<AsyncRequestsSender::Response> shardResponses,
+                        const std::vector<AsyncRequestsSender::Response>& shardResponses,
                         std::set<ErrorCodes::Error> ignoredErrors = {});
 
 /**

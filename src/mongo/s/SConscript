@@ -484,6 +484,19 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='cluster_commands_helpers_test',
+    source=[
+        'append_raw_responses_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
+        'shard_server_test_fixture',
+        'sharding_router_api',
+    ]
+)
+
+env.CppUnitTest(
     target='balancer_configuration_test',
     source=[
         'balancer_configuration_test.cpp',
