@@ -64,3 +64,13 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: gUseMultipleOplogEntryFormatForTransactions
         default: false
+
+    maxNumberOfTransactionOperationsInSingleOplogEntry:
+        description: >-
+            Maximum number of operations to pack into a single oplog entry, when multi-oplog
+            format for transactions is in use.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gMaxNumberOfTransactionOperationsInSingleOplogEntry
+        default: 2147483647  # INT_MAX
+        validator: { gte: 1 }

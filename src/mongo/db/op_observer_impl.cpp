@@ -992,17 +992,38 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
 
 namespace {
 
-OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
-                                       std::vector<repl::ReplOperation> stmts,
-                                       const OplogSlot& oplogSlot,
-                                       repl::OpTime prevWriteOpTime,
-                                       StmtId stmtId,
-                                       const bool prepare,
-                                       const bool isPartialTxn,
-                                       const bool shouldWriteStateField) {
+// Logs one applyOps, packing in as many operations as fit in a single applyOps entry.  If
+// isPartialTxn is not set, all operations are attempted to be packed, regardless of whether or
+// not they fit; TransactionTooLarge will be thrown if this is not the case.
+//
+// Returns an iterator to the first ReplOperation not packed in the batch.
+std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApplyOpsForTransaction(
+    OperationContext* opCtx,
+    std::vector<repl::ReplOperation>::const_iterator stmtBegin,
+    std::vector<repl::ReplOperation>::const_iterator stmtEnd,
+    const OplogSlot& oplogSlot,
+    repl::OpTime prevWriteOpTime,
+    StmtId stmtId,
+    const bool prepare,
+    const bool isPartialTxn,
+    const bool shouldWriteStateField) {
     BSONObjBuilder applyOpsBuilder;
     BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
-    for (auto& stmt : stmts) {
+    std::vector<repl::ReplOperation>::const_iterator stmtIter;
+    for (stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
+        const auto& stmt = *stmtIter;
+        // Stop packing when either number of transaction operations is reached, or when the next
+        // one would put the array over the maximum BSON Object User Size.  We rely on the
+        // head room between BSONObjMaxUserSize and BSONObjMaxInternalSize to cover the
+        // BSON overhead and the other applyOps fields.  But if the array with a single operation
+        // exceeds BSONObjMaxUserSize, we still log it, as a single max-length operation
+        // should be able to be applied.
+        if (isPartialTxn &&
+            (opsArray.arrSize() == gMaxNumberOfTransactionOperationsInSingleOplogEntry ||
+             (opsArray.arrSize() > 0 &&
+              (opsArray.len() + OplogEntry::getDurableReplOperationSize(stmt) >
+               BSONObjMaxUserSize))))
+            break;
         opsArray.append(stmt.toBSON());
     }
     opsArray.done();
@@ -1059,7 +1080,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                                txnState,
                                startOpTime);
         }
-        return times;
+        return {times, stmtIter};
     } catch (const AssertionException& e) {
         // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
         uassert(ErrorCodes::TransactionTooLarge,
@@ -1099,12 +1120,13 @@ OpTimeBundle logReplOperationForTransaction(OperationContext* opCtx,
     return times;
 }
 
-// This function expects that the size of 'oplogSlots' be at least as big as the size of 'stmts'. If
-// there are more oplog slots than statements, then only the first n slots are used, where n is the
-// size of 'stmts'.
-void logOplogEntriesForTransaction(OperationContext* opCtx,
-                                   const std::vector<repl::ReplOperation>& stmts,
-                                   const std::vector<OplogSlot>& oplogSlots) {
+// This function expects that the size of 'oplogSlots' be at least as big as the size of 'stmts' in
+// the worst case, where each operation requires an applyOps entry of its own. If there are more
+// oplog slots than applyOps operations are written, the number of oplog slots corresponding to the
+// number of applyOps written will be used.  The number of oplog entries written is returned.
+int logOplogEntriesForTransaction(OperationContext* opCtx,
+                                  const std::vector<repl::ReplOperation>& stmts,
+                                  const std::vector<OplogSlot>& oplogSlots) {
     invariant(!stmts.empty());
     invariant(stmts.size() <= oplogSlots.size());
 
@@ -1122,23 +1144,23 @@ void logOplogEntriesForTransaction(OperationContext* opCtx,
             // Note the logged statement IDs are not the same as the user-chosen statement IDs.
             stmtId = 0;
             auto oplogSlot = oplogSlots.begin();
-            for (const auto& stmt : stmts) {
-                // Wrap each individual operation in an applyOps entry. This is temporary until we
-                // implement the logic to pack multiple operations into a single applyOps entry for
-                // the larger transactions project.
-                // TODO (SERVER-40725): Modify this comment once packing logic is done.
-                prevWriteOpTime = logApplyOpsForTransaction(opCtx,
-                                                            {stmt},
-                                                            *oplogSlot++,
-                                                            prevWriteOpTime.writeOpTime,
-                                                            stmtId,
-                                                            false /* prepare */,
-                                                            true /* isPartialTxn */,
-                                                            true /* shouldWriteStateField */);
+            auto stmtsBegin = stmts.begin();
+            while (stmtsBegin != stmts.end()) {
+                std::tie(prevWriteOpTime, stmtsBegin) =
+                    logApplyOpsForTransaction(opCtx,
+                                              stmtsBegin,
+                                              stmts.end(),
+                                              *oplogSlot++,
+                                              prevWriteOpTime.writeOpTime,
+                                              stmtId,
+                                              false /* prepare */,
+                                              true /* isPartialTxn */,
+                                              true /* shouldWriteStateField */);
                 stmtId++;
             }
             wuow.commit();
         });
+    return stmtId;
 }
 
 void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
@@ -1280,14 +1302,15 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         invariant(lastWriteOpTime.isNull());
         commitOpTime = logApplyOpsForTransaction(
                            opCtx,
-                           statements,
+                           statements.begin(),
+                           statements.end(),
                            OplogSlot(),
                            lastWriteOpTime,
                            StmtId(0),
                            false /* prepare */,
                            false /* isPartialTxn */,
                            fcv >= ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42)
-                           .writeOpTime;
+                           .first.writeOpTime;
     } else {
         // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
         // reserve enough entries for all statements in the transaction, plus one for the commit
@@ -1296,12 +1319,10 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         auto commitSlot = oplogSlots.back();
         oplogSlots.pop_back();
         invariant(oplogSlots.size() == statements.size());
-        logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
-        commitOpTime = logCommitForUnpreparedTransaction(opCtx,
-                                                         statements.size() /* stmtId */,
-                                                         oplogSlots.back(),
-                                                         commitSlot,
-                                                         statements.size());
+        int numOplogEntries = logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
+        const auto prevWriteOpTime = oplogSlots[numOplogEntries - 1];
+        commitOpTime = logCommitForUnpreparedTransaction(
+            opCtx, StmtId(numOplogEntries), prevWriteOpTime, commitSlot, statements.size());
     }
     invariant(!commitOpTime.isNull());
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, commitOpTime);
@@ -1410,7 +1431,8 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                 invariant(lastWriteOpTime.isNull());
                 logApplyOpsForTransaction(
                     opCtx,
-                    statements,
+                    statements.begin(),
+                    statements.end(),
                     prepareOpTime,
                     lastWriteOpTime,
                     StmtId(0),
@@ -1436,16 +1458,23 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                 WriteUnitOfWork wuow(opCtx);
                 // It is possible that the transaction resulted in no changes, In that case, we
                 // should not write any operations other than the prepare oplog entry.
+                int nOperationOplogEntries = 0;
                 if (!statements.empty()) {
-                    logOplogEntriesForTransaction(opCtx, statements, reservedSlots);
+                    nOperationOplogEntries =
+                        logOplogEntriesForTransaction(opCtx, statements, reservedSlots);
 
-                    // The prevOpTime is the OpTime of the second last entry in the reserved slots.
-                    prevOpTime = reservedSlots.rbegin()[1];
+                    // We had reserved enough oplog slots for the worst case where each operation
+                    // produced one oplog entry.  When operations are smaller and can be packed,
+                    // we will waste the extra slots.  The prepare will still use the last
+                    // reserved slot, because the transaction participant has already used
+                    // that as the prepare time.  So we set the prevOpTime to the last applyOps,
+                    // to make the prevOpTime links work correctly.
+                    prevOpTime = reservedSlots[nOperationOplogEntries - 1];
                 }
                 auto startTxnSlot = reservedSlots.front();
                 const auto startOpTime = startTxnSlot;
                 logPrepareTransaction(
-                    opCtx, statements.size() /* stmtId */, prevOpTime, prepareOpTime, startOpTime);
+                    opCtx, StmtId(nOperationOplogEntries), prevOpTime, prepareOpTime, startOpTime);
                 wuow.commit();
             });
     }

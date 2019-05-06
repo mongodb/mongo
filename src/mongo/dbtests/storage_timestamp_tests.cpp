@@ -2823,18 +2823,29 @@ public:
     }
 };
 
+class MultiOplogScopedSettings {
+public:
+    MultiOplogScopedSettings()
+        : _prevPackingLimit(gMaxNumberOfTransactionOperationsInSingleOplogEntry) {
+        gUseMultipleOplogEntryFormatForTransactions = true;
+        gMaxNumberOfTransactionOperationsInSingleOplogEntry = 1;
+    }
+    ~MultiOplogScopedSettings() {
+        gUseMultipleOplogEntryFormatForTransactions = false;
+        gMaxNumberOfTransactionOperationsInSingleOplogEntry = _prevPackingLimit;
+    }
+
+private:
+    int _prevPackingLimit;
+};
+
 class MultiOplogEntryTransaction : public MultiDocumentTransactionTest {
 public:
     MultiOplogEntryTransaction() : MultiDocumentTransactionTest("multiOplogEntryTransaction") {
-        gUseMultipleOplogEntryFormatForTransactions = true;
         const auto currentTime = _clock->getClusterTime();
         firstOplogEntryTs = currentTime.addTicks(1).asTimestamp();
         secondOplogEntryTs = currentTime.addTicks(2).asTimestamp();
         commitEntryTs = currentTime.addTicks(3).asTimestamp();
-    }
-
-    ~MultiOplogEntryTransaction() {
-        gUseMultipleOplogEntryFormatForTransactions = false;
     }
 
     void run() {
@@ -2953,22 +2964,20 @@ public:
 
 protected:
     Timestamp firstOplogEntryTs, secondOplogEntryTs;
+
+private:
+    MultiOplogScopedSettings multiOplogSettings;
 };
 
 class CommitPreparedMultiOplogEntryTransaction : public MultiDocumentTransactionTest {
 public:
     CommitPreparedMultiOplogEntryTransaction()
         : MultiDocumentTransactionTest("preparedMultiOplogEntryTransaction") {
-        gUseMultipleOplogEntryFormatForTransactions = true;
         const auto currentTime = _clock->getClusterTime();
         firstOplogEntryTs = currentTime.addTicks(1).asTimestamp();
         secondOplogEntryTs = currentTime.addTicks(2).asTimestamp();
         prepareEntryTs = currentTime.addTicks(3).asTimestamp();
         commitEntryTs = currentTime.addTicks(4).asTimestamp();
-    }
-
-    ~CommitPreparedMultiOplogEntryTransaction() {
-        gUseMultipleOplogEntryFormatForTransactions = false;
     }
 
     void run() {
@@ -3170,21 +3179,19 @@ public:
 
 protected:
     Timestamp firstOplogEntryTs, secondOplogEntryTs, prepareEntryTs;
+
+private:
+    MultiOplogScopedSettings multiOplogSettings;
 };
 
 class AbortPreparedMultiOplogEntryTransaction : public MultiDocumentTransactionTest {
 public:
     AbortPreparedMultiOplogEntryTransaction()
         : MultiDocumentTransactionTest("preparedMultiOplogEntryTransaction") {
-        gUseMultipleOplogEntryFormatForTransactions = true;
         const auto currentTime = _clock->getClusterTime();
         firstOplogEntryTs = currentTime.addTicks(1).asTimestamp();
         prepareEntryTs = currentTime.addTicks(2).asTimestamp();
         abortEntryTs = currentTime.addTicks(3).asTimestamp();
-    }
-
-    ~AbortPreparedMultiOplogEntryTransaction() {
-        gUseMultipleOplogEntryFormatForTransactions = false;
     }
 
     void run() {
@@ -3284,6 +3291,9 @@ public:
 
 protected:
     Timestamp firstOplogEntryTs, secondOplogEntryTs, prepareEntryTs, abortEntryTs;
+
+private:
+    MultiOplogScopedSettings multiOplogSettings;
 };
 
 class PreparedMultiDocumentTransaction : public MultiDocumentTransactionTest {
