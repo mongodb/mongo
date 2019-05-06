@@ -277,3 +277,12 @@ function assertErrMsgContains(coll, pipe, code, expectedMessage) {
         response.errmsg.indexOf(expectedMessage),
         "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response));
 }
+
+/**
+ * Asserts that two arrays are equal - that is, if their sizes are equal and each element in
+ * the 'actual' array has a matching element in the 'expected' array, without honoring elements
+ * order.
+ */
+function assertArrayEq({actual = [], expected = []} = {}) {
+    assert(arrayEq(actual, expected), `actual=${tojson(actual)}, expected=${tojson(expected)}`);
+}

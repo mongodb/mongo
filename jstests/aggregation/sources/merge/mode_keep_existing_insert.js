@@ -1,4 +1,4 @@
-// Tests the behaviour of the $merge stage with whenMatched=merge and whenNotMatched=insert.
+// Tests the behaviour of the $merge stage with whenMatched=keepExisting and whenNotMatched=insert.
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
@@ -14,7 +14,7 @@
     const target = db[`${jsTest.name()}_target`];
     target.drop();
     const mergeStage = {
-        $merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "insert"}
+        $merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "insert"}
     };
     const pipeline = [mergeStage];
 
@@ -50,15 +50,15 @@
         });
     })();
 
-    // Test $merge updates documents in the target collection if they were modified in the source
-    // collection.
-    (function testMergeUpdatesModifiedDocuments() {
+    // Test $merge doesn't update documents in the target collection if they were modified in the
+    // source collection.
+    (function testMergeDoesNotUpdateModifiedDocuments() {
         // Update and merge a single document.
         assert.commandWorked(source.update({_id: 2}, {a: 22, c: "c"}));
         assert.doesNotThrow(() => source.aggregate(pipeline));
         assertArrayEq({
             actual: target.find().toArray(),
-            expected: [{_id: 1, a: 1, b: "a"}, {_id: 2, a: 22, b: "b", c: "c"}]
+            expected: [{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}]
         });
 
         // Update and merge multiple documents.
@@ -67,7 +67,7 @@
         assert.doesNotThrow(() => source.aggregate(pipeline));
         assertArrayEq({
             actual: target.find().toArray(),
-            expected: [{_id: 1, a: 11, b: "a"}, {_id: 2, a: 22, b: "b", c: "c", d: "d"}]
+            expected: [{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}]
         });
     })();
 
@@ -79,11 +79,7 @@
         assert.doesNotThrow(() => source.aggregate(pipeline));
         assertArrayEq({
             actual: target.find().toArray(),
-            expected: [
-                {_id: 1, a: 11, b: "a"},
-                {_id: 2, a: 22, b: "b", c: "c", d: "d"},
-                {_id: 3, a: 3, b: "c"}
-            ]
+            expected: [{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}, {_id: 3, a: 3, b: "c"}]
         });
         assert.commandWorked(source.deleteOne({_id: 3}));
         assert.commandWorked(target.deleteOne({_id: 3}));
@@ -95,8 +91,8 @@
         assertArrayEq({
             actual: target.find().toArray(),
             expected: [
-                {_id: 1, a: 11, b: "a"},
-                {_id: 2, a: 22, b: "b", c: "c", d: "d"},
+                {_id: 1, a: 1, b: "a"},
+                {_id: 2, a: 2, b: "b"},
                 {_id: 3, a: 3, b: "c"},
                 {_id: 4, a: 4, c: "d"}
             ]
@@ -113,8 +109,8 @@
         assertArrayEq({
             actual: target.find().toArray(),
             expected: [
-                {_id: 1, a: 11, b: "a"},
-                {_id: 2, a: 22, b: "b", c: "c", d: "d"},
+                {_id: 1, a: 1, b: "a"},
+                {_id: 2, a: 2, b: "b"},
             ]
         });
     })();
@@ -128,15 +124,15 @@
             return;
         }
 
-        assert.commandWorked(source.insert({_id: 4, a: 11}));
+        assert.commandWorked(source.insert({_id: 4, a: 1}));
         assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
         const error = assert.throws(() => source.aggregate(pipeline));
         assert.commandFailedWithCode(error, ErrorCodes.DuplicateKey);
         assertArrayEq({
             actual: target.find().toArray(),
             expected: [
-                {_id: 1, a: 11, b: "a"},
-                {_id: 2, a: 22, b: "b", c: "c", d: "d"},
+                {_id: 1, a: 1, b: "a"},
+                {_id: 2, a: 2, b: "b"},
             ]
         });
         assert.commandWorked(target.dropIndex({a: 1}));
@@ -182,9 +178,9 @@
         assertArrayEq({
             actual: target.find().toArray(),
             expected: [
-                {_id: 1, a: 1, b: "a", c: "x"},
+                {_id: 1, a: 1, c: "x"},
                 {_id: 2, a: 2, b: "b"},
-                {_id: 4, a: 30, b: "c", c: "y"},
+                {_id: 4, a: 30, c: "y"},
                 {_id: 5, a: 40, c: "z"}
             ]
         });
@@ -205,7 +201,7 @@
         assertArrayEq({
             actual: target.find().toArray(),
             expected: [
-                {_id: 1, a: 1, b: "a", c: "x"},
+                {_id: 1, a: 1, b: "a"},
                 {_id: 2, a: 2, b: "b"},
                 {_id: 4, a: 30, b: "c", c: "y"},
                 {_id: 5, a: 40, c: "z"}
@@ -241,7 +237,7 @@
             actual: target.find().toArray(),
             expected: [
                 {_id: 1, a: {b: "b"}, c: "x"},
-                {_id: 2, a: {b: "c"}, c: "y"},
+                {_id: 2, a: {b: "c"}},
                 {_id: 3, a: {b: 30}, b: "c"}
             ]
         });
@@ -342,7 +338,7 @@
     // exist.
     (function testMergeImplicitlyCreatesTargetDatabase() {
         assert(source.drop());
-        assert.commandWorked(source.insert({_id: 1, a: 1, b: "a"}));
+        assert.commandWorked(source.insert({_id: 1, a: 1}));
 
         const foreignDb = db.getSiblingDB(`${jsTest.name()}_foreign_db`);
         assert.commandWorked(foreignDb.dropDatabase());
@@ -350,15 +346,14 @@
         const foreignPipeline = [{
             $merge: {
                 into: {db: foreignDb.getName(), coll: foreignTarget.getName()},
-                whenMatched: "merge",
+                whenMatched: "keepExisting",
                 whenNotMatched: "insert"
             }
         }];
 
         if (!FixtureHelpers.isMongos(db)) {
             assert.doesNotThrow(() => source.aggregate(foreignPipeline));
-            assertArrayEq(
-                {actual: foreignTarget.find().toArray(), expected: [{_id: 1, a: 1, b: "a"}]});
+            assertArrayEq({actual: foreignTarget.find().toArray(), expected: [{_id: 1, a: 1}]});
         } else {
             // Implicit database creation is prohibited in a cluster.
             const error = assert.throws(() => source.aggregate(foreignPipeline));
@@ -368,8 +363,9 @@
             assert.commandWorked(foreignTarget.insert({_id: 1, a: 1}));
         }
 
+        assert.commandWorked(source.update({_id: 1}, {a: 1, b: "a"}));
         assert.doesNotThrow(() => source.aggregate(foreignPipeline));
-        assertArrayEq({actual: foreignTarget.find().toArray(), expected: [{_id: 1, a: 1, b: "a"}]});
+        assertArrayEq({actual: foreignTarget.find().toArray(), expected: [{_id: 1, a: 1}]});
         assert.commandWorked(foreignDb.dropDatabase());
     })();
 }());

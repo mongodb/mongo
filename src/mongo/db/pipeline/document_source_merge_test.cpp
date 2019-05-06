@@ -610,6 +610,14 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
                                  << "keepExisting"
                                  << "whenNotMatched"
                                  << "insert"));
+    ASSERT(createMergeStage(spec));
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
+                                 << "[{$addFields: {x: 1}}]"
+                                 << "whenNotMatched"
+                                 << "insert"));
     ASSERT_THROWS_CODE(createMergeStage(spec), DBException, ErrorCodes::BadValue);
 
     spec = BSON("$merge" << BSON("into"

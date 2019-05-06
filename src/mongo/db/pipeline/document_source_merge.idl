@@ -45,6 +45,7 @@ enums:
         values:
             kFail: "fail"
             kMerge: "merge"
+            kKeepExisting: "keepExisting"
             kReplaceWithNew: "replaceWithNew"
 
     MergeWhenNotMatchedMode:

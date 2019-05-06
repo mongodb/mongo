@@ -65,6 +65,8 @@ constexpr auto kDefaultWhenNotMatched = WhenNotMatched::kInsert;
 constexpr auto kReplaceWithNewInsertMode =
     MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kInsert};
 constexpr auto kMergeInsertMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kInsert};
+constexpr auto kKeepExistingInsertMode =
+    MergeMode{WhenMatched::kKeepExisting, WhenNotMatched::kInsert};
 constexpr auto kFailInsertMode = MergeMode{WhenMatched::kFail, WhenNotMatched::kInsert};
 
 /**
@@ -136,6 +138,10 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
          {kMergeInsertMode,
           {ActionType::insert, ActionType::update},
           makeUpdateStrategy(true, makeUpdateTransform("$set"))}},
+        {kKeepExistingInsertMode,
+         {kKeepExistingInsertMode,
+          {ActionType::insert, ActionType::update},
+          makeUpdateStrategy(true, makeUpdateTransform("$setOnInsert"))}},
         {kFailInsertMode, {kFailInsertMode, {ActionType::insert}, makeInsertStrategy()}}};
     return mergeStrategyDescriptors;
 }
