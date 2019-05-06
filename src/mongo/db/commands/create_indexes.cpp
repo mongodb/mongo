@@ -269,27 +269,22 @@ bool runCreateIndexes(OperationContext* opCtx,
     // already exist while holding an intent lock. Only continue if new indexes need to be built
     // and the collection or database should be re-locked in exclusive mode.
     {
-        boost::optional<AutoGetCollection> autoColl(boost::in_place_init, opCtx, ns, MODE_IX);
-        if (auto collection = autoColl->getCollection()) {
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        if (auto collection = autoColl.getCollection()) {
             auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
             if (specsCopy.size() == 0) {
                 return indexesAlreadyExist(collection->getIndexCatalog()->numIndexesTotal(opCtx));
             }
-        } else {
-            // We'll need to create a collection and maybe even a new database. Temporarily
-            // releases the Database lock while holding a Global IX lock. This prevents replication
-            // from changing, but requires abandoning the current snapshot in case indexes change
-            // during the period of time where no database lock is held.
-            autoColl.reset();
-            opCtx->recoveryUnit()->abandonSnapshot();
-            dbLock.relockWithMode(MODE_X);
         }
     }
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, ns.db());
     if (!db) {
-        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
+        // Temporarily release the Database lock while holding a Global IX lock. This prevents
+        // replication state from changing. Abandon the current snapshot to see changed metadata.
+        opCtx->recoveryUnit()->abandonSnapshot();
+        dbLock.relockWithMode(MODE_X);
         db = databaseHolder->openDb(opCtx, ns.db());
     }
 

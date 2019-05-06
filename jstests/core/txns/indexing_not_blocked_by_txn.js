@@ -29,8 +29,12 @@
 
     // Creating an index on a different collection should not conflict.
     assert.commandWorked(mydb.bar.createIndex({x: 1}));
+
     // Dropping shouldn't either.
     assert.commandWorked(mydb.bar.dropIndex({x: 1}));
+
+    // Creating an index on a non-existent collection in an existing database should not conflict.
+    assert.commandWorked(mydb.baz.createIndex({x: 1}));
 
     assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
