@@ -67,10 +67,10 @@ else:
     env.Append(
         CCFLAGS=[
             '-include', 'js-confdefs.h',
-            '-Wno-invalid-offsetof',
         ],
         CXXFLAGS=[
             '-Wno-non-virtual-dtor',
+            '-Wno-invalid-offsetof',
         ],
     )
 
