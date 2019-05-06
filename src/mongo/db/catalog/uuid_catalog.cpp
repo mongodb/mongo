@@ -305,11 +305,14 @@ CollectionCatalogEntry* UUIDCatalog::lookupCollectionCatalogEntryByNamespace(
     return it == _collections.end() ? nullptr : it->second->collectionCatalogEntry.get();
 }
 
-NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
+boost::optional<NamespaceString> UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
-    if (foundIt != _catalog.end())
-        return foundIt->second.collectionCatalogEntry->ns();
+    if (foundIt != _catalog.end()) {
+        NamespaceString ns = foundIt->second.collectionCatalogEntry->ns();
+        invariant(!ns.isEmpty());
+        return ns;
+    }
 
     // Only in the case that the catalog is closed and a UUID is currently unknown, resolve it
     // using the pre-close state. This ensures that any tasks reloading the catalog can see their
@@ -319,7 +322,7 @@ NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
         if (shadowIt != _shadowCatalog->end())
             return shadowIt->second;
     }
-    return NamespaceString();
+    return boost::none;
 }
 
 boost::optional<CollectionUUID> UUIDCatalog::lookupUUIDByNSS(const NamespaceString& nss) const {

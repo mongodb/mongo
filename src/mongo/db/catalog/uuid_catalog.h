@@ -204,11 +204,11 @@ public:
         const NamespaceString& nss) const;
 
     /**
-     * This function gets the NamespaceString from the Collection* pointer that
-     * corresponds to CollectionUUID uuid. If there is no such pointer, an empty
-     * NamespaceString is returned. See onCloseCatalog/onOpenCatalog for more info.
+     * This function gets the NamespaceString from the collection catalog entry that
+     * corresponds to CollectionUUID uuid. If no collection exists with the uuid, return
+     * boost::none. See onCloseCatalog/onOpenCatalog for more info.
      */
-    NamespaceString lookupNSSByUUID(CollectionUUID uuid) const;
+    boost::optional<NamespaceString> lookupNSSByUUID(CollectionUUID uuid) const;
 
     /**
      * Returns the UUID if `nss` exists in UUIDCatalog. The time complexity of

@@ -801,8 +801,8 @@ std::pair<OptionalCollectionUUID, NamespaceString> parseCollModUUIDAndNss(Operat
             str::stream() << "Failed to apply operation due to missing collection (" << uuid
                           << "): "
                           << redact(cmd.toString()),
-            !nsByUUID.isEmpty());
-    return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, nsByUUID);
+            nsByUUID);
+    return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, *nsByUUID);
 }
 
 NamespaceString parseUUID(OperationContext* opCtx, const BSONElement& ui) {
@@ -811,9 +811,8 @@ NamespaceString parseUUID(OperationContext* opCtx, const BSONElement& ui) {
     auto uuid = statusWithUUID.getValue();
     auto& catalog = UUIDCatalog::get(opCtx);
     auto nss = catalog.lookupNSSByUUID(uuid);
-    uassert(
-        ErrorCodes::NamespaceNotFound, "No namespace with UUID " + uuid.toString(), !nss.isEmpty());
-    return nss;
+    uassert(ErrorCodes::NamespaceNotFound, "No namespace with UUID " + uuid.toString(), nss);
+    return *nss;
 }
 
 NamespaceString parseUUIDorNs(OperationContext* opCtx,

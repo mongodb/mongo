@@ -653,9 +653,9 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetEx
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
     const auto& tmpB = UUIDCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
-    ASSERT_FALSE(tmpB.isEmpty());
-    ASSERT_TRUE(tmpB.coll().startsWith("tmp"));
-    ASSERT_TRUE(tmpB != collB);
+    ASSERT(tmpB);
+    ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
+    ASSERT_TRUE(*tmpB != collB);
 }
 
 TEST_F(RenameCollectionTest,
@@ -686,10 +686,10 @@ TEST_F(RenameCollectionTest,
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
     const auto& tmpB = UUIDCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
-    ASSERT_FALSE(tmpB.isEmpty());
-    ASSERT_TRUE(tmpB != collB);
-    ASSERT_TRUE(tmpB.coll().startsWith("tmp"));
-    ASSERT_TRUE(_isTempCollection(_opCtx.get(), tmpB));
+    ASSERT(tmpB);
+    ASSERT_TRUE(*tmpB != collB);
+    ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
+    ASSERT_TRUE(_isTempCollection(_opCtx.get(), *tmpB));
 }
 
 TEST_F(RenameCollectionTest,
@@ -712,9 +712,9 @@ TEST_F(RenameCollectionTest,
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
     const auto& tmpB = UUIDCatalog::get(_opCtx.get()).lookupNSSByUUID(collBUUID);
-    ASSERT_FALSE(tmpB.isEmpty());
-    ASSERT_TRUE(tmpB != collB);
-    ASSERT_TRUE(tmpB.coll().startsWith("tmp"));
+    ASSERT(tmpB);
+    ASSERT_TRUE(*tmpB != collB);
+    ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
 }
 
 TEST_F(RenameCollectionTest,

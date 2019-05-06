@@ -162,15 +162,15 @@ NamespaceString AutoGetCollection::resolveNamespaceStringOrUUID(OperationContext
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Unable to resolve " << nsOrUUID.toString(),
-            resolvedNss.isValid());
+            resolvedNss && resolvedNss->isValid());
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "UUID " << nsOrUUID.toString() << " specified in " << nsOrUUID.dbname()
                           << " resolved to a collection in a different database: "
-                          << resolvedNss.toString(),
-            resolvedNss.db() == nsOrUUID.dbname());
+                          << *resolvedNss,
+            resolvedNss->db() == nsOrUUID.dbname());
 
-    return resolvedNss;
+    return *resolvedNss;
 }
 
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,

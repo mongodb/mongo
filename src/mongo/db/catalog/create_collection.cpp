@@ -226,16 +226,16 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 const auto currentName = catalog.lookupNSSByUUID(uuid);
                 auto serviceContext = opCtx->getServiceContext();
                 auto opObserver = serviceContext->getOpObserver();
-                if (currentName == newCollName)
+                if (currentName && *currentName == newCollName)
                     return Result(Status::OK());
 
-                if (currentName.isDropPendingNamespace()) {
+                if (currentName && currentName->isDropPendingNamespace()) {
                     log() << "CMD: create " << newCollName
                           << " - existing collection with conflicting UUID " << uuid
-                          << " is in a drop-pending state: " << currentName;
+                          << " is in a drop-pending state: " << *currentName;
                     return Result(Status(ErrorCodes::NamespaceExists,
                                          str::stream() << "existing collection "
-                                                       << currentName.toString()
+                                                       << currentName->toString()
                                                        << " with conflicting UUID "
                                                        << uuid.toString()
                                                        << " is in a drop-pending state."));
@@ -280,14 +280,16 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // If the collection with the requested UUID already exists, but with a different
                 // name, just rename it to 'newCollName'.
                 if (catalog.lookupCollectionByUUID(uuid)) {
+                    invariant(currentName);
                     uassert(40655,
                             str::stream() << "Invalid name " << newCollName << " for UUID " << uuid,
-                            currentName.db() == newCollName.db());
-                    Status status = db->renameCollection(opCtx, currentName, newCollName, stayTemp);
+                            currentName->db() == newCollName.db());
+                    Status status =
+                        db->renameCollection(opCtx, *currentName, newCollName, stayTemp);
                     if (!status.isOK())
                         return Result(status);
                     opObserver->onRenameCollection(opCtx,
-                                                   currentName,
+                                                   *currentName,
                                                    newCollName,
                                                    uuid,
                                                    /*dropTargetUUID*/ {},

@@ -223,8 +223,8 @@ NamespaceString parseUUIDOrNs(OperationContext* opCtx, const OplogEntry& oplogEn
     auto nss = catalog.lookupNSSByUUID(uuid);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "No namespace with UUID " << uuid.toString(),
-            !nss.isEmpty());
-    return nss;
+            nss);
+    return *nss;
 }
 
 NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op) {

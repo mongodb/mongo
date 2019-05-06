@@ -535,9 +535,9 @@ TEST_F(UUIDCatalogTest, LookupCollectionByUUID) {
 
 TEST_F(UUIDCatalogTest, LookupNSSByUUID) {
     // Ensure the string value of the obtained NamespaceString is equal to nss.ns().
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID).ns(), nss.ns());
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID)->ns(), nss.ns());
     // Ensure namespace lookups of unknown UUIDs result in empty NamespaceStrings.
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(CollectionUUID::gen()).ns(), NamespaceString().ns());
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(CollectionUUID::gen()), boost::none);
 }
 
 TEST_F(UUIDCatalogTest, InsertAfterLookup) {
@@ -549,11 +549,11 @@ TEST_F(UUIDCatalogTest, InsertAfterLookup) {
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
     ASSERT(catalog.lookupCollectionByUUID(newUUID) == nullptr);
-    ASSERT(catalog.lookupNSSByUUID(newUUID) == NamespaceString());
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(newUUID), boost::none);
     catalog.registerCatalogEntry(newUUID, std::move(newCatalogEntry));
     catalog.onCreateCollection(&opCtx, std::move(newCollUnique), newUUID);
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(newUUID), newCol);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), nss);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 }
 
 TEST_F(UUIDCatalogTest, OnDropCollection) {
@@ -583,9 +583,9 @@ TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
     catalog.onDropCollection(&opCtx, colUUID);
     catalog.deregisterCatalogEntry(colUUID);
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), nss);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
     catalog.onOpenCatalog(&opCtx);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), NamespaceString());
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), boost::none);
 }
 
 TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
@@ -598,16 +598,16 @@ TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
     catalog.onCloseCatalog(&opCtx);
     ASSERT(catalog.lookupCollectionByUUID(newUUID) == nullptr);
-    ASSERT(catalog.lookupNSSByUUID(newUUID) == NamespaceString());
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(newUUID), boost::none);
     catalog.registerCatalogEntry(newUUID, std::move(newCatalogEntry));
     catalog.onCreateCollection(&opCtx, std::move(newCollUnique), newUUID);
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(newUUID), newCol);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), nss);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 
     // Ensure that collection still exists after opening the catalog again.
     catalog.onOpenCatalog(&opCtx);
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(newUUID), newCol);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), nss);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 }
 
 TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
@@ -620,16 +620,16 @@ TEST_F(UUIDCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
     catalog.onDropCollection(&opCtx, colUUID);
     catalog.deregisterCatalogEntry(colUUID);
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), nss);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
     catalog.registerCatalogEntry(colUUID, std::move(newCatalogEntry));
     catalog.onCreateCollection(&opCtx, std::move(newCollUnique), colUUID);
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(colUUID), newCol);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), newNss);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), newNss);
 
     // Ensure that collection still exists after opening the catalog again.
     catalog.onOpenCatalog(&opCtx);
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(colUUID), newCol);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(colUUID), newNss);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), newNss);
 }
 
 DEATH_TEST_F(UUIDCatalogResourceTest, AddInvalidResourceType, "invariant") {

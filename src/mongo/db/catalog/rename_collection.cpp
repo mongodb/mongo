@@ -65,7 +65,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(writeConfilctInRenameCollCopyToTmp);
 
-NamespaceString getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
+boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
     return UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
 }
 
@@ -397,7 +397,6 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
             return Status::OK();
         }
         if (uuidToDrop && uuidToDrop != targetColl->uuid()) {
-            auto dropTargetNssFromUUID = getNamespaceFromUUID(opCtx, uuidToDrop.get());
             // We need to rename the targetColl to a temporary name.
             auto status = renameTargetCollectionToTmp(
                 opCtx, source, sourceColl->uuid().get(), db, target, targetColl->uuid().get());
@@ -413,9 +412,9 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     if (!targetColl && uuidToDrop) {
         invariant(options.dropTarget);
         auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.get());
-        if (!collToDropBasedOnUUID.isEmpty() && !collToDropBasedOnUUID.isDropPendingNamespace()) {
-            invariant(collToDropBasedOnUUID.db() == target.db());
-            targetColl = db->getCollection(opCtx, collToDropBasedOnUUID);
+        if (collToDropBasedOnUUID && !collToDropBasedOnUUID->isDropPendingNamespace()) {
+            invariant(collToDropBasedOnUUID->db() == target.db());
+            targetColl = db->getCollection(opCtx, *collToDropBasedOnUUID);
         }
     }
 
@@ -764,8 +763,8 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     if (!ui.eoo()) {
         uuidToRename = uassertStatusOK(UUID::parse(ui));
         auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuidToRename.get());
-        if (!nss.isEmpty())
-            sourceNss = nss;
+        if (nss)
+            sourceNss = *nss;
     }
 
     RenameCollectionOptions options;
@@ -797,7 +796,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
             .getCollection();
 
     if (sourceNss.isDropPendingNamespace() || sourceColl == nullptr) {
-        NamespaceString dropTargetNss;
+        boost::optional<NamespaceString> dropTargetNss;
 
         if (options.dropTarget)
             dropTargetNss = targetNss;
@@ -806,10 +805,10 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
             dropTargetNss = getNamespaceFromUUID(opCtx, uuidToDrop.get());
 
         // Downgrade renameCollection to dropCollection.
-        if (!dropTargetNss.isEmpty()) {
+        if (dropTargetNss) {
             BSONObjBuilder unusedResult;
             return dropCollection(opCtx,
-                                  dropTargetNss,
+                                  *dropTargetNss,
                                   unusedResult,
                                   renameOpTime,
                                   DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
@@ -838,17 +837,18 @@ Status renameCollectionForRollback(OperationContext* opCtx,
                                    const UUID& uuid) {
     // If the UUID we're targeting already exists, rename from there no matter what.
     auto source = getNamespaceFromUUID(opCtx, uuid);
-    invariant(source.db() == target.db(),
+    invariant(source);
+    invariant(source->db() == target.db(),
               str::stream() << "renameCollectionForRollback: source and target namespaces must "
                                "have the same database. source: "
-                            << source
+                            << *source
                             << ". target: "
                             << target);
 
-    log() << "renameCollectionForRollback: rename " << source << " (" << uuid << ") to " << target
+    log() << "renameCollectionForRollback: rename " << *source << " (" << uuid << ") to " << target
           << ".";
 
-    return renameCollectionWithinDB(opCtx, source, target, {});
+    return renameCollectionWithinDB(opCtx, *source, target, {});
 }
 
 }  // namespace mongo

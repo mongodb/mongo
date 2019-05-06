@@ -710,8 +710,9 @@ void dropIndex(OperationContext* opCtx,
  */
 void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::string> indexNames) {
 
-    NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+    boost::optional<NamespaceString> nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    invariant(nss);
+    Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
     Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
 
     // If we cannot find the collection, we skip over dropping the index.
@@ -732,12 +733,12 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
     for (auto itIndex = indexNames.begin(); itIndex != indexNames.end(); itIndex++) {
         const string& indexName = *itIndex;
 
-        log() << "Dropping index in rollback for collection: " << nss << ", UUID: " << uuid
+        log() << "Dropping index in rollback for collection: " << *nss << ", UUID: " << uuid
               << ", index: " << indexName;
 
-        dropIndex(opCtx, indexCatalog, indexName, nss);
+        dropIndex(opCtx, indexCatalog, indexName, *nss);
 
-        LOG(1) << "Dropped index in rollback for collection: " << nss << ", UUID: " << uuid
+        LOG(1) << "Dropped index in rollback for collection: " << *nss << ", UUID: " << uuid
                << ", index: " << indexName;
     }
 }
@@ -750,8 +751,9 @@ void rollbackDropIndexes(OperationContext* opCtx,
                          UUID uuid,
                          std::map<std::string, BSONObj> indexNames) {
 
-    NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+    boost::optional<NamespaceString> nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    invariant(nss);
+    Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
     Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
@@ -768,17 +770,17 @@ void rollbackDropIndexes(OperationContext* opCtx,
         // renameCollection command has occurred, changing the namespace of the
         // collection from what it initially was during the creation of this index.
         BSONObjBuilder updatedNss;
-        updatedNss.append("ns", nss.ns());
+        updatedNss.append("ns", nss->ns());
 
         BSONObj updatedNssObj = updatedNss.obj();
         indexSpec = indexSpec.addField(updatedNssObj.firstElement());
 
-        log() << "Creating index in rollback for collection: " << nss << ", UUID: " << uuid
+        log() << "Creating index in rollback for collection: " << *nss << ", UUID: " << uuid
               << ", index: " << indexName;
 
-        createIndexForApplyOps(opCtx, indexSpec, nss, {}, OplogApplication::Mode::kRecovering);
+        createIndexForApplyOps(opCtx, indexSpec, *nss, {}, OplogApplication::Mode::kRecovering);
 
-        LOG(1) << "Created index in rollback for collection: " << nss << ", UUID: " << uuid
+        LOG(1) << "Created index in rollback for collection: " << *nss << ", UUID: " << uuid
                << ", index: " << indexName;
     }
 }
@@ -1049,18 +1051,23 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         invariant(!doc._id.eoo());  // This is checked when we insert to the set.
 
         UUID uuid = doc.uuid;
-        NamespaceString nss = catalog.lookupNSSByUUID(uuid);
+        boost::optional<NamespaceString> nss = catalog.lookupNSSByUUID(uuid);
 
         try {
-            LOG(2) << "Refetching document, collection: " << nss << ", UUID: " << uuid << ", "
-                   << redact(doc._id);
+            if (nss) {
+                LOG(2) << "Refetching document, collection: " << *nss << ", UUID: " << uuid << ", "
+                       << redact(doc._id);
+            } else {
+                LOG(2) << "Refetching document, UUID: " << uuid << ", " << redact(doc._id);
+            }
             // TODO : Slow. Lots of round trips.
             numFetched++;
 
             BSONObj good;
             NamespaceString resNss;
-            std::tie(good, resNss) =
-                rollbackSource.findOneByUUID(nss.db().toString(), uuid, doc._id.wrap());
+
+            std::string dbName = nss ? nss->db().toString() : "";
+            std::tie(good, resNss) = rollbackSource.findOneByUUID(dbName, uuid, doc._id.wrap());
 
             // To prevent inconsistencies in the transactions collection, rollback fails if the UUID
             // of the collection is different on the sync source than on the node rolling back,
@@ -1159,20 +1166,20 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         invariant(!fixUpInfo.collectionsToRename.count(uuid));
         invariant(!fixUpInfo.collectionsToResyncMetadata.count(uuid));
 
-        NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+        boost::optional<NamespaceString> nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
         // Do not attempt to acquire the database lock with an empty namespace. We should survive
         // an attempt to drop a non-existent collection.
-        if (nss.isEmpty()) {
+        if (!nss) {
             log() << "This collection does not exist, UUID: " << uuid;
         } else {
-            log() << "Dropping collection: " << nss << ", UUID: " << uuid;
-            AutoGetDb dbLock(opCtx, nss.db(), MODE_X);
+            log() << "Dropping collection: " << *nss << ", UUID: " << uuid;
+            AutoGetDb dbLock(opCtx, nss->db(), MODE_X);
 
             Database* db = dbLock.getDb();
             if (db) {
                 Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
-                dropCollection(opCtx, nss, collection, db);
-                LOG(1) << "Dropped collection: " << nss << ", UUID: " << uuid;
+                dropCollection(opCtx, *nss, collection, db);
+                LOG(1) << "Dropped collection: " << *nss << ", UUID: " << uuid;
             }
         }
     }
@@ -1217,14 +1224,15 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         // occurs and then the collection is dropped. If we do not first re-create the
         // collection, we will not be able to retrieve the collection's catalog entries.
         for (auto uuid : fixUpInfo.collectionsToResyncMetadata) {
-            NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+            boost::optional<NamespaceString> nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+            invariant(nss);
 
-            log() << "Resyncing collection metadata for collection: " << nss << ", UUID: " << uuid;
+            log() << "Resyncing collection metadata for collection: " << *nss << ", UUID: " << uuid;
 
-            Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+            Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
 
             auto databaseHolder = DatabaseHolder::get(opCtx);
-            auto db = databaseHolder->openDb(opCtx, nss.db().toString());
+            auto db = databaseHolder->openDb(opCtx, nss->db().toString());
             invariant(db);
 
             Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
@@ -1232,7 +1240,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
             auto cce = collection->getCatalogEntry();
 
-            auto infoResult = rollbackSource.getCollectionInfoByUUID(nss.db().toString(), uuid);
+            auto infoResult = rollbackSource.getCollectionInfoByUUID(nss->db().toString(), uuid);
 
             if (!infoResult.isOK()) {
                 // The collection was dropped by the sync source so we can't correctly change it
@@ -1240,8 +1248,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                 // is rolled back upstream and we restart, we expect to still have the
                 // collection.
 
-                log() << nss.ns() << " not found on remote host, so we do not roll back collmod "
-                                     "operation. Instead, we will drop the collection soon.";
+                log() << nss->ns() << " not found on remote host, so we do not roll back collmod "
+                                      "operation. Instead, we will drop the collection soon.";
                 continue;
             }
 
@@ -1287,7 +1295,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                 opCtx, options.validator, options.validationLevel, options.validationAction);
             if (!validatorStatus.isOK()) {
                 throw RSFatalException(
-                    str::stream() << "Failed to update validator for " << nss.toString() << " ("
+                    str::stream() << "Failed to update validator for " << nss->toString() << " ("
                                   << uuid
                                   << ") with "
                                   << redact(info)
@@ -1297,7 +1305,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
             wuow.commit();
 
-            LOG(1) << "Resynced collection metadata for collection: " << nss << ", UUID: " << uuid
+            LOG(1) << "Resynced collection metadata for collection: " << *nss << ", UUID: " << uuid
                    << ", with: " << redact(info)
                    << ", to: " << redact(cce->getCollectionOptions(opCtx).toBSON());
         }
@@ -1334,12 +1342,15 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         unique_ptr<RemoveSaver> removeSaver;
         invariant(!fixUpInfo.collectionsToDrop.count(uuid));
 
-        NamespaceString nss = catalog.lookupNSSByUUID(uuid);
+        boost::optional<NamespaceString> nss = catalog.lookupNSSByUUID(uuid);
+        if (!nss) {
+            nss = NamespaceString();
+        }
 
         if (RollbackImpl::shouldCreateDataFiles()) {
-            removeSaver = std::make_unique<RemoveSaver>("rollback", "", nss.ns());
+            removeSaver = std::make_unique<RemoveSaver>("rollback", "", nss->ns());
             log() << "Preparing to write deleted documents to a rollback file for collection "
-                  << nss << " with uuid " << uuid.toString() << " to "
+                  << *nss << " with uuid " << uuid.toString() << " to "
                   << removeSaver->file().generic_string();
         }
 
@@ -1374,16 +1385,16 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                     if (found) {
                         auto status = removeSaver->goingToDelete(obj);
                         if (!status.isOK()) {
-                            severe() << "Rollback cannot write document in namespace " << nss.ns()
+                            severe() << "Rollback cannot write document in namespace " << nss->ns()
                                      << " to archive file: " << redact(status);
                             throw RSFatalException(str::stream()
                                                    << "Rollback cannot write document in namespace "
-                                                   << nss.ns()
+                                                   << nss->ns()
                                                    << " to archive file.");
                         }
                     } else {
                         error() << "Rollback cannot find object: " << pattern << " in namespace "
-                                << nss.ns();
+                                << nss->ns();
                     }
                 }
 
@@ -1409,7 +1420,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                 const auto findOneStart = clock->now();
                                 RecordId loc = Helpers::findOne(opCtx, collection, pattern, false);
                                 if (clock->now() - findOneStart > Milliseconds(200))
-                                    warning() << "Roll back slow no _id index for " << nss.ns()
+                                    warning() << "Roll back slow no _id index for " << nss->ns()
                                               << " perhaps?";
                                 // Would be faster but requires index:
                                 // RecordId loc = Helpers::findById(nsd, pattern);
@@ -1444,7 +1455,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                 // eventually.
 
                                 warning() << "Ignoring failure to roll back change to capped "
-                                          << "collection " << nss.ns() << " with _id "
+                                          << "collection " << nss->ns() << " with _id "
                                           << redact(idAndDoc.first._id.toString(
                                                  /*includeFieldName*/ false))
                                           << ": " << redact(e);
@@ -1452,7 +1463,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                         } else {
                             deleteObjects(opCtx,
                                           collection,
-                                          nss,
+                                          *nss,
                                           pattern,
                                           true,   // justOne
                                           true);  // god
@@ -1465,7 +1476,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                     // TODO faster...
                     updates++;
 
-                    UpdateRequest request(nss);
+                    UpdateRequest request(*nss);
 
                     request.setQuery(pattern);
                     request.setUpdateModification(idAndDoc.second);
@@ -1475,8 +1486,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                     update(opCtx, ctx.db(), request);
                 }
             } catch (const DBException& e) {
-                log() << "Exception in rollback ns:" << nss.ns() << ' ' << pattern.toString() << ' '
-                      << redact(e) << " ndeletes:" << deletes;
+                log() << "Exception in rollback ns:" << nss->ns() << ' ' << pattern.toString()
+                      << ' ' << redact(e) << " ndeletes:" << deletes;
                 throw;
             }
         }

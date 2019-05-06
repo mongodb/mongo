@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
 #include <pcrecpp.h>
 
 #include "mongo/bson/util/builder.h"
@@ -352,13 +353,13 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         auto fromUuid = UUID::gen();
 
         auto&& uuidCatalog = UUIDCatalog::get(opCtx);
-        ASSERT_EQUALS(NamespaceString(), uuidCatalog.lookupNSSByUUID(fromUuid));
+        ASSERT_EQUALS(boost::none, uuidCatalog.lookupNSSByUUID(fromUuid));
 
         WriteUnitOfWork wuow(opCtx);
         CollectionOptions fromCollectionOptions;
         fromCollectionOptions.uuid = fromUuid;
         ASSERT_TRUE(db->createCollection(opCtx, fromNss, fromCollectionOptions));
-        ASSERT_EQUALS(fromNss, uuidCatalog.lookupNSSByUUID(fromUuid));
+        ASSERT_EQUALS(fromNss, *uuidCatalog.lookupNSSByUUID(fromUuid));
 
         auto stayTemp = false;
         ASSERT_OK(db->renameCollection(opCtx, fromNss, toNss, stayTemp));
@@ -374,7 +375,7 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         ASSERT_TRUE(toUuid);
         ASSERT_EQUALS(fromUuid, *toUuid);
 
-        ASSERT_EQUALS(toNss, uuidCatalog.lookupNSSByUUID(*toUuid));
+        ASSERT_EQUALS(toNss, *uuidCatalog.lookupNSSByUUID(*toUuid));
 
         wuow.commit();
     });

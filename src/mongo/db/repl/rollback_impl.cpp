@@ -592,7 +592,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
         // managed by the storage engine. See StorageEngine::supportsPendingDrops().
-        if (nss.isEmpty()) {
+        if (!nss) {
             invariant(storageEngine->supportsPendingDrops(),
                       str::stream() << "The collection with UUID " << uuid
                                     << " is unexpectedly missing in the UUIDCatalog");
@@ -611,7 +611,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
                                        "collection count during rollback.");
             oldCount = static_cast<StorageInterface::CollectionCount>(dropPendingInfo.count);
         } else {
-            auto countSW = _storageInterface->getCollectionCount(opCtx, nss);
+            auto countSW = _storageInterface->getCollectionCount(opCtx, *nss);
             if (!countSW.isOK()) {
                 return countSW.getStatus();
             }
@@ -619,7 +619,8 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
         }
 
         if (oldCount > static_cast<uint64_t>(std::numeric_limits<long long>::max())) {
-            warning() << "Count for " << nss.ns() << " (" << uuid.toString() << ") was " << oldCount
+            warning() << "Count for " << nss->ns() << " (" << uuid.toString() << ") was "
+                      << oldCount
                       << " which is larger than the maximum int64_t value. Not attempting to fix "
                          "count during rollback.";
             continue;
@@ -629,7 +630,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
         auto newCount = oldCountSigned + countDiff;
 
         if (newCount < 0) {
-            warning() << "Attempted to set count for " << nss.ns() << " (" << uuid.toString()
+            warning() << "Attempted to set count for " << nss->ns() << " (" << uuid.toString()
                       << ") to " << newCount
                       << " but set it to 0 instead. This is likely due to the count previously "
                          "becoming inconsistent from an unclean shutdown or a rollback that could "
@@ -637,7 +638,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
                       << oldCount << ". Count change: " << countDiff;
             newCount = 0;
         }
-        LOG(2) << "Record count of " << nss.ns() << " (" << uuid.toString()
+        LOG(2) << "Record count of " << nss->ns() << " (" << uuid.toString()
                << ") before rollback is " << oldCount << ". Setting it to " << newCount
                << ", due to change of " << countDiff;
         _newCounts[uuid] = newCount;
@@ -1013,25 +1014,25 @@ Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
         // managed by the storage engine. See StorageEngine::supportsPendingDrops().
-        if (nss.isEmpty() && storageEngine->supportsPendingDrops()) {
+        if (!nss && storageEngine->supportsPendingDrops()) {
             log() << "The collection with UUID " << uuid
                   << " is missing in the UUIDCatalog. This could be due to a dropped collection. "
-                     "Not writing rollback file for namespace "
-                  << nss.ns() << " with uuid " << uuid;
+                     "Not writing rollback file for uuid "
+                  << uuid;
             continue;
         }
 
-        invariant(!nss.isEmpty(),
+        invariant(nss,
                   str::stream() << "The collection with UUID " << uuid
                                 << " is unexpectedly missing in the UUIDCatalog");
 
         if (_isInShutdown()) {
-            log() << "Rollback shutting down; not writing rollback file for namespace " << nss.ns()
+            log() << "Rollback shutting down; not writing rollback file for namespace " << nss->ns()
                   << " with uuid " << uuid;
             continue;
         }
 
-        _writeRollbackFileForNamespace(opCtx, uuid, nss, entry.second);
+        _writeRollbackFileForNamespace(opCtx, uuid, *nss, entry.second);
     }
 
     // TODO (SERVER-40614): This interrupt point should be removed.
