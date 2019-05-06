@@ -90,6 +90,8 @@ variables:
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
       ${activate_virtualenv}
+      ### SPLUNK Since we are using a virtualenv from the toolchain now, we need pyyaml
+      pip install pyyaml
       MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
 
 - &apply_compile_expansions
@@ -257,7 +259,9 @@ functions:
         ${activate_virtualenv}
         bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
         # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
-        mongo_ver=$($mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
+        ### SPLUNK
+        ### mongo_ver=$($mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
+        mongo_ver=$(LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/tmp/openssl-1.0.2/lib $mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
         # The versions must match
         if [ "$bin_ver" != "$mongo_ver" ]; then
           echo "The mongo version is $mongo_ver, expected version is $bin_ver"
@@ -527,21 +531,55 @@ functions:
             set -o igncr
         fi;
 
+        ### SPLUNK
+        # We need pcap headers
+        rpm -ivh http://boxes.10gen.com/build/libpcap-devel-0.9.4-15.el5.x86_64.rpm
+
+        ### SPLUNK
+        sed -i.bak "s/built-without-version-string/3.6.17-SERVER-42525-splunk/" common/options/options.go
+        sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
+
+        # Move the vendor source to make compatible with gccgo
+        mkdir /data/go
+        mkdir /data/go/src
+        cp -r vendor/* /data/go/src
+
+        export GOROOT=/data/go
+        export PATH=/opt/mongodbtoolchain/v2/bin/:$PATH
+        ### SPLUNK
+
         # set_goenv provides set_goenv(), print_ldflags() and print_tags() used below
         . ./set_goenv.sh
-        GOROOT="" set_goenv || exit
+        ### SPLUNK
+        set_goenv || exit
         env | grep ^GO
         go version
 
+        ### SPLUNK
+        # In RHEL 5.5, /usr/bin/ld can't handle --build-id parameters, so
+        # use a wrapper if it's present on the system
+        #
+        if [ -d /opt/ldwrapper/bin ]
+        then
+          export PATH=/opt/ldwrapper/bin:$PATH
+        fi
+
         build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
 
+        # SPLUNK - Don't build mongoreplay
         if [ "${build_mongoreplay}" = "true" ]; then
             build_tools="$build_tools mongoreplay"
         fi
 
+        ### SPLUNK
+        export CGO_CPPFLAGS=-I/tmp/openssl-1.0.2/include
+        export CGO_LDFLAGS="-L/tmp/openssl-1.0.2/lib -lssl -lcrypto"
+
         for i in $build_tools; do
             go build $(buildflags) -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../mongo-tools/$i${exe|}" $i/main/$i.go
-            "../../../../../../mongo-tools/$i${exe|}" --version
+            ### SPLUNK
+            LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/tmp/openssl-1.0.2/lib "../../../../../../mongo-tools/$i${exe|}" --version
+
             file "../../../../../../mongo-tools/$i${exe|}"
         done
 
@@ -570,10 +608,25 @@ functions:
       name: perf
       file: src/perf.json
 
+  ### SPLUNK openssl 1.0.2
+  "install openssl 1.0.2" : &install_openssl
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+          set -o errexit
+          set -o verbose
+          # if hostname | grep macos # MAC
+          if [ `cat /etc/redhat-release  | awk '{print $7}'` == '5.7' ]
+          then
+             curl http://boxes.10gen.com/build/openssl-1.0.2l.tar.gz | tar -zxf- -C /tmp
+          fi
+
   "do setup" :
   - *fetch_artifacts
   - *fetch_binaries
   - *extract_binaries
+  - *install_openssl
   - *check_binary_version
   - *get_buildnumber
   - *set_up_credentials
@@ -596,16 +649,24 @@ functions:
           set -o errexit
           set -o verbose
 
+          ### SPLUNK
+          ### Forget old python, it fails on RHEL 5.5
+          ### Stick with the toolchain python 2
+          ### There is no python3 in the RHEL 5.5 toolchain.  It's only used for lint with mypy
           python_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})
-          python3_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python3})
+          ### python3_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python3})
           if [ "Windows_NT" = "$OS" ]; then
             python_loc=$(cygpath -w $python_loc)
             python3_loc=$(cygpath -w c:/python/Python36/python.exe)
           fi
           # Set up virtualenv in ${workdir}
-          virtualenv --python "$python_loc" --system-site-packages "${workdir}/venv"
-          # Add virtualenv for python3 in ${workdir}
-          virtualenv --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
+          ### SPLUNK
+          ### virtualenv --python "$python_loc" --system-site-packages "${workdir}/venv"
+          virtualenv --python "$python_loc" "${workdir}/venv"
+          ### SPLUNK, don't add this for RHEL 5.5
+          ### Add virtualenv for python3 in ${workdir}
+          ### SPLUNK - No python 3
+          ### virtualenv --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
 
   "run tests" :
     - command: expansions.update
@@ -723,6 +784,7 @@ functions:
             extra_args="$extra_args --tagFile=etc/test_retrial.yml"
           fi
 
+          ### SPLUNK add ld_library_path
           # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
           # invocation. It doesn't set any environment variables and should therefore come last in
           # this list of expansions.
@@ -734,6 +796,7 @@ functions:
               ${lang_environment}                         \
               ${san_options}                              \
               ${san_symbolizer}                           \
+              ${ld_library_path}                          \
               ${snmp_config_path}                         \
               ${resmoke_wrapper}                          \
               $python buildscripts/evergreen_run_tests.py \
@@ -791,6 +854,15 @@ functions:
 
         rm -rf ${install_directory|/data/mongo-install-directory}
 
+          ### SPLUNK
+          ### Since we aren't building the tools, create some placeholders
+
+          ### mkdir -p src/mongo-tools
+          ### for i in mongodump mongorestore mongoexport mongoimport mongostat mongotop bsondump mongofiles mongooplog mongoreplay;do
+          ###  echo a > src/mongo-tools/$i
+          ### done
+
+
         extra_args=""
         if [ "${targets}" = "all" ] && [ -n "${num_scons_compile_all_jobs_available|}" ]; then
           echo "Changing SCons to run with --jobs=${num_scons_compile_all_jobs_available|}"
@@ -809,12 +881,15 @@ functions:
         set -o verbose
 
         # We get the raw version string (r1.2.3-45-gabcdef) from git
-        MONGO_VERSION=$(git describe)
+        ### MONGO_VERSION=$(git describe)
+        ### SPLUNK
+        MONGO_VERSION=3.6.17-SERVER-42525-splunk
         # If this is a patch build, we add the patch version id to the version string so we know
         # this build was a patch, and which evergreen task it came from
-        if [ "${is_patch|}" = "true" ]; then
-          MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-        fi
+        ### SPLUNK Get rid of the below block
+        ### if [ "${is_patch|}" = "true" ]; then
+        ###   MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+        ### fi
 
         # This script converts the generated version string into a sanitized version string for
         # use by scons and uploading artifacts as well as information about for the scons cache.
@@ -1007,7 +1082,9 @@ functions:
 
           ${add_nodejs_to_path}
 
-          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars} --branch ${branch_name}
+          ### SPLUNK - Fix up the npm runs
+          ### npm run ${npm_command|jstestfuzz} -- --jsTestsDir ../jstests ${jstestfuzz_vars}
+          LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/tmp/openssl-1.0.2/lib npm run ${npm_command|jstestfuzz} -- --jsTestsDir ../jstests ${jstestfuzz_vars}
 
     - command: archive.targz_pack
       params:
@@ -1211,6 +1288,10 @@ functions:
         set -o verbose
 
         rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto venv
+        ### SPLUNK
+        ### Remove openssl 1.0.2 from /tmp when finished
+        echo "deleting openssl openssl 1.0.2"
+        rm -rf /tmp/openssl-1.0.2
 
   "kill processes" :
     command: shell.exec
@@ -2009,6 +2090,13 @@ pre:
             python=${python|/opt/mongodbtoolchain/v2/bin/python2}
           fi
           echo "python set to $(which $python)"
+
+          ### pip install pyyaml Cheetah typing requests pymongo urllib3
+          ### SPLUNK we need to lock down some versions
+          pip install argparse==1.4.0 certifi==2018.1.18 chardet==3.0.4 \
+          cpplint==1.3.0 enum34==1.1.6 idna==2.6 poster==0.8.1 \
+          psutil==5.4.3 pycrypto==2.6.1 PyKMIP==0.4.0 pymongo==3.5.1 PyYAML==3.11 \
+          requests==2.18.4 simples3==1.0 six==1.11.0 urllib3==1.22 Cheetah typing
        - key: activate_virtualenv_3
          value: |
           # check if virtualenv for python3 is set up
@@ -2511,6 +2599,8 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "fetch and build OpenSSL"
+    ### SPLUNK Install openssl
+    - func: "install openssl 1.0.2"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
@@ -2675,6 +2765,8 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "fetch and build OpenSSL"
+    ### SPLUNK Install openssl 1.0.2
+    - func: "install openssl 1.0.2"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions.
@@ -5945,28 +6037,38 @@ buildvariants:
 #         Linux buildvariants             #
 ###########################################
 
+### SPLUNK
 - name: linux-64
-  display_name: Linux
+  display_name: Linux Splunk
   run_on:
-  - rhel62-small
+  ### - rhel62-small
+  ### SPLUNK
+  - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --release
+    ### SPLUNK
+    ### compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --release
+    ld_library_path: LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/tmp/openssl-1.0.2/lib
+    compile_flags: --ssl -j$(grep -c ^processor /proc/cpuinfo) LINKFLAGS=-static-libgcc --variables-files=etc/scons/mongodbtoolchain_gcc.vars --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
-    tooltags: ""
-    build_mongoreplay: true
+    tooltags: "ssl"
+    build_mongoreplay: false 
   tasks:
   - name: compile
     distros:
-    - rhel62-large
+    ### SPLUNK
+    ### - rhel62-large
+    - rhel55-build
   - name: compile_all
     distros:
-    - rhel62-large
+    ### SPLUNK
+    ### - rhel62-large
+    - rhel55-build
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT

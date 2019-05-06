@@ -1,0 +1,43 @@
+Splunk Custom Build Linux
+=========================
+
+NOTE: We use 3 separate branches to build and test builds for Splunk:  Linux, Windows, and MacOS.
+
+This is because signficant changes have to be made to build the tools on RHEL 5.5 Linux.  We also need to make some code changes to account for features
+that are not available in the older OS.
+
+Finally, Splunk requires different versions of openssl (and a specific location requirement on macOS requiring its own distro in Evergreen)
+This would be hard to generalize in a single evergreen.yml in one branch.
+
+Current branches:
+
+splunk-linux-v3.6.17-BACKPORT-6439
+splunk-macos-v3.6.17-BACKPORT-6439
+splunk-windows-v3.6.17-BACKPORT-6439
+
+
+We build on RHEL 5.5
+
+Use the "linux64" variant for patches:
+
+```
+evergreen patch -p "mongodb-mongo-v3.6" -t "compile" -d "BUILD-10833 Splunk custom build of 3.6.17 with BACKPORT-6439" -v "linux-64" -u -f -y
+```
+
+Here is the last full patch build
+
+https://evergreen.mongodb.com/version/5e839c9c0305b97fc1bafa03
+
+We expect the below tests to fail:
+https://jira.mongodb.org/browse/BUILD-10428?focusedCommentId=2947636&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-2947636
+
+jstestfuzz_*
+multiverson_*
+sharding_last_stable_mongos_and_mixed_shards
+compile_all
+serial_run_WT
+
+In the near future, we will probably change the way we build and test these Linux versions per:
+
+https://jira.mongodb.org/browse/WRITING-6736
+https://docs.google.com/document/d/1kDfQ_1k0OHTueH_kleOF17G7ZWvECde_IvCLLM2f47g/edit#
