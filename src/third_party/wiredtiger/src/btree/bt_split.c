@@ -263,9 +263,11 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 		__wt_cell_unpack(
 		    session, from_home, (WT_CELL *)ref_addr, &unpack);
 		WT_RET(__wt_calloc_one(session, &addr));
-		addr->oldest_start_ts = unpack.oldest_start_ts;
 		addr->newest_durable_ts = unpack.newest_durable_ts;
+		addr->oldest_start_ts = unpack.oldest_start_ts;
+		addr->oldest_start_txn = unpack.oldest_start_txn;
 		addr->newest_stop_ts = unpack.newest_stop_ts;
+		addr->newest_stop_txn = unpack.newest_stop_txn;
 		WT_ERR(__wt_memdup(
 		    session, unpack.data, unpack.size, &addr->addr));
 		addr->size = (uint8_t)unpack.size;
@@ -1442,13 +1444,17 @@ __split_multi_inmem(
 	 * here either because an update could not be written when evicting a
 	 * page, or eviction chose to keep a page in memory.
 	 *
+	 * Reconciliation won't create a disk image with entries the running
+	 * database no longer cares about (at least, not based on the current
+	 * tests we're performing), ignore the validity window.
+	 *
 	 * Steal the disk image and link the page into the passed-in WT_REF to
 	 * simplify error handling: our caller will not discard the disk image
 	 * when discarding the original page, and our caller will discard the
 	 * allocated page on error, when discarding the allocated WT_REF.
 	 */
 	WT_RET(__wt_page_inmem(
-	    session, ref, multi->disk_image, WT_PAGE_DISK_ALLOC, &page));
+	    session, ref, multi->disk_image, WT_PAGE_DISK_ALLOC, false, &page));
 	multi->disk_image = NULL;
 
 	/*
@@ -1674,9 +1680,11 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	if (multi->addr.addr != NULL) {
 		WT_RET(__wt_calloc_one(session, &addr));
 		ref->addr = addr;
-		addr->oldest_start_ts = multi->addr.oldest_start_ts;
 		addr->newest_durable_ts = multi->addr.newest_durable_ts;
+		addr->oldest_start_ts = multi->addr.oldest_start_ts;
+		addr->oldest_start_txn = multi->addr.oldest_start_txn;
 		addr->newest_stop_ts = multi->addr.newest_stop_ts;
+		addr->newest_stop_txn = multi->addr.newest_stop_txn;
 		WT_RET(__wt_memdup(session,
 		    multi->addr.addr, multi->addr.size, &addr->addr));
 		addr->size = multi->addr.size;

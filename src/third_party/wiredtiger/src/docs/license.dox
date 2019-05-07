@@ -69,23 +69,6 @@ of the WiredTiger library z13 builds should comply with these copyrights.
 @row{\c src/support/zseries/*, IBM Corp., <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a> or the <a href="http://www.gnu.org/licenses/gpl-2.0-standalone.html">GNU General Public License\, version 2 or later</a>}
 </table>
 
-@section license_leveldb 3rd party software optionally included in the WiredTiger library: LevelDB
-
-If the \c --enable-leveldb configuration option is specified when
-configuring the WiredTiger build, additional 3rd party software is
-included in the WiredTiger library binary, distributed under separate
-license terms.  Redistribution of the WiredTiger library built with the
-\c --enable-leveldb configuration option should comply with these
-copyrights.
-
-<table>
-@hrow{Distribution Files, Copyright Holder, License}
-@row{\c api/leveldb/basho/*, Basho Technologies\, Inc., <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a>}
-@row{\c api/leveldb/hyperleveldb/*, The HyperLevelDB Authors, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/leveldb/*, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/rocksdb/*, Facebook\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-</table>
-
 @section license_distribution 3rd party software included in the WiredTiger distribution
 
 The WiredTiger software distribution includes additional 3rd party software

@@ -40,7 +40,7 @@ static void	   config_helium_reset(void);
 static void	   config_in_memory(void);
 static void	   config_in_memory_reset(void);
 static int	   config_is_perm(const char *);
-static void	   config_isolation(void);
+static void	   config_transaction(void);
 static void	   config_lrt(void);
 static void	   config_lsm_reset(void);
 static void	   config_map_checkpoint(const char *, u_int *);
@@ -50,7 +50,6 @@ static void	   config_map_encryption(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
 static void	   config_map_isolation(const char *, u_int *);
 static void	   config_pct(void);
-static void	   config_prepare(void);
 static void	   config_reset(void);
 
 /*
@@ -192,10 +191,9 @@ config_setup(void)
 	config_compression("compression");
 	config_compression("logging_compression");
 	config_encryption();
-	config_isolation();
 	config_lrt();
+	config_transaction();
 	config_pct();
-	config_prepare();
 	config_cache();
 
 	/* Give Helium, in-memory and LSM configurations a final review. */
@@ -612,20 +610,52 @@ config_lsm_reset(void)
 }
 
 /*
- * config_isolation --
- *	Isolation configuration.
+ * config_transaction --
+ *	Transaction configuration.
  */
 static void
-config_isolation(void)
+config_transaction(void)
 {
+	char buf[256];
 	const char *cstr;
+	bool timestamps;
+
+	/*
+	 * We cannot prepare a transaction if logging is configured, or if
+	 * timestamps are not configured.
+	 *
+	 * Prepare isn't configured often, let it control other features, unless
+	 * they're explicitly set/not-set.
+	 */
+	if (g.c_prepare && config_is_perm("prepare")) {
+		if (g.c_logging && config_is_perm("logging"))
+			testutil_die(EINVAL,
+			    "prepare is incompatible with logging");
+		if (!g.c_txn_timestamps &&
+		    config_is_perm("transaction_timestamps"))
+			testutil_die(EINVAL,
+			    "prepare requires transaction timestamps");
+	}
+	if (g.c_logging && config_is_perm("logging"))
+		config_single("prepare=off", 0);
+	if (!g.c_txn_timestamps && config_is_perm("transaction_timestamps"))
+		config_single("prepare=off", 0);
+
+	if (g.c_prepare) {
+		config_single("logging=off", 0);
+		config_single("transaction_timestamps=on", 0);
+	}
+
+	timestamps = g.c_txn_timestamps;
 
 	/*
 	 * Isolation: choose something if isolation wasn't specified.
+	 *
+	 * Timestamps can only be used with snapshot isolation.
 	 */
 	if (!config_is_perm("isolation")) {
 		/* Avoid "maybe uninitialized" warnings. */
-		switch (mmrand(NULL, 1, 4)) {
+		switch (timestamps ? 0 : mmrand(NULL, 1, 4)) {
 		case 1:
 			cstr = "isolation=random";
 			break;
@@ -641,6 +671,13 @@ config_isolation(void)
 			break;
 		}
 		config_single(cstr, 0);
+	}
+
+	if (!config_is_perm("transaction-frequency")) {
+		testutil_check(__wt_snprintf(buf, sizeof(buf),
+		    "transaction-frequency=%" PRIu32,
+		    timestamps ? 100: mmrand(NULL, 1, 100)));
+		config_single(buf, 0);
 	}
 }
 
@@ -769,44 +806,6 @@ config_pct(void)
 
 	testutil_assert(g.c_delete_pct + g.c_insert_pct +
 	    g.c_modify_pct + g.c_read_pct + g.c_write_pct == 100);
-}
-
-/*
- * config_prepare --
- *	Transaction prepare configuration.
- */
-static void
-config_prepare(void)
-{
-	/*
-	 * We cannot prepare a transaction if logging is configured, or if
-	 * timestamps are not configured.
-	 *
-	 * Prepare isn't configured often, let it control other features, unless
-	 * they're explicitly set/not-set.
-	 */
-	if (!g.c_prepare)
-		return;
-	if (config_is_perm("prepare")) {
-		if (g.c_logging && config_is_perm("logging"))
-			testutil_die(EINVAL,
-			    "prepare is incompatible with logging");
-		if (!g.c_txn_timestamps &&
-		    config_is_perm("transaction_timestamps"))
-			testutil_die(EINVAL,
-			    "prepare requires transaction timestamps");
-	}
-	if (g.c_logging && config_is_perm("logging")) {
-		config_single("prepare=off", 0);
-		return;
-	}
-	if (!g.c_txn_timestamps && config_is_perm("transaction_timestamps")) {
-		config_single("prepare=off", 0);
-		return;
-	}
-
-	config_single("logging=off", 0);
-	config_single("transaction_timestamps=on", 0);
 }
 
 /*

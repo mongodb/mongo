@@ -384,7 +384,7 @@ static CONFIG c[] = {
 
 	{ "transaction-frequency",
 	  "percent operations done inside an explicit transaction",
-	  0x0, 1, 100, 100, &g.c_txn_freq, NULL },
+	  C_IGNORE, 1, 0, 100, &g.c_txn_freq, NULL },
 
 	{ "truncate",						/* 100% */
 	  "enable truncation",

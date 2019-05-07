@@ -46,6 +46,7 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
     ])
 
     conn_config = 'log=(enabled)'
+    session_config = 'isolation=snapshot'
 
     def test_degenerate_timestamps(self):
         self.session.create(self.uri,

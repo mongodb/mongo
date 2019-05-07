@@ -49,6 +49,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         ('V1', dict(conn_config=',log=(enabled),compatibility=(release="2.9")', using_log=True)),
         ('V2', dict(conn_config=',log=(enabled)', using_log=True)),
     ]
+    session_config = 'isolation=snapshot'
 
     # Minimum cache_size requirement of lsm is 31MB.
     types = [
@@ -105,7 +106,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
         except wiredtiger.WiredTigerError as e:
             print("Failed conn at '%s' with config '%s'" % (dir, conn_params))
-        self.session = self.conn.open_session(None)
+        self.session = wttest.WiredTigerTestCase.setUpSessionOpen(self, self.conn)
 
     def test_rollback_to_stable(self):
         self.ConnectionOpen(self.cacheSize)

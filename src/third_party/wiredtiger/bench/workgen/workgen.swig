@@ -105,11 +105,10 @@ import numbers
 %extend workgen::classname {
 %pythoncode %{
     def __setattr__(self, attr, val):
-        if getattr(self, attr) == None:
+        if attr != 'this' and getattr(self, attr) == None:
             raise AttributeError("'" + #classname +
               "' object has no attribute '" + attr + "'")
-        f = _workgen.__dict__[#classname + '_' + attr + '_set']
-        f(self, val)
+        object.__setattr__(self, attr, val)
 %}
 };
 %enddef

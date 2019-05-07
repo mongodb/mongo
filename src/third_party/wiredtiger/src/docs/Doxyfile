@@ -213,6 +213,7 @@ ALIASES                = \
                          ebusy_errors="@returns zero on success, EBUSY if the object is not available for exclusive access, and a non-zero error code on failure.  See @ref error_handling \"Error handling\" for details." \
                          errors="@returns zero on success and a non-zero error code on failure.  See @ref error_handling \"Error handling\" for details." \
                          exclusive="This method requires exclusive access to the specified data source(s).  If any cursors are open with the specified name(s) or a data source is otherwise in use, the call will fail and return \c EBUSY.\n\n" \
+                         not_transactional="This method is not transactional, and will not guarantee ACID properties, see @ref transactions for more details." \
                          ex_ref{1}="@ref \1 \"\1\"" \
                          hrow{1}="<tr><th>\1</th></tr>" \
                          hrow{2}="<tr><th>\1</th><th>\2</th></tr>" \

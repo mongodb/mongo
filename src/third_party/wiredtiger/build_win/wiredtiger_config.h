@@ -7,9 +7,6 @@
 /* Define to 1 to pause for debugger attach on failure. */
 /* #undef HAVE_ATTACH */
 
-/* Build the LevelDB API with Basho LevelDB support. */
-/* #undef HAVE_BASHOLEVELDB */
-
 /* LZ4 support automatically loaded. */
 /* #undef HAVE_BUILTIN_EXTENSION_LZ4 */
 
@@ -42,9 +39,6 @@
 
 /* Define to 1 if you have the `gettimeofday' function. */
 /* #undef HAVE_GETTIMEOFDAY */
-
-/* Build the LevelDB API with HyperLevelDB support. */
-/* #undef HAVE_HYPERLEVELDB */
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
@@ -96,9 +90,6 @@
 
 /* Define to 1 if you have the `posix_memalign' function. */
 /* #undef HAVE_POSIX_MEMALIGN */
-
-/* Build the LevelDB API with RocksDB support. */
-/* #undef HAVE_ROCKSDB */
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1

@@ -186,8 +186,11 @@ Commit timestamps cannot be set in the past of any read timestamp that has
 been used.  This is enforced by assertions in diagnostic builds, if
 applications violate this rule, data consistency can be violated.
 
-The commits to a particular data item must be performed in timestamp order.
-If applications violate this rule, data consistency can be violated.
+The commits to a particular data item must be performed in timestamp
+order.  If applications violate this rule, data consistency can be
+violated. Committing an update without a timestamp truncates the update's
+timestamp history and limits repeatable reads: no earlier version of the
+update will be returned regardless of the setting of the read timestamp.
 
 The WT_SESSION::prepare_transaction API is designed to be used in conjunction
 with timestamps and assigns a prepare timestamp to the transaction, which will

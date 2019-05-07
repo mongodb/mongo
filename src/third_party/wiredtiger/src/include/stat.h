@@ -371,6 +371,7 @@ struct __wt_connection_stats {
 	int64_t cache_lookaside_score;
 	int64_t cache_lookaside_entries;
 	int64_t cache_lookaside_insert;
+	int64_t cache_lookaside_ondisk;
 	int64_t cache_lookaside_remove;
 	int64_t cache_eviction_checkpoint;
 	int64_t cache_eviction_get_ref;

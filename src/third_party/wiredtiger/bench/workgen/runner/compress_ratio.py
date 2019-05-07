@@ -89,7 +89,14 @@ compression_opts = {
     "zlib_tenpage" : "block_compressor=zlib,memory_page_image_max=320k",
     "zstd" : "block_compressor=zstd"
 }
+
+# What compressors are available for testing, and the connection configuration
+# needed, depends on what compressors have been configured into the WiredTiger
+# library linked by workgen.  Any compressors that are explicitly 'built-in'
+# to WiredTiger will not need an explicit extension parameter.
+#
 #conn_config += extensions_config(['compressors/snappy'])
+
 conn = wiredtiger_open("WT_TEST", conn_config)
 s = conn.open_session()
 

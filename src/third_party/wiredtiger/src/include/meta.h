@@ -27,6 +27,7 @@
 #define	WT_METAFILE_SLVG	"WiredTiger.wt.orig"	/* Metadata copy */
 #define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata table URI */
 
+#define	WT_LAS_FILE		"WiredTigerLAS.wt"	/* Lookaside table */
 #define	WT_LAS_URI		"file:WiredTigerLAS.wt"	/* Lookaside table URI*/
 
 #define	WT_SYSTEM_PREFIX	"system:"		/* System URI prefix */
@@ -76,9 +77,12 @@ struct __wt_ckpt {
 
 	uint64_t write_gen;		/* Write generation */
 
-	wt_timestamp_t oldest_start_ts;	/* Aggregated timestamp information */
-	wt_timestamp_t newest_durable_ts;
-	wt_timestamp_t newest_stop_ts;
+					/* Validity window */
+	wt_timestamp_t	newest_durable_ts;
+	wt_timestamp_t	oldest_start_ts;
+	uint64_t	oldest_start_txn;
+	wt_timestamp_t	newest_stop_ts;
+	uint64_t	newest_stop_txn;
 
 	void	*bpriv;			/* Block manager private */
 

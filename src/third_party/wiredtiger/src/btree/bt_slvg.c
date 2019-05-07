@@ -72,15 +72,13 @@ struct __wt_track_shared {
  * split the leaf page chunks up, one chunk for each unique key range.
  */
 struct __wt_track {
-#define	trk_addr		shared->addr.addr
-#define	trk_addr_size		shared->addr.size
-#define	trk_oldest_start_ts	shared->addr.oldest_start_ts
-#define	trk_newest_stop_ts	shared->addr.newest_stop_ts
-#define	trk_gen			shared->gen
-#define	trk_ovfl_addr		shared->ovfl_addr
-#define	trk_ovfl_cnt		shared->ovfl_cnt
-#define	trk_ovfl_slot		shared->ovfl_slot
-#define	trk_size		shared->size
+#define	trk_addr	shared->addr.addr
+#define	trk_addr_size	shared->addr.size
+#define	trk_gen		shared->gen
+#define	trk_ovfl_addr	shared->ovfl_addr
+#define	trk_ovfl_cnt	shared->ovfl_cnt
+#define	trk_ovfl_slot	shared->ovfl_slot
+#define	trk_size	shared->size
 	WT_TRACK_SHARED *shared;		/* Shared information */
 
 	WT_STUFF  *ss;				/* Enclosing stuff */
@@ -153,7 +151,7 @@ static int  __slvg_trk_init(WT_SESSION_IMPL *, const WT_PAGE_HEADER *,
 		uint8_t *, size_t, WT_STUFF *, WT_TRACK **);
 static int  __slvg_trk_leaf(WT_SESSION_IMPL *,
 		const WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
-static int  __slvg_trk_leaf_walk(
+static int  __slvg_trk_leaf_ovfl(
 		WT_SESSION_IMPL *, const WT_PAGE_HEADER *, WT_TRACK *);
 static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
 		const WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
@@ -330,7 +328,8 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 */
 	if (ss->root_ref.page != NULL) {
 		btree->ckpt = ckptbase;
-		ret = __wt_evict(session, &ss->root_ref, true, WT_REF_MEM);
+		ret = __wt_evict(session, &ss->root_ref, WT_REF_MEM,
+		    WT_EVICT_CALL_CLOSING);
 		ss->root_ref.page = NULL;
 		btree->ckpt = NULL;
 	}
@@ -503,12 +502,6 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_memdup(session, addr, addr_size, &trk->trk_addr));
 	trk->trk_addr_size = (uint8_t)addr_size;
 	trk->trk_size = dsk->mem_size;
-	trk->trk_oldest_start_ts = WT_TS_MAX;
-	trk->trk_newest_stop_ts = WT_TS_NONE;
-	if (!__wt_process.page_version_ts || dsk->type == WT_PAGE_COL_FIX) {
-		trk->trk_oldest_start_ts = WT_TS_NONE;
-		trk->trk_newest_stop_ts = WT_TS_MAX;
-	}
 	trk->trk_gen = dsk->write_gen;
 
 	*retp = trk;
@@ -569,7 +562,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * the page.
 		 */
 		stop_recno = dsk->recno;
-		WT_CELL_FOREACH_BEGIN(session, btree, dsk, unpack, true) {
+		WT_CELL_FOREACH_BEGIN(session, btree, dsk, unpack) {
 			stop_recno += __wt_cell_rle(&unpack);
 		} WT_CELL_FOREACH_END;
 
@@ -582,8 +575,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		    session, trk->trk_addr, trk->trk_addr_size, ss->tmp1),
 		    trk->col_start, trk->col_stop);
 
-		/* Column-store pages: track timestamps and overflow items. */
-		WT_ERR(__slvg_trk_leaf_walk(session, dsk, trk));
+		/* Column-store pages can contain overflow items. */
+		WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -598,7 +591,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * to read the page into memory and we don't want page discard
 		 * to free it.
 		 */
-		WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, &page));
+		WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, false, &page));
 		WT_ERR(__wt_row_leaf_key_copy(session,
 		    page, &page->pg_row[0], &trk->row_start));
 		WT_ERR(__wt_row_leaf_key_copy(session,
@@ -617,8 +610,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		    __wt_buf_set_printable(session,
 		    trk->row_stop.data, trk->row_stop.size, ss->tmp2));
 
-		/* Row-store pages: track timestamps and overflow items. */
-		WT_ERR(__slvg_trk_leaf_walk(session, dsk, trk));
+		/* Row-store pages can contain overflow items. */
+		WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
 		break;
 	}
 	ss->pages[ss->pages_next++] = trk;
@@ -655,24 +648,11 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session,
 }
 
 /*
- * __slvg_trk_leaf_ts --
- *     Update leaf-page timestamp information.
- */
-static void
-__slvg_trk_leaf_ts(WT_TRACK *trk, WT_CELL_UNPACK *unpack)
-{
-	trk->trk_oldest_start_ts =
-	    WT_MIN(unpack->start_ts, trk->trk_oldest_start_ts);
-	trk->trk_newest_stop_ts =
-	    WT_MAX(unpack->stop_ts, trk->trk_newest_stop_ts);
-}
-
-/*
- * __slvg_trk_leaf_walk --
- *	Review a leaf page, looking for overflow items and timestamps.
+ * __slvg_trk_leaf_ovfl --
+ *	Search a leaf page for overflow items.
  */
 static int
-__slvg_trk_leaf_walk(
+__slvg_trk_leaf_ovfl(
     WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_TRACK *trk)
 {
 	WT_BTREE *btree;
@@ -681,12 +661,11 @@ __slvg_trk_leaf_walk(
 
 	btree = S2BT(session);
 
-	/* Determine page min/max timestamps, count page overflow items. */
+	/* Count page overflow items. */
 	ovfl_cnt = 0;
-	WT_CELL_FOREACH_BEGIN(session, btree, dsk, unpack, true) {
+	WT_CELL_FOREACH_BEGIN(session, btree, dsk, unpack) {
 		if (unpack.ovfl)
 			++ovfl_cnt;
-		__slvg_trk_leaf_ts(trk, &unpack);
 	} WT_CELL_FOREACH_END;
 	if (ovfl_cnt == 0)
 		return (0);
@@ -699,7 +678,7 @@ __slvg_trk_leaf_walk(
 	trk->trk_ovfl_cnt = ovfl_cnt;
 
 	ovfl_cnt = 0;
-	WT_CELL_FOREACH_BEGIN(session, btree, dsk, unpack, true) {
+	WT_CELL_FOREACH_BEGIN(session, btree, dsk, unpack) {
 		if (unpack.ovfl) {
 			WT_RET(__wt_memdup(session, unpack.data,
 			    unpack.size, &trk->trk_ovfl_addr[ovfl_cnt].addr));
@@ -1060,14 +1039,6 @@ delete_b:	/*
 	F_SET(a_trk, WT_TRACK_MERGE);
 
 merge:
-	/*
-	 * Calculate min/max merged timestamps. (Just set both tracks, we don't
-	 * care which one we're using at the end of the day.)
-	 */
-	a_trk->trk_oldest_start_ts = b_trk->trk_oldest_start_ts =
-	    WT_MIN(a_trk->trk_oldest_start_ts, b_trk->trk_oldest_start_ts);
-	a_trk->trk_newest_stop_ts = b_trk->trk_newest_stop_ts =
-	    WT_MAX(a_trk->trk_newest_stop_ts, b_trk->trk_newest_stop_ts);
 	__wt_verbose(session, WT_VERB_SALVAGE,
 	    "%s and %s require merge",
 	    __wt_addr_string(
@@ -1199,12 +1170,14 @@ __slvg_col_build_internal(
 
 		/*
 		 * Salvage doesn't read tree internal pages, so all pages are
-		 * immediately durable, regardless of the leaf page timestamps.
+		 * immediately durable, regardless of a value's timestamps or
+		 * transaction IDs.
 		 */
 		WT_ERR(__wt_calloc_one(session, &addr));
-		addr->oldest_start_ts = trk->trk_oldest_start_ts;
-		addr->newest_durable_ts = WT_TS_NONE;
-		addr->newest_stop_ts = trk->trk_newest_stop_ts;
+		addr->newest_durable_ts = addr->oldest_start_ts = WT_TS_NONE;
+		addr->oldest_start_txn = WT_TXN_NONE;
+		addr->newest_stop_ts = WT_TS_MAX;
+		addr->newest_stop_txn = WT_TXN_MAX;
 		WT_ERR(__wt_memdup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
 		addr->size = trk->trk_addr_size;
@@ -1328,7 +1301,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
-		ret = __wt_evict(session, ref, true, WT_REF_MEM);
+		ret = __wt_evict(session, ref, WT_REF_MEM,
+		    WT_EVICT_CALL_CLOSING);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));
@@ -1718,14 +1692,6 @@ delete_b:	/*
 	F_SET(a_trk, WT_TRACK_MERGE);
 
 merge:
-	/*
-	 * Calculate min/max merged timestamps. (Just set both tracks, we don't
-	 * care which one we're using at the end of the day.)
-	 */
-	a_trk->trk_oldest_start_ts = b_trk->trk_oldest_start_ts =
-	    WT_MIN(a_trk->trk_oldest_start_ts, b_trk->trk_oldest_start_ts);
-	a_trk->trk_newest_stop_ts = b_trk->trk_newest_stop_ts =
-	    WT_MAX(a_trk->trk_newest_stop_ts, b_trk->trk_newest_stop_ts);
 	__wt_verbose(session, WT_VERB_SALVAGE,
 	    "%s and %s require merge",
 	    __wt_addr_string(
@@ -1785,7 +1751,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->trk_size, &dsk));
 	WT_ERR(__wt_bt_read(session, dsk, trk->trk_addr, trk->trk_addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, dsk->data, 0, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, dsk->data, 0, false, &page));
 
 	/*
 	 * Walk the page, looking for a key sorting greater than the specified
@@ -1873,12 +1839,14 @@ __slvg_row_build_internal(
 
 		/*
 		 * Salvage doesn't read tree internal pages, so all pages are
-		 * immediately durable, regardless of the leaf page timestamps.
+		 * immediately durable, regardless of a value's timestamps or
+		 * transaction IDs.
 		 */
 		WT_ERR(__wt_calloc_one(session, &addr));
-		addr->oldest_start_ts = trk->trk_oldest_start_ts;
-		addr->newest_durable_ts = WT_TS_NONE;
-		addr->newest_stop_ts = trk->trk_newest_stop_ts;
+		addr->newest_durable_ts = addr->oldest_start_ts = WT_TS_NONE;
+		addr->oldest_start_txn = WT_TXN_NONE;
+		addr->newest_stop_ts = WT_TS_MAX;
+		addr->newest_stop_txn = WT_TXN_MAX;
 		WT_ERR(__wt_memdup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
 		addr->size = trk->trk_addr_size;
@@ -2063,7 +2031,8 @@ __slvg_row_build_leaf(
 	 */
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
-		ret = __wt_evict(session, ref, true, WT_REF_MEM);
+		ret = __wt_evict(session, ref, WT_REF_MEM,
+		    WT_EVICT_CALL_CLOSING);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));

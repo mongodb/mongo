@@ -241,8 +241,7 @@ __stat_page_row_int(
 	 * a reference to the original cell.
 	 */
 	if (page->dsk != NULL)
-		WT_CELL_FOREACH_BEGIN(
-		    session, btree, page->dsk, unpack, false) {
+		WT_CELL_FOREACH_BEGIN(session, btree, page->dsk, unpack) {
 			if (__wt_cell_type(unpack.cell) == WT_CELL_KEY_OVFL)
 				++ovfl_cnt;
 		} WT_CELL_FOREACH_END;
@@ -315,8 +314,7 @@ __stat_page_row_leaf(
 	 */
 	if (page->dsk != NULL) {
 		key = false;
-		WT_CELL_FOREACH_BEGIN(
-		    session, btree, page->dsk, unpack, false) {
+		WT_CELL_FOREACH_BEGIN(session, btree, page->dsk, unpack) {
 			switch (__wt_cell_type(unpack.cell)) {
 			case WT_CELL_KEY_OVFL:
 				++ovfl_cnt;

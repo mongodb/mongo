@@ -326,7 +326,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			    page->read_gen == WT_READGEN_WONT_NEED &&
 			    !tried_eviction) {
 				WT_ERR_BUSY_OK(
-				    __wt_page_release_evict(session, walk));
+				    __wt_page_release_evict(session, walk, 0));
 				walk = prev;
 				prev = NULL;
 				tried_eviction = true;

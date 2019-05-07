@@ -2318,7 +2318,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	__wt_cache_read_gen_bump(session, ref->page);
 
 	WT_WITH_BTREE(session, btree,
-	     ret = __wt_evict(session, ref, false, previous_state));
+	    ret = __wt_evict(session, ref, previous_state, 0));
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 

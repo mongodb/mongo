@@ -39,6 +39,7 @@ def timestamp_str(t):
 
 class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'config_base=false,create,log=(enabled)'
+    session_config = 'isolation=snapshot'
     coll1_uri = 'table:collection10.1'
     coll2_uri = 'table:collection10.2'
     coll3_uri = 'table:collection10.3'

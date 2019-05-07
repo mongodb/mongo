@@ -93,7 +93,7 @@ tname = "table:log"
 s.create(tname, 'key_format=S,value_format=S,' + table_config)
 logtable = Table(tname)
 
-##icount=200000000 / 8
+##icount=200000000 // 8
 icount=20000
 ins_ops = operations(Operation.OP_INSERT, tables, Key(Key.KEYGEN_APPEND, 20), Value(500))
 thread = Thread(ins_ops * icount)

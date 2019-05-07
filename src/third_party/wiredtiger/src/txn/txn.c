@@ -635,6 +635,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	 */
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
+#ifdef HAVE_DIAGNOSTIC
+	txn->multi_update_count = 0;
+#endif
 
 	txn->rollback_reason = NULL;
 
@@ -823,7 +826,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		F_CLR(txn, WT_TXN_TS_ROUND_PREPARED);
 
 	/* Set the commit and the durable timestamps. */
-	WT_ERR( __wt_txn_set_timestamp(session, cfg));
+	WT_ERR(__wt_txn_set_timestamp(session, cfg));
 
 	if (prepare) {
 		if (!F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
@@ -990,6 +993,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 		__wt_txn_op_free(session, op);
 	}
+
+	/*
+	 * FIXME: I think we want to say that all prepared updates were
+	 * resolved.
+	 * WT_ASSERT(session, txn->multi_update_count == 0);
+	 */
 	txn->mod_count = 0;
 
 	/*
@@ -1377,10 +1386,6 @@ __wt_txn_release_resources(WT_SESSION_IMPL *session)
 	__wt_free(session, txn->mod);
 	txn->mod_alloc = 0;
 	txn->mod_count = 0;
-#ifdef HAVE_DIAGNOSTIC
-	WT_ASSERT(session, txn->multi_update_count == 0);
-	txn->multi_update_count = 0;
-#endif
 }
 
 /*
@@ -1532,10 +1537,6 @@ __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 		iso_tag = "WT_ISO_SNAPSHOT";
 		break;
 	}
-	__wt_timestamp_to_string(txn->commit_timestamp, ts_string[0]);
-	__wt_timestamp_to_string(txn->durable_timestamp, ts_string[1]);
-	__wt_timestamp_to_string(txn->first_commit_timestamp, ts_string[2]);
-	__wt_timestamp_to_string(txn->read_timestamp, ts_string[3]);
 	WT_RET(__wt_msg(session,
 	    "mod count: %u"
 	    ", snap min: %" PRIu64
@@ -1549,10 +1550,10 @@ __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 	    txn->mod_count,
 	    txn->snap_min,
 	    txn->snap_max,
-	    ts_string[0],
-	    ts_string[1],
-	    ts_string[2],
-	    ts_string[3],
+	    __wt_timestamp_to_string(txn->commit_timestamp, ts_string[0]),
+	    __wt_timestamp_to_string(txn->durable_timestamp, ts_string[1]),
+	    __wt_timestamp_to_string(txn->first_commit_timestamp, ts_string[2]),
+	    __wt_timestamp_to_string(txn->read_timestamp, ts_string[3]),
 	    txn->flags,
 	    iso_tag));
 	return (0);
@@ -1586,14 +1587,14 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 	    "metadata_pinned ID: %" PRIu64, txn_global->metadata_pinned));
 	WT_RET(__wt_msg(session, "oldest ID: %" PRIu64, txn_global->oldest_id));
 
-	__wt_timestamp_to_string(txn_global->commit_timestamp, ts_string);
-	WT_RET(__wt_msg(session, "commit timestamp: %s", ts_string));
-	__wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string);
-	WT_RET(__wt_msg(session, "oldest timestamp: %s", ts_string));
-	__wt_timestamp_to_string(txn_global->pinned_timestamp, ts_string);
-	WT_RET(__wt_msg(session, "pinned timestamp: %s", ts_string));
-	__wt_timestamp_to_string(txn_global->stable_timestamp, ts_string);
-	WT_RET(__wt_msg(session, "stable timestamp: %s", ts_string));
+	WT_RET(__wt_msg(session, "commit timestamp: %s",
+	    __wt_timestamp_to_string(txn_global->commit_timestamp, ts_string)));
+	WT_RET(__wt_msg(session, "oldest timestamp: %s",
+	    __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string)));
+	WT_RET(__wt_msg(session, "pinned timestamp: %s",
+	    __wt_timestamp_to_string(txn_global->pinned_timestamp, ts_string)));
+	WT_RET(__wt_msg(session, "stable timestamp: %s",
+	    __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string)));
 	WT_RET(__wt_msg(session, "has_commit_timestamp: %s",
 	    txn_global->has_commit_timestamp ? "yes" : "no"));
 	WT_RET(__wt_msg(session, "has_oldest_timestamp: %s",

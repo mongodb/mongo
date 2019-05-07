@@ -270,10 +270,11 @@ thread_run(void *arg)
 	 * that modify a table that is logged. But we also want to test mixed
 	 * logged and not-logged transactions.
 	 */
-	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+	testutil_check(td->conn->open_session(
+	    td->conn, NULL, "isolation=snapshot", &session));
 	if (use_prep)
 		testutil_check(td->conn->open_session(
-		    td->conn, NULL, NULL, &prepared_session));
+		    td->conn, NULL, "isolation=snapshot", &prepared_session));
 	/*
 	 * Open a cursor to each table.
 	 */

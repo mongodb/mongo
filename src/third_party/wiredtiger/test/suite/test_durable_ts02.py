@@ -37,6 +37,7 @@ def timestamp_str(t):
 # test_durable_ts03.py
 #    Checking visibility and durability of updates with durable_timestamp
 class test_durable_ts03(wttest.WiredTigerTestCase):
+    session_config = 'isolation=snapshot'
 
     keyfmt = [
         ('row-string', dict(keyfmt='S')),
@@ -70,7 +71,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
 
-        session = self.conn.open_session()
+        session = self.conn.open_session(self.session_config)
         cursor = session.open_cursor(uri, None)
 
         # Set stable timestamp to checkpoint initial data set.

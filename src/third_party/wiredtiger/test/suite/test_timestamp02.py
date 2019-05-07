@@ -49,6 +49,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
     ])
 
     conn_config = 'log=(enabled)'
+    session_config = 'isolation=snapshot'
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.

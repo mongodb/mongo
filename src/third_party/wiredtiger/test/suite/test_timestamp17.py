@@ -44,6 +44,7 @@ def timestamp_str(t):
 class test_timestamp17(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp17'
     uri = 'table:' + tablename
+    session_config = 'isolation=snapshot'
 
     def test_inconsistent_timestamping(self):
         self.session.create(self.uri, 'key_format=i,value_format=i')

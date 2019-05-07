@@ -48,6 +48,7 @@ class test_assert01(wttest.WiredTigerTestCase, suite_subprocess):
     cfg_def = ''
     cfg_never = 'assert=(commit_timestamp=never)'
     cfg_none = 'assert=(commit_timestamp=none)'
+    session_config = 'isolation=snapshot'
 
     count = 1
     #

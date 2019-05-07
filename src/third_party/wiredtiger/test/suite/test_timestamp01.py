@@ -37,6 +37,8 @@ def timestamp_str(t):
     return '%x' % t
 
 class test_timestamp01(wttest.WiredTigerTestCase, suite_subprocess):
+    session_config = 'isolation=snapshot'
+
     def test_timestamp_range(self):
         # Cannot set a timestamp on a non-running transaction
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

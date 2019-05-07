@@ -121,7 +121,6 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		F_SET(btree, WT_BTREE_READONLY);
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
-	WT_CLEAR(ckpt);
 	WT_RET(__wt_meta_checkpoint(
 	    session, dhandle->name, dhandle->checkpoint, &ckpt));
 
@@ -564,8 +563,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	btree->modified = false;			/* Clean */
 
 	btree->syncing = WT_BTREE_SYNC_OFF;	/* Not syncing */
-	btree->write_gen = ckpt->write_gen;	/* Write generation */
+						/* Checkpoint generation */
 	btree->checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
+						/* Write generation */
+	btree->write_gen = WT_MAX(ckpt->write_gen, conn->base_write_gen);
 
 	return (0);
 }
@@ -657,7 +658,7 @@ __wt_btree_tree_open(
 	 */
 	WT_ERR(__wt_page_inmem(session, NULL, dsk.data,
 	    WT_DATA_IN_ITEM(&dsk) ?
-	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
+	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, true, &page));
 	dsk.mem = NULL;
 
 	/* Finish initializing the root, root reference links. */

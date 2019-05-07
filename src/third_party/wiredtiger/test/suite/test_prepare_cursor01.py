@@ -87,7 +87,7 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         after_ts_s = self.conn.open_session()
         after_ts_c = after_ts_s.open_cursor(uri, None)
 
-        prep_session = self.conn.open_session()
+        prep_session = self.conn.open_session('isolation=snapshot')
         prep_cursor = prep_session.open_cursor(uri, None)
 
         # Scenario-1 : Check cursor navigate with insert in prepared transaction.

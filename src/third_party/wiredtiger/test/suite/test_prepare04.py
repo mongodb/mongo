@@ -41,6 +41,8 @@ def timestamp_str(t):
 class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare_cursor'
     uri = 'table:' + tablename
+    session_config = 'isolation=snapshot'
+
     before_ts = timestamp_str(150)
     prepare_ts = timestamp_str(200)
     after_ts = timestamp_str(250)

@@ -37,6 +37,8 @@ def timestamp_str(t):
     return '%x' % t
 
 class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
+    session_config = 'isolation=snapshot'
+
     def test_timestamp_alter(self):
         base = 'assert04'
         uri = 'file:' + base

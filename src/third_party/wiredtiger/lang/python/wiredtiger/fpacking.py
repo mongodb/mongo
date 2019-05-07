@@ -30,7 +30,7 @@
 # struct library.
 
 import struct
-from .packing import empty_pack
+from wiredtiger.packing import empty_pack
 
 def __wt2struct(fmt):
     if not fmt:

@@ -29,7 +29,6 @@ CSUITE_TEST_SEARCH_STR = "  # End of csuite test tasks"
 # This list of sub directories will be skipped from checking.
 # They are not expected to trigger any 'make check' testing.
 make_check_subdir_skips = [
-    "api/leveldb",  # no need to test
     "test/csuite",  # csuite has its own set of Evergreen tasks, skip the checking here
 ]
 

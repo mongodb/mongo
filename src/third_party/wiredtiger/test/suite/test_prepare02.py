@@ -37,6 +37,8 @@ def timestamp_str(t):
     return '%x' % t
 
 class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
+    session_config = 'isolation=snapshot'
+
     def test_prepare_session_operations(self):
         self.session.create("table:mytable", "key_format=S,value_format=S")
         cursor = self.session.open_cursor("table:mytable", None)

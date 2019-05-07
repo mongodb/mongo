@@ -116,14 +116,16 @@ class test_alter02(wttest.WiredTigerTestCase):
             keys = c.get_key()
             # txnid, rectype, optype, fileid, logrec_key, logrec_value
             values = c.get_value()
-            # We are only looking for log records that that have a key/value
-            # pair.
-            if values[4] != b'':
-                if self.value.encode() in values[5]:     # logrec_value
-                    count += 1
-                self.assertFalse(self.value2.encode() in values[5])
+            if self.value.encode() in values[5]:     # logrec_value
+                count += 1
+            self.assertFalse(self.value2.encode() in values[5])
         c.close()
-        self.assertEqual(count, expected_keys)
+        #
+        # We check that we saw the expected keys at twice the rate because
+        # the log cursor, for each commit record, will first return the entire,
+        # full record, and then return the individual operation. We will detect
+        # the string in both records.
+        self.assertEqual(count, expected_keys * 2)
 
     # Alter: Change the log setting after creation
     def test_alter02_log(self):

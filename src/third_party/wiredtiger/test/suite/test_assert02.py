@@ -37,6 +37,8 @@ def timestamp_str(t):
     return '%x' % t
 
 class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
+    session_config = 'isolation=snapshot'
+
     def test_read_timestamp(self):
         #if not wiredtiger.diagnostic_build():
         #    self.skipTest('requires a diagnostic build')

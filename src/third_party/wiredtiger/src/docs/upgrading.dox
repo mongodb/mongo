@@ -1,12 +1,12 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
 </dl><hr>
-@section version_311 Upgrading to Version 3.1.1
+@section version_320 Upgrading to Version 3.2.0
 <dl>
 
 <dt>Raw compression</dt>
 <dd>
-Support for "raw compression" has been removed in the 3.1.1 release.  Only
+Support for "raw compression" has been removed in the 3.2.0 release.  Only
 applications configuring their own compressors will require modification,
 those applications should remove their initialization of the \c WT_COMPRESSOR
 structure's \c WT_COMPRESSOR::compress_raw field. Applications configuring
@@ -15,12 +15,19 @@ supported raw compression), will work without change, but applications may
 see different compression ratios from previous releases.
 </dd>
 
+<dt>LevelDB support</dt>
+<dd>
+Support for the Google LevelDB API compatibility layer (as well as the
+related Basho Technologies Riak, HyperLevelDB HyperDex and Facebook
+RocksDB compatibility layers), has been removed in the 3.2.0 release.
+</dd>
+
 <dt>WiredTiger timestamps</dt>
 <dd>
 In previous releases of WiredTiger, it was possible to disable timestamp
 support as well as to configure a timestamp size different from the 64-bit
 default, using the <code>--with-timestamp-size=X</code> configuration option.
-That is no longer the case, in the 3.1.1 release, timestamps are always
+That is no longer the case, in the 3.2.0 release, timestamps are always
 configured, and are always 64-bit unsigned integers.
 </dd>
 
@@ -30,7 +37,7 @@ In previous releases of WiredTiger, it was possible to use implicit
 transactions in combination with WT_CURSOR::modify operations. This
 requires applications be extraordinarily careful to avoid multiple
 threads which are changing the same values racing with each other. In
-the 3.1.1 release, WT_CURSOR::modify operations must be performed in an
+the 3.2.0 release, WT_CURSOR::modify operations must be performed in an
 explicit transaction, and will fail if that's not the case.
 </dd>
 

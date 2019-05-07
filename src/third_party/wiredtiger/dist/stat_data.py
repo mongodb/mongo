@@ -274,6 +274,7 @@ connection_stats = [
     CacheStat('cache_lookaside_cursor_wait_internal', 'cache overflow cursor internal thread wait time (usecs)'),
     CacheStat('cache_lookaside_entries', 'cache overflow table entries', 'no_clear,no_scale'),
     CacheStat('cache_lookaside_insert', 'cache overflow table insert calls'),
+    CacheStat('cache_lookaside_ondisk', 'cache overflow table on-disk size', 'no_clear,no_scale,size'),
     CacheStat('cache_lookaside_remove', 'cache overflow table remove calls'),
     CacheStat('cache_lookaside_score', 'cache overflow score', 'no_clear,no_scale'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),

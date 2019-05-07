@@ -37,6 +37,7 @@ def timestamp_str(t):
 # test_prepare_cursor02.py
 #    WT_CURSOR navigation (next/prev) tests with prepared transactions
 class test_prepare_cursor02(wttest.WiredTigerTestCase):
+    session_config = 'isolation=snapshot'
 
     keyfmt = [
         ('row-store', dict(keyfmt='i')),
@@ -46,11 +47,7 @@ class test_prepare_cursor02(wttest.WiredTigerTestCase):
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
     ]
 
-    iso_types = [
-        ('isolation_read_committed', dict(isolation='read-committed')),
-        ('isolation_snapshot', dict(isolation='snapshot'))
-    ]
-    scenarios = make_scenarios(types, keyfmt, iso_types)
+    scenarios = make_scenarios(types, keyfmt)
 
     def skip(self):
         return self.keyfmt == 'r' and \
@@ -66,7 +63,7 @@ class test_prepare_cursor02(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 0, key_format=self.keyfmt)
         ds.populate()
 
-        session = self.conn.open_session()
+        session = self.session
         cursor = session.open_cursor(uri, None)
         session.begin_transaction()
         cursor.set_key(ds.key(1))
@@ -74,7 +71,7 @@ class test_prepare_cursor02(wttest.WiredTigerTestCase):
         cursor.insert()
         session.prepare_transaction('prepare_timestamp=' + timestamp_str(100))
 
-        prep_session = self.conn.open_session()
+        prep_session = self.conn.open_session(self.session_config)
         prep_cursor = prep_session.open_cursor(uri, None)
 
         # Check cursor navigate with insert in prepared transaction.

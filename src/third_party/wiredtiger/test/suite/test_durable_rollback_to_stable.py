@@ -38,6 +38,7 @@ def timestamp_str(t):
 #    Checking visibility and durability of updates with durable_timestamp and
 #    with rollback to stable.
 class test_durable_rollback_to_stable(wttest.WiredTigerTestCase):
+    session_config = 'isolation=snapshot'
 
     keyfmt = [
         ('row-string', dict(keyfmt='S')),
@@ -71,7 +72,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
 
-        session = self.conn.open_session()
+        session = self.conn.open_session(self.session_config)
         cursor = session.open_cursor(uri, None)
 
         # Set stable timestamp to checkpoint initial data set.
@@ -155,7 +156,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase):
 
         # Check that second update value was not durable by reopening.
         self.conn.rollback_to_stable()
-        session = self.conn.open_session()
+        session = self.conn.open_session(self.session_config)
         cursor = session.open_cursor(uri, None)
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(250))
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(250))

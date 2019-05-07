@@ -27,18 +27,23 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # Decode a checkpoint 'addr'
+#
+# This script uses WiredTiger's integer unpacking library.  To load the
+# WiredTiger library built in a development tree, you may have to set
+# LD_LIBRARY_PATH or the equivalent for your system.  For example:
+#   $ export LD_LIBRARY_PATH=`pwd`/../build_posix/.libs
 
 import os, sys, getopt
 
 def usage():
-    print 'Usage:\n\
+    print('Usage:\n\
   $ python .../tools/wt_ckpt_decode.py [ -a allocsize ] addr...\n\
 \n\
 addr is a hex string\n\
-'
+')
 
 def err_usage(msg):
-        print 'wt_ckpt_decode.py: ERROR: ' + msg
+        print('wt_ckpt_decode.py: ERROR: ' + msg)
         usage()
         sys.exit(False)
 
@@ -48,14 +53,15 @@ while not os.path.isdir(wt_disttop + '/build_posix'):
     if wt_disttop == '/':
         err_usage('current dir not in wiredtiger development directory')
     wt_disttop = os.path.dirname(wt_disttop)
-sys.path.insert(1, os.path.join(wt_disttop, 'lang', 'python', 'wiredtiger'))
+    sys.path.insert(1, os.path.join(wt_disttop, 'build_posix', 'lang',
+        'python'))
 
-from packing import pack, unpack
+from wiredtiger.packing import unpack
 
 def show_one(label, value):
     l = 16 - len(label)
     l = l if l > 1 else 1
-    print '    {0}{1}{2:10d}  (0x{2:x})'.format(label, (' ' * l), value, value)
+    print('    {0}{1}{2:10d}  (0x{2:x})'.format(label, (' ' * l), value, value))
     
 def show_triple(triple, name, allocsize):
     off = triple[0]
@@ -67,18 +73,18 @@ def show_triple(triple, name, allocsize):
     show_one(name + ' offset', (off + 1) * allocsize)
     show_one(name + ' size', (size) * allocsize)
     show_one(name + ' cksum', csum)
-    print ''
+    print('')
 
 def decode_arg(arg, allocsize):
-    addr = arg.decode("hex")
-    version = ord(addr[0])
-    print arg + ': '
+    addr = bytearray.fromhex(arg)
+    version = addr[0]
+    print(arg + ': ')
     if version != 1:
-        print '**** ERROR: unknown version ' + str(version)
+        print('**** ERROR: unknown version ' + str(version))
     addr = addr[1:]
     result = unpack('iiiiiiiiiiiiii',addr)
     if len(result) != 14:
-        print '**** ERROR: result len unexpected: ' + str(len(result))
+        print('**** ERROR: result len unexpected: ' + str(len(result)))
     show_triple(result[0:3], 'root', allocsize)
     show_triple(result[3:6], 'alloc', allocsize)
     show_triple(result[6:9], 'avail', allocsize)

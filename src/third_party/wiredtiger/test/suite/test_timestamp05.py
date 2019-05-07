@@ -40,6 +40,7 @@ def timestamp_str(t):
 
 class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:ts05'
+    session_config = 'isolation=snapshot'
 
     def test_create(self):
         s = self.session

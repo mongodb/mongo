@@ -69,7 +69,7 @@ except:
             py_args.insert(0, sys.executable)
             try:
                 os.execv(sys.executable, py_args)
-            except Exception, exception:
+            except Exception as exception:
                 print('re-exec failed: ' + str(exception), file=sys.stderr)
                 print('  exec(' + sys.executable + ', ' + str(py_args) + ')')
                 print('Try adding "' + dotlibs + '" to the', file=sys.stderr)

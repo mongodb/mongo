@@ -37,8 +37,7 @@ def timestamp_str(t):
 # test to ensure lookaside eviction is working for prepared transactions.
 class test_prepare_lookaside01(wttest.WiredTigerTestCase):
     # Force a small cache.
-    def conn_config(self):
-        return 'cache_size=50MB'
+    conn_config = 'cache_size=50MB'
 
     def prepare_updates(self, uri, ds, nrows, nsessions, nkeys):
         # Update a large number of records in their individual transactions.
@@ -61,11 +60,11 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         bigvalue1 = b"bbbbb" * 100
         cursor = self.session.open_cursor(uri)
         for i in range(1, nsessions * nkeys):
-            self.session.begin_transaction()
+            self.session.begin_transaction('isolation=snapshot')
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(bigvalue1)
-            self.assertEquals(cursor.update(), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(i))
+            self.assertEquals(cursor.insert(), 0)
+            self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
 
         # Have prepared updates in multiple sessions. This should ensure writing
         # prepared updates to the lookaside
@@ -74,7 +73,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         bigvalue2 = b"ccccc" * 100
         for j in range (0, nsessions):
             sessions[j] = self.conn.open_session()
-            sessions[j].begin_transaction("isolation=snapshot")
+            sessions[j].begin_transaction('isolation=snapshot')
             cursors[j] = sessions[j].open_cursor(uri)
             # Each session will update many consecutive keys.
             start = (j * nkeys)
@@ -82,21 +81,19 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
             for i in range(start, end):
                 cursors[j].set_key(ds.key(nrows + i))
                 cursors[j].set_value(bigvalue2)
-                self.assertEquals(cursors[j].update(), 0)
+                self.assertEquals(cursors[j].insert(), 0)
             sessions[j].prepare_transaction('prepare_timestamp=' + timestamp_str(2))
 
-        # Commit more regular updates. To do this, the pages that were just
-        # evicted need to be read back. This ensures reading prepared updates
-        # from the lookaside
-        bigvalue3 = b"ddddd" * 100
+        # Re-read the original versions of all the data.  To do this, the pages
+        # that were just evicted need to be read back. This ensures reading
+        # prepared updates from the lookaside
         cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction('read_timestamp=' + timestamp_str(1))
         for i in range(1, nsessions * nkeys):
-            self.session.begin_transaction()
             cursor.set_key(ds.key(nrows + i))
-            cursor.set_value(bigvalue3)
-            self.assertEquals(cursor.update(), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(i + 3))
+            self.assertEquals(cursor.search(), 0)
         cursor.close()
+        self.session.commit_transaction()
 
         # Close all cursors and sessions, this will cause prepared updates to be
         # rollback-ed

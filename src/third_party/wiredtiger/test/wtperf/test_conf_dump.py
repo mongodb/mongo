@@ -97,9 +97,9 @@ def execute_wtperf(conf_file, option_C = "", option_T = "", option_o = ""):
         option_o_cmd_str = option_o.replace('"', '\\"')
         cmd += " -o " + option_o_cmd_str
 
-    print "Running: ", cmd
+    print("Running:  " + cmd)
     subprocess.check_call(cmd, shell=True)
-    print "=========================\n"
+    print("=========================\n")
 
 # Build a dictionary of config key and it's value from the given config file.
 # Optionally take -C, -T and -o and overwrite/append values as per correct
@@ -209,7 +209,7 @@ def run_test(conf_file, option_C = "", option_T = "", option_o = ""):
 
         # Check if we see this config key in the dumped file
         if not key in key_val_dict_op:
-            print "Key '", key, "' not found in dumped file ", OP_FILE
+            print("Key '" + key + "' not found in dumped file " + OP_FILE)
             match = match_itr = False
             continue
 
@@ -235,7 +235,7 @@ def run_test(conf_file, option_C = "", option_T = "", option_o = ""):
             if ((conn_config_from_file and file_loc == -1) or
                 (conn_config_from_opt_o and option_o_loc == -1) or
                 (option_C and option_C_loc == -1)):
-                print "Part of conn_config missing in dumped file ", OP_FILE
+                print("Part of conn_config missing in dumped file " + OP_FILE)
                 match_itr = False
 
             # Check if the values got appended in the correct order
@@ -244,7 +244,7 @@ def run_test(conf_file, option_C = "", option_T = "", option_o = ""):
                      option_o_loc < file_loc) or
                     (option_C_loc != CONF_NOT_PROVIDED and
                      (option_C_loc < file_loc or option_C_loc < option_o_loc))):
-                    print "Detected incorrect config append order:"
+                    print("Detected incorrect config append order:")
                     match_itr = False
 
         # Check if values from all sources of table_config are presented in the
@@ -270,7 +270,7 @@ def run_test(conf_file, option_C = "", option_T = "", option_o = ""):
             if ((table_config_from_file and file_loc == -1) or
                 (table_config_from_opt_o and option_o_loc == -1) or
                 (option_T and option_T_loc == -1)):
-                print "Part of table_config missing in dumped file ", OP_FILE
+                print("Part of table_config missing in dumped file " + OP_FILE)
                 match_itr = False
 
             # Check if the values got appended in the correct order
@@ -279,18 +279,18 @@ def run_test(conf_file, option_C = "", option_T = "", option_o = ""):
                      option_o_loc < file_loc) or
                     (option_T_loc != CONF_NOT_PROVIDED and
                      (option_T_loc < file_loc or option_T_loc < option_o_loc))):
-                    print "Detected incorrect config append order:"
+                    print("Detected incorrect config append order:")
                     match_itr = False
 
         if (key != 'table_config' and key != 'conn_config' and
             key_val_dict_ip[key] != key_val_dict_op[key]):
-            print "Config mismatch between:"
+            print("Config mismatch between:")
             match_itr = False
 
         if match_itr is False:
-            print "Input Config:", key, '=', key_val_dict_ip[key]
-            print "Dumped Config:", key, '=', key_val_dict_op[key]
-            print "\n"
+            print("Input Config:" + key + '=' + key_val_dict_ip[key])
+            print("Dumped Config:" + key + '=' + key_val_dict_op[key])
+            print("\n")
 
         match = match and match_itr
 
@@ -321,4 +321,4 @@ subprocess.check_call("rm -rf WT_TEST/", shell=True)
 if len(sys.argv) == 1 and conf_file == TMP_CONF:
     subprocess.check_call("rm " + TMP_CONF, shell=True)
 
-print "All tests succeeded"
+print("All tests succeeded")

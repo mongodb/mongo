@@ -292,6 +292,10 @@ struct __wt_connection_impl {
 	uint64_t ckpt_write_bytes;
 	uint64_t ckpt_write_pages;
 
+	/* Connection's maximum and base write generations. */
+	uint64_t max_write_gen;
+	uint64_t base_write_gen;
+
 	uint32_t stat_flags;		/* Options declared in flags.py */
 
 					/* Connection statistics */

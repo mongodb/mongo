@@ -203,7 +203,10 @@ __wt_txn_resolve_prepared_op(
 	 * set it to aborted.
 	 */
 	if (upd == NULL && commit) {
-		WT_ASSERT(session, txn->multi_update_count > 0);
+		/*
+		 * FIXME:
+		 * WT_ASSERT(session, txn->multi_update_count > 0);
+		 */
 		--txn->multi_update_count;
 	}
 #endif
@@ -259,7 +262,10 @@ __wt_txn_resolve_prepared_op(
 		 * updates processed in resolution of an transaction operation.
 		 */
 		if (upd->prepare_state == WT_PREPARE_RESOLVED) {
-			WT_ASSERT(session, txn->multi_update_count > 0);
+			/*
+			 * FIXME:
+			 * WT_ASSERT(session, txn->multi_update_count > 0);
+			 */
 			--txn->multi_update_count;
 		} else if (upd != op->u.op_upd)
 			++txn->multi_update_count;
@@ -272,7 +278,8 @@ __wt_txn_resolve_prepared_op(
 		__txn_resolve_prepared_update(session, upd);
 	}
 
-#ifdef HAVE_DIAGNOSTIC
+	/* FIXME: it isn't safe to walk updates after they are resolved. */
+#if 0 && defined(HAVE_DIAGNOSTIC)
 	upd = op->u.op_upd;
 	/* Ensure that we have not missed any of this transaction updates. */
 	for (; upd != NULL; upd = upd->next) {

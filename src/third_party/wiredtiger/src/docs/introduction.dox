@@ -27,7 +27,6 @@ For more information about building and installing WiredTiger, see:
 
 - @subpage build-posix
 - @subpage build-windows
-- @subpage leveldb
 
 For more information about writing WiredTiger applications, see:
 

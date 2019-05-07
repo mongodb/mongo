@@ -127,8 +127,7 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 
 			upd->txnid = WT_TXN_ABORTED;
 			WT_STAT_CONN_INCR(session, txn_rollback_upd_aborted);
-			upd->durable_ts = 0;
-			upd->start_ts = 0;
+			upd->durable_ts = upd->start_ts = WT_TS_NONE;
 		}
 	}
 }

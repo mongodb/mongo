@@ -58,7 +58,7 @@ functions:
         else
           cd build_posix
           sh ./reconf
-          ${configure_env_vars|} ../configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+          ${configure_env_vars|} ../configure ${configure_python_setting|} --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
           ${make_command|make} ${smp_command|} 2>&1
     
           # On macOS, change the binary location with install_name_tool since DYLD_LIBRARY_PATH
@@ -840,7 +840,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} python ../test/suite/run.py [ab] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [ab] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket01
     depends_on:
@@ -854,7 +854,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} python ../test/suite/run.py [c] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [c] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket02
     depends_on:
@@ -868,7 +868,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} python ../test/suite/run.py [defg] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [defg] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket03
     depends_on:
@@ -882,7 +882,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} python ../test/suite/run.py [hijk] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [hijk] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket04
     depends_on:
@@ -896,7 +896,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} python ../test/suite/run.py [lmnopq] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [lmnopq] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket05
     depends_on:
@@ -910,7 +910,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} python ../test/suite/run.py [rs] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [rs] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket06
     depends_on:
@@ -924,7 +924,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} python ../test/suite/run.py [t] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [t] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket07
     depends_on:
@@ -938,7 +938,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} python ../test/suite/run.py [uvwxyz] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [uvwxyz] -v 2 ${smp_command|} 2>&1
 
   # End of Python unit test tasks
 
@@ -1204,6 +1204,28 @@ buildvariants:
     - name: unit-test-bucket06
     - name: unit-test-bucket07
     - name: fops
+
+- name: ubuntu1404-python3
+  display_name: Ubuntu 14.04 (Python3)
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    configure_python_setting: PYTHON=python3
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    python_binary: python3
+  tasks:
+    - name: compile
+    - name: unit-test-bucket00
+    - name: unit-test-bucket01
+    - name: unit-test-bucket02
+    - name: unit-test-bucket03
+    - name: unit-test-bucket04
+    - name: unit-test-bucket05
+    - name: unit-test-bucket06
+    - name: unit-test-bucket07
 
 - name: large-scale-test
   display_name: Large scale testing

@@ -92,7 +92,7 @@ else:
     def _string_result(s):
         return s
 
-from .intpacking import pack_int, unpack_int
+from wiredtiger.intpacking import pack_int, unpack_int
 
 def __get_type(fmt):
     if not fmt:

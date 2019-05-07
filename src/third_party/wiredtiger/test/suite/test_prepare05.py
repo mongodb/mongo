@@ -39,6 +39,7 @@ def timestamp_str(t):
 class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare05'
     uri = 'table:' + tablename
+    session_config = 'isolation=snapshot'
 
     def test_timestamp_api(self):
         self.session.create(self.uri, 'key_format=i,value_format=i')
@@ -76,24 +77,25 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
         # It is illegal to set a prepare timestamp same as or earlier than an
         # active read timestamp.
         # Start a new reader to have an active read timestamp.
-        s_reader = self.conn.open_session()
-        s_reader.begin_transaction('read_timestamp=' + timestamp_str(4))
-        self.session.begin_transaction()
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(4)),
-            "/must be greater than the latest active read timestamp/")
-        self.session.rollback_transaction()
+        if wiredtiger.diagnostic_build():
+            s_reader = self.conn.open_session()
+            s_reader.begin_transaction('read_timestamp=' + timestamp_str(4))
+            self.session.begin_transaction()
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.session.prepare_transaction(
+                'prepare_timestamp=' + timestamp_str(4)),
+                "/must be greater than the latest active read timestamp/")
+            self.session.rollback_transaction()
 
-        # Check setting the prepare timestamp as later than active read
-        # timestamp is valid.
-        self.session.begin_transaction()
-        c[1] = 1
-        self.session.prepare_transaction(
-                'prepare_timestamp=' + timestamp_str(5))
-        # Resolve the reader transaction started earlier.
-        s_reader.rollback_transaction()
-        self.session.rollback_transaction()
+            # Check setting the prepare timestamp as later than active read
+            # timestamp is valid.
+            self.session.begin_transaction()
+            c[1] = 1
+            self.session.prepare_transaction(
+                    'prepare_timestamp=' + timestamp_str(5))
+            # Resolve the reader transaction started earlier.
+            s_reader.rollback_transaction()
+            self.session.rollback_transaction()
 
         # It is illegal to set a commit timestamp older than prepare
         # timestamp of a transaction.

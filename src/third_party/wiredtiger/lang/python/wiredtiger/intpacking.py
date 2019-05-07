@@ -28,7 +28,7 @@
 #
 
 from __future__ import print_function
-from .packing import _chr, _ord
+from wiredtiger.packing import _chr, _ord
 import math, struct, sys
 
 # Variable-length integer packing
@@ -46,7 +46,7 @@ import math, struct, sys
 # [01 xxxxxx] | 0    | -2^6                   | -1
 # [10 xxxxxx] | 0    | 0                      | 2^6 - 1 
 # [11 0xxxxx] | 1    | 2^6                    | 2^13 + 2^6 - 1
-# [11 10llll] | l    | 2^14 + 2^7             | 2^64 - 1
+# [11 10llll] | l    | 2^13 + 2^6             | 2^64 - 1
 # [11 11xxxx] | free | N/A                    | N/A
 
 NEG_MULTI_MARKER = 0x10

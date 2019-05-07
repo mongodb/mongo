@@ -50,7 +50,7 @@ def main():
     cursor.close()
 
     session.checkpoint()
-    print WIREDTIGER_VERSION_STRING
+    print(WIREDTIGER_VERSION_STRING)
     print_database_stats(session)
     print_file_stats(session)
     print_overflow_pages(session)
@@ -71,7 +71,7 @@ def print_overflow_pages(session):
     ostatcursor = session.open_cursor("statistics:table:access")
     val = ostatcursor[stat.dsrc.btree_overflow]
     if val != 0:
-        print '%s=%s' % (str(val[0]), str(val[1]))
+        print('%s=%s' % (str(val[0]), str(val[1])))
     ostatcursor.close()
 
 def print_derived_stats(session):
@@ -81,7 +81,7 @@ def print_derived_stats(session):
     percent = 0
     if file_size != 0:
         percent = 100 * ((float(file_size) - float(ckpt_size)) / float(file_size))
-    print "Table is %%%s fragmented" % str(percent)
+    print("Table is %%%s fragmented" % str(percent))
 
     app_insert = int(dstatcursor[stat.dsrc.cursor_insert_bytes][1])
     app_remove = int(dstatcursor[stat.dsrc.cursor_remove_bytes][1])
@@ -89,14 +89,14 @@ def print_derived_stats(session):
     fs_writes = int(dstatcursor[stat.dsrc.cache_bytes_write][1])
 
     if app_insert + app_remove + app_update != 0:
-        print "Write amplification is " + '{:.2f}'.format(fs_writes / (app_insert + app_remove + app_update))
+        print("Write amplification is " + '{:.2f}'.format(fs_writes / (app_insert + app_remove + app_update)))
     dstatcursor.close()
 
 def print_cursor(mycursor):
     while mycursor.next() == 0:
         val = mycursor.get_value()
         if val[1] != '0':
-            print '%s=%s' % (str(val[0]), str(val[1]))
+            print('%s=%s' % (str(val[0]), str(val[1])))
 
 if __name__ == "__main__":
     main()

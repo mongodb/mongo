@@ -331,7 +331,7 @@ class Translator:
                         '# Note that op_multi_table has already multiplied\n' +\
                         '# the number of operations by the number of tables.\n'
                 tdecls += 'ops = ops * (' + \
-                          str(run_ops) + ' / (' + str(topts.count) + \
+                          str(run_ops) + ' // (' + str(topts.count) + \
                           ' * table_count))' + \
                           '     # run_ops = ' + str(run_ops) + \
                           ', thread.count = ' + str(topts.count) + '\n'
@@ -420,7 +420,7 @@ class Translator:
             s += indent + 'table.options.random_value = True\n'
         if opts.random_range != 0:
             # In wtperf, the icount plus random_range is the key range
-            table_range = (opts.random_range + opts.icount) / opts.table_count
+            table_range = (opts.random_range + opts.icount) // opts.table_count
             s += indent + 'table.options.range = ' + str(table_range) + '\n'
         if opts.compressibility != 100:
             s += indent + 'table.options.value_compressibility = ' + \
@@ -475,7 +475,7 @@ class Translator:
             s += 'pop_ops = op_multi_table(pop_ops, tables)\n'
 
         if need_ops_per_thread:
-            s += 'nops_per_thread = icount / (populate_threads * table_count)\n'
+            s += 'nops_per_thread = icount // (populate_threads * table_count)\n'
             op_mult = ' * nops_per_thread'
         else:
             op_mult = ''
@@ -704,7 +704,7 @@ for arg in sys.argv[1:]:
             try:
                 # Run python on the generated script
                 ret = subprocess.call([sys.executable, tmpfile])
-            except (KeyboardInterrupt, Exception), exception:
+            except (KeyboardInterrupt, Exception) as exception:
                 raised = exception
             if not os.path.isdir(homedir):
                 os.makedirs(homedir)

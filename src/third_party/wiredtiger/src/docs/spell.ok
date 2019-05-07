@@ -266,7 +266,6 @@ html
 htmlinclude
 huffman
 hugepage
-hyperleveldb
 icount
 iflag
 indices
@@ -293,7 +292,6 @@ lang
 lastname
 le
 len
-leveldb
 li
 libdir
 libhe
@@ -428,7 +426,6 @@ ret
 rf
 rmw
 ro
-rocksdb
 rotn
 rpc
 runnable

@@ -287,3 +287,9 @@ struct __wt_cache_pool {
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint8_t flags;
 };
+
+/* Flags used with __wt_evict */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_EVICT_CALL_CLOSING  0x1u		/* Closing connection or tree */
+#define	WT_EVICT_CALL_NO_SPLIT 0x2u		/* Splits not allowed */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */

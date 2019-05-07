@@ -39,6 +39,7 @@ def timestamp_str(t):
 
 class test_backup08(wttest.WiredTigerTestCase):
     conn_config = 'config_base=false,create,log=(enabled)'
+    session_config = 'isolation=snapshot'
     dir = 'backup.dir'
     coll1_uri = 'table:collection10.1'
     coll2_uri = 'table:collection10.2'

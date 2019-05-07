@@ -41,6 +41,7 @@ def timestamp_str(t):
 class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp14'
     uri = 'table:' + tablename
+    session_config = 'isolation=snapshot'
 
     def test_all_committed(self):
         all_committed_uri = self.uri + '_all_committed'

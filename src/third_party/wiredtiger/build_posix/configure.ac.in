@@ -29,7 +29,7 @@ define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
 # reason to believe "c++" can build compatible objects.
 #
 # Check whether the C++ compiler works by linking a trivial program.
-if test $CC = "cc"; then
+if test "$CC" = "cc"; then
 	AC_CACHE_CHECK([whether the C++ compiler works],
 		       [wt_cv_prog_cxx_works],
 		       [AC_LANG_PUSH([C++])
@@ -259,15 +259,6 @@ AC_MSG_RESULT($with_helium)
 AM_CONDITIONAL([HAVE_HELIUM], [test -d $with_helium])
 AC_SUBST(HELIUM_PATH, [$with_helium])
 
-# Sanity check the build
-AM_COND_IF([LEVELDB], [
-  AM_COND_IF([SNAPPY], [], [
-    AC_MSG_ERROR(
-      [--enable-leveldb requires --enable-snappy or --with-builtins=snappy.])
-  ])
-])
-
-
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then
 	AC_MSG_WARN(
@@ -295,10 +286,6 @@ fi
 
 # Output files
 AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
-
-# The LevelDB API needs some configuration knowledge
-AM_COND_IF([LEVELDB],
-    AC_CONFIG_HEADERS([api/leveldb/leveldb_wt_config.h:api/leveldb/config.hin]))
 
 # BEGIN check existence -- maintained by reconf and Make.subdirs
 # END check existence

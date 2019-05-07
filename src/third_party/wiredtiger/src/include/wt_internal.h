@@ -271,6 +271,14 @@ struct __wt_page_modify;
     typedef struct __wt_page_modify WT_PAGE_MODIFY;
 struct __wt_process;
     typedef struct __wt_process WT_PROCESS;
+struct __wt_rec_chunk;
+    typedef struct __wt_rec_chunk WT_REC_CHUNK;
+struct __wt_rec_dictionary;
+    typedef struct __wt_rec_dictionary WT_REC_DICTIONARY;
+struct __wt_rec_kv;
+    typedef struct __wt_rec_kv WT_REC_KV;
+struct __wt_reconcile;
+    typedef struct __wt_reconcile WT_RECONCILE;
 struct __wt_ref;
     typedef struct __wt_ref WT_REF;
 struct __wt_ref_hist;
@@ -372,6 +380,7 @@ typedef uint64_t wt_timestamp_t;
 #include "btree.h"
 #include "cache.h"
 #include "capacity.h"
+#include "cell.h"
 #include "compact.h"
 #include "config.h"
 #include "cursor.h"
@@ -382,6 +391,7 @@ typedef uint64_t wt_timestamp_t;
 #include "meta.h"
 #include "optrack.h"
 #include "os.h"
+#include "reconcile.h"
 #include "schema.h"
 #include "thread_group.h"
 #include "txn.h"
@@ -417,6 +427,7 @@ typedef uint64_t wt_timestamp_t;
 #include "os_fs.i"
 #include "os_fstream.i"
 #include "packing.i"
+#include "reconcile.i"
 #include "serial.i"
 
 #if defined(__cplusplus)

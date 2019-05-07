@@ -38,6 +38,7 @@ def timestamp_str(t):
 
 class test_timestamp12(wttest.WiredTigerTestCase):
     conn_config = 'config_base=false,create,log=(enabled)'
+    session_config = 'isolation=snapshot'
     coll_uri = 'table:collection12'
     oplog_uri = 'table:oplog12'
     closecfg = [

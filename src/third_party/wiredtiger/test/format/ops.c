@@ -865,7 +865,7 @@ ops(void *arg)
 		 * the time.
 		 */
 		if (!SINGLETHREADED &&
-		    !intxn && mmrand(&tinfo->rnd, 1, 100) >= g.c_txn_freq) {
+		    !intxn && mmrand(&tinfo->rnd, 1, 100) <= g.c_txn_freq) {
 			begin_transaction(tinfo, session, &iso_config);
 			snap =
 			    iso_config == ISOLATION_SNAPSHOT ? snap_list : NULL;
