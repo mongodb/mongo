@@ -3927,15 +3927,15 @@ void ReplicationCoordinatorImpl::ReadWriteAbility::setCanAcceptNonLocalWrites(
     // We must be holding the RSTL in mode X to change _canAcceptNonLocalWrites.
     invariant(opCtx);
     invariant(opCtx->lockState()->isRSTLExclusive());
-    _canAcceptNonLocalWrites = canAcceptWrites;
+    _canAcceptNonLocalWrites.store(canAcceptWrites);
 }
 
 bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites(WithLock) const {
-    return _canAcceptNonLocalWrites;
+    return _canAcceptNonLocalWrites.loadRelaxed();
 }
 
 bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites_UNSAFE() const {
-    return _canAcceptNonLocalWrites;
+    return _canAcceptNonLocalWrites.loadRelaxed();
 }
 
 bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites(
@@ -3943,7 +3943,7 @@ bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites(
     // We must be holding the RSTL.
     invariant(opCtx);
     invariant(opCtx->lockState()->isRSTLLocked());
-    return _canAcceptNonLocalWrites;
+    return _canAcceptNonLocalWrites.loadRelaxed();
 }
 
 bool ReplicationCoordinatorImpl::ReadWriteAbility::canServeNonLocalReads_UNSAFE() const {

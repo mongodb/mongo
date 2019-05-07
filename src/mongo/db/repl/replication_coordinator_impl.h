@@ -681,7 +681,7 @@ private:
         // it, must have either the RSTL or the replication coordinator mutex. To set it, must have
         // both the RSTL in mode X and the replication coordinator mutex.
         // Always true for standalone nodes.
-        bool _canAcceptNonLocalWrites;
+        AtomicWord<bool> _canAcceptNonLocalWrites;
 
         // Flag that indicates whether reads from databases other than "local" are allowed. Unlike
         // _canAcceptNonLocalWrites, above, this question is about admission control on secondaries.
