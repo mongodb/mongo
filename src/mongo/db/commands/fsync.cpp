@@ -387,7 +387,9 @@ void FSyncLockThread::run() {
         fsyncCmd.acquireFsyncLockSyncCV.notify_one();
 
         while (fsyncCmd.getLockCount_inLock() > 0) {
-            fsyncCmd.releaseFsyncLockSyncCV.wait(lk);
+            warning() << "WARNING: instance is locked, blocking all writes. The fsync command has "
+                         "finished execution, remember to unlock the instance using fsyncUnlock().";
+            fsyncCmd.releaseFsyncLockSyncCV.wait_for(lk, Seconds(60).toSystemDuration());
         }
 
         if (successfulFsyncLock) {
