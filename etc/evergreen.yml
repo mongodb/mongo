@@ -930,6 +930,7 @@ functions:
           git clone git@github.com:10gen/jstestfuzz.git
 
           cp mongodb*/bin/mongod .
+
     - command: shell.exec
       params:
         working_dir: src
@@ -939,6 +940,27 @@ functions:
 
           git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
           git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
+
+    - command: shell.exec
+      params:
+        working_dir: src/jstestfuzz
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # Add node and npm binaries to PATH
+          if [ "Windows_NT" = "$OS" ]; then
+            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
+            # Work around the issue by specifying a different %APPDATA% path.
+            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
+            export APPDATA=${workdir}/npm-app-data
+            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
+          else
+            export PATH="$PATH:/opt/node/bin"
+          fi
+
+          npm install
+
     - command: shell.exec
       type: test
       params:
@@ -947,6 +969,7 @@ functions:
           set -o errexit
           set -o verbose
 
+          # Add node and npm binaries to PATH
           if [ "Windows_NT" = "$OS" ]; then
             # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
             # Work around the issue by specifying a different %APPDATA% path.
