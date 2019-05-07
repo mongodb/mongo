@@ -65,6 +65,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         result->appendNumber("totalIndexSize", 0);
         result->append("indexDetails", BSONObj());
         result->append("indexSizes", BSONObj());
+        result->append("scaleFactor", scale);
         std::string errmsg = !(ctx.getDb()) ? "Database [" + nss.db().toString() + "] not found."
                                             : "Collection [" + nss.toString() + "] not found.";
         return {ErrorCodes::NamespaceNotFound, errmsg};
@@ -117,6 +118,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     result->appendNumber("totalIndexSize", indexSize / scale);
     result->append("indexSizes", indexSizes.obj());
+    result->append("scaleFactor", scale);
 
     return Status::OK();
 }
