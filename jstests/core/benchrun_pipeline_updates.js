@@ -18,7 +18,7 @@
               ns: coll.getFullName(),
               query: {_id: 0},
               writeCmd: true,
-              update: [{$addFields: {x: {$add: ["$x", 1]}}}]
+              update: [{$set: {x: {$add: ["$x", 1]}}}]
             },
         ],
         parallel: 2,

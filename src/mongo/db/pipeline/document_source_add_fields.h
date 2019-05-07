@@ -36,14 +36,21 @@ namespace mongo {
 /**
  * $addFields adds or replaces the specified fields to/in the document while preserving the original
  * document. It is modeled on and throws the same errors as $project.
+ *
+ * This stage is also aliased as $set and functions the same way.
  */
 class DocumentSourceAddFields final {
 public:
+    static constexpr StringData kStageName = "$addFields"_sd;
+    static constexpr StringData kAliasNameSet = "$set"_sd;  // An alternate name for this stage.
+
     /**
      * Convenience method for creating a $addFields stage from 'addFieldsSpec'.
      */
     static boost::intrusive_ptr<DocumentSource> create(
-        BSONObj addFieldsSpec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONObj addFieldsSpec,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        StringData stageName = kStageName);
 
     /**
      * Parses a $addFields stage from the user-supplied BSON.
