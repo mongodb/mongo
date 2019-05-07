@@ -181,6 +181,12 @@ public:
     bool reload(OperationContext* opCtx);
 
     /**
+     * Clears all entries from the shard registry entries, which will force the registry to do a
+     * reload on next access.
+     */
+    void clearEntries();
+
+    /**
      * Takes a connection string describing either a shard or config server replica set, looks
      * up the corresponding Shard object based on the replica set name, then updates the
      * ShardRegistry's notion of what hosts make up that shard.

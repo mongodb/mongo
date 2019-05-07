@@ -1516,16 +1516,11 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
         fassertFailedNoTrace(50712);
     }
 
-    // The code below will force the config server to update its shard registry.
-    // Otherwise it may have the stale data that has been just rolled back.
+    // Force the config server to update its shard registry on next access. Otherwise it may have
+    // the stale data that has been just rolled back.
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
-            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            ON_BLOCK_EXIT([ argsCopy = readConcernArgs, &readConcernArgs ] {
-                readConcernArgs = std::move(argsCopy);
-            });
-            readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-            shardRegistry->reload(opCtx);
+            shardRegistry->clearEntries();
         }
     }
 }

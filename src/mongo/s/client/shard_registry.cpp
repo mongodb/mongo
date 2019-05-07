@@ -342,6 +342,12 @@ bool ShardRegistry::reload(OperationContext* opCtx) {
     return true;
 }
 
+void ShardRegistry::clearEntries() {
+    ShardRegistryData empty;
+    empty.addConfigShard(_data.getConfigShard());
+    _data.swap(empty);
+}
+
 void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContext,
                                                    const ConnectionString& connStr) noexcept {
     ThreadClient tc("UpdateReplicaSetOnConfigServer", serviceContext);
