@@ -48,6 +48,17 @@ namespace mongo {
  */
 class TransactionRouter {
 public:
+    // The type of commit initiated for this transaction.
+    enum class CommitType {
+        kNotInitiated,
+        kNoShards,
+        kSingleShard,
+        kSingleWriteShard,
+        kReadOnly,
+        kTwoPhaseCommit,
+        kRecoverWithToken,
+    };
+
     // The default value to use as the statement id of the first command in the transaction if none
     // was sent.
     static const StmtId kDefaultFirstStmtId = 0;
@@ -195,7 +206,9 @@ public:
      * 3. Also append fields for first statements (ex. startTransaction, readConcern)
      *    if the shard was newly added to the list of participants.
      */
-    BSONObj attachTxnFieldsIfNeeded(const ShardId& shardId, const BSONObj& cmdObj);
+    BSONObj attachTxnFieldsIfNeeded(OperationContext* opCtx,
+                                    const ShardId& shardId,
+                                    const BSONObj& cmdObj);
 
     /**
      * Processes the transaction metadata in the response from the participant if the response
@@ -329,17 +342,6 @@ public:
     }
 
 private:
-    // The type of commit initiated for this transaction.
-    enum class CommitType {
-        kNotInitiated,
-        kNoShards,
-        kSingleShard,
-        kSingleWriteShard,
-        kReadOnly,
-        kTwoPhaseCommit,
-        kRecoverWithToken,
-    };
-
     // Helper to convert the CommitType enum into a human readable string for diagnostics.
     std::string _commitTypeToString(CommitType state) const {
         switch (state) {

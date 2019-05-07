@@ -61,7 +61,9 @@ env.Library(
         'cluster_commands_helpers.cpp',
         'multi_statement_transaction_requests_sender.cpp',
         'transaction_router.cpp',
+        'router_transactions_metrics.cpp',
         'session_catalog_router.cpp',
+        env.Idlc('router_transactions_stats.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
