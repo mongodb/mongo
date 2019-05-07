@@ -58,7 +58,9 @@
 //
 // ScopedCollectionMetadata's destructor decrements the CollectionMetadata's usageCounter.
 // Whenever a usageCounter drops to zero, we check whether any now-unused CollectionMetadata
-// elements can be removed from _metadata.
+// elements can be popped off the front of _metadata.  We need to keep the unused elements in the
+// middle (as seen below) because they may schedule deletions of chunks depended on by older
+// mappings.
 //
 // New chunk mappings are pushed onto the back of _metadata. Subsequently started queries use the
 // new mapping while still-running queries continue using the older "snapshot" mappings.  We treat
@@ -356,20 +358,17 @@ void MetadataManager::_setActiveMetadata(WithLock wl, CollectionMetadata newMeta
 }
 
 void MetadataManager::_retireExpiredMetadata(WithLock lock) {
-    auto iter = _metadata.begin();
-    // Do no remove the last item in the list which is the active metadata. If _metadata is empty
-    // decrementing iter will be out of bounds, so we must check that the size is > 1.
-    while (_metadata.size() > 1 && iter != (--_metadata.end())) {
-        if (!(*iter)->usageCounter) {
-            if (!(*iter)->orphans.empty()) {
-                LOG(0) << "Queries possibly dependent on " << _nss.ns()
-                       << " range(s) finished; scheduling ranges for deletion";
-                _pushListToClean(lock, std::move((*iter)->orphans));
-            }
-            iter = _metadata.erase(iter);
-        } else {
-            ++iter;
+    while (_metadata.size() > 1 && !_metadata.front()->usageCounter) {
+        if (!_metadata.front()->orphans.empty()) {
+            LOG(0) << "Queries possibly dependent on " << _nss.ns()
+                   << " range(s) finished; scheduling ranges for deletion";
+
+            // It is safe to push orphan ranges from _metadata.back(), even though new queries might
+            // start any time, because any request to delete a range it maps is rejected.
+            _pushListToClean(lock, std::move(_metadata.front()->orphans));
         }
+
+        _metadata.pop_front();
     }
 }
 
