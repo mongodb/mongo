@@ -518,7 +518,7 @@ functions:
         fi
         # For compile bypass we need to skip the binary version check since we can tag a commit
         # after the base commit binaries were created. This would lead to a mismatch of the binaries
-        # and the version from git describe in the compile_expansions.yml.
+        # and the version from git describe --abbrev=7 in the compile_expansions.yml.
         if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
           echo "Skipping binary version check since we are bypassing compile in this patch build."
           exit 0
@@ -1590,7 +1590,7 @@ functions:
         set -o verbose
 
         # We get the raw version string (r1.2.3-45-gabcdef) from git
-        MONGO_VERSION=$(git describe)
+        MONGO_VERSION=$(git describe --abbrev=7)
         # If this is a patch build, we add the patch version id to the version string so we know
         # this build was a patch, and which evergreen task it came from
         if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "false" ]; then
