@@ -1816,18 +1816,17 @@ void ReplicationCoordinatorImpl::_updateAndLogStatsOnStepDown(const KillOpContai
     log() << "Successfully stepped down from primary, stats: " << bob.obj();
 }
 
-void ReplicationCoordinatorImpl::_killUserOperationsOnStepDown(
-    const OperationContext* stepDownOpCtx, KillOpContainer* koc) {
+void ReplicationCoordinatorImpl::_killOperationsOnStepDown(const OperationContext* stepDownOpCtx,
+                                                           KillOpContainer* koc) {
     ServiceContext* serviceCtx = stepDownOpCtx->getServiceContext();
     invariant(serviceCtx);
 
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
-        if (!client->isFromUserConnection()) {
-            // Don't kill system operations.
+        stdx::lock_guard<Client> lk(*client);
+        if (client->isFromSystemConnection() && !client->shouldKillSystemOperation(lk)) {
             continue;
         }
 
-        stdx::lock_guard<Client> lk(*client);
         OperationContext* toKill = client->getOperationContext();
 
         // Don't kill the stepdown thread.
@@ -1862,7 +1861,7 @@ void ReplicationCoordinatorImpl::KillOpContainer::killOpThreadFn() {
         // Reset the value before killing user operations as we only want to track the number
         // of operations that's running after step down.
         _userOpsRunning = 0;
-        _replCord->_killUserOperationsOnStepDown(_stepDownOpCtx, this);
+        _replCord->_killOperationsOnStepDown(_stepDownOpCtx, this);
 
         // Destroy all stashed transaction resources, in order to release locks.
         SessionKiller::Matcher matcherAllSessions(

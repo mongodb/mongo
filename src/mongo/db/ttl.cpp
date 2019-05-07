@@ -51,6 +51,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/ttl_gen.h"
 #include "mongo/util/background.h"
@@ -59,6 +60,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
 
 Counter64 ttlPasses;
 Counter64 ttlDeletedDocuments;
@@ -69,7 +72,7 @@ ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocume
 
 class TTLMonitor : public BackgroundJob {
 public:
-    TTLMonitor() {}
+    TTLMonitor(ServiceContext* serviceContext) : _serviceContext(serviceContext) {}
     virtual ~TTLMonitor() {}
 
     virtual std::string name() const {
@@ -79,8 +82,13 @@ public:
     static std::string secondsExpireField;
 
     virtual void run() {
-        ThreadClient tc(name(), getGlobalServiceContext());
+        ThreadClient tc(name(), _serviceContext);
         AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationKillable(lk);
+        }
 
         while (!globalInShutdownDeprecated()) {
             {
@@ -106,6 +114,8 @@ public:
                 doTTLPass();
             } catch (const WriteConflictException&) {
                 LOG(1) << "got WriteConflictException";
+            } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruption) {
+                LOG(1) << "TTLMonitor was interrupted: " << interruption;
             }
         }
     }
@@ -129,7 +139,6 @@ private:
 
         // Get all TTL indexes from every collection.
         for (const std::string& collectionNS : ttlCollections) {
-            UninterruptibleLockGuard noInterrupt(opCtx.lockState());
             NamespaceString collectionNSS(collectionNS);
             AutoGetCollection autoGetCollection(&opCtx, collectionNSS, MODE_IS);
             Collection* coll = autoGetCollection.getCollection();
@@ -152,6 +161,10 @@ private:
         for (const BSONObj& idx : ttlIndexes) {
             try {
                 doTTLForIndex(&opCtx, idx);
+            } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+                warning() << "TTLMonitor was interrupted, waiting " << ttlMonitorSleepSecs.load()
+                          << " seconds before doing another pass";
+                return;
             } catch (const DBException& dbex) {
                 error() << "Error processing ttl index: " << idx << " -- " << dbex.toString();
                 // Continue on to the next index.
@@ -185,6 +198,12 @@ private:
         LOG(1) << "ns: " << collectionNSS << " key: " << key << " name: " << name;
 
         AutoGetCollection autoGetCollection(opCtx, collectionNSS, MODE_IX);
+        if (MONGO_FAIL_POINT(hangTTLMonitorWithLock)) {
+            log() << "Hanging due to hangTTLMonitorWithLock fail point";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangTTLMonitorWithLock);
+        }
+
+
         Collection* collection = autoGetCollection.getCollection();
         if (!collection) {
             // Collection was dropped.
@@ -267,6 +286,8 @@ private:
         ttlDeletedDocuments.increment(numDeleted);
         LOG(1) << "deleted: " << numDeleted;
     }
+
+    ServiceContext* _serviceContext;
 };
 
 namespace {
@@ -276,8 +297,8 @@ namespace {
 TTLMonitor* ttlMonitor = nullptr;
 }  // namespace
 
-void startTTLBackgroundJob() {
-    ttlMonitor = new TTLMonitor();
+void startTTLBackgroundJob(ServiceContext* serviceContext) {
+    ttlMonitor = new TTLMonitor(serviceContext);
     ttlMonitor->go();
 }
 

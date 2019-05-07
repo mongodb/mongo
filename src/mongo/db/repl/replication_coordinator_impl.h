@@ -1041,9 +1041,10 @@ private:
     void _updateAndLogStatsOnStepDown(const KillOpContainer* koc) const;
 
     /**
-     * kill all user operations that have taken a global lock except in IS mode.
+     * Kills all user operations and any system operations marked as killable that are holding a
+     * global lock in any mode except MODE_IS.
      */
-    void _killUserOperationsOnStepDown(const OperationContext* stepDownOpCtx, KillOpContainer* koc);
+    void _killOperationsOnStepDown(const OperationContext* stepDownOpCtx, KillOpContainer* koc);
 
     /**
      * Completes a step-down of the current node.  Must be run with a global

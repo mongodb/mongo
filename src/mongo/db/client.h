@@ -195,6 +195,30 @@ public:
     bool isFromUserConnection() const {
         return _connectionId > 0;
     }
+    bool isFromSystemConnection() const {
+        return _connectionId == 0;
+    }
+
+    /**
+     * Used to set system operations as killable. This should only be called once per Client and
+     * only from system connections. The Client should be locked by the caller.
+     */
+    void setSystemOperationKillable(WithLock) {
+        // This can only be changed once for system operations.
+        invariant(isFromSystemConnection());
+        invariant(!_systemOperationKillable);
+        _systemOperationKillable = true;
+    }
+
+    /**
+     * Used to determine whether a system operation is killable that was started by a system
+     * connection. The Client should be locked by the caller.
+     */
+    bool shouldKillSystemOperation(WithLock) const {
+        // Should only be called on system operations.
+        invariant(isFromSystemConnection());
+        return _systemOperationKillable;
+    }
 
     PseudoRandom& getPrng() {
         return _prng;
@@ -224,6 +248,9 @@ private:
 
     // If != NULL, then contains the currently active OperationContext
     OperationContext* _opCtx = nullptr;
+
+    // If the active system client operation is allowed to be killed.
+    bool _systemOperationKillable = false;
 
     PseudoRandom _prng;
 };

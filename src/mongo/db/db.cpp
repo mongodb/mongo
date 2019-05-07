@@ -592,7 +592,7 @@ ExitCode _initAndListen(int listenPort) {
             log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
             log() << startupWarningsLog;
         } else {
-            startTTLBackgroundJob();
+            startTTLBackgroundJob(serviceContext);
         }
 
         if (replSettings.usingReplSets() || !gInternalValidateFeaturesAsMaster) {

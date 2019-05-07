@@ -1172,6 +1172,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/fsync_locked',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        'service_context',
         'commands/server_status_core',
         'write_ops',
     ]

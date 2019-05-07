@@ -30,5 +30,9 @@
 #pragma once
 
 namespace mongo {
-void startTTLBackgroundJob();
-}
+
+class ServiceContext;
+
+void startTTLBackgroundJob(ServiceContext* serviceContext);
+
+}  // namespace mongo
