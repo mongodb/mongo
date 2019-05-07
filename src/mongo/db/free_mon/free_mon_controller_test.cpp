@@ -971,18 +971,19 @@ TEST_F(FreeMonControllerTest, TestRegisterTimeout) {
     ASSERT_GTE(controller.registerCollector->count(), 2UL);
 }
 
-// Negatve: Test Register times out if the registration is wrong
+// Negatve: Test Register fails if the registration is wrong
 TEST_F(FreeMonControllerTest, TestRegisterFail) {
 
     FreeMonNetworkInterfaceMock::Options opts;
     opts.invalidRegister = true;
-    ControllerHolder controller(_mockThreadPool.get(), opts, false);
+    ControllerHolder controller(_mockThreadPool.get(), opts);
 
     controller.start(RegistrationType::DoNotRegister);
 
-    auto optionalStatus = controller->registerServerCommand(Seconds(15));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
     ASSERT(optionalStatus);
-    ASSERT_NOT_OK(*optionalStatus);
+    ASSERT_OK(*optionalStatus);
+    controller->turnCrankForTest(Turner().registerCommand(1));
 
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::disabled);
     ASSERT_EQ(controller.network->getRegistersCalls(), 1);
