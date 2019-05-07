@@ -5,6 +5,8 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/fixture_helpers.js");  // For isMongos.
+
     const coll = db.find_and_modify_pipeline_update;
     coll.drop();
 
@@ -33,14 +35,21 @@
         {query: {_id: 3}, update: [{$addFields: {y: 3}}], fields: {x: 1}, new: true});
     assert.eq(found, {_id: 3, x: 3});
 
+    // We skip the following test for sharded fixtures as it will fail as the query for
+    // findAndModify must contain the shard key.
+    if (!FixtureHelpers.isMongos(db)) {
+        // Test that 'sort' works with pipeline-style update.
+        assert(coll.drop());
+        assert.commandWorked(
+            coll.insert([{_id: 0, x: 'b'}, {_id: 1, x: 'd'}, {_id: 2, x: 'a'}, {_id: 3, x: 'c'}]));
+        found =
+            coll.findAndModify({update: [{$addFields: {foo: "bar"}}], sort: {x: -1}, new: true});
+        assert.eq(found, {_id: 1, x: 'd', foo: "bar"});
+    }
+
     // Test that it rejects the combination of arrayFilters and a pipeline-style update.
     let err = assert.throws(
         () => coll.findAndModify(
             {query: {_id: 1}, update: [{$addFields: {y: 1}}], arrayFilters: [{"i.x": 4}]}));
     assert.eq(err.code, ErrorCodes.FailedToParse);
-
-    // SERVER-40405 Add support for sort.
-    err = assert.throws(() => coll.findAndModify(
-                            {query: {_id: 1}, update: [{$addFields: {y: 1}}], sort: {_id: -1}}));
-    assert.eq(err.code, ErrorCodes.NotImplemented);
 }());

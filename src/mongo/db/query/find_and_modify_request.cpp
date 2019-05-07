@@ -217,14 +217,9 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         }
     }
 
-    if (update && update->type() == write_ops::UpdateModification::Type::kPipeline) {
-        if (arrayFiltersSet) {
-            return {ErrorCodes::FailedToParse, "Cannot specify arrayFilters and a pipeline update"};
-        }
-        if (!sort.isEmpty()) {
-            // TODO SERVER-40405
-            return {ErrorCodes::NotImplemented, "No support for sort and pipeline update"};
-        }
+    if (update && update->type() == write_ops::UpdateModification::Type::kPipeline &&
+        arrayFiltersSet) {
+        return {ErrorCodes::FailedToParse, "Cannot specify arrayFilters and a pipeline update"};
     }
 
     FindAndModifyRequest request(std::move(fullNs), query, std::move(update));
