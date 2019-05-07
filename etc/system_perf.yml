@@ -79,12 +79,12 @@ functions:
           set -o verbose
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe)
+          MONGO_VERSION=$(git describe --abbrev=7)
 
           # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
           # that githash to version string.
           if [ "${compile-variant|}" = "-wtdevelop" ]; then
-            WT_VERSION=$(cd src/third_party/wtdevelop; git describe | cut -c 9-)
+            WT_VERSION=$(cd src/third_party/wtdevelop; git describe --abbrev=7 | cut -c 9-)
             MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
           fi
           # If this is a patch build, we add the patch version id to the version string so we know

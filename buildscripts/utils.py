@@ -95,9 +95,9 @@ def get_git_version():
 
 
 def get_git_describe():
-    """Return 'git describe'."""
+    """Return 'git describe --abbrev=7'."""
     with open(os.devnull, "r+") as devnull:
-        proc = subprocess.Popen("git describe", stdout=subprocess.PIPE, stderr=devnull,
+        proc = subprocess.Popen("git describe --abbrev=7", stdout=subprocess.PIPE, stderr=devnull,
                                 stdin=devnull, shell=True)
         return proc.communicate()[0].strip()
 
