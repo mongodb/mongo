@@ -401,6 +401,8 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
 
     // Recursive global lock.
     locker.lockGlobal(MODE_IX);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 2U);
+
     ASSERT_FALSE(locker.unlockGlobal());
 
     // Unlock them so that they will be pending to unlock.
@@ -410,11 +412,11 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
     ASSERT_EQ(locker.numResourcesToUnlockAtEndUnitOfWorkForTest(), 3UL);
     ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->unlockPending, 1U);
     ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 1U);
-    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 2U);
-    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 2U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);
 
     locker.releaseWriteUnitOfWork(&lockInfo);
-    ASSERT_EQ(lockInfo.unlockPendingLocks.size(), 4UL);
+    ASSERT_EQ(lockInfo.unlockPendingLocks.size(), 3UL);
 
     // Things should still be locked.
     ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
@@ -423,7 +425,7 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
     ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 1U);
     ASSERT(locker.isLocked());
     ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 0U);
-    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 2U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);
 
     // The locker is no longer participating the two-phase locking.
     ASSERT_FALSE(locker.inAWriteUnitOfWork());
@@ -448,15 +450,13 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
         ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->unlockPending, 0U);
         ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 2U);
         locker.unlock(resIdDatabase);
-        ASSERT_EQ(locker.numResourcesToUnlockAtEndUnitOfWorkForTest(), 2UL);
-        // The DB lock has been locked twice, but only once in this WUOW.
-        ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->unlockPending, 1U);
-        ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 2U);
+        ASSERT_EQ(locker.numResourcesToUnlockAtEndUnitOfWorkForTest(), 1UL);
+        ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->unlockPending, 0U);
+        ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 1U);
         locker.unlockGlobal();
-        ASSERT_EQ(locker.numResourcesToUnlockAtEndUnitOfWorkForTest(), 3UL);
-        // The global lock has been locked 3 times, but only 1 of them is part of this WUOW.
-        ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 1U);
-        ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 3U);
+        ASSERT_EQ(locker.numResourcesToUnlockAtEndUnitOfWorkForTest(), 1UL);
+        ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 0U);
+        ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);
         locker.endWriteUnitOfWork();
     }
     ASSERT_FALSE(locker.inAWriteUnitOfWork());
@@ -468,7 +468,7 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
     ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 1U);
     ASSERT(locker.isLocked());
     ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 0U);
-    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 2U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);
     // The new locks has been released.
     ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection2));
 
@@ -483,8 +483,8 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
     ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->unlockPending, 1U);
     ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 1U);
     ASSERT(locker.isLocked());
-    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 2U);
-    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 2U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);
 
     locker.endWriteUnitOfWork();
 
@@ -559,6 +559,89 @@ TEST_F(LockerImplTest, releaseAndRestoreEmptyWriteUnitOfWork) {
     ASSERT_FALSE(locker.isLocked());
 
     locker.endWriteUnitOfWork();
+    ASSERT_FALSE(locker.isLocked());
+}
+
+TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
+    Locker::LockSnapshot lockInfo;
+
+    LockerImpl locker;
+
+    const ResourceId resIdDatabase(RESOURCE_DATABASE, "TestDB"_sd);
+    const ResourceId resIdCollection(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    locker.beginWriteUnitOfWork();
+    // Lock some stuff.
+    locker.lockGlobal(MODE_IX);
+    locker.lock(resIdDatabase, MODE_IX);
+    locker.lock(resIdCollection, MODE_X);
+    // Recursively lock them again with a weaker mode.
+    locker.lockGlobal(MODE_IS);
+    locker.lock(resIdDatabase, MODE_IS);
+    locker.lock(resIdCollection, MODE_S);
+
+    // Make sure locks are converted.
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT_TRUE(locker.isWriteLocked());
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 2U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 2U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->recursiveCount, 2U);
+
+    // Unlock them so that they will be pending to unlock.
+    ASSERT_FALSE(locker.unlock(resIdCollection));
+    ASSERT_FALSE(locker.unlock(resIdDatabase));
+    ASSERT_FALSE(locker.unlockGlobal());
+    // Make sure locks are still acquired in the correct mode.
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT_TRUE(locker.isWriteLocked());
+    // Make sure unlocking converted locks decrements the locks' recursiveCount instead of
+    // incrementing unlockPending.
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 0U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->unlockPending, 0U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->unlockPending, 0U);
+
+    // Unlock again so unlockPending == recursiveCount.
+    ASSERT_FALSE(locker.unlock(resIdCollection));
+    ASSERT_FALSE(locker.unlock(resIdDatabase));
+    ASSERT_FALSE(locker.unlockGlobal());
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->unlockPending, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->unlockPending, 1U);
+
+    ASSERT(locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo));
+
+    // Things shouldn't be locked anymore.
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
+    ASSERT_FALSE(locker.isLocked());
+
+    // Restore lock state.
+    locker.restoreWriteUnitOfWorkAndLock(nullptr, lockInfo);
+
+    // Make sure things were re-locked in the correct mode.
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT_TRUE(locker.isWriteLocked());
+    // Make sure locks were coalesced after restore and are pending to unlock as before.
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->unlockPending, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->unlockPending, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->recursiveCount, 1U);
+    ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->unlockPending, 1U);
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
     ASSERT_FALSE(locker.isLocked());
 }
 
@@ -1005,11 +1088,13 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlock) {
     ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
+    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 1);
 
     // Convert lock pending unlock.
     locker.lock(resId, MODE_X);
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
+    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 2);
 
     locker.endWriteUnitOfWork();
 
@@ -1035,16 +1120,22 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlockAndUnlock) {
     ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
+    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 1);
 
     // Convert lock pending unlock.
     locker.lock(resId, MODE_X);
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
+    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 2);
 
     // Unlock the lock conversion.
     ASSERT_FALSE(locker.unlock(resId));
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 2);
+    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
+    // Make sure we still hold X lock and unlock the weaker mode to decrement recursiveCount instead
+    // of incrementing unlockPending.
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_X));
+    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 1);
 
     locker.endWriteUnitOfWork();
 

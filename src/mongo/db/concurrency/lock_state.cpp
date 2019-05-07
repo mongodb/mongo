@@ -530,6 +530,14 @@ bool LockerImpl::unlock(ResourceId resId) {
         return false;
 
     if (inAWriteUnitOfWork() && _shouldDelayUnlock(it.key(), (it->mode))) {
+        // Only delay unlocking if the lock is not acquired more than once. Otherwise, we can simply
+        // call _unlockImpl to decrement recursiveCount instead of incrementing unlockPending. This
+        // is safe because the lock is still being held in the strongest mode necessary.
+        if (it->recursiveCount > 1) {
+            // Invariant that the lock is still being held.
+            invariant(!_unlockImpl(&it));
+            return false;
+        }
         if (!it->unlockPending) {
             _numResourcesToUnlockAtEndUnitOfWork++;
         }
