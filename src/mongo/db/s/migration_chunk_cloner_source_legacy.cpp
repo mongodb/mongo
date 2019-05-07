@@ -92,7 +92,7 @@ bool shouldApplyOplogToSession(const repl::OplogEntry& oplog,
                                const ShardKeyPattern& keyPattern) {
     // Skip appending CRUD operations that don't pertain to the ChunkRange being migrated.
     if (oplog.isCrudOpType()) {
-        auto shardKey = keyPattern.extractShardKeyFromDoc(oplog.getOperationToApply());
+        auto shardKey = keyPattern.extractShardKeyFromDoc(oplog.getObjectContainingDocumentKey());
         if (!range.containsKey(shardKey)) {
             return false;
         }

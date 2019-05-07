@@ -286,8 +286,9 @@ bool OplogEntry::shouldPrepare() const {
 BSONElement OplogEntry::getIdElement() const {
     invariant(isCrudOpType());
     if (getOpType() == OpTypeEnum::kUpdate) {
-        // We cannot use getOperationToApply() here because the BSONObj will go out out of scope
-        // after we return the BSONElement.
+        // We cannot use getObjectContainingDocumentKey() here because the BSONObj will go out
+        // of scope after we return the BSONElement.
+        fassert(31080, getObject2() != boost::none);
         return getObject2()->getField("_id");
     } else {
         return getObject()["_id"];
@@ -295,15 +296,17 @@ BSONElement OplogEntry::getIdElement() const {
 }
 
 BSONObj OplogEntry::getOperationToApply() const {
-    if (getOpType() != OpTypeEnum::kUpdate) {
+    return getObject();
+}
+
+BSONObj OplogEntry::getObjectContainingDocumentKey() const {
+    invariant(isCrudOpType());
+    if (getOpType() == OpTypeEnum::kUpdate) {
+        fassert(31081, getObject2() != boost::none);
+        return *getObject2();
+    } else {
         return getObject();
     }
-
-    if (auto optionalObj = getObject2()) {
-        return *optionalObj;
-    }
-
-    return {};
 }
 
 OplogEntry::CommandType OplogEntry::getCommandType() const {
