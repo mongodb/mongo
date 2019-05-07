@@ -17,7 +17,12 @@ var $config = (function() {
     var data = {
         // uses the workload name as _id on the document.
         // assumes this name will be unique.
-        id: 'update_inc'
+        id: 'update_inc',
+        getUpdateArgument: function(fieldName) {
+            var updateDoc = {$inc: {}};
+            updateDoc.$inc[fieldName] = 1;
+            return updateDoc;
+        },
     };
 
     var states = {
@@ -27,8 +32,7 @@ var $config = (function() {
         },
 
         update: function update(db, collName) {
-            var updateDoc = {$inc: {}};
-            updateDoc.$inc[this.fieldName] = 1;
+            var updateDoc = this.getUpdateArgument(this.fieldName);
 
             var res = db[collName].update({_id: this.id}, updateDoc);
             assertAlways.eq(0, res.nUpserted, tojson(res));
@@ -85,8 +89,8 @@ var $config = (function() {
     }
 
     return {
-        threadCount: 5,
-        iterations: 10,
+        threadCount: 10,
+        iterations: 20,
         data: data,
         states: states,
         transitions: transitions,
