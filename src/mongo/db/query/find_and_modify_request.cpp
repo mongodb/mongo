@@ -221,10 +221,6 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         if (arrayFiltersSet) {
             return {ErrorCodes::FailedToParse, "Cannot specify arrayFilters and a pipeline update"};
         }
-        if (!fields.isEmpty()) {
-            // TODO SERVER-40404
-            return {ErrorCodes::NotImplemented, "No support for fields and pipeline update"};
-        }
         if (!sort.isEmpty()) {
             // TODO SERVER-40405
             return {ErrorCodes::NotImplemented, "No support for sort and pipeline update"};
