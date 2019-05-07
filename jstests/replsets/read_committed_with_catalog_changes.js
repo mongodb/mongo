@@ -74,7 +74,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
                 assert(db.coll.drop());
             },
             performOp: function(db) {
-                assert.commandWorked(db.dropDatabase());
+                assert.commandWorked(db.dropDatabase({w: 1}));
             },
             blockedCollections: [],
             unblockedCollections: ['coll'],
@@ -100,7 +100,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
                 assert(db.coll.drop());
             },
             performOp: function(db) {
-                assert.commandWorked(db.dropDatabase());
+                assert.commandWorked(db.dropDatabase({w: 1}));
                 assert.writeOK(db.coll.insert({_id: 1}));
             },
             blockedCollections: ['coll'],

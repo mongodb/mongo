@@ -35,7 +35,7 @@
         var primary = db.getMongo();
         jsTestLog("Dropping database " + rollbackDb + " on primary node " + primary.host);
         var dbToDrop = db.getSiblingDB(rollbackDb);
-        assert.commandWorked(dbToDrop.dropDatabase());
+        assert.commandWorked(dbToDrop.dropDatabase({w: 1}));
     };
     let waitForDropDatabaseToFinish = startParallelShell(dropDatabaseFn, rollbackNode.port);
 
