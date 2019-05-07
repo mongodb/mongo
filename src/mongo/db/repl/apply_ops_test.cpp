@@ -471,7 +471,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
                                                               << operation3.toBSON();
         ASSERT_EQUALS(ui3, *operation3.getUuid());
         ASSERT_EQUALS(ns3, operation3.getNamespace());
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 3), operation3.getOperationToApply());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 1), operation3.getOperationToApply());
 
         auto optionalUpsertBool = operation3.getUpsert();
         ASSERT(optionalUpsertBool);

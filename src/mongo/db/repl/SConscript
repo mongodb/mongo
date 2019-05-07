@@ -734,6 +734,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target='oplog_entry_test',
+    source=[
+        'oplog_entry_test.cpp',
+    ],
+    LIBDEPS=[
+        'idempotency_test_fixture',
+    ],
+)
+
+env.CppUnitTest(
     target='idempotency_document_structure_test',
     source=[
         'idempotency_document_structure_test.cpp',

@@ -122,12 +122,21 @@ public:
     BSONElement getIdElement() const;
 
     /**
-     * Returns the document representing the operation to apply.
-     * For commands and insert/delete operations, this will be the document in the 'o' field.
-     * For update operations, this will be the document in the 'o2' field.
-     * An empty document returned by this function indicates that we have a malformed OplogEntry.
+     * Returns the document representing the operation to apply. This is the 'o' field for all
+     * operations, including updates. For updates this is not guaranteed to include the _id or the
+     * shard key.
      */
     BSONObj getOperationToApply() const;
+
+    /**
+     * Returns an object containing the _id of the target document for a CRUD operation. In a
+     * sharded cluster this object also contains the shard key. This object may contain more fields
+     * in the target document than the _id and shard key.
+     * For insert/delete operations, this will be the document in the 'o' field.
+     * For update operations, this will be the document in the 'o2' field.
+     * Should not be called for non-CRUD operations.
+     */
+    BSONObj getObjectContainingDocumentKey() const;
 
     /**
      * Returns the type of command of the oplog entry. Must be called on a command op.

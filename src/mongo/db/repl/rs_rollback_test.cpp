@@ -2072,25 +2072,7 @@ TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
         RSFatalException);
 }
 
-TEST(RSRollbackTest, LocalUpdateEntryWithoutO2IsFatal) {
-    const auto validOplogEntry = BSON("op"
-                                      << "u"
-                                      << "ui"
-                                      << UUID::gen()
-                                      << "ts"
-                                      << Timestamp(1, 1)
-                                      << "t"
-                                      << 1LL
-                                      << "h"
-                                      << 1LL
-                                      << "ns"
-                                      << "test.t"
-                                      << "o"
-                                      << BSON("_id" << 1 << "a" << 1)
-                                      << "o2"
-                                      << BSON("_id" << 1));
-    FixUpInfo fui;
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry, false));
+DEATH_TEST_F(RSRollbackTest, LocalUpdateEntryWithoutO2IsFatal, "Fatal Assertion") {
     const auto invalidOplogEntry = BSON("op"
                                         << "u"
                                         << "ui"
@@ -2105,9 +2087,8 @@ TEST(RSRollbackTest, LocalUpdateEntryWithoutO2IsFatal) {
                                         << "test.t"
                                         << "o"
                                         << BSON("_id" << 1 << "a" << 1));
-    ASSERT_THROWS(
-        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
-        RSFatalException);
+    FixUpInfo fui;
+    updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).ignore();
 }
 
 TEST(RSRollbackTest, LocalUpdateEntryWithEmptyO2IsFatal) {
