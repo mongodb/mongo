@@ -33,20 +33,21 @@
 
 #include "mongo/executor/non_auth_task_executor.h"
 
+#include <utility>
+
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace executor {
 
 namespace {
 
-const auto getExecutor = ServiceContext::declareDecoration<std::unique_ptr<TaskExecutor>>();
-
-ServiceContext::ConstructorActionRegisterer nonAuthExecutorCAR{
-    "NonAuthTaskExecutor",
-    [](ServiceContext* service) {
+struct State {
+    State() : hasStarted(false) {
         std::shared_ptr<NetworkInterface> ni =
             makeNetworkInterface("NonAuthExecutor", nullptr, nullptr, [] {
                 ConnectionPool::Options options;
@@ -54,21 +55,34 @@ ServiceContext::ConstructorActionRegisterer nonAuthExecutorCAR{
                 return options;
             }());
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(ni.get());
-        auto exec = std::make_unique<ThreadPoolTaskExecutor>(std::move(tp), std::move(ni));
+        executor = std::make_unique<ThreadPoolTaskExecutor>(std::move(tp), std::move(ni));
+    }
 
-        exec->startup();
+    AtomicWord<bool> hasStarted;
+    std::unique_ptr<TaskExecutor> executor;
+};
 
-        getExecutor(service) = std::move(exec);
-    },
+const auto getExecutor = ServiceContext::declareDecoration<State>();
+
+ServiceContext::ConstructorActionRegisterer nonAuthExecutorCAR{
+    "NonAuthTaskExecutor",
+    [](ServiceContext* service) {},
     [](ServiceContext* service) {
         // Destruction implicitly performs the needed shutdown and join()
-        getExecutor(service).reset();
+        getExecutor(service).executor.reset();
     }};
 
 }  // namespace
 
 TaskExecutor* getNonAuthTaskExecutor(ServiceContext* svc) {
-    return getExecutor(svc).get();
+    auto& state = getExecutor(svc);
+    invariant(state.executor);
+
+    if (!state.hasStarted.load() && !state.hasStarted.swap(true)) {
+        state.executor->startup();
+    }
+
+    return state.executor.get();
 }
 
 }  // namespace executor
