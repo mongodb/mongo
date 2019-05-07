@@ -167,8 +167,6 @@ using std::string;
 
 namespace dps = ::mongo::dotted_path_support;
 
-const int WiredTigerKVEngine::kDefaultJournalDelayMillis = 100;
-
 class WiredTigerKVEngine::WiredTigerSessionSweeper : public BackgroundJob {
 public:
     explicit WiredTigerSessionSweeper(WiredTigerSessionCache* sessionCache)
@@ -240,9 +238,6 @@ public:
             }
 
             int ms = storageGlobalParams.journalCommitIntervalMs.load();
-            if (!ms) {
-                ms = kDefaultJournalDelayMillis;
-            }
 
             MONGO_IDLE_THREAD_BLOCK;
             sleepmillis(ms);

@@ -171,9 +171,6 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
             // If we're not shutting down and nobody is actively waiting for the oplog to become
             // durable, delay journaling a bit to reduce the sync rate.
             auto journalDelay = Milliseconds(storageGlobalParams.journalCommitIntervalMs.load());
-            if (journalDelay == Milliseconds(0)) {
-                journalDelay = Milliseconds(WiredTigerKVEngine::kDefaultJournalDelayMillis);
-            }
             auto now = Date_t::now();
             auto deadline = now + journalDelay;
             auto shouldSyncOpsWaitingForJournal = [&] {

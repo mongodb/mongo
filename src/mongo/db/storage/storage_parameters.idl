@@ -53,6 +53,7 @@ server_parameters:
         description: 'Number of milliseconds between journal commits'
         set_at: runtime
         cpp_varname: 'storageGlobalParams.journalCommitIntervalMs'
+        default: 100
         validator:
             gte: 1
             lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
