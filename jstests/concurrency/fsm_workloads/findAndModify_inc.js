@@ -15,6 +15,11 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
+    let data = {
+        getUpdateArgument: function(fieldName) {
+            return {$inc: {[fieldName]: 1}};
+        },
+    };
 
     var states = {
 
@@ -24,8 +29,7 @@ var $config = (function() {
         },
 
         update: function update(db, collName) {
-            var updateDoc = {$inc: {}};
-            updateDoc.$inc[this.fieldName] = 1;
+            var updateDoc = this.getUpdateArgument(this.fieldName);
 
             var res = db.runCommand(
                 {findAndModify: collName, query: {_id: 'findAndModify_inc'}, update: updateDoc});
@@ -65,12 +69,18 @@ var $config = (function() {
     var transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
 
     function setup(db, collName, cluster) {
-        db[collName].insert({_id: 'findAndModify_inc'});
+        const doc = {_id: 'findAndModify_inc'};
+        // Initialize the fields used to a count of 0.
+        for (let i = 0; i < this.threadCount; ++i) {
+            doc['t' + i] = 0;
+        }
+        db[collName].insert(doc);
     }
 
     return {
         threadCount: 20,
         iterations: 20,
+        data: data,
         states: states,
         transitions: transitions,
         setup: setup

@@ -6,6 +6,7 @@ selector:
   exclude_files:
   # These workloads implicitly assume that their tid ranges are [0, $config.threadCount). This
   # isn't guaranteed to be true when they are run in parallel with other workloads.
+  - jstests/concurrency/fsm_workloads/findAndModify_inc_pipeline.js
   - jstests/concurrency/fsm_workloads/list_indexes.js
   - jstests/concurrency/fsm_workloads/update_inc_capped.js
   - jstests/concurrency/fsm_workloads/update_inc_pipeline.js
