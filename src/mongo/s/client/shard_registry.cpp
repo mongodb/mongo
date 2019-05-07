@@ -66,17 +66,17 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
 
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
+using executor::TaskExecutor;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
-using executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
 
@@ -348,6 +348,12 @@ void ShardRegistry::replicaSetChangeShardRegistryUpdateHook(
     auto connString = fassert(28805, ConnectionString::parse(newConnectionString));
     invariant(setName == connString.getSetName());
     Grid::get(getGlobalServiceContext())->shardRegistry()->updateReplSetHosts(connString);
+}
+
+void ShardRegistry::clearEntries() {
+    ShardRegistryData empty;
+    empty.addConfigShard(_data.getConfigShard());
+    _data.swap(empty);
 }
 
 void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& setName,
