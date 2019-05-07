@@ -44,7 +44,13 @@ var $config = (function() {
                                 ErrorCodes.LockTimeout,
                                 ErrorCodes.NoSuchTransaction,
                               ],
-                              [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
+                              [
+                                ErrorCodes.NoSuchTransaction,
+                                ErrorCodes.Interrupted,
+                                // Anonymous code for when user tries to send commit as the first
+                                // operation in a transaction without sending a recovery token
+                                50940
+                              ]);
         },
 
         incrementTxnNumber: function incrementTxnNumber(db, collName) {

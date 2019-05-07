@@ -327,7 +327,7 @@ void TransactionRouter::processParticipantResponse(const ShardId& shardId,
 
 LogicalTime TransactionRouter::AtClusterTime::getTime() const {
     invariant(_atClusterTime != LogicalTime::kUninitialized);
-    invariant(_stmtIdSelectedAt != kUninitializedStmtId);
+    invariant(_stmtIdSelectedAt);
     return _atClusterTime;
 }
 
@@ -338,7 +338,7 @@ void TransactionRouter::AtClusterTime::setTime(LogicalTime atClusterTime, StmtId
 }
 
 bool TransactionRouter::AtClusterTime::canChange(StmtId currentStmtId) const {
-    return _stmtIdSelectedAt == kUninitializedStmtId || _stmtIdSelectedAt == currentStmtId;
+    return !_stmtIdSelectedAt || *_stmtIdSelectedAt == currentStmtId;
 }
 
 TransactionRouter* TransactionRouter::get(OperationContext* opCtx) {
@@ -598,76 +598,76 @@ void TransactionRouter::_setAtClusterTime(const boost::optional<LogicalTime>& af
 void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
                                            TxnNumber txnNumber,
                                            TransactionActions action) {
-    if (action == TransactionActions::kStart) {
-        // TODO: do we need more robust checking? Like, did we actually sent start to the
-        // participants?
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "txnNumber " << _txnNumber << " for session " << _sessionId()
-                              << " already started",
-                txnNumber != _txnNumber);
+    if (txnNumber < _txnNumber) {
+        // This transaction is older than the transaction currently in progress, so throw an error.
+        uasserted(ErrorCodes::TransactionTooOld,
+                  str::stream() << "txnNumber " << txnNumber << " is less than last txnNumber "
+                                << _txnNumber
+                                << " seen in session "
+                                << _sessionId());
+    } else if (txnNumber == _txnNumber) {
+        // This is the same transaction as the one in progress.
+        switch (action) {
+            case TransactionActions::kStart: {
+                uasserted(ErrorCodes::ConflictingOperationInProgress,
+                          str::stream() << "txnNumber " << _txnNumber << " for session "
+                                        << _sessionId()
+                                        << " already started");
+            }
+            case TransactionActions::kContinue: {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Only the first command in a transaction may specify a readConcern",
+                        repl::ReadConcernArgs::get(opCtx).isEmpty());
 
-        uassert(ErrorCodes::TransactionTooOld,
-                str::stream() << "txnNumber " << txnNumber << " is less than last txnNumber "
-                              << _txnNumber
-                              << " seen in session "
-                              << _sessionId(),
-                txnNumber > _txnNumber);
-
-        auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        uassert(ErrorCodes::InvalidOptions,
-                "The first command in a transaction cannot specify a readConcern level other "
-                "than local, majority, or snapshot",
-                !readConcernArgs.hasLevel() ||
-                    isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel()));
-        _readConcernArgs = readConcernArgs;
-    } else if (action == TransactionActions::kCommit) {
-        uassert(ErrorCodes::TransactionTooOld,
-                str::stream() << "txnNumber " << txnNumber << " is less than last txnNumber "
-                              << _txnNumber
-                              << " seen in session "
-                              << _sessionId(),
-                txnNumber >= _txnNumber);
-
-        if (_participants.empty()) {
-            _isRecoveringCommit = true;
+                repl::ReadConcernArgs::get(opCtx) = _readConcernArgs;
+                ++_latestStmtId;
+                return;
+            }
+            case TransactionActions::kCommit:
+                ++_latestStmtId;
+                return;
         }
-    } else {
-        uassert(ErrorCodes::NoSuchTransaction,
-                str::stream() << "cannot continue txnId " << _txnNumber << " for session "
-                              << _sessionId()
-                              << " with txnId "
-                              << txnNumber,
-                txnNumber == _txnNumber);
+    } else if (txnNumber > _txnNumber) {
+        // This is a newer transaction.
+        switch (action) {
+            case TransactionActions::kStart: {
+                auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "The first command in a transaction cannot specify a readConcern level other "
+                    "than local, majority, or snapshot",
+                    !readConcernArgs.hasLevel() ||
+                        isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel()));
 
-        uassert(ErrorCodes::InvalidOptions,
-                "Only the first command in a transaction may specify a readConcern",
-                repl::ReadConcernArgs::get(opCtx).isEmpty());
+                _resetRouterState(txnNumber);
 
-        repl::ReadConcernArgs::get(opCtx) = _readConcernArgs;
+                _readConcernArgs = readConcernArgs;
+
+                if (_readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+                    _atClusterTime.emplace();
+                }
+
+                LOG(3) << txnIdToString() << " New transaction started";
+                return;
+            }
+            case TransactionActions::kContinue: {
+                uasserted(ErrorCodes::NoSuchTransaction,
+                          str::stream() << "cannot continue txnId " << _txnNumber << " for session "
+                                        << _sessionId()
+                                        << " with txnId "
+                                        << txnNumber);
+            }
+            case TransactionActions::kCommit: {
+                _resetRouterState(txnNumber);
+                // If the first action seen by the router for this transaction is to commit, that
+                // means that the client is attempting to recover a commit decision.
+                _isRecoveringCommit = true;
+                LOG(3) << txnIdToString() << " Commit recovery started";
+                return;
+            }
+        };
     }
-
-    if (_txnNumber == txnNumber) {
-        ++_latestStmtId;
-        return;
-    }
-
-    _txnNumber = txnNumber;
-    _participants.clear();
-    _coordinatorId.reset();
-    _recoveryShardId.reset();
-    _atClusterTime.reset();
-    _commitType = CommitType::kNotInitiated;
-
-    // TODO SERVER-37115: Parse statement ids from the client and remember the statement id of the
-    // command that started the transaction, if one was included.
-    _latestStmtId = kDefaultFirstStmtId;
-    _firstStmtId = kDefaultFirstStmtId;
-
-    if (_readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        _atClusterTime.emplace();
-    }
-
-    LOG(3) << txnIdToString() << " New transaction started";
+    MONGO_UNREACHABLE;
 }
 
 const LogicalSessionId& TransactionRouter::_sessionId() const {
@@ -725,7 +725,7 @@ BSONObj TransactionRouter::commitTransaction(
     if (_participants.empty()) {
         // The participants list can be empty if a transaction was began on mongos, but it never
         // ended up targeting any hosts. Such cases are legal for example if a find is issued
-        // against a non-existend database.
+        // against a non-existent database.
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot commit without participants",
                 _txnNumber != kUninitializedTxnNumber);
@@ -853,6 +853,22 @@ void TransactionRouter::appendRecoveryToken(BSONObjBuilder* builder) const {
     recoveryToken.serialize(&recoveryTokenBuilder);
     recoveryTokenBuilder.doneFast();
 }
+
+void TransactionRouter::_resetRouterState(const TxnNumber& txnNumber) {
+    _txnNumber = txnNumber;
+    _commitType = CommitType::kNotInitiated;
+    _isRecoveringCommit = false;
+    _participants.clear();
+    _coordinatorId.reset();
+    _recoveryShardId.reset();
+    _readConcernArgs = {};
+    _atClusterTime.reset();
+
+    // TODO SERVER-37115: Parse statement ids from the client and remember the statement id
+    // of the command that started the transaction, if one was included.
+    _latestStmtId = kDefaultFirstStmtId;
+    _firstStmtId = kDefaultFirstStmtId;
+};
 
 BSONObj TransactionRouter::_commitWithRecoveryToken(OperationContext* opCtx,
                                                     const TxnRecoveryToken& recoveryToken) {

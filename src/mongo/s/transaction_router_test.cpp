@@ -486,6 +486,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForRea
     txnRouter.processParticipantResponse(shard2, kOkReadOnlyTrueResponse);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
     // The recovery shard is not set even if the participants say they did a write for commit.
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), boost::none); });
@@ -881,6 +884,27 @@ void checkWriteConcern(const BSONObj& cmdObj, const WriteConcernOptions& expecte
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
+       CommitTransactionWithNoParticipantsDoesNotSendCommit) {
+    TxnNumber txnNum{3};
+
+    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
+    auto commitResult = txnRouter.commitTransaction(operationContext(), boost::none);
+    ASSERT_BSONOBJ_EQ(commitResult, BSON("ok" << 1));
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        ASSERT_FALSE(network()->hasReadyRequests());
+    }
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyForSingleParticipantThatIsReadOnly) {
     TxnNumber txnNum{3};
 
@@ -894,6 +918,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setRecoveryShardId(shard1);
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
 
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
@@ -927,6 +954,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setRecoveryShardId(shard1);
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
 
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
@@ -962,6 +992,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setRecoveryShardId(shard1);
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
 
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
@@ -1133,6 +1166,9 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
     // Sending commit with a recovery token again should cause the router to use the recovery path
     // again.
 
+    txnRouter->beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
     future = launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
 
     onCommand([&](const RemoteCommandRequest& request) {
@@ -1152,6 +1188,186 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
     });
 
     future.default_timed_get();
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       CrossShardTxnCommitWorksAfterRecoveryCommitForPreviousTransaction) {
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setTxnNumber(txnNum);
+
+    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    opCtx->setWriteConcern(writeConcern);
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    // Simulate recovering a commit with a recovery token and no participants.
+    {
+        txnRouter->beginOrContinueTxn(
+            opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+
+        TxnRecoveryToken recoveryToken;
+        recoveryToken.setRecoveryShardId(shard1);
+
+        auto future =
+            launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+
+        onCommand([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(hostAndPort1, request.target);
+            ASSERT_EQ("admin", request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+            auto participantElements = request.cmdObj["participants"].Array();
+            ASSERT_TRUE(participantElements.empty());
+
+            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
+            checkWriteConcern(request.cmdObj, writeConcern);
+
+            return BSON("ok" << 1);
+        });
+
+        future.default_timed_get();
+    }
+
+    // Increase the txn number and run a cross-shard transaction with two-phase commit. The commit
+    // should be sent with the correct participant list.
+    {
+        ++txnNum;
+        txnRouter->beginOrContinueTxn(
+            operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+        txnRouter->setDefaultAtClusterTime(operationContext());
+
+        txnRouter->attachTxnFieldsIfNeeded(shard1, {});
+        txnRouter->attachTxnFieldsIfNeeded(shard2, {});
+        txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+        txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+
+        txnRouter->beginOrContinueTxn(
+            operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
+        TxnRecoveryToken recoveryToken;
+        recoveryToken.setRecoveryShardId(shard1);
+
+        auto future =
+            launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+
+        onCommand([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(hostAndPort1, request.target);
+            ASSERT_EQ("admin", request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+            std::set<std::string> expectedParticipants = {shard1.toString(), shard2.toString()};
+            auto participantElements = request.cmdObj["participants"].Array();
+            ASSERT_EQ(expectedParticipants.size(), participantElements.size());
+
+            for (const auto& element : participantElements) {
+                auto shardId = element["shardId"].valuestr();
+                ASSERT_EQ(1ull, expectedParticipants.count(shardId));
+                expectedParticipants.erase(shardId);
+            }
+
+            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
+
+            return BSON("ok" << 1);
+        });
+
+        future.default_timed_get();
+    }
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       RouterShouldWorkAsRecoveryRouterEvenIfItHasSeenPreviousTransactions) {
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setTxnNumber(txnNum);
+
+    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    opCtx->setWriteConcern(writeConcern);
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    // Run a cross-shard transaction with two-phase commit. The commit should be sent with the
+    // correct participant list.
+    {
+        txnRouter->beginOrContinueTxn(
+            operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+        txnRouter->setDefaultAtClusterTime(operationContext());
+
+        txnRouter->attachTxnFieldsIfNeeded(shard1, {});
+        txnRouter->attachTxnFieldsIfNeeded(shard2, {});
+        txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+        txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+
+        txnRouter->beginOrContinueTxn(
+            operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
+        TxnRecoveryToken recoveryToken;
+        recoveryToken.setRecoveryShardId(shard1);
+
+        auto future =
+            launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+
+        onCommand([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(hostAndPort1, request.target);
+            ASSERT_EQ("admin", request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+            std::set<std::string> expectedParticipants = {shard1.toString(), shard2.toString()};
+            auto participantElements = request.cmdObj["participants"].Array();
+            ASSERT_EQ(expectedParticipants.size(), participantElements.size());
+
+            for (const auto& element : participantElements) {
+                auto shardId = element["shardId"].valuestr();
+                ASSERT_EQ(1ull, expectedParticipants.count(shardId));
+                expectedParticipants.erase(shardId);
+            }
+
+            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
+
+            return BSON("ok" << 1);
+        });
+
+        future.default_timed_get();
+    }
+
+    // Increase the txn number and simulate recovering a commit with a recovery token and no
+    // participants.
+    {
+        ++txnNum;
+
+        txnRouter->beginOrContinueTxn(
+            opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+
+        TxnRecoveryToken recoveryToken;
+        recoveryToken.setRecoveryShardId(shard1);
+
+        auto future =
+            launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+
+        onCommand([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(hostAndPort1, request.target);
+            ASSERT_EQ("admin", request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+            auto participantElements = request.cmdObj["participants"].Array();
+            ASSERT_TRUE(participantElements.empty());
+
+            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
+            checkWriteConcern(request.cmdObj, writeConcern);
+
+            return BSON("ok" << 1);
+        });
+
+        future.default_timed_get();
+    }
 }
 
 TEST_F(TransactionRouterTest, CommitWithEmptyRecoveryToken) {
