@@ -71,7 +71,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
         invariant(!stageConstraints.isIndependentOfAnyCollection);
     }
 
-    _pipeline->addInitialSource(DocumentSourceMock::create());
+    _pipeline->addInitialSource(DocumentSourceMock::create(expCtx));
 }
 
 UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParams) const {

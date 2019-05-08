@@ -50,7 +50,7 @@ TEST(TeeBufferTest, ShouldRequirePositiveBatchSize) {
 }
 
 TEST(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {
-    auto mock = DocumentSourceMock::create();
+    auto mock = DocumentSourceMock::createForTest();
     auto teeBuffer = TeeBuffer::create(1);
     teeBuffer->setSource(mock.get());
 
@@ -61,7 +61,7 @@ TEST(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {
 
 TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfTheyFitInOneBatch) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
-    auto mock = DocumentSourceMock::create(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs);
     auto teeBuffer = TeeBuffer::create(1);
     teeBuffer->setSource(mock.get());
 
@@ -79,7 +79,7 @@ TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfTheyFitInOneBatch) {
 
 TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
-    auto mock = DocumentSourceMock::create(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs);
 
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
     auto teeBuffer = TeeBuffer::create(1, bufferBytes);
@@ -99,7 +99,7 @@ TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
 
 TEST(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsumers) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
-    auto mock = DocumentSourceMock::create(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs);
 
     const size_t nConsumers = 2;
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
@@ -142,7 +142,7 @@ TEST(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsume
 
 TEST(TeeBufferTest, ShouldAllowOtherConsumersToAdvanceOnceTrailingConsumerIsDisposed) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
-    auto mock = DocumentSourceMock::create(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs);
 
     const size_t nConsumers = 2;
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.

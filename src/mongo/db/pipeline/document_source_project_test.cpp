@@ -61,7 +61,7 @@ using ProjectStageTest = AggregationContextFixture;
 TEST_F(ProjectStageTest, InclusionProjectionShouldRemoveUnspecifiedFields) {
     auto project =
         DocumentSourceProject::create(BSON("a" << true << "c" << BSON("d" << true)), getExpCtx());
-    auto source = DocumentSourceMock::create("{_id: 0, a: 1, b: 1, c: {d: 1}}");
+    auto source = DocumentSourceMock::createForTest("{_id: 0, a: 1, b: 1, c: {d: 1}}");
     project->setSource(source.get());
     // The first result exists and is as expected.
     auto next = project->getNext();
@@ -99,7 +99,7 @@ TEST_F(ProjectStageTest, ShouldErrorOnNonObjectSpec) {
  */
 TEST_F(ProjectStageTest, InclusionShouldBeAbleToProcessMultipleDocuments) {
     auto project = DocumentSourceProject::create(BSON("a" << true), getExpCtx());
-    auto source = DocumentSourceMock::create({"{a: 1, b: 2}", "{a: 3, b: 4}"});
+    auto source = DocumentSourceMock::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"});
     project->setSource(source.get());
     auto next = project->getNext();
     ASSERT(next.isAdvanced());
@@ -122,7 +122,7 @@ TEST_F(ProjectStageTest, InclusionShouldBeAbleToProcessMultipleDocuments) {
  */
 TEST_F(ProjectStageTest, ExclusionShouldBeAbleToProcessMultipleDocuments) {
     auto project = DocumentSourceProject::create(BSON("a" << false), getExpCtx());
-    auto source = DocumentSourceMock::create({"{a: 1, b: 2}", "{a: 3, b: 4}"});
+    auto source = DocumentSourceMock::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"});
     project->setSource(source.get());
     auto next = project->getNext();
     ASSERT(next.isAdvanced());
@@ -141,12 +141,13 @@ TEST_F(ProjectStageTest, ExclusionShouldBeAbleToProcessMultipleDocuments) {
 
 TEST_F(ProjectStageTest, ShouldPropagatePauses) {
     auto project = DocumentSourceProject::create(BSON("a" << false), getExpCtx());
-    auto source = DocumentSourceMock::create({Document(),
-                                              DocumentSource::GetNextResult::makePauseExecution(),
-                                              Document(),
-                                              DocumentSource::GetNextResult::makePauseExecution(),
-                                              Document(),
-                                              DocumentSource::GetNextResult::makePauseExecution()});
+    auto source =
+        DocumentSourceMock::createForTest({Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution()});
     project->setSource(source.get());
 
     ASSERT_TRUE(project->getNext().isAdvanced());
@@ -249,7 +250,7 @@ TEST_F(ProjectStageTest, ExclusionProjectionReportsExcludedPathsWithIdExclusion)
 TEST_F(ProjectStageTest, CanUseRemoveSystemVariableToConditionallyExcludeProjectedField) {
     auto project = DocumentSourceProject::create(
         fromjson("{a: 1, b: {$cond: [{$eq: ['$b', 4]}, '$$REMOVE', '$b']}}"), getExpCtx());
-    auto source = DocumentSourceMock::create({"{a: 2, b: 2}", "{a: 3, b: 4}"});
+    auto source = DocumentSourceMock::createForTest({"{a: 2, b: 2}", "{a: 3, b: 4}"});
     project->setSource(source.get());
     auto next = project->getNext();
     ASSERT(next.isAdvanced());
@@ -281,7 +282,7 @@ BSONObj makeProjectForNestedDocument(size_t depth) {
 TEST_F(ProjectStageTest, CanAddNestedDocumentExactlyAtDepthLimit) {
     auto project = DocumentSourceProject::create(
         makeProjectForNestedDocument(BSONDepth::getMaxAllowableDepth()), getExpCtx());
-    auto mock = DocumentSourceMock::create(Document{{"_id", 1}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"_id", 1}});
     project->setSource(mock.get());
 
     auto next = project->getNext();

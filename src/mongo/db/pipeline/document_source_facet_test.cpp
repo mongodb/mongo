@@ -284,7 +284,7 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::create(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs);
 
     auto dummy = DocumentSourcePassthrough::create();
 
@@ -313,7 +313,7 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::create(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs);
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto firstPipeline = uassertStatusOK(Pipeline::createFacetPipeline({firstDummy}, ctx));
@@ -352,7 +352,7 @@ TEST_F(DocumentSourceFacetTest,
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}, Document{{"_id", 3}}};
-    auto mock = DocumentSourceMock::create(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs);
 
     auto passthrough = DocumentSourcePassthrough::create();
     auto passthroughPipe = uassertStatusOK(Pipeline::createFacetPipeline({passthrough}, ctx));
@@ -390,7 +390,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
     auto ctx = getExpCtx();
 
     deque<DocumentSource::GetNextResult> inputs = {Document{{"_id", 0}}, Document{{"_id", 1}}};
-    auto mock = DocumentSourceMock::create(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs);
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto secondDummy = DocumentSourcePassthrough::create();
@@ -410,7 +410,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
 TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
     auto ctx = getExpCtx();
 
-    auto mockSource = DocumentSourceMock::create();
+    auto mockSource = DocumentSourceMock::createForTest();
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto firstPipe = uassertStatusOK(Pipeline::createFacetPipeline({firstDummy}, ctx));
@@ -433,7 +433,8 @@ DEATH_TEST_F(DocumentSourceFacetTest,
              ShouldFailIfGivenPausedInput,
              "Invariant failure !input.isPaused()") {
     auto ctx = getExpCtx();
-    auto mock = DocumentSourceMock::create(DocumentSource::GetNextResult::makePauseExecution());
+    auto mock =
+        DocumentSourceMock::createForTest(DocumentSource::GetNextResult::makePauseExecution());
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto pipeline = uassertStatusOK(Pipeline::createFacetPipeline({firstDummy}, ctx));

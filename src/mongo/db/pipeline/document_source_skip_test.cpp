@@ -44,12 +44,13 @@ using DocumentSourceSkipTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
     auto skip = DocumentSourceSkip::create(getExpCtx(), 2);
-    auto mock = DocumentSourceMock::create({Document(),
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document(),
-                                            Document(),
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            DocumentSource::GetNextResult::makePauseExecution()});
+    auto mock =
+        DocumentSourceMock::createForTest({Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document(),
+                                           Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           DocumentSource::GetNextResult::makePauseExecution()});
     skip->setSource(mock.get());
 
     // Skip the first document.

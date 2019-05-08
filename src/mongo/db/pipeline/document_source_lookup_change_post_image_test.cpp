@@ -85,7 +85,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyO
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "documentKey" field.
-    auto mockLocalSource = DocumentSourceMock::create(
+    auto mockLocalSource = DocumentSourceMock::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"operationType", "update"_sd},
                  {"fullDocument", Document{{"_id", 0}}},
@@ -107,7 +107,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationTyp
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::create(
+    auto mockLocalSource = DocumentSourceMock::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"fullDocument", Document{{"_id", 0}}},
@@ -129,7 +129,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::create(Document{
+    auto mockLocalSource = DocumentSourceMock::createForTest(Document{
         {"_id", makeResumeToken(0)},
         {"documentKey", Document{{"_id", 0}}},
         {"operationType", "update"_sd},
@@ -152,10 +152,10 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource =
-        DocumentSourceMock::create(Document{{"_id", makeResumeToken(0)},
-                                            {"documentKey", Document{{"_id", 0}}},
-                                            {"operationType", "update"_sd},
-                                            {"ns", 4}});
+        DocumentSourceMock::createForTest(Document{{"_id", makeResumeToken(0)},
+                                                   {"documentKey", Document{{"_id", 0}}},
+                                                   {"operationType", "update"_sd},
+                                                   {"ns", 4}});
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -173,7 +173,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatch
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::create(
+    auto mockLocalSource = DocumentSourceMock::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
@@ -197,7 +197,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDatabaseMismatchOnC
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::create(
+    auto mockLocalSource = DocumentSourceMock::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
@@ -224,7 +224,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPassIfDatabaseMatchesOnCol
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
     expCtx->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(mockForeignContents);
 
-    auto mockLocalSource = DocumentSourceMock::create(
+    auto mockLocalSource = DocumentSourceMock::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
@@ -250,7 +250,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with an update document.
-    auto mockLocalSource = DocumentSourceMock::create(
+    auto mockLocalSource = DocumentSourceMock::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
@@ -275,7 +275,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input, pausing every other result.
-    auto mockLocalSource = DocumentSourceMock::create(
+    auto mockLocalSource = DocumentSourceMock::createForTest(
         {Document{{"_id", makeResumeToken(0)},
                   {"documentKey", Document{{"_id", 0}}},
                   {"operationType", "insert"_sd},

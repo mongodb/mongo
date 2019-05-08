@@ -179,7 +179,7 @@ private:
      * '_unwind' must be initialized before calling this method.
      */
     void assertResultsMatch(BSONObj expectedResults) {
-        auto source = DocumentSourceMock::create(inputData());
+        auto source = DocumentSourceMock::createForTest(inputData());
         _unwind->setSource(source.get());
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
@@ -690,9 +690,9 @@ TEST_F(UnwindStageTest, ShouldPropagatePauses) {
     auto unwind = DocumentSourceUnwind::create(
         getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
     auto source =
-        DocumentSourceMock::create({Document{{"array", vector<Value>{Value(1), Value(2)}}},
-                                    DocumentSource::GetNextResult::makePauseExecution(),
-                                    Document{{"array", vector<Value>{Value(1), Value(2)}}}});
+        DocumentSourceMock::createForTest({Document{{"array", vector<Value>{Value(1), Value(2)}}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"array", vector<Value>{Value(1), Value(2)}}}});
 
     unwind->setSource(source.get());
 

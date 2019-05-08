@@ -62,16 +62,24 @@ public:
         return constraints;
     }
 
-    static boost::intrusive_ptr<DocumentSourceMock> create();
+    // Constructors which create their own ExpressionContextForTest. Do _not_ use these outside of
+    // tests, as they will spin up ServiceContexts (TODO SERVER-41060).
+    static boost::intrusive_ptr<DocumentSourceMock> createForTest();
 
-    static boost::intrusive_ptr<DocumentSourceMock> create(Document doc);
+    static boost::intrusive_ptr<DocumentSourceMock> createForTest(Document doc);
 
-    static boost::intrusive_ptr<DocumentSourceMock> create(const GetNextResult& result);
-    static boost::intrusive_ptr<DocumentSourceMock> create(std::deque<GetNextResult> results);
+    static boost::intrusive_ptr<DocumentSourceMock> createForTest(const GetNextResult& result);
+    static boost::intrusive_ptr<DocumentSourceMock> createForTest(
+        std::deque<GetNextResult> results);
 
-    static boost::intrusive_ptr<DocumentSourceMock> create(const char* json);
-    static boost::intrusive_ptr<DocumentSourceMock> create(
+    static boost::intrusive_ptr<DocumentSourceMock> createForTest(const char* json);
+    static boost::intrusive_ptr<DocumentSourceMock> createForTest(
         const std::initializer_list<const char*>& jsons);
+
+    // Use these constructors outside of tests.
+    // TODO: SERVER-40539 this should no longer be necessary once there's a DocumentSourceQueue.
+    static boost::intrusive_ptr<DocumentSourceMock> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     void reattachToOperationContext(OperationContext* opCtx) {
         isDetachedFromOpCtx = false;

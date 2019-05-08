@@ -58,7 +58,7 @@ static constexpr StringData kTestNs = "test.ns"_sd;
 
 class CheckResumeTokenTest : public AggregationContextFixture {
 public:
-    CheckResumeTokenTest() : _mock(DocumentSourceMock::create()) {}
+    CheckResumeTokenTest() : _mock(DocumentSourceMock::createForTest()) {}
 
 protected:
     /**
@@ -486,7 +486,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) final {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                             PipelineDeleter(expCtx->opCtx));
-        pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
+        pipeline->addInitialSource(DocumentSourceMock::createForTest(_mockResults));
         return pipeline;
     }
 

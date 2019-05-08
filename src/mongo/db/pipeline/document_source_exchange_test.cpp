@@ -78,7 +78,7 @@ protected:
     }
 
     auto getMockSource(int cnt) {
-        auto source = DocumentSourceMock::create();
+        auto source = DocumentSourceMock::createForTest();
 
         for (int i = 0; i < cnt; ++i)
             source->queue.emplace_back(Document{{"a", i}, {"b", "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd}});
@@ -96,7 +96,7 @@ protected:
     auto getRandomMockSource(size_t cnt, int64_t seed) {
         PseudoRandom prng(seed);
 
-        auto source = DocumentSourceMock::create();
+        auto source = DocumentSourceMock::createForTest();
 
         for (size_t i = 0; i < cnt; ++i)
             source->queue.emplace_back(Document{{"a", static_cast<int>(prng.nextInt32() % cnt)},

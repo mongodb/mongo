@@ -534,7 +534,7 @@ public:
             break;
         }
 
-        pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
+        pipeline->addInitialSource(DocumentSourceMock::createForTest(_mockResults));
         return pipeline;
     }
 
@@ -561,10 +561,10 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
 
     // Mock its input, pausing every other result.
     auto mockLocalSource =
-        DocumentSourceMock::create({Document{{"foreignId", 0}},
-                                    DocumentSource::GetNextResult::makePauseExecution(),
-                                    Document{{"foreignId", 1}},
-                                    DocumentSource::GetNextResult::makePauseExecution()});
+        DocumentSourceMock::createForTest({Document{{"foreignId", 0}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"foreignId", 1}},
+                                           DocumentSource::GetNextResult::makePauseExecution()});
 
     lookup->setSource(mockLocalSource.get());
 
@@ -618,10 +618,10 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     // Mock its input, pausing every other result.
     auto mockLocalSource =
-        DocumentSourceMock::create({Document{{"foreignId", 0}},
-                                    DocumentSource::GetNextResult::makePauseExecution(),
-                                    Document{{"foreignId", 1}},
-                                    DocumentSource::GetNextResult::makePauseExecution()});
+        DocumentSourceMock::createForTest({Document{{"foreignId", 0}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"foreignId", 1}},
+                                           DocumentSource::GetNextResult::makePauseExecution()});
     lookup->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
@@ -971,7 +971,7 @@ TEST_F(DocumentSourceLookUpTest,
     ASSERT(lookupStage);
 
     // Prepare the mocked local and foreign sources.
-    auto mockLocalSource = DocumentSourceMock::create(
+    auto mockLocalSource = DocumentSourceMock::createForTest(
         {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}});
 
     lookupStage->setSource(mockLocalSource.get());
@@ -1049,7 +1049,8 @@ TEST_F(DocumentSourceLookUpTest,
     ASSERT(lookupStage);
 
     // Prepare the mocked local and foreign sources.
-    auto mockLocalSource = DocumentSourceMock::create({Document{{"_id", 0}}, Document{{"_id", 1}}});
+    auto mockLocalSource =
+        DocumentSourceMock::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}});
 
     lookupStage->setSource(mockLocalSource.get());
 

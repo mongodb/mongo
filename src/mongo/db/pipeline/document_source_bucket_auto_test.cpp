@@ -72,7 +72,7 @@ public:
             mockInputs.emplace_back(std::move(input));
         }
 
-        auto source = DocumentSourceMock::create(std::move(mockInputs));
+        auto source = DocumentSourceMock::createForTest(std::move(mockInputs));
         bucketAutoStage->setSource(source.get());
 
         vector<Document> results;
@@ -317,13 +317,14 @@ TEST_F(BucketAutoTests, RespectsCanonicalTypeOrderingOfValues) {
 TEST_F(BucketAutoTests, ShouldPropagatePauses) {
     auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}");
     auto bucketAutoStage = createBucketAuto(bucketAutoSpec);
-    auto source = DocumentSourceMock::create({Document{{"x", 1}},
-                                              DocumentSource::GetNextResult::makePauseExecution(),
-                                              Document{{"x", 2}},
-                                              Document{{"x", 3}},
-                                              DocumentSource::GetNextResult::makePauseExecution(),
-                                              Document{{"x", 4}},
-                                              DocumentSource::GetNextResult::makePauseExecution()});
+    auto source =
+        DocumentSourceMock::createForTest({Document{{"x", 1}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"x", 2}},
+                                           Document{{"x", 3}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"x", 4}},
+                                           DocumentSource::GetNextResult::makePauseExecution()});
     bucketAutoStage->setSource(source.get());
 
     // The $bucketAuto stage needs to consume all inputs before returning any output, so we should
@@ -362,10 +363,10 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
         expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
-    auto mock = DocumentSourceMock::create({Document{{"a", 0}, {"largeStr", largeStr}},
-                                            Document{{"a", 1}, {"largeStr", largeStr}},
-                                            Document{{"a", 2}, {"largeStr", largeStr}},
-                                            Document{{"a", 3}, {"largeStr", largeStr}}});
+    auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}, {"largeStr", largeStr}},
+                                                   Document{{"a", 1}, {"largeStr", largeStr}},
+                                                   Document{{"a", 2}, {"largeStr", largeStr}},
+                                                   Document{{"a", 3}, {"largeStr", largeStr}}});
     bucketAutoStage->setSource(mock.get());
 
     auto next = bucketAutoStage->getNext();
@@ -399,12 +400,13 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
     auto sort = DocumentSourceSort::create(expCtx, BSON("_id" << -1), -1, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
-    auto mock = DocumentSourceMock::create({Document{{"a", 0}, {"largeStr", largeStr}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"a", 1}, {"largeStr", largeStr}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"a", 2}, {"largeStr", largeStr}},
-                                            Document{{"a", 3}, {"largeStr", largeStr}}});
+    auto mock =
+        DocumentSourceMock::createForTest({Document{{"a", 0}, {"largeStr", largeStr}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 1}, {"largeStr", largeStr}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 2}, {"largeStr", largeStr}},
+                                           Document{{"a", 3}, {"largeStr", largeStr}}});
     bucketAutoStage->setSource(mock.get());
 
     // There were 2 pauses, so we should expect 2 paused results before any results can be
@@ -638,7 +640,7 @@ void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expC
         expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
-    auto mock = DocumentSourceMock::create(
+    auto mock = DocumentSourceMock::createForTest(
         {Document{{"a", 0}, {"largeStr", largeStr}}, Document{{"a", 1}, {"largeStr", largeStr}}});
     bucketAutoStage->setSource(mock.get());
 
@@ -674,10 +676,11 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
         expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes / 2, 'x');
-    auto mock = DocumentSourceMock::create({Document{{"a", 0}, {"largeStr", largeStr}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"a", 1}, {"largeStr", largeStr}},
-                                            Document{{"a", 2}, {"largeStr", largeStr}}});
+    auto mock =
+        DocumentSourceMock::createForTest({Document{{"a", 0}, {"largeStr", largeStr}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 1}, {"largeStr", largeStr}},
+                                           Document{{"a", 2}, {"largeStr", largeStr}}});
     bucketAutoStage->setSource(mock.get());
 
     // The first getNext() should pause.

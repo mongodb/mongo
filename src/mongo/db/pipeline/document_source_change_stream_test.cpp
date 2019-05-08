@@ -181,7 +181,7 @@ public:
         ASSERT_EQ(string(transform->getSourceName()), DSChangeStream::kStageName);
 
         // Create mock stage and insert at the front of the stages.
-        auto mock = DocumentSourceMock::create(D(entry));
+        auto mock = DocumentSourceMock::createForTest(D(entry));
         stages.insert(stages.begin(), mock);
 
         // Wire up the stages by setting the source stage.

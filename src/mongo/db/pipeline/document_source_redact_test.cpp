@@ -65,10 +65,11 @@ TEST_F(DocumentSourceRedactTest, ShouldPropagatePauses) {
     auto redactSpec = BSON("$redact"
                            << "$$KEEP");
     auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), getExpCtx());
-    auto mock = DocumentSourceMock::create({Document{{"_id", 0}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"_id", 1}},
-                                            DocumentSource::GetNextResult::makePauseExecution()});
+    auto mock =
+        DocumentSourceMock::createForTest({Document{{"_id", 0}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"_id", 1}},
+                                           DocumentSource::GetNextResult::makePauseExecution()});
     redact->setSource(mock.get());
 
     // The $redact is keeping everything, so we should see everything from the mock, then EOF.

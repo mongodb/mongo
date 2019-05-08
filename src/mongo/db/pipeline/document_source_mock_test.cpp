@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -39,22 +40,23 @@ namespace {
 
 TEST(DocumentSourceMockTest, OneDoc) {
     auto doc = Document{{"a", 1}};
-    auto source = DocumentSourceMock::create(doc);
+    auto source = DocumentSourceMock::createForTest(doc);
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), doc);
     ASSERT(source->getNext().isEOF());
 }
 
 TEST(DocumentSourceMockTest, ShouldBeConstructableFromInitializerListOfDocuments) {
-    auto source = DocumentSourceMock::create({Document{{"a", 1}}, Document{{"a", 2}}});
+    auto source = DocumentSourceMock::createForTest({Document{{"a", 1}}, Document{{"a", 2}}});
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
     ASSERT(source->getNext().isEOF());
 }
 
 TEST(DocumentSourceMockTest, ShouldBeConstructableFromDequeOfResults) {
-    auto source = DocumentSourceMock::create({Document{{"a", 1}},
-                                              DocumentSource::GetNextResult::makePauseExecution(),
-                                              Document{{"a", 2}}});
+    auto source =
+        DocumentSourceMock::createForTest({Document{{"a", 1}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 2}}});
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
     ASSERT_TRUE(source->getNext().isPaused());
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
@@ -62,20 +64,27 @@ TEST(DocumentSourceMockTest, ShouldBeConstructableFromDequeOfResults) {
 }
 
 TEST(DocumentSourceMockTest, StringJSON) {
-    auto source = DocumentSourceMock::create("{a : 1}");
+    auto source = DocumentSourceMock::createForTest("{a : 1}");
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
     ASSERT(source->getNext().isEOF());
 }
 
 TEST(DocumentSourceMockTest, DequeStringJSONs) {
-    auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}"});
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"});
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
     ASSERT(source->getNext().isEOF());
 }
 
 TEST(DocumentSourceMockTest, Empty) {
-    auto source = DocumentSourceMock::create();
+    auto source = DocumentSourceMock::createForTest();
+    ASSERT(source->getNext().isEOF());
+}
+
+TEST(DocumentSourceMockTest, NonTestConstructor) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    auto source = DocumentSourceMock::create(expCtx);
     ASSERT(source->getNext().isEOF());
 }
 

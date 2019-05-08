@@ -477,13 +477,14 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
 
 TEST_F(DocumentSourceMatchTest, ShouldPropagatePauses) {
     auto match = DocumentSourceMatch::create(BSON("a" << 1), getExpCtx());
-    auto mock = DocumentSourceMock::create({DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"a", 1}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"a", 2}},
-                                            Document{{"a", 2}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"a", 1}}});
+    auto mock =
+        DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 1}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 2}},
+                                           Document{{"a", 2}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 1}}});
     match->setSource(mock.get());
 
     ASSERT_TRUE(match->getNext().isPaused());
@@ -504,10 +505,10 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
 
     match->joinMatchWith(secondMatch);
 
-    const auto mock = DocumentSourceMock::create({Document{{"a", 1}, {"b", 1}},
-                                                  Document{{"a", 2}, {"b", 1}},
-                                                  Document{{"a", 1}, {"b", 2}},
-                                                  Document{{"a", 2}, {"b", 2}}});
+    const auto mock = DocumentSourceMock::createForTest({Document{{"a", 1}, {"b", 1}},
+                                                         Document{{"a", 2}, {"b", 1}},
+                                                         Document{{"a", 1}, {"b", 2}},
+                                                         Document{{"a", 2}, {"b", 2}}});
 
     match->setSource(mock.get());
 
@@ -565,7 +566,7 @@ TEST_F(DocumentSourceMatchTest, ShouldMatchCorrectlyAfterDescendingMatch) {
 
     const auto descendedMatch =
         DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
-    const auto mock = DocumentSourceMock::create(
+    const auto mock = DocumentSourceMock::createForTest(
         {Document{{"b", 1}, {"c", 1}, {"d", 1}},
          Document{{"b", 1}, {"a", Document{{"c", 1}}}, {"d", 1}},
          Document{{"a", Document{{"b", 1}}}, {"a", Document{{"c", 1}}}, {"d", 1}},
@@ -588,7 +589,7 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateElemMatchPredicate) {
 
     const std::vector<Document> matchingVector = {Document{{"b", 0}}, Document{{"b", 1}}};
     const std::vector<Document> nonMatchingVector = {Document{{"b", 0}}, Document{{"b", 2}}};
-    const auto mock = DocumentSourceMock::create(
+    const auto mock = DocumentSourceMock::createForTest(
         {Document{{"a", matchingVector}}, Document{{"a", nonMatchingVector}}, Document{{"a", 1}}});
 
     match->setSource(mock.get());
@@ -608,7 +609,7 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
     const auto match = DocumentSourceMatch::create(
         fromjson("{$jsonSchema: {properties: {a: {type: 'number'}}}}"), getExpCtx());
 
-    const auto mock = DocumentSourceMock::create(
+    const auto mock = DocumentSourceMock::createForTest(
         {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{0, 1}}}}}});
 
     match->setSource(mock.get());

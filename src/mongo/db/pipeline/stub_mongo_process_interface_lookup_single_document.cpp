@@ -60,7 +60,7 @@ StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
-    pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
+    pipeline->addInitialSource(DocumentSourceMock::createForTest(_mockResults));
     return pipeline;
 }
 

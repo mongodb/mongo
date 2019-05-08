@@ -54,7 +54,7 @@ using boost::intrusive_ptr;
 
 class SampleBasics : public AggregationContextFixture {
 public:
-    SampleBasics() : _mock(DocumentSourceMock::create()) {}
+    SampleBasics() : _mock(DocumentSourceMock::createForTest()) {}
 
 protected:
     virtual void createSample(long long size) {

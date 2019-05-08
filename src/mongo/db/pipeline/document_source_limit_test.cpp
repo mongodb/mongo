@@ -47,7 +47,7 @@ namespace {
 using DocumentSourceLimitTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceLimitTest, ShouldDisposeSourceWhenLimitIsReached) {
-    auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}"});
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"});
     auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
     limit->setSource(source.get());
     // The limit's result is as expected.
@@ -61,7 +61,7 @@ TEST_F(DocumentSourceLimitTest, ShouldDisposeSourceWhenLimitIsReached) {
 }
 
 TEST_F(DocumentSourceLimitTest, ShouldNotBeAbleToLimitToZeroDocuments) {
-    auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}"});
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"});
     ASSERT_THROWS_CODE(DocumentSourceLimit::create(getExpCtx(), 0), AssertionException, 15958);
 }
 
@@ -91,7 +91,7 @@ TEST_F(DocumentSourceLimitTest, TwoLimitStagesShouldCombineIntoOne) {
 }
 
 TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {
-    auto source = DocumentSourceMock::create({"{a: 1}", "{a: 1}"});
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 1}"});
 
     // Create a DocumentSourceMatch.
     BSONObj spec = BSON("$match" << BSON("a" << 1));
@@ -121,12 +121,13 @@ TEST_F(DocumentSourceLimitTest, ShouldNotIntroduceAnyDependencies) {
 
 TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
     auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
-    auto mock = DocumentSourceMock::create({DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document(),
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document(),
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document()});
+    auto mock =
+        DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document()});
     limit->setSource(mock.get());
 
     ASSERT_TRUE(limit->getNext().isPaused());

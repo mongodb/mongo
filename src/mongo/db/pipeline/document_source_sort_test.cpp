@@ -189,7 +189,7 @@ public:
                       BSONObj sortSpec,
                       string expectedResultSetString) {
         createSort(sortSpec);
-        auto source = DocumentSourceMock::create(inputDocs);
+        auto source = DocumentSourceMock::createForTest(inputDocs);
         sort()->setSource(source.get());
 
         // Load the results from the DocumentSourceUnwind.
@@ -351,9 +351,10 @@ TEST_F(DocumentSourceSortExecutionTest, ExtractArrayValues) {
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
     auto sort = DocumentSourceSort::create(getExpCtx(), BSON("a" << 1));
-    auto mock = DocumentSourceMock::create({DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"a", 0}},
-                                            DocumentSource::GetNextResult::makePauseExecution()});
+    auto mock =
+        DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 0}},
+                                           DocumentSource::GetNextResult::makePauseExecution()});
     sort->setSource(mock.get());
 
     // Should propagate the first pause.
@@ -370,9 +371,10 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
     auto sort = DocumentSourceSort::create(getExpCtx(), BSON("a" << 1));
-    auto mock = DocumentSourceMock::create({Document{{"a", 1}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"a", 0}}});
+    auto mock =
+        DocumentSourceMock::createForTest({Document{{"a", 1}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 0}}});
     sort->setSource(mock.get());
 
     // Should load the first document, then propagate the pause.
@@ -404,11 +406,12 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
     auto sort = DocumentSourceSort::create(expCtx, BSON("_id" << -1), -1, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
-    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"_id", 1}, {"largeStr", largeStr}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"_id", 2}, {"largeStr", largeStr}}});
+    auto mock =
+        DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"_id", 1}, {"largeStr", largeStr}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"_id", 2}, {"largeStr", largeStr}}});
     sort->setSource(mock.get());
 
     // There were 2 pauses, so we should expect 2 paused results before any results can be returned.
@@ -438,8 +441,8 @@ TEST_F(DocumentSourceSortExecutionTest,
     auto sort = DocumentSourceSort::create(expCtx, BSON("_id" << -1), -1, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
-    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                            Document{{"_id", 1}, {"largeStr", largeStr}}});
+    auto mock = DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                                   Document{{"_id", 1}, {"largeStr", largeStr}}});
     sort->setSource(mock.get());
 
     ASSERT_THROWS_CODE(sort->getNext(), AssertionException, 16819);
@@ -453,10 +456,11 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     auto sort = DocumentSourceSort::create(expCtx, BSON("_id" << -1), -1, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes / 2, 'x');
-    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"_id", 1}, {"largeStr", largeStr}},
-                                            Document{{"_id", 2}, {"largeStr", largeStr}}});
+    auto mock =
+        DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"_id", 1}, {"largeStr", largeStr}},
+                                           Document{{"_id", 2}, {"largeStr", largeStr}}});
     sort->setSource(mock.get());
 
     // The first getNext() should pause.

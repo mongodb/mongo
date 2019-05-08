@@ -70,7 +70,7 @@ TEST_F(ReplaceRootBasics, FieldPathAsNewRootPromotesSubdocument) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot"
                                               << "$a"));
     Document subdoc = Document{{"b", 1}, {"c", "hello"_sd}, {"d", Document{{"e", 2}}}};
-    auto mock = DocumentSourceMock::create(Document{{"a", subdoc}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"a", subdoc}});
     replaceRoot->setSource(mock.get());
 
     auto next = replaceRoot->getNext();
@@ -86,7 +86,7 @@ TEST_F(ReplaceRootBasics, DottedFieldPathAsNewRootPromotesSubdocument) {
                                               << "$a.b"));
     // source document: {a: {b: {c: 3}}}
     Document subdoc = Document{{"c", 3}};
-    auto mock = DocumentSourceMock::create(Document{{"a", Document{{"b", subdoc}}}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"a", Document{{"b", subdoc}}}});
     replaceRoot->setSource(mock.get());
 
     auto next = replaceRoot->getNext();
@@ -102,7 +102,8 @@ TEST_F(ReplaceRootBasics, FieldPathAsNewRootPromotesSubdocumentInMultipleDocumen
                                               << "$a"));
     Document subdoc1 = Document{{"b", 1}, {"c", 2}};
     Document subdoc2 = Document{{"b", 3}, {"c", 4}};
-    auto mock = DocumentSourceMock::create({Document{{"a", subdoc1}}, Document{{"a", subdoc2}}});
+    auto mock =
+        DocumentSourceMock::createForTest({Document{{"a", subdoc1}}, Document{{"a", subdoc2}}});
     replaceRoot->setSource(mock.get());
 
     // Verify that the first document that comes out is the first document we put in.
@@ -121,7 +122,7 @@ TEST_F(ReplaceRootBasics, FieldPathAsNewRootPromotesSubdocumentInMultipleDocumen
 // object.
 TEST_F(ReplaceRootBasics, ExpressionObjectForNewRootReplacesRootWithThatObject) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot" << BSON("b" << 1)));
-    auto mock = DocumentSourceMock::create(Document{{"a", 2}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"a", 2}});
     replaceRoot->setSource(mock.get());
 
     auto next = replaceRoot->getNext();
@@ -131,7 +132,7 @@ TEST_F(ReplaceRootBasics, ExpressionObjectForNewRootReplacesRootWithThatObject) 
 
     BSONObj newObject = BSON("a" << 1 << "b" << 2 << "arr" << BSON_ARRAY(3 << 4 << 5));
     replaceRoot = createReplaceRoot(BSON("newRoot" << newObject));
-    mock = DocumentSourceMock::create(Document{{"c", 2}});
+    mock = DocumentSourceMock::createForTest(Document{{"c", 2}});
     replaceRoot->setSource(mock.get());
 
     next = replaceRoot->getNext();
@@ -140,7 +141,7 @@ TEST_F(ReplaceRootBasics, ExpressionObjectForNewRootReplacesRootWithThatObject) 
     assertExhausted(replaceRoot);
 
     replaceRoot = createReplaceRoot(BSON("newRoot" << BSON("a" << BSON("b" << 1))));
-    mock = DocumentSourceMock::create(Document{{"c", 2}});
+    mock = DocumentSourceMock::createForTest(Document{{"c", 2}});
     replaceRoot->setSource(mock.get());
 
     next = replaceRoot->getNext();
@@ -149,7 +150,7 @@ TEST_F(ReplaceRootBasics, ExpressionObjectForNewRootReplacesRootWithThatObject) 
     assertExhausted(replaceRoot);
 
     replaceRoot = createReplaceRoot(BSON("newRoot" << BSON("a" << 2)));
-    mock = DocumentSourceMock::create(Document{{"b", 2}});
+    mock = DocumentSourceMock::createForTest(Document{{"b", 2}});
     replaceRoot->setSource(mock.get());
 
     next = replaceRoot->getNext();
@@ -165,7 +166,7 @@ TEST_F(ReplaceRootBasics, SystemVariableForNewRootReplacesRootWithThatObject) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot"
                                               << "$$CURRENT"));
     Document inputDoc = Document{{"b", 2}};
-    auto mock = DocumentSourceMock::create({inputDoc});
+    auto mock = DocumentSourceMock::createForTest({inputDoc});
     replaceRoot->setSource(mock.get());
 
     auto next = replaceRoot->getNext();
@@ -175,7 +176,7 @@ TEST_F(ReplaceRootBasics, SystemVariableForNewRootReplacesRootWithThatObject) {
 
     replaceRoot = createReplaceRoot(BSON("newRoot"
                                          << "$$ROOT"));
-    mock = DocumentSourceMock::create({inputDoc});
+    mock = DocumentSourceMock::createForTest({inputDoc});
     replaceRoot->setSource(mock.get());
 
     next = replaceRoot->getNext();
@@ -187,12 +188,13 @@ TEST_F(ReplaceRootBasics, SystemVariableForNewRootReplacesRootWithThatObject) {
 TEST_F(ReplaceRootBasics, ShouldPropagatePauses) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot"
                                               << "$$ROOT"));
-    auto mock = DocumentSourceMock::create({Document(),
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document(),
-                                            Document(),
-                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                            DocumentSource::GetNextResult::makePauseExecution()});
+    auto mock =
+        DocumentSourceMock::createForTest({Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document(),
+                                           Document(),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           DocumentSource::GetNextResult::makePauseExecution()});
     replaceRoot->setSource(mock.get());
 
     ASSERT_TRUE(replaceRoot->getNext().isAdvanced());
@@ -212,18 +214,18 @@ TEST_F(ReplaceRootBasics, ErrorsWhenNewRootDoesNotEvaluateToAnObject) {
                                               << "$a"));
 
     // A string is not an object.
-    auto mock = DocumentSourceMock::create(Document{{"a", "hello"_sd}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"a", "hello"_sd}});
     replaceRoot->setSource(mock.get());
     ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
 
     // An integer is not an object.
-    mock = DocumentSourceMock::create(Document{{"a", 5}});
+    mock = DocumentSourceMock::createForTest(Document{{"a", 5}});
     replaceRoot->setSource(mock.get());
     ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
 
     // Literals are not objects.
     replaceRoot = createReplaceRoot(BSON("newRoot" << BSON("$literal" << 1)));
-    mock = DocumentSourceMock::create(Document());
+    mock = DocumentSourceMock::createForTest(Document());
     replaceRoot->setSource(mock.get());
     ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
     assertExhausted(replaceRoot);
@@ -231,7 +233,7 @@ TEST_F(ReplaceRootBasics, ErrorsWhenNewRootDoesNotEvaluateToAnObject) {
     // Most operator expressions do not resolve to objects.
     replaceRoot = createReplaceRoot(BSON("newRoot" << BSON("$and"
                                                            << "$a")));
-    mock = DocumentSourceMock::create(Document{{"a", true}});
+    mock = DocumentSourceMock::createForTest(Document{{"a", true}});
     replaceRoot->setSource(mock.get());
     ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
     assertExhausted(replaceRoot);
@@ -243,12 +245,12 @@ TEST_F(ReplaceRootBasics, ErrorsIfNewRootFieldPathDoesNotExist) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot"
                                               << "$a"));
 
-    auto mock = DocumentSourceMock::create(Document());
+    auto mock = DocumentSourceMock::createForTest(Document());
     replaceRoot->setSource(mock.get());
     ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
     assertExhausted(replaceRoot);
 
-    mock = DocumentSourceMock::create(Document{{"e", Document{{"b", Document{{"c", 3}}}}}});
+    mock = DocumentSourceMock::createForTest(Document{{"e", Document{{"b", Document{{"c", 3}}}}}});
     replaceRoot->setSource(mock.get());
     ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
     assertExhausted(replaceRoot);
@@ -285,7 +287,7 @@ TEST_F(ReplaceRootBasics, ReplaceRootWithRemoveSystemVariableThrows) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot"
                                               << "$$REMOVE"));
     Document inputDoc = Document{{"b", 2}};
-    auto mock = DocumentSourceMock::create({inputDoc});
+    auto mock = DocumentSourceMock::createForTest({inputDoc});
     replaceRoot->setSource(mock.get());
 
     ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
