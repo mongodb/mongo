@@ -64,6 +64,7 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "suite",
     "target_resmoke_time",
     "task",
+    "task_id",
     "use_default_timeouts",
     "use_large_distro",
     "use_multiversion",
@@ -118,6 +119,8 @@ def get_config_options(cmd_line_options, config_file):
     run_multiple_jobs = read_config.get_config_value("run_multiple_jobs", cmd_line_options,
                                                      config_file_data, default="true")
     task = read_config.get_config_value("task", cmd_line_options, config_file_data, required=True)
+    task_id = read_config.get_config_value("task_id", cmd_line_options, config_file_data,
+                                           required=True)
     suite = read_config.get_config_value("suite", cmd_line_options, config_file_data, default=task)
     variant = read_config.get_config_value("build_variant", cmd_line_options, config_file_data,
                                            required=True)
@@ -141,8 +144,8 @@ def get_config_options(cmd_line_options, config_file):
 
     return ConfigOptions(build_id, depends_on, fallback_num_sub_suites, is_patch, large_distro_name,
                          max_sub_suites, project, repeat_suites, resmoke_args, resmoke_jobs_max,
-                         run_multiple_jobs, suite, target_resmoke_time, task, use_default_timeouts,
-                         use_large_distro, use_multiversion, variant)
+                         run_multiple_jobs, suite, target_resmoke_time, task, task_id,
+                         use_default_timeouts, use_large_distro, use_multiversion, variant)
 
 
 def divide_remaining_tests_among_suites(remaining_tests_runtimes, suites):
@@ -269,6 +272,28 @@ def calculate_timeout(avg_runtime, scaling_factor):
         return int(math.ceil(runtime + distance_to_min))
 
     return max(MIN_TIMEOUT_SECONDS, round_to_minute(avg_runtime)) * scaling_factor
+
+
+def should_tasks_be_generated(evg_api, task_id):
+    """
+    Determine if we should attempt to generate tasks.
+
+    If an evergreen task that calls 'generate.tasks' is restarted, the 'generate.tasks' command
+    will no-op. So, if we are in that state, we should avoid generating new configuration files
+    that will just be confusing to the user (since that would not be used).
+
+    :param evg_api: Evergreen API object.
+    :param task_id: Id of the task being run.
+    :return: Boolean of whether to generate tasks.
+    """
+    task = evg_api.task_by_id(task_id, fetch_all_executions=True)
+    # If any previous execution was successful, do not generate more tasks.
+    for i in range(task.execution):
+        task_execution = task.get_execution(i)
+        if task_execution.is_success():
+            return False
+
+    return True
 
 
 class EvergreenConfigGenerator(object):
@@ -658,6 +683,10 @@ class Main(object):
 
         if options.verbose:
             enable_logging()
+
+        if not should_tasks_be_generated(self.evergreen_api, self.config_options.task_id):
+            LOGGER.info("Not generating configuration due to previous successful generation.")
+            return
 
         LOGGER.debug("Starting execution for options %s", options)
         LOGGER.debug("config options %s", self.config_options)
