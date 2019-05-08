@@ -1359,6 +1359,38 @@ TEST_F(OpObserverMultiEntryTransactionTest,
     assertNoTxnRecord();
 }
 
+TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
+    const NamespaceString nss("testDB", "testColl");
+    auto uuid = CollectionUUID::gen();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    std::vector<InsertStatement> inserts;
+    inserts.emplace_back(0, BSON("_id" << 0));
+
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss, MODE_IX);
+    opObserver().onInserts(opCtx(), nss, uuid, inserts.begin(), inserts.end(), false);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
+    auto oplogEntryObj = getNOplogEntries(opCtx(), 1)[0];
+    checkSessionAndTransactionFields(oplogEntryObj, 0);
+    auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+    ASSERT(!oplogEntry.getPrepare());
+    ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
+    ASSERT_EQ(repl::OpTime(), *oplogEntry.getPrevWriteOpTimeInTransaction());
+
+    // The implicit commit oplog entry.
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns"
+                                                        << nss.toString()
+                                                        << "ui"
+                                                        << uuid
+                                                        << "o"
+                                                        << BSON("_id" << 0))));
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntry.getObject());
+}
+
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
@@ -1379,7 +1411,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
     opObserver().onInserts(opCtx(), nss2, uuid2, inserts2.begin(), inserts2.end(), false);
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 5);
+    auto oplogEntryObjs = getNOplogEntries(opCtx(), 4);
     StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -1430,6 +1462,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
                                 << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 
+    // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
+    // field.
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "i"
                                                    << "ns"
@@ -1438,12 +1472,9 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
                                                    << uuid2
                                                    << "o"
                                                    << BSON("_id" << 3)))
-                                << "partialTxn"
-                                << true);
+                                << "count"
+                                << 4);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[3].getObject());
-
-    oExpected = BSON("commitTransaction" << 1 << "prepared" << false << "count" << 4);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[4].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
@@ -1479,7 +1510,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     opObserver().onUpdate(opCtx(), update2);
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 3);
+    auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -1510,6 +1541,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
                                      << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
+    // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
+    // field.
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "u"
                                                    << "ns"
@@ -1521,12 +1554,9 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
                                                                           << "y"))
                                                    << "o2"
                                                    << BSON("_id" << 1)))
-                                << "partialTxn"
-                                << true);
+                                << "count"
+                                << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
-
-    oExpected = BSON("commitTransaction" << 1 << "prepared" << false << "count" << 2);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
@@ -1553,7 +1583,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, false, boost::none);
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 3);
+    auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -1581,6 +1611,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
                                      << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
+    // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
+    // field.
     oExpected = oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                                << "d"
                                                                << "ns"
@@ -1589,12 +1621,9 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
                                                                << uuid2
                                                                << "o"
                                                                << BSON("_id" << 1)))
-                                            << "partialTxn"
-                                            << true);
+                                            << "count"
+                                            << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
-
-    oExpected = BSON("commitTransaction" << 1 << "prepared" << false << "count" << 2);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest,
@@ -2082,7 +2111,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
     opObserver().onInserts(opCtx(), nss2, uuid2, inserts2.begin(), inserts2.end(), false);
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
+    auto oplogEntryObjs = getNOplogEntries(opCtx(), 1);
     StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -2128,12 +2157,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
                                                            << "ui"
                                                            << uuid2
                                                            << "o"
-                                                           << BSON("_id" << 3)))
-                                     << "partialTxn"
-                                     << true);
+                                                           << BSON("_id" << 3))));
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
-    oExpected = BSON("commitTransaction" << 1 << "prepared" << false << "count" << 4);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPackingTest) {
@@ -2344,7 +2369,7 @@ TEST_F(OpObserverLargeMultiEntryTransactionTest, LargeTransactionCreatesMultiple
     txnParticipant.addTransactionOperation(opCtx(), operation2);
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 3);
+    auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -2363,11 +2388,8 @@ TEST_F(OpObserverLargeMultiEntryTransactionTest, LargeTransactionCreatesMultiple
     auto oExpected = BSON("applyOps" << BSON_ARRAY(operation1.toBSON()) << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
-    oExpected = BSON("applyOps" << BSON_ARRAY(operation2.toBSON()) << "partialTxn" << true);
+    oExpected = BSON("applyOps" << BSON_ARRAY(operation2.toBSON()) << "count" << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
-
-    oExpected = BSON("commitTransaction" << 1 << "prepared" << false << "count" << 2);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 }
 
 }  // namespace

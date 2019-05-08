@@ -992,24 +992,22 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
 
 namespace {
 
-// Logs one applyOps, packing in as many operations as fit in a single applyOps entry.  If
-// isPartialTxn is not set, all operations are attempted to be packed, regardless of whether or
-// not they fit; TransactionTooLarge will be thrown if this is not the case.
+// Accepts an empty BSON builder and appends the given transaction statements to an 'applyOps' array
+// field. Appends as many operations as possible until either the constructed object exceeds the
+// 16MB limit or the maximum number of transaction statements allowed in one entry.
 //
-// Returns an iterator to the first ReplOperation not packed in the batch.
-std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApplyOpsForTransaction(
-    OperationContext* opCtx,
+// If 'limitSize' is false, then it attempts to include all given operations, regardless of whether
+// or not they fit. If the ops don't fit, BSONObjectTooLarge will be thrown in that case.
+//
+// Returns an iterator to the first statement that wasn't packed into the applyOps object.
+std::vector<repl::ReplOperation>::const_iterator packTransactionStatementsForApplyOps(
+    BSONObjBuilder* applyOpsBuilder,
     std::vector<repl::ReplOperation>::const_iterator stmtBegin,
     std::vector<repl::ReplOperation>::const_iterator stmtEnd,
-    const OplogSlot& oplogSlot,
-    repl::OpTime prevWriteOpTime,
-    StmtId stmtId,
-    const bool prepare,
-    const bool isPartialTxn,
-    const bool shouldWriteStateField) {
-    BSONObjBuilder applyOpsBuilder;
-    BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
+    bool limitSize) {
+
     std::vector<repl::ReplOperation>::const_iterator stmtIter;
+    BSONArrayBuilder opsArray(applyOpsBuilder->subarrayStart("applyOps"_sd));
     for (stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
         const auto& stmt = *stmtIter;
         // Stop packing when either number of transaction operations is reached, or when the next
@@ -1018,7 +1016,7 @@ std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApp
         // BSON overhead and the other applyOps fields.  But if the array with a single operation
         // exceeds BSONObjMaxUserSize, we still log it, as a single max-length operation
         // should be able to be applied.
-        if (isPartialTxn &&
+        if (limitSize &&
             (opsArray.arrSize() == gMaxNumberOfTransactionOperationsInSingleOplogEntry ||
              (opsArray.arrSize() > 0 &&
               (opsArray.len() + OplogEntry::getDurableReplOperationSize(stmt) >
@@ -1027,6 +1025,35 @@ std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApp
         opsArray.append(stmt.toBSON());
     }
     opsArray.done();
+    return stmtIter;
+}
+
+// Logs one applyOps entry and may update the transactions table. Assumes that the given BSON
+// builder object already has  an 'applyOps' field appended pointing to the desired array of ops
+// i.e. { "applyOps" : [op1, op2, ...] }
+//
+// @param prepare determines whether a 'prepare' field will be attached to the written oplog entry.
+// @param isPartialTxn is this applyOps entry part of an in-progress multi oplog entry transaction.
+// Should be set for all non-terminal ops of an unprepared multi oplog entry transaction.
+// @param shouldWriteStateField determines whether a 'state' field will be included in the write to
+// the transactions table. Only meaningful if 'updateTxnTable' is true.
+// @param updateTxnTable determines whether the transactions table will updated after the oplog
+// entry is written.
+//
+// Returns the optime of the written oplog entry.
+OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
+                                       BSONObjBuilder* applyOpsBuilder,
+                                       const OplogSlot& oplogSlot,
+                                       repl::OpTime prevWriteOpTime,
+                                       StmtId stmtId,
+                                       const bool prepare,
+                                       const bool isPartialTxn,
+                                       const bool shouldWriteStateField,
+                                       const bool updateTxnTable,
+                                       boost::optional<long long> count) {
+
+    // A 'prepare' oplog entry should never include a 'partialTxn' field.
+    invariant(!(isPartialTxn && prepare));
 
     const NamespaceString cmdNss{"admin", "$cmd"};
 
@@ -1040,12 +1067,15 @@ std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApp
     try {
         if (prepare) {
             // TODO: SERVER-36814 Remove "prepare" field on applyOps.
-            applyOpsBuilder.append("prepare", true);
+            applyOpsBuilder->append("prepare", true);
         }
         if (isPartialTxn) {
-            applyOpsBuilder.append("partialTxn", true);
+            applyOpsBuilder->append("partialTxn", true);
         }
-        auto applyOpCmd = applyOpsBuilder.done();
+        if (count) {
+            applyOpsBuilder->append("count", *count);
+        }
+        auto applyOpCmd = applyOpsBuilder->done();
         auto times = replLogApplyOps(
             opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink, prepare, oplogSlot);
 
@@ -1053,7 +1083,7 @@ std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApp
                          prevWriteOpTime,
                          isPartialTxn,
                          shouldWriteStateField]() -> boost::optional<DurableTxnStateEnum> {
-            if (!shouldWriteStateField || !prevWriteOpTime.isNull()) {
+            if (!shouldWriteStateField) {
                 // TODO (SERVER-40678): Either remove the invariant on prepare or separate the
                 // checks of FCV and 'prevWriteOpTime' once we support implicit prepare on
                 // primaries.
@@ -1068,7 +1098,7 @@ std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApp
             return prepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted;
         }();
 
-        if (prevWriteOpTime.isNull()) {
+        if (updateTxnTable) {
             // Only update the transaction table on the first 'partialTxn' entry when using the
             // multiple transaction oplog entries format.
             auto startOpTime = isPartialTxn ? boost::make_optional(oplogSlot) : boost::none;
@@ -1080,7 +1110,7 @@ std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApp
                                txnState,
                                startOpTime);
         }
-        return {times, stmtIter};
+        return times;
     } catch (const AssertionException& e) {
         // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
         uassert(ErrorCodes::TransactionTooLarge,
@@ -1089,6 +1119,36 @@ std::pair<OpTimeBundle, std::vector<repl::ReplOperation>::const_iterator> logApp
         throw;
     }
     MONGO_UNREACHABLE;
+}
+
+// Log a single applyOps for transactions without any attempt to pack operations. If the given
+// statements would exceed the maximum BSON size limit of a single oplog entry, this will throw a
+// TransactionTooLarge error.
+// TODO (SERVER-39809): Consider removing this function once old transaction format is no longer
+// needed.
+OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
+                                       const std::vector<repl::ReplOperation>& statements,
+                                       const OplogSlot& oplogSlot,
+                                       repl::OpTime prevWriteOpTime,
+                                       StmtId stmtId,
+                                       const bool prepare,
+                                       const bool isPartialTxn,
+                                       const bool shouldWriteStateField,
+                                       const bool updateTxnTable,
+                                       boost::optional<long long> count) {
+    BSONObjBuilder applyOpsBuilder;
+    packTransactionStatementsForApplyOps(
+        &applyOpsBuilder, statements.begin(), statements.end(), false /* limitSize */);
+    return logApplyOpsForTransaction(opCtx,
+                                     &applyOpsBuilder,
+                                     oplogSlot,
+                                     prevWriteOpTime,
+                                     stmtId,
+                                     prepare,
+                                     isPartialTxn,
+                                     shouldWriteStateField,
+                                     updateTxnTable,
+                                     count);
 }
 
 OpTimeBundle logReplOperationForTransaction(OperationContext* opCtx,
@@ -1126,7 +1186,8 @@ OpTimeBundle logReplOperationForTransaction(OperationContext* opCtx,
 // number of applyOps written will be used.  The number of oplog entries written is returned.
 int logOplogEntriesForTransaction(OperationContext* opCtx,
                                   const std::vector<repl::ReplOperation>& stmts,
-                                  const std::vector<OplogSlot>& oplogSlots) {
+                                  const std::vector<OplogSlot>& oplogSlots,
+                                  bool prepare) {
     invariant(!stmts.empty());
     invariant(stmts.size() <= oplogSlots.size());
 
@@ -1144,18 +1205,49 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
             // Note the logged statement IDs are not the same as the user-chosen statement IDs.
             stmtId = 0;
             auto oplogSlot = oplogSlots.begin();
-            auto stmtsBegin = stmts.begin();
-            while (stmtsBegin != stmts.end()) {
-                std::tie(prevWriteOpTime, stmtsBegin) =
-                    logApplyOpsForTransaction(opCtx,
-                                              stmtsBegin,
-                                              stmts.end(),
-                                              *oplogSlot++,
-                                              prevWriteOpTime.writeOpTime,
-                                              stmtId,
-                                              false /* prepare */,
-                                              true /* isPartialTxn */,
-                                              true /* shouldWriteStateField */);
+
+            // At the beginning of each loop iteration below, 'stmtsIter' will always point to the
+            // first statement of the sequence of remaining, unpacked transaction statements. If all
+            // statements have been packed, it should point to stmts.end(), which is the loop's
+            // termination condition.
+            auto stmtsIter = stmts.begin();
+            while (stmtsIter != stmts.end()) {
+
+                BSONObjBuilder applyOpsBuilder;
+                auto nextStmt = packTransactionStatementsForApplyOps(
+                    &applyOpsBuilder, stmtsIter, stmts.end(), true /* limitSize */);
+
+                // If we packed the last op, then the next oplog entry we log should be the implicit
+                // commit, i.e. we omit the 'partialTxn' field.
+                //
+                // TODO (SERVER-40678): Until we support implicit prepare for transactions, always
+                // log 'partialTxn' for prepared transactions. For unprepared transactions, update
+                // the transactions table on the first and last op. For prepared transactions, only
+                // update it on the first op.
+                auto firstOp = stmtsIter == stmts.begin();
+                auto lastOp = nextStmt == stmts.end();
+                auto isPartialTxn = prepare || !lastOp;
+                auto updateTxnTable = firstOp || (lastOp && !prepare);
+
+                // The 'count' field gives the total number of individual operations in the
+                // transaction. We do not include this if only logging a single applyOps entry for
+                // an unprepared transaction. It is never included here for prepared transactions.
+                auto count = (lastOp && !firstOp && !prepare)
+                    ? boost::optional<long long>(stmts.size())
+                    : boost::none;
+                prevWriteOpTime = logApplyOpsForTransaction(opCtx,
+                                                            &applyOpsBuilder,
+                                                            *oplogSlot++,
+                                                            prevWriteOpTime.writeOpTime,
+                                                            stmtId,
+                                                            false /* prepare */,
+                                                            isPartialTxn,
+                                                            true /* shouldWriteStateField */,
+                                                            updateTxnTable,
+                                                            count);
+
+                // Advance the iterator to the beginning of the remaining unpacked statements.
+                stmtsIter = nextStmt;
                 stmtId++;
             }
             wuow.commit();
@@ -1229,6 +1321,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 }
 
 // This is used only for multi-oplog-entry unprepared transactions
+// TODO (SERVER-40728) Remove this unused function.
 repl::OpTime logCommitForUnpreparedTransaction(OperationContext* opCtx,
                                                StmtId stmtId,
                                                const repl::OpTime& prevOpTime,
@@ -1302,27 +1395,25 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         invariant(lastWriteOpTime.isNull());
         commitOpTime = logApplyOpsForTransaction(
                            opCtx,
-                           statements.begin(),
-                           statements.end(),
+                           statements,
                            OplogSlot(),
                            lastWriteOpTime,
                            StmtId(0),
                            false /* prepare */,
                            false /* isPartialTxn */,
-                           fcv >= ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42)
-                           .first.writeOpTime;
+                           fcv >= ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42,
+                           true /* updateTxnTable */,
+                           boost::none)
+                           .writeOpTime;
     } else {
         // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
-        // reserve enough entries for all statements in the transaction, plus one for the commit
-        // oplog entry.
-        auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size() + 1);
-        auto commitSlot = oplogSlots.back();
-        oplogSlots.pop_back();
+        // reserve enough entries for all statements in the transaction.
+        auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size());
         invariant(oplogSlots.size() == statements.size());
-        int numOplogEntries = logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
-        const auto prevWriteOpTime = oplogSlots[numOplogEntries - 1];
-        commitOpTime = logCommitForUnpreparedTransaction(
-            opCtx, StmtId(numOplogEntries), prevWriteOpTime, commitSlot, statements.size());
+
+        // Log in-progress entries for the transaction along with the implicit commit.
+        int numOplogEntries = logOplogEntriesForTransaction(opCtx, statements, oplogSlots, false);
+        commitOpTime = oplogSlots[numOplogEntries - 1];
     }
     invariant(!commitOpTime.isNull());
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, commitOpTime);
@@ -1431,14 +1522,15 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                 invariant(lastWriteOpTime.isNull());
                 logApplyOpsForTransaction(
                     opCtx,
-                    statements.begin(),
-                    statements.end(),
+                    statements,
                     prepareOpTime,
                     lastWriteOpTime,
                     StmtId(0),
                     true /* prepare */,
                     false /* isPartialTxn */,
-                    fcv >= ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42);
+                    fcv >= ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42,
+                    true /* updateTxnTable */,
+                    boost::none);
                 wuow.commit();
             });
     } else {
@@ -1460,8 +1552,8 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                 // should not write any operations other than the prepare oplog entry.
                 int nOperationOplogEntries = 0;
                 if (!statements.empty()) {
-                    nOperationOplogEntries =
-                        logOplogEntriesForTransaction(opCtx, statements, reservedSlots);
+                    nOperationOplogEntries = logOplogEntriesForTransaction(
+                        opCtx, statements, reservedSlots, true /* prepare */);
 
                     // We had reserved enough oplog slots for the worst case where each operation
                     // produced one oplog entry.  When operations are smaller and can be packed,

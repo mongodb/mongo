@@ -2844,8 +2844,7 @@ public:
     MultiOplogEntryTransaction() : MultiDocumentTransactionTest("multiOplogEntryTransaction") {
         const auto currentTime = _clock->getClusterTime();
         firstOplogEntryTs = currentTime.addTicks(1).asTimestamp();
-        secondOplogEntryTs = currentTime.addTicks(2).asTimestamp();
-        commitEntryTs = currentTime.addTicks(3).asTimestamp();
+        commitEntryTs = currentTime.addTicks(2).asTimestamp();
     }
 
     void run() {
@@ -2874,19 +2873,27 @@ public:
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
             assertDocumentAtTimestamp(coll, firstOplogEntryTs, BSONObj());
-            assertDocumentAtTimestamp(coll, secondOplogEntryTs, BSONObj());
             assertFilteredDocumentAtTimestamp(coll, query1, commitEntryTs, doc);
             assertFilteredDocumentAtTimestamp(coll, query2, commitEntryTs, doc2);
             assertFilteredDocumentAtTimestamp(coll, query1, nullTs, doc);
             assertFilteredDocumentAtTimestamp(coll, query2, nullTs, doc2);
 
-            // Commit oplog entry should exist at commitEntryTs.
-            const auto commitFilter = BSON("ts" << commitEntryTs << "op"
-                                                << "c");
+            // Implicit commit oplog entry should exist at commitEntryTs.
+            const auto commitFilter =
+                BSON("ts" << commitEntryTs << "o"
+                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                                << "i"
+                                                                << "ns"
+                                                                << nss.ns()
+                                                                << "ui"
+                                                                << coll->uuid().get()
+                                                                << "o"
+                                                                << doc2))
+                                             << "count"
+                                             << 2));
             assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, firstOplogEntryTs, false);
-            assertOplogDocumentExistsAtTimestamp(commitFilter, secondOplogEntryTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, true);
 
@@ -2895,7 +2902,6 @@ public:
             assertOldestActiveTxnTimestampEquals(boost::none, presentTs);
             assertOldestActiveTxnTimestampEquals(boost::none, beforeTxnTs);
             assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, firstOplogEntryTs);
-            assertOldestActiveTxnTimestampEquals(firstOplogEntryTs, secondOplogEntryTs);
             assertOldestActiveTxnTimestampEquals(boost::none, commitEntryTs);
             assertOldestActiveTxnTimestampEquals(boost::none, nullTs);
 
@@ -2915,29 +2921,8 @@ public:
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, firstOplogEntryTs, true);
-            assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, secondOplogEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, commitEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, nullTs, true);
-
-            // second oplog entry should exist at secondOplogEntryTs and after it.
-            const auto secondOplogEntryFilter =
-                BSON("ts" << secondOplogEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns"
-                                                                << nss.ns()
-                                                                << "ui"
-                                                                << coll->uuid().get()
-                                                                << "o"
-                                                                << doc2))
-                                             << "partialTxn"
-                                             << true));
-            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, presentTs, false);
-            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, beforeTxnTs, false);
-            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, firstOplogEntryTs, false);
-            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, secondOplogEntryTs, true);
-            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, commitEntryTs, true);
-            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, nullTs, true);
 
             // Session state should go to inProgress at firstOplogEntryTs, then to committed
             // at commitEntryTs
@@ -2946,24 +2931,22 @@ public:
             auto sessionInfo = getSessionTxnInfoAtTimestamp(firstOplogEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "inProgress");
             ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), firstOplogEntryTs);
-
-            sessionInfo = getSessionTxnInfoAtTimestamp(secondOplogEntryTs, true);
-            ASSERT_EQ(sessionInfo["state"].String(), "inProgress");
-            // The transaction table is only updated at the start of the transaction.
-            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), firstOplogEntryTs);
+            ASSERT_EQ(sessionInfo["startOpTime"]["ts"].timestamp(), firstOplogEntryTs);
 
             sessionInfo = getSessionTxnInfoAtTimestamp(commitEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "committed");
             ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), commitEntryTs);
+            ASSERT_FALSE(sessionInfo.hasField("startOpTime"));
 
             sessionInfo = getSessionTxnInfoAtTimestamp(nullTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "committed");
             ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), commitEntryTs);
+            ASSERT_FALSE(sessionInfo.hasField("startOpTime"));
         }
     }
 
 protected:
-    Timestamp firstOplogEntryTs, secondOplogEntryTs;
+    Timestamp firstOplogEntryTs;
 
 private:
     MultiOplogScopedSettings multiOplogSettings;
@@ -3161,19 +3144,23 @@ public:
             auto sessionInfo = getSessionTxnInfoAtTimestamp(firstOplogEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "inProgress");
             ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), firstOplogEntryTs);
+            ASSERT_EQ(sessionInfo["startOpTime"]["ts"].timestamp(), firstOplogEntryTs);
 
             sessionInfo = getSessionTxnInfoAtTimestamp(secondOplogEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "inProgress");
             // The transaction table is only updated at the start of the transaction.
             ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), firstOplogEntryTs);
+            ASSERT_EQ(sessionInfo["startOpTime"]["ts"].timestamp(), firstOplogEntryTs);
 
             sessionInfo = getSessionTxnInfoAtTimestamp(prepareEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "prepared");
             ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), prepareEntryTs);
+            ASSERT_EQ(sessionInfo["startOpTime"]["ts"].timestamp(), firstOplogEntryTs);
 
             sessionInfo = getSessionTxnInfoAtTimestamp(nullTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "committed");
             ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), commitEntryTs);
+            ASSERT_FALSE(sessionInfo.hasField("startOpTime"));
         }
     }
 
@@ -3286,6 +3273,7 @@ public:
             auto sessionInfo = getSessionTxnInfoAtTimestamp(abortEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "aborted");
             ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), abortEntryTs);
+            ASSERT_FALSE(sessionInfo.hasField("startOpTime"));
         }
     }
 
