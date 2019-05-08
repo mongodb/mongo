@@ -66,6 +66,13 @@ TEST(NonAuthTaskExecutor, Basic) {
     ASSERT_OK(pf.future.getNoThrow());
 }
 
+TEST(NonAuthTaskExecutor, NotUsingIsNonFatal) {
+    // Test purposefully makes a service context and immediately throws it away to ensure that we
+    // can construct and destruct a service context (which is decorated with a non auth task
+    // executor) even if we never call startup().
+    ServiceContext::make();
+}
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo

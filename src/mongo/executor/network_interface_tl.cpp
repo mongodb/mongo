@@ -57,7 +57,7 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
       _connPoolOpts(std::move(connPoolOpts)),
       _onConnectHook(std::move(onConnectHook)),
       _metadataHook(std::move(metadataHook)),
-      _inShutdown(false) {}
+      _state(kDefault) {}
 
 std::string NetworkInterfaceTL::getDiagnosticString() {
     return "DEPRECATED: getDiagnosticString is deprecated in NetworkInterfaceTL";
@@ -104,6 +104,8 @@ void NetworkInterfaceTL::startup() {
         setThreadName(_instanceName);
         _run();
     });
+
+    invariant(_state.swap(kStarted) == kDefault);
 }
 
 void NetworkInterfaceTL::_run() {
@@ -124,7 +126,7 @@ void NetworkInterfaceTL::_run() {
 }
 
 void NetworkInterfaceTL::shutdown() {
-    if (_inShutdown.swap(true))
+    if (_state.swap(kStopped) != kStarted)
         return;
 
     LOG(2) << "Shutting down network interface.";
@@ -138,7 +140,7 @@ void NetworkInterfaceTL::shutdown() {
 }
 
 bool NetworkInterfaceTL::inShutdown() const {
-    return _inShutdown.load();
+    return _state.load() == kStopped;
 }
 
 void NetworkInterfaceTL::waitForWork() {

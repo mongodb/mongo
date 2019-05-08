@@ -145,7 +145,15 @@ private:
     Counters _counters;
 
     std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;
-    AtomicWord<bool> _inShutdown;
+
+    // We start in kDefault, transition to kStarted after startup() is complete and enter kStopped
+    // at the first call to shutdown()
+    enum State : int {
+        kDefault,
+        kStarted,
+        kStopped,
+    };
+    AtomicWord<State> _state;
     stdx::thread _ioThread;
 
     stdx::mutex _inProgressMutex;
