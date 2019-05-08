@@ -91,6 +91,7 @@ using std::endl;
 namespace repl {
 
 AtomicInt32 SyncTail::replBatchLimitOperations{5 * 1000};
+AtomicInt32 SyncTail::replBatchLimitBytes{100 * 1024 * 1024};
 
 namespace {
 
@@ -138,6 +139,25 @@ public:
         return Status::OK();
     }
 } exportedBatchLimitOperationsParam;
+
+class ExportedBatchLimitBytesParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
+public:
+    ExportedBatchLimitBytesParameter()
+        : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "replBatchLimitBytes",
+              &SyncTail::replBatchLimitBytes) {}
+
+    virtual Status validate(const int& potentialNewValue) {
+        if (potentialNewValue < (16 * 1024 * 1024) || potentialNewValue > (100 * 1024 * 1024)) {
+            return Status(ErrorCodes::BadValue,
+                          "replBatchLimitBytes must be between 16MB and 100MB, inclusive");
+        }
+
+        return Status::OK();
+    }
+} exportedBatchLimitBytesParam;
 
 // The oplog entries applied
 Counter64 opsAppliedStats;
@@ -324,7 +344,7 @@ std::size_t SyncTail::calculateBatchLimitBytes(OperationContext* opCtx,
     auto oplogMaxSizeResult =
         storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
     auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
-    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
+    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes.load()));
 }
 
 std::unique_ptr<ThreadPool> SyncTail::makeWriterPool() {
@@ -840,14 +860,14 @@ private:
         Client::initThread("ReplBatcher");
 
         BatchLimits batchLimits;
-        batchLimits.bytes =
-            calculateBatchLimitBytes(cc().makeOperationContext().get(), _storageInterface);
 
         while (true) {
             batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
 
-            // Check this once per batch since users can change it at runtime.
+            // Check the limits once per batch since users can change them at runtime.
             batchLimits.ops = replBatchLimitOperations.load();
+            batchLimits.bytes =
+                calculateBatchLimitBytes(cc().makeOperationContext().get(), _storageInterface);
 
             OpQueue ops(batchLimits.ops);
             // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.

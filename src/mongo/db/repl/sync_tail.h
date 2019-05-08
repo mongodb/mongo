@@ -80,7 +80,7 @@ public:
     /**
      * Lower bound of batch limit size (in bytes) returned by calculateBatchLimitBytes().
      */
-    static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
+    static AtomicInt32 replBatchLimitBytes;
 
     /**
      * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
