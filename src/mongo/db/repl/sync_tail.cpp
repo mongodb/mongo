@@ -633,16 +633,16 @@ private:
         Client::initThread("ReplBatcher");
 
         BatchLimits batchLimits;
-        batchLimits.bytes = OplogApplier::calculateBatchLimitBytes(
-            cc().makeOperationContext().get(), _storageInterface);
 
         while (true) {
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(rsSyncApplyStop);
 
             batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
 
-            // Check this once per batch since users can change it at runtime.
+            // Check the limits once per batch since users can change them at runtime.
             batchLimits.ops = OplogApplier::getBatchLimitOperations();
+            batchLimits.bytes = OplogApplier::calculateBatchLimitBytes(
+                cc().makeOperationContext().get(), _storageInterface);
 
             OpQueue ops(batchLimits.ops);
             {
