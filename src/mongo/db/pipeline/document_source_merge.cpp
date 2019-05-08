@@ -64,14 +64,18 @@ constexpr auto kDefaultWhenMatched = WhenMatched::kMerge;
 constexpr auto kDefaultWhenNotMatched = WhenNotMatched::kInsert;
 constexpr auto kReplaceWithNewInsertMode =
     MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kInsert};
+constexpr auto kReplaceWithNewFailMode =
+    MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kFail};
 constexpr auto kMergeInsertMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kInsert};
+constexpr auto kMergeFailMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kFail};
 constexpr auto kKeepExistingInsertMode =
     MergeMode{WhenMatched::kKeepExisting, WhenNotMatched::kInsert};
 constexpr auto kFailInsertMode = MergeMode{WhenMatched::kFail, WhenNotMatched::kInsert};
 constexpr auto kPipelineInsertMode = MergeMode{WhenMatched::kPipeline, WhenNotMatched::kInsert};
+constexpr auto kPipelineFailMode = MergeMode{WhenMatched::kPipeline, WhenNotMatched::kFail};
 
 /**
- * Creates a merge strategy which uses update semantics to do perform a merge operation. If
+ * Creates a merge strategy which uses update semantics to perform a merge operation. If
  * 'BatchTransform' function is provided, it will be called to transform batched objects before
  * passing them to the 'update'.
  */
@@ -81,6 +85,7 @@ MergeStrategy makeUpdateStrategy(bool upsert, BatchTransform transform) {
         if (transform) {
             transform(batch);
         }
+
         constexpr auto multi = false;
         expCtx->mongoProcessInterface->update(expCtx,
                                               ns,
@@ -90,6 +95,47 @@ MergeStrategy makeUpdateStrategy(bool upsert, BatchTransform transform) {
                                               upsert,
                                               multi,
                                               epoch);
+    };
+}
+
+/**
+ * Creates a merge strategy which uses update semantics to perform a merge operation and ensures
+ * that each document in the batch has a matching document in the 'ns' collection (note that a
+ * matching document may not be modified as a result of an update operation, yet it still will be
+ * counted as matching). If at least one document doesn't have a match, this strategy returns an
+ * error. If 'BatchTransform' function is provided, it will be called to transform batched objects
+ * before passing them to the 'update'.
+ */
+MergeStrategy makeStrictUpdateStrategy(bool upsert, BatchTransform transform) {
+    return [upsert, transform](
+        const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
+        if (transform) {
+            transform(batch);
+        }
+
+        const auto batchSize = batch.size();
+        constexpr auto multi = false;
+        auto writeResult =
+            expCtx->mongoProcessInterface->updateWithResult(expCtx,
+                                                            ns,
+                                                            std::move(batch.uniqueKeys),
+                                                            std::move(batch.modifications),
+                                                            wc,
+                                                            upsert,
+                                                            multi,
+                                                            epoch);
+        constexpr auto initValue = 0ULL;
+        auto nMatched =
+            std::accumulate(writeResult.results.begin(),
+                            writeResult.results.end(),
+                            initValue,
+                            [](auto total, const auto& opRes) {
+                                return total + (opRes.isOK() ? opRes.getValue().getN() : 0);
+                            });
+        uassert(ErrorCodes::MergeStageNoMatchingDocument,
+                "{} could not find a matching document in the target collection "
+                "for at least one document in the source collection"_format(kStageName),
+                nMatched == batchSize);
     };
 }
 
@@ -110,8 +156,8 @@ MergeStrategy makeInsertStrategy() {
 }
 
 /**
- * Creates a batched objects transformation function which wraps each element of the 'batch.objects'
- * array into the given 'updateOp' operator.
+ * Creates a batched objects transformation function which wraps each element of the
+ * 'batch.modifications' array into the given 'updateOp' operator.
  */
 BatchTransform makeUpdateTransform(const std::string& updateOp) {
     return [updateOp](auto& batch) {
@@ -139,22 +185,38 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
     // initialized until the first use, which is when the program already started and all global
     // variables had been initialized.
     static const auto mergeStrategyDescriptors = MergeStrategyDescriptorsMap{
+        // whenMatched: replaceWithNew, whenNotMatched: insert
         {kReplaceWithNewInsertMode,
          {kReplaceWithNewInsertMode,
           {ActionType::insert, ActionType::update},
           makeUpdateStrategy(true, {})}},
+        // whenMatched: replaceWithNew, whenNotMatched: fail
+        {kReplaceWithNewFailMode,
+         {kReplaceWithNewFailMode, {ActionType::update}, makeStrictUpdateStrategy(false, {})}},
+        // whenMatched: merge, whenNotMatched: insert
         {kMergeInsertMode,
          {kMergeInsertMode,
           {ActionType::insert, ActionType::update},
           makeUpdateStrategy(true, makeUpdateTransform("$set"))}},
+        // whenMatched: merge, whenNotMatched: fail
+        {kMergeFailMode,
+         {kMergeFailMode,
+          {ActionType::update},
+          makeStrictUpdateStrategy(false, makeUpdateTransform("$set"))}},
+        // whenMatched: keepExisting, whenNotMatched: insert
         {kKeepExistingInsertMode,
          {kKeepExistingInsertMode,
           {ActionType::insert, ActionType::update},
           makeUpdateStrategy(true, makeUpdateTransform("$setOnInsert"))}},
+        // whenMatched: [pipeline], whenNotMatched: insert
         {kPipelineInsertMode,
          {kPipelineInsertMode,
           {ActionType::insert, ActionType::update},
           makeUpdateStrategy(true, {})}},
+        // whenMatched: [pipeline], whenNotMatched: fail
+        {kPipelineFailMode,
+         {kPipelineFailMode, {ActionType::update}, makeStrictUpdateStrategy(false, {})}},
+        // whenMatched: fail, whenNotMatched: insert
         {kFailInsertMode, {kFailInsertMode, {ActionType::insert}, makeInsertStrategy()}}};
     return mergeStrategyDescriptors;
 }
@@ -347,6 +409,7 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
     auto whenMatched =
         mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->mode : kDefaultWhenMatched;
     auto whenNotMatched = mergeSpec.getWhenNotMatched().value_or(kDefaultWhenNotMatched);
+
     uassert(51181,
             "Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
             "is not supported"_format(kStageName,

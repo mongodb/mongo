@@ -242,14 +242,15 @@ void MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionConte
         "Insert failed: ");
 }
 
-void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      const NamespaceString& ns,
-                                      std::vector<BSONObj>&& queries,
-                                      std::vector<write_ops::UpdateModification>&& updates,
-                                      const WriteConcernOptions& wc,
-                                      bool upsert,
-                                      bool multi,
-                                      boost::optional<OID> targetEpoch) {
+WriteResult MongoInterfaceStandalone::updateWithResult(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::vector<BSONObj>&& queries,
+    std::vector<write_ops::UpdateModification>&& updates,
+    const WriteConcernOptions& wc,
+    bool upsert,
+    bool multi,
+    boost::optional<OID> targetEpoch) {
     auto writeResults = performUpdates(expCtx->opCtx,
                                        buildUpdateOp(ns,
                                                      std::move(queries),
@@ -268,6 +269,20 @@ void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionConte
             return Status::OK();
         }(),
         "Update failed: ");
+
+    return writeResults;
+}
+
+void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const NamespaceString& ns,
+                                      std::vector<BSONObj>&& queries,
+                                      std::vector<write_ops::UpdateModification>&& updates,
+                                      const WriteConcernOptions& wc,
+                                      bool upsert,
+                                      bool multi,
+                                      boost::optional<OID> targetEpoch) {
+    [[maybe_unused]] auto writeResult = updateWithResult(
+        expCtx, ns, std::move(queries), std::move(updates), wc, upsert, multi, targetEpoch);
 }
 
 CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext* opCtx,

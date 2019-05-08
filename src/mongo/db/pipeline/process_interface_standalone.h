@@ -70,6 +70,14 @@ public:
                 bool upsert,
                 bool multi,
                 boost::optional<OID> targetEpoch) override;
+    WriteResult updateWithResult(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 const NamespaceString& ns,
+                                 std::vector<BSONObj>&& queries,
+                                 std::vector<write_ops::UpdateModification>&& updates,
+                                 const WriteConcernOptions& wc,
+                                 bool upsert,
+                                 bool multi,
+                                 boost::optional<OID> targetEpoch) override;
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;
     void appendLatencyStats(OperationContext* opCtx,

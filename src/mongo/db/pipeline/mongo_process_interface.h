@@ -42,6 +42,7 @@
 #include "mongo/db/generic_cursor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -140,6 +141,21 @@ public:
                         bool upsert,
                         bool multi,
                         boost::optional<OID> targetEpoch) = 0;
+
+    /**
+     * Updates the documents matching 'queries' with the objects 'updates'. Throws a UserException
+     * if any of the updates fail. If 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the
+     * targeted collection does not have the same epoch, or if the epoch changes during the update.
+     * Returns a 'WriteResult' object with information about the write operation.
+     */
+    virtual WriteResult updateWithResult(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const NamespaceString& ns,
+                                         std::vector<BSONObj>&& queries,
+                                         std::vector<write_ops::UpdateModification>&& updates,
+                                         const WriteConcernOptions& wc,
+                                         bool upsert,
+                                         bool multi,
+                                         boost::optional<OID> targetEpoch) = 0;
 
     virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                                   const NamespaceString& ns) = 0;

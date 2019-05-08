@@ -286,3 +286,49 @@ function assertErrMsgContains(coll, pipe, code, expectedMessage) {
 function assertArrayEq({actual = [], expected = []} = {}) {
     assert(arrayEq(actual, expected), `actual=${tojson(actual)}, expected=${tojson(expected)}`);
 }
+
+/**
+ * Generates the 'numDocs' number of documents each of 'docSize' size and inserts them into the
+ * collecton 'coll'. Each document is generated from the 'template' function, which, by default,
+ * returns a document in the form of {_id: i}, where 'i' is the iteration index, starting from 0.
+ * The 'template' function is called on each iteration and can take three arguments and return
+ * any JSON document which will be used as a document template:
+ *   - 'itNum' - the current iteration number in the range [0, numDocs)
+ *   - 'docSize' - is the 'docSize' parameter passed to 'generateCollection'
+ *   - 'numDocs' - is the 'numDocs' parameter passed to 'generateCollection'
+ *
+ * After a document is generated from the template, it will be assigned a new field called 'padding'
+ * holding a repeating string of 'x' characters, so that the total size of the generated object
+ * equals to 'docSize'.
+ */
+function generateCollection({
+    coll = null,
+    numDocs = 0,
+    docSize = 0,
+    template =
+        (itNum) => {
+            return {_id: itNum};
+        }
+} = {}) {
+    assert(coll, "Collection not provided");
+
+    const bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; ++i) {
+        const doc = Object.assign({padding: ""}, template(i, docSize, numDocs));
+        const len = docSize - Object.bsonsize(doc);
+        assert.lte(0, len, `Document is already bigger than ${docSize} bytes: ${tojson(doc)}`);
+
+        doc.padding = "x".repeat(len);
+        assert.eq(
+            docSize,
+            Object.bsonsize(doc),
+            `Generated document's size doesn't match requested document's size: ${tojson(doc)}`);
+
+        bulk.insert(doc);
+    }
+
+    const res = bulk.execute();
+    assert.commandWorked(res);
+    assert.eq(numDocs, res.nInserted);
+    assert.eq(numDocs, coll.find().itcount());
+}

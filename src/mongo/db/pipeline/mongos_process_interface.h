@@ -119,6 +119,17 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    WriteResult updateWithResult(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 const NamespaceString& ns,
+                                 std::vector<BSONObj>&& queries,
+                                 std::vector<write_ops::UpdateModification>&& updates,
+                                 const WriteConcernOptions& wc,
+                                 bool upsert,
+                                 bool multi,
+                                 boost::optional<OID> targetEpoch) final override {
+        MONGO_UNREACHABLE;
+    }
+
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                           const NamespaceString& ns) final {
         MONGO_UNREACHABLE;
