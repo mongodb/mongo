@@ -41,26 +41,10 @@ using boost::intrusive_ptr;
 using std::deque;
 
 DocumentSourceMock::DocumentSourceMock(deque<GetNextResult> results)
-    : DocumentSource(new ExpressionContextForTest()),
-      queue(std::move(results)),
-      sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
-
-DocumentSourceMock::DocumentSourceMock(deque<GetNextResult> results,
-                                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx),
-      queue(std::move(results)),
-      sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
+    : DocumentSourceQueue(std::move(results), new ExpressionContextForTest()) {}
 
 const char* DocumentSourceMock::getSourceName() const {
     return "mock";
-}
-
-Value DocumentSourceMock::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(), Document()}});
-}
-
-void DocumentSourceMock::doDispose() {
-    isDisposed = true;
 }
 
 intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(Document doc) {
@@ -91,23 +75,5 @@ intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
         results.emplace_back(Document(fromjson(json)));
     }
     return new DocumentSourceMock(std::move(results));
-}
-
-boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceMock({}, expCtx);
-}
-
-DocumentSource::GetNextResult DocumentSourceMock::getNext() {
-    invariant(!isDisposed);
-    invariant(!isDetachedFromOpCtx);
-
-    if (queue.empty()) {
-        return GetNextResult::makeEOF();
-    }
-
-    auto next = std::move(queue.front());
-    queue.pop_front();
-    return next;
 }
 }

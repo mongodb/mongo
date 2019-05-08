@@ -27,45 +27,32 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <map>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/update/update_executor.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/db/pipeline/document_source_queue.h"
 
 namespace mongo {
 
-/**
- * An UpdateExecutor representing a pipeline-style update.
- */
-class PipelineExecutor : public UpdateExecutor {
+boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new DocumentSourceQueue({}, expCtx);
+}
 
-public:
-    /**
-     * Initializes the node with an aggregation pipeline definition.
-     */
-    explicit PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              const std::vector<BSONObj>& pipeline);
+DocumentSourceQueue::DocumentSourceQueue(std::deque<GetNextResult> results,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(expCtx), _queue(std::move(results)) {}
 
-    /**
-     * Replaces the document that 'applyParams.element' belongs to with 'val'. If 'val' does not
-     * contain an _id, the _id from the original document is preserved. 'applyParams.element' must
-     * be the root of the document. Always returns a result stating that indexes are affected when
-     * the replacement is not a noop.
-     */
-    ApplyResult applyUpdate(ApplyParams applyParams) const final;
+const char* DocumentSourceQueue::getSourceName() const {
+    return kStageName.rawData();
+}
 
-    Value serialize() const final;
+DocumentSource::GetNextResult DocumentSourceQueue::getNext() {
+    if (_queue.empty()) {
+        return GetNextResult::makeEOF();
+    }
 
-private:
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
-};
-
-}  // namespace mongo
+    auto next = std::move(_queue.front());
+    _queue.pop_front();
+    return next;
+}
+}

@@ -102,7 +102,7 @@ protected:
      */
     void loadDocuments(int nDocs) {
         for (int i = 0; i < nDocs; i++) {
-            _mock->queue.push_back(DOC("_id" << i));
+            _mock->push_back(DOC("_id" << i));
         }
     }
 
@@ -160,7 +160,7 @@ TEST_F(SampleBasics, SampleEOFBeforeSource) {
  */
 TEST_F(SampleBasics, DocsUnmodified) {
     createSample(1);
-    source()->queue.push_back(DOC("a" << 1 << "b" << DOC("c" << 2)));
+    source()->push_back(DOC("a" << 1 << "b" << DOC("c" << 2)));
     auto next = sample()->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.releaseDocument();
@@ -172,12 +172,12 @@ TEST_F(SampleBasics, DocsUnmodified) {
 
 TEST_F(SampleBasics, ShouldPropagatePauses) {
     createSample(2);
-    source()->queue.push_back(Document());
-    source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
-    source()->queue.push_back(Document());
-    source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
-    source()->queue.push_back(Document());
-    source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
+    source()->push_back(Document());
+    source()->push_back(DocumentSource::GetNextResult::makePauseExecution());
+    source()->push_back(Document());
+    source()->push_back(DocumentSource::GetNextResult::makePauseExecution());
+    source()->push_back(Document());
+    source()->push_back(DocumentSource::GetNextResult::makePauseExecution());
 
     // The $sample stage needs to populate itself, so should propagate all three pauses before
     // returning any results.
@@ -276,7 +276,7 @@ TEST_F(SampleFromRandomCursorBasics, SampleEOFBeforeSource) {
  */
 TEST_F(SampleFromRandomCursorBasics, DocsUnmodified) {
     createSample(1);
-    source()->queue.push_back(DOC("_id" << 1 << "b" << DOC("c" << 2)));
+    source()->push_back(DOC("_id" << 1 << "b" << DOC("c" << 2)));
     auto next = sample()->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.releaseDocument();
@@ -291,9 +291,9 @@ TEST_F(SampleFromRandomCursorBasics, DocsUnmodified) {
  */
 TEST_F(SampleFromRandomCursorBasics, IgnoreDuplicates) {
     createSample(2);
-    source()->queue.push_back(DOC("_id" << 1));
-    source()->queue.push_back(DOC("_id" << 1));  // Duplicate, should ignore.
-    source()->queue.push_back(DOC("_id" << 2));
+    source()->push_back(DOC("_id" << 1));
+    source()->push_back(DOC("_id" << 1));  // Duplicate, should ignore.
+    source()->push_back(DOC("_id" << 2));
 
     auto next = sample()->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -322,7 +322,7 @@ TEST_F(SampleFromRandomCursorBasics, IgnoreDuplicates) {
 TEST_F(SampleFromRandomCursorBasics, TooManyDups) {
     createSample(2);
     for (int i = 0; i < 1000; i++) {
-        source()->queue.push_back(DOC("_id" << 1));
+        source()->push_back(DOC("_id" << 1));
     }
 
     // First should be successful, it's not a duplicate.
@@ -338,14 +338,14 @@ TEST_F(SampleFromRandomCursorBasics, TooManyDups) {
 TEST_F(SampleFromRandomCursorBasics, MissingIdField) {
     // Once with only a bad document.
     createSample(2);  // _idField is '_id'.
-    source()->queue.push_back(DOC("non_id" << 2));
+    source()->push_back(DOC("non_id" << 2));
     ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 28793);
 
     // Again, with some regular documents before a bad one.
     createSample(2);  // _idField is '_id'.
-    source()->queue.push_back(DOC("_id" << 1));
-    source()->queue.push_back(DOC("_id" << 1));
-    source()->queue.push_back(DOC("non_id" << 2));
+    source()->push_back(DOC("_id" << 1));
+    source()->push_back(DOC("_id" << 1));
+    source()->push_back(DOC("non_id" << 2));
 
     // First should be successful.
     ASSERT_TRUE(sample()->getNext().isAdvanced());
@@ -367,8 +367,8 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
         _sample = DocumentSourceSampleFromRandomCursor::create(getExpCtx(), 2, "_id", 3);
         sample()->setSource(_mock.get());
 
-        source()->queue.push_back(DOC("_id" << 1));
-        source()->queue.push_back(DOC("_id" << 2));
+        source()->push_back(DOC("_id" << 1));
+        source()->push_back(DOC("_id" << 2));
 
         auto doc = sample()->getNext();
         ASSERT_TRUE(doc.isAdvanced());
@@ -395,8 +395,8 @@ DEATH_TEST_F(SampleFromRandomCursorBasics,
              ShouldFailIfGivenPausedInput,
              "Invariant failure Hit a MONGO_UNREACHABLE!") {
     createSample(2);
-    source()->queue.push_back(Document{{"_id", 1}});
-    source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
+    source()->push_back(Document{{"_id", 1}});
+    source()->push_back(DocumentSource::GetNextResult::makePauseExecution());
 
     // Should see the first result, then see a pause and fail.
     ASSERT_TRUE(sample()->getNext().isAdvanced());

@@ -32,7 +32,7 @@
 #include "mongo/db/update/pipeline_executor.h"
 
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/storage_validation.h"
@@ -71,17 +71,35 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
         invariant(!stageConstraints.isIndependentOfAnyCollection);
     }
 
-    _pipeline->addInitialSource(DocumentSourceMock::create(expCtx));
+    _pipeline->addInitialSource(DocumentSourceQueue::create(expCtx));
 }
 
 UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParams) const {
-    DocumentSourceMock* mockStage = static_cast<DocumentSourceMock*>(_pipeline->peekFront());
-    mockStage->queue.emplace_back(Document{applyParams.element.getDocument().getObject()});
+    DocumentSourceQueue* queueStage = static_cast<DocumentSourceQueue*>(_pipeline->peekFront());
+    queueStage->emplace_back(Document{applyParams.element.getDocument().getObject()});
     auto transformedDoc = _pipeline->getNext()->toBson();
     auto transformedDocHasIdField = transformedDoc.hasField(kIdFieldName);
 
     return ObjectReplaceExecutor::applyReplacementUpdate(
         applyParams, transformedDoc, transformedDocHasIdField);
+}
+
+Value PipelineExecutor::serialize() const {
+    std::vector<Value> valueArray;
+    for (const auto& stage : _pipeline->getSources()) {
+        // The queue stage we add to adapt the pull-based '_pipeline' to our use case should not
+        // be serialized out. Firstly, this was not part of the user's pipeline and is just an
+        // implementation detail. It wouldn't have much value in exposing. Secondly, supporting
+        // a serialization that we can later re-parse is non trivial. See the comment in
+        // DocumentSourceQueue for more details.
+        if (typeid(*stage) == typeid(DocumentSourceQueue)) {
+            continue;
+        }
+
+        stage->serializeToArray(valueArray);
+    }
+
+    return Value(valueArray);
 }
 
 }  // namespace mongo

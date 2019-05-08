@@ -67,7 +67,7 @@ protected:
      */
     void addDocument(
         Timestamp ts, int version, std::size_t applyOpsIndex, Document docKey, UUID uuid) {
-        _mock->queue.push_back(
+        _mock->push_back(
             Document{{"_id",
                       ResumeToken(ResumeTokenData(ts, version, applyOpsIndex, uuid, Value(docKey)))
                           .toDocument()}});
@@ -89,7 +89,7 @@ protected:
     }
 
     void addPause() {
-        _mock->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
+        _mock->push_back(DocumentSource::GetNextResult::makePauseExecution());
     }
 
     /**

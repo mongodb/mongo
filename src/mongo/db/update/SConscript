@@ -92,7 +92,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/db/pipeline/document_source_mock',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/update_index_data',
         'update_common',
