@@ -78,7 +78,7 @@
         }];
         let correctAddresses = coll.aggregate(addressPipe).toArray();
 
-        // Then compute the same results using $replaceWith.
+        // Then compute the same results using $replaceRoot.
         let replaceWithResult = coll.aggregate([
                                         {$replaceRoot: {newRoot: "$address"}},
                                         {$sort: {city: 1, zip: 1, street: 1, number: 1}}

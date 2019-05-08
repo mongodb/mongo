@@ -49,7 +49,7 @@ using boost::intrusive_ptr;
 class ReplaceRootBasics : public AggregationContextFixture {
 protected:
     intrusive_ptr<DocumentSource> createReplaceRoot(const BSONObj& replaceRoot) {
-        BSONObj spec = BSON("$replaceRoot" << replaceRoot);
+        BSONObj spec = BSON(DocumentSourceReplaceRoot::kStageName << replaceRoot);
         BSONElement specElement = spec.firstElement();
         return DocumentSourceReplaceRoot::createFromBson(specElement, getExpCtx());
     }
@@ -303,6 +303,17 @@ public:
                                                          getExpCtx());
     }
 
+    intrusive_ptr<DocumentSource> createReplaceWith(std::string fieldPath) {
+        BSONObj spec = BSON(DocumentSourceReplaceRoot::kAliasNameReplaceWith << fieldPath);
+        return DocumentSourceReplaceRoot::createFromBson(spec.firstElement(), getExpCtx());
+    }
+
+    intrusive_ptr<DocumentSource> createReplaceWith(BSONObj expression) {
+        BSONObj spec = BSON(DocumentSourceReplaceRoot::kAliasNameReplaceWith << expression);
+        return DocumentSourceReplaceRoot::createFromBson(spec.firstElement(), getExpCtx());
+    }
+
+
     BSONObj createSpec(BSONObj spec) {
         return BSON("$replaceRoot" << spec);
     }
@@ -328,22 +339,22 @@ TEST_F(ReplaceRootSpec, OnlyValidOptionInObjectSpecIsNewRoot) {
                                                          << "root"
                                                          << 2))),
                        AssertionException,
-                       40230);
+                       40415);
     ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("newRoot"
                                                          << "$a"
                                                          << "path"
                                                          << 2))),
                        AssertionException,
-                       40230);
+                       40415);
     ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("path"
                                                          << "$a"))),
                        AssertionException,
-                       40230);
+                       40415);
 }
 
 // Verify that $replaceRoot requires a valid expression as input to the newRoot option.
 TEST_F(ReplaceRootSpec, RequiresExpressionForNewRootOption) {
-    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSONObj())), AssertionException, 40231);
+    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSONObj())), AssertionException, 40414);
     ASSERT_THROWS(createReplaceRoot(createSpec(BSON("newRoot"
                                                     << "$$$a"))),
                   AssertionException);
@@ -378,6 +389,55 @@ TEST_F(ReplaceRootSpec, NewRootAcceptsAllTypesOfExpressions) {
     // Accumulators
     ASSERT_TRUE(createReplaceRoot(createFullSpec(BSON("$sum"
                                                       << "$a"))));
+}
+
+TEST_F(ReplaceRootSpec, ReplaceWithAcceptsAllTypesOfExpressions) {
+    // Field Path and system variables
+    ASSERT_TRUE(createReplaceWith("$a.b.c.d.e"));
+    ASSERT_TRUE(createReplaceWith("$$CURRENT"));
+
+    // Literals
+    ASSERT_TRUE(createReplaceWith(BSON("$literal" << 1)));
+
+    // Expression Objects
+    ASSERT_TRUE(createReplaceWith(BSON("a" << BSON("b" << 1))));
+
+    // Operator Expressions
+    ASSERT_TRUE(createReplaceWith(BSON("$and"
+                                       << "$a")));
+    ASSERT_TRUE(createReplaceWith(BSON("$gt" << BSON_ARRAY("$a" << 1))));
+    ASSERT_TRUE(createReplaceWith(BSON("$sqrt"
+                                       << "$a")));
+
+    // Accumulators
+    ASSERT_TRUE(createReplaceWith(BSON("$sum"
+                                       << "$a")));
+}
+
+// Verify that $replaceRoot round trips through serialization.
+TEST_F(ReplaceRootSpec, ReplaceRootRoundTrips) {
+    auto replaceRoot = createReplaceRoot(createSpec(BSON("newRoot"
+                                                         << "$a.b.c.d.e")));
+    ASSERT_EQ(replaceRoot->getSourceName(), DocumentSourceReplaceRoot::kStageName);
+    std::vector<Value> serialization;
+    replaceRoot->serializeToArray(serialization);
+    replaceRoot = createReplaceRoot(serialization[0].getDocument().toBson());
+    ASSERT_EQ(replaceRoot->getSourceName(), DocumentSourceReplaceRoot::kStageName);
+}
+
+// Verify that $replaceWith round trips through serialization.
+TEST_F(ReplaceRootSpec, ReplaceWithRoundTrips) {
+    auto replaceWith = createReplaceWith("$newRoot");
+    // We should always create a stage with the name '$replaceRoot' internally, even if the alias is
+    // used.
+    ASSERT_EQ(replaceWith->getSourceName(), DocumentSourceReplaceRoot::kStageName);
+
+    std::vector<Value> serialization;
+    replaceWith->serializeToArray(serialization);
+    replaceWith = createReplaceRoot(serialization[0].getDocument().toBson());
+    // While the stage that has round-tripped through serialization should mean the same thing, it
+    // will have a different name since it always serializes to the full $replaceRoot syntax.
+    ASSERT_EQ(replaceWith->getSourceName(), DocumentSourceReplaceRoot::kStageName);
 }
 
 }  // namespace

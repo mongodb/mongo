@@ -64,7 +64,7 @@
     testUpdate({
         query: {_id: 1},
         initialDocumentList: [{_id: 1, x: 1, t: {u: {v: 1}}}],
-        update: [{$replaceRoot: {newRoot: "$t"}}],
+        update: [{$replaceWith: "$t"}],
         resultDocList: [{_id: 1, u: {v: 1}}],
         nModified: 1
     });

@@ -35,6 +35,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_source_replace_root_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
@@ -44,13 +45,14 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 /**
- * This class implements the transformation logic for the $replaceRoot stage.
+ * This class implements the transformation logic for the $replaceRoot and $replaceWith stages.
  */
 class ReplaceRootTransformation final : public TransformerInterface {
 
 public:
-    ReplaceRootTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : _expCtx(expCtx) {}
+    ReplaceRootTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              boost::intrusive_ptr<Expression> newRootExpression)
+        : _expCtx(expCtx), _newRoot(std::move(newRootExpression)) {}
 
     TransformerType getType() const final {
         return TransformerType::kReplaceRoot;
@@ -69,7 +71,7 @@ public:
                     << typeName(newRoot.getType())
                     << "'. Input document: "
                     << input.toString(),
-                newRoot.getType() == Object);
+                newRoot.getType() == BSONType::Object);
 
         // Turn the value into a document.
         MutableDocument newDoc(newRoot.getDocument());
@@ -99,63 +101,54 @@ public:
         return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
     }
 
-    // Create the replaceRoot transformer. Uasserts on invalid input.
-    static std::unique_ptr<ReplaceRootTransformation> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONElement& spec) {
-
-        // Confirm that the stage was called with an object.
-        uassert(40229,
-                str::stream() << "expected an object as specification for $replaceRoot stage, got "
-                              << typeName(spec.type()),
-                spec.type() == Object);
-
-        // Create the pointer, parse the stage, and return.
-        std::unique_ptr<ReplaceRootTransformation> parsedReplaceRoot =
-            stdx::make_unique<ReplaceRootTransformation>(expCtx);
-        parsedReplaceRoot->parse(expCtx, spec);
-        return parsedReplaceRoot;
-    }
-
-    // Check for valid replaceRoot options, and populate internal state variables.
-    void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONElement& spec) {
-        // We need a VariablesParseState in order to parse the 'newRoot' expression.
-        VariablesParseState vps = expCtx->variablesParseState;
-
-        // Get the options from this stage. Currently the only option is newRoot.
-        for (auto&& argument : spec.Obj()) {
-            const StringData argName = argument.fieldNameStringData();
-
-            if (argName == "newRoot") {
-                // Allows for field path, object, and other expressions.
-                _newRoot = Expression::parseOperand(expCtx, argument, vps);
-            } else {
-                uasserted(40230,
-                          str::stream() << "unrecognized option to $replaceRoot stage: " << argName
-                                        << ", only valid option is 'newRoot'.");
-            }
-        }
-
-        // Check that there was a new root specified.
-        uassert(40231, "no newRoot specified for the $replaceRoot stage", _newRoot);
-    }
-
 private:
-    boost::intrusive_ptr<Expression> _newRoot;
     const boost::intrusive_ptr<ExpressionContext> _expCtx;
+    boost::intrusive_ptr<Expression> _newRoot;
 };
 
 REGISTER_DOCUMENT_SOURCE(replaceRoot,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceReplaceRoot::createFromBson);
+REGISTER_DOCUMENT_SOURCE(replaceWith,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceReplaceRoot::createFromBson);
 
 intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto stageName = elem.fieldNameStringData();
+    auto newRootExpression = [&]() {
+        if (stageName == kAliasNameReplaceWith) {
+            return Expression::parseOperand(expCtx, elem, expCtx->variablesParseState);
+        }
 
+        invariant(
+            stageName == kStageName,
+            str::stream() << "Unexpected stage registered with DocumentSourceReplaceRoot parser: "
+                          << stageName);
+        uassert(40229,
+                str::stream() << "expected an object as specification for " << kStageName
+                              << " stage, got "
+                              << typeName(elem.type()),
+                elem.type() == Object);
+
+        auto spec =
+            ReplaceRootSpec::parse(IDLParserErrorContext(kStageName), elem.embeddedObject());
+
+        // The IDL doesn't give us back the type we need to feed into the expression parser, and
+        // the expression parser needs the extra state in 'vps' and 'expCtx', so for now we have
+        // to adapt the two.
+        BSONObj parsingBson = BSON("newRoot" << spec.getNewRoot());
+        return Expression::parseOperand(
+            expCtx, parsingBson.firstElement(), expCtx->variablesParseState);
+    }();
+
+    // Whether this was specified as $replaceWith or $replaceRoot, always use the name $replaceRoot
+    // to simplify the serialization process.
     const bool isIndependentOfAnyCollection = false;
     return new DocumentSourceSingleDocumentTransformation(
-        pExpCtx,
-        ReplaceRootTransformation::create(pExpCtx, elem),
-        "$replaceRoot",
+        expCtx,
+        std::make_unique<ReplaceRootTransformation>(expCtx, newRootExpression),
+        kStageName.toString(),
         isIndependentOfAnyCollection);
 }
 

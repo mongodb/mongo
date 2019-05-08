@@ -38,15 +38,21 @@ namespace mongo {
  * each incoming document with the result of evaluating that expression. Throws an error if the
  * given expression is not an object or if the expression evaluates to the "missing" Value. This
  * is implemented as an extension of DocumentSourceSingleDocumentTransformation.
+ *
+ * There is a shorthand $replaceWith alias which takes a direct single argument containing the
+ * expression which will become the new root: {$replaceWith: <expression>} aliases to {$replaceRoot:
+ * {newRoot: <expression>}}.
  */
 class DocumentSourceReplaceRoot final {
 public:
+    static constexpr StringData kStageName = "$replaceRoot"_sd;
+    static constexpr StringData kAliasNameReplaceWith = "$replaceWith"_sd;
     /**
      * Creates a new replaceRoot DocumentSource from the BSON specification of the $replaceRoot
      * stage.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
     // It is illegal to construct a DocumentSourceReplaceRoot directly, use createFromBson()

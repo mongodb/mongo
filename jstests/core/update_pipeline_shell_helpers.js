@@ -80,9 +80,8 @@
     assert.docEq(findOneAndUpdatePostImage, expectedFindOneAndUpdatePostImage);
 
     // Shell helpers for replacement updates should reject pipeline-style updates.
-    assert.throws(() => testColl.replaceOne({_id: 1}, [{$replaceRoot: {newRoot: {}}}]));
-    assert.throws(() => testColl.findOneAndReplace({_id: 1}, [{$replaceRoot: {newRoot: {}}}]));
-    assert.throws(
-        () => testColl.bulkWrite(
-            [{replaceOne: {filter: {_id: 1}, replacement: [{$replaceRoot: {newRoot: {}}}]}}]));
+    assert.throws(() => testColl.replaceOne({_id: 1}, [{$replaceWith: {}}]));
+    assert.throws(() => testColl.findOneAndReplace({_id: 1}, [{$replaceWith: {}}]));
+    assert.throws(() => testColl.bulkWrite(
+                      [{replaceOne: {filter: {_id: 1}, replacement: [{$replaceWith: {}}]}}]));
 })();

@@ -275,7 +275,7 @@ TEST_F(PipelineExecutorTest, SerializeTest) {
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 0, a: [{b: 1}]}}"),
                                   fromjson("{$project: {a: 1}}"),
-                                  fromjson("{$replaceRoot: {newRoot: '$foo'}}")};
+                                  fromjson("{$replaceWith: '$foo'}")};
     PipelineExecutor exec(expCtx, pipeline);
 
     auto serialized = exec.serialize();

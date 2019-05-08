@@ -60,6 +60,7 @@
           {$set: {_id: "$newId"}}
         ],
         {$replaceRoot: {newRoot: {otherField: "$_id"}}},
+        {$replaceWith: {otherField: "$_id"}},
         {$redact: {$cond: {if: {$gt: ["$_id", {}]}, then: "$$DESCEND", else: "$$PRUNE"}}}  // _id:0
     ];
 
@@ -91,6 +92,7 @@
           {$set: {_id: "$newId"}}
         ],
         {$replaceRoot: {newRoot: {_id: "$_id"}}},
+        {$replaceWith: {_id: "$_id"}},
         {
           $redact: {
               $cond: {

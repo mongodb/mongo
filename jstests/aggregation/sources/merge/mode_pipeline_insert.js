@@ -93,6 +93,18 @@
         assertArrayEq(
             {actual: target.find().toArray(), expected: [{_id: 1, x: 2}, {_id: 2, x: null}]});
 
+        // Test $replaceWith stage.
+        assert(target.drop());
+        assert.commandWorked(
+            target.insert([{_id: 1, b: 1, c: {x: {y: 1}}}, {_id: 2, b: 2, c: {x: {y: 2}}}]));
+        assert.doesNotThrow(
+            () => source.aggregate(makeMergePipeline(
+                {target: target.getName(), updatePipeline: [{$replaceWith: "$c"}]})));
+        assertArrayEq({
+            actual: target.find().toArray(),
+            expected: [{_id: 1, x: {y: 1}}, {_id: 2, x: {y: 2}}]
+        });
+
         // Test $replaceRoot stage.
         assert(target.drop());
         assert.commandWorked(

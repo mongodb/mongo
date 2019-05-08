@@ -578,7 +578,7 @@ TEST(FindAndModifyRequest, ParsesAndSerializesPipelineUpdate) {
     setTestCommandsEnabled(true);
     BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
-            update: [{$replaceRoot: {newRoot: {y: 1}}}]
+            update: [{$replaceWith: {y: 1}}]
         })json"));
 
     auto request =
@@ -589,7 +589,7 @@ TEST(FindAndModifyRequest, ParsesAndSerializesPipelineUpdate) {
     ASSERT_BSONOBJ_EQ(serialized, fromjson(R"json({
       findAndModify: "b",
       query: {x: 1},
-      update: [{$replaceRoot: {newRoot: {y: 1}}}],
+      update: [{$replaceWith: {y: 1}}],
       fields: {},
       sort: {},
       collation: {}
@@ -601,7 +601,7 @@ TEST(FindAndModifyRequest, RejectsBothArrayFiltersAndPipelineUpdate) {
     setTestCommandsEnabled(true);
     BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
-            update: [{$replaceRoot: {newRoot: {y: 1}}}],
+            update: [{$replaceWith: {y: 1}}],
             arrayFilters: []
         })json"));
 
@@ -610,7 +610,7 @@ TEST(FindAndModifyRequest, RejectsBothArrayFiltersAndPipelineUpdate) {
 
     cmdObj = fromjson(R"json({
             query: { x: 1 },
-            update: [{$replaceRoot: {newRoot: {y: 1}}}],
+            update: [{$replaceWith: {y: 1}}],
             arrayFilters: [{"i.x": 1}]
         })json");
     auto swRequestOneFilter = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);

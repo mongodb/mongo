@@ -50,7 +50,7 @@
         assert(coll.drop());
         assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
         doc = coll.findAndModify({
-            update: [{$replaceRoot: {newRoot: {newField: {$indexOfArray: ["$x", "B"]}}}}],
+            update: [{$replaceWith: {newField: {$indexOfArray: ["$x", "B"]}}}],
             collation: caseSensitive,
             new: true
         });
@@ -78,7 +78,7 @@
         assert(coll.drop());
         assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
         doc = coll.findAndModify({
-            update: [{$replaceRoot: {newRoot: {newField: {$indexOfArray: ["$x", "B"]}}}}],
+            update: [{$replaceWith: {newField: {$indexOfArray: ["$x", "B"]}}}],
             collation: caseInsensitive,
             new: true
         });
