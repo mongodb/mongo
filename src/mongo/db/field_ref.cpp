@@ -139,6 +139,16 @@ void FieldRef::removeLastPart() {
     _size--;
 }
 
+void FieldRef::removeFirstPart() {
+    if (_size == 0) {
+        return;
+    }
+    for (size_t i = 0; i + 1 < _size; ++i) {
+        setPart(i, getPart(i + 1));
+    }
+    removeLastPart();
+}
+
 size_t FieldRef::appendParsedPart(FieldRef::StringView part) {
     if (_size < kReserveAhead) {
         _fixed[_size] = part;

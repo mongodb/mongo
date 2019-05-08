@@ -115,6 +115,12 @@ public:
     void removeLastPart();
 
     /**
+     * Removes the first part from the path, decreasing its size by 1. Has no effect on a FielRef
+     * with size 0.
+     */
+    void removeFirstPart();
+
+    /**
      * Returns the 'i-th' field part. Assumes i < size(). Behavior is undefined otherwise.
      */
     StringData getPart(size_t i) const;

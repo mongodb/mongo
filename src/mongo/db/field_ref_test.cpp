@@ -872,5 +872,38 @@ TEST(NumericPathComponents, FieldsWithLeadingZeroesAreNotConsideredNumeric) {
     ASSERT(numericPathComponents == expectedComponents);
 }
 
+TEST(RemoveFirstPart, EmptyPathDoesNothing) {
+    FieldRef path;
+    path.removeFirstPart();
+    ASSERT_EQ(path.numParts(), 0U);
+}
+
+TEST(RemoveFirstPart, PathWithOneComponentBecomesEmpty) {
+    FieldRef path("first");
+    path.removeFirstPart();
+    ASSERT_EQ(path.numParts(), 0U);
+}
+
+TEST(RemoveFirstPart, PathWithTwoComponentsOnlyHoldsSecond) {
+    FieldRef path("remove.keep");
+    path.removeFirstPart();
+    ASSERT_EQ(path.numParts(), 1U);
+    ASSERT_EQ(path, FieldRef("keep"));
+}
+
+TEST(RemoveFirstPart, RemovingFirstPartFromLongPathMultipleTimes) {
+    FieldRef path("first.second.third.fourth.fifth.sixth.seventh.eigth.ninth.tenth");
+    path.removeFirstPart();
+    ASSERT_EQ(path, FieldRef("second.third.fourth.fifth.sixth.seventh.eigth.ninth.tenth"));
+    path.removeFirstPart();
+    ASSERT_EQ(path, FieldRef("third.fourth.fifth.sixth.seventh.eigth.ninth.tenth"));
+    path.removeFirstPart();
+    ASSERT_EQ(path, FieldRef("fourth.fifth.sixth.seventh.eigth.ninth.tenth"));
+    path.removeFirstPart();
+    ASSERT_EQ(path, FieldRef("fifth.sixth.seventh.eigth.ninth.tenth"));
+    path.removeFirstPart();
+    ASSERT_EQ(path, FieldRef("sixth.seventh.eigth.ninth.tenth"));
+}
+
 }  // namespace
 }  // namespace mongo

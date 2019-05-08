@@ -104,6 +104,10 @@ public:
         return TransformerType::kExclusionProjection;
     }
 
+    const ExclusionNode& getRoot() const {
+        return *_root;
+    }
+
     Document serializeTransformation(
         boost::optional<ExplainOptions::Verbosity> explain) const final;
 

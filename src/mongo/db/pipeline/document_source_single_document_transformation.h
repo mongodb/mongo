@@ -81,6 +81,10 @@ public:
         return _parsedTransform->getType();
     }
 
+    const auto& getTransformer() const {
+        return *_parsedTransform;
+    }
+
     bool isSubsetOfProjection(const BSONObj& proj) const {
         return _parsedTransform->isSubsetOfProjection(proj);
     }

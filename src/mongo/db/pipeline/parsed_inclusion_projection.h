@@ -98,6 +98,10 @@ public:
         return TransformerType::kInclusionProjection;
     }
 
+    const InclusionNode& getRoot() const {
+        return *_root;
+    }
+
     /**
      * Parses the projection specification given by 'spec', populating internal data structures.
      */
