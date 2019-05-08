@@ -35,8 +35,13 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
+
+namespace stdx {
+class condition_variable;
+}
 
 /**
  * Notifyable is a slim type meant to allow integration of special kinds of waiters for
@@ -46,7 +51,11 @@ namespace mongo {
  * See Waitable for the stdx::condition_variable integration.
  */
 class Notifyable {
+    friend class stdx::condition_variable;
+
 public:
+    Notifyable() = default;
+
     // !!! PAY ATTENTION, THERE IS DANGER HERE !!!
     //
     // Implementers of the notifyable api must be level triggered by notify, rather than edge
@@ -64,6 +73,15 @@ public:
 
 protected:
     ~Notifyable() = default;
+
+private:
+    // Notifyable's own a list node which they splice into a stdx::condition_variable's wait list
+    // when waiting on one.  It's important that we pre-allocate this entry on construction.
+    //
+    // Note that the notifyable** in this list is only used and meaningful while the notifyable
+    // waits on a condition variable (so the ownership of a self pointer doesn't really have
+    // implications for copy/move, as the objects shouldn't be moved/copied while waiting)
+    std::list<Notifyable*> _handleContainer{this};
 };
 
 class Waitable;
@@ -85,7 +103,7 @@ public:
 
     void notify_one() noexcept {
         if (_notifyableCount.load()) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard lk(_mutex);
 
             if (_notifyNextNotifyable(lk)) {
                 return;
@@ -97,7 +115,7 @@ public:
 
     void notify_all() noexcept {
         if (_notifyableCount.load()) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard lk(_mutex);
 
             while (_notifyNextNotifyable(lk)) {
             }
@@ -119,9 +137,10 @@ private:
      * duration of the callback execution, a notification on the condvar will trigger a notify() to
      * the Notifyable.
      *
-     * The scheme here is that list entries are erased from the notification list when notified (so
-     * that they don't eat multiple notify_one's).  We detect that condition by noting that our
-     * Notifyable* has been overwritten with null (in which case we should avoid a double erase).
+     * The scheme here is that list entries are spliced back to their Notifyable from the
+     * notification list when notified (so that they don't eat multiple notify_one's).  We detect
+     * that condition by noting that our list isn't empty (in which case we should avoid a double
+     * splice back).
      *
      * The method is private, and accessed via friendship in Waitable.
      */
@@ -130,26 +149,27 @@ private:
         static_assert(noexcept(std::forward<Callback>(cb)()),
                       "Only noexcept functions may be invoked with _runWithNotifyable");
 
-        // We use this local pad to receive notification that we were notified, rather than timing
-        // out organically.
-        //
-        // Note that n must be guarded by _mutex after its insertion in _notifyables (so that we can
-        // detect notification in a thread-safe manner).
-        Notifyable* n = &notifyable;
-
         auto iter = [&] {
-            stdx::lock_guard<stdx::mutex> localMutex(_mutex);
+            stdx::lock_guard localMutex(_mutex);
             _notifyableCount.addAndFetch(1);
-            return _notifyables.insert(_notifyables.end(), &n);
+            _notifyables.splice(_notifyables.end(),
+                                notifyable._handleContainer,
+                                notifyable._handleContainer.begin());
+            return --_notifyables.end();
         }();
 
+        // The supplied callback should do the equivalent of waiting on this condition_variable
+        // (i.e. return on notify), as well as any other work the waiter would like to do while
+        // waiting.
         std::forward<Callback>(cb)();
 
-        stdx::lock_guard<stdx::mutex> localMutex(_mutex);
-        // if n is null, we were notified, and erased in _notifyNextNotifyable
-        if (n) {
+        stdx::lock_guard localMutex(_mutex);
+
+        // If our list isn't empty, we were notified, and spliced back in _notifyNextNotifyable.
+        // If it is empty, we need to stash our wait queue iterator ourselves.
+        if (notifyable._handleContainer.empty()) {
             _notifyableCount.subtractAndFetch(1);
-            _notifyables.erase(iter);
+            _spliceBack(localMutex, iter);
         }
     }
 
@@ -158,12 +178,11 @@ private:
      *
      * Returns true if there was a notifyable to be notified.
      *
-     * Note that as part of notifying, we zero out pointers allocated on the stack by
-     * _runWithNotifyable callers.  This is safe because we hold _mutex while we do so, and our
-     * erasure communicates that those waiters need not clear themselves from the notification list
-     * on wakeup.
+     * Note that as part of notifying, we splice back iterators to _runWithNotifyable callers.  This
+     * is safe because we hold _mutex while we do so, and our splicing communicates that those
+     * waiters need not clear themselves from the notification list on wakeup.
      */
-    bool _notifyNextNotifyable(const stdx::lock_guard<stdx::mutex>&) noexcept {
+    bool _notifyNextNotifyable(WithLock wl) noexcept {
         auto iter = _notifyables.begin();
         if (iter == _notifyables.end()) {
             return false;
@@ -171,21 +190,26 @@ private:
 
         _notifyableCount.subtractAndFetch(1);
 
-        (**iter)->notify();
+        (*iter)->notify();
 
-        // null out iter here, so that the notifyable won't remove itself from the list when it
-        // wakes up
-        **iter = nullptr;
-
-        _notifyables.erase(iter);
+        _spliceBack(wl, iter);
 
         return true;
+    }
+
+    /**
+     * Splice the notifyable iterator back into the notifyable (out from this condvar's wait list)
+     */
+    void _spliceBack(WithLock, std::list<Notifyable*>::iterator iter) {
+        auto notifyable = *iter;
+        notifyable->_handleContainer.splice(
+            notifyable->_handleContainer.begin(), _notifyables, iter);
     }
 
     AtomicWord<unsigned long long> _notifyableCount;
 
     stdx::mutex _mutex;
-    std::list<Notifyable**> _notifyables;
+    std::list<Notifyable*> _notifyables;
 };
 
 }  // namespace stdx

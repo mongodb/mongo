@@ -446,7 +446,7 @@ class Interruptible::NotInterruptible final : public Interruptible {
 };
 
 inline Interruptible* Interruptible::notInterruptible() {
-    static NotInterruptible notInterruptible{};
+    thread_local static NotInterruptible notInterruptible{};
 
     return &notInterruptible;
 }
