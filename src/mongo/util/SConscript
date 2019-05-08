@@ -765,6 +765,13 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='errno_util_test',
+    source=[
+        'errno_util_test.cpp',
+    ],
+)
+
 env.Benchmark(
     target='decimal_counter_bm',
     source=[

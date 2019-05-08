@@ -61,7 +61,8 @@ std::string errnoWithDescription(int errNumber) {
     char buf[kBuflen];
     char* msg{nullptr};
 
-#if defined(__GNUC__) && defined(_GNU_SOURCE) && !(__ANDROID_API__ <= 22) && !defined(EMSCRIPTEN)
+#if defined(__GNUC__) && defined(_GNU_SOURCE) && \
+    (!defined(__ANDROID_API__) || !(__ANDROID_API__ <= 22)) && !defined(EMSCRIPTEN)
     msg = strerror_r(errNumber, buf, kBuflen);
 #elif defined(_WIN32)
 
