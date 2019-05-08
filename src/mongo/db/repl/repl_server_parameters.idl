@@ -237,3 +237,16 @@ server_parameters:
             lte:
                 expr: 1000 * 1000
 
+    replBatchLimitBytes:
+        description: The maximum oplog application batch size in bytes
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: replBatchLimitBytes
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gte:
+                expr: 16 * 1024 * 1024
+            lte:
+                expr: 100 * 1024 * 1024
+

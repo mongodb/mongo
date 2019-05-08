@@ -1685,7 +1685,7 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
     // Obtain next batch of operations from OplogApplier.
     auto opCtx = makeOpCtx();
     OplogApplier::BatchLimits batchLimits;
-    batchLimits.bytes = OplogApplier::replBatchLimitBytes;
+    batchLimits.bytes = OplogApplier::calculateBatchLimitBytes(opCtx.get(), _storage);
     batchLimits.ops = OplogApplier::getBatchLimitOperations();
     return _oplogApplier->getNextApplierBatch(opCtx.get(), batchLimits);
 }
