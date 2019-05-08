@@ -24,6 +24,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     var runTest = function(isRSCluster) {
         "use strict";
 
+        const kMinVersion = 5;
+        const kCurrentVerion = 6;
+
         jsTest.log("Starting" + (isRSCluster ? " (replica set)" : "") + " cluster" + "...");
 
         var testCRUDAndAgg = function(db) {
@@ -68,8 +71,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         // check that config.version document gets initialized properly
         var version = st.s.getCollection('config.version').findOne();
-        assert.eq(version.minCompatibleVersion, 5);
-        assert.eq(version.currentVersion, 6);
+        assert.eq(version.minCompatibleVersion, kMinVersion);
+        assert.eq(version.currentVersion, kCurrentVerion);
         var clusterID = version.clusterId;
         assert.neq(null, clusterID);
         assert.eq(version.excluding, undefined);
@@ -89,6 +92,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // upgrade the config servers first
         jsTest.log('upgrading config servers');
         st.upgradeCluster("latest", {upgradeMongos: false, upgradeShards: false});
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        // Restart mongos to clear all cache and force it to do remote calls.
         st.restartMongoses();
 
         testCRUDAndAgg(st.s.getDB('unsharded'));
@@ -97,6 +105,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // Then upgrade the shards.
         jsTest.log('upgrading shard servers');
         st.upgradeCluster("latest", {upgradeMongos: false, upgradeConfigs: false});
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        // Restart mongos to clear all cache and force it to do remote calls.
         st.restartMongoses();
 
         testCRUDAndAgg(st.s.getDB('unsharded'));
@@ -105,6 +118,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // Finally, upgrade mongos
         jsTest.log('upgrading mongos servers');
         st.upgradeCluster("latest", {upgradeConfigs: false, upgradeShards: false});
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        // Restart mongos to clear all cache and force it to do remote calls.
         st.restartMongoses();
 
         testCRUDAndAgg(st.s.getDB('unsharded'));
@@ -112,8 +130,54 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         // Check that version document is unmodified.
         version = st.s.getCollection('config.version').findOne();
-        assert.eq(version.minCompatibleVersion, 5);
-        assert.eq(version.currentVersion, 6);
+        assert.eq(version.minCompatibleVersion, kMinVersion);
+        assert.eq(version.currentVersion, kCurrentVerion);
+        assert.eq(clusterID, version.clusterId);
+        assert.eq(version.excluding, undefined);
+
+        ///////////////////////////////////////////////////////////////////////////////////////////
+        // Downgrade back
+
+        jsTest.log('downgrading mongos servers');
+        st.upgradeCluster("last-stable", {upgradeConfigs: false, upgradeShards: false});
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        // Restart mongos to clear all cache and force it to do remote calls.
+        st.restartMongoses();
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        jsTest.log('downgrading shard servers');
+        st.upgradeCluster("last-stable", {upgradeMongos: false, upgradeConfigs: false});
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        // Restart mongos to clear all cache and force it to do remote calls.
+        st.restartMongoses();
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        jsTest.log('downgrading config servers');
+        st.upgradeCluster("last-stable", {upgradeMongos: false, upgradeShards: false});
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        // Restart mongos to clear all cache and force it to do remote calls.
+        st.restartMongoses();
+
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
+
+        // Check that version document is unmodified.
+        version = st.s.getCollection('config.version').findOne();
+        assert.eq(version.minCompatibleVersion, kMinVersion);
+        assert.eq(version.currentVersion, kCurrentVerion);
         assert.eq(clusterID, version.clusterId);
         assert.eq(version.excluding, undefined);
 
