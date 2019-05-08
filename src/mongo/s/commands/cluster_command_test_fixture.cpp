@@ -44,6 +44,7 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
@@ -66,6 +67,11 @@ void ClusterCommandTestFixture::setUp() {
     LogicalTimeValidator::set(getServiceContext(), std::move(validator));
 
     LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
+
+    // Set up a tick source for transaction metrics.
+    auto tickSource = stdx::make_unique<TickSourceMock<Microseconds>>();
+    tickSource->reset(1);
+    getServiceContext()->setTickSource(std::move(tickSource));
 
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
 
