@@ -181,6 +181,18 @@
         }                                                                                       \
     } while (false)
 
+#define ASSERT_STRING_OMITS(BIG_STRING, OMITS)                                                  \
+    do {                                                                                        \
+        std::string myString(BIG_STRING);                                                       \
+        std::string myOmits(OMITS);                                                             \
+        if (myString.find(myOmits) != std::string::npos) {                                      \
+            ::mongo::str::stream err;                                                           \
+            err << "Did not expect to find " #OMITS " (" << myOmits << ") in " #BIG_STRING " (" \
+                << myString << ")";                                                             \
+            ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream();          \
+        }                                                                                       \
+    } while (false)
+
 /**
  * Construct a single test, named "TEST_NAME" within the test case "CASE_NAME".
  *
