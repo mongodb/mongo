@@ -35,6 +35,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
@@ -174,6 +175,7 @@ public:
      * attached.
      */
     static TransactionRouter* get(OperationContext* opCtx);
+    static TransactionRouter* get(const ObservableSession& osession);
 
     /**
      * Starts a fresh transaction in this session or continue an existing one. Also cleans up the

@@ -72,6 +72,9 @@ private:
     // practice, it is only used inside of the SessionCatalog itself.
     OperationContext* _checkoutOpCtx{nullptr};
 
+    // Keeps the last time this session was checked-out
+    Date_t _lastCheckout{Date_t::now()};
+
     // Counter indicating the number of times ObservableSession::kill has been called on this
     // session, which have not yet had a corresponding call to checkOutSessionForKill.
     int _killsRequested{0};

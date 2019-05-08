@@ -27,15 +27,32 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <memory>
-
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_cache.h"
-#include "mongo/db/service_liaison.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
+namespace {
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheEmbedded();
+class LogicalSessionServerStatusSection : public ServerStatusSection {
+public:
+    LogicalSessionServerStatusSection() : ServerStatusSection("logicalSessionRecordCache") {}
 
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        const auto logicalSessionCache = LogicalSessionCache::get(opCtx);
+
+        return logicalSessionCache ? logicalSessionCache->getStats().toBSON() : BSONObj();
+    }
+
+} logicalSessionsServerStatusSection;
+
+}  // namespace
 }  // namespace mongo

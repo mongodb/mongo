@@ -74,6 +74,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/sessions_collection',
     ],
 )
 

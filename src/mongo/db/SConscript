@@ -1529,7 +1529,6 @@ env.Library(
     source=[
         'initialize_operation_session_info.cpp',
         'logical_session_cache_impl.cpp',
-        'logical_session_server_status_section.cpp',
     ],
     LIBDEPS=[
         'logical_session_cache',
@@ -1540,7 +1539,6 @@ env.Library(
         'kill_sessions',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
     ]
 )

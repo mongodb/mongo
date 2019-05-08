@@ -43,8 +43,6 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_requests_sender.h"
@@ -381,6 +379,10 @@ TransactionRouter* TransactionRouter::get(OperationContext* opCtx) {
     }
 
     return nullptr;
+}
+
+TransactionRouter* get(const ObservableSession& osession) {
+    return &getTransactionRouter(osession.get());
 }
 
 TransactionRouter::TransactionRouter() = default;

@@ -169,7 +169,9 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                     LOG(0) << "Need to resume coordinating commit for " << coordinatorDocs.size()
                            << " transactions";
 
-                    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+                    const auto service = opCtx->getServiceContext();
+                    const auto clockSource = service->getFastClockSource();
+
                     auto& catalog = catalogAndScheduler->catalog;
                     auto& scheduler = catalogAndScheduler->scheduler;
 
@@ -180,7 +182,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                         const auto txnNumber = *doc.getId().getTxnNumber();
 
                         auto coordinator = std::make_shared<TransactionCoordinator>(
-                            opCtx->getServiceContext(),
+                            service,
                             lsid,
                             txnNumber,
                             scheduler.makeChildScheduler(),
@@ -191,9 +193,6 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                     }
                 })
             .tapAll([catalogAndScheduler = _catalogAndScheduler](Status status) {
-                // TODO (SERVER-38320): Reschedule the step-up task if the interruption was not due
-                // to stepdown.
-
                 auto& catalog = catalogAndScheduler->catalog;
                 catalog.exitStepUp(status);
             });

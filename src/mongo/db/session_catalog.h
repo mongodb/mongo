@@ -98,7 +98,7 @@ public:
      * Iterates through the SessionCatalog and applies 'workerFn' to each Session. This locks the
      * SessionCatalog.
      */
-    using ScanSessionsCallbackFn = stdx::function<void(const ObservableSession&)>;
+    using ScanSessionsCallbackFn = stdx::function<void(ObservableSession&)>;
     void scanSession(const LogicalSessionId& lsid, const ScanSessionsCallbackFn& workerFn);
     void scanSessions(const SessionKiller::Matcher& matcher,
                       const ScanSessionsCallbackFn& workerFn);
@@ -109,18 +109,30 @@ public:
      */
     KillToken killSession(const LogicalSessionId& lsid);
 
+    /**
+     * Returns the total number of entries currently cached on the session catalog.
+     */
+    size_t size() const;
+
 private:
     struct SessionRuntimeInfo {
         SessionRuntimeInfo(LogicalSessionId lsid) : session(std::move(lsid)) {}
+        ~SessionRuntimeInfo();
 
         // Must only be accessed when the state is kInUse and only by the operation context, which
         // currently has it checked out
         Session session;
 
+        // Counts how many threads have called checkOutSession/checkOutSessionForKill and are
+        // blocked in it waiting for the session to become available. Used to block reaping of
+        // sessions entries from the map.
+        int numWaitingToCheckOut{0};
+
         // Signaled when the state becomes available. Uses the transaction table's mutex to protect
         // the state transitions.
         stdx::condition_variable availableCondVar;
     };
+    using SessionRuntimeInfoMap = LogicalSessionIdMap<std::unique_ptr<SessionRuntimeInfo>>;
 
     /**
      * Blocking method, which checks-out the session set on 'opCtx'.
@@ -141,10 +153,10 @@ private:
     void _releaseSession(SessionRuntimeInfo* sri, boost::optional<KillToken> killToken);
 
     // Protects the state below
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // Owns the Session objects for all current Sessions.
-    LogicalSessionIdMap<std::unique_ptr<SessionRuntimeInfo>> _sessions;
+    SessionRuntimeInfoMap _sessions;
 };
 
 /**
@@ -205,10 +217,10 @@ private:
 class SessionCatalog::SessionToKill {
 public:
     SessionToKill(ScopedCheckedOutSession&& scos) : _scos(std::move(scos)) {}
+
     Session* get() const {
         return _scos.get();
     }
-
     const LogicalSessionId& getSessionId() const {
         return get()->getSessionId();
     }
@@ -250,6 +262,13 @@ public:
     }
 
     /**
+     * Returns when is the last time this session was checked-out, for reaping purposes.
+     */
+    Date_t getLastCheckout() const {
+        return _session->_lastCheckout;
+    }
+
+    /**
      * Increments the number of "killers" for this session and returns a 'kill token' to to be
      * passed later on to 'checkOutSessionForKill' method of the SessionCatalog in order to permit
      * the caller to execute any kill cleanup tasks. This token is later used to decrement the
@@ -263,6 +282,16 @@ public:
      * operation context which has it checked-out.
      */
     SessionCatalog::KillToken kill(ErrorCodes::Error reason = ErrorCodes::Interrupted) const;
+
+    /**
+     * Indicates to the SessionCatalog that the session tracked by this object is safe to be deleted
+     * from the map. It is up to the caller to provide the necessary checks that all the decorations
+     * they are using are prepared to be destroyed.
+     *
+     * Calling this method does not guarantee that the session will in fact be destroyed, which
+     * could happen if there are threads waiting for it to be checked-out.
+     */
+    void markForReap();
 
     /**
      * Returns a pointer to the Session itself.
@@ -291,6 +320,7 @@ private:
 
     Session* _session;
     stdx::unique_lock<Client> _clientLock;
+    bool _markedForReap{false};
 };
 
 /**

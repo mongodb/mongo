@@ -40,26 +40,28 @@
 #include "mongo/db/refresh_sessions_gen.h"
 
 namespace mongo {
+namespace {
 
 class RefreshSessionsCommand final : public BasicCommand {
-    RefreshSessionsCommand(const RefreshSessionsCommand&) = delete;
-    RefreshSessionsCommand& operator=(const RefreshSessionsCommand&) = delete;
-
 public:
     RefreshSessionsCommand() : BasicCommand("refreshSessions") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
+
     bool adminOnly() const override {
         return false;
     }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     std::string help() const override {
         return "renew a set of logical sessions";
     }
+
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) const override {
@@ -75,18 +77,18 @@ public:
         }
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& db,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) override {
+    bool run(OperationContext* opCtx,
+             const std::string& db,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         IDLParserErrorContext ctx("RefreshSessionsCmdFromClient");
         auto cmd = RefreshSessionsCmdFromClient::parse(ctx, cmdObj);
-        auto res =
-            LogicalSessionCache::get(opCtx->getServiceContext())->refreshSessions(opCtx, cmd);
-        uassertStatusOK(res);
+        uassertStatusOK(LogicalSessionCache::get(opCtx)->refreshSessions(opCtx, cmd));
 
         return true;
     }
+
 } refreshSessionsCommand;
 
+}  // namespace
 }  // namespace mongo

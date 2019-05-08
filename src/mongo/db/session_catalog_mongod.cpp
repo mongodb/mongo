@@ -141,6 +141,7 @@ int removeSessionsTransactionRecords(OperationContext* opCtx,
     if (expiredSessionIds.empty())
         return 0;
 
+    // Remove the session ids from the on-disk catalog
     write_ops::Delete deleteOp(NamespaceString::kSessionTransactionsTableNamespace);
     deleteOp.setWriteCommandBase([] {
         write_ops::WriteCommandBase base;
@@ -343,6 +344,42 @@ void MongoDSessionCatalog::invalidateAllSessions(OperationContext* opCtx) {
 int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
                                                 SessionsCollection& sessionsCollection,
                                                 Date_t possiblyExpired) {
+    {
+        const auto catalog = SessionCatalog::get(opCtx);
+
+        // Capture the possbily expired in-memory session ids
+        LogicalSessionIdSet lsids;
+        catalog->scanSessions(SessionKiller::Matcher(
+                                  KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)}),
+                              [&](const ObservableSession& session) {
+                                  if (session.getLastCheckout() < possiblyExpired) {
+                                      lsids.insert(session.getSessionId());
+                                  }
+                              });
+
+        // From the passed-in sessions, find the ones which are actually expired/removed
+        auto expiredSessionIds =
+            uassertStatusOK(sessionsCollection.findRemovedSessions(opCtx, lsids));
+
+        // Remove the session ids from the in-memory catalog
+        for (const auto& lsid : expiredSessionIds) {
+            catalog->scanSession(lsid, [](ObservableSession& session) {
+                const auto participant = TransactionParticipant::get(session);
+                if (!participant.inMultiDocumentTransaction()) {
+                    session.markForReap();
+                }
+            });
+        }
+    }
+
+    // The "unsafe" check for primary below is a best-effort attempt to ensure that the on-disk
+    // state reaping code doesn't run if the node is secondary and cause log spam. It is a work
+    // around the fact that the logical sessions cache is not registered to listen for replication
+    // state changes.
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, NamespaceString::kConfigDb))
+        return 0;
+
     // Scan for records older than the minimum lifetime and uses a sort to walk the '_id' index
     DBDirectClient client(opCtx);
     auto cursor =

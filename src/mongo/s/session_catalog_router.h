@@ -40,6 +40,8 @@ public:
     /**
      * Locates session entries from the in-memory catalog  which have not been referenced before
      * 'possiblyExpired' and deletes them.
+     *
+     * Returns the number of sessions, which were reaped from the in-memory catalog.
      */
     static int reapSessionsOlderThan(OperationContext* opCtx,
                                      SessionsCollection& sessionsCollection,

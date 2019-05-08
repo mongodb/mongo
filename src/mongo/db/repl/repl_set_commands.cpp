@@ -359,18 +359,20 @@ private:
 
 class CmdReplSetReconfig : public ReplSetCommand {
 public:
+    CmdReplSetReconfig() : ReplSetCommand("replSetReconfig") {}
+
     std::string help() const override {
         return "Adjust configuration of a replica set\n"
                "{ replSetReconfig : config_object }\n"
                "http://dochub.mongodb.org/core/replicasetcommands";
     }
-    CmdReplSetReconfig() : ReplSetCommand("replSetReconfig") {}
-    virtual bool run(OperationContext* opCtx,
-                     const string&,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        uassertStatusOK(status);
+
+    bool run(OperationContext* opCtx,
+             const string&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const auto replCoord = ReplicationCoordinator::get(opCtx);
+        uassertStatusOK(replCoord->checkReplEnabledForCommand(&result));
 
         if (cmdObj["replSetReconfig"].type() != Object) {
             result.append("errmsg", "no configuration specified");
@@ -380,23 +382,22 @@ public:
         ReplicationCoordinator::ReplSetReconfigArgs parsedArgs;
         parsedArgs.newConfigObj = cmdObj["replSetReconfig"].Obj();
         parsedArgs.force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-        status =
-            ReplicationCoordinator::get(opCtx)->processReplSetReconfig(opCtx, parsedArgs, &result);
+        auto status = replCoord->processReplSetReconfig(opCtx, parsedArgs, &result);
 
-        Lock::GlobalLock globalLock(opCtx, MODE_IX);
-
-        WriteUnitOfWork wuow(opCtx);
         if (status.isOK() && !parsedArgs.force) {
+            const auto service = opCtx->getServiceContext();
+
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+            WriteUnitOfWork wuow(opCtx);
             // Users must not be allowed to provide their own contents for the o2 field.
             // o2 field of no-ops is supposed to be used internally.
-            getGlobalServiceContext()->getOpObserver()->onOpMessage(
-                opCtx,
-                BSON("msg"
-                     << "Reconfig set"
-                     << "version"
-                     << parsedArgs.newConfigObj["version"]));
+            service->getOpObserver()->onOpMessage(opCtx,
+                                                  BSON("msg"
+                                                       << "Reconfig set"
+                                                       << "version"
+                                                       << parsedArgs.newConfigObj["version"]));
+            wuow.commit();
         }
-        wuow.commit();
 
         uassertStatusOK(status);
         return true;

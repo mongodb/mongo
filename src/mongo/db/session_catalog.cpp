@@ -33,7 +33,6 @@
 
 #include "mongo/db/session_catalog.h"
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -84,12 +83,16 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSession(Operati
 
     // Wait until the session is no longer checked out and until the previously scheduled kill has
     // completed
+    ++sri->numWaitingToCheckOut;
+    ON_BLOCK_EXIT([&] { --sri->numWaitingToCheckOut; });
+
     opCtx->waitForConditionOrInterrupt(sri->availableCondVar, ul, [&ul, &sri]() {
         ObservableSession osession(ul, sri->session);
         return !osession.currentOperation() && !osession._killed();
     });
 
     sri->session._checkoutOpCtx = opCtx;
+    sri->session._lastCheckout = Date_t::now();
 
     return ScopedCheckedOutSession(
         *this, std::move(sri), boost::none /* Not checked out for kill */);
@@ -107,33 +110,62 @@ SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationCo
     invariant(ObservableSession(ul, sri->session)._killed());
 
     // Wait until the session is no longer checked out
+    ++sri->numWaitingToCheckOut;
+    ON_BLOCK_EXIT([&] { --sri->numWaitingToCheckOut; });
+
     opCtx->waitForConditionOrInterrupt(sri->availableCondVar, ul, [&ul, &sri] {
         ObservableSession osession(ul, sri->session);
         return !osession.currentOperation();
     });
 
     sri->session._checkoutOpCtx = opCtx;
+    sri->session._lastCheckout = Date_t::now();
 
     return SessionToKill(ScopedCheckedOutSession(*this, std::move(sri), std::move(killToken)));
 }
 
 void SessionCatalog::scanSession(const LogicalSessionId& lsid,
                                  const ScanSessionsCallbackFn& workerFn) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-    auto it = _sessions.find(lsid);
-    if (it != _sessions.end())
-        workerFn({lg, it->second->session});
+    std::unique_ptr<SessionRuntimeInfo> sessionToReap;
+
+    {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        auto it = _sessions.find(lsid);
+        if (it != _sessions.end()) {
+            auto& sri = it->second;
+            ObservableSession osession(lg, sri->session);
+            workerFn(osession);
+
+            if (osession._markedForReap && !osession._killed() && !osession.currentOperation() &&
+                !sri->numWaitingToCheckOut) {
+                sessionToReap = std::move(sri);
+                _sessions.erase(it);
+            }
+        }
+    }
 }
 
 void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
                                   const ScanSessionsCallbackFn& workerFn) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::vector<std::unique_ptr<SessionRuntimeInfo>> sessionsToReap;
 
-    LOG(2) << "Beginning scanSessions. Scanning " << _sessions.size() << " sessions.";
+    {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    for (auto& sessionEntry : _sessions) {
-        if (matcher.match(sessionEntry.first)) {
-            workerFn({lg, sessionEntry.second->session});
+        LOG(2) << "Beginning scanSessions. Scanning " << _sessions.size() << " sessions.";
+
+        for (auto it = _sessions.begin(); it != _sessions.end(); ++it) {
+            if (matcher.match(it->first)) {
+                auto& sri = it->second;
+                ObservableSession osession(lg, sri->session);
+                workerFn(osession);
+
+                if (osession._markedForReap && !osession._killed() &&
+                    !osession.currentOperation() && !sri->numWaitingToCheckOut) {
+                    sessionsToReap.emplace_back(std::move(sri));
+                    _sessions.erase(it++);
+                }
+            }
         }
     }
 }
@@ -145,6 +177,11 @@ SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& ls
 
     auto& sri = it->second;
     return ObservableSession(lg, sri->session).kill();
+}
+
+size_t SessionCatalog::size() const {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    return _sessions.size();
 }
 
 SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getOrCreateSessionRuntimeInfo(
@@ -174,6 +211,10 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
     }
 }
 
+SessionCatalog::SessionRuntimeInfo::~SessionRuntimeInfo() {
+    invariant(!numWaitingToCheckOut);
+}
+
 SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) const {
     const bool firstKiller = (0 == _session->_killsRequested);
     ++_session->_killsRequested;
@@ -187,6 +228,10 @@ SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) cons
     }
 
     return SessionCatalog::KillToken(getSessionId());
+}
+
+void ObservableSession::markForReap() {
+    _markedForReap = true;
 }
 
 bool ObservableSession::_killed() const {

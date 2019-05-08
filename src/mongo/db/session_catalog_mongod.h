@@ -69,6 +69,8 @@ public:
     /**
      * Locates session entries from the in-memory catalog and in 'config.transactions' which have
      * not been referenced before 'possiblyExpired' and deletes them.
+     *
+     * Returns the number of sessions, which were reaped from the persisted store on disk.
      */
     static int reapSessionsOlderThan(OperationContext* opCtx,
                                      SessionsCollection& sessionsCollection,

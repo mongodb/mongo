@@ -34,8 +34,6 @@
 
 namespace mongo {
 
-class BSONArrayBuilder;
-class BSONObjBuilder;
 class DBClientBase;
 class OperationContext;
 
@@ -46,7 +44,6 @@ class OperationContext;
  * implement their own classes that fulfill this interface.
  */
 class SessionsCollection {
-
 public:
     static constexpr StringData kSessionsTTLIndex = "lsidTTLIndex"_sd;
 
@@ -98,6 +95,8 @@ public:
     static BSONObj generateCollModCmd();
 
 protected:
+    SessionsCollection();
+
     /**
      * Makes a send function for the given client.
      */

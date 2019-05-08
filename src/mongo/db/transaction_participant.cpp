@@ -291,7 +291,9 @@ const BSONObj TransactionParticipant::kDeadEndSentinel(BSON("$incompleteOplogHis
 
 TransactionParticipant::TransactionParticipant() = default;
 
-TransactionParticipant::~TransactionParticipant() = default;
+TransactionParticipant::~TransactionParticipant() {
+    // invariant(!_o.txnState.isInProgress());
+}
 
 TransactionParticipant::Observer::Observer(const ObservableSession& osession)
     : Observer(&getTransactionParticipant(osession.get())) {}
@@ -2027,20 +2029,18 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
 
 void TransactionParticipant::Participant::abortPreparedTransactionForRollback(
     OperationContext* opCtx) {
-    stdx::lock_guard<Client> lg(*opCtx->getClient());
-
-    // Invalidate the session.
-    _invalidate(lg);
-
     uassert(51030,
             str::stream() << "Cannot call abortPreparedTransactionForRollback on unprepared "
                           << "transaction.",
             o().txnState.isPrepared());
 
+    stdx::lock_guard<Client> lg(*opCtx->getClient());
+
     // It should be safe to clear transactionOperationBytes and transactionOperations because
     // we only modify these variables when adding an operation to a transaction. Since this
     // transaction is already prepared, we cannot add more operations to it. We will have this
     // in the prepare oplog entry.
+    _invalidate(lg);
     _resetTransactionState(lg, TransactionState::kNone);
 }
 

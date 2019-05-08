@@ -33,12 +33,38 @@
 
 #include "mongo/s/session_catalog_router.h"
 
+#include "mongo/db/sessions_collection.h"
+
 namespace mongo {
 
 int RouterSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
                                                 SessionsCollection& sessionsCollection,
                                                 Date_t possiblyExpired) {
-    return 0;
+    const auto catalog = SessionCatalog::get(opCtx);
+
+    // Capture the possbily expired in-memory session ids
+    LogicalSessionIdSet lsids;
+    catalog->scanSessions(
+        SessionKiller::Matcher(KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)}),
+        [&](const ObservableSession& session) {
+            if (session.getLastCheckout() < possiblyExpired) {
+                lsids.insert(session.getSessionId());
+            }
+        });
+
+    // From the passed-in sessions, find the ones which are actually expired/removed
+    auto expiredSessionIds = uassertStatusOK(sessionsCollection.findRemovedSessions(opCtx, lsids));
+
+    // Remove the session ids from the in-memory catalog
+    int numReaped = 0;
+    for (const auto& lsid : expiredSessionIds) {
+        catalog->scanSession(lsid, [&](ObservableSession& session) {
+            session.markForReap();
+            ++numReaped;
+        });
+    }
+
+    return numReaped;
 }
 
 RouterOperationContextSession::RouterOperationContextSession(OperationContext* opCtx)

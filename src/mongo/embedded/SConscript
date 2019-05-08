@@ -72,7 +72,6 @@ env.Library(
         'embedded_options_init.cpp',
         'embedded_options_parser_init.cpp',
         'index_builds_coordinator_embedded.cpp',
-        'logical_session_cache_factory_embedded.cpp',
         'periodic_runner_embedded.cpp',
         'process_interface_factory_embedded.cpp',
         'read_concern_embedded.cpp',
