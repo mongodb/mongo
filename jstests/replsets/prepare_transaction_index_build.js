@@ -48,6 +48,7 @@
     assert.commandWorked(sessionColl.insert({x: 1000}));
 
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
+    jsTestLog("Prepared a transaction at " + prepareTimestamp);
 
     jsTestLog("Unblocking index build.");
 
@@ -55,11 +56,13 @@
     secondary.getDB("admin").runCommand(
         {configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'});
 
-    jsTestLog("Waiting for all index builds to finish on all nodes.");
-
-    // wait for the index build to finish; we know it's done if the prepare has finished on the
-    // secondary.
-    replTest.awaitReplication();
+    // It's illegal to commit a prepared transaction before its prepare oplog entry has been
+    // majority committed. So wait for prepare oplog entry to be majority committed before issuing
+    // the commitTransaction command. We know the index build is also done if the prepare has
+    // finished on the secondary.
+    jsTestLog(
+        "Waiting for prepare oplog entry to be majority committed and all index builds to finish on all nodes.");
+    PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp);
 
     jsTestLog("Committing txn");
     // Commit the transaction.

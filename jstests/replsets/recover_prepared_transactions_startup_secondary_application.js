@@ -47,10 +47,12 @@
     session.startTransaction();
     assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
     let prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
+    jsTestLog("Prepared a transaction at " + prepareTimestamp);
 
     session2.startTransaction();
     assert.commandWorked(sessionColl2.update({_id: 2}, {_id: 2, a: 1}));
     const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2, {w: 1});
+    jsTestLog("Prepared another transaction at " + prepareTimestamp2);
 
     const lsid = session.getSessionId();
     const txnNumber = session.getTxnNumber_forTesting();
@@ -71,7 +73,11 @@
 
     assert.commandWorked(
         primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
-    replTest.awaitReplication();
+
+    // It's illegal to commit a prepared transaction before its prepare oplog entry has been
+    // majority committed. So wait for prepare oplog entry to be majority committed before issuing
+    // the commitTransaction command.
+    PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp2);
 
     jsTestLog("Checking that the first transaction is properly prepared");
 

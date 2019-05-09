@@ -123,6 +123,24 @@ const PrepareHelpers = (function() {
         }
     }
 
+    /**
+     * Waits for the oplog entry of the given timestamp to be majority committed.
+     */
+    function awaitMajorityCommitted(replSet, timestamp) {
+        print(`Waiting for majority commit point to advance past the given timestamp ${timestamp}`);
+        const primary = replSet.getPrimary();
+        assert.soon(() => {
+            const ts = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}))
+                           .optimes.lastCommittedOpTime.ts;
+            if (ts >= timestamp) {
+                return true;
+            } else {
+                print(`Awaiting lastCommittedOpTime.ts, now at ${ts}`);
+                return false;
+            }
+        }, "Timeout waiting for majority commit point", ReplSetTest.kDefaultTimeoutMS, 1000);
+    }
+
     return {
         prepareTransaction: prepareTransaction,
         commitTransaction: commitTransaction,
@@ -131,6 +149,7 @@ const PrepareHelpers = (function() {
         oplogSizeBytes: oplogSizeBytes,
         replSetStartSetOptions: {oplogSize: oplogSizeMB},
         growOplogPastMaxSize: growOplogPastMaxSize,
-        awaitOplogTruncation: awaitOplogTruncation
+        awaitOplogTruncation: awaitOplogTruncation,
+        awaitMajorityCommitted: awaitMajorityCommitted
     };
 })();
