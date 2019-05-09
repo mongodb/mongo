@@ -241,7 +241,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         noJournal: true,
         binVersion: true,
         waitForConnect: true,
-        bridgeOptions: true
+        bridgeOptions: true,
+        skipValidation: true,
     };
 
     MongoRunner.toRealPath = function(path, pathOpts) {
