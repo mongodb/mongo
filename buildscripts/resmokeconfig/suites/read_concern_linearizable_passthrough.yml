@@ -13,6 +13,7 @@ selector:
   - jstests/core/capped_update.js
   # These tests use benchRun(), which isn't configured to use the overridden writeConcern.
   - jstests/core/bench_test*.js
+  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
   # fsync.js runs the {fsync: 1, lock: 1} command, which prevents a linearizable read from writing
   # an entry to the oplog.
   - jstests/core/fsync.js

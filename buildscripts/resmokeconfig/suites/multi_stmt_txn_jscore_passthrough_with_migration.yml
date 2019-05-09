@@ -187,6 +187,7 @@ selector:
   # transaction and can cause test to timeout because of the 3 hr transactions lifetime setting and
   # moveChunk getting blocked trying to acquire collection X lock while doing chunk refresh.
   - jstests/core/bench_test*.js
+  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
 
   ##
   ## Some aggregation stages don't support snapshot readconcern.
@@ -370,6 +371,7 @@ selector:
   # op3 will still be using the snapshot from op1, and not see op2 at all.
   - jstests/core/cursora.js
   - jstests/core/bench_test1.js
+  - jstests/core/benchrun_pipeline_updates.js
 
   # The tests below use applyOps, SERVER-1439.
   - jstests/core/list_collections1.js

@@ -283,6 +283,7 @@ selector:
   - jstests/core/ismaster.js
 
   - jstests/core/bench_test*.js # benchRun() used for writes
+  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
   - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
   - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
   - jstests/core/insert2.js # Creates new mongo connection.

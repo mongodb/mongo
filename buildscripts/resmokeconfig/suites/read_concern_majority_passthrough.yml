@@ -14,6 +14,7 @@ selector:
   - jstests/core/capped_update.js
   # These tests use benchRun(), which isn't configured to use the overridden writeConcern.
   - jstests/core/bench_test*.js
+  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

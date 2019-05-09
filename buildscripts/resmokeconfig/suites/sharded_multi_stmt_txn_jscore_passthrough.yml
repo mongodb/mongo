@@ -300,6 +300,7 @@ selector:
   # op3 will still be using the snapshot from op1, and not see op2 at all.
   - jstests/core/cursora.js
   - jstests/core/bench_test1.js
+  - jstests/core/benchrun_pipeline_updates.js
 
   # The tests below use applyOps, SERVER-1439.
   - jstests/core/list_collections1.js
