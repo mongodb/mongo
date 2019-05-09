@@ -38,7 +38,8 @@ class BSONObjBuilder;
 
 
 /**
- * Operations for manipulating the lock statistics abstracting whether they are atomic or not.
+ * Abstraction for manipulating the lock statistics, operating on either AtomicWord<long long> or
+ * int64_t, which the rest of the code in this file refers to as CounterType.
  */
 struct CounterOps {
     static int64_t get(const int64_t& counter) {
@@ -72,7 +73,10 @@ struct CounterOps {
 
 
 /**
- * Bundle of locking statistics values.
+ * Counts numAcquisitions, numWaits and combinedWaitTimeMicros values.
+ *
+ * Additionally supports appending or subtracting other LockStatCounters' values to or from its own;
+ * and can reset its own values to 0.
  */
 template <typename CounterType>
 struct LockStatCounters {
@@ -96,7 +100,7 @@ struct LockStatCounters {
         CounterOps::set(combinedWaitTimeMicros, 0);
     }
 
-
+    // The lock statistics we track.
     CounterType numAcquisitions;
     CounterType numWaits;
     CounterType combinedWaitTimeMicros;
@@ -106,6 +110,8 @@ struct LockStatCounters {
 /**
  * Templatized lock statistics management class, which can be specialized with atomic integers
  * for the global stats and with regular integers for the per-locker stats.
+ *
+ * CounterType allows the code to operate on both int64_t and AtomicWord<long long>
  */
 template <typename CounterType>
 class LockStats {
@@ -135,10 +141,6 @@ public:
             return _oplogStats.modeStats[mode];
         }
 
-        if (resId == resourceIdGlobal) {
-            return _resourceIdGlobal.modeStats[mode];
-        }
-
         return _stats[resId.getType()].modeStats[mode];
     }
 
@@ -161,12 +163,6 @@ public:
             LockStatCountersType& thisStats = _oplogStats.modeStats[mode];
             thisStats.append(otherStats);
         }
-
-        for (int mode = 0; mode < LockModesCount; ++mode) {
-            const OtherLockStatCountersType& otherStats = other._resourceIdGlobal.modeStats[mode];
-            LockStatCountersType& thisStats = _resourceIdGlobal.modeStats[mode];
-            thisStats.append(otherStats);
-        }
     }
 
     template <typename OtherType>
@@ -184,12 +180,6 @@ public:
         for (int mode = 0; mode < LockModesCount; mode++) {
             const OtherLockStatCountersType& otherStats = other._oplogStats.modeStats[mode];
             LockStatCountersType& thisStats = _oplogStats.modeStats[mode];
-            thisStats.subtract(otherStats);
-        }
-
-        for (int mode = 0; mode < LockModesCount; ++mode) {
-            const OtherLockStatCountersType& otherStats = other._resourceIdGlobal.modeStats[mode];
-            LockStatCountersType& thisStats = _resourceIdGlobal.modeStats[mode];
             thisStats.subtract(otherStats);
         }
     }
@@ -212,15 +202,13 @@ private:
 
 
     void _report(BSONObjBuilder* builder,
-                 const char* sectionName,
-                 const PerModeLockStatCounters& stat,
-                 const bool includeCanonicalGlobal) const;
+                 const char* resourceTypeName,
+                 const PerModeLockStatCounters& stat) const;
 
 
-    // Split the lock stats per resource type. Special-case the oplog and global lock so we can
-    // collect more detailed stats for it.
+    // Split the lock stats per resource type. Special-case the oplog so we can collect more
+    // detailed stats for it.
     PerModeLockStatCounters _stats[ResourceTypesCount];
-    PerModeLockStatCounters _resourceIdGlobal;
     PerModeLockStatCounters _oplogStats;
 };
 

@@ -147,7 +147,12 @@ TEST_F(LockStatsTest, Subtraction) {
 }
 
 namespace {
-void assertAcquisitionStats(ResourceId rid) {
+/**
+ * Locks 'rid' and then checks the global lock stat is reported correctly. Either the global lock is
+ * reported locked if 'rid' is the global lock resource, or unlocked if 'rid' is not the global lock
+ * resource.
+ */
+void assertGlobalAcquisitionStats(ResourceId rid) {
     resetGlobalLockStats();
 
     SingleThreadedLockStats stats;
@@ -177,20 +182,22 @@ void assertAcquisitionStats(ResourceId rid) {
 }  // namespace
 
 TEST_F(LockStatsTest, GlobalRetrievableSeparately) {
-    assertAcquisitionStats(resourceIdGlobal);
-    assertAcquisitionStats(resourceIdParallelBatchWriterMode);
-    assertAcquisitionStats(resourceIdReplicationStateTransitionLock);
+    assertGlobalAcquisitionStats(resourceIdGlobal);
+    assertGlobalAcquisitionStats(resourceIdParallelBatchWriterMode);
+    assertGlobalAcquisitionStats(resourceIdReplicationStateTransitionLock);
 }
 
-TEST_F(LockStatsTest, ServerStatusAggregatesAllGlobal) {
+TEST_F(LockStatsTest, ServerStatus) {
     resetGlobalLockStats();
 
+    // If there are no locks, nothing is reported.
     SingleThreadedLockStats stats;
     reportGlobalLockingStats(&stats);
     BSONObjBuilder builder;
     stats.report(&builder);
     ASSERT_EQUALS(0, builder.done().nFields());
 
+    // Take the global, PBWM and RSTL locks in MODE_IX to create acquisition stats for them.
     LockerImpl locker;
     locker.lockGlobal(LockMode::MODE_IX);
     locker.lock(resourceIdParallelBatchWriterMode, LockMode::MODE_IX);
@@ -200,12 +207,21 @@ TEST_F(LockStatsTest, ServerStatusAggregatesAllGlobal) {
     locker.unlock(resourceIdParallelBatchWriterMode);
     locker.unlockGlobal();
 
+    // Now the MODE_IX lock acquisitions should be reported, separately for each lock type.
     reportGlobalLockingStats(&stats);
     BSONObjBuilder builder2;
     stats.report(&builder2);
+    auto lockingStats = builder2.done();
     ASSERT_EQUALS(
-        3,
-        builder2.done().getObjectField("Global").getObjectField("acquireCount").getIntField("w"));
+        1, lockingStats.getObjectField("Global").getObjectField("acquireCount").getIntField("w"));
+    ASSERT_EQUALS(1,
+                  lockingStats.getObjectField("ParallelBatchWriter")
+                      .getObjectField("acquireCount")
+                      .getIntField("w"));
+    ASSERT_EQUALS(1,
+                  lockingStats.getObjectField("ReplicationStateTransition")
+                      .getObjectField("acquireCount")
+                      .getIntField("w"));
 }
 
 }  // namespace mongo

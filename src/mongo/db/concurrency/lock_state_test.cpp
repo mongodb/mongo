@@ -668,7 +668,6 @@ TEST_F(LockerImplTest, SharedLocksShouldTwoPhaseLockIsTrue) {
     // and S locks are postponed until endWriteUnitOfWork() is called. Mode IX and X locks always
     // participate in two-phased locking, regardless of the setting.
 
-    const ResourceId globalResId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
     const ResourceId resId1(RESOURCE_DATABASE, "TestDB1"_sd);
     const ResourceId resId2(RESOURCE_DATABASE, "TestDB2"_sd);
     const ResourceId resId3(RESOURCE_COLLECTION, "TestDB.collection3"_sd);
@@ -678,7 +677,7 @@ TEST_F(LockerImplTest, SharedLocksShouldTwoPhaseLockIsTrue) {
     locker.setSharedLocksShouldTwoPhaseLock(true);
 
     locker.lockGlobal(MODE_IS);
-    ASSERT_EQ(locker.getLockMode(globalResId), MODE_IS);
+    ASSERT_EQ(locker.getLockMode(resourceIdGlobal), MODE_IS);
 
     locker.lock(resourceIdReplicationStateTransitionLock, MODE_IS);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
@@ -707,7 +706,7 @@ TEST_F(LockerImplTest, SharedLocksShouldTwoPhaseLockIsTrue) {
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
 
     ASSERT_FALSE(locker.unlockGlobal());
-    ASSERT_EQ(locker.getLockMode(globalResId), MODE_IS);
+    ASSERT_EQ(locker.getLockMode(resourceIdGlobal), MODE_IS);
 
     locker.endWriteUnitOfWork();
 
@@ -716,14 +715,13 @@ TEST_F(LockerImplTest, SharedLocksShouldTwoPhaseLockIsTrue) {
     ASSERT_EQ(locker.getLockMode(resId3), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(resId4), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
-    ASSERT_EQ(locker.getLockMode(globalResId), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resourceIdGlobal), MODE_NONE);
 }
 
 TEST_F(LockerImplTest, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
     // Unlock on mode IX and X locks during a WUOW should always be postponed until
     // endWriteUnitOfWork() is called. Mode IS and S locks should unlock immediately.
 
-    const ResourceId globalResId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
     const ResourceId resId1(RESOURCE_DATABASE, "TestDB1"_sd);
     const ResourceId resId2(RESOURCE_DATABASE, "TestDB2"_sd);
     const ResourceId resId3(RESOURCE_COLLECTION, "TestDB.collection3"_sd);
@@ -732,7 +730,7 @@ TEST_F(LockerImplTest, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
     LockerImpl locker;
 
     locker.lockGlobal(MODE_IX);
-    ASSERT_EQ(locker.getLockMode(globalResId), MODE_IX);
+    ASSERT_EQ(locker.getLockMode(resourceIdGlobal), MODE_IX);
 
     locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
@@ -761,14 +759,14 @@ TEST_F(LockerImplTest, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     ASSERT_FALSE(locker.unlockGlobal());
-    ASSERT_EQ(locker.getLockMode(globalResId), MODE_IX);
+    ASSERT_EQ(locker.getLockMode(resourceIdGlobal), MODE_IX);
 
     locker.endWriteUnitOfWork();
 
     ASSERT_EQ(locker.getLockMode(resId2), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(resId4), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
-    ASSERT_EQ(locker.getLockMode(globalResId), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resourceIdGlobal), MODE_NONE);
 }
 
 TEST_F(LockerImplTest, RSTLUnlocksWithNestedLock) {
@@ -950,7 +948,6 @@ bool lockerInfoContainsLock(const Locker::LockerInfo& lockerInfo,
 }  // namespace
 
 TEST_F(LockerImplTest, GetLockerInfoShouldReportHeldLocks) {
-    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
     const ResourceId dbId(RESOURCE_DATABASE, "TestDB"_sd);
     const ResourceId collectionId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
 
@@ -964,7 +961,7 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportHeldLocks) {
     Locker::LockerInfo lockerInfo;
     locker.getLockerInfo(&lockerInfo, boost::none);
 
-    ASSERT(lockerInfoContainsLock(lockerInfo, globalId, MODE_IX));
+    ASSERT(lockerInfoContainsLock(lockerInfo, resourceIdGlobal, MODE_IX));
     ASSERT(lockerInfoContainsLock(lockerInfo, dbId, MODE_IX));
     ASSERT(lockerInfoContainsLock(lockerInfo, collectionId, MODE_X));
     ASSERT_EQ(3U, lockerInfo.locks.size());
@@ -975,7 +972,6 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportHeldLocks) {
 }
 
 TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
-    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
     const ResourceId dbId(RESOURCE_DATABASE, "TestDB"_sd);
     const ResourceId collectionId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
 
@@ -994,7 +990,7 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
     // Assert the held locks show up in the output of getLockerInfo().
     Locker::LockerInfo lockerInfo;
     conflictingLocker.getLockerInfo(&lockerInfo, boost::none);
-    ASSERT(lockerInfoContainsLock(lockerInfo, globalId, MODE_IS));
+    ASSERT(lockerInfoContainsLock(lockerInfo, resourceIdGlobal, MODE_IS));
     ASSERT(lockerInfoContainsLock(lockerInfo, dbId, MODE_IS));
     ASSERT(lockerInfoContainsLock(lockerInfo, collectionId, MODE_IS));
     ASSERT_EQ(3U, lockerInfo.locks.size());

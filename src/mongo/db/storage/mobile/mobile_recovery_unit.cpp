@@ -222,16 +222,14 @@ void MobileRecoveryUnit::_txnOpen(OperationContext* opCtx, bool readOnly) {
     // Check for correct locking at higher levels
     if (readOnly) {
         // Confirm that this reader has taken a shared lock
-        if (!opCtx->lockState()->isLockHeldForMode(
-                ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL), MODE_S)) {
+        if (!opCtx->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_S)) {
             opCtx->lockState()->dump();
             invariant(!"Reading without a shared lock");
         }
         SqliteStatement::execQuery(_session.get(), "BEGIN");
     } else {
         // Single writer allowed at a time, confirm a global write lock has been taken
-        if (!opCtx->lockState()->isLockHeldForMode(
-                ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL), MODE_X)) {
+        if (!opCtx->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_X)) {
             opCtx->lockState()->dump();
             invariant(!"Writing without an exclusive lock");
         }

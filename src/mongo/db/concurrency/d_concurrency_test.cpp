@@ -288,19 +288,17 @@ TEST_F(DConcurrencyTestFixture,
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
     auto lockState = opCtx->lockState();
 
-    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
-
     auto globalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
     ASSERT(lockState->isW());
-    ASSERT(MODE_X == lockState->getLockMode(globalId))
-        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_X == lockState->getLockMode(resourceIdGlobal))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
     ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     {
         Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
         ASSERT(lockState->isW());
-        ASSERT(MODE_X == lockState->getLockMode(globalId))
-            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_X == lockState->getLockMode(resourceIdGlobal))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
 
         // If we destroy the GlobalWrite out of order relative to the DBLock, we will leave the
         // global lock resource locked in MODE_X. We have to explicitly downgrade this resource to
@@ -310,19 +308,19 @@ TEST_F(DConcurrencyTestFixture,
         ASSERT(lockState->isW());
         ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
-        lockState->downgrade(globalId, MODE_IX);
+        lockState->downgrade(resourceIdGlobal, MODE_IX);
         ASSERT_FALSE(lockState->isW());
         ASSERT(lockState->isWriteLocked());
-        ASSERT(MODE_IX == lockState->getLockMode(globalId))
-            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(resourceIdGlobal))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
         ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
     }
 
 
     ASSERT_FALSE(lockState->isW());
     ASSERT_FALSE(lockState->isWriteLocked());
-    ASSERT(MODE_NONE == lockState->getLockMode(globalId))
-        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_NONE == lockState->getLockMode(resourceIdGlobal))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
     ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
 }
 
@@ -332,28 +330,26 @@ TEST_F(DConcurrencyTestFixture,
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
     auto lockState = opCtx->lockState();
 
-    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
-
     auto globalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
     ASSERT(lockState->isW());
-    ASSERT(MODE_X == lockState->getLockMode(globalId))
-        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_X == lockState->getLockMode(resourceIdGlobal))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
     ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     {
         Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
         ASSERT(lockState->isW());
-        ASSERT(MODE_X == lockState->getLockMode(globalId))
-            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_X == lockState->getLockMode(resourceIdGlobal))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
         ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
         // Downgrade global lock resource to MODE_IX to allow other write operations to make
         // progress.
-        lockState->downgrade(globalId, MODE_IX);
+        lockState->downgrade(resourceIdGlobal, MODE_IX);
         ASSERT_FALSE(lockState->isW());
         ASSERT(lockState->isWriteLocked());
-        ASSERT(MODE_IX == lockState->getLockMode(globalId))
-            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(resourceIdGlobal))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
         ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
     }
 
@@ -364,8 +360,8 @@ TEST_F(DConcurrencyTestFixture,
     globalWrite = {};
     ASSERT_FALSE(lockState->isW());
     ASSERT_FALSE(lockState->isWriteLocked());
-    ASSERT(MODE_NONE == lockState->getLockMode(globalId))
-        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_NONE == lockState->getLockMode(resourceIdGlobal))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
     ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
 }
 
@@ -375,8 +371,6 @@ TEST_F(DConcurrencyTestFixture,
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
     auto lockState = opCtx->lockState();
 
-    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
-
     auto outerGlobalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
     auto innerGlobalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
     ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
@@ -384,17 +378,17 @@ TEST_F(DConcurrencyTestFixture,
     {
         Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
         ASSERT(lockState->isW());
-        ASSERT(MODE_X == lockState->getLockMode(globalId))
-            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_X == lockState->getLockMode(resourceIdGlobal))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
         ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
         // Downgrade global lock resource to MODE_IX to allow other write operations to make
         // progress.
-        lockState->downgrade(globalId, MODE_IX);
+        lockState->downgrade(resourceIdGlobal, MODE_IX);
         ASSERT_FALSE(lockState->isW());
         ASSERT(lockState->isWriteLocked());
-        ASSERT(MODE_IX == lockState->getLockMode(globalId))
-            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(resourceIdGlobal))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
         ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
     }
 
@@ -405,15 +399,15 @@ TEST_F(DConcurrencyTestFixture,
     innerGlobalWrite = {};
     ASSERT_FALSE(lockState->isW());
     ASSERT(lockState->isWriteLocked());
-    ASSERT(MODE_IX == lockState->getLockMode(globalId))
-        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_IX == lockState->getLockMode(resourceIdGlobal))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
     ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     outerGlobalWrite = {};
     ASSERT_FALSE(lockState->isW());
     ASSERT_FALSE(lockState->isWriteLocked());
-    ASSERT(MODE_NONE == lockState->getLockMode(globalId))
-        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_NONE == lockState->getLockMode(resourceIdGlobal))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(resourceIdGlobal));
     ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
 }
 

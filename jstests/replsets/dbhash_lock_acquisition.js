@@ -31,7 +31,8 @@
     assert.eq(1,
               ops.length,
               () => "Failed to find session in currentOp() output: " + tojson(db.currentOp()));
-    assert.eq(ops[0].locks, {Global: "w", Database: "w", Collection: "w"});
+    assert.eq(ops[0].locks,
+              {ReplicationStateTransition: "w", Global: "w", Database: "w", Collection: "w"});
 
     const threadCaptruncCmd = new ScopedThread(function(host) {
         try {
@@ -78,9 +79,8 @@
         if (ops.length === 0) {
             return false;
         }
-        // The lock mode for the Global resource is reported as "w" rather than "r" because of the
-        // mode taken for the ReplicationStateTransitionLock when acquiring the global lock.
-        assert.eq(ops[0].locks, {Global: "w", Database: "r", Collection: "r"});
+        assert.eq(ops[0].locks,
+                  {ReplicationStateTransition: "w", Global: "r", Database: "r", Collection: "r"});
         return true;
     }, () => "Failed to find create collection in currentOp() output: " + tojson(db.currentOp()));
 

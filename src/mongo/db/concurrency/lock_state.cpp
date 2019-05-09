@@ -56,7 +56,14 @@ MONGO_FAIL_POINT_DEFINE(failNonIntentLocksIfWaitNeeded);
 namespace {
 
 /**
- * Partitioned global lock statistics, so we don't hit the same bucket.
+ * Tracks global (across all clients) lock acquisition statistics, partitioned into multiple
+ * buckets to minimize concurrent access conflicts.
+ *
+ * Each client has a LockerId that monotonically increases across all client instances. The
+ * LockerId % 8 is used to index into one of 8 LockStats instances. These LockStats objects must be
+ * atomically accessed, so maintaining 8 that are indexed by LockerId reduces client conflicts and
+ * improves concurrent write access. A reader, to collect global lock statics for reporting, will
+ * sum the results of all 8 disjoint 'buckets' of stats.
  */
 class PartitionedInstanceWideLockStats {
     PartitionedInstanceWideLockStats(const PartitionedInstanceWideLockStats&) = delete;
@@ -117,7 +124,8 @@ const Milliseconds MaxWaitTime = Milliseconds(500);
 // Dispenses unique LockerId identifiers
 AtomicWord<unsigned long long> idCounter(0);
 
-// Partitioned global lock statistics, so we don't hit the same bucket
+// Tracks lock statistics across all Locker instances. Distributes stats across multiple buckets
+// indexed by LockerId in order to minimize concurrent access conflicts.
 PartitionedInstanceWideLockStats globalStats;
 
 }  // namespace
@@ -128,6 +136,8 @@ bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
             return false;
 
         case RESOURCE_GLOBAL:
+        case RESOURCE_PBWM:
+        case RESOURCE_RSTL:
         case RESOURCE_DATABASE:
         case RESOURCE_COLLECTION:
         case RESOURCE_METADATA:
@@ -395,7 +405,9 @@ bool LockerImpl::unlockGlobal() {
         // If we're here we should only have one reference to any lock. It is a programming
         // error for any lock used with multi-granularity locking to have more references than
         // the global lock, because every scope starts by calling lockGlobal.
-        if (it.key().getType() == RESOURCE_GLOBAL || it.key().getType() == RESOURCE_MUTEX) {
+        const auto resType = it.key().getType();
+        if (resType == RESOURCE_GLOBAL || resType == RESOURCE_PBWM || resType == RESOURCE_RSTL ||
+            resType == RESOURCE_MUTEX) {
             it.next();
         } else {
             invariant(_unlockImpl(&it));
@@ -749,9 +761,10 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
             continue;
 
         // We should never have to save and restore metadata locks.
-        invariant(RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() ||
-                  (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(it->mode)) ||
-                  (resourceIdReplicationStateTransitionLock == resId && it->mode == MODE_IX));
+        invariant(RESOURCE_DATABASE == resType || RESOURCE_COLLECTION == resType ||
+                  (RESOURCE_GLOBAL == resType && isSharedLockMode(it->mode)) ||
+                  (RESOURCE_PBWM == resType && isSharedLockMode(it->mode)) ||
+                  (RESOURCE_RSTL == resType && it->mode == MODE_IX));
 
         // And, stuff the info into the out parameter.
         OneLock info;
@@ -837,7 +850,7 @@ LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, Lock
     // Give priority to the full modes for Global, PBWM, and RSTL resources so we don't stall global
     // operations such as shutdown or stepdown.
     const ResourceType resType = resId.getType();
-    if (resType == RESOURCE_GLOBAL) {
+    if (resType == RESOURCE_GLOBAL || resType == RESOURCE_PBWM || resType == RESOURCE_RSTL) {
         if (mode == MODE_S || mode == MODE_X) {
             request->enqueueAtFront = true;
             request->compatibleFirst = true;
@@ -976,6 +989,7 @@ void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode
 }
 
 LockResult LockerImpl::lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
+    invariant(mode == MODE_IX || mode == MODE_X);
     return lockBegin(opCtx, resourceIdReplicationStateTransitionLock, mode);
 }
 
@@ -1063,13 +1077,12 @@ void resetGlobalLockStats() {
     globalStats.reset();
 }
 
-// Definition for the hardcoded localdb and oplog collection info
+// Hardcoded resource IDs.
 const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, StringData("local"));
 const ResourceId resourceIdOplog = ResourceId(RESOURCE_COLLECTION, StringData("local.oplog.rs"));
 const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
-const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
-const ResourceId resourceIdParallelBatchWriterMode =
-    ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_PARALLEL_BATCH_WRITER_MODE);
-const ResourceId resourceIdReplicationStateTransitionLock =
-    ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_REPLICATION_STATE_TRANSITION_LOCK);
+const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, 1ULL);
+const ResourceId resourceIdParallelBatchWriterMode = ResourceId(RESOURCE_PBWM, 1ULL);
+const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(RESOURCE_RSTL, 1ULL);
+
 }  // namespace mongo

@@ -650,9 +650,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
         if (opCtx->getServiceContext()->getStorageEngine()->supportsDBLocking()) {
             if (globalWriteLock) {
-                const ResourceId globalLockResourceId(RESOURCE_GLOBAL,
-                                                      ResourceId::SINGLETON_GLOBAL);
-                opCtx->lockState()->downgrade(globalLockResourceId, MODE_IX);
+                opCtx->lockState()->downgrade(resourceIdGlobal, MODE_IX);
                 invariant(!opCtx->lockState()->isW());
             } else {
                 invariant(opCtx->lockState()->isW());

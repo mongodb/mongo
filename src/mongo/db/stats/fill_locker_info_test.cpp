@@ -41,11 +41,9 @@ namespace {
 using LockerInfo = Locker::LockerInfo;
 using OneLock = Locker::OneLock;
 
-const ResourceId kGlobalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
-
 TEST(FillLockerInfo, DoesReportWaitingForLockIfWaiting) {
     LockerInfo info;
-    info.waitingResource = kGlobalId;
+    info.waitingResource = resourceIdGlobal;
     ASSERT_TRUE(info.waitingResource.isValid());
 
     BSONObjBuilder infoBuilder;
@@ -72,7 +70,7 @@ TEST(FillLockerInfo, DoesNotReportWaitingForLockIfNotWaiting) {
 TEST(FillLockerInfo, DoesReportLockStats) {
     LockerInfo info;
     SingleThreadedLockStats stats;
-    stats.recordAcquisition(kGlobalId, MODE_IX);
+    stats.recordAcquisition(resourceIdGlobal, MODE_IX);
     info.stats = stats;
 
     BSONObjBuilder infoBuilder;
@@ -86,7 +84,7 @@ DEATH_TEST(FillLockerInfo, ShouldFailIfLocksAreNotSortedAppropriately, "Invarian
     LockerInfo info;
     // The global lock is supposed to come before the database lock.
     info.locks = {OneLock{ResourceId(RESOURCE_DATABASE, "TestDB"_sd), MODE_X},
-                  OneLock{kGlobalId, MODE_IX}};
+                  OneLock{resourceIdGlobal, MODE_IX}};
 
     BSONObjBuilder infoBuilder;
     fillLockerInfo(info, infoBuilder);
@@ -95,15 +93,16 @@ DEATH_TEST(FillLockerInfo, ShouldFailIfLocksAreNotSortedAppropriately, "Invarian
 TEST(FillLockerInfo, DoesReportLocksHeld) {
     const ResourceId dbId(RESOURCE_DATABASE, "TestDB"_sd);
     LockerInfo info;
-    info.locks = {OneLock{kGlobalId, MODE_IX}, OneLock{dbId, MODE_IX}};
+    info.locks = {OneLock{resourceIdGlobal, MODE_IX}, OneLock{dbId, MODE_IX}};
 
     BSONObjBuilder infoBuilder;
     fillLockerInfo(info, infoBuilder);
     const BSONObj infoObj = infoBuilder.done();
 
     ASSERT_EQ(infoObj["locks"].type(), BSONType::Object);
-    ASSERT_EQ(infoObj["locks"][resourceTypeName(kGlobalId.getType())].type(), BSONType::String);
-    ASSERT_EQ(infoObj["locks"][resourceTypeName(kGlobalId.getType())].String(), "w");
+    ASSERT_EQ(infoObj["locks"][resourceTypeName(resourceIdGlobal.getType())].type(),
+              BSONType::String);
+    ASSERT_EQ(infoObj["locks"][resourceTypeName(resourceIdGlobal.getType())].String(), "w");
     ASSERT_EQ(infoObj["locks"][resourceTypeName(dbId.getType())].type(), BSONType::String);
     ASSERT_EQ(infoObj["locks"][resourceTypeName(dbId.getType())].String(), "w");
 }
@@ -112,8 +111,9 @@ TEST(FillLockerInfo, ShouldReportMaxTypeHeldForResourceType) {
     const ResourceId firstDbId(RESOURCE_DATABASE, "FirstDB"_sd);
     const ResourceId secondDbId(RESOURCE_DATABASE, "SecondDB"_sd);
     LockerInfo info;
-    info.locks = {
-        OneLock{kGlobalId, MODE_IX}, OneLock{firstDbId, MODE_IX}, OneLock{secondDbId, MODE_X}};
+    info.locks = {OneLock{resourceIdGlobal, MODE_IX},
+                  OneLock{firstDbId, MODE_IX},
+                  OneLock{secondDbId, MODE_X}};
 
     BSONObjBuilder infoBuilder;
     fillLockerInfo(info, infoBuilder);
@@ -125,8 +125,9 @@ TEST(FillLockerInfo, ShouldReportMaxTypeHeldForResourceType) {
               "W");  // One is held in IX, one in X, so X should win and be displayed as "W".
 
     // Ensure it still works if locks are reported in the opposite order.
-    info.locks = {
-        OneLock{kGlobalId, MODE_IX}, OneLock{secondDbId, MODE_X}, OneLock{firstDbId, MODE_IX}};
+    info.locks = {OneLock{resourceIdGlobal, MODE_IX},
+                  OneLock{secondDbId, MODE_X},
+                  OneLock{firstDbId, MODE_IX}};
 
     ASSERT_EQ(infoObj["locks"].type(), BSONType::Object);
     ASSERT_EQ(infoObj["locks"][resourceTypeName(firstDbId.getType())].type(), BSONType::String);
