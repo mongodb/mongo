@@ -239,6 +239,11 @@ struct CommandHelpers {
                                           const Command* command,
                                           const OpMsgRequest& request);
 
+    /**
+     * Returns OK if command is allowed to run under a transaction in the given database.
+     */
+    static Status canUseTransactions(StringData dbName, StringData cmdName);
+
     static constexpr StringData kHelpFieldName = "help"_sd;
 };
 

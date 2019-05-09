@@ -36,6 +36,8 @@
 
     function testCommand(command) {
         jsTest.log("Testing command: " + tojson(command));
+        const errmsgRegExp = new RegExp(
+            'Cannot run .* in a multi-document transaction.\|This command is not supported in transactions');
 
         // Check that the command runs successfully outside transactions.
         setup();
@@ -43,14 +45,16 @@
 
         // Check that the command cannot be used to start a transaction.
         setup();
-        assert.commandFailedWithCode(sessionDb.runCommand(Object.assign({}, command, {
+        let res = assert.commandFailedWithCode(sessionDb.runCommand(Object.assign({}, command, {
             readConcern: {level: "snapshot"},
             txnNumber: NumberLong(++txnNumber),
             stmtId: NumberInt(0),
             startTransaction: true,
             autocommit: false
         })),
-                                     ErrorCodes.OperationNotSupportedInTransaction);
+                                               ErrorCodes.OperationNotSupportedInTransaction);
+        // Check that the command fails with expected error message.
+        assert(res.errmsg.match(errmsgRegExp), res);
         assert.commandFailedWithCode(sessionDb.adminCommand({
             commitTransaction: 1,
             txnNumber: NumberLong(txnNumber),
@@ -70,12 +74,14 @@
             startTransaction: true,
             autocommit: false
         }));
-        assert.commandFailedWithCode(
+        res = assert.commandFailedWithCode(
             sessionDb.runCommand(Object.assign(
                 {},
                 command,
                 {txnNumber: NumberLong(txnNumber), stmtId: NumberInt(1), autocommit: false})),
             ErrorCodes.OperationNotSupportedInTransaction);
+        // Check that the command fails with expected error message.
+        assert(res.errmsg.match(errmsgRegExp), res);
         assert.commandWorked(sessionDb.adminCommand({
             commitTransaction: 1,
             txnNumber: NumberLong(txnNumber),

@@ -102,6 +102,31 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
     return false;
 }
 
+// The command names that are allowed in a multi-document transaction.
+const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
+                                        {"aggregate", 1},
+                                        {"commitTransaction", 1},
+                                        {"delete", 1},
+                                        {"distinct", 1},
+                                        {"doTxn", 1},
+                                        {"find", 1},
+                                        {"findandmodify", 1},
+                                        {"findAndModify", 1},
+                                        {"geoSearch", 1},
+                                        {"getMore", 1},
+                                        {"insert", 1},
+                                        {"killCursors", 1},
+                                        {"prepareTransaction", 1},
+                                        {"update", 1}};
+
+// The command names that are allowed in a multi-document transaction only when test commands are
+// enabled.
+const StringMap<int> txnCmdForTestingWhitelist = {{"dbHash", 1}};
+
+// The commands that can be run on the 'admin' database in multi-document transactions.
+const StringMap<int> txnAdminCommands = {
+    {"abortTransaction", 1}, {"commitTransaction", 1}, {"doTxn", 1}, {"prepareTransaction", 1}};
+
 }  // namespace
 
 
@@ -383,6 +408,30 @@ bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
         CommandHelpers::auditLogAuthEvent(opCtx, nullptr, request, e.code());
         throw;
     }
+}
+
+Status CommandHelpers::canUseTransactions(StringData dbName, StringData cmdName) {
+    if (cmdName == "count"_sd) {
+        return {ErrorCodes::OperationNotSupportedInTransaction,
+                "Cannot run 'count' in a multi-document transaction. Please see "
+                "http://dochub.mongodb.org/core/transaction-count for a recommended alternative."};
+    }
+
+    if (txnCmdWhitelist.find(cmdName) == txnCmdWhitelist.cend() &&
+        !(getTestCommandsEnabled() &&
+          txnCmdForTestingWhitelist.find(cmdName) != txnCmdForTestingWhitelist.cend())) {
+        return {ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction."};
+    }
+
+    if (dbName == "config"_sd || dbName == "local"_sd ||
+        (dbName == "admin"_sd && txnAdminCommands.find(cmdName) == txnAdminCommands.cend())) {
+        return {ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot run command against the '" << dbName
+                              << "' database in a transaction"};
+    }
+
+    return Status::OK();
 }
 
 constexpr StringData CommandHelpers::kHelpFieldName;

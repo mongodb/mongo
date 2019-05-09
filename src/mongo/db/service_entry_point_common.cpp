@@ -701,6 +701,10 @@ void execCommandDatabase(OperationContext* opCtx,
             str::stream() << "Invalid database name: '" << dbname << "'",
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
+        if (sessionOptions.getAutocommit()) {
+            uassertStatusOK(CommandHelpers::canUseTransactions(dbname, command->getName()));
+        }
+
         // Session ids are forwarded in requests, so commands that require roundtrips between
         // servers may result in a deadlock when a server tries to check out a session it is already
         // using to service an earlier operation in the command's chain. To avoid this, only check
