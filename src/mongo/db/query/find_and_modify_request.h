@@ -51,7 +51,6 @@ class StatusWith;
  */
 class FindAndModifyRequest {
 public:
-    static constexpr auto kBypassDocumentValidationFieldName = "bypassDocumentValidation"_sd;
     static constexpr auto kLegacyCommandName = "findandmodify"_sd;
     static constexpr auto kCommandName = "findAndModify"_sd;
 
@@ -107,6 +106,7 @@ public:
     bool shouldReturnNew() const;
     bool isUpsert() const;
     bool isRemove() const;
+    bool getBypassDocumentValidation() const;
 
     // Not implemented. Use extractWriteConcern() to get the setting instead.
     WriteConcernOptions getWriteConcern() const;
@@ -168,6 +168,8 @@ public:
      */
     void setWriteConcern(WriteConcernOptions writeConcern);
 
+    void setBypassDocumentValidation(bool bypassDocumentValidation);
+
 private:
     /**
      * Creates a new FindAndModifyRequest with the required fields.
@@ -180,13 +182,14 @@ private:
     const NamespaceString _ns;
     BSONObj _query;
 
-    boost::optional<bool> _isUpsert;
+    bool _isUpsert{false};
     boost::optional<BSONObj> _fieldProjection;
     boost::optional<BSONObj> _sort;
     boost::optional<BSONObj> _collation;
     boost::optional<std::vector<BSONObj>> _arrayFilters;
-    boost::optional<bool> _shouldReturnNew;
+    bool _shouldReturnNew{false};
     boost::optional<WriteConcernOptions> _writeConcern;
+    bool _bypassDocumentValidation{false};
 
     // Holds value when performing an update request and none when a remove request.
     boost::optional<write_ops::UpdateModification> _update;
