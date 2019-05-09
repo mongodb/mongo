@@ -997,7 +997,7 @@ namespace {
 // 16MB limit or the maximum number of transaction statements allowed in one entry.
 //
 // If 'limitSize' is false, then it attempts to include all given operations, regardless of whether
-// or not they fit. If the ops don't fit, BSONObjectTooLarge will be thrown in that case.
+// or not they fit. If the ops don't fit, TransactionTooLarge will be thrown in that case.
 //
 // Returns an iterator to the first statement that wasn't packed into the applyOps object.
 std::vector<repl::ReplOperation>::const_iterator packTransactionStatementsForApplyOps(
@@ -1024,7 +1024,17 @@ std::vector<repl::ReplOperation>::const_iterator packTransactionStatementsForApp
             break;
         opsArray.append(stmt.toBSON());
     }
-    opsArray.done();
+    try {
+        // BSONArrayBuilder will throw a BSONObjectTooLarge exception if we exceeded the max BSON
+        // size.
+        opsArray.done();
+    } catch (const AssertionException& e) {
+        // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
+        uassert(ErrorCodes::TransactionTooLarge,
+                e.reason(),
+                e.code() != ErrorCodes::BSONObjectTooLarge);
+        throw;
+    }
     return stmtIter;
 }
 

@@ -63,6 +63,8 @@ using repl::UnreplicatedWritesBlock;
 
 Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionLock");
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingRunningTransactionsOnFCVDowngrade);
+
 void FeatureCompatibilityVersion::setTargetUpgrade(OperationContext* opCtx) {
     // Sets both 'version' and 'targetVersion' fields.
     _runUpdateCommand(opCtx, [](auto updateMods) {
@@ -175,6 +177,13 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         }
 
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+            if (MONGO_FAIL_POINT(hangBeforeAbortingRunningTransactionsOnFCVDowngrade)) {
+                log() << "featureCompatibilityVersion - "
+                         "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled. "
+                         "Blocking until fail point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(
+                    hangBeforeAbortingRunningTransactionsOnFCVDowngrade);
+            }
             // Abort all open transactions when downgrading the featureCompatibilityVersion.
             SessionKiller::Matcher matcherAllSessions(
                 KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
