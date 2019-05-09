@@ -558,7 +558,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
                     str::stream() << "Field 'update' is only valid for update op type. Op type is "
                                   << opType,
                     (opType == "update"));
-            myOp.update = write_ops::UpdateModification::parseFromBSON(arg);
+            myOp.update = arg.Obj();
         } else if (name == "upsert") {
             uassert(34392,
                     str::stream() << "Field 'upsert' is only valid for update op type. Op type is "
@@ -931,7 +931,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                         return;
                 }
                 if (!_config->handleErrors && !op.handleError)
-                    throw;
+                    return;
 
                 sleepFor(_config->delayMillisOnFailedOperation);
 
@@ -1151,36 +1151,16 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             {
                 BenchRunEventTrace _bret(&state->stats->updateCounter);
                 BSONObj query = fixQuery(this->query, *state->bsonTemplateEvaluator);
+                BSONObj update = fixQuery(this->update, *state->bsonTemplateEvaluator);
 
                 if (this->useWriteCmd) {
                     BSONObjBuilder builder;
                     builder.append("update", nsToCollectionSubstring(this->ns));
-                    BSONArrayBuilder updateArray(builder.subarrayStart("updates"));
-                    {
-                        BSONObjBuilder singleUpdate;
-                        singleUpdate.append("q", query);
-                        switch (this->update.type()) {
-                            case write_ops::UpdateModification::Type::kClassic: {
-                                singleUpdate.append("u",
-                                                    fixQuery(this->update.getUpdateClassic(),
-                                                             *state->bsonTemplateEvaluator));
-                                break;
-                            }
-                            case write_ops::UpdateModification::Type::kPipeline: {
-                                BSONArrayBuilder pipelineBuilder(singleUpdate.subarrayStart("u"));
-                                for (auto&& stage : this->update.getUpdatePipeline()) {
-                                    pipelineBuilder.append(
-                                        fixQuery(stage, *state->bsonTemplateEvaluator));
-                                }
-                                pipelineBuilder.doneFast();
-                                break;
-                            }
-                        }
-                        singleUpdate.append("multi", this->multi);
-                        singleUpdate.append("upsert", this->upsert);
-                        updateArray.append(singleUpdate.done());
-                    }
-                    updateArray.doneFast();
+                    BSONArrayBuilder docBuilder(builder.subarrayStart("updates"));
+                    docBuilder.append(BSON("q" << query << "u" << update << "multi" << this->multi
+                                               << "upsert"
+                                               << this->upsert));
+                    docBuilder.done();
                     builder.append("writeConcern", this->writeConcern);
 
                     boost::optional<TxnNumber> txnNumberForOp;
@@ -1196,16 +1176,11 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                           txnNumberForOp,
                                           &result);
                 } else {
-                    uassert(
-                        30015,
-                        "cannot use legacy write protocol for anything but classic style updates",
-                        this->update.type() == write_ops::UpdateModification::Type::kClassic);
-                    auto toSend = makeUpdateMessage(
-                        this->ns,
-                        query,
-                        fixQuery(this->update.getUpdateClassic(), *state->bsonTemplateEvaluator),
-                        (this->upsert ? UpdateOption_Upsert : 0) |
-                            (this->multi ? UpdateOption_Multi : 0));
+                    auto toSend = makeUpdateMessage(this->ns,
+                                                    query,
+                                                    update,
+                                                    (this->upsert ? UpdateOption_Upsert : 0) |
+                                                        (this->multi ? UpdateOption_Multi : 0));
                     conn->say(toSend);
                     if (this->safe)
                         result = conn->getLastErrorDetailed();

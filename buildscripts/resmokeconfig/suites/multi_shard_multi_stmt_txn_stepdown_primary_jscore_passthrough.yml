@@ -348,7 +348,6 @@ selector:
   # op3 will still be using the snapshot from op1, and not see op2 at all.
   - jstests/core/cursora.js
   - jstests/core/bench_test1.js
-  - jstests/core/benchrun_pipeline_updates.js
 
   # auto_retry_on_network_error.js will timeout with assert.soon and give a different error from
   # what test expects. Excluding from suite since it doesn't really do any database operations, so
