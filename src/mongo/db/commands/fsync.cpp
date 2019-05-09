@@ -52,6 +52,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -80,6 +81,7 @@ public:
 
 private:
     bool _allowFsyncFailure;
+    static bool _shutdownTaskRegistered;
 };
 
 class FSyncCommand : public ErrmsgCommandDeprecated {
@@ -214,6 +216,10 @@ public:
 
     void releaseLock() {
         stdx::unique_lock<stdx::mutex> lk(lockStateMutex);
+        releaseLock_inLock(lk);
+    }
+
+    void releaseLock_inLock(stdx::unique_lock<stdx::mutex>& lk) {
         invariant(_lockCount >= 1);
         _lockCount--;
 
@@ -296,31 +302,31 @@ public:
 
         Lock::ExclusiveLock lk(opCtx->lockState(), commandMutex);
 
-        if (unlockFsync()) {
-            const auto lockCount = fsyncCmd.getLockCount();
-            result.append("info", str::stream() << "fsyncUnlock completed");
-            result.append("lockCount", lockCount);
-            if (lockCount == 0) {
-                log() << "fsyncUnlock completed. mongod is now unlocked and free to accept writes";
-            } else {
-                log() << "fsyncUnlock completed. Lock count is now " << lockCount;
-            }
-            return true;
-        } else {
+        stdx::unique_lock<stdx::mutex> stateLock(fsyncCmd.lockStateMutex);
+
+        auto lockCount = fsyncCmd.getLockCount_inLock();
+        if (lockCount == 0) {
             errmsg = "fsyncUnlock called when not locked";
             return false;
         }
-    }
 
-private:
-    // Returns true if lock count is decremented.
-    bool unlockFsync() {
-        if (fsyncCmd.getLockCount() == 0) {
-            error() << "fsyncUnlock called when not locked";
-            return false;
+        fsyncCmd.releaseLock_inLock(stateLock);
+
+        // Relies on the lock to be released in 'releaseLock_inLock()' when the release brings
+        // the lock count to 0.
+        if (stateLock) {
+            // If we're still locked then lock count is not zero.
+            invariant(lockCount > 0);
+            lockCount = fsyncCmd.getLockCount_inLock();
+            log() << "fsyncUnlock completed. Lock count is now " << lockCount;
+        } else {
+            invariant(fsyncCmd.getLockCount() == 0);
+            lockCount = 0;
+            log() << "fsyncUnlock completed. mongod is now unlocked and free to accept writes";
         }
 
-        fsyncCmd.releaseLock();
+        result.append("info", str::stream() << "fsyncUnlock completed");
+        result.append("lockCount", lockCount);
         return true;
     }
 
@@ -328,6 +334,8 @@ private:
 
 // Exposed publically via extern in fsync.h.
 SimpleMutex filesLockedFsync;
+
+bool FSyncLockThread::_shutdownTaskRegistered = false;
 
 void FSyncLockThread::run() {
     ThreadClient tc("fsyncLockWorker", getGlobalServiceContext());
@@ -341,7 +349,26 @@ void FSyncLockThread::run() {
         OperationContext& opCtx = *opCtxPtr;
         Lock::GlobalRead global(&opCtx);  // Block any writes in order to flush the files.
 
-        StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
+        ServiceContext* serviceContext = opCtx.getServiceContext();
+        StorageEngine* storageEngine = serviceContext->getStorageEngine();
+
+        // The fsync shutdown task has to be registered once the server is running otherwise it
+        // conflicts with the servers shutdown task.
+        if (!_shutdownTaskRegistered) {
+            _shutdownTaskRegistered = true;
+            registerShutdownTask([&] {
+                stdx::unique_lock<stdx::mutex> stateLock(fsyncCmd.lockStateMutex);
+                if (fsyncCmd.getLockCount_inLock() > 0) {
+                    warning() << "Interrupting fsync because the server is shutting down.";
+                    while (fsyncCmd.getLockCount_inLock()) {
+                        // Relies on the lock to be released in 'releaseLock_inLock()' when the
+                        // release brings the lock count to 0.
+                        invariant(stateLock);
+                        fsyncCmd.releaseLock_inLock(stateLock);
+                    }
+                }
+            });
+        }
 
         try {
             storageEngine->flushAllFiles(&opCtx, true);
@@ -353,7 +380,7 @@ void FSyncLockThread::run() {
         }
 
         bool successfulFsyncLock = false;
-        auto backupCursorHooks = BackupCursorHooks::get(opCtx.getServiceContext());
+        auto backupCursorHooks = BackupCursorHooks::get(serviceContext);
         try {
             writeConflictRetry(&opCtx,
                                "beginBackup",
