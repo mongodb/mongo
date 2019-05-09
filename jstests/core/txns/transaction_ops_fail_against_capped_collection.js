@@ -1,33 +1,29 @@
 /**
- * Tests that transaction CRUD operations against a shard on a capped collection fail.
+ * Tests that transaction CRUD operations are not allowed on capped collections.
  *
- * Capped collection writes take collection X locks and cannot guarantee successful application
- * across all replica set members (a write could succeed on a primary and fail on one of the
- * secondaries), so they are not allowed in prepared transactions or transactions on shards more
- * generally.
- *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * 'requires_capped' tagged tests are excluded from txn passthrough suites.
+ * @tags: [requires_capped, uses_transactions]
  */
 (function() {
     "use strict";
 
-    const st = new ShardingTest({shards: 1});
+    const dbName = "test";
+    const cappedCollName = "transaction_ops_fail_against_capped_collection";
+    const testDB = db.getSiblingDB(dbName);
+    const cappedTestColl = testDB.getCollection(cappedCollName);
+    const testDocument = {"a": 1};
 
-    const dbName = "test_db";
-    const cappedCollName = "test_capped_coll";
-    const testDB = st.shard0.getDB('test_db');
+    cappedTestColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Creating a capped collection '" + dbName + "." + cappedCollName + "'.");
     assert.commandWorked(testDB.createCollection(cappedCollName, {capped: true, size: 500}));
 
-    jsTest.log("Adding data to the capped collection so that the update op can be tested in " +
-               "the subsequent transaction attempts");
-    const testCappedColl = testDB.getCollection(cappedCollName);
-    const testDocument = {"a": "docToTryToUpdateThenDelete"};
-    assert.writeOK(testCappedColl.insert(testDocument));
+    jsTest.log("Adding a document to the capped collection so that the update op can be tested " +
+               "in the subsequent transaction attempts");
+    assert.commandWorked(cappedTestColl.insert(testDocument));
 
-    jsTest.log("Setting up a session in which to execute transaction ops.");
-    const session = testDB.getMongo().startSession();
+    jsTest.log("Setting up a transaction in which to execute transaction ops.");
+    const session = db.getMongo().startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionCappedColl = sessionDB.getCollection(cappedCollName);
 
@@ -50,6 +46,4 @@
     // Deletes do not work against capped collections so we will not test it in a transaction.
 
     session.endSession();
-
-    st.stop();
 })();

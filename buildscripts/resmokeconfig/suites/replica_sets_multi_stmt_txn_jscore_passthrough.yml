@@ -277,6 +277,8 @@ selector:
   - assumes_read_concern_unchanged
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
+  # Transactions are not allowed to operate on capped collections.
+  - requires_capped
 
 executor:
   archive:

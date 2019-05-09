@@ -46,7 +46,7 @@ selector:
   - jstests/core/txns/empty_commit_abort.js
 
   exclude_with_any_tags:
-  # Transactions are not allowed to operate on capped collections on shard servers.
+  # Transactions are not allowed to operate on capped collections.
   - requires_capped
   # Prepare is not a command on mongos.
   - uses_prepare_transaction

@@ -317,7 +317,7 @@ selector:
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
   - assumes_against_mongod_not_mongos
-  # Transactions are not allowed to operate on capped collections on shard servers.
+  # Transactions are not allowed to operate on capped collections.
   - requires_capped
 
 executor:

@@ -324,22 +324,24 @@ void insertDocuments(OperationContext* opCtx,
 
 /**
  * Returns a OperationNotSupportedInTransaction error Status if we are in a transaction and
- * operating on a capped collection on a shard.
+ * operating on a capped collection.
  *
  * The behavior of an operation against a capped collection may differ across replica set members,
  * where it can succeed on one member and fail on another, crashing the failing member. Prepared
  * transactions are not allowed to fail, so capped collections will not be allowed on shards.
- * Furthermore, capped collections only allow one operation at a time because they enforce
- * sequential insertion order with a MODE_X collection lock, which we cannot hold in transactions.
+ * Even in the unsharded case, capped collections are still problematic with transactions because
+ * they only allow one operation at a time because they enforce insertion order with a MODE_X
+ * collection lock, which we cannot hold in transactions.
  */
-Status checkIfTransactionOnCappedCollOnShard(OperationContext* opCtx, Collection* collection) {
+Status checkIfTransactionOnCappedColl(OperationContext* opCtx, Collection* collection) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (txnParticipant && txnParticipant.inMultiDocumentTransaction() && collection->isCapped() &&
-        serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        return {ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Collection '" << collection->ns()
-                              << "' is a capped collection. Transactions are not allowed on capped "
-                                 "collections on shards."};
+    if (txnParticipant && txnParticipant.inMultiDocumentTransaction() && collection->isCapped()) {
+        return {
+            ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream()
+                << "Collection '"
+                << collection->ns()
+                << "' is a capped collection. Transactions are not allowed on capped collections."};
     }
     return Status::OK();
 }
@@ -433,9 +435,9 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 try {
                     if (!collection)
                         acquireCollection();
-                    // Transactions are not allowed to operate on capped collections on shards.
+                    // Transactions are not allowed to operate on capped collections.
                     uassertStatusOK(
-                        checkIfTransactionOnCappedCollOnShard(opCtx, collection->getCollection()));
+                        checkIfTransactionOnCappedColl(opCtx, collection->getCollection()));
                     lastOpFixer->startingOp();
                     insertDocuments(opCtx, collection->getCollection(), it, it + 1, fromMigrate);
                     lastOpFixer->finishedOpSuccessfully();
@@ -621,8 +623,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }
 
     if (auto coll = collection->getCollection()) {
-        // Transactions are not allowed to operate on capped collections on shards.
-        uassertStatusOK(checkIfTransactionOnCappedCollOnShard(opCtx, coll));
+        // Transactions are not allowed to operate on capped collections.
+        uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(

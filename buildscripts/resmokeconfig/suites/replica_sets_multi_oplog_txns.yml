@@ -9,6 +9,9 @@ selector:
   - jstests/replsets/recover_prepared_transaction_state.js
   - jstests/replsets/rollback_prepare_transaction.js
   - jstests/replsets/rollback_reconstructs_transactions_prepared_before_stable.js
+  exclude_with_any_tags:
+  # Transactions are not allowed to operate on capped collections.
+  - requires_capped
 
 executor:
   config:

@@ -16,6 +16,10 @@ selector:
   # happens after a transaction is prepared, but before it is committed.
   - jstests/core/txns/prepare_conflict_aggregation_behavior.js
 
+  exclude_with_any_tags:
+  # Transactions are not allowed to operate on capped collections.
+  - requires_capped
+
 executor:
   archive:
     hooks:
