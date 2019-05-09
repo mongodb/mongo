@@ -98,25 +98,28 @@ Status SessionsCollectionStandalone::checkSessionsCollectionExists(OperationCont
 
 Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
                                                      const LogicalSessionRecordSet& sessions) {
+    const std::vector<LogicalSessionRecord> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
     return doRefresh(NamespaceString::kLogicalSessionsNamespace,
-                     std::vector(sessions.begin(), sessions.end()),
+                     sessionsVector,
                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 Status SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
                                                    const LogicalSessionIdSet& sessions) {
+    const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
     return doRemove(NamespaceString::kLogicalSessionsNamespace,
-                    std::vector(sessions.begin(), sessions.end()),
+                    sessionsVector,
                     makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
+    const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
     return doFindRemoved(NamespaceString::kLogicalSessionsNamespace,
-                         std::vector(sessions.begin(), sessions.end()),
+                         sessionsVector,
                          makeFindFnForCommand(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
