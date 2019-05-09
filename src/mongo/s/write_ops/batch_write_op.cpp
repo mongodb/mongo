@@ -481,12 +481,15 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                     insertOp.setDocuments(std::move(*insertDocs));
                     return insertOp;
                 }());
-            case BatchedCommandRequest::BatchType_Update:
+            case BatchedCommandRequest::BatchType_Update: {
                 return BatchedCommandRequest([&] {
                     write_ops::Update updateOp(_clientRequest.getNS());
                     updateOp.setUpdates(std::move(*updates));
+                    // Each child batch inherits its runtime constants from the parent batch.
+                    updateOp.setRuntimeConstants(_clientRequest.getRuntimeConstants());
                     return updateOp;
                 }());
+            }
             case BatchedCommandRequest::BatchType_Delete:
                 return BatchedCommandRequest([&] {
                     write_ops::Delete deleteOp(_clientRequest.getNS());

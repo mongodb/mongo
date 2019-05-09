@@ -65,11 +65,13 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     if (request.getRuntimeConstants()) {
         variables.setRuntimeConstants(request.getRuntimeConstants().get());
     } else {
-        variables.generateRuntimeConstants(opCtx);
+        variables.setDefaultRuntimeConstants(opCtx);
     }
 }
 
-ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator)
+ExpressionContext::ExpressionContext(OperationContext* opCtx,
+                                     const CollatorInterface* collator,
+                                     const boost::optional<RuntimeConstants>& runtimeConstants)
     : opCtx(opCtx),
       mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
       timeZoneDatabase(opCtx && opCtx->getServiceContext()
@@ -78,7 +80,11 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInte
       variablesParseState(variables.useIdGenerator()),
       _collator(collator),
       _documentComparator(_collator),
-      _valueComparator(_collator) {}
+      _valueComparator(_collator) {
+    if (runtimeConstants) {
+        variables.setRuntimeConstants(*runtimeConstants);
+    }
+}
 
 ExpressionContext::ExpressionContext(NamespaceString nss,
                                      std::shared_ptr<MongoProcessInterface> processInterface,

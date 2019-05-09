@@ -190,23 +190,31 @@ RuntimeConstants Variables::getRuntimeConstants() const {
 
 void Variables::setRuntimeConstants(const RuntimeConstants& constants) {
     _runtimeConstants[kNowId] = Value(constants.getLocalNow());
-    _runtimeConstants[kClusterTimeId] = Value(constants.getClusterTime());
+    // We use a null Timestamp to indicate that the clusterTime is not available; this can happen if
+    // the logical clock is not running. We do not use boost::optional because this would allow the
+    // IDL to serialize a RuntimConstants without clusterTime, which should always be an error.
+    if (!constants.getClusterTime().isNull()) {
+        _runtimeConstants[kClusterTimeId] = Value(constants.getClusterTime());
+    }
 }
 
-void Variables::generateRuntimeConstants(OperationContext* opCtx) {
-    _runtimeConstants[kNowId] = Value(Date_t::now());
+void Variables::setDefaultRuntimeConstants(OperationContext* opCtx) {
+    setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+}
 
+RuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
+    // On a standalone, the clock may not be running and $$CLUSTER_TIME is unavailable. If the
+    // logical clock is available, set the clusterTime in the runtime constants. Otherwise, the
+    // clusterTime is set to the null Timestamp.
     if (opCtx->getClient()) {
         if (auto logicalClock = LogicalClock::get(opCtx); logicalClock) {
             auto clusterTime = logicalClock->getClusterTime();
-
-            // On a standalone mongod the logical clock may not be running and $$CLUSTER_TIME is not
-            // available.
             if (clusterTime != LogicalTime::kUninitialized) {
-                _runtimeConstants[kClusterTimeId] = Value(clusterTime.asTimestamp());
+                return {Date_t::now(), clusterTime.asTimestamp()};
             }
         }
     }
+    return {Date_t::now(), Timestamp()};
 }
 
 Variables::Id VariablesParseState::defineVariable(StringData name) {

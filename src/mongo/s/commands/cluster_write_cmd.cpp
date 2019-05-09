@@ -39,6 +39,7 @@
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -621,8 +622,12 @@ private:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
-        return stdx::make_unique<Invocation>(
-            this, request, BatchedCommandRequest::parseUpdate(request));
+        auto parsedRequest = BatchedCommandRequest::parseUpdate(request);
+        uassert(51195,
+                "Cannot specify runtime constants option to a mongos",
+                !parsedRequest.hasRuntimeConstants());
+        parsedRequest.setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+        return stdx::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }
 
     std::string help() const override {

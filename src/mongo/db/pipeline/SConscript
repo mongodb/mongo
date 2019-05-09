@@ -594,6 +594,16 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='runtime_constants_idl',
+    source=[
+        env.Idlc('runtime_constants.idl')[0]
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='document_sources_idl',
     source=[
         env.Idlc('document_source_change_stream.idl')[0],
@@ -603,7 +613,6 @@ env.Library(
         env.Idlc('document_source_out.idl')[0],
         env.Idlc('document_source_replace_root.idl')[0],
         env.Idlc('exchange_spec.idl')[0],
-        env.Idlc('runtime_constants.idl')[0],
         env.Idlc('value.idl')[0],
         'document_source_merge_spec.cpp',
         'resume_token.cpp'
@@ -614,6 +623,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/s/common_s',
         'document_value',
+        'runtime_constants_idl',
     ],
 )
 

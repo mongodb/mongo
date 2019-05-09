@@ -685,7 +685,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* opCtx,
                                                               const NamespaceString& ns,
                                                               StmtId stmtId,
-                                                              const write_ops::UpdateOpEntry& op) {
+                                                              const write_ops::UpdateOpEntry& op,
+                                                              RuntimeConstants runtimeConstants) {
     globalOpCounters.gotUpdate();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
@@ -707,6 +708,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
     UpdateRequest request(ns);
     request.setQuery(op.getQ());
     request.setUpdateModification(op.getU());
+    request.setRuntimeConstants(std::move(runtimeConstants));
     request.setCollation(write_ops::collationOf(op));
     request.setStmtId(stmtId);
     request.setArrayFilters(write_ops::arrayFiltersOf(op));
@@ -770,6 +772,11 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     WriteResult out;
     out.results.reserve(wholeOp.getUpdates().size());
 
+    // If the update command specified runtime constants, we adopt them. Otherwise, we set them to
+    // the current local and cluster time. These constants are applied to each update in the batch.
+    const auto& runtimeConstants =
+        wholeOp.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
+
     for (auto&& singleOp : wholeOp.getUpdates()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
@@ -796,7 +803,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
         try {
             lastOpFixer.startingOp();
             out.results.emplace_back(performSingleUpdateOpWithDupKeyRetry(
-                opCtx, wholeOp.getNamespace(), stmtId, singleOp));
+                opCtx, wholeOp.getNamespace(), stmtId, singleOp, runtimeConstants));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue =

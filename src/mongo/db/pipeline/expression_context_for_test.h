@@ -60,7 +60,7 @@ public:
         // initialize with a nullptr and set post-construction.
         timeZoneDatabase = TimeZoneDatabase::get(_serviceContext.getServiceContext());
         opCtx = _testOpCtx.get();
-        RuntimeConstants constants(Date_t::now(), Timestamp());
+        RuntimeConstants constants(Date_t::now(), Timestamp(1, 0));
         variables.setRuntimeConstants(constants);
     }
 

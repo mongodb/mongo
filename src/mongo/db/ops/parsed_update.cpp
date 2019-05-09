@@ -44,7 +44,7 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const ExtensionsCallback& extensionsCallback)
     : _opCtx(opCtx),
       _request(request),
-      _driver(new ExpressionContext(opCtx, nullptr)),
+      _driver(new ExpressionContext(opCtx, nullptr, _request->getRuntimeConstants())),
       _canonicalQuery(),
       _extensionsCallback(extensionsCallback) {}
 
@@ -123,7 +123,8 @@ Status ParsedUpdate::parseQueryToCQ() {
         allowedMatcherFeatures &= ~MatchExpressionParser::AllowedFeatures::kExpr;
     }
 
-    boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto expCtx =
+        make_intrusive<ExpressionContext>(_opCtx, _collator.get(), _request->getRuntimeConstants());
     auto statusWithCQ = CanonicalQuery::canonicalize(
         _opCtx, std::move(qr), std::move(expCtx), _extensionsCallback, allowedMatcherFeatures);
     if (statusWithCQ.isOK()) {

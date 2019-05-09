@@ -363,6 +363,8 @@ private:
             UpdateRequest updateRequest(_batch.getNamespace());
             updateRequest.setQuery(_batch.getUpdates()[0].getQ());
             updateRequest.setUpdateModification(_batch.getUpdates()[0].getU());
+            updateRequest.setRuntimeConstants(
+                _batch.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
             updateRequest.setCollation(write_ops::collationOf(_batch.getUpdates()[0]));
             updateRequest.setArrayFilters(write_ops::arrayFiltersOf(_batch.getUpdates()[0]));
             updateRequest.setMulti(_batch.getUpdates()[0].getMulti());

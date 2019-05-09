@@ -108,10 +108,12 @@ public:
                       boost::optional<UUID> collUUID);
 
     /**
-     * Constructs an ExpressionContext to be used for MatchExpression parsing outside of the context
-     * of aggregation.
+     * Constructs an ExpressionContext suitable for use outside of the aggregation system, including
+     * for MatchExpression parsing and executing pipeline-style operations in the Update system.
      */
-    ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator);
+    ExpressionContext(OperationContext* opCtx,
+                      const CollatorInterface* collator,
+                      const boost::optional<RuntimeConstants>& runtimeConstants = boost::none);
 
     /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if

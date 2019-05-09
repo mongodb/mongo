@@ -115,6 +115,21 @@ public:
         return *_shardVersion;
     }
 
+    void setRuntimeConstants(const RuntimeConstants& runtimeConstants) {
+        invariant(_updateReq);
+        _updateReq->setRuntimeConstants(runtimeConstants);
+    }
+
+    bool hasRuntimeConstants() const {
+        invariant(_updateReq);
+        return _updateReq->getRuntimeConstants().has_value();
+    }
+
+    const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
+        invariant(_updateReq);
+        return _updateReq->getRuntimeConstants();
+    }
+
     const write_ops::WriteCommandBase& getWriteCommandBase() const;
     void setWriteCommandBase(write_ops::WriteCommandBase writeCommandBase);
 
