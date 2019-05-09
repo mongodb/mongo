@@ -104,6 +104,11 @@ public:
         OperationContext* opCtx, const BatchLimits& batchLimits)>;
 
     /**
+     * Lower bound of batch limit size (in bytes) returned by calculateBatchLimitBytes().
+     */
+    static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
+
+    /**
      * Creates thread pool for writer tasks.
      */
     static std::unique_ptr<ThreadPool> makeWriterPool();

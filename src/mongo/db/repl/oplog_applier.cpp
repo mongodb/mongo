@@ -77,7 +77,7 @@ std::size_t OplogApplier::calculateBatchLimitBytes(OperationContext* opCtx,
     auto oplogMaxSizeResult =
         storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
     auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
-    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes.load()));
+    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
 }
 
 OplogApplier::OplogApplier(executor::TaskExecutor* executor,
