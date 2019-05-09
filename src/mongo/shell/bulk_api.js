@@ -708,6 +708,10 @@ var _bulk_api_module = (function() {
             },
 
             replaceOne: function(updateDocument) {
+                // Cannot use pipeline-style updates in a replacement operation.
+                if (Array.isArray(updateDocument)) {
+                    throw new Error('Cannot use pipeline-style updates in a replacement operation');
+                }
                 findOperations.updateOne(updateDocument);
             },
 
