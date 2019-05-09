@@ -100,6 +100,7 @@ selector:
   - jstests/sharding/move_chunk_remove_with_write_retryability.js
   - jstests/sharding/move_chunk_update_with_write_retryability.js
   - jstests/sharding/txn_two_phase_commit_commands_basic_requirements.js
+  - jstests/sharding/txn_two_phase_commit_coordinator_shutdown_and_restart.js
   - jstests/sharding/txn_two_phase_commit_failover.js
   - jstests/sharding/txn_two_phase_commit_wait_for_majority_commit_after_stepup.js
   # Runs setShardVersion/getShardVersion against the config server and we don't support retries
