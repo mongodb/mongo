@@ -139,7 +139,13 @@
         assert(false, "Expected 'restartReplSetNodes' to throw");
     } catch (err) {
         assert.eq(err.message, `Failed to start node ${rst.getNodeId(secondaries[0])}`);
-        assert(rawMongoProgramOutput().match("Fatal Assertion 28782"));
+        // In most cases we expect the node to fail with 28782 because it sees the wildcard index in
+        // its catalog on startup and doesn't recognize the format. However in some cases the node
+        // will start up having not completely persisted the index build before shutting down. In
+        // these cases the node will attempt to re-build the index on startup and encounter a
+        // different error (40590) upon trying to rebuild the wildcard index.
+        assert(rawMongoProgramOutput().match("Fatal Assertion 28782") ||
+               rawMongoProgramOutput().match("Fatal Assertion 40590"));
     }
 
     jsTestLog("Restart the failed node on binary 4.2 and gracefully shut down the replset.");
