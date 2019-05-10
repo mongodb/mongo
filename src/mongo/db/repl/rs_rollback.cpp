@@ -1570,7 +1570,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     // If necessary, clear the memory of existing sessions.
     if (fixUpInfo.refetchTransactionDocs) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
+        MongoDSessionCatalog::invalidateAllSessions(opCtx);
     }
 
     if (auto validator = LogicalTimeValidator::get(opCtx)) {

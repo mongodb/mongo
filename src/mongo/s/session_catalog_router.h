@@ -41,7 +41,7 @@ public:
      * Locates session entries from the in-memory catalog  which have not been referenced before
      * 'possiblyExpired' and deletes them.
      */
-    static int reapSessionsOlderThan(OperationContext* OperationContext,
+    static int reapSessionsOlderThan(OperationContext* opCtx,
                                      SessionsCollection& sessionsCollection,
                                      Date_t possiblyExpired);
 };

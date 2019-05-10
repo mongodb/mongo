@@ -39,9 +39,9 @@
 namespace mongo {
 namespace {
 
-using MergeChunkTest = ConfigServerTestFixture;
-
 const NamespaceString kNamespace("TestDB.TestColl");
+
+using MergeChunkTest = ConfigServerTestFixture;
 
 TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     ChunkType chunk;

@@ -53,23 +53,24 @@ public:
     static boost::optional<UUID> getTransactionTableUUID(OperationContext* opCtx);
 
     /**
-     * Callback to be invoked when it is suspected that the on-disk session contents might not be in
-     * sync with what is in the sessions cache.
-     *
-     * If no specific document is available, the method will invalidate all sessions. Otherwise if
-     * one is avaiable (which is the case for insert/update/delete), it must contain _id field with
-     * a valid session entry, in which case only that particular session will be invalidated. If the
-     * _id field is missing or doesn't contain a valid serialization of logical session, the method
-     * will throw. This prevents invalid entries from making it in the collection.
+     * Callback to be invoked in response to insert/update/delete of 'config.transactions' in order
+     * to notify the session catalog that the on-disk contents are out of sync with the in-memory
+     * state. The 'singleSessionDoc' must contain the _id of the session which was updated.
      */
-    static void invalidateSessions(OperationContext* opCtx,
-                                   boost::optional<BSONObj> singleSessionDoc);
+    static void observeDirectWriteToConfigTransactions(OperationContext* opCtx,
+                                                       BSONObj singleSessionDoc);
+
+    /**
+     * Callback to be invoked when the contents of 'config.transactions' are out of sync with that
+     * in the in-memory catalog, such as when rollback happens or drop of 'config.transactions'.
+     */
+    static void invalidateAllSessions(OperationContext* opCtx);
 
     /**
      * Locates session entries from the in-memory catalog and in 'config.transactions' which have
      * not been referenced before 'possiblyExpired' and deletes them.
      */
-    static int reapSessionsOlderThan(OperationContext* OperationContext,
+    static int reapSessionsOlderThan(OperationContext* opCtx,
                                      SessionsCollection& sessionsCollection,
                                      Date_t possiblyExpired);
 };

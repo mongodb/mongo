@@ -58,8 +58,6 @@
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/server_transactions_metrics.h"
-#include "mongo/db/session.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant_gen.h"
@@ -291,6 +289,9 @@ MONGO_FAIL_POINT_DEFINE(onPrimaryTransactionalWrite);
 
 const BSONObj TransactionParticipant::kDeadEndSentinel(BSON("$incompleteOplogHistory" << 1));
 
+TransactionParticipant::TransactionParticipant() = default;
+
+TransactionParticipant::~TransactionParticipant() = default;
 
 TransactionParticipant::Observer::Observer(const ObservableSession& osession)
     : Observer(&getTransactionParticipant(osession.get())) {}
@@ -307,8 +308,7 @@ TransactionParticipant::Participant::Participant(const SessionToKill& session)
     : Observer(&getTransactionParticipant(session.get())) {}
 
 void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringData msg) {
-    repl::ReplicationCoordinator* replCoord =
-        repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     // The locker must not have a max lock timeout when this noop write is performed, since if it
     // threw LockTimeout, this would be treated as a TransientTransactionError, which would indicate

@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <map>
 
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/logical_session_id.h"

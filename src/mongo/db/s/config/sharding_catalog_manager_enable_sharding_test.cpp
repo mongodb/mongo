@@ -63,7 +63,7 @@ namespace {
 using executor::RemoteCommandRequest;
 using std::vector;
 
-class EnableShardingTest : public ConfigServerTestFixture {};
+using EnableShardingTest = ConfigServerTestFixture;
 
 TEST_F(EnableShardingTest, noDBExists) {
     ShardType shard;

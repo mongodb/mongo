@@ -445,8 +445,8 @@ Status RollbackImpl::_runRollbackCriticalSection(
     // If there were rolled back operations on any session, invalidate all sessions.
     // We invalidate sessions before we recover so that we avoid invalidating sessions that had
     // just recovered prepared transactions.
-    if (_observerInfo.rollbackSessionIds.size() > 0) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
+    if (!_observerInfo.rollbackSessionIds.empty()) {
+        MongoDSessionCatalog::invalidateAllSessions(opCtx);
     }
 
     // Recover to the stable timestamp.

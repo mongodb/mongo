@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-using SplitChunkTest = ConfigServerTestFixture;
-
 const NamespaceString kNamespace("TestDB", "TestColl");
+
+using SplitChunkTest = ConfigServerTestFixture;
 
 TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ChunkType chunk;

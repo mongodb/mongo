@@ -45,6 +45,7 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+namespace {
 
 class KeyGeneratorUpdateTest : public ConfigServerTestFixture {
 protected:
@@ -416,4 +417,5 @@ TEST_F(KeyGeneratorUpdateTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPo
     ASSERT_EQ(0U, allKeys.size());
 }
 
+}  // namespace
 }  // namespace mongo

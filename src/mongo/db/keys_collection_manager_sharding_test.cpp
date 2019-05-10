@@ -45,6 +45,7 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+namespace {
 
 class KeysManagerShardedTest : public ConfigServerTestFixture {
 public:
@@ -370,4 +371,5 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     ASSERT_EQ(true, keyManager()->hasSeenKeys());
 }
 
+}  // namespace
 }  // namespace mongo

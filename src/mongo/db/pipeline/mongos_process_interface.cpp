@@ -48,7 +48,6 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/router_exec_stage.h"
-#include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {

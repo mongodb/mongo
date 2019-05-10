@@ -81,6 +81,10 @@ auto getThreadPool(OperationContext* opCtx) {
     return &sessionTasksExecutor(opCtx->getServiceContext()).threadPool;
 }
 
+/**
+ * Non-blocking call, which schedules asynchronously the work to finish cleaning up the specified
+ * set of kill tokens.
+ */
 void killSessionTokens(OperationContext* opCtx,
                        std::vector<SessionCatalog::KillToken> sessionKillTokens) {
     if (sessionKillTokens.empty())
@@ -102,6 +106,18 @@ void killSessionTokens(OperationContext* opCtx,
                 participant.invalidate(opCtx);
             }
         });
+}
+
+void disallowDirectWritesUnderSession(OperationContext* opCtx) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    if (isReplSet) {
+        uassert(40528,
+                str::stream() << "Direct writes against "
+                              << NamespaceString::kSessionTransactionsTableNamespace
+                              << " cannot be performed using a transaction or on a session.",
+                !opCtx->getLogicalSessionId());
+    }
 }
 
 const auto kIdProjection = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
@@ -241,41 +257,60 @@ boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationCon
     return coll->uuid();
 }
 
-void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
-                                              boost::optional<BSONObj> singleSessionDoc) {
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-    if (isReplSet) {
-        uassert(40528,
-                str::stream() << "Direct writes against "
-                              << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                              << " cannot be performed using a transaction or on a session.",
-                !opCtx->getLogicalSessionId());
-    }
+void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationContext* opCtx,
+                                                                  BSONObj singleSessionDoc) {
+    disallowDirectWritesUnderSession(opCtx);
+
+    class KillSessionTokenOnCommit : public RecoveryUnit::Change {
+    public:
+        KillSessionTokenOnCommit(OperationContext* opCtx,
+                                 SessionCatalog::KillToken sessionKillToken)
+            : _opCtx(opCtx), _sessionKillToken(std::move(sessionKillToken)) {}
+
+        void commit(boost::optional<Timestamp>) override {
+            rollback();
+        }
+
+        void rollback() override {
+            std::vector<SessionCatalog::KillToken> sessionKillTokenVec;
+            sessionKillTokenVec.emplace_back(std::move(_sessionKillToken));
+            killSessionTokens(_opCtx, std::move(sessionKillTokenVec));
+        }
+
+    private:
+        OperationContext* _opCtx;
+        SessionCatalog::KillToken _sessionKillToken;
+    };
+
+    const auto catalog = SessionCatalog::get(opCtx);
+
+    const auto lsid =
+        LogicalSessionId::parse(IDLParserErrorContext("lsid"), singleSessionDoc["_id"].Obj());
+    catalog->scanSession(lsid, [&](const ObservableSession& session) {
+        const auto participant = TransactionParticipant::get(session);
+        uassert(ErrorCodes::PreparedTransactionInProgress,
+                str::stream() << "Cannot modify the entry for session "
+                              << session.getSessionId().getId()
+                              << " because it is in the prepared state",
+                !participant.transactionIsPrepared());
+
+        opCtx->recoveryUnit()->registerChange(new KillSessionTokenOnCommit(opCtx, session.kill()));
+    });
+}
+
+void MongoDSessionCatalog::invalidateAllSessions(OperationContext* opCtx) {
+    disallowDirectWritesUnderSession(opCtx);
 
     const auto catalog = SessionCatalog::get(opCtx);
 
     std::vector<SessionCatalog::KillToken> sessionKillTokens;
 
-    if (singleSessionDoc) {
-        const auto lsid = LogicalSessionId::parse(IDLParserErrorContext("lsid"),
-                                                  singleSessionDoc->getField("_id").Obj());
-        catalog->scanSession(lsid, [&sessionKillTokens](const ObservableSession& session) {
-            const auto participant = TransactionParticipant::get(session);
-            uassert(ErrorCodes::PreparedTransactionInProgress,
-                    str::stream() << "Cannot modify the entry for session "
-                                  << session.getSessionId().getId()
-                                  << " because it is in the prepared state",
-                    !participant.transactionIsPrepared());
-            sessionKillTokens.emplace_back(session.kill());
-        });
-    } else {
-        SessionKiller::Matcher matcher(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        catalog->scanSessions(matcher, [&sessionKillTokens](const ObservableSession& session) {
-            sessionKillTokens.emplace_back(session.kill());
-        });
-    }
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    catalog->scanSessions(matcher, [&sessionKillTokens](const ObservableSession& session) {
+        sessionKillTokens.emplace_back(session.kill());
+    });
+
     killSessionTokens(opCtx, std::move(sessionKillTokens));
 }
 
@@ -291,11 +326,11 @@ int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
                      0,
                      &kIdProjection);
 
-    // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object
-    // size limit
-    LogicalSessionIdSet lsids;
+    // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object size
+    // limit
     const int kMaxBatchSize = 10'000;
 
+    LogicalSessionIdSet lsids;
     int numReaped = 0;
     while (cursor->more()) {
         auto transactionSession = SessionsCollectionFetchResultIndividualResult::parse(

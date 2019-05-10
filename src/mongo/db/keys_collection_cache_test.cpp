@@ -41,6 +41,7 @@
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
+namespace {
 
 class CacheTest : public ConfigServerTestFixture {
 protected:
@@ -267,4 +268,5 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

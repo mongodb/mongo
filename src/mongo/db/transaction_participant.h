@@ -92,9 +92,6 @@ enum class TerminationCause {
  * the comments below for more information.
  */
 class TransactionParticipant {
-    TransactionParticipant(const TransactionParticipant&) = delete;
-    TransactionParticipant& operator=(const TransactionParticipant&) = delete;
-
     struct PrivateState;
     struct ObservableState;
 
@@ -191,6 +188,13 @@ class TransactionParticipant {
 
 public:
     static inline MutableObeserverRegistry<int32_t> observeTransactionLifetimeLimitSeconds;
+
+    TransactionParticipant();
+
+    TransactionParticipant(const TransactionParticipant&) = delete;
+    TransactionParticipant& operator=(const TransactionParticipant&) = delete;
+
+    ~TransactionParticipant();
 
     /**
      * Holds state for a snapshot read or multi-statement transaction in between network
@@ -360,10 +364,9 @@ public:
         TransactionParticipant* _tp;
     };  // class Observer
 
-
     /**
-     * Class used by a thread that has checked out the TransactionParticipant's session to
-     * observe and modify the transaction participant.
+     * Class used by a thread that has checked out the TransactionParticipant's session to observe
+     * and modify the transaction participant.
      */
     class Participant : public Observer {
     public:
@@ -778,9 +781,6 @@ public:
         // invalidating a transaction, or starting a new transaction.
         void _resetTransactionState(WithLock wl, TransactionState::StateFlag state);
 
-        // Helper that updates ServerTransactionsMetrics once a transaction commits.
-        void _updateTxnMetricsOnCommit(OperationContext* opCtx, bool isCommittingWithPrepare);
-
         // Releases the resources held in *o().txnResources to the operation context.
         // o().txnResources must be engaged prior to calling this.
         void _releaseTransactionResourcesToOpCtx(OperationContext* opCtx);
@@ -809,7 +809,6 @@ public:
         return Observer(osession);
     }
 
-
     /**
      * Returns the timestamp of the oldest oplog entry written across all open transactions, at the
      * time of the stable timestamp. Returns boost::none if there are no active transactions, or an
@@ -823,9 +822,6 @@ public:
      * want to await a write concern.
      */
     static void performNoopWrite(OperationContext* opCtx, StringData msg);
-
-    TransactionParticipant() = default;
-    ~TransactionParticipant() = default;
 
 private:
     /**
@@ -909,22 +905,25 @@ private:
 
     /**
      * State in this struct may be read and written by methods of the Participant, only. It may
-     * access the struct via the private p() accessor. No further locking is required in methods
-     * of the Participant.
+     * access the struct via the private p() accessor. No further locking is required in methods of
+     * the Participant.
      */
     struct PrivateState {
+        // Specifies whether the session information needs to be refreshed from storage
+        bool isValid{false};
+
         // Only set if the server is shutting down and it has been ensured that no new requests will
         // be accepted. Ensures that any transaction resources will not be stashed from the
         // operation context onto the transaction participant when the session is checked-in so that
         // locks can automatically get freed.
-        bool inShutdown = false;
+        bool inShutdown{false};
 
         // Holds oplog data for operations which have been applied in the current multi-document
         // transaction.
         std::vector<repl::ReplOperation> transactionOperations;
 
         // Total size in bytes of all operations within the _transactionOperations vector.
-        size_t transactionOperationBytes = 0;
+        size_t transactionOperationBytes{0};
 
         // The autocommit setting of this transaction. Should always be false for multi-statement
         // transaction. Currently only needed for diagnostics reporting.
@@ -942,9 +941,6 @@ private:
         //
         // Retryable writes state
         //
-
-        // Specifies whether the session information needs to be refreshed from storage
-        bool isValid{false};
 
         // Set to true if incomplete history is detected. For example, when the oplog to a write was
         // truncated because it was too old.
