@@ -164,11 +164,20 @@ TEST(TransportLayerASIO, PortZeroConnect) {
 
 class TimeoutSEP : public ServiceEntryPoint {
 public:
+    ~TimeoutSEP() override {
+        // This should shutdown immediately, so give the maximum timeout
+        shutdown(Milliseconds::max());
+    }
+
     void endAllSessions(transport::Session::TagMask tags) override {
         MONGO_UNREACHABLE;
     }
 
     bool shutdown(Milliseconds timeout) override {
+        log() << "Joining all worker threads";
+        for (auto& thread : _workerThreads) {
+            thread.join();
+        }
         return true;
     }
 
@@ -206,10 +215,18 @@ protected:
         _cond.notify_one();
     }
 
+    template <typename FunT>
+    void startWorkerThread(FunT&& fun) {
+        _workerThreads.emplace_back(std::forward<FunT>(fun));
+    }
+
 private:
     stdx::mutex _mutex;
+
     stdx::condition_variable _cond;
     bool _finished = false;
+
+    std::vector<stdx::thread> _workerThreads;
 };
 
 class TimeoutSyncSEP : public TimeoutSEP {
@@ -219,7 +236,7 @@ public:
 
     void startSession(transport::SessionHandle session) override {
         log() << "Accepted connection from " << session->remote();
-        stdx::thread([ this, session = std::move(session) ]() mutable {
+        startWorkerThread([ this, session = std::move(session) ]() mutable {
             log() << "waiting for message";
             session->setTimeout(Milliseconds{500});
             auto status = session->sourceMessage().getStatus();
@@ -233,7 +250,7 @@ public:
 
             session.reset();
             notifyComplete();
-        }).detach();
+        });
     }
 
 private:
@@ -315,7 +332,7 @@ class TimeoutSwitchModesSEP : public TimeoutSEP {
 public:
     void startSession(transport::SessionHandle session) override {
         log() << "Accepted connection from " << session->remote();
-        stdx::thread worker([ this, session = std::move(session) ]() mutable {
+        startWorkerThread([ this, session = std::move(session) ]() mutable {
             log() << "waiting for message";
             auto sourceMessage = [&] { return session->sourceMessage().getStatus(); };
 
@@ -342,7 +359,6 @@ public:
             notifyComplete();
             log() << "ending test";
         });
-        worker.detach();
     }
 };
 
