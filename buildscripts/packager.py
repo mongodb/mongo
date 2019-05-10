@@ -326,7 +326,7 @@ class Distro(object):
             raise Exception("BUG: unsupported architecture (%s)" % arch)
 
         if re.search("(suse)", self.dname):
-            return ["suse11", "suse12"]
+            return ["suse11", "suse12", "suse15"]
         elif re.search("(redhat|fedora|centos)", self.dname):
             return ["rhel70", "rhel71", "rhel72", "rhel62", "rhel55", "rhel67"]
         elif self.dname in ['amazon', 'amazon2']:
