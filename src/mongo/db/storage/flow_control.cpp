@@ -54,6 +54,11 @@ const auto getFlowControl = ServiceContext::declareDecoration<std::unique_ptr<Fl
 const int kMaxTickets = 1000 * 1000 * 1000;
 
 int multiplyWithOverflowCheck(double term1, double term2, int maxValue) {
+    if (term1 == 0.0 || term2 == 0.0) {
+        // Early return to avoid any divide by zero errors.
+        return 0;
+    }
+
     if (static_cast<double>(std::numeric_limits<int>::max()) / term2 < term1) {
         // Multiplying term1 and term2 would overflow, return maxValue.
         return maxValue;
