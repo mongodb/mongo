@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/index/index_descriptor_fwd.h"
 #include "mongo/db/storage/biggie/store.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"

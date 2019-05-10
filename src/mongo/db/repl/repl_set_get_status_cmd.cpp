@@ -30,6 +30,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/repl/repl_set_command.h"
+#include "mongo/db/repl/replication_coordinator.h"
 
 namespace mongo {
 namespace repl {
