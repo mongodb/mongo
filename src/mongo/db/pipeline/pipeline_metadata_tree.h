@@ -280,4 +280,4 @@ inline void zip(Stage<T>* tree,
     detail::walk(tree, &iter, zipper);
 }
 
-}  // namespace mongo::AggregatePipelineSchemaTracker
+}  // namespace mongo::pipeline_metadata_tree

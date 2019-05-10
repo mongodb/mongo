@@ -40,7 +40,42 @@ namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource {
 public:
+    /**
+     * Convenience method for creating a $match stage.
+     */
+    static boost::intrusive_ptr<DocumentSourceMatch> create(
+        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Parses a $match stage from 'elem'.
+     */
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
+
+    /**
+     * Returns a new DocumentSourceMatch with a MatchExpression that, if executed on the
+     * sub-document at 'path', is equivalent to 'expression'.
+     *
+     * For example, if the original expression is {$and: [{'a.b': {$gt: 0}}, {'a.d': {$eq: 3}}]},
+     * the new $match will have the expression {$and: [{b: {$gt: 0}}, {d: {$eq: 3}}]} after
+     * descending on the path 'a'.
+     *
+     * Should be called _only_ on a MatchExpression that is a predicate on 'path', or subfields of
+     * 'path'. It is also invalid to call this method on an expression including a $elemMatch on
+     * 'path', for example: {'path': {$elemMatch: {'subfield': 3}}}
+     */
+    static boost::intrusive_ptr<DocumentSourceMatch> descendMatchOnPath(
+        MatchExpression* matchExpr,
+        const std::string& path,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
     virtual ~DocumentSourceMatch() = default;
+
+    /**
+     * Parses 'filter' and resets the member of this source to be consistent with the new
+     * MatchExpression. Takes ownership of 'filter'.
+     */
+    void rebuild(BSONObj filter);
 
     GetNextResult getNext() override;
 
@@ -74,18 +109,6 @@ public:
         // This stage does not modify or rename any paths.
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
-
-    /**
-     * Convenience method for creating a $match stage.
-     */
-    static boost::intrusive_ptr<DocumentSourceMatch> create(
-        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    /**
-     * Parses a $match stage from 'elem'.
-     */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
     /**
      * Access the MatchExpression stored inside the DocumentSourceMatch. Does not release ownership.
@@ -141,23 +164,6 @@ public:
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
     splitSourceBy(const std::set<std::string>& fields, const StringMap<std::string>& renames);
 
-    /**
-     * Returns a new DocumentSourceMatch with a MatchExpression that, if executed on the
-     * sub-document at 'path', is equivalent to 'expression'.
-     *
-     * For example, if the original expression is {$and: [{'a.b': {$gt: 0}}, {'a.d': {$eq: 3}}]},
-     * the new $match will have the expression {$and: [{b: {$gt: 0}}, {d: {$eq: 3}}]} after
-     * descending on the path 'a'.
-     *
-     * Should be called _only_ on a MatchExpression that is a predicate on 'path', or subfields of
-     * 'path'. It is also invalid to call this method on an expression including a $elemMatch on
-     * 'path', for example: {'path': {$elemMatch: {'subfield': 3}}}
-     */
-    static boost::intrusive_ptr<DocumentSourceMatch> descendMatchOnPath(
-        MatchExpression* matchExpr,
-        const std::string& path,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
     boost::optional<MergingLogic> mergingLogic() final {
         return boost::none;
     }
@@ -171,7 +177,7 @@ protected:
 private:
     std::unique_ptr<MatchExpression> _expression;
 
-    const bool _isTextQuery;
+    bool _isTextQuery;
 
     // Cache the dependencies so that we know what fields we need to serialize to BSON for matching.
     DepsTracker _dependencies;
