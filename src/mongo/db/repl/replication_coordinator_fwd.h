@@ -1,6 +1,5 @@
-
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,16 +29,8 @@
 
 #pragma once
 
-#include "mongo/client/connection_string.h"
-
 namespace mongo {
-namespace unittest {
-
-/**
- * Gets the connection string for the MongoDB deployment that this test is running
- * against.
- */
-ConnectionString getFixtureConnectionString();
-
-}  // namespace unittest
+namespace repl {
+class ReplicationCoordinator;
+}  // namespace repl
 }  // namespace mongo

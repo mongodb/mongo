@@ -38,7 +38,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/snapshot.h"
 
 namespace mongo {
