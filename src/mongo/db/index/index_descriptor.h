@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include "mongo/db/index/index_descriptor_fwd.h"
+
 #include <set>
 #include <string>
 

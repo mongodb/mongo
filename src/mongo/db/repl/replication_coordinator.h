@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "mongo/db/repl/replication_coordinator_fwd.h"
+
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
