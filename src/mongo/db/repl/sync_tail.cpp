@@ -844,15 +844,6 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
     }
 }
 
-// Returns whether an oplog entry represents a commitTransaction for a transaction which has not
-// been prepared.  An entry is an unprepared commit if it has a boolean "prepared" field set to
-// false.
-inline bool isUnpreparedCommit(const OplogEntry& entry) {
-    return entry.getCommandType() == OplogEntry::CommandType::kCommitTransaction &&
-        entry.getObject()[CommitTransactionOplogObject::kPreparedFieldName].isBoolean() &&
-        !entry.getObject()[CommitTransactionOplogObject::kPreparedFieldName].boolean();
-}
-
 // Returns whether an oplog entry represents an applyOps which is a self-contained atomic operation,
 // or the last applyOps of an unprepared transaction, as opposed to part of a prepared transaction
 // or a non-final applyOps in an transaction.
@@ -1230,37 +1221,6 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
                     50711,
                     exceptionToStatus().withContext(str::stream()
                                                     << "Unable to extract operations from applyOps "
-                                                    << redact(op.toBSON())));
-            }
-            continue;
-        } else if (isUnpreparedCommit(op)) {
-            // TODO(SERVER-40728): Remove this block after SERVER-40676 because we will no longer
-            // emit a commitTransaction oplog entry for an unprepared transaction. This code will
-            // no longer be reachable because we will commit the unprepared transaction on the last
-            // applyOps oplog entry, which will not contain a partialTxn field.
-
-            // On commit of unprepared transactions, get transactional operations from the oplog and
-            // fill writers with those operations.
-            try {
-                invariant(derivedOps);
-                auto& partialTxnList = partialTxnOps[*op.getSessionId()];
-                {
-                    // We need to use a ReadSourceScope avoid the reads of the transaction messing
-                    // up the state of the opCtx.  In particular we do not want to set the
-                    // ReadSource to kLastApplied.
-                    ReadSourceScope readSourceScope(opCtx);
-                    derivedOps->emplace_back(
-                        readTransactionOperationsFromOplogChain(opCtx, op, partialTxnList));
-                    partialTxnList.clear();
-                }
-                // Transaction entries cannot have different session updates.
-                _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
-            } catch (...) {
-                fassertFailedWithStatusNoTrace(
-                    51116,
-                    exceptionToStatus().withContext(str::stream()
-                                                    << "Unable to read operations for transaction "
-                                                    << "commit "
                                                     << redact(op.toBSON())));
             }
             continue;

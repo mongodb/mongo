@@ -593,17 +593,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
             case OplogEntry::CommandType::kAbortTransaction: {
                 return Status::OK();
             }
-            // TODO(SERVER-40728): Remove commitTransaction handling for unprepared transactions.
-            case OplogEntry::CommandType::kCommitTransaction: {
-                IDLParserErrorContext ctx("commitTransaction");
-                auto commitCommand = CommitTransactionOplogObject::parse(ctx, obj);
-                const bool prepared = !commitCommand.getPrepared() || *commitCommand.getPrepared();
-                if (!prepared) {
-                    log() << "Ignoring unprepared commitTransaction during rollback: "
-                          << redact(oplogEntry.toBSON());
-                    return Status::OK();
-                }
-            }
             default: {
                 std::string message = str::stream() << "Can't roll back this command yet: "
                                                     << " cmdname = " << first.fieldName();
