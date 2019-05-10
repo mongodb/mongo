@@ -19,7 +19,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     assert.writeOK(res);
 
     // Add another node to the replica set to allow an initial sync to occur
-    var initSyncNode = rst.add();
+    var initSyncNode = rst.add({setParameter: 'numInitialSyncAttempts=1'});
     var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
     clearRawMongoProgramOutput();
@@ -66,7 +66,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     assert.writeOK(res);
 
     // Add another node to the replica set to allow an initial sync to occur
-    var initSyncNode = rst.add();
+    var initSyncNode = rst.add({setParameter: 'numInitialSyncAttempts=1'});
     var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
     clearRawMongoProgramOutput();
