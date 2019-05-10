@@ -45,33 +45,27 @@ using parsed_aggregation_projection::ParsedAddFields;
 REGISTER_DOCUMENT_SOURCE(addFields,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceAddFields::createFromBson);
-REGISTER_DOCUMENT_SOURCE(set,
-                         LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceAddFields::createFromBson);
 
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
-    BSONObj addFieldsSpec, const intrusive_ptr<ExpressionContext>& expCtx, StringData stageName) {
+    BSONObj addFieldsSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
 
     const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSourceSingleDocumentTransformation> addFields(
         new DocumentSourceSingleDocumentTransformation(
             expCtx,
             ParsedAddFields::create(expCtx, addFieldsSpec),
-            stageName.toString(),
+            "$addFields",
             isIndependentOfAnyCollection));
     return addFields;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto specifiedName = elem.fieldNameStringData();
-    invariant(specifiedName == kStageName || specifiedName == kAliasNameSet);
-
     uassert(40272,
-            str::stream() << specifiedName << " specification stage must be an object, got "
+            str::stream() << "$addFields specification stage must be an object, got "
                           << typeName(elem.type()),
             elem.type() == Object);
 
-    return DocumentSourceAddFields::create(elem.Obj(), expCtx, specifiedName);
+    return DocumentSourceAddFields::create(elem.Obj(), expCtx);
 }
 }

@@ -151,7 +151,7 @@
         // differentiate between an update object and an array.
         res = myDb.runCommand({
             update: collName,
-            updates: [{q: {}, u: [{$set: {pipeline: 1}}]}],
+            updates: [{q: {}, u: [{$addFields: {pipeline: 1}}]}],
             bypassDocumentValidation: false
         });
         assertFailsValidation(BulkWriteResult(res));
@@ -159,21 +159,21 @@
 
         assert.commandWorked(myDb.runCommand({
             update: collName,
-            updates: [{q: {}, u: [{$set: {pipeline: 1}}]}],
+            updates: [{q: {}, u: [{$addFields: {pipeline: 1}}]}],
             bypassDocumentValidation: true
         }));
         assert.eq(1, coll.count({pipeline: 1}));
 
         assert.commandFailed(myDb.runCommand({
             findAndModify: collName,
-            update: [{$set: {findAndModifyPipeline: 1}}],
+            update: [{$addFields: {findAndModifyPipeline: 1}}],
             bypassDocumentValidation: false
         }));
         assert.eq(0, coll.count({findAndModifyPipeline: 1}));
 
         assert.commandWorked(myDb.runCommand({
             findAndModify: collName,
-            update: [{$set: {findAndModifyPipeline: 1}}],
+            update: [{$addFields: {findAndModifyPipeline: 1}}],
             bypassDocumentValidation: true
         }));
         assert.eq(1, coll.count({findAndModifyPipeline: 1}));

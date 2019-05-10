@@ -34,30 +34,30 @@
         {$project: {_id: {data: "$_id._data", typeBits: "$_id._typeBits"}}},    // Fields renamed.
         {$project: {_id: {_typeBits: "$_id._typeBits", _data: "$_id._data"}}},  // Fields reordered.
         {$project: {_id: {_data: "$_id._typeBits", _typeBits: "$_id._data"}}},  // Fields swapped.
-        {$set: {_id: "newValue"}},
-        {$set: {_id: "$otherField"}},
-        {$set: {"_id._data": "newValue"}},
-        {$set: {"_id._data": "$otherField"}},
-        {$set: {"_id.otherField": "newValue"}},  // New subfield added to _id.
+        {$addFields: {_id: "newValue"}},
+        {$addFields: {_id: "$otherField"}},
+        {$addFields: {"_id._data": "newValue"}},
+        {$addFields: {"_id._data": "$otherField"}},
+        {$addFields: {"_id.otherField": "newValue"}},  // New subfield added to _id.
         [
           {$addFields: {otherField: "$_id"}},
-          {$set: {otherField: "newValue"}},
-          {$set: {_id: "$otherField"}}
+          {$addFields: {otherField: "newValue"}},
+          {$addFields: {_id: "$otherField"}}
         ],
         [
           // Fields renamed.
           {$addFields: {newId: {data: "$_id._data", typeBits: "$_id._typeBits"}}},
-          {$set: {_id: "$newId"}}
+          {$addFields: {_id: "$newId"}}
         ],
         [
           // Fields reordered.
           {$addFields: {newId: {_typeBits: "$_id._typeBits", _data: "$_id._data"}}},
-          {$set: {_id: "$newId"}}
+          {$addFields: {_id: "$newId"}}
         ],
         [
           // Fields swapped.
           {$addFields: {newId: {_data: "$_id._typeBits", _typeBits: "$_id._data"}}},
-          {$set: {_id: "$newId"}}
+          {$addFields: {_id: "$newId"}}
         ],
         {$replaceRoot: {newRoot: {otherField: "$_id"}}},
         {$redact: {$cond: {if: {$gt: ["$_id", {}]}, then: "$$DESCEND", else: "$$PRUNE"}}}  // _id:0
@@ -82,13 +82,13 @@
         ],
         {$project: {"_id._data": 1, "_id._typeBits": 1}},
         {$project: {_id: {_data: "$_id._data", _typeBits: "$_id._typeBits"}}},
-        {$set: {_id: "$_id"}},
+        {$addFields: {_id: "$_id"}},
         {$addFields: {otherField: "newValue"}},
-        {$set: {_id: {_data: "$_id._data", _typeBits: "$_id._typeBits"}}},
-        [{$addFields: {otherField: "$_id"}}, {$set: {_id: "$otherField"}}],
+        {$addFields: {_id: {_data: "$_id._data", _typeBits: "$_id._typeBits"}}},
+        [{$addFields: {otherField: "$_id"}}, {$addFields: {_id: "$otherField"}}],
         [
           {$addFields: {newId: {_data: "$_id._data", _typeBits: "$_id._typeBits"}}},
-          {$set: {_id: "$newId"}}
+          {$addFields: {_id: "$newId"}}
         ],
         {$replaceRoot: {newRoot: {_id: "$_id"}}},
         {

@@ -50,7 +50,7 @@
     testUpdate({
         query: {_id: 1},
         initialDocumentList: [{_id: 1, x: 1}],
-        update: [{$set: {foo: 4}}],
+        update: [{$addFields: {foo: 4}}],
         resultDocList: [{_id: 1, x: 1, foo: 4}],
         nModified: 1
     });
@@ -73,7 +73,7 @@
     testUpdate({
         query: {x: 1},
         initialDocumentList: [{_id: 1, x: 1}, {_id: 2, x: 1}],
-        update: [{$set: {bar: 4}}],
+        update: [{$addFields: {bar: 4}}],
         resultDocList: [{_id: 1, x: 1, bar: 4}, {_id: 2, x: 1, bar: 4}],
         nModified: 2,
         options: {multi: true}
@@ -85,7 +85,7 @@
         testUpdate({
             query: {_id: {$in: [1, 2]}},
             initialDocumentList: [{_id: 1, x: 1}, {_id: 2, x: 2}],
-            update: [{$set: {bar: 4}}],
+            update: [{$addFields: {bar: 4}}],
             resultDocList: [{_id: 1, x: 1, bar: 4}, {_id: 2, x: 2, bar: 4}],
             nModified: 1,
             options: {multi: false}
@@ -93,7 +93,7 @@
     }
 
     // Upsert performs insert.
-    testUpsertDoesInsert({_id: 1, x: 1}, [{$set: {foo: 4}}], {_id: 1, x: 1, foo: 4});
+    testUpsertDoesInsert({_id: 1, x: 1}, [{$addFields: {foo: 4}}], {_id: 1, x: 1, foo: 4});
     testUpsertDoesInsert({_id: 1, x: 1}, [{$project: {x: 1}}], {_id: 1, x: 1});
     testUpsertDoesInsert({_id: 1, x: 1}, [{$project: {x: "foo"}}], {_id: 1, x: "foo"});
 
@@ -136,6 +136,6 @@
 
     // The 'arrayFilters' option is not valid for pipeline updates.
     assert.commandFailedWithCode(
-        coll.update({_id: 1}, [{$set: {x: 1}}], {arrayFilters: [{x: {$eq: 1}}]}),
+        coll.update({_id: 1}, [{$addFields: {x: 1}}], {arrayFilters: [{x: {$eq: 1}}]}),
         ErrorCodes.FailedToParse);
 })();

@@ -10,10 +10,10 @@
         const conn = MongoRunner.runMongod();
         const db = conn.getDB("test");
 
-        assert.commandFailedWithCode(db.coll.update({}, [{$set: {x: 1}}]),
+        assert.commandFailedWithCode(db.coll.update({}, [{$addFields: {x: 1}}]),
                                      ErrorCodes.FailedToParse);
         const error =
-            assert.throws(() => db.coll.findAndModify({query: {}, update: [{$set: {x: 1}}]}));
+            assert.throws(() => db.coll.findAndModify({query: {}, update: [{$addFields: {x: 1}}]}));
         assert.eq(error.code, ErrorCodes.FailedToParse);
 
         MongoRunner.stopMongod(conn);
@@ -24,8 +24,9 @@
         const conn = MongoRunner.runMongod();
         const db = conn.getDB("test");
 
-        assert.commandWorked(db.coll.update({}, [{$set: {x: 1}}]));
-        assert.doesNotThrow(() => db.coll.findAndModify({query: {}, update: [{$set: {x: 1}}]}));
+        assert.commandWorked(db.coll.update({}, [{$addFields: {x: 1}}]));
+        assert.doesNotThrow(() =>
+                                db.coll.findAndModify({query: {}, update: [{$addFields: {x: 1}}]}));
 
         MongoRunner.stopMongod(conn);
     }());

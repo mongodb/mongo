@@ -57,7 +57,7 @@
             update: collName,
             updates: [{
                 q: {type: 'oak'},
-                u: [{$set: {type: 'ginkgo'}}],
+                u: [{$addFields: {type: 'ginkgo'}}],
             }],
             writeConcern: {w: 'majority'}
         },
@@ -94,7 +94,7 @@
         req: {
             findAndModify: collName,
             query: {type: 'oak'},
-            update: [{$set: {type: 'ginkgo'}}],
+            update: [{$addFields: {type: 'ginkgo'}}],
             writeConcern: {w: 'majority'}
         },
         setupFunc: function() {

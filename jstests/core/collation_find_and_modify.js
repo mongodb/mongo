@@ -21,7 +21,7 @@
         assert.commandWorked(db.createCollection(coll.getName(), {collation: caseInsensitive}));
         assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
         let doc = coll.findAndModify(
-            {update: [{$set: {newField: {$indexOfArray: ["$x", "B"]}}}], new: true});
+            {update: [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}], new: true});
         assert.eq(doc.newField, 3, doc);
 
         //
@@ -32,7 +32,7 @@
         assert(coll.drop());
         assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
         doc = coll.findAndModify({
-            update: [{$set: {newField: {$indexOfArray: ["$x", "B"]}}}],
+            update: [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}],
             collation: caseSensitive,
             new: true
         });
@@ -60,7 +60,7 @@
         assert(coll.drop());
         assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
         doc = coll.findAndModify({
-            update: [{$set: {newField: {$indexOfArray: ["$x", "B"]}}}],
+            update: [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}],
             collation: caseInsensitive,
             new: true
         });
