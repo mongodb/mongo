@@ -61,7 +61,7 @@ using std::vector;
 
 // SERVER-36807: Limit --setShellParameter to SetParameters we know we want to expose.
 const std::set<std::string> kSetShellParameterWhitelist = {
-    "disabledSecureAllocatorDomains",
+    "disabledSecureAllocatorDomains", "newLineAfterPasswordPromptForTest",
 };
 
 std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {

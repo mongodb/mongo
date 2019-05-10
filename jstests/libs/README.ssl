@@ -62,7 +62,6 @@ combine key and certificate
 cat mycrt.crt mykey.key > mycrt.pem
 
 ---------------------------
-The other ceriticates in this directory come from x509gen.
 How to generate a certificate with a custom extension:
 
 1. Generate a normal certificate signing request without an extension
@@ -95,3 +94,54 @@ cat roles.pem roles2.key > roles_final.pem
 Example Commands for UTF-8
 --------------------------
 openssl req -new -utf8 -nameopt multiline,utf8  -config .\jstests\libs\client_utf8.cnf -newkey rsa:2048 -nodes -keyout roles.key -out roles.csr
+
+Generating other certificates
+-----------------------------
+
+The openssl_configs directory contains the openssl config files to create/sign certificates from the
+test CA. There is one config file per certificate. As an example, to generate server.pem:
+
+Reset the CA state with fresh directories and a new serial
+$ mkdir ca_state
+$ echo '01' > ca_state/serial
+$ touch ca_state/index.txt
+
+Create the CSR for the server certificate from its config (this will also generate server.key)
+$ openssl req -new -config openssl_config/server.cnf -out server.csr
+
+Sign the certificate with the CA (this will update ca_state and output the certificate as server.pem)
+$ openssl ca -config openssl_config/ca.cnf -out server.pem -in server.csr
+
+Concatenate the server key into the certificate you just generated
+$ cat server.key >> server.pem
+
+Clean up - we don't keep the ca_state around
+$ rm -rf ca_state server.key server.csr
+
+Generating CRLs
+---------------
+
+Issue your certificate using the ca config above and then revoke it/create a CRL file:
+
+Reset the CA state with fresh directories and a new serial
+$ mkdir ca_state
+$ echo '01' > ca_state/serial
+$ touch ca_state/index.txt
+
+Create the CSR for the server certificate from its config (this will also generate server.key)
+$ openssl req -new -config openssl_config/client_revoked.cnf -out client_revoked.csr
+
+Sign the certificate
+$ openssl ca -config openssl_config/ca.cnf -out client_revoked.pem -in client_revoked.csr
+
+Revoked the certificate
+$ openssl ca -config openssl_config/ca.cnf -revoke client_revoked.pem
+
+Generate the CRL
+$ openssl ca -config openssl_config/ca.cnf -gencrl -out crl_client_revoked.pem
+
+Concatenate the revoked certificate
+$ cat client_revoked.key >> client_revoked.pem
+
+Clean up
+$ rm -rf ca_state client_revoked.key client_revoked.csr

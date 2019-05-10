@@ -1,0 +1,30 @@
+# This is the openssl config file for generating the CSR for the localhostnameCN.pem certificate
+
+[ req ]
+default_bits = 2048
+default_keyfile = localhostnameCN.key
+encrypt_key = no
+default_md = sha256
+prompt = no
+utf8 = yes
+distinguished_name = localhostnameCN_req_distinguished_name
+req_extensions = localhostnameCN_extensions
+
+[ localhostnameCN_req_distinguished_name ]
+C = US
+ST = New York
+L = New York City
+O  = MongoDB
+OU = Kernel
+CN = 127.0.0.1
+
+[ localhostnameCN_extensions ]
+basicConstraints=CA:FALSE
+subjectAltName=@localhostnameCN_subject_alt_names
+subjectKeyIdentifier = hash
+keyUsage = keyEncipherment, digitalSignature
+extendedKeyUsage = serverAuth
+
+[ localhostnameCN_subject_alt_names ]
+DNS.1 = localhost
+DNS.2 = 127.0.0.1

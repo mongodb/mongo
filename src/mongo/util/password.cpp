@@ -40,12 +40,18 @@
 #endif
 
 #include "mongo/util/log.h"
+#include "mongo/util/password_params_gen.h"
 
 namespace mongo {
 
 std::string askPassword() {
     std::string password;
     std::cerr << "Enter password: ";
+
+    if (newLineAfterPasswordPromptForTest) {
+        std::cerr << "\n";
+    }
+
 #ifndef _WIN32
     const int stdinfd = 0;
     termios termio;

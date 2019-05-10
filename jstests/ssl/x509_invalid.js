@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    const CLIENT_NAME = 'C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client';
+    const CLIENT_NAME = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
     const CLIENT_CERT = 'jstests/libs/client.pem';
     const SERVER_CERT = 'jstests/libs/server.pem';
     const CA_CERT = 'jstests/libs/ca.pem';

@@ -137,6 +137,15 @@ private:
     std::vector<SSLX509Name::Entry> _canonicalServerSubjectName;
 };
 
+// These represent the ASN.1 type bytes for strings used in an X509 DirectoryString
+constexpr int kASN1BMPString = 30;
+constexpr int kASN1IA5String = 22;
+constexpr int kASN1OctetString = 4;
+constexpr int kASN1PrintableString = 19;
+constexpr int kASN1TeletexString = 20;
+constexpr int kASN1UTF8String = 12;
+constexpr int kASN1UniversalString = 28;
+
 /**
  * Stores information about a globally unique OID.
  */

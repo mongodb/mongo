@@ -1468,7 +1468,35 @@ StatusWith<SSLX509Name> getCertificateSubjectName(PCCERT_CONTEXT cert) {
                                                  const_cast<wchar_t*>(wstr.data()),
                                                  needed);
             invariant(needed == converted);
-            rdn.emplace_back(rdnAttribute.pszObjId, rdnAttribute.dwValueType, toUtf8String(wstr));
+
+            // The value of rdnAttribute.dwValueType is not actually the asn1 type id, it's
+            // a Microsoft-specific value. We convert the types for a valid directory string
+            // here so other non-windows parts of the SSL stack can safely compare SSLX509Name's
+            // later.
+            int asn1Type = rdnAttribute.dwValueType & CERT_RDN_TYPE_MASK;
+            switch (asn1Type) {
+                case CERT_RDN_UTF8_STRING:
+                case CERT_RDN_UNICODE_STRING:  // This is the same value as CERT_RDN_BMP_STRING
+                    asn1Type = kASN1UTF8String;
+                    break;
+                case CERT_RDN_PRINTABLE_STRING:
+                    asn1Type = kASN1PrintableString;
+                    break;
+                case CERT_RDN_TELETEX_STRING:
+                    asn1Type = kASN1TeletexString;
+                    break;
+                case CERT_RDN_UNIVERSAL_STRING:
+                    asn1Type = kASN1UniversalString;
+                    break;
+                case CERT_RDN_OCTET_STRING:
+                    asn1Type = kASN1OctetString;
+                    break;
+                case CERT_RDN_IA5_STRING:
+                    asn1Type = kASN1IA5String;
+                    break;
+            }
+
+            rdn.emplace_back(rdnAttribute.pszObjId, asn1Type, toUtf8String(wstr));
         }
         entries.push_back(std::move(rdn));
     }

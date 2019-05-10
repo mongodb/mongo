@@ -1,0 +1,32 @@
+# This is the openssl config file for generating the CSR for the localhostnameSAN.pem certificate
+
+[ req ]
+default_bits = 2048
+default_keyfile = localhostnameSAN.key
+encrypt_key = no
+default_md = sha256
+prompt = no
+utf8 = yes
+distinguished_name = localhostnameSAN_req_distinguished_name
+req_extensions = localhostnameSAN_extensions
+
+[ localhostnameSAN_req_distinguished_name ]
+C = US
+ST = New York
+L = New York City
+O  = MongoDB
+OU = Kernel
+CN = santesthostname.com
+
+[ localhostnameSAN_extensions ]
+basicConstraints=CA:FALSE
+subjectAltName=@localhostnameSAN_subject_alt_names
+subjectKeyIdentifier = hash
+keyUsage = keyEncipherment, digitalSignature
+extendedKeyUsage = serverAuth
+
+[ localhostnameSAN_subject_alt_names ]
+DNS.1 = *.example.com
+DNS.2 = 127.0.0.1
+DNS.3 = morefun!
+DNS.4 = localhost

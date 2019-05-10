@@ -285,13 +285,6 @@ std::pair<std::string, RFC4514Parser::ValueTerminator> RFC4514Parser::extractVal
 
 const auto getTLSVersionCounts = ServiceContext::declareDecoration<TLSVersionCounts>();
 
-// These represent the ASN.1 type bytes for strings used in an X509 DirectoryString
-constexpr int kASN1UTF8String = 12;
-constexpr int kASN1PrintableString = 19;
-constexpr int kASN1TeletexString = 20;
-constexpr int kASN1UniversalString = 28;
-constexpr int kASN1BMPString = 30;
-constexpr int kASN1OctetString = 4;
 
 void canonicalizeClusterDN(std::vector<std::string>* dn) {
     // remove all RDNs we don't care about
@@ -584,6 +577,7 @@ Status SSLX509Name::normalizeStrings() {
                 case kASN1TeletexString:
                 case kASN1UniversalString:
                 case kASN1BMPString:
+                case kASN1IA5String:
                 case kASN1OctetString: {
                     // Technically https://tools.ietf.org/html/rfc5280#section-4.1.2.4 requires
                     // that DN component values must be at least 1 code point long, but we've
@@ -602,6 +596,10 @@ Status SSLX509Name::normalizeStrings() {
                     entry.type = kASN1UTF8String;
                     break;
                 }
+                default:
+                    LOG(1) << "Certificate subject name contains unknown string type: "
+                           << entry.type << " (string value is \"" << entry.value << "\")";
+                    break;
             }
         }
     }

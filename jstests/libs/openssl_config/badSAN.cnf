@@ -1,0 +1,29 @@
+# This is the openssl config file for generating the CSR for the badSAN.pem certificate
+
+[ req ]
+default_bits = 2048
+default_keyfile = badSAN.key
+encrypt_key = no
+default_md = sha256
+prompt = no
+utf8 = yes
+distinguished_name = badSAN_req_distinguished_name
+req_extensions = badSAN_extensions
+
+[ badSAN_req_distinguished_name ]
+C = US
+ST = New York
+L = New York City
+O  = MongoDB
+OU = Kernel
+CN = 127.0.0.1
+
+[ badSAN_extensions ]
+basicConstraints=CA:FALSE
+subjectAltName=@badSAN_subject_alt_names
+subjectKeyIdentifier = hash
+keyUsage = keyEncipherment, digitalSignature
+extendedKeyUsage = serverAuth
+
+[ badSAN_subject_alt_names ]
+DNS.1 = badSAN

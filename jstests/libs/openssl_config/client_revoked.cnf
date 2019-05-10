@@ -1,0 +1,26 @@
+# This is the openssl config file for generating the CSR for the client.pem certificate
+
+[ req ]
+default_bits = 2048
+default_keyfile = client_revoked.key
+encrypt_key = no
+default_md = sha256
+prompt = no
+utf8 = yes
+distinguished_name = client_revoked_req_distinguished_name
+req_extensions = client_revoked_extensions
+
+[ client_revoked_req_distinguished_name ]
+C = US
+ST = New York
+L = New York City
+O  = MongoDB
+OU = KernelUser
+CN = client_revoked
+
+[ client_revoked_extensions ]
+basicConstraints=CA:FALSE
+subjectKeyIdentifier = hash
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+
