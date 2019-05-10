@@ -7,6 +7,7 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/check_log.js");
     load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
 
     const dbName = "test";
@@ -83,6 +84,7 @@
         data: {document: {msg: "new primary"}}
     }));
     nodeE.reconnect([nodeA, nodeC, nodeD]);
+    checkLog.contains(nodeE, "stopReplProducerOnDocument fail point is enabled.");
     assert.soon(() => {
         return 1 === nodeE.getDB(dbName)[collName].find({term: 1}).itcount();
     });

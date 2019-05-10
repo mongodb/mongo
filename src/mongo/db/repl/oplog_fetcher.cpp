@@ -408,6 +408,7 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
         if (!queryResponse.documents.empty() &&
             SimpleBSONObjComparator::kInstance.evaluate(
                 fp.getData()["document"].Obj() == queryResponse.documents.front()["o"].Obj())) {
+            log() << "stopReplProducerOnDocument fail point is enabled.";
             return Status(ErrorCodes::FailPointEnabled,
                           "stopReplProducerOnDocument fail point is enabled");
         }
