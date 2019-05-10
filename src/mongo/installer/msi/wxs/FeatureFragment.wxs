@@ -29,12 +29,9 @@
              <ComponentRef Id="c_mongod"/>
              <ComponentRef Id="c_mongodPdb"/>
              <ComponentRef Id="c_mongodCfg"/>
- 
+
              <?if $(var.Edition) = Enterprise ?>
                <ComponentGroupRef Id="cg_EnterpriseServer" />
-             <?endif ?>
-             <?if $(var.Edition) = SSL ?>
-               <ComponentGroupRef Id="cg_SSLBase" />
              <?endif ?>
         </Feature>
         <Feature Id="ServerService"
@@ -48,12 +45,9 @@
              <ComponentRef Id="c_MONGO_LOG_PATH"/>
              <ComponentRef Id="c_mongodPdb"/>
              <ComponentRef Id="c_mongodCfg"/>
- 
+
              <?if $(var.Edition) = Enterprise ?>
                <ComponentGroupRef Id="cg_EnterpriseServer" />
-             <?endif ?>
-             <?if $(var.Edition) = SSL ?>
-               <ComponentGroupRef Id="cg_SSLBase" />
              <?endif ?>
         </Feature>
         <Feature Id="Client"
@@ -64,9 +58,6 @@
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
           <?endif ?>
-          <?if $(var.Edition) = SSL ?>
-            <ComponentGroupRef Id="cg_SSLBase" />
-          <?endif ?>
         </Feature>
         <Feature Id="MonitoringTools"
                  Title ="Monitoring Tools"
@@ -76,9 +67,6 @@
           <ComponentRef Id="c_mongotop"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
-          <?endif ?>
-          <?if $(var.Edition) = SSL ?>
-            <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
         </Feature>
         <Feature Id="ImportExportTools"
@@ -92,9 +80,6 @@
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
           <?endif ?>
-          <?if $(var.Edition) = SSL ?>
-            <ComponentGroupRef Id="cg_SSLBase" />
-          <?endif ?>
         </Feature>
         <Feature Id="Router"
                  Title ="Router"
@@ -104,9 +89,6 @@
           <ComponentRef Id="c_mongosPdb"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
-          <?endif ?>
-          <?if $(var.Edition) = SSL ?>
-            <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
         </Feature>
         <Feature Id="MiscellaneousTools"
@@ -119,9 +101,6 @@
             <ComponentGroupRef Id="cg_EnterpriseBase" />
             <ComponentRef Id="c_mongodecrypt"/>
             <ComponentRef Id="c_mongoldap"/>
-          <?endif ?>
-          <?if $(var.Edition) = SSL ?>
-            <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
         </Feature>
         <?if $(var.Edition) = Enterprise ?>

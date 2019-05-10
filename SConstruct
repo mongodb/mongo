@@ -3198,9 +3198,8 @@ def doConfigure(myenv):
     else:
         ssl_provider = "none"
 
-    # The Windows build needs the openssl binaries if it targets openssl or includes the tools
-    # since the tools link against openssl
-    if conf.env.TargetOSIs('windows') and (ssl_provider == "openssl" or has_option("use-new-tools")):
+    # The Windows build needs the openssl binaries if it targets openssl
+    if conf.env.TargetOSIs('windows') and ssl_provider == "openssl":
         # Add the SSL binaries to the zip file distribution
         def addOpenSslLibraryToDistArchive(file_name):
             openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())

@@ -121,16 +121,6 @@
                 DiskId ="1" KeyPath="yes"/>
         </Component>
       <?endif ?>
-      <?if $(var.Edition) = Enterprise Or $(var.Edition) = SSL ?>
-        <Component Id="c_ssleay" Guid="8879033A-F4F7-4879-A7F8-4D81355A47E3">
-          <File Id="f_ssleay" Name="ssleay32.dll" Source="$(var.SslSource)\ssleay32.dll"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_libeay" Guid="E6CC6AA5-AC71-45EC-803C-71F816E33135">
-          <File Id="f_libeay" Name="libeay32.dll" Source="$(var.SslSource)\libeay32.dll"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-      <?endif ?>
     </DirectoryRef>
     <?if $(var.Edition) = Enterprise ?>
       <DirectoryRef Id="SNMP">
@@ -182,8 +172,6 @@
       <ComponentGroup Id="cg_EnterpriseBase">
         <ComponentRef Id="c_sasl" />
         <ComponentRef Id="c_saslPdb" />
-        <ComponentRef Id="c_ssleay" />
-        <ComponentRef Id="c_libeay" />
       </ComponentGroup>
       <ComponentGroup Id="cg_EnterpriseServer">
         <ComponentGroupRef Id="cg_EnterpriseBase" />
@@ -194,13 +182,6 @@
         <ComponentRef Id="c_snmpConfSubagent" />
         <ComponentRef Id="c_snmpMongodMib" />
         <ComponentRef Id="c_snmpMongodbincMib" />
-      </ComponentGroup>
-    <?endif ?>
-
-    <?if $(var.Edition) = SSL ?>
-      <ComponentGroup Id="cg_SSLBase">
-        <ComponentRef Id="c_ssleay" />
-        <ComponentRef Id="c_libeay" />
       </ComponentGroup>
     <?endif ?>
   </Fragment>
