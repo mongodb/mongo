@@ -231,6 +231,7 @@ functions:
           build_variant: ${build_variant}
           execution: ${execution}
           is_patch: ${is_patch|false}
+          order: ${revision_order_id}
           project: ${project}
           project_dir: ${project_dir}
           revision: ${revision}
@@ -238,7 +239,6 @@ functions:
           task_name: ${task_name}
           version_id: ${version_id}
           workdir: ${workdir}
-          order: ${revision_order_id}
 
           # sys-perf expansions
           dsi_rev: ${dsi_rev}
