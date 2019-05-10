@@ -24,7 +24,8 @@ TestData.skipCheckDBHashes = true;
     const rs0_opts = {nodes: [{}, {}]};
     // Start the participant replSet with one node as a priority 0 node to avoid flip flopping.
     const rs1_opts = {nodes: [{}, {rsConfig: {priority: 0}}]};
-    const st = new ShardingTest({shards: {rs0: rs0_opts, rs1: rs1_opts}, mongos: 1});
+    const st = new ShardingTest(
+        {shards: {rs0: rs0_opts, rs1: rs1_opts}, mongos: 1, causallyConsistent: true});
 
     // Create a sharded collection:
     // shard0: [-inf, 0)
@@ -105,17 +106,24 @@ TestData.skipCheckDBHashes = true;
     // Once the coordinator has gone down, do a majority write on the participant while there is a
     // prepared transaction. This will ensure that the stable timestamp is able to advance since
     // this write must be in the committed snapshot.
-    assert.commandWorked(participantPrimaryConn.getDB("dummy").getCollection("dummy").insert(
-        {dummy: 2}, {writeConcern: {w: "majority"}}));
+    const session = participantPrimaryConn.startSession();
+    const sessionDB = session.getDatabase("dummy");
+    const sessionColl = sessionDB.getCollection("dummy");
+    session.resetOperationTime_forTesting();
+    assert.commandWorked(sessionColl.insert({dummy: 2}, {writeConcern: {w: "majority"}}));
+    assert.neq(session.getOperationTime(), null);
+    assert.neq(session.getClusterTime(), null);
     jsTest.log("Successfully completed majority write on participant");
 
     // Confirm that a majority read on the secondary includes the dummy write. This would mean that
     // the stable timestamp also advanced on the secondary.
+    // In order to do this read with readConcern majority, we must use afterClusterTime with causal
+    // consistency enabled.
     const participantSecondaryConn = participantReplSetTest.getSecondary();
     const secondaryDB = participantSecondaryConn.getDB("dummy");
     const res = secondaryDB.runCommand({
         find: "dummy",
-        readConcern: {level: "majority"},
+        readConcern: {level: "majority", afterClusterTime: session.getOperationTime()},
     });
     assert.eq(res.cursor.firstBatch.length, 1);
 
