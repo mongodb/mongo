@@ -176,6 +176,7 @@ functions:
           build_variant: ${build_variant}
           execution: ${execution}
           is_patch: ${is_patch}
+          order: ${revision_order_id}
           project: ${project}
           project_dir: ${project_dir}
           revision: ${revision}
