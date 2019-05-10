@@ -84,12 +84,36 @@ var FixtureHelpers = (function() {
      * Runs the command given by 'cmdObj' on the database given by 'db' on each replica set in
      * the fixture (besides the config servers). Asserts that each command works, and returns an
      * array with the responses from each shard, or with a single element if the fixture was a
-     * replica set. Asserts if the fixture is a standalone or if the shards are standalones.
+     * replica set. If the fixture is a standalone, will run the command directly.
      */
     function runCommandOnEachPrimary({db, cmdObj}) {
-        return _getAllReplicas(db).map(
-            (replSet) =>
-                assert.commandWorked(replSet.getPrimary().getDB(db.getName()).runCommand(cmdObj)));
+        function getConnToPrimaryOrStandalone(host) {
+            const conn = new Mongo(host);
+            const isMaster = conn.getDB("test").isMaster();
+
+            if (isMaster.hasOwnProperty("setName")) {
+                // It's a repl set.
+                const rs = new ReplSetTest(host);
+                return rs.getPrimary();
+            } else {
+                // It's a standalone.
+                return conn;
+            }
+        }
+
+        const connList = [];
+        if (isMongos(db)) {
+            const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray();
+
+            for (let shardObj of shardObjs) {
+                connList.push(getConnToPrimaryOrStandalone(shardObj.host));
+            }
+        } else {
+            connList.push(getConnToPrimaryOrStandalone(db.getMongo().host));
+        }
+
+        return connList.map((conn) =>
+                                assert.commandWorked(conn.getDB(db.getName()).runCommand(cmdObj)));
     }
 
     /**
