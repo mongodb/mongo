@@ -156,7 +156,9 @@ private:
 
     /** Reads the given config file into the output string.  This function is virtual for
      *  testing purposes only. */
-    virtual Status readConfigFile(const std::string& filename, std::string*);
+    virtual Status readConfigFile(const std::string& filename,
+                                  std::string*,
+                                  ConfigExpand configExpand);
 };
 
 }  // namespace optionenvironment

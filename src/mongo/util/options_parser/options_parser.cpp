@@ -33,12 +33,22 @@
 
 #include <algorithm>
 #include <boost/filesystem.hpp>
+#include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/stream_buffer.hpp>
 #include <boost/program_options.hpp>
 #include <cctype>
 #include <cerrno>
+#include <fcntl.h>
 #include <fstream>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <yaml-cpp/yaml.h>
+
+#ifdef _WIN32
+#include <io.h>
+#endif
 
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
@@ -1351,6 +1361,30 @@ bool isYAMLConfig(const YAML::Node& config) {
     }
 }
 
+#ifndef _WIN32
+Status checkFileOwnershipAndMode(int fd, mode_t prohibit, StringData modeDesc) {
+    struct stat stats;
+
+    if (::fstat(fd, &stats) == -1) {
+        const auto& ewd = errnoWithDescription();
+        return {ErrorCodes::InvalidPath, str::stream() << "Error reading file metadata: " << ewd};
+    }
+
+    if (stats.st_uid != ::getuid()) {
+        // Must be owned by current process user.
+        return {ErrorCodes::InvalidPath, "File is not owned by current user"};
+    }
+
+    if ((stats.st_mode & prohibit) != 0) {
+        // Must not be accessible by non-owner.
+        return {ErrorCodes::InvalidPath,
+                str::stream() << "File is " << modeDesc << " by non-owner users"};
+    }
+
+    return Status::OK();
+}
+#endif
+
 }  // namespace
 
 /**
@@ -1381,23 +1415,58 @@ Status OptionsParser::addDefaultValues(const OptionSection& options, Environment
  * We could redesign the parser to use some kind of streaming interface, but for now this is
  * simple and works for the current use case of config files which should be limited in size.
  */
-Status OptionsParser::readConfigFile(const std::string& filename, std::string* contents) {
-    std::ifstream file;
-    file.open(filename.c_str());
-    if (file.fail()) {
-        const int current_errno = errno;
-        StringBuilder sb;
-        sb << "Error opening config file: " << strerror(current_errno);
-        return Status(ErrorCodes::InternalError, sb.str());
-    }
-
+Status OptionsParser::readConfigFile(const std::string& filename,
+                                     std::string* contents,
+                                     ConfigExpand configExpand) {
     // check if it's a regular file
     fs::path configPath(filename);
     if (!fs::is_regular_file(filename)) {
-        StringBuilder sb;
-        sb << "Error opening config file: " << strerror(EISDIR);
-        return Status(ErrorCodes::InternalError, sb.str());
+        return {ErrorCodes::InternalError,
+                str::stream() << "Error opening config file: " << strerror(EISDIR)};
     }
+
+#ifdef _WIN32
+    int fd = ::_open(filename.c_str(), O_RDONLY);
+#else
+    int fd = ::open(filename.c_str(), O_RDONLY);
+#endif
+
+    if (fd < 0) {
+        const auto& ewd = errnoWithDescription();
+        return {ErrorCodes::InternalError, str::stream() << "Error opening config file: " << ewd};
+    }
+
+#ifdef _WIN32
+    // The checks below are only performed on POSIX systems
+    // due to differing permission models.
+    auto fdguard = makeGuard([&fd] { ::_close(fd); });
+#else
+    auto fdguard = makeGuard([&fd] { ::close(fd); });
+
+    if (configExpand.rest) {
+        auto status = checkFileOwnershipAndMode(fd, S_IRGRP | S_IROTH, "readable"_sd);
+        if (!status.isOK()) {
+            return {status.code(),
+                    str::stream() << "When using --configExpand=rest, config file must be "
+                                  << "exclusively readable by current process user. "
+                                  << status.reason()};
+        }
+    }
+
+    if (configExpand.exec) {
+        auto status = checkFileOwnershipAndMode(fd, S_IWGRP | S_IWOTH, "writable"_sd);
+        if (!status.isOK()) {
+            return {status.code(),
+                    str::stream() << "When using --configExpand=exec, config file must be "
+                                  << "exclusively writable by current process user. "
+                                  << status.reason()};
+        }
+    }
+#endif
+
+    boost::iostreams::stream_buffer<boost::iostreams::file_descriptor_source> fdBuf(
+        fd, boost::iostreams::file_descriptor_flags::never_close_handle);
+    std::istream file(&fdBuf);
 
     // Transfer data to a stringstream
     std::stringstream config;
@@ -1704,17 +1773,17 @@ Status OptionsParser::run(const OptionSection& options,
             return ret;
         }
 
-        std::string config_file;
-        ret = readConfigFile(config_filename, &config_file);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
         auto swExpand = parseConfigExpand(commandLineEnvironment);
         if (!swExpand.isOK()) {
             return swExpand.getStatus();
         }
         auto configExpand = std::move(swExpand.getValue());
+
+        std::string config_file;
+        ret = readConfigFile(config_filename, &config_file, configExpand);
+        if (!ret.isOK()) {
+            return ret;
+        }
 
         ret = parseConfigFile(options, config_file, &configEnvironment, configExpand);
         if (!ret.isOK()) {

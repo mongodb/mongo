@@ -141,6 +141,16 @@ function configExpandSuccess(config, test = null, opts = {}) {
     const configFile = MongoRunner.dataPath + '/configExpand.conf';
     writeFile(configFile, jsToYaml(config));
 
+    let chmod = 0o600;
+    if (opts.chmod !== undefined) {
+        chmod = opts.chmod;
+        delete opts.chmod;
+    }
+
+    if (!_isWindows()) {
+        assert.eq(0, runMongoProgram("chmod", chmod.toString(8), configFile));
+    }
+
     const mongod = MongoRunner.runMongod(Object.assign({
         configExpand: 'rest,exec',
         config: configFile,
@@ -159,6 +169,16 @@ function configExpandSuccess(config, test = null, opts = {}) {
 function configExpandFailure(config, test = null, opts = {}) {
     const configFile = MongoRunner.dataPath + '/configExpand.conf';
     writeFile(configFile, jsToYaml(config));
+
+    let chmod = 0o600;
+    if (opts.chmod !== undefined) {
+        chmod = opts.chmod;
+        delete opts.chmod;
+    }
+
+    if (!_isWindows()) {
+        assert.eq(0, runMongoProgram("chmod", chmod.toString(8), configFile));
+    }
 
     const options = Object.assign({
         configExpand: 'rest,exec',
