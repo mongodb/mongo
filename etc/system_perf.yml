@@ -238,6 +238,7 @@ functions:
           task_name: ${task_name}
           version_id: ${version_id}
           workdir: ${workdir}
+          order: ${revision_order_id}
 
           # sys-perf expansions
           dsi_rev: ${dsi_rev}
