@@ -187,7 +187,8 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     StringData dbName,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
-    const std::vector<AsyncRequestsSender::Request>& requests) {
+    const std::vector<AsyncRequestsSender::Request>& requests,
+    const std::set<ErrorCodes::Error>& ignorableErrors) {
 
     // Send the requests.
     MultiStatementTransactionRequestsSender ars(
@@ -201,8 +202,6 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     // Get the responses.
 
     std::vector<AsyncRequestsSender::Response> responses;  // Stores results by ShardId
-    bool atLeastOneSucceeded = false;
-    boost::optional<Status> implicitCreateErrorStatus;
 
     while (!ars.done()) {
         auto response = ars.next();
@@ -214,10 +213,6 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
             // Check for special errors that require throwing out any accumulated results.
             auto& responseObj = response.swResponse.getValue().data;
             status = getStatusFromCommandResult(responseObj);
-
-            if (status.isOK()) {
-                atLeastOneSucceeded = true;
-            }
 
             // Failing to establish a consistent shardVersion means no results should be examined.
             if (ErrorCodes::isStaleShardVersionError(status.code())) {
@@ -244,18 +239,16 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
                 uassertStatusOK(status);
             }
 
-            if (ErrorCodes::CannotImplicitlyCreateCollection == status) {
-                implicitCreateErrorStatus = status;
+            // TODO: This should not be needed once we get better targetting with SERVER-32723.
+            // Some commands are sent with allowImplicit: false to all shards and expect only some
+            // of them to succeed.
+            if (ignorableErrors.find(ErrorCodes::CannotImplicitlyCreateCollection) ==
+                    ignorableErrors.end() &&
+                ErrorCodes::CannotImplicitlyCreateCollection == status) {
+                uassertStatusOK(status);
             }
         }
         responses.push_back(std::move(response));
-    }
-
-    // TODO: This should not be needed once we get better targetting with SERVER-32723.
-    // Some commands are sent with allowImplicit: false to all shards and expect only some of
-    // them to succeed.
-    if (implicitCreateErrorStatus && !atLeastOneSucceeded) {
-        uassertStatusOK(*implicitCreateErrorStatus);
     }
 
     return responses;
@@ -304,7 +297,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
     const NamespaceString& nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy) {
+    Shard::RetryPolicy retryPolicy,
+    const std::set<ErrorCodes::Error>& ignorableErrors) {
     auto routingInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
@@ -319,7 +313,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
             opCtx, nss, routingInfo, cmdObj, BSONObj(), BSONObj());
     }
 
-    return gatherResponses(opCtx, nss.db(), readPref, retryPolicy, requests);
+    return gatherResponses(opCtx, nss.db(), readPref, retryPolicy, requests, ignorableErrors);
 }
 
 AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(

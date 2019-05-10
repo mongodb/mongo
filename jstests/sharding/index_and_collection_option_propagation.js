@@ -179,6 +179,20 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq("CannotCreateIndex", res.codeName, tojson(res));
     assert.neq(null, res.errmsg, tojson(res));
 
+    // If all the non-ignorable errors reported by shards are the same, the overall command error
+    // should be set to that error.
+    res = st.s.getDB(dbName).getCollection(collName).createIndex({z: 1}, {unique: true});
+    assert.eq(res.raw[st.shard0.host].ok, 0, tojson(res));
+    assert.eq(res.raw[st.shard1.host].ok, 0, tojson(res));
+    assert.eq(null, res.raw[st.shard2.host], tojson(res));
+    assert.eq(ErrorCodes.CannotCreateIndex, res.raw[st.shard0.host].code, tojson(res));
+    assert.eq(ErrorCodes.CannotCreateIndex, res.raw[st.shard1.host].code, tojson(res));
+    assert.eq("CannotCreateIndex", res.raw[st.shard0.host].codeName, tojson(res));
+    assert.eq("CannotCreateIndex", res.raw[st.shard1.host].codeName, tojson(res));
+    assert.eq(res.code, ErrorCodes.CannotCreateIndex, tojson(res));
+    assert.eq("CannotCreateIndex", res.codeName, tojson(res));
+    assert.neq(null, res.errmsg, tojson(res));
+
     st.rs0.stopSet();
 
     // If we receive a non-ignorable error, it should be reported as the command error.

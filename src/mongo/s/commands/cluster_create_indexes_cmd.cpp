@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/util/log.h"
 
@@ -77,7 +78,19 @@ public:
             nss,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),
-            Shard::RetryPolicy::kNoRetry);
+            Shard::RetryPolicy::kNoRetry,
+            {ErrorCodes::CannotImplicitlyCreateCollection});
+
+        if (std::all_of(shardResponses.begin(), shardResponses.end(), [](const auto& response) {
+                return response.swResponse.getStatus().isOK() &&
+                    getStatusFromCommandResult(response.swResponse.getValue().data) ==
+                    ErrorCodes::CannotImplicitlyCreateCollection;
+            })) {
+            // Propagate the ExtraErrorInfo from the first response.
+            uassertStatusOK(
+                getStatusFromCommandResult(shardResponses.front().swResponse.getValue().data));
+        }
+
         return appendRawResponses(opCtx,
                                   &errmsg,
                                   &output,
