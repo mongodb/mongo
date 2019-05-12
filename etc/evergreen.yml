@@ -999,7 +999,7 @@ functions:
           set -o errexit
           echo "jstestfuzz self-tests finished"
 
-          npm run ${npm_command|jstestfuzz} -- --jsTestsDir ../jstests ${jstestfuzz_vars}
+          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars}
 
     - command: archive.targz_pack
       params:
@@ -2965,6 +2965,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -2976,6 +2978,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -2988,7 +2992,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3001,7 +3005,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3014,7 +3018,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3027,7 +3031,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3040,7 +3044,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3053,7 +3057,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3066,7 +3070,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3079,7 +3083,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3092,7 +3096,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3105,7 +3109,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3118,7 +3122,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 25
+      jstestfuzz_vars: --numGeneratedFiles 25 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3131,7 +3135,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3144,7 +3148,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3156,6 +3160,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3167,6 +3173,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3179,7 +3187,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3192,7 +3200,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3205,7 +3213,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3218,7 +3226,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
+      jstestfuzz_vars: --numGeneratedFiles 75 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3230,6 +3238,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3241,6 +3251,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3252,6 +3264,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3263,6 +3277,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3274,6 +3290,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3285,6 +3303,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3297,7 +3317,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 50
+      jstestfuzz_vars: --numGeneratedFiles 50 --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3309,6 +3329,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -3320,6 +3342,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
