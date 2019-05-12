@@ -1626,7 +1626,7 @@ functions:
           set -o errexit
           echo "jstestfuzz self-tests finished"
 
-          npm run ${npm_command|jstestfuzz} -- --jsTestsDir ../jstests ${jstestfuzz_vars}
+          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars}
 
     - command: archive.targz_pack
       params:
