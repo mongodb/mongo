@@ -3174,7 +3174,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --jsTestsDir ../jstests --jsTestsDir ../jstests
+      jstestfuzz_vars: --jsTestsDir ../jstests
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
