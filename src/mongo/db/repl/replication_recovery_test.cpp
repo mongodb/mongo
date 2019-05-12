@@ -240,8 +240,7 @@ repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
                             boost::none,                      // statement id
                             boost::none,   // optime of previous write within same transaction
                             boost::none,   // pre-image optime
-                            boost::none,   // post-image optime
-                            boost::none);  // prepare
+                            boost::none);  // post-image optime
 }
 
 /**
@@ -251,7 +250,6 @@ repl::OplogEntry _makeTransactionOplogEntry(repl::OpTime opTime,
                                             repl::OpTypeEnum opType,
                                             BSONObj object,
                                             repl::OpTime prevOpTime,
-                                            bool prepare,
                                             StmtId stmtId,
                                             OperationSessionInfo sessionInfo,
                                             Date_t wallTime) {
@@ -266,9 +264,6 @@ repl::OplogEntry _makeTransactionOplogEntry(repl::OpTime opTime,
     builder.append("wall", wallTime);
     builder.append("stmtId", stmtId);
     builder.append("prevOpTime", prevOpTime.toBSON());
-    if (prepare) {
-        builder.append("prepare", prepare);
-    }
 
     return uassertStatusOK(repl::OplogEntry::parse(builder.obj()));
 }
@@ -911,7 +906,6 @@ TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConf
                                    repl::OpTypeEnum::kCommand,
                                    BSON("applyOps" << BSONArray() << "prepare" << true),
                                    OpTime(Timestamp(0, 0), -1),
-                                   true,  // prepare
                                    0,
                                    sessionInfo,
                                    lastDate);
@@ -960,7 +954,6 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
                                    repl::OpTypeEnum::kCommand,
                                    BSON("applyOps" << BSONArray() << "prepare" << true),
                                    OpTime(Timestamp(0, 0), -1),
-                                   true,  // prepare
                                    0,
                                    sessionInfo,
                                    prepareDate);
@@ -973,7 +966,6 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
                                                     repl::OpTypeEnum::kCommand,
                                                     BSON("abortTransaction" << 1),
                                                     OpTime(Timestamp(2, 0), 1),
-                                                    false,  // prepare
                                                     1,
                                                     sessionInfo,
                                                     abortDate);
@@ -1025,7 +1017,6 @@ DEATH_TEST_F(ReplicationRecoveryTest,
                                    repl::OpTypeEnum::kCommand,
                                    BSON("applyOps" << BSONArray() << "prepare" << true),
                                    OpTime(Timestamp(0, 0), -1),
-                                   true,  // prepare
                                    0,
                                    sessionInfo,
                                    lastDate);
@@ -1065,7 +1056,6 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
                                    repl::OpTypeEnum::kCommand,
                                    BSON("applyOps" << txnOperations << "prepare" << true),
                                    OpTime(Timestamp(0, 0), -1),
-                                   true,  // prepare
                                    0,
                                    sessionInfo,
                                    prepareDate);
@@ -1079,7 +1069,6 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
         repl::OpTypeEnum::kCommand,
         BSON("commitTransaction" << 1 << "commitTimestamp" << Timestamp(2, 1)),
         OpTime(Timestamp(2, 0), 1),
-        false,  // prepare
         1,
         sessionInfo,
         commitDate);
@@ -1144,7 +1133,6 @@ TEST_F(ReplicationRecoveryTest,
                                    repl::OpTypeEnum::kCommand,
                                    BSON("applyOps" << txnOperations << "prepare" << true),
                                    OpTime(Timestamp(0, 0), -1),
-                                   true,  // prepare
                                    0,
                                    sessionInfo,
                                    prepareDate);
@@ -1170,7 +1158,6 @@ TEST_F(ReplicationRecoveryTest,
         repl::OpTypeEnum::kCommand,
         BSON("commitTransaction" << 1 << "commitTimestamp" << Timestamp(2, 1)),
         OpTime(Timestamp(2, 0), 1),
-        false,  // prepare
         1,
         sessionInfo,
         commitDate);

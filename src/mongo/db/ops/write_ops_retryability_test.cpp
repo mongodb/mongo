@@ -58,8 +58,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 BSONObj oField,
                                 boost::optional<BSONObj> o2Field = boost::none,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
-                                boost::optional<repl::OpTime> postImageOpTime = boost::none,
-                                boost::optional<bool> prepare = boost::none) {
+                                boost::optional<repl::OpTime> postImageOpTime = boost::none) {
     return repl::OplogEntry(opTime,                           // optime
                             boost::none,                      // hash
                             opType,                           // opType
@@ -73,10 +72,9 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             boost::none,                      // upsert
                             boost::none,                      // wall clock time
                             boost::none,                      // statement id
-                            boost::none,      // optime of previous write within same transaction
-                            preImageOpTime,   // pre-image optime
-                            postImageOpTime,  // post-image optime
-                            prepare);         // prepare
+                            boost::none,       // optime of previous write within same transaction
+                            preImageOpTime,    // pre-image optime
+                            postImageOpTime);  // post-image optime
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {

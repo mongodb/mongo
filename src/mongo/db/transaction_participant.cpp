@@ -185,7 +185,7 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
             if ((serverGlobalParams.featureCompatibility.getVersion() <=
                  ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) &&
                 (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
-                 !entry.shouldPrepare())) {
+                 !entry.shouldPrepare() && !entry.isPartialTransaction())) {
                 result.state = result.TxnRecordState::kCommitted;
             }
         } catch (const DBException& ex) {

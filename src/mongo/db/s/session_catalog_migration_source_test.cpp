@@ -63,8 +63,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 StmtId stmtId,
                                 repl::OpTime prevWriteOpTimeInTransaction,
                                 boost::optional<repl::OpTime> preImageOpTime,
-                                boost::optional<repl::OpTime> postImageOpTime,
-                                boost::optional<bool> prepare) {
+                                boost::optional<repl::OpTime> postImageOpTime) {
     return repl::OplogEntry(
         opTime,                           // optime
         0,                                // hash
@@ -81,8 +80,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         stmtId,                           // statement id
         prevWriteOpTimeInTransaction,     // optime of previous write within same transaction
         preImageOpTime,                   // pre-image optime
-        postImageOpTime,                  // post-image optime
-        prepare);                         // prepare
+        postImageOpTime);                 // post-image optime
 }
 
 repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
@@ -93,8 +91,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 StmtId stmtId,
                                 repl::OpTime prevWriteOpTimeInTransaction,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
-                                boost::optional<repl::OpTime> postImageOpTime = boost::none,
-                                boost::optional<bool> prepare = boost::none) {
+                                boost::optional<repl::OpTime> postImageOpTime = boost::none) {
     return makeOplogEntry(opTime,
                           opType,
                           kNs,
@@ -104,8 +101,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                           stmtId,
                           prevWriteOpTimeInTransaction,
                           preImageOpTime,
-                          postImageOpTime,
-                          prepare);
+                          postImageOpTime);
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, NoSessionsToTransferShouldNotHaveOplog) {
@@ -374,8 +370,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
         1,                                   // statement id
         repl::OpTime(Timestamp(0, 0), 0),    // optime of previous write within same transaction
         boost::none,                         // pre-image optime
-        boost::none,                         // pre-image optime
-        boost::none);                        // prepare
+        boost::none);                        // post-image optime
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord2;

@@ -15,14 +15,6 @@
     load("jstests/core/txns/libs/prepare_helpers.js");
     load("jstests/libs/check_log.js");
 
-    function findPrepareEntry(oplogColl) {
-        if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
-            return oplogColl.findOne({op: "c", "o.prepare": true});
-        } else {
-            return oplogColl.findOne({prepare: true});
-        }
-    }
-
     // A new replica set for both the commit and abort tests to ensure the same clean state.
     function doTest(commitOrAbort) {
         const replSet = new ReplSetTest({
@@ -60,7 +52,7 @@
             assert.soon(() => {
                 return secondaryOplog.dataSize() >= PrepareHelpers.oplogSizeBytes;
             }, "waiting for secondary oplog to grow", ReplSetTest.kDefaultTimeoutMS);
-            const secondaryOplogEntry = findPrepareEntry(secondaryOplog);
+            const secondaryOplogEntry = PrepareHelpers.findPrepareEntry(secondaryOplog);
             assert.eq(secondaryOplogEntry.ts, prepareTimestamp, tojson(secondaryOplogEntry));
         }
         checkSecondaryOplog();

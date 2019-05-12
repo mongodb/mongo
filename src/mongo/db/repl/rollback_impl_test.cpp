@@ -1445,8 +1445,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
                                          boost::none,                // statementId
                                          OpTime(),                   // prevWriteOpTimeInTransaction
                                          boost::none,                // preImageOpTime
-                                         boost::none,                // postImageOpTime
-                                         boost::none);               // prepare
+                                         boost::none);               // postImageOpTime
     ASSERT_OK(_insertOplogEntry(partialApplyOpsOplogEntry.toBSON()));
     ops.push_back(std::make_pair(partialApplyOpsOplogEntry.toBSON(), insertOp2.second));
 
@@ -1471,8 +1470,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
                                         boost::none,                // statementId
                                         partialApplyOpsOpTime,      // prevWriteOpTimeInTransaction
                                         boost::none,                // preImageOpTime
-                                        boost::none,                // postImageOpTime
-                                        boost::none);               // prepare
+                                        boost::none);               // postImageOpTime
     ASSERT_OK(_insertOplogEntry(commitApplyOpsOplogEntry.toBSON()));
     ops.push_back(std::make_pair(commitApplyOpsOplogEntry.toBSON(), insertOp3.second));
 

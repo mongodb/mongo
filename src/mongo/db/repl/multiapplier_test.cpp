@@ -81,8 +81,7 @@ OplogEntry makeOplogEntry(int ts) {
                       boost::none,                  // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
-                      boost::none,   // post-image optime
-                      boost::none);  // prepare
+                      boost::none);  // post-image optime
 }
 
 TEST_F(MultiApplierTest, InvalidConstruction) {

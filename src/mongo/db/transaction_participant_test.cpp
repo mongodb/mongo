@@ -94,8 +94,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         stmtId,                        // statement id
         prevWriteOpTimeInTransaction,  // optime of previous write within same transaction
         boost::none,                   // pre-image optime
-        boost::none,                   // post-image optime
-        boost::none);                  // prepare
+        boost::none);                  // post-image optime
 }
 
 class OpObserverMock : public OpObserverNoop {

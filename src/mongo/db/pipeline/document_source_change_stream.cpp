@@ -169,7 +169,7 @@ BSONObj getTxnApplyOpsFilter(BSONElement nsMatch, const NamespaceString& nss) {
     applyOpsBuilder.append("op", "c");
     applyOpsBuilder.append("lsid", BSON("$exists" << true));
     applyOpsBuilder.append("txnNumber", BSON("$exists" << true));
-    applyOpsBuilder.append("prepare", BSON("$not" << BSON("$eq" << true)));
+    applyOpsBuilder.append("o.prepare", BSON("$not" << BSON("$eq" << true)));
     const std::string& kApplyOpsNs = "o.applyOps.ns";
     applyOpsBuilder.appendAs(nsMatch, kApplyOpsNs);
     return applyOpsBuilder.obj();

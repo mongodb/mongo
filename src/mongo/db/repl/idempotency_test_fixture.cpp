@@ -76,8 +76,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<Date_t> wallClockTime = boost::none,
                                 boost::optional<StmtId> stmtId = boost::none,
                                 boost::optional<UUID> uuid = boost::none,
-                                boost::optional<OpTime> prevOpTime = boost::none,
-                                const boost::optional<bool> prepare = boost::none) {
+                                boost::optional<OpTime> prevOpTime = boost::none) {
     return repl::OplogEntry(opTime,                           // optime
                             boost::none,                      // hash
                             opType,                           // opType
@@ -91,10 +90,9 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             boost::none,                      // upsert
                             wallClockTime,                    // wall clock time
                             stmtId,                           // statement id
-                            prevOpTime,   // optime of previous write within same transaction
-                            boost::none,  // pre-image optime
-                            boost::none,  // post-image optime
-                            prepare);     // prepare
+                            prevOpTime,    // optime of previous write within same transaction
+                            boost::none,   // pre-image optime
+                            boost::none);  // post-image optime
 }
 
 }  // namespace
@@ -482,8 +480,7 @@ OplogEntry IdempotencyTest::prepare(LogicalSessionId lsid,
                           Date_t::min() /* wallClockTime -- required but not checked */,
                           stmtId,
                           boost::none /* uuid */,
-                          OpTime(),
-                          true);
+                          OpTime());
 }
 
 OplogEntry IdempotencyTest::commitUnprepared(LogicalSessionId lsid,

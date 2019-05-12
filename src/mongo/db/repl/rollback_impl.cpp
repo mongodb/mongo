@@ -714,7 +714,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
 
     // For applyOps entries, we process each sub-operation individually.
     if (oplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps) {
-        if (oplogEntry.getPrepare()) {
+        if (oplogEntry.shouldPrepare()) {
             // Uncommitted prepared transactions are always aborted before rollback begins, which
             // rolls back collection counts. Processing the operation here would result in
             // double-counting the sub-operations when correcting collection counts later.

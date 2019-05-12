@@ -232,8 +232,7 @@ public:
      * Helper for running an applyOps through the pipeline, and getting all of the results.
      */
     std::vector<Document> getApplyOpsResults(const Document& applyOpsDoc,
-                                             const LogicalSessionFromClient& lsid,
-                                             bool setPrepareTrue = false) {
+                                             const LogicalSessionFromClient& lsid) {
         BSONObj applyOpsObj = applyOpsDoc.toBson();
 
         // Create an oplog entry and then glue on an lsid and txnNumber
@@ -246,9 +245,6 @@ public:
         BSONObjBuilder builder(baseOplogEntry.toBSON());
         builder.append("lsid", lsid.toBSON());
         builder.append("txnNumber", 0LL);
-        if (setPrepareTrue) {
-            builder.append("prepare", true);
-        }
         BSONObj oplogEntry = builder.done();
 
         // Create the stages and check that the documents produced matched those in the applyOps.
@@ -310,8 +306,7 @@ public:
                                 boost::none,                        // statement id
                                 boost::none,   // optime of previous write within same transaction
                                 boost::none,   // pre-image optime
-                                boost::none,   // post-image optime
-                                boost::none);  // prepare
+                                boost::none);  // post-image optime
     }
 };
 
@@ -893,15 +888,16 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
 }
 
 TEST_F(ChangeStreamStageTest, PreparedTransactionApplyOpsEntriesAreIgnored) {
-    Document applyOpsDoc = Document{{"applyOps",
-                                     Value{std::vector<Document>{Document{
-                                         {"op", "i"_sd},
-                                         {"ns", nss.ns()},
-                                         {"ui", testUuid()},
-                                         {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}},
-                                         {"prepare", true}}}}}};
+    Document applyOpsDoc =
+        Document{{"applyOps",
+                  Value{std::vector<Document>{
+                      Document{{"op", "i"_sd},
+                               {"ns", nss.ns()},
+                               {"ui", testUuid()},
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}},
+                 {"prepare", true}};
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, true);
+    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // applyOps entries that are part of a prepared transaction are ignored. These entries will be
     // fetched for changeStreams delivery as part of transaction commit.
@@ -921,16 +917,13 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
         {"prepare", true},
     };
 
-    auto basePreparedTransaction = makeOplogEntry(OpTypeEnum::kCommand,
-                                                  nss.getCommandNS(),
-                                                  preparedApplyOps.toBson(),
-                                                  testUuid(),
-                                                  boost::none,  // fromMigrate
-                                                  boost::none,  // o2 field
-                                                  kPreparedTransactionOpTime);
-    BSONObjBuilder builder(basePreparedTransaction.toBSON());
-    builder.append("prepare", true);
-    auto preparedTransaction = uassertStatusOK(repl::OplogEntry::parse(builder.done()));
+    auto preparedTransaction = makeOplogEntry(OpTypeEnum::kCommand,
+                                              nss.getCommandNS(),
+                                              preparedApplyOps.toBson(),
+                                              testUuid(),
+                                              boost::none,  // fromMigrate
+                                              boost::none,  // o2 field
+                                              kPreparedTransactionOpTime);
 
     // Create an oplog entry representing the commit for the prepared transaction. The commit has a
     // 'prevWriteOpTimeInTransaction' value that matches the 'preparedApplyOps' entry, which the
@@ -954,8 +947,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
         boost::none,                      // statement id
         kPreparedTransactionOpTime,       // optime of previous write within same transaction
         boost::none,                      // pre-image optime
-        boost::none,                      // post-image optime
-        boost::none);                     // prepare
+        boost::none);                     // post-image optime
 
     // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
     // expect it to return the insert op within our 'preparedApplyOps' oplog entry.

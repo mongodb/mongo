@@ -65,12 +65,10 @@ OplogEntry createOplogEntryForTransactionTableUpdate(repl::OpTime opTime,
                             {},    // sessionInfo
                             true,  // upsert
                             wallClockTime,
-                            boost::none,  // statementId
-                            boost::none,  // prevWriteOpTime
-                            boost::none,  // preImangeOpTime
-                            boost::none,  // postImageOpTime
-                            boost::none   // prepare
-                            );
+                            boost::none,   // statementId
+                            boost::none,   // prevWriteOpTime
+                            boost::none,   // preImangeOpTime
+                            boost::none);  // postImageOpTime
 }
 
 /**
@@ -289,15 +287,7 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
         }
         switch (entry.getCommandType()) {
             case repl::OplogEntry::CommandType::kApplyOps:
-                // The single applyOps transaction oplog format will have a 'prepare' boolean
-                // flag at the root level of the oplog entry. The multi-oplog-entry format
-                // only has the flag in the applyOps object.
-                // TODO (SERVER-39809): Remove this check once we remove the old applyOps
-                // format.
-                if (entry.getPrepare() && *entry.getPrepare()) {
-                    newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
-                    newTxnRecord.setStartOpTime(entry.getOpTime());
-                } else if (entry.shouldPrepare()) {
+                if (entry.shouldPrepare()) {
                     newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
                     if (entry.getPrevWriteOpTimeInTransaction()->isNull()) {
                         // The prepare oplog entry is the first operation of the transaction.

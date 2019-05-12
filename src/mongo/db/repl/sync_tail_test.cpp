@@ -98,8 +98,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollec
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
-                      boost::none,   // post-image optime
-                      boost::none);  // prepare
+                      boost::none);  // post-image optime
 }
 
 /**
@@ -2479,8 +2478,7 @@ public:
                                 boost::none,    // statement id
                                 boost::none,    // optime of previous write within same transaction
                                 boost::none,    // pre-image optime
-                                boost::none,    // post-image optime
-                                boost::none);   // prepare
+                                boost::none);   // post-image optime
     }
 
     /**
@@ -2508,8 +2506,7 @@ public:
                                 boost::none,    // statement id
                                 boost::none,    // optime of previous write within same transaction
                                 boost::none,    // pre-image optime
-                                boost::none,    // post-image optime
-                                boost::none);   // prepare
+                                boost::none);   // post-image optime
     }
 
     void checkTxnTable(const OperationSessionInfo& sessionInfo,

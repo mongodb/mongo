@@ -376,8 +376,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             Date_t wallTime,
                             const OperationSessionInfo& sessionInfo,
                             StmtId statementId,
-                            const OplogLink& oplogLink,
-                            bool prepare) {
+                            const OplogLink& oplogLink) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -403,10 +402,6 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     b.appendDate(OplogEntryBase::kWallClockTimeFieldName, wallTime);
 
     appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
-
-    if (prepare) {
-        b.appendBool(OplogEntryBase::kPrepareFieldName, true);
-    }
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
@@ -492,7 +487,6 @@ OpTime logOp(OperationContext* opCtx,
              const OperationSessionInfo& sessionInfo,
              StmtId statementId,
              const OplogLink& oplogLink,
-             bool prepare,
              const OplogSlot& oplogSlot) {
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
@@ -545,8 +539,7 @@ OpTime logOp(OperationContext* opCtx,
                                wallClockTime,
                                sessionInfo,
                                statementId,
-                               oplogLink,
-                               prepare);
+                               oplogLink);
     const DocWriter* basePtr = &writer;
     auto timestamp = slot.getTimestamp();
     _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot, wallClockTime);
@@ -606,8 +599,6 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         if (insertStatementOplogSlot.isNull()) {
             insertStatementOplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
         }
-        // Only 'applyOps' oplog entries can be prepared.
-        constexpr bool prepare = false;
         writers.emplace_back(_logOpWriter(opCtx,
                                           "i",
                                           nss,
@@ -619,8 +610,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                           wallClockTime,
                                           sessionInfo,
                                           begin[i].stmtId,
-                                          oplogLink,
-                                          prepare));
+                                          oplogLink));
         oplogLink.prevOpTime = insertStatementOplogSlot;
         timestamps[i] = oplogLink.prevOpTime.getTimestamp();
         opTimes.push_back(insertStatementOplogSlot);
@@ -1854,7 +1844,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    const bool assignCommandTimestamp = [opCtx, mode, &op, &o] {
+    const bool assignCommandTimestamp = [&] {
         const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
@@ -1864,7 +1854,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
         // Don't assign commit timestamp for transaction commands.
         const StringData commandName(o.firstElementFieldName());
-        if (op.getBoolField("prepare") || commandName == "abortTransaction" ||
+        if (entry.shouldPrepare() || commandName == "abortTransaction" ||
             commandName == "commitTransaction" || commandName == "prepareTransaction")
             return false;
 

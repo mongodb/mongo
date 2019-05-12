@@ -141,6 +141,10 @@ const PrepareHelpers = (function() {
         }, "Timeout waiting for majority commit point", ReplSetTest.kDefaultTimeoutMS, 1000);
     }
 
+    function findPrepareEntry(oplogColl) {
+        return oplogColl.findOne({op: "c", "o.prepare": true});
+    }
+
     return {
         prepareTransaction: prepareTransaction,
         commitTransaction: commitTransaction,
@@ -150,6 +154,7 @@ const PrepareHelpers = (function() {
         replSetStartSetOptions: {oplogSize: oplogSizeMB},
         growOplogPastMaxSize: growOplogPastMaxSize,
         awaitOplogTruncation: awaitOplogTruncation,
-        awaitMajorityCommitted: awaitMajorityCommitted
+        awaitMajorityCommitted: awaitMajorityCommitted,
+        findPrepareEntry: findPrepareEntry,
     };
 })();

@@ -162,8 +162,9 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
 }
 
 /**
- * Returns whether an oplog entry represents an applyOps which is a self-contained atomic operation,
- * as opposed to part of a prepared transaction.
+ * Returns whether an oplog entry represents an applyOps which doesn't imply prepare.
+ * It could be a partial transaction oplog entry, an implicit commit applyOps or an applyOps outside
+ * of transaction.
  */
 bool isUnpreparedApplyOps(const OplogEntry& entry) {
     // TODO (SERVER-39810): Remove the check of the prepare flag in the root oplog level once the

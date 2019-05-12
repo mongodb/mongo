@@ -140,7 +140,6 @@ OpTime logOp(OperationContext* opCtx,
              const OperationSessionInfo& sessionInfo,
              StmtId stmtId,
              const OplogLink& oplogLink,
-             bool prepare,
              const OplogSlot& oplogSlot);
 
 // Flush out the cached pointer to the oplog.

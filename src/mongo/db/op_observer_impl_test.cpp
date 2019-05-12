@@ -809,8 +809,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
                                      << "prepare"
                                      << true);
     ASSERT_BSONOBJ_EQ(oExpected, o);
-    ASSERT(oplogEntry.getPrepare());
-    ASSERT(oplogEntry.getPrepare().get());
+    ASSERT(oplogEntry.shouldPrepare());
     ASSERT_EQ(oplogEntry.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
 }
 
@@ -865,7 +864,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
         auto o = oplogEntry.getObject();
         auto oExpected = BSON("commitTransaction" << 1 << "commitTimestamp" << prepareTimestamp);
         ASSERT_BSONOBJ_EQ(oExpected, o);
-        ASSERT_FALSE(oplogEntry.getPrepare());
+        ASSERT_FALSE(oplogEntry.shouldPrepare());
     }
 
     {
@@ -884,7 +883,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
                                          << "prepare"
                                          << true);
         ASSERT_BSONOBJ_EQ(oExpected, o);
-        ASSERT(oplogEntry.getPrepare());
+        ASSERT(oplogEntry.shouldPrepare());
     }
 
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
@@ -933,7 +932,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
         auto o = oplogEntry.getObject();
         auto oExpected = BSON("abortTransaction" << 1);
         ASSERT_BSONOBJ_EQ(oExpected, o);
-        ASSERT_FALSE(oplogEntry.getPrepare());
+        ASSERT_FALSE(oplogEntry.shouldPrepare());
     }
 
     {
@@ -952,7 +951,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
                                          << "prepare"
                                          << true);
         ASSERT_BSONOBJ_EQ(oExpected, o);
-        ASSERT(oplogEntry.getPrepare());
+        ASSERT(oplogEntry.shouldPrepare());
     }
 
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
@@ -1004,8 +1003,7 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
     auto o = oplogEntry.getObject();
     auto oExpected = BSON("applyOps" << BSONArray() << "prepare" << true);
     ASSERT_BSONOBJ_EQ(oExpected, o);
-    ASSERT(oplogEntry.getPrepare());
-    ASSERT(oplogEntry.getPrepare().get());
+    ASSERT(oplogEntry.shouldPrepare());
     ASSERT_EQ(oplogEntry.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
 }
 
@@ -1221,7 +1219,7 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
                                                            << BSON("_id" << 3 << "data"
                                                                          << "w"))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
-    ASSERT(!oplogEntry.getPrepare());
+    ASSERT(!oplogEntry.shouldPrepare());
     ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
 }
 
@@ -1388,7 +1386,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
     auto oplogEntryObj = getNOplogEntries(opCtx(), 1)[0];
     checkSessionAndTransactionFields(oplogEntryObj);
     auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
-    ASSERT(!oplogEntry.getPrepare());
+    ASSERT(!oplogEntry.shouldPrepare());
     ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
     ASSERT_EQ(repl::OpTime(), *oplogEntry.getPrevWriteOpTimeInTransaction());
 
@@ -1431,7 +1429,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
         checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        ASSERT(!oplogEntry.getPrepare());
+        ASSERT(!oplogEntry.shouldPrepare());
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
@@ -1528,7 +1526,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
         checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        ASSERT(!oplogEntry.getPrepare());
+        ASSERT(!oplogEntry.shouldPrepare());
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
@@ -1599,7 +1597,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
         checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        ASSERT(!oplogEntry.getPrepare());
+        ASSERT(!oplogEntry.shouldPrepare());
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
@@ -2128,7 +2126,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
         checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        ASSERT(!oplogEntry.getPrepare());
+        ASSERT(!oplogEntry.shouldPrepare());
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
@@ -2376,7 +2374,7 @@ TEST_F(OpObserverLargeMultiEntryTransactionTest, LargeTransactionCreatesMultiple
         checkSessionAndTransactionFields(oplogEntryObj);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        ASSERT(!oplogEntry.getPrepare());
+        ASSERT(!oplogEntry.shouldPrepare());
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
         ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
