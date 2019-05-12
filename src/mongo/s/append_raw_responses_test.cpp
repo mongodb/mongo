@@ -28,6 +28,8 @@
  */
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
