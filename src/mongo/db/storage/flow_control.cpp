@@ -51,7 +51,6 @@ namespace mongo {
 
 namespace {
 const auto getFlowControl = ServiceContext::declareDecoration<std::unique_ptr<FlowControl>>();
-const int kMaxTickets = 1000 * 1000 * 1000;
 
 int multiplyWithOverflowCheck(double term1, double term2, int maxValue) {
     if (term1 == 0.0 || term2 == 0.0) {
@@ -123,7 +122,9 @@ FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* 
     : ServerStatusSection("flowControl"),
       _replCoord(replCoord),
       _lastTimeSustainerAdvanced(Date_t::now()) {
-    FlowControlTicketholder::set(service, stdx::make_unique<FlowControlTicketholder>(1000));
+    // Initialize _lastTargetTicketsPermitted to maximum tickets to make sure flow control doesn't
+    // cause a slow start on start up.
+    FlowControlTicketholder::set(service, stdx::make_unique<FlowControlTicketholder>(_kMaxTickets));
 
     service->getPeriodicRunner()->scheduleJob(
         {"FlowControlRefresher",
@@ -262,7 +263,7 @@ int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>&
     if (sustainerAppliedCount == -1) {
         // We don't know how many ops the sustainer applied. Hand out less tickets than were
         // used in the last period.
-        return std::min(static_cast<int>(locksUsedLastPeriod / 2.0), kMaxTickets);
+        return std::min(static_cast<int>(locksUsedLastPeriod / 2.0), _kMaxTickets);
     }
 
     // Given a "sustainer rate", this function wants to calculate what fraction the primary should
@@ -289,7 +290,7 @@ int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>&
                          << " Threshold lag: " << thresholdLagMillis << " Exponent: " << exponent
                          << " Reduce: " << reduce << " Penalty: " << sustainerAppliedPenalty;
 
-    return multiplyWithOverflowCheck(locksPerOp, sustainerAppliedPenalty, kMaxTickets);
+    return multiplyWithOverflowCheck(locksPerOp, sustainerAppliedPenalty, _kMaxTickets);
 }
 
 int FlowControl::getNumTickets() {
@@ -315,7 +316,7 @@ int FlowControl::getNumTickets() {
         locksPerOp < 0.0) {
         _trimSamples(std::min(lastCommitted.opTime.getTimestamp(),
                               getMedianAppliedTimestamp(_prevMemberData)));
-        return kMaxTickets;
+        return _kMaxTickets;
     }
 
     int ret = 0;
@@ -336,7 +337,7 @@ int FlowControl::getNumTickets() {
         ret = multiplyWithOverflowCheck(_lastTargetTicketsPermitted.load() +
                                             gFlowControlTicketAdderConstant.load(),
                                         gFlowControlTicketMultiplierConstant.load(),
-                                        kMaxTickets);
+                                        _kMaxTickets);
         _lastTimeSustainerAdvanced = Date_t::now();
     } else if (sustainerAdvanced(_prevMemberData, _currMemberData)) {
         // Expected case where flow control has meaningful data from the last period to make a new

@@ -83,6 +83,7 @@ public:
                             const BSONElement& configElement) const override;
 
 private:
+    const int _kMaxTickets = 1000 * 1000 * 1000;
     std::int64_t _getLocksUsedLastPeriod();
     double _getLocksPerOp();
 
@@ -101,7 +102,7 @@ private:
 
     // These values are updated with each flow control computation and are also surfaced in server
     // status.
-    AtomicWord<int> _lastTargetTicketsPermitted{0};
+    AtomicWord<int> _lastTargetTicketsPermitted{_kMaxTickets};
     AtomicWord<double> _lastLocksPerOp{0.0};
     AtomicWord<int> _lastSustainerAppliedCount{0};
 
