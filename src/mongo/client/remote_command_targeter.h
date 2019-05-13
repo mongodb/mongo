@@ -81,6 +81,9 @@ public:
     virtual SemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
                                                         Milliseconds maxWait) = 0;
 
+    virtual SemiFuture<std::vector<HostAndPort>> findHostsWithMaxWait(
+        const ReadPreferenceSetting& readPref, Milliseconds maxWait) = 0;
+
     /**
      * Reports to the targeter that a 'status' indicating a not master error was received when
      * communicating with 'host', and so it should update its bookkeeping to avoid giving out the

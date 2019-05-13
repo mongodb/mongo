@@ -142,7 +142,7 @@ public:
     struct Waiter {
         Date_t deadline;
         ReadPreferenceSetting criteria;
-        Promise<HostAndPort> promise;
+        Promise<std::vector<HostAndPort>> promise;
     };
 
     SetState(const MongoURI& uri, ReplicaSetChangeNotifier*, executor::TaskExecutor*);
@@ -154,6 +154,8 @@ public:
      *
      * Note: Uses only local data and does not go over the network.
      */
+    std::vector<HostAndPort> getMatchingHosts(const ReadPreferenceSetting& criteria) const;
+
     HostAndPort getMatchingHost(const ReadPreferenceSetting& criteria) const;
 
     /**

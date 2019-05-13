@@ -66,6 +66,11 @@ SemiFuture<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
     return _rsMonitor->getHostOrRefresh(readPref, maxWait);
 }
 
+SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterRS::findHostsWithMaxWait(
+    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
+    return _rsMonitor->getHostsOrRefresh(readPref, maxWait);
+}
+
 StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCtx,
                                                           const ReadPreferenceSetting& readPref) {
     const auto interruptStatus = opCtx->checkForInterruptNoAssert();

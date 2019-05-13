@@ -58,6 +58,9 @@ public:
     SemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
                                                 Milliseconds maxWait) override;
 
+    SemiFuture<std::vector<HostAndPort>> findHostsWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                              Milliseconds maxWait) override;
+
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                      const ReadPreferenceSetting& readPref) override;
 
@@ -81,6 +84,8 @@ public:
      */
     void setFindHostReturnValue(StatusWith<HostAndPort> returnValue);
 
+    void setFindHostsReturnValue(StatusWith<std::vector<HostAndPort>> returnValue);
+
     /**
      * Returns the current set of hosts marked down and resets the mock's internal list of marked
      * down hosts.
@@ -89,7 +94,7 @@ public:
 
 private:
     ConnectionString _connectionStringReturnValue;
-    StatusWith<HostAndPort> _findHostReturnValue;
+    StatusWith<std::vector<HostAndPort>> _findHostReturnValue;
 
     // Protects _hostsMarkedDown.
     mutable stdx::mutex _mutex;

@@ -58,6 +58,11 @@ public:
         return _mock->findHostWithMaxWait(readPref, maxWait);
     }
 
+    SemiFuture<std::vector<HostAndPort>> findHostsWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                              Milliseconds maxWait) override {
+        return _mock->findHostsWithMaxWait(readPref, maxWait);
+    }
+
     void markHostNotMaster(const HostAndPort& host, const Status& status) override {
         _mock->markHostNotMaster(host, status);
     }

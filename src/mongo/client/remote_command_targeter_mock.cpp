@@ -55,11 +55,24 @@ ConnectionString RemoteCommandTargeterMock::connectionString() {
 
 StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* opCtx,
                                                             const ReadPreferenceSetting& readPref) {
-    return _findHostReturnValue;
+    if (!_findHostReturnValue.isOK()) {
+        return _findHostReturnValue.getStatus();
+    }
+
+    return _findHostReturnValue.getValue()[0];
 }
 
 SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHostWithMaxWait(
     const ReadPreferenceSetting& readPref, Milliseconds maxTime) {
+    if (!_findHostReturnValue.isOK()) {
+        return _findHostReturnValue.getStatus();
+    }
+
+    return _findHostReturnValue.getValue()[0];
+}
+
+SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHostsWithMaxWait(
+    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
 
     return _findHostReturnValue;
 }
@@ -79,6 +92,15 @@ void RemoteCommandTargeterMock::setConnectionStringReturnValue(const ConnectionS
 }
 
 void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {
+    if (!returnValue.isOK()) {
+        _findHostReturnValue = returnValue.getStatus();
+    } else {
+        _findHostReturnValue = std::vector{returnValue.getValue()};
+    }
+}
+
+void RemoteCommandTargeterMock::setFindHostsReturnValue(
+    StatusWith<std::vector<HostAndPort>> returnValue) {
     _findHostReturnValue = std::move(returnValue);
 }
 

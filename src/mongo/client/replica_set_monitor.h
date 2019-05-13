@@ -90,6 +90,9 @@ public:
     SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                              Milliseconds maxWait = kDefaultFindHostTimeout);
 
+    SemiFuture<std::vector<HostAndPort>> getHostsOrRefresh(
+        const ReadPreferenceSetting& readPref, Milliseconds maxWait = kDefaultFindHostTimeout);
+
     /**
      * Returns the host we think is the current master or uasserts.
      *
@@ -258,6 +261,9 @@ public:
     void runScanForMockReplicaSet();
 
 private:
+    Future<std::vector<HostAndPort>> _getHostsOrRefresh(const ReadPreferenceSetting& readPref,
+                                                        Milliseconds maxWait);
+
     /**
      * Schedules a refresh via the task executor. (Task is automatically canceled in the d-tor.)
      */
