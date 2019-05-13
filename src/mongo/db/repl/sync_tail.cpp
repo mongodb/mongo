@@ -326,13 +326,8 @@ Status SyncTail::syncApply(OperationContext* opCtx,
     };
 
     if (opType == OpTypeEnum::kNoop) {
-        if (nss.db() == "") {
-            incrementOpsAppliedStats();
-            return Status::OK();
-        }
-        Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-        OldClientContext ctx(opCtx, nss.ns());
-        return finishApply(applyOp(ctx.db()));
+        incrementOpsAppliedStats();
+        return Status::OK();
     } else if (OplogEntry::isCrudOpType(opType)) {
         return finishApply(writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
             // Need to throw instead of returning a status for it to be properly ignored.
