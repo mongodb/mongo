@@ -113,7 +113,7 @@ load('jstests/libs/write_concern_util.js');
             update: collName,
             updates: [{
                 q: {type: 'oak'},
-                u: [{$addFields: {type: 'ginkgo'}}],
+                u: [{$set: {type: 'ginkgo'}}],
             }],
             writeConcern: {w: 'majority'}
         },
@@ -152,7 +152,7 @@ load('jstests/libs/write_concern_util.js');
         req: {
             findAndModify: collName,
             query: {type: 'oak'},
-            update: [{$addFields: {type: 'ginkgo'}}],
+            update: [{$set: {type: 'ginkgo'}}],
             writeConcern: {w: 'majority'}
         },
         setupFunc: function() {

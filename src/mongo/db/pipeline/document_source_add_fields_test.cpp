@@ -73,6 +73,35 @@ TEST_F(AddFieldsTest, ShouldKeepUnspecifiedFieldsReplaceExistingFieldsAndAddNewF
     ASSERT_TRUE(addFields->getNext().isEOF());
 }
 
+TEST_F(AddFieldsTest, ShouldSerializeAndParse) {
+    auto addFields = DocumentSourceAddFields::create(BSON("a" << BSON("$const"
+                                                                      << "new")),
+                                                     getExpCtx());
+    ASSERT(addFields->getSourceName() == DocumentSourceAddFields::kStageName);
+    vector<Value> serializedArray;
+    addFields->serializeToArray(serializedArray);
+    auto serializedBson = serializedArray[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(serializedBson, fromjson("{$addFields: {a: {$const: 'new'}}}"));
+    addFields = DocumentSourceAddFields::createFromBson(serializedBson.firstElement(), getExpCtx());
+    ASSERT(addFields != nullptr);
+    ASSERT(addFields->getSourceName() == DocumentSourceAddFields::kStageName);
+}
+
+TEST_F(AddFieldsTest, SetAliasShouldSerializeAndParse) {
+    auto setStage = DocumentSourceAddFields::create(BSON("a" << BSON("$const"
+                                                                     << "new")),
+                                                    getExpCtx(),
+                                                    DocumentSourceAddFields::kAliasNameSet);
+    ASSERT(setStage->getSourceName() == DocumentSourceAddFields::kAliasNameSet);
+    vector<Value> serializedArray;
+    setStage->serializeToArray(serializedArray);
+    auto serializedBson = serializedArray[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(serializedBson, fromjson("{$set: {a: {$const: 'new'}}}"));
+    setStage = DocumentSourceAddFields::createFromBson(serializedBson.firstElement(), getExpCtx());
+    ASSERT(setStage != nullptr);
+    ASSERT(setStage->getSourceName() == DocumentSourceAddFields::kAliasNameSet);
+}
+
 TEST_F(AddFieldsTest, ShouldOptimizeInnerExpressions) {
     auto addFields = DocumentSourceAddFields::create(
         BSON("a" << BSON("$and" << BSON_ARRAY(BSON("$const" << true)))), getExpCtx());
