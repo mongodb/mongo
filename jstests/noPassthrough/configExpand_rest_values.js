@@ -31,5 +31,18 @@
                                       "Incorrect derived config value scramSHA256IterationCount");
                         });
 
+    // With digest
+    // SHA256HMAC('12345', 'secret')
+    const hash = 'f88c7ebe4740db59c873cecf5e1f18e3726a1ad64068a13d764b79028430ab0e';
+    configExpandSuccess({
+        setParameter: {
+            scramIterationCount: {
+                __rest: web.getStringReflectionURL('12345'),
+                digest: hash,
+                digest_key: '736563726574'
+            }
+        }
+    });
+
     web.stop();
 })();

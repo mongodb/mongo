@@ -24,6 +24,7 @@ optsEnv.Library(
         '$BUILD_DIR/third_party/shim_yaml',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/util/net/http_client',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/third_party/shim_boost',
