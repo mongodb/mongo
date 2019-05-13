@@ -79,6 +79,20 @@ TaskExecutor::RemoteCommandCallbackArgs::RemoteCommandCallbackArgs(
     const ResponseStatus& theResponse)
     : executor(theExecutor), myHandle(theHandle), request(theRequest), response(theResponse) {}
 
+TaskExecutor::RemoteCommandCallbackArgs::RemoteCommandCallbackArgs(
+    const RemoteCommandOnAnyCallbackArgs& other, size_t idx)
+    : executor(other.executor),
+      myHandle(other.myHandle),
+      request(other.request, idx),
+      response(other.response) {}
+
+TaskExecutor::RemoteCommandOnAnyCallbackArgs::RemoteCommandOnAnyCallbackArgs(
+    TaskExecutor* theExecutor,
+    const CallbackHandle& theHandle,
+    const RemoteCommandRequestOnAny& theRequest,
+    const ResponseOnAnyStatus& theResponse)
+    : executor(theExecutor), myHandle(theHandle), request(theRequest), response(theResponse) {}
+
 TaskExecutor::CallbackState* TaskExecutor::getCallbackFromHandle(const CallbackHandle& cbHandle) {
     return cbHandle.getCallback();
 }
@@ -94,6 +108,16 @@ void TaskExecutor::setEventForHandle(EventHandle* eventHandle, std::shared_ptr<E
 void TaskExecutor::setCallbackForHandle(CallbackHandle* cbHandle,
                                         std::shared_ptr<CallbackState> callback) {
     cbHandle->setCallback(std::move(callback));
+}
+
+
+StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
+    const BatonHandle& baton) {
+    return scheduleRemoteCommandOnAny(request, [cb](const RemoteCommandOnAnyCallbackArgs& args) {
+        cb({args, 0});
+    });
 }
 
 }  // namespace executor

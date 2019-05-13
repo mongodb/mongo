@@ -65,7 +65,7 @@ public:
     void signalWorkAvailable() override;
     Date_t now() override;
     Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                        RemoteCommandRequest& request,
+                        RemoteCommandRequestOnAny& request,
                         RemoteCommandCompletionFn&& onFinish,
                         const BatonHandle& baton) override;
 
@@ -86,21 +86,22 @@ public:
 private:
     struct CommandState {
         CommandState(NetworkInterfaceTL* interface_,
-                     RemoteCommandRequest request_,
+                     RemoteCommandRequestOnAny request_,
                      const TaskExecutor::CallbackHandle& cbHandle_,
-                     Promise<RemoteCommandResponse> promise_);
+                     Promise<RemoteCommandOnAnyResponse> promise_);
         ~CommandState();
 
         // Create a new CommandState in a shared_ptr
         // Prefer this over raw construction
         static auto make(NetworkInterfaceTL* interface,
-                         RemoteCommandRequest request,
+                         RemoteCommandRequestOnAny request,
                          const TaskExecutor::CallbackHandle& cbHandle,
-                         Promise<RemoteCommandResponse> promise);
+                         Promise<RemoteCommandOnAnyResponse> promise);
 
         NetworkInterfaceTL* interface;
 
-        RemoteCommandRequest request;
+        RemoteCommandRequestOnAny requestOnAny;
+        boost::optional<RemoteCommandRequest> request;
         TaskExecutor::CallbackHandle cbHandle;
         Date_t deadline = RemoteCommandRequest::kNoExpirationDate;
         Date_t start;
@@ -109,7 +110,7 @@ private:
         std::unique_ptr<transport::ReactorTimer> timer;
 
         AtomicWord<bool> done;
-        Promise<RemoteCommandResponse> promise;
+        Promise<RemoteCommandOnAnyResponse> promise;
     };
 
     struct AlarmState {

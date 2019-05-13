@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/executor/remote_command_request.h"
 
 namespace mongo {
 
@@ -43,7 +44,6 @@ struct HostAndPort;
 namespace executor {
 
 struct RemoteCommandResponse;
-struct RemoteCommandRequest;
 
 /**
  * An hooking interface for augmenting an implementation of NetworkInterface with domain-specific

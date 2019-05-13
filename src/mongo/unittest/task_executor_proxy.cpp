@@ -99,11 +99,11 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWo
     return _executor->scheduleWorkAt(when, std::move(work));
 }
 
-StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleRemoteCommand(
-    const executor::RemoteCommandRequest& request,
-    const RemoteCommandCallbackFn& cb,
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleRemoteCommandOnAny(
+    const executor::RemoteCommandRequestOnAny& request,
+    const RemoteCommandOnAnyCallbackFn& cb,
     const BatonHandle& baton) {
-    return _executor->scheduleRemoteCommand(request, cb, baton);
+    return _executor->scheduleRemoteCommandOnAny(request, cb, baton);
 }
 
 void TaskExecutorProxy::cancel(const CallbackHandle& cbHandle) {

@@ -168,7 +168,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFai
 
     TaskExecutorMock taskExecutorMock(&getExecutor());
     taskExecutorMock.shouldFailScheduleRemoteCommandRequest =
-        [](const executor::RemoteCommandRequest&) { return true; };
+        [](const executor::RemoteCommandRequestOnAny&) { return true; };
 
     MockOplogFetcher oplogFetcher(
         &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));

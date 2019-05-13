@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -51,37 +52,85 @@ namespace executor {
 /**
  * Type of object describing the response of previously sent RemoteCommandRequest.
  */
-struct RemoteCommandResponse {
-    RemoteCommandResponse() = default;
+struct RemoteCommandResponseBase {
+    RemoteCommandResponseBase() = default;
 
-    RemoteCommandResponse(ErrorCodes::Error code, std::string reason);
+    RemoteCommandResponseBase(ErrorCodes::Error code, std::string reason);
 
-    RemoteCommandResponse(ErrorCodes::Error code, std::string reason, Milliseconds millis);
+    RemoteCommandResponseBase(ErrorCodes::Error code, std::string reason, Milliseconds millis);
 
-    RemoteCommandResponse(Status s);
+    RemoteCommandResponseBase(Status s);
 
-    RemoteCommandResponse(Status s, Milliseconds millis);
+    RemoteCommandResponseBase(Status s, Milliseconds millis);
 
-    RemoteCommandResponse(BSONObj dataObj, Milliseconds millis);
+    RemoteCommandResponseBase(BSONObj dataObj, Milliseconds millis);
 
-    RemoteCommandResponse(Message messageArg, BSONObj dataObj, Milliseconds millis);
-
-    RemoteCommandResponse(const rpc::ReplyInterface& rpcReply, Milliseconds millis);
+    RemoteCommandResponseBase(const rpc::ReplyInterface& rpcReply, Milliseconds millis);
 
     bool isOK() const;
+
+    BSONObj data;  // Always owned. May point into message.
+    boost::optional<Milliseconds> elapsedMillis;
+    Status status = Status::OK();
+
+protected:
+    ~RemoteCommandResponseBase() = default;
+};
+
+struct RemoteCommandOnAnyResponse;
+
+struct RemoteCommandResponse : RemoteCommandResponseBase {
+    using RemoteCommandResponseBase::RemoteCommandResponseBase;
+
+    RemoteCommandResponse(const RemoteCommandOnAnyResponse& other);
 
     std::string toString() const;
 
     bool operator==(const RemoteCommandResponse& rhs) const;
     bool operator!=(const RemoteCommandResponse& rhs) const;
 
-    std::shared_ptr<const Message> message;  // May be null.
-    BSONObj data;                            // Always owned. May point into message.
-    boost::optional<Milliseconds> elapsedMillis;
-    Status status = Status::OK();
+    friend std::ostream& operator<<(std::ostream& os, const RemoteCommandResponse& request);
 };
 
-std::ostream& operator<<(std::ostream& os, const RemoteCommandResponse& request);
+/**
+ * This type is a RemoteCommandResponse + the target that the origin request was actually run on.
+ *
+ * For the moment, it is only returned by scheduleRemoteCommandOnAny, and should be thought of as a
+ * different return type for that rpc api, rather than a higher-information RemoteCommandResponse.
+ */
+struct RemoteCommandOnAnyResponse : RemoteCommandResponseBase {
+    RemoteCommandOnAnyResponse() = default;
+
+    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
+                               ErrorCodes::Error code,
+                               std::string reason);
+
+    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
+                               ErrorCodes::Error code,
+                               std::string reason,
+                               Milliseconds millis);
+
+    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s);
+
+    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s, Milliseconds millis);
+
+    RemoteCommandOnAnyResponse(HostAndPort hp, BSONObj dataObj, Milliseconds millis);
+
+    RemoteCommandOnAnyResponse(HostAndPort hp,
+                               const rpc::ReplyInterface& rpcReply,
+                               Milliseconds millis);
+
+    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, const RemoteCommandResponse& other);
+
+    std::string toString() const;
+
+    bool operator==(const RemoteCommandOnAnyResponse& rhs) const;
+    bool operator!=(const RemoteCommandOnAnyResponse& rhs) const;
+
+    boost::optional<HostAndPort> target;
+
+    friend std::ostream& operator<<(std::ostream& os, const RemoteCommandOnAnyResponse& request);
+};
 
 }  // namespace executor
 }  // namespace mongo

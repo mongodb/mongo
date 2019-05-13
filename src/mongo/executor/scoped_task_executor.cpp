@@ -131,12 +131,13 @@ public:
             std::move(work));
     }
 
-    StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
-                                                     const RemoteCommandCallbackFn& cb,
-                                                     const BatonHandle& baton = nullptr) override {
+    StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
+        const RemoteCommandRequestOnAny& request,
+        const RemoteCommandOnAnyCallbackFn& cb,
+        const BatonHandle& baton = nullptr) override {
         return _wrapCallback(
             [&](auto&& x) {
-                return _executor->scheduleRemoteCommand(request, std::move(x), baton);
+                return _executor->scheduleRemoteCommandOnAny(request, std::move(x), baton);
             },
             cb);
     }
@@ -250,9 +251,9 @@ private:
                     args.status = kShutdownStatus;
                 }
                 else {
-                    static_assert(std::is_same_v<ArgsT, RemoteCommandCallbackArgs>,
+                    static_assert(std::is_same_v<ArgsT, RemoteCommandOnAnyCallbackArgs>,
                                   "_wrapCallback only supports CallbackArgs and "
-                                  "RemoteCommandCallbackArgs");
+                                  "RemoteCommandOnAnyCallbackArgs");
                     args.response.status = kShutdownStatus;
                 }
 
