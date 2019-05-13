@@ -11109,6 +11109,7 @@ buildvariants:
   expansions: &enterprise-rhel-62-64-bit-flow-control-off
     test_flags: >-
       --flowControl=off
+      --excludeWithAnyTags=requires_flow_control
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl

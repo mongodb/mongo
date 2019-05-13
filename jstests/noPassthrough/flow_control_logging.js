@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_replication,
+ *   requires_flow_control,
  *   requires_majority_read_concern,
  * ]
  */
@@ -14,7 +15,6 @@
     const replSet = new ReplSetTest({name: "flow_control_logging", nodes: 3});
     replSet.startSet({
         setParameter: {
-            enableFlowControl: true,
             flowControlSamplePeriod:
                 1,  // Increase resolution to detect lag in a light write workload.
             flowControlWarnThresholdSeconds: 1,
