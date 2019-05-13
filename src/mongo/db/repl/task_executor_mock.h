@@ -42,15 +42,16 @@ class TaskExecutorMock : public unittest::TaskExecutorProxy {
 public:
     using ShouldFailScheduleWorkRequestFn = stdx::function<bool()>;
     using ShouldFailScheduleRemoteCommandRequestFn =
-        stdx::function<bool(const executor::RemoteCommandRequest&)>;
+        stdx::function<bool(const executor::RemoteCommandRequestOnAny&)>;
 
     explicit TaskExecutorMock(executor::TaskExecutor* executor);
 
     StatusWith<CallbackHandle> scheduleWork(CallbackFn&& work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) override;
-    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
-                                                     const RemoteCommandCallbackFn& cb,
-                                                     const BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
+        const executor::RemoteCommandRequestOnAny& request,
+        const RemoteCommandOnAnyCallbackFn& cb,
+        const BatonHandle& baton = nullptr) override;
 
     // Override to make scheduleWork() fail during testing.
     ShouldFailScheduleWorkRequestFn shouldFailScheduleWorkRequest = []() { return false; };
@@ -67,7 +68,7 @@ public:
 
     // Override to make scheduleRemoteCommand fail during testing.
     ShouldFailScheduleRemoteCommandRequestFn shouldFailScheduleRemoteCommandRequest =
-        [](const executor::RemoteCommandRequest&) { return false; };
+        [](const executor::RemoteCommandRequestOnAny&) { return false; };
 };
 
 }  // namespace repl

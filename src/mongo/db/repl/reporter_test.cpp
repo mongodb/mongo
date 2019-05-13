@@ -604,9 +604,9 @@ TEST_F(ReporterTestNoTriggerAtSetUp, FailingToScheduleRemoteCommandTaskShouldMak
     public:
         TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor)
             : unittest::TaskExecutorProxy(executor) {}
-        virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommand(
-            const executor::RemoteCommandRequest& request,
-            const RemoteCommandCallbackFn& cb,
+        virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
+            const executor::RemoteCommandRequestOnAny& request,
+            const RemoteCommandOnAnyCallbackFn& cb,
             const BatonHandle& baton = nullptr) override {
             // Any error status other than ShutdownInProgress will cause the reporter to fassert.
             return Status(ErrorCodes::ShutdownInProgress,

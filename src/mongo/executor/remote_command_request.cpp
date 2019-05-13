@@ -31,11 +31,14 @@
 
 #include "mongo/executor/remote_command_request.h"
 
-#include <ostream>
+#include <fmt/format.h>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/if_constexpr.h"
 #include "mongo/util/str.h"
+
+using namespace fmt::literals;
 
 namespace mongo {
 namespace executor {
@@ -47,43 +50,69 @@ AtomicWord<unsigned long long> requestIdCounter(0);
 
 }  // namespace
 
-constexpr Milliseconds RemoteCommandRequest::kNoTimeout;
-constexpr Date_t RemoteCommandRequest::kNoExpirationDate;
+constexpr Milliseconds RemoteCommandRequestBase::kNoTimeout;
 
-RemoteCommandRequest::RemoteCommandRequest() : id(requestIdCounter.addAndFetch(1)) {}
+constexpr Date_t RemoteCommandRequestBase::kNoExpirationDate;
 
-RemoteCommandRequest::RemoteCommandRequest(RequestId requestId,
-                                           const HostAndPort& theTarget,
-                                           const std::string& theDbName,
-                                           const BSONObj& theCmdObj,
-                                           const BSONObj& metadataObj,
-                                           OperationContext* opCtx,
-                                           Milliseconds timeoutMillis)
+RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
+                                                   const std::string& theDbName,
+                                                   const BSONObj& theCmdObj,
+                                                   const BSONObj& metadataObj,
+                                                   OperationContext* opCtx,
+                                                   Milliseconds timeoutMillis)
     : id(requestId),
-      target(theTarget),
       dbname(theDbName),
       metadata(metadataObj),
       cmdObj(theCmdObj),
       opCtx(opCtx),
       timeout(timeoutMillis) {}
 
-RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& theTarget,
-                                           const std::string& theDbName,
-                                           const BSONObj& theCmdObj,
-                                           const BSONObj& metadataObj,
-                                           OperationContext* opCtx,
-                                           Milliseconds timeoutMillis)
-    : RemoteCommandRequest(requestIdCounter.addAndFetch(1),
-                           theTarget,
-                           theDbName,
-                           theCmdObj,
-                           metadataObj,
-                           opCtx,
-                           timeoutMillis) {}
+RemoteCommandRequestBase::RemoteCommandRequestBase() : id(requestIdCounter.addAndFetch(1)) {}
 
-std::string RemoteCommandRequest::toString() const {
+template <typename T>
+RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl() = default;
+
+template <typename T>
+RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
+                                                      const T& theTarget,
+                                                      const std::string& theDbName,
+                                                      const BSONObj& theCmdObj,
+                                                      const BSONObj& metadataObj,
+                                                      OperationContext* opCtx,
+                                                      Milliseconds timeoutMillis)
+    : RemoteCommandRequestBase(requestId, theDbName, theCmdObj, metadataObj, opCtx, timeoutMillis),
+      target(theTarget) {
+    IF_CONSTEXPR(std::is_same_v<T, std::vector<HostAndPort>>) {
+        invariant(!theTarget.empty());
+    }
+}
+
+template <typename T>
+RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
+                                                      const std::string& theDbName,
+                                                      const BSONObj& theCmdObj,
+                                                      const BSONObj& metadataObj,
+                                                      OperationContext* opCtx,
+                                                      Milliseconds timeoutMillis)
+    : RemoteCommandRequestImpl(requestIdCounter.addAndFetch(1),
+                               theTarget,
+                               theDbName,
+                               theCmdObj,
+                               metadataObj,
+                               opCtx,
+                               timeoutMillis) {}
+
+template <typename T>
+std::string RemoteCommandRequestImpl<T>::toString() const {
     str::stream out;
-    out << "RemoteCommand " << id << " -- target:" << target.toString() << " db:" << dbname;
+    out << "RemoteCommand " << id << " -- target:";
+    IF_CONSTEXPR(std::is_same_v<HostAndPort, T>) {
+        out << target.toString();
+    }
+    else {
+        out << "[{}]"_format(fmt::join(target, ", "));
+    }
+    out << " db:" << dbname;
 
     if (expirationDate != kNoExpirationDate) {
         out << " expDate:" << expirationDate.toString();
@@ -93,7 +122,8 @@ std::string RemoteCommandRequest::toString() const {
     return out;
 }
 
-bool RemoteCommandRequest::operator==(const RemoteCommandRequest& rhs) const {
+template <typename T>
+bool RemoteCommandRequestImpl<T>::operator==(const RemoteCommandRequestImpl& rhs) const {
     if (this == &rhs) {
         return true;
     }
@@ -103,13 +133,13 @@ bool RemoteCommandRequest::operator==(const RemoteCommandRequest& rhs) const {
         timeout == rhs.timeout;
 }
 
-bool RemoteCommandRequest::operator!=(const RemoteCommandRequest& rhs) const {
+template <typename T>
+bool RemoteCommandRequestImpl<T>::operator!=(const RemoteCommandRequestImpl& rhs) const {
     return !(*this == rhs);
 }
 
-std::ostream& operator<<(std::ostream& os, const RemoteCommandRequest& request) {
-    return os << request.toString();
-}
+template struct RemoteCommandRequestImpl<HostAndPort>;
+template struct RemoteCommandRequestImpl<std::vector<HostAndPort>>;
 
 }  // namespace executor
 }  // namespace mongo

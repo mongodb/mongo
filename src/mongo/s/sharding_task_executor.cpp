@@ -110,18 +110,18 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWorkAt(Da
     return _executor->scheduleWorkAt(when, std::move(work));
 }
 
-StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCommand(
-    const RemoteCommandRequest& request,
-    const RemoteCommandCallbackFn& cb,
+StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCommandOnAny(
+    const RemoteCommandRequestOnAny& request,
+    const RemoteCommandOnAnyCallbackFn& cb,
     const BatonHandle& baton) {
 
     // schedule the user's callback if there is not opCtx
     if (!request.opCtx) {
-        return _executor->scheduleRemoteCommand(request, cb, baton);
+        return _executor->scheduleRemoteCommandOnAny(request, cb, baton);
     }
 
-    boost::optional<RemoteCommandRequest> requestWithFixedLsid = [&] {
-        boost::optional<RemoteCommandRequest> newRequest;
+    boost::optional<RemoteCommandRequestOnAny> requestWithFixedLsid = [&] {
+        boost::optional<RemoteCommandRequestOnAny> newRequest;
 
         if (!request.opCtx->getLogicalSessionId()) {
             return newRequest;
@@ -160,38 +160,53 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
     auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());
 
-    auto shardingCb = [ timeTracker, clusterGLE, cb, grid = Grid::get(request.opCtx) ](
-        const TaskExecutor::RemoteCommandCallbackArgs& args) {
+    auto shardingCb =
+        [ timeTracker, clusterGLE, cb, grid = Grid::get(request.opCtx), hosts = request.target ](
+            const TaskExecutor::RemoteCommandOnAnyCallbackArgs& args) {
         ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
-        // Update replica set monitor info.
-        auto shard = grid->shardRegistry()->getShardForHostNoReload(args.request.target);
-        if (!shard) {
-            LOG(1) << "Could not find shard containing host: " << args.request.target.toString();
-        }
-
         if (!args.response.isOK()) {
+            HostAndPort target;
+
+            if (args.response.target) {
+                target = *args.response.target;
+            } else {
+                target = hosts.front();
+            }
+
+            auto shard = grid->shardRegistry()->getShardForHostNoReload(target);
+
+            if (!shard) {
+                LOG(1) << "Could not find shard containing host: " << target;
+            }
+
             if (isMongos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
-                severe()
-                    << "This mongos server must be upgraded. It is attempting to communicate with "
-                       "an upgraded cluster with which it is incompatible. Error: '"
-                    << args.response.status.toString()
-                    << "' Crashing in order to bring attention to the incompatibility, rather "
-                       "than erroring endlessly.";
+                severe() << "This mongos server must be upgraded. It is attempting to communicate "
+                            "with "
+                            "an upgraded cluster with which it is incompatible. Error: '"
+                         << args.response.status.toString()
+                         << "' Crashing in order to bring attention to the incompatibility, rather "
+                            "than erroring endlessly.";
                 fassertNoTrace(50710, false);
             }
 
             if (shard) {
-                shard->updateReplSetMonitor(args.request.target, args.response.status);
+                shard->updateReplSetMonitor(target, args.response.status);
             }
 
             LOG(1) << "Error processing the remote request, not updating operationTime or gLE";
+
             return;
         }
 
+        invariant(args.response.target);
+
+        auto target = *args.response.target;
+
+        auto shard = grid->shardRegistry()->getShardForHostNoReload(target);
+
         if (shard) {
-            shard->updateReplSetMonitor(args.request.target,
-                                        getStatusFromCommandResult(args.response.data));
+            shard->updateReplSetMonitor(target, getStatusFromCommandResult(args.response.data));
         }
 
         // Update the logical clock.
@@ -208,9 +223,9 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             if (swShardingMetadata.isOK()) {
                 auto shardingMetadata = std::move(swShardingMetadata.getValue());
 
-                auto shardConn = ConnectionString::parse(args.request.target.toString());
+                auto shardConn = ConnectionString::parse(target.toString());
                 if (!shardConn.isOK()) {
-                    severe() << "got bad host string in saveGLEStats: " << args.request.target;
+                    severe() << "got bad host string in saveGLEStats: " << target;
                 }
 
                 clusterGLE->addHostOpTime(shardConn.getValue(),
@@ -224,7 +239,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         }
     };
 
-    return _executor->scheduleRemoteCommand(
+    return _executor->scheduleRemoteCommandOnAny(
         requestWithFixedLsid ? *requestWithFixedLsid : request, shardingCb, baton);
 }
 

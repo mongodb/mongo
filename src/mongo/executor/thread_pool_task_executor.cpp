@@ -391,10 +391,10 @@ using ResponseStatus = TaskExecutor::ResponseStatus;
 // which expects a RemoteCommandResponse as part of RemoteCommandCallbackArgs,
 // can be run despite a RemoteCommandResponse never having been created.
 void remoteCommandFinished(const TaskExecutor::CallbackArgs& cbData,
-                           const TaskExecutor::RemoteCommandCallbackFn& cb,
-                           const RemoteCommandRequest& request,
-                           const ResponseStatus& rs) {
-    cb(TaskExecutor::RemoteCommandCallbackArgs(cbData.executor, cbData.myHandle, request, rs));
+                           const TaskExecutor::RemoteCommandOnAnyCallbackFn& cb,
+                           const RemoteCommandRequestOnAny& request,
+                           const TaskExecutor::ResponseOnAnyStatus& rs) {
+    cb({cbData.executor, cbData.myHandle, request, rs});
 }
 
 // If the request failed to receive a connection from the pool,
@@ -402,11 +402,10 @@ void remoteCommandFinished(const TaskExecutor::CallbackArgs& cbData,
 // which expects a RemoteCommandResponse as part of RemoteCommandCallbackArgs,
 // can be run despite a RemoteCommandResponse never having been created.
 void remoteCommandFailedEarly(const TaskExecutor::CallbackArgs& cbData,
-                              const TaskExecutor::RemoteCommandCallbackFn& cb,
-                              const RemoteCommandRequest& request) {
+                              const TaskExecutor::RemoteCommandOnAnyCallbackFn& cb,
+                              const RemoteCommandRequestOnAny& request) {
     invariant(!cbData.status.isOK());
-    cb(TaskExecutor::RemoteCommandCallbackArgs(
-        cbData.executor, cbData.myHandle, request, {cbData.status}));
+    cb({cbData.executor, cbData.myHandle, request, {boost::none, cbData.status}});
 }
 
 // The command names that the initial sync test fixture pauses on during the collection cloning
@@ -416,9 +415,9 @@ const auto initialSyncPauseCmds =
 
 }  // namespace
 
-StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteCommand(
-    const RemoteCommandRequest& request,
-    const RemoteCommandCallbackFn& cb,
+StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteCommandOnAny(
+    const RemoteCommandRequestOnAny& request,
+    const RemoteCommandOnAnyCallbackFn& cb,
     const BatonHandle& baton) {
 
     if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
@@ -441,7 +440,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
         }
     }
 
-    RemoteCommandRequest scheduledRequest = request;
+    RemoteCommandRequestOnAny scheduledRequest = request;
     if (request.timeout == RemoteCommandRequest::kNoTimeout) {
         scheduledRequest.expirationDate = RemoteCommandRequest::kNoExpirationDate;
     } else {
@@ -467,7 +466,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     auto commandStatus = _net->startCommand(
         swCbHandle.getValue(),
         scheduledRequest,
-        [this, scheduledRequest, cbState, cb](const ResponseStatus& response) {
+        [this, scheduledRequest, cbState, cb](const ResponseOnAnyStatus& response) {
             using std::swap;
             CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
                 remoteCommandFinished(cbData, cb, scheduledRequest, response);

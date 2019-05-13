@@ -105,7 +105,7 @@ std::string NetworkInterfaceMock::getHostName() {
 }
 
 Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
-                                          RemoteCommandRequest& request,
+                                          RemoteCommandRequestOnAny& request,
                                           RemoteCommandCompletionFn&& onFinish,
                                           const BatonHandle& baton) {
     if (inShutdown()) {
@@ -117,11 +117,14 @@ Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
     const Date_t now = _now_inlock();
     auto op = NetworkOperation(cbHandle, request, now, std::move(onFinish));
 
+    // network interface mock only works with single target requests
+    invariant(request.target.size() == 1);
+
     // If we don't have a hook, or we have already 'connected' to this host, enqueue the op.
-    if (!_hook || _connections.count(request.target)) {
+    if (!_hook || _connections.count(request.target[0])) {
         _enqueueOperation_inlock(std::move(op));
     } else {
-        _connectThenEnqueueOperation_inlock(request.target, std::move(op));
+        _connectThenEnqueueOperation_inlock(request.target[0], std::move(op));
     }
 
     return Status::OK();
@@ -531,7 +534,8 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
 
     auto cbh = op.getCallbackHandle();
     // The completion handler for the postconnect command schedules the original command.
-    auto postconnectCompletionHandler = [ this, op = std::move(op) ](ResponseStatus rs) mutable {
+    auto postconnectCompletionHandler =
+        [ this, op = std::move(op) ](TaskExecutor::ResponseOnAnyStatus rs) mutable {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!rs.isOK()) {
             op.setResponse(_now_inlock(), rs);
@@ -663,17 +667,21 @@ NetworkInterfaceMock::NetworkOperation::NetworkOperation()
       _response(kUnsetResponse),
       _onFinish() {}
 
-NetworkInterfaceMock::NetworkOperation::NetworkOperation(const CallbackHandle& cbHandle,
-                                                         const RemoteCommandRequest& theRequest,
-                                                         Date_t theRequestDate,
-                                                         RemoteCommandCompletionFn onFinish)
+NetworkInterfaceMock::NetworkOperation::NetworkOperation(
+    const CallbackHandle& cbHandle,
+    const RemoteCommandRequestOnAny& theRequest,
+    Date_t theRequestDate,
+    RemoteCommandCompletionFn onFinish)
     : _requestDate(theRequestDate),
       _nextConsiderationDate(theRequestDate),
       _responseDate(),
       _cbHandle(cbHandle),
-      _request(theRequest),
+      _requestOnAny(theRequest),
+      _request(theRequest, 0),
       _response(kUnsetResponse),
-      _onFinish(std::move(onFinish)) {}
+      _onFinish(std::move(onFinish)) {
+    invariant(theRequest.target.size() == 1);
+}
 
 std::string NetworkInterfaceMock::NetworkOperation::getDiagnosticString() const {
     return str::stream() << "NetworkOperation -- request:'" << _request.toString()
@@ -699,7 +707,7 @@ void NetworkInterfaceMock::NetworkOperation::setResponse(Date_t responseDate,
 
 void NetworkInterfaceMock::NetworkOperation::finishResponse() {
     invariant(_onFinish);
-    _onFinish(_response);
+    _onFinish({_request.target, _response});
     _onFinish = RemoteCommandCompletionFn();
 }
 
