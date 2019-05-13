@@ -132,6 +132,20 @@ __wt_txn_parse_timestamp(WT_SESSION_IMPL *session, const char *name,
 }
 
 /*
+ * __txn_get_read_timestamp --
+ *	Get the read timestamp from the transaction. Additionally
+ *	return bool to specify whether the transaction has set
+ *	clear read queue flag.
+ */
+static bool
+__txn_get_read_timestamp(
+    WT_TXN *txn, wt_timestamp_t *read_timestampp)
+{
+	WT_ORDERED_READ(*read_timestampp, txn->read_timestamp);
+	return (!txn->clear_read_q);
+}
+
+/*
  * __txn_get_pinned_timestamp --
  *	Calculate the current pinned timestamp.
  */
@@ -142,7 +156,7 @@ __txn_get_pinned_timestamp(
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	wt_timestamp_t tmp_ts;
+	wt_timestamp_t tmp_read_ts, tmp_ts;
 	bool include_oldest, txn_has_write_lock;
 
 	conn = S2C(session);
@@ -171,15 +185,18 @@ __txn_get_pinned_timestamp(
 	TAILQ_FOREACH(txn, &txn_global->read_timestamph, read_timestampq) {
 		/*
 		 * Skip any transactions on the queue that are not active.
+		 * Copy out value of read timestamp to prevent possible
+		 * race where a transaction resets its read timestamp while
+		 * we traverse the queue.
 		 */
-		if (txn->clear_read_q)
+		if (!__txn_get_read_timestamp(txn, &tmp_read_ts))
 			continue;
 		/*
 		 * A zero timestamp is possible here only when the oldest
 		 * timestamp is not accounted for.
 		 */
-		if (tmp_ts == 0 || txn->read_timestamp < tmp_ts)
-			tmp_ts = txn->read_timestamp;
+		if (tmp_ts == 0 || tmp_read_ts < tmp_ts)
+			tmp_ts = tmp_read_ts;
 		/*
 		 * We break on the first active txn on the list.
 		 */
@@ -239,6 +256,13 @@ __txn_global_query_timestamp(
 			break;
 		}
 		__wt_readunlock(session, &txn_global->commit_timestamp_rwlock);
+
+		/*
+		 * If a transaction is committing with timestamp 1, we could
+		 * return zero here, which is unexpected.  Fail instead.
+		 */
+		if (ts == 0)
+			return (WT_NOTFOUND);
 	} else if (WT_STRING_MATCH("last_checkpoint", cval.str, cval.len))
 		/* Read-only value forever. No lock needed. */
 		ts = txn_global->last_ckpt_timestamp;
@@ -679,7 +703,7 @@ __wt_txn_parse_prepare_timestamp(
 	WT_CONFIG_ITEM cval;
 	WT_TXN *prev;
 	WT_TXN_GLOBAL *txn_global;
-	wt_timestamp_t oldest_ts;
+	wt_timestamp_t oldest_ts, tmp_timestamp;
 	char hex_timestamp[WT_TS_HEX_SIZE];
 
 	txn_global = &S2C(session)->txn_global;
@@ -706,12 +730,12 @@ __wt_txn_parse_prepare_timestamp(
 			/*
 			 * Skip any transactions that are not active.
 			 */
-			if (prev->clear_read_q) {
+			if (!__txn_get_read_timestamp(prev, &tmp_timestamp)) {
 				prev = TAILQ_PREV(
 				    prev, __wt_txn_rts_qh, read_timestampq);
 				continue;
 			}
-			if (prev->read_timestamp >= *timestamp) {
+			if (tmp_timestamp >= *timestamp) {
 				__wt_readunlock(session,
 				    &txn_global->read_timestamp_rwlock);
 				__wt_timestamp_to_hex_string(
@@ -972,6 +996,7 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session)
 {
 	WT_TXN *qtxn, *txn, *txn_tmp;
 	WT_TXN_GLOBAL *txn_global;
+	wt_timestamp_t tmp_timestamp;
 	uint64_t walked;
 
 	txn = &session->txn;
@@ -1023,11 +1048,14 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session)
 		 */
 		qtxn = TAILQ_LAST(
 		     &txn_global->read_timestamph, __wt_txn_rts_qh);
-		while (qtxn != NULL &&
-		    qtxn->read_timestamp > txn->read_timestamp) {
-			++walked;
-			qtxn = TAILQ_PREV(
-			    qtxn, __wt_txn_rts_qh, read_timestampq);
+		while (qtxn != NULL) {
+			if (!__txn_get_read_timestamp(qtxn, &tmp_timestamp) ||
+			    tmp_timestamp > txn->read_timestamp) {
+				++walked;
+				qtxn = TAILQ_PREV(qtxn,
+				    __wt_txn_rts_qh, read_timestampq);
+			} else
+				break;
 		}
 		if (qtxn == NULL) {
 			TAILQ_INSERT_HEAD(&txn_global->read_timestamph,
@@ -1061,9 +1089,10 @@ __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
-	if (!F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
+	if (!F_ISSET(txn, WT_TXN_PUBLIC_TS_READ)) {
+		txn->read_timestamp = WT_TS_NONE;
 		return;
-
+	}
 #ifdef HAVE_DIAGNOSTIC
 	{
 	WT_TXN_GLOBAL *txn_global;
@@ -1084,6 +1113,7 @@ __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
 	 */
 	WT_PUBLISH(txn->clear_read_q, true);
 	WT_PUBLISH(txn->flags, flags);
+	txn->read_timestamp = WT_TS_NONE;
 }
 
 /*
