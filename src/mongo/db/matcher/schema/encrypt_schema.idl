@@ -87,10 +87,6 @@ structs:
             description: "The encryption algorithm to be used."
             type: FleAlgorithm
             optional: true
-          initializationVector:
-            description: "Provided to be used for unique encryption for different collections."
-            type: bindata_generic
-            optional: true
           keyId:
             description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
             type: encryptSchemaKeyId
@@ -107,10 +103,6 @@ structs:
             description: "The encryption algorithm to be used."
             type: FleAlgorithm
             optional: true
-          initializationVector:
-            description: "Provided to be used for unique encryption for different collections."
-            type: bindata_generic
-            optional: true
           keyId:
             description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
             type: encryptSchemaKeyId
@@ -125,12 +117,6 @@ structs:
             description: "The encryption algorithm to be used."
             type: FleAlgorithmInt
             cpp_name: algorithm
-          iv:
-            description: "Provided to be used for unique encryption for different collections."
-            type: bindata_generic
-            cpp_name: initializationVector
-            # Only present if algorithm is deterministic.
-            optional: true
           ki:
             description: "Used to query the key vault by _id. If omitted, ka must be specified."
             type: uuid

@@ -2069,8 +2069,6 @@ TEST(JSONSchemaParserTest, ParseSucceedsIfEncryptFieldsAreValid) {
                                             << "string"
                                             << "keyId"
                                             << "/pointer"
-                                            << "initializationVector"
-                                            << BSONBinData("four", 4, BinDataType::BinDataGeneral)
                                             << "algorithm"
                                             << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
@@ -2127,7 +2125,6 @@ TEST(JSONSchemaParserTest, FailsToParseWithBadPointer) {
 TEST(JSONSchemaParserTest, TopLevelEncryptMetadataValidatedCorrectly) {
     BSONObj schema = fromjson(
         "{encryptMetadata: {algorithm: \"AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic\","
-        "initializationVector: {$binary: \"four\", $type: \"00\"},"
         " keyId: [{$binary: \"ASNFZ4mrze/ty6mHZUMhAQ==\", $type: \"04\"}]}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
