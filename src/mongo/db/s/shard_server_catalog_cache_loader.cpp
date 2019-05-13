@@ -407,7 +407,7 @@ std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSinc
                     // began but before the OperationContext was added to the group. So we'll check
                     // that we're still in the same _term.
                     stdx::lock_guard<stdx::mutex> lock(_mutex);
-                    uassert(ErrorCodes::Interrupted,
+                    uassert(ErrorCodes::InterruptedDueToStepDown,
                             "Unable to refresh routing table because replica set state changed or "
                             "the node is shutting down.",
                             _term == term);
@@ -457,7 +457,7 @@ void ShardServerCatalogCacheLoader::getDatabase(
             // we're still in the same _term.
             if (_term != currentTerm) {
                 callbackFn(context.opCtx(),
-                           Status{ErrorCodes::Interrupted,
+                           Status{ErrorCodes::InterruptedDueToStepDown,
                                   "Unable to refresh routing table because replica set state "
                                   "changed or node is shutting down."});
                 return;
