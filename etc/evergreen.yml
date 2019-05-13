@@ -2073,7 +2073,7 @@ functions:
         set -o errexit
         set -o verbose
 
-        bash src/mongo/db/modules/enterprise/jstests/watchdog/charybdefs_setup.sh
+        bash jstests/watchdog/charybdefs_setup.sh
 
   "cleanup environment":
     command: shell.exec
@@ -8138,6 +8138,7 @@ buildvariants:
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
+  - name: watchdog_wiredtiger
   - name: package
     distros:
     - ubuntu1604-packer
@@ -8316,6 +8317,7 @@ buildvariants:
   - name: ssl_gen
   - name: sslSpecial_gen
   - name: tool
+  - name: watchdog_wiredtiger
   - name: package
     distros:
     - ubuntu1604-packer
@@ -14078,6 +14080,8 @@ buildvariants:
   - name: tool
   - name: update_fuzzer_gen
   - name: update_fuzzer_replication_gen
+  - name: watchdog_inmemory
+  - name: watchdog_wiredtiger
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough_gen
 

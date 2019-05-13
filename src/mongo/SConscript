@@ -42,6 +42,7 @@ env.SConscript(
         'transport',
         'unittest',
         'util',
+        'watchdog',
     ],
     exports=[
         'env',
@@ -424,6 +425,7 @@ mongod = env.Program(
         'util/options_parser/options_parser_init',
         'util/periodic_runner_factory',
         'util/version_impl',
+        'watchdog/watchdog_mongod',
     ],
     INSTALL_ALIAS=[
         'core',

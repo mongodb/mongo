@@ -127,6 +127,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/encryption_hooks.h"
+#include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -178,8 +179,7 @@
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
-
-#include "mongo/db/storage/flow_control.h"
+#include "mongo/watchdog/watchdog_mongod.h"
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_options.h"
@@ -402,6 +402,8 @@ ExitCode _initAndListen(int listenPort) {
     }
 
     initializeSNMP();
+
+    startWatchdog();
 
     if (!storageGlobalParams.readOnly) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");

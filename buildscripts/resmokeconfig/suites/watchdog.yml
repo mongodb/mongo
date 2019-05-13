@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/watchdog/*.js
+  - jstests/watchdog/*.js
 
 executor:
   config:
