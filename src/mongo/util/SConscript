@@ -692,6 +692,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target='strong_weak_finish_line_test',
+    source=[
+        'strong_weak_finish_line_test.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
     target='errno_util_test',
     source=[
         'errno_util_test.cpp',
