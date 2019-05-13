@@ -1103,6 +1103,13 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         const auto ticks = opCtx->getServiceContext()->getTickSource()->getTicks();
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onPrepare(ServerTransactionsMetrics::get(opCtx), ticks);
+
+        // Ensure the lastWriteOpTime is set. This is needed so that we can correctly assign the
+        // prevOpTime for commit and abort oplog entries if a failover happens after the prepare.
+        // This value is updated in _registerCacheUpdateOnCommit, but only on primaries. We
+        // update the lastWriteOpTime here so that it is also available to secondaries. We can
+        // count on it to persist since we never invalidate prepared transactions.
+        o(lk).lastWriteOpTime = prepareOplogSlot;
     }
 
     if (MONGO_FAIL_POINT(hangAfterSettingPrepareStartTime)) {
@@ -1296,6 +1303,10 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
             // in order to set the finishOpTime.
             invariant(commitOplogEntryOpTime);
         }
+
+        // We must have a lastWriteOpTime set, as that will be used for the prevOpTime on the oplog
+        // entry.
+        invariant(!o().lastWriteOpTime.isNull());
 
         // If commitOplogEntryOpTime is a nullopt, then we grab the OpTime from the commitOplogSlot
         // which will only be set if we are primary. Otherwise, the commitOplogEntryOpTime must have
