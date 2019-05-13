@@ -69,6 +69,7 @@ public:
                                      DiskUseRequirement::kWritesTmpData,
                                      FacetRequirement::kAllowed,
                                      TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
                                      ChangeStreamRequirement::kBlacklist);
 
         // Can't swap with a $match if a limit has been absorbed, as $match can't swap with $limit.

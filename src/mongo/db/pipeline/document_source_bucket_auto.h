@@ -55,7 +55,8 @@ public:
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kWritesTmpData,
                 FacetRequirement::kAllowed,
-                TransactionRequirement::kAllowed};
+                TransactionRequirement::kAllowed,
+                LookupRequirement::kAllowed};
     }
 
     /**

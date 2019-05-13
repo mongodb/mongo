@@ -69,6 +69,7 @@ public:
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
+                LookupRequirement::kNotAllowed,
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
@@ -124,6 +125,7 @@ public:
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
+                LookupRequirement::kNotAllowed,
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 

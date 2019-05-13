@@ -255,7 +255,7 @@ TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
                 .firstElement(),
             expCtx),
         AssertionException,
-        ErrorCodes::IllegalOperation);
+        51047);
 }
 
 TEST_F(ReplDocumentSourceLookUpTest, RejectsSubPipelineWithChangeStreamStage) {
@@ -273,7 +273,7 @@ TEST_F(ReplDocumentSourceLookUpTest, RejectsSubPipelineWithChangeStreamStage) {
                 .firstElement(),
             expCtx),
         AssertionException,
-        ErrorCodes::IllegalOperation);
+        51047);
 }
 
 TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpecified) {

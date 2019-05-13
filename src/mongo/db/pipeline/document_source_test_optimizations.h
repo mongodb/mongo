@@ -52,7 +52,8 @@ public:
                                 HostTypeRequirement::kNone,
                                 DiskUseRequirement::kNoDiskUse,
                                 FacetRequirement::kAllowed,
-                                TransactionRequirement::kNotAllowed};
+                                TransactionRequirement::kNotAllowed,
+                                LookupRequirement::kAllowed};
     }
 
     virtual boost::optional<MergingLogic> mergingLogic() override {

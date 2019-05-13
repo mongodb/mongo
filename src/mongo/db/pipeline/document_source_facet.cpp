@@ -107,6 +107,20 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
     }
     return rawFacetPipelines;
 }
+
+StageConstraints::LookupRequirement computeLookupRequirement(
+    const std::vector<DocumentSourceFacet::FacetPipeline>& facets) {
+    for (auto&& facet : facets) {
+        const auto& sources = facet.pipeline->getSources();
+        for (auto&& src : sources) {
+            if (!src->constraints().isAllowedInLookupPipeline()) {
+                return StageConstraints::LookupRequirement::kNotAllowed;
+            }
+        }
+    }
+    return StageConstraints::LookupRequirement::kAllowed;
+}
+
 }  // namespace
 
 std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
@@ -273,7 +287,8 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
             host,
             std::get<StageConstraints::DiskUseRequirement>(diskAndTxnReq),
             FacetRequirement::kNotAllowed,
-            std::get<StageConstraints::TransactionRequirement>(diskAndTxnReq)};
+            std::get<StageConstraints::TransactionRequirement>(diskAndTxnReq),
+            computeLookupRequirement(_facets)};
 }
 
 bool DocumentSourceFacet::usedDisk() {

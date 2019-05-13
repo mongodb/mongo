@@ -139,6 +139,7 @@ public:
     using FacetRequirement = StageConstraints::FacetRequirement;
     using StreamType = StageConstraints::StreamType;
     using TransactionRequirement = StageConstraints::TransactionRequirement;
+    using LookupRequirement = StageConstraints::LookupRequirement;
 
     /**
      * This is what is returned from the main DocumentSource API: getNext(). It is essentially a

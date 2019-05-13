@@ -54,6 +54,7 @@ public:
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
+                LookupRequirement::kNotAllowed,
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 

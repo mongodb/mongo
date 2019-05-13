@@ -2346,7 +2346,8 @@ public:
                 HostTypeRequirement::kMongoS,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
-                TransactionRequirement::kAllowed};
+                TransactionRequirement::kAllowed,
+                LookupRequirement::kNotAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourceMustRunOnMongoS> create() {
@@ -2530,7 +2531,8 @@ public:
                                      HostTypeRequirement::kNone,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
-                                     TransactionRequirement::kAllowed);
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed);
         constraints.isIndependentOfAnyCollection = true;
         constraints.requiresInputDocSource = false;
         return constraints;
@@ -2625,7 +2627,8 @@ public:
                                 HostTypeRequirement::kNone,
                                 DiskUseRequirement::kNoDiskUse,
                                 FacetRequirement::kAllowed,
-                                TransactionRequirement::kNotAllowed};
+                                TransactionRequirement::kNotAllowed,
+                                LookupRequirement::kAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourceDisallowedInTransactions> create() {
@@ -2697,7 +2700,8 @@ public:
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
-                TransactionRequirement::kAllowed};
+                TransactionRequirement::kAllowed,
+                LookupRequirement::kAllowed};
     }
 };
 

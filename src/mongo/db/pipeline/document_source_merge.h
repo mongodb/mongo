@@ -163,7 +163,8 @@ public:
                     : HostTypeRequirement::kPrimaryShard,
                 DiskUseRequirement::kWritesPersistentData,
                 FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed};
+                TransactionRequirement::kNotAllowed,
+                LookupRequirement::kNotAllowed};
     }
 
     boost::optional<MergingLogic> mergingLogic() final override {

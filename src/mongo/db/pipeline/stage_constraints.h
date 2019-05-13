@@ -101,6 +101,11 @@ struct StageConstraints {
      */
     enum class TransactionRequirement { kNotAllowed, kAllowed };
 
+    /**
+     * Indicates whether or not this stage may be run as part of a $lookup pipeline.
+     */
+    enum class LookupRequirement { kNotAllowed, kAllowed };
+
     using DiskUseAndTransactionRequirement = std::pair<DiskUseRequirement, TransactionRequirement>;
 
     /**
@@ -145,6 +150,7 @@ struct StageConstraints {
         DiskUseRequirement diskRequirement,
         FacetRequirement facetRequirement,
         TransactionRequirement transactionRequirement,
+        LookupRequirement lookupRequirement,
         ChangeStreamRequirement changeStreamRequirement = ChangeStreamRequirement::kBlacklist)
         : requiredPosition(requiredPosition),
           hostRequirement(hostRequirement),
@@ -152,12 +158,19 @@ struct StageConstraints {
           changeStreamRequirement(changeStreamRequirement),
           facetRequirement(facetRequirement),
           transactionRequirement(transactionRequirement),
+          lookupRequirement(lookupRequirement),
           streamType(streamType) {
         // Stages which are allowed to run in $facet must not have any position requirements.
         invariant(!(isAllowedInsideFacetStage() && requiredPosition != PositionRequirement::kNone));
 
-        // No change stream stages are permitted to run in a $facet pipeline.
+        // No change stream stages are permitted to run in a $facet or $lookup pipelines.
         invariant(!(isChangeStreamStage() && isAllowedInsideFacetStage()));
+        invariant(!(isChangeStreamStage() && isAllowedInLookupPipeline()));
+
+        // Stages which write persistent data cannot be used in a $lookup pipeline.
+        invariant(!(isAllowedInLookupPipeline() && writesPersistentData()));
+        invariant(
+            !(isAllowedInLookupPipeline() && hostRequirement == HostTypeRequirement::kMongoS));
 
         // Only streaming stages are permitted in $changeStream pipelines.
         invariant(!(isAllowedInChangeStream() && streamType == StreamType::kBlocking));
@@ -237,6 +250,13 @@ struct StageConstraints {
     }
 
     /**
+     * Returns true if this stage may be used inside a $lookup subpipeline.
+     */
+    bool isAllowedInLookupPipeline() const {
+        return lookupRequirement == LookupRequirement::kAllowed;
+    }
+
+    /**
      * Returns true if this stage writes persistent data to disk.
      */
     bool writesPersistentData() const {
@@ -264,6 +284,9 @@ struct StageConstraints {
     // Indicates whether this stage is legal when the readConcern level is "snapshot" or the
     // aggregate is running inside of a multi-document transaction.
     const TransactionRequirement transactionRequirement;
+
+    // Indicates whether this stage is allowed in a $lookup subpipeline.
+    const LookupRequirement lookupRequirement;
 
     // Indicates whether this is a streaming or blocking stage.
     const StreamType streamType;

@@ -68,7 +68,10 @@ public:
                                      hostRequirement,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kAllowed,
-                                     TransactionRequirement::kAllowed);
+                                     TransactionRequirement::kAllowed,
+                                     hostRequirement == HostTypeRequirement::kMongoS
+                                         ? LookupRequirement::kNotAllowed
+                                         : LookupRequirement::kAllowed);
 
         constraints.canSwapWithMatch = true;
         return constraints;

@@ -223,6 +223,7 @@ env.CppUnitTest(
         'document_source_geo_near_test.cpp',
         'document_source_graph_lookup_test.cpp',
         'document_source_group_test.cpp',
+        'document_source_internal_split_pipeline_test.cpp',
         'document_source_limit_test.cpp',
         'document_source_lookup_change_post_image_test.cpp',
         'document_source_lookup_test.cpp',

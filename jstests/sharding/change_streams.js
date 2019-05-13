@@ -46,8 +46,7 @@
                         [{$changeStream: {}}, {$group: {_id: '$documentKey'}}],
                         ErrorCodes.IllegalOperation);
 
-        // Test that using change streams with any stages not allowed to run on mongos results in an
-        // error.
+        // Test that using change streams with $out results in an error.
         assertErrorCode(
             mongosColl, [{$changeStream: {}}, {$out: "shouldntWork"}], ErrorCodes.IllegalOperation);
 

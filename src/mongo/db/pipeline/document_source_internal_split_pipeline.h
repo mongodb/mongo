@@ -69,7 +69,9 @@ public:
                 _mergeType,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
-                TransactionRequirement::kAllowed};
+                TransactionRequirement::kAllowed,
+                _mergeType == HostTypeRequirement::kMongoS ? LookupRequirement::kNotAllowed
+                                                           : LookupRequirement::kAllowed};
     }
 
     GetNextResult getNext() final;

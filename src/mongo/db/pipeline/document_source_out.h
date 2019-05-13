@@ -145,7 +145,8 @@ public:
                 hostTypeRequirement,
                 DiskUseRequirement::kWritesPersistentData,
                 FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed};
+                TransactionRequirement::kNotAllowed,
+                LookupRequirement::kNotAllowed};
     }
 
     const NamespaceString& getOutputNs() const {

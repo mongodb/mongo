@@ -210,7 +210,8 @@ public:
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
-                TransactionRequirement::kAllowed};
+                TransactionRequirement::kAllowed,
+                LookupRequirement::kNotAllowed};
     }
 
     boost::optional<MergingLogic> mergingLogic() final {

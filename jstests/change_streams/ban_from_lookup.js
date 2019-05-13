@@ -13,9 +13,8 @@
     assert.writeOK(coll.insert({_id: 1}));
 
     // Verify that we cannot create a $lookup using a pipeline which begins with $changeStream.
-    assertErrorCode(coll,
-                    [{$lookup: {from: foreignColl, as: 'as', pipeline: [{$changeStream: {}}]}}],
-                    ErrorCodes.IllegalOperation);
+    assertErrorCode(
+        coll, [{$lookup: {from: foreignColl, as: 'as', pipeline: [{$changeStream: {}}]}}], 51047);
 
     // Verify that we cannot create a $lookup if its pipeline contains a sub-$lookup whose pipeline
     // begins with $changeStream.
@@ -31,5 +30,5 @@
                ]
            }
         }],
-        ErrorCodes.IllegalOperation);
+        51047);
 })();
