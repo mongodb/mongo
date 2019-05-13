@@ -64,6 +64,28 @@ void testAtomicWordBasicOperations() {
     ASSERT_EQUALS(WordType(0), w.load());
 }
 
+template <typename AtomicWordType>
+void testAtomicWordBitOperations() {
+    typedef typename AtomicWordType::WordType WordType;
+    AtomicWordType w;
+
+    WordType highBit = 1ull << ((sizeof(WordType) * 8) - 1);
+
+    w.store(highBit | 0xFFull);
+    ASSERT_EQUALS(WordType(highBit | 0xFFull), w.fetchAndBitAnd(highBit));
+    ASSERT_EQUALS(WordType(highBit), w.fetchAndBitOr(highBit | 0xFFull));
+    ASSERT_EQUALS(WordType(highBit | 0xFFull), w.fetchAndBitXor(0xFFFF));
+    ASSERT_EQUALS(WordType(highBit | 0xFF00ull), w.load());
+}
+
+ASSERT_DOES_NOT_COMPILE(typename T = int, AtomicWord<T>().fetchAndBitAnd(0));
+ASSERT_DOES_NOT_COMPILE(typename T = int, AtomicWord<T>().fetchAndBitOr(0));
+ASSERT_DOES_NOT_COMPILE(typename T = int, AtomicWord<T>().fetchAndBitXor(0));
+
+ASSERT_DOES_NOT_COMPILE(typename T = char, AtomicWord<T>().fetchAndBitAnd(0));
+ASSERT_DOES_NOT_COMPILE(typename T = char, AtomicWord<T>().fetchAndBitOr(0));
+ASSERT_DOES_NOT_COMPILE(typename T = char, AtomicWord<T>().fetchAndBitXor(0));
+
 enum TestEnum { E0, E1, E2, E3 };
 
 TEST(AtomicWordTests, BasicOperationsEnum) {
@@ -79,6 +101,7 @@ TEST(AtomicWordTests, BasicOperationsEnum) {
 TEST(AtomicWordTests, BasicOperationsUnsigned32Bit) {
     typedef unsigned WordType;
     testAtomicWordBasicOperations<AtomicWord<unsigned>>();
+    testAtomicWordBitOperations<AtomicWord<unsigned>>();
 
     AtomicWord<unsigned> w(0xdeadbeef);
     ASSERT_EQUALS(WordType(0xdeadbeef), w.compareAndSwap(0, 1));
@@ -91,6 +114,7 @@ TEST(AtomicWordTests, BasicOperationsUnsigned32Bit) {
 TEST(AtomicWordTests, BasicOperationsUnsigned64Bit) {
     typedef unsigned long long WordType;
     testAtomicWordBasicOperations<AtomicWord<unsigned long long>>();
+    testAtomicWordBitOperations<AtomicWord<unsigned long long>>();
 
     AtomicWord<unsigned long long> w(0xdeadbeefcafe1234ULL);
     ASSERT_EQUALS(WordType(0xdeadbeefcafe1234ULL), w.compareAndSwap(0, 1));

@@ -117,29 +117,11 @@ const BSONObj& FailPoint::getData() const {
 }
 
 void FailPoint::enableFailPoint() {
-    // TODO: Better to replace with a bitwise OR, once available for AU32
-    ValType currentVal = _fpInfo.load();
-    ValType expectedCurrentVal;
-    ValType newVal;
-
-    do {
-        expectedCurrentVal = currentVal;
-        newVal = expectedCurrentVal | ACTIVE_BIT;
-        currentVal = _fpInfo.compareAndSwap(expectedCurrentVal, newVal);
-    } while (expectedCurrentVal != currentVal);
+    _fpInfo.fetchAndBitOr(ACTIVE_BIT);
 }
 
 void FailPoint::disableFailPoint() {
-    // TODO: Better to replace with a bitwise AND, once available for AU32
-    ValType currentVal = _fpInfo.load();
-    ValType expectedCurrentVal;
-    ValType newVal;
-
-    do {
-        expectedCurrentVal = currentVal;
-        newVal = expectedCurrentVal & REF_COUNTER_MASK;
-        currentVal = _fpInfo.compareAndSwap(expectedCurrentVal, newVal);
-    } while (expectedCurrentVal != currentVal);
+    _fpInfo.fetchAndBitAnd(~ACTIVE_BIT);
 }
 
 FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
