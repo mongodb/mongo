@@ -51,7 +51,7 @@ namespace mongo {
 using repl::OplogEntry;
 namespace {
 // If enabled, causes _applyPrepareTransaction to hang before preparing the transaction participant.
-MONGO_FAIL_POINT_DEFINE(applyPrepareCommandHangBeforePreparingTransaction);
+MONGO_FAIL_POINT_DEFINE(applyOpsHangBeforePreparingTransaction);
 
 // Failpoint that will cause reconstructPreparedTransactions to return early.
 MONGO_FAIL_POINT_DEFINE(skipReconstructPreparedTransactions);
@@ -77,7 +77,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
  * Helper that will find the previous oplog entry for that transaction, then for old-style applyOps
  * entries, will transform it to be a normal applyOps command and applies the oplog entry.
  *
- * For new-style transactions, with prepare command entries, will then read the entire set of oplog
+ * For new-style transactions, with multiple oplog entries, will then read the entire set of oplog
  * entries for the transaction and apply each of them.
  *
  * Currently used for oplog application of a commitTransaction oplog entry during recovery, rollback
@@ -91,7 +91,6 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
     invariant(mode == repl::OplogApplication::Mode::kRecovering ||
               mode == repl::OplogApplication::Mode::kInitialSync);
 
-    BSONObj prepareCmd;
     repl::MultiApplier::Operations ops;
     {
         // Traverse the oplog chain with its own snapshot and read timestamp.
@@ -103,18 +102,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         TransactionHistoryIterator iter(prepareOpTime.get());
         invariant(iter.hasNext());
         const auto prepareOplogEntry = iter.next(opCtx);
-
-        if (prepareOplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps) {
-            // Transform prepare command into a normal applyOps command.
-            prepareCmd = prepareOplogEntry.getOperationToApply().removeField("prepare");
-        } else {
-            invariant(prepareOplogEntry.getCommandType() ==
-                      OplogEntry::CommandType::kPrepareTransaction);
-            // The operations here are reconstructed at their prepare time.  However, that time will
-            // be ignored because there is an outer write unit of work during their application.
-            // Both the prepare time and the commit time are set explicitly below.
-            ops = readTransactionOperationsFromOplogChain(opCtx, prepareOplogEntry, {});
-        }
+        ops = readTransactionOperationsFromOplogChain(opCtx, prepareOplogEntry, {});
     }
 
     const auto dbName = entry.getNss().db().toString();
@@ -127,11 +115,8 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
 
         BSONObjBuilder resultWeDontCareAbout;
-        if (prepareCmd.isEmpty()) {
-            status = _applyOperationsForTransaction(opCtx, ops, mode);
-        } else {
-            status = applyOps(opCtx, dbName, prepareCmd, mode, &resultWeDontCareAbout);
-        }
+
+        status = _applyOperationsForTransaction(opCtx, ops, mode);
         if (status.isOK()) {
             opCtx->recoveryUnit()->setPrepareTimestamp(commitTimestamp);
             wunit.prepare();
@@ -295,6 +280,11 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
         invariant(operationEntry.isPartialTransaction());
         _reconstructPartialTxnEntryAtGivenTime(operationEntry, commitOrPrepareObj, &ops);
     }
+
+    // Reconstruct the operations from the commit or prepare oplog entry.
+    if (commitOrPrepare.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+        _reconstructPartialTxnEntryAtGivenTime(commitOrPrepare, commitOrPrepareObj, &ops);
+    }
     return ops;
 }
 
@@ -353,10 +343,10 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    if (MONGO_FAIL_POINT(applyPrepareCommandHangBeforePreparingTransaction)) {
-        LOG(0) << "Hit applyPrepareCommandHangBeforePreparingTransaction failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-            opCtx, applyPrepareCommandHangBeforePreparingTransaction);
+    if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
+        LOG(0) << "Hit applyOpsHangBeforePreparingTransaction failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                        applyOpsHangBeforePreparingTransaction);
     }
 
     transaction.prepareTransaction(opCtx, entry.getOpTime());
@@ -366,20 +356,16 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 }
 
 /**
- * Apply a prepared transaction during recovery.  The OplogEntry must be an 'applyOps' with
- * 'prepare' set or a prepareTransaction command.
+ * Apply a prepared transaction during recovery.
  */
 Status applyRecoveredPrepareTransaction(OperationContext* opCtx,
                                         const OplogEntry& entry,
                                         repl::OplogApplication::Mode mode) {
     // Snapshot transactions never conflict with the PBWM lock.
     invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
-    if (entry.getCommandType() == OplogEntry::CommandType::kPrepareTransaction) {
-        return _applyPrepareTransaction(opCtx, entry, mode);
-    } else {
-        // This is an applyOps with prepare.
-        return applyRecoveredPrepareApplyOpsOplogEntry(opCtx, entry, mode);
-    }
+    // We might replay a prepared transaction behind oldest timestamp.
+    opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
+    return _applyPrepareTransaction(opCtx, entry, mode);
 }
 }  // namespace
 
@@ -470,5 +456,4 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
         }
     }
 }
-
 }  // namespace mongo

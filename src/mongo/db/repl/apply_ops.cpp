@@ -70,9 +70,6 @@ namespace {
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
 MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
 
-// If enabled, causes _applyPrepareTransaction to hang before preparing the transaction participant.
-MONGO_FAIL_POINT_DEFINE(applyOpsHangBeforePreparingTransaction);
-
 /**
  * Return true iff the applyOpsCmd can be executed in a single WriteUnitOfWork.
  */
@@ -282,107 +279,6 @@ Status _applyOps(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status _applyPrepareTransaction(OperationContext* opCtx,
-                                const repl::OplogEntry& entry,
-                                repl::OplogApplication::Mode oplogApplicationMode) {
-    const auto info = ApplyOpsCommandInfo::parse(entry.getObject());
-    invariant(info.getPrepare() && *info.getPrepare());
-    uassert(
-        50946,
-        "applyOps with prepared must only include CRUD operations and cannot have precondition.",
-        !info.getPreCondition() && info.areOpsCrudOnly());
-
-    // Block application of prepare oplog entry on secondaries when a concurrent background index
-    // build is running.
-    // This will prevent hybrid index builds from corrupting an index on secondary nodes if a
-    // prepared transaction becomes prepared during a build but commits after the index build
-    // commits.
-    for (const auto& opObj : info.getOperations()) {
-        auto ns = opObj.getField("ns").checkAndGetStringData();
-        auto uuid = uassertStatusOK(UUID::parse(opObj.getField("ui")));
-        BackgroundOperation::awaitNoBgOpInProgForNs(ns);
-        IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(uuid);
-    }
-
-    // Transaction operations are in its own batch, so we can modify their opCtx.
-    invariant(entry.getSessionId());
-    invariant(entry.getTxnNumber());
-    opCtx->setLogicalSessionId(*entry.getSessionId());
-    opCtx->setTxnNumber(*entry.getTxnNumber());
-    // The write on transaction table may be applied concurrently, so refreshing state
-    // from disk may read that write, causing starting a new transaction on an existing
-    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
-
-    auto transaction = TransactionParticipant::get(opCtx);
-    transaction.unstashTransactionResources(opCtx, "prepareTransaction");
-
-    // Apply the operations via applysOps functionality.
-    int numApplied = 0;
-    BSONObjBuilder resultWeDontCareAbout;
-    auto status = _applyOps(opCtx,
-                            entry.getNss().db().toString(),
-                            entry.getObject(),
-                            info,
-                            oplogApplicationMode,
-                            &resultWeDontCareAbout,
-                            &numApplied,
-                            nullptr);
-    if (!status.isOK()) {
-        return status;
-    }
-    invariant(!entry.getOpTime().isNull());
-
-    if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
-        LOG(0) << "Hit applyOpsHangBeforePreparingTransaction failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                        applyOpsHangBeforePreparingTransaction);
-    }
-
-    transaction.prepareTransaction(opCtx, entry.getOpTime());
-    transaction.stashTransactionResources(opCtx);
-
-    return Status::OK();
-}
-
-/**
- * Make sure that if we are in replication recovery or initial sync, we don't apply the prepare
- * transaction oplog entry until we either see a commit transaction oplog entry or are at the very
- * end of recovery/initial sync. Otherwise, only apply the prepare transaction oplog entry if we are
- * a secondary.
- */
-Status _applyPrepareTransactionOplogEntry(OperationContext* opCtx,
-                                          const repl::OplogEntry& entry,
-                                          repl::OplogApplication::Mode oplogApplicationMode) {
-    // Don't apply the operations from the prepared transaction until either we see a commit
-    // transaction oplog entry during recovery or are at the end of recovery.
-    if (oplogApplicationMode == OplogApplication::Mode::kRecovering) {
-        if (!serverGlobalParams.enableMajorityReadConcern) {
-            error() << "Cannot replay a prepared transaction when 'enableMajorityReadConcern' is "
-                       "set to false. Restart the server with --enableMajorityReadConcern=true "
-                       "to complete recovery.";
-        }
-        fassert(50964, serverGlobalParams.enableMajorityReadConcern);
-        return Status::OK();
-    }
-
-    // Don't apply the operations from the prepared transaction until either we see a commit
-    // transaction oplog entry during the oplog application phase of initial sync or are at the end
-    // of initial sync.
-    if (oplogApplicationMode == OplogApplication::Mode::kInitialSync) {
-        return Status::OK();
-    }
-
-    // Return error if run via applyOps command.
-    uassert(50945,
-            "applyOps with prepared flag is only used internally by secondaries.",
-            oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
-
-    invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
-
-    return _applyPrepareTransaction(opCtx, entry, oplogApplicationMode);
-}
-
 Status _checkPrecondition(OperationContext* opCtx,
                           const std::vector<BSONObj>& preConditions,
                           BSONObjBuilder* result) {
@@ -464,26 +360,13 @@ ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
 Status applyApplyOpsOplogEntry(OperationContext* opCtx,
                                const OplogEntry& entry,
                                repl::OplogApplication::Mode oplogApplicationMode) {
-    // Apply prepare transaction operation if "prepare" is true.
-    // The lock requirement of transaction operations should be the same as that on the primary,
-    // so we don't acquire the locks conservatively for them.
-    if (entry.shouldPrepare()) {
-        return _applyPrepareTransactionOplogEntry(opCtx, entry, oplogApplicationMode);
-    }
+    invariant(!entry.shouldPrepare());
     BSONObjBuilder resultWeDontCareAbout;
     return applyOps(opCtx,
                     entry.getNss().db().toString(),
                     entry.getObject(),
                     oplogApplicationMode,
                     &resultWeDontCareAbout);
-}
-
-Status applyRecoveredPrepareApplyOpsOplogEntry(OperationContext* opCtx,
-                                               const OplogEntry& entry,
-                                               repl::OplogApplication::Mode mode) {
-    // We might replay a prepared transaction behind oldest timestamp.
-    opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
-    return _applyPrepareTransaction(opCtx, entry, mode);
 }
 
 Status applyOps(OperationContext* opCtx,

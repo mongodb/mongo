@@ -1004,7 +1004,7 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
 
 DEATH_TEST_F(ReplicationRecoveryTest,
              RecoveryFailsWithPrepareAndEnableReadConcernMajorityFalse,
-             "Fatal Assertion 50964") {
+             "Fatal Assertion 51146") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 

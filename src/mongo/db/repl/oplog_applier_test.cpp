@@ -130,7 +130,11 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss) {
  */
 OplogEntry makeApplyOpsOplogEntry(int t, bool prepare) {
     auto nss = NamespaceString(NamespaceString::kAdminDb).getCommandNS();
-    BSONObj oField = BSON("applyOps" << BSONArray());
+    BSONObjBuilder oField;
+    oField.append("applyOps", BSONArray());
+    if (prepare) {
+        oField.append("prepare", true);
+    }
     return OplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                       boost::none,                 // hash
                       OpTypeEnum::kCommand,        // op type
@@ -138,7 +142,7 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare) {
                       boost::none,                 // uuid
                       boost::none,                 // fromMigrate
                       OplogEntry::kOplogVersion,   // version
-                      oField,                      // o
+                      oField.obj(),                // o
                       boost::none,                 // o2
                       {},                          // sessionInfo
                       boost::none,                 // upsert

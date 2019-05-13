@@ -280,7 +280,7 @@ bool OplogEntry::isCrudOpType() const {
 }
 
 bool OplogEntry::shouldPrepare() const {
-    return getPrepare() && *getPrepare();
+    return getObject().hasField("prepare") && getObject().getBoolField("prepare");
 }
 
 BSONElement OplogEntry::getIdElement() const {
