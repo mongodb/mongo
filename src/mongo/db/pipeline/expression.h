@@ -244,9 +244,6 @@ public:
     const auto& getChildren() const {
         return _children;
     }
-    auto& getChildren() {
-        return _children;
-    }
 
 protected:
     using ExpressionVector = std::vector<boost::intrusive_ptr<Expression>>;
