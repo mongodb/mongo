@@ -105,7 +105,7 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     return boost::none;
 }
 
-void makeUpdateRequest(const OperationContext* opCtx,
+void makeUpdateRequest(OperationContext* opCtx,
                        const FindAndModifyRequest& args,
                        bool explain,
                        UpdateRequest* requestOut) {
@@ -113,6 +113,8 @@ void makeUpdateRequest(const OperationContext* opCtx,
     requestOut->setProj(args.getFields());
     invariant(args.getUpdate());
     requestOut->setUpdateModification(*args.getUpdate());
+    requestOut->setRuntimeConstants(
+        args.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
     requestOut->setSort(args.getSort());
     requestOut->setCollation(args.getCollation());
     requestOut->setArrayFilters(args.getArrayFilters());
@@ -129,12 +131,14 @@ void makeUpdateRequest(const OperationContext* opCtx,
                                    : PlanExecutor::YIELD_AUTO);
 }
 
-void makeDeleteRequest(const OperationContext* opCtx,
+void makeDeleteRequest(OperationContext* opCtx,
                        const FindAndModifyRequest& args,
                        bool explain,
                        DeleteRequest* requestOut) {
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
+    requestOut->setRuntimeConstants(
+        args.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
     requestOut->setSort(args.getSort());
     requestOut->setCollation(args.getCollation());
     requestOut->setMulti(false);

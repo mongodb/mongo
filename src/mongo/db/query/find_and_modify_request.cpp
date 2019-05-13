@@ -45,6 +45,7 @@ const char kQueryField[] = "query";
 const char kSortField[] = "sort";
 const char kCollationField[] = "collation";
 const char kArrayFiltersField[] = "arrayFilters";
+const char kRuntimeConstantsField[] = "runtimeConstants";
 const char kRemoveField[] = "remove";
 const char kUpdateField[] = "update";
 const char kNewField[] = "new";
@@ -122,6 +123,12 @@ BSONObj FindAndModifyRequest::toBSON(const BSONObj& commandPassthroughFields) co
         arrayBuilder.doneFast();
     }
 
+    if (_runtimeConstants) {
+        BSONObjBuilder rtcBuilder(builder.subobjStart(kRuntimeConstantsField));
+        _runtimeConstants->serialize(&rtcBuilder);
+        rtcBuilder.doneFast();
+    }
+
     if (_shouldReturnNew) {
         builder.append(kNewField, _shouldReturnNew);
     }
@@ -155,6 +162,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     bool bypassDocumentValidation = false;
     bool arrayFiltersSet = false;
     std::vector<BSONObj> arrayFilters;
+    boost::optional<RuntimeConstants> runtimeConstants;
     bool writeConcernOptionsSet = false;
     WriteConcernOptions writeConcernOptions;
 
@@ -203,6 +211,10 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
                     arrayFilters.push_back(arrayFilter.embeddedObject());
                 }
             }
+        } else if (field == kRuntimeConstantsField) {
+            runtimeConstants =
+                RuntimeConstants::parse(IDLParserErrorContext(kRuntimeConstantsField),
+                                        cmdObj.getObjectField(kRuntimeConstantsField));
         } else if (field == kWriteConcernField) {
             BSONElement writeConcernElt;
             Status writeConcernEltStatus = bsonExtractTypedField(
@@ -259,6 +271,9 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     request.setBypassDocumentValidation(bypassDocumentValidation);
     if (arrayFiltersSet) {
         request.setArrayFilters(std::move(arrayFilters));
+    }
+    if (runtimeConstants) {
+        request.setRuntimeConstants(*runtimeConstants);
     }
     if (writeConcernOptionsSet) {
         request.setWriteConcern(std::move(writeConcernOptions));

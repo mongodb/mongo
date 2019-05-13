@@ -219,10 +219,6 @@ public:
         builder << " updateModification: " << _updateMod.toString();
         builder << " stmtId: " << _stmtId;
 
-        if (_runtimeConstants) {
-            builder << "runtimeConstants: " << _runtimeConstants->toBSON().toString();
-        }
-
         builder << " arrayFilters: [";
         bool first = true;
         for (auto arrayFilter : _arrayFilters) {
@@ -233,6 +229,10 @@ public:
             builder << arrayFilter;
         }
         builder << "]";
+
+        if (_runtimeConstants) {
+            builder << " runtimeConstants: " << _runtimeConstants->toBSON().toString();
+        }
 
         builder << " god: " << _god;
         builder << " upsert: " << _upsert;

@@ -181,5 +181,92 @@
         assert.eq(result.ctime5, result.ctime6);
     }
 
+    // Test that we cannot issue a findAndModify to mongoS with runtime constants already present.
+    assert.commandFailedWithCode(db.runCommand({
+        findAndModify: coll.getName(),
+        query: {},
+        update: {$set: {operationFailsBeforeApplyingUpdates: true}},
+        runtimeConstants: {localNow: new Date(), clusterTime: new Timestamp(0, 0)}
+    }),
+                                 51196);
+
+    // Test that $$NOW and $$CLUSTER_TIME can be used in a findAndModify query and update.
+    let returnedDoc = coll.findAndModify({
+        query: {
+            shard: 0,
+            $expr: {
+                $and: [
+                    {$lt: ["$_id", {$min: [_idMidpoint, "$$NOW"]}]},
+                    {$gt: ["$$CLUSTER_TIME", "$insertClusterTime"]}
+                ]
+            }
+        },
+        update: [{$addFields: {nowFAM: "$$NOW", ctimeFAM: "$$CLUSTER_TIME"}}],
+        sort: {_id: 1},
+        new: true
+    });
+    assert(returnedDoc.nowFAM instanceof Date);
+    assert(returnedDoc.ctimeFAM instanceof Timestamp);
+    assert.gt(returnedDoc.nowFAM, returnedDoc.now4);
+    assert.gt(returnedDoc.ctimeFAM, returnedDoc.ctime4);
+
+    results = coll.find({nowFAM: {$exists: true}, ctimeFAM: {$exists: true}}).toArray();
+    assert.eq(results.length, 1);
+    assert.docEq(results[0], returnedDoc);
+
+    // Test that $$NOW and $$CLUSTER_TIME can be used in a findAndModify upsert.
+    returnedDoc = coll.findAndModify({
+        query: {shard: 0, fieldDoesNotExist: {$exists: true}},
+        update:
+            [{$addFields: {_id: "$$NOW", nowFAMUpsert: "$$NOW", ctimeFAMUpsert: "$$CLUSTER_TIME"}}],
+        sort: {_id: 1},
+        upsert: true,
+        new: true
+    });
+    assert(returnedDoc.nowFAMUpsert instanceof Date);
+    assert(returnedDoc.ctimeFAMUpsert instanceof Timestamp);
+
+    assert.eq(coll.find().itcount(), numDocs + 1);
+    results = coll.find({nowFAMUpsert: {$exists: true}, ctimeFAMUpsert: {$exists: true}}).toArray();
+    assert.eq(results.length, 1);
+    assert.docEq(results[0], returnedDoc);
+
+    // Test that $$NOW and $$CLUSTER_TIME can be used in a findAndModify delete.
+    returnedDoc = coll.findAndModify({
+        query: {
+            shard: 0,
+            nowFAMUpsert: {$exists: true},
+            ctimeFAMUpsert: {$exists: true},
+            $expr: {
+                $and: [
+                    {$lt: ["$nowFAMUpsert", "$$NOW"]},
+                    {$gt: ["$$CLUSTER_TIME", "$ctimeFAMUpsert"]}
+                ]
+            }
+        },
+        sort: {_id: 1},
+        remove: true
+    });
+    assert.eq(coll.find({nowFAMUpsert: {$exists: true}}).itcount(), 0);
+    assert.eq(coll.find().itcount(), numDocs);
+    assert.neq(returnedDoc, null);
+
+    // Test that we can explain() a findAndModify command that uses $$NOW and $$CLUSTER_TIME.
+    assert.commandWorked(coll.explain().findAndModify({
+        query: {
+            shard: 0,
+            $expr: {
+                $and: [
+                    {$lt: ["$_id", {$min: [_idMidpoint, "$$NOW"]}]},
+                    {$gt: ["$$CLUSTER_TIME", "$insertClusterTime"]}
+                ]
+            }
+        },
+        update:
+            [{$addFields: {explainDoesNotWrite1: "$$NOW", explainDoesNotWrite2: "$$CLUSTER_TIME"}}],
+        sort: {_id: 1},
+        new: true
+    }));
+
     st.stop();
 }());

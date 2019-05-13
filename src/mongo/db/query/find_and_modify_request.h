@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
@@ -164,6 +165,20 @@ public:
     void setArrayFilters(const std::vector<BSONObj>& arrayFilters);
 
     /**
+     * Sets any constant values which may be required by the query and/or update.
+     */
+    void setRuntimeConstants(const RuntimeConstants& runtimeConstants) {
+        _runtimeConstants = runtimeConstants;
+    }
+
+    /**
+     * Returns the runtime constants associated with this findAndModify request, if present.
+     */
+    const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
+        return _runtimeConstants;
+    }
+
+    /**
      * Sets the write concern for this request.
      */
     void setWriteConcern(WriteConcernOptions writeConcern);
@@ -187,6 +202,7 @@ private:
     boost::optional<BSONObj> _sort;
     boost::optional<BSONObj> _collation;
     boost::optional<std::vector<BSONObj>> _arrayFilters;
+    boost::optional<RuntimeConstants> _runtimeConstants;
     bool _shouldReturnNew{false};
     boost::optional<WriteConcernOptions> _writeConcern;
     bool _bypassDocumentValidation{false};

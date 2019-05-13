@@ -31,6 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/unittest/unittest.h"
 
@@ -223,6 +224,26 @@ TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
     ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON({}));
 }
 
+TEST(FindAndModifyRequest, UpdateWithRuntimeConstants) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setRuntimeConstants({Date_t(), Timestamp(1, 0)});
+
+    BSONObj expectedObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: { x: 1 },
+            update: { y: 1 },
+            runtimeConstants: {
+                localNow: new Date(0),
+                clusterTime: Timestamp(1, 0)
+            }
+        })json"));
+
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON({}));
+}
+
 TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
@@ -232,6 +253,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     const std::vector<BSONObj> arrayFilters{BSON("i" << 0)};
     const BSONObj field(BSON("x" << 1 << "y" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
+    auto rtc = RuntimeConstants{Date_t(), Timestamp(1, 0)};
 
     auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
     request.setFieldProjection(field);
@@ -239,6 +261,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     request.setSort(sort);
     request.setCollation(collation);
     request.setArrayFilters(arrayFilters);
+    request.setRuntimeConstants(rtc);
     request.setWriteConcern(writeConcern);
     request.setBypassDocumentValidation(true);
     request.setUpsert(true);
@@ -252,6 +275,10 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
             sort: { z: -1 },
             collation: { locale: 'en_US' },
             arrayFilters: [ { i: 0 } ],
+            runtimeConstants: {
+                localNow: new Date(0),
+                clusterTime: Timestamp(1, 0)
+            },
             new: true,
             writeConcern: { w: 2, fsync: true, wtimeout: 150 },
             bypassDocumentValidation: true
@@ -349,12 +376,14 @@ TEST(FindAndModifyRequest, RemoveWithFullSpec) {
                                  << "en_US"));
     const BSONObj field(BSON("x" << 1 << "y" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
+    auto rtc = RuntimeConstants{Date_t(), Timestamp(1, 0)};
 
     auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
     request.setFieldProjection(field);
     request.setSort(sort);
     request.setCollation(collation);
     request.setWriteConcern(writeConcern);
+    request.setRuntimeConstants(rtc);
 
     BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
@@ -363,6 +392,10 @@ TEST(FindAndModifyRequest, RemoveWithFullSpec) {
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
             collation: { locale: 'en_US' },
+            runtimeConstants: {
+                localNow: new Date(0),
+                clusterTime: Timestamp(1, 0)
+            },
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 

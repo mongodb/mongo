@@ -58,6 +58,16 @@ namespace mongo {
 namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
+const char kRuntimeConstantsField[] = "runtimeConstants";
+
+BSONObj appendRuntimeConstantsToCommandObject(OperationContext* opCtx, const BSONObj& origCmdObj) {
+    uassert(51196,
+            "Cannot specify runtime constants option to a mongos",
+            !origCmdObj.getField(kRuntimeConstantsField));
+    auto rtcBSON =
+        BSON(kRuntimeConstantsField << Variables::generateRuntimeConstants(opCtx).toBSON());
+    return origCmdObj.addField(rtcBSON.getField(kRuntimeConstantsField));
+}
 
 BSONObj getCollation(const BSONObj& cmdObj) {
     BSONElement collationElement;
@@ -183,7 +193,8 @@ public:
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShardId()));
         }
 
-        const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
+        const auto explainCmd = ClusterExplain::wrapAsExplain(
+            appendRuntimeConstantsToCommandObject(opCtx, cmdObj), verbosity);
 
         // Time how long it takes to run the explain command on the shard.
         Timer timer;
@@ -219,21 +230,24 @@ public:
         // that the parsing be pulled into this function.
         uassertStatusOK(createShardDatabase(opCtx, nss.db()));
 
+        // Append mongoS' runtime constants to the command object before forwarding it to the shard.
+        auto cmdObjForShard = appendRuntimeConstantsToCommandObject(opCtx, cmdObj);
+
         const auto routingInfo = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
         if (!routingInfo.cm()) {
             _runCommand(opCtx,
                         routingInfo.db().primaryId(),
                         ChunkVersion::UNSHARDED(),
                         nss,
-                        cmdObj,
+                        cmdObjForShard,
                         &result);
             return true;
         }
 
         const auto chunkMgr = routingInfo.cm();
 
-        const BSONObj query = cmdObj.getObjectField("query");
-        const BSONObj collation = getCollation(cmdObj);
+        const BSONObj query = cmdObjForShard.getObjectField("query");
+        const BSONObj collation = getCollation(cmdObjForShard);
         const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, query);
         auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
@@ -241,7 +255,7 @@ public:
                     chunk.getShardId(),
                     chunkMgr->getVersion(chunk.getShardId()),
                     nss,
-                    cmdObj,
+                    cmdObjForShard,
                     &result);
 
         return true;
@@ -338,7 +352,6 @@ private:
         result->appendElementsUnique(
             CommandHelpers::filterCommandReplyForPassthrough(response.data));
     }
-
 } findAndModifyCmd;
 
 }  // namespace
