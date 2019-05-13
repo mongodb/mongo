@@ -9,16 +9,6 @@
  *         ~2.8 hours (10000 seconds). Wait 70 seconds and check that 3 more docs deleted.
  */
 
-assertEntryMatches = function(array, regex) {
-    var found = false;
-    for (i = 0; i < array.length; i++) {
-        if (regex.test(array[i])) {
-            found = true;
-        }
-    }
-    assert(found,
-           "The regex: " + regex + " did not match any entries in the array: " + array.join('\n'));
-};
 // Part 1
 var t = db.ttl1;
 t.drop();
@@ -38,17 +28,9 @@ t.insert({x: /foo/});  // non-date value
 
 assert.eq(30, t.count());
 
-t.ensureIndex({z: 1}, {expireAfterSeconds: "20000"});
-
 sleep(70 * 1000);
 
 assert.eq(t.count(), 30);
-
-var loggedWarning = false;
-var log = db.adminCommand({getLog: "global"}).log;
-var msg = RegExp("ttl indexes require the expireAfterSeconds" +
-                 " field to be numeric but received a type of");
-assertEntryMatches(log, msg);
 
 // Part 2
 t.ensureIndex({x: 1}, {expireAfterSeconds: 20000});

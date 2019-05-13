@@ -184,6 +184,67 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
 }
 
 /**
+ * Ensures that the options passed in for TTL indexes are valid.
+ */
+Status validateTTLOptions(OperationContext* opCtx, const BSONObj& cmdObj) {
+    const std::string kExpireAfterSeconds = "expireAfterSeconds";
+
+    const BSONElement& indexes = cmdObj[kIndexesFieldName];
+    for (const auto& index : indexes.Array()) {
+        BSONObj indexObj = index.Obj();
+        if (!indexObj.hasField(kExpireAfterSeconds)) {
+            continue;
+        }
+
+        const BSONElement expireAfterSecondsElt = indexObj[kExpireAfterSeconds];
+        if (!expireAfterSecondsElt.isNumber()) {
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream() << "TTL index '" << kExpireAfterSeconds
+                                  << "' option must be numeric, but received a type of '"
+                                  << typeName(expireAfterSecondsElt.type())
+                                  << "'. Index spec: "
+                                  << indexObj};
+        }
+
+        if (expireAfterSecondsElt.safeNumberLong() < 0) {
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream() << "TTL index '" << kExpireAfterSeconds
+                                  << "' option cannot be less than 0. Index spec: "
+                                  << indexObj};
+        }
+
+        const std::string tooLargeErr = str::stream()
+            << "TTL index '" << kExpireAfterSeconds
+            << "' option must be within an acceptable range, try a lower number. Index spec: "
+            << indexObj;
+
+        // There are two cases where we can encounter an issue here.
+        // The first case is when we try to cast to millseconds from seconds, which could cause an
+        // overflow. The second case is where 'expireAfterSeconds' is larger than the current epoch
+        // time.
+        try {
+            auto expireAfterMillis =
+                duration_cast<Milliseconds>(Seconds(expireAfterSecondsElt.safeNumberLong()));
+            if (expireAfterMillis > Date_t::now().toDurationSinceEpoch()) {
+                return {ErrorCodes::CannotCreateIndex, tooLargeErr};
+            }
+        } catch (const AssertionException&) {
+            return {ErrorCodes::CannotCreateIndex, tooLargeErr};
+        }
+
+        const BSONObj key = indexObj["key"].Obj();
+        if (key.nFields() != 1) {
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream() << "TTL indexes are single-field indexes, compound indexes do "
+                                     "not support TTL. Index spec: "
+                                  << indexObj};
+        }
+    }
+
+    return Status::OK();
+}
+
+/**
  * Retrieves the commit quorum from 'cmdObj' if it is present. If it isn't, we provide a default
  * commit quorum, which consists of all the data-bearing nodes.
  */
@@ -253,6 +314,9 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     auto specs = uassertStatusOK(
         parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
+
+    Status validateTTL = validateTTLOptions(opCtx, cmdObj);
+    uassertStatusOK(validateTTL);
 
     // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
     Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
@@ -484,6 +548,9 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     auto specs = uassertStatusOK(
         parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
     boost::optional<CommitQuorumOptions> commitQuorum = parseAndGetCommitQuorum(opCtx, cmdObj);
+
+    Status validateTTL = validateTTLOptions(opCtx, cmdObj);
+    uassertStatusOK(validateTTL);
 
     // Preliminary checks before handing control over to IndexBuildsCoordinator:
     // 1) We are in a replication mode that allows for index creation.
