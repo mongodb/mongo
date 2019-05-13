@@ -160,8 +160,6 @@ function assertCanUpdatePrimitiveShardKey(
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"x": 505}));
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
@@ -171,9 +169,6 @@ function assertCanUpdatePrimitiveShardKey(
 
         shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
         cleanupOrphanedDocs(st, ns);
-        // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort
-        // txn
-        assert.commandWorked(sessionDB.foo.insert({"x": 505}));
         runFindAndModifyCmdSuccess(
             st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
     } else {
@@ -198,8 +193,6 @@ function assertCanUpdateDottedPath(
         st, kDbName, ns, {"x.a": 1}, docsToInsert, {"x.a": 100}, {"x.a": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"x": {"a": 505}}));
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
@@ -211,9 +204,6 @@ function assertCanUpdateDottedPath(
             st, kDbName, ns, {"x.a": 1}, docsToInsert, {"x.a": 100}, {"x.a": 300});
         cleanupOrphanedDocs(st, ns);
 
-        // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort
-        // txn
-        assert.commandWorked(sessionDB.foo.insert({"x": {"a": 505}}));
         runFindAndModifyCmdSuccess(
             st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
     } else {
@@ -234,8 +224,6 @@ function assertCanUpdatePartialShardKey(
         st, kDbName, ns, {"x": 1, "y": 1}, docsToInsert, {"x": 100, "y": 50}, {"x": 300, "y": 80});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"x": 505, "y": 90}));
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
@@ -252,9 +240,6 @@ function assertCanUpdatePartialShardKey(
                                   {"x": 300, "y": 80});
         cleanupOrphanedDocs(st, ns);
 
-        // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort
-        // txn
-        assert.commandWorked(sessionDB.foo.insert({"x": 505, "y": 90}));
         runFindAndModifyCmdSuccess(
             st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true);
     } else {
@@ -272,8 +257,6 @@ function assertCannotUpdate_id(
         st, kDbName, ns, {"_id": 1}, docsToInsert, {"_id": 100}, {"_id": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"_id": 505}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -295,8 +278,6 @@ function assertCannotUpdate_idDottedPath(
         st, kDbName, ns, {"_id.a": 1}, docsToInsert, {"_id.a": 100}, {"_id.a": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"_id": {"a": 505}}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -314,8 +295,6 @@ function assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
         st, kDbName, ns, {"x": 1, "y": 1}, docsToInsert, {"x": 100, "y": 50}, {"x": 300, "y": 80});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"x": 505, "y": 90}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -331,8 +310,6 @@ function assertCannotUpdateWithMultiTrue(
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"x": 505}));
     runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, true);
 
     sessionDB.foo.drop();
@@ -344,8 +321,6 @@ function assertCannotUpdateSKToArray(
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"x": 505}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -362,8 +337,6 @@ function assertCannotUnsetSKField(
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    assert.commandWorked(sessionDB.foo.insert({"x": 505}));
     if (isFindAndModify) {
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
@@ -383,8 +356,6 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     // Update multiple documents on different shards
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    sessionDB.foo.insert({"x": 505});
     if (inTxn) {
         session.startTransaction();
     }
@@ -416,8 +387,6 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     // the doc will not change shards, so both udpates will be targeted to the same shard.
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    sessionDB.foo.insert({"x": 505});
     if (inTxn) {
         session.startTransaction();
     }
@@ -449,8 +418,6 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     // targeted to the same shard.
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    sessionDB.foo.insert({"x": 505});
     if (inTxn) {
         session.startTransaction();
     }
@@ -492,8 +459,6 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    sessionDB.foo.insert({"x": 505});
     if (inTxn) {
         session.startTransaction();
     }
@@ -544,8 +509,6 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     // Multiple updates - one updates the shard key and the other updates a different field.
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    sessionDB.foo.insert({"x": 505});
     if (inTxn) {
         session.startTransaction();
     }
@@ -590,8 +553,6 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     // Update multiple documents on different shards
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    sessionDB.foo.insert({"x": 505});
     if (inTxn) {
         session.startTransaction();
     }
@@ -626,8 +587,6 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     // Update multiple documents on the same shard
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-    // TODO: Remove once SERVER-37677 is done. Read so don't get ssv causing shard to abort txn
-    sessionDB.foo.insert({"x": 505});
     if (inTxn) {
         session.startTransaction();
     }

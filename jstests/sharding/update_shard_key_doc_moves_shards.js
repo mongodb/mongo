@@ -25,9 +25,6 @@
         let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
         shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
         cleanupOrphanedDocs(st, ns);
-        // TODO: Remove once SERVER-37677 is done. Read so mongos doesn't get ssv causing shard to
-        // abort txn
-        mongos.getDB(kDbName).foo.insert({"x": 505});
 
         // Assert that the document is not updated when the delete fails
         assert.commandWorked(st.rs1.getPrimary().getDB(kDbName).adminCommand({
@@ -220,11 +217,12 @@
     // ----Assert correct error when changing a doc shard key conflicts with an orphan----
 
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
-    // TODO: Remove once SERVER-37677 is done. Read so mongos doesn't get ssv causing shard to abort
-    // txn
     mongos.getDB(kDbName).foo.insert({"x": 505});
 
-    let res = sessionDB.foo.update({"x": 500}, {"$set": {"x": 20}});
+    let _id = mongos.getDB(kDbName).foo.find({"x": 505}).toArray()[0]._id;
+    assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).foo.insert({"x": 2, "_id": _id}));
+
+    let res = sessionDB.foo.update({"x": 505}, {"$set": {"x": 20}});
     assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
     assert(res.getWriteError().errmsg.includes(
         "There is either an orphan for this document or _id for this collection is not globally unique."));
@@ -233,7 +231,7 @@
     sessionDB = session.getDatabase(kDbName);
 
     session.startTransaction();
-    res = sessionDB.foo.update({"x": 500}, {"$set": {"x": 20}});
+    res = sessionDB.foo.update({"x": 505}, {"$set": {"x": 20}});
     assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
     assert(res.errmsg.includes(
         "There is either an orphan for this document or _id for this collection is not globally unique."));
@@ -245,9 +243,6 @@
 
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-    // TODO: Remove once SERVER-37677 is done. Read so mongos doesn't get ssv causing shard to
-    // abort txn
-    mongos.getDB(kDbName).foo.insert({"x": 505});
 
     session = st.s.startSession({retryWrites: true});
     sessionDB = session.getDatabase(kDbName);
@@ -302,10 +297,6 @@
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so mongos doesn't get ssv causing shard to abort
-    // txn
-    mongos.getDB(kDbName).foo.insert({"x": 505});
-
     session.startTransaction();
     let id = mongos.getDB(kDbName).foo.find({"x": 500}).toArray()[0]._id;
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
@@ -327,10 +318,6 @@
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
-    // TODO: Remove once SERVER-37677 is done. Read so mongos doesn't get ssv causing shard to abort
-    // txn
-    mongos.getDB(kDbName).foo.insert({"x": 505});
-
     session.startTransaction();
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
@@ -346,10 +333,6 @@
 
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
-
-    // TODO: Remove once SERVER-37677 is done. Read so mongos doesn't get ssv causing shard to abort
-    // txn
-    mongos.getDB(kDbName).foo.insert({"x": 505});
 
     // Insert and $inc before moving doc
     session.startTransaction();
