@@ -184,6 +184,7 @@ if (typeof _threadInject != "undefined") {
             "set_param1.js",          // changes global state
             "geo_update_btree2.js",   // SERVER-11132 test disables table scans
             "update_setOnInsert.js",  // SERVER-9982
+            "autocomplete.js",        // SERVER-41117
 
             // This overwrites MinKey/MaxKey's singleton which breaks
             // any other test that uses MinKey/MaxKey
