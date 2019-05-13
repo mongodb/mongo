@@ -86,18 +86,24 @@ var ChunkHelper = (function() {
     // or a set of connections to the config servers, and return a connection
     // to any node in the set for which ismaster is true.
     function getPrimary(connArr) {
+        const kDefaultTimeoutMS = 10 * 60 * 1000;  // 10 minutes.
         assertAlways(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
 
-        for (var conn of connArr) {
-            assert(isMongod(conn.getDB('admin')), tojson(conn) + ' is not to a mongod');
-            var res = conn.adminCommand({isMaster: 1});
-            assertAlways.commandWorked(res);
+        let primary = null;
+        assert.soon(() => {
+            for (let conn of connArr) {
+                assert(isMongod(conn.getDB('admin')), tojson(conn) + ' is not to a mongod');
+                let res = conn.adminCommand({isMaster: 1});
+                assertAlways.commandWorked(res);
 
-            if (res.ismaster) {
-                return conn;
+                if (res.ismaster) {
+                    primary = conn;
+                    return primary;
+                }
             }
-        }
-        assertAlways(false, 'No primary found for set: ' + tojson(connArr));
+        }, 'Finding primary timed out', kDefaultTimeoutMS);
+
+        return primary;
     }
 
     // Take a set of mongos connections to a sharded cluster and return a
