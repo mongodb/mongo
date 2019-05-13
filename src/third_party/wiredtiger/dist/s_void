@@ -93,9 +93,6 @@ func_ok()
 	    -e '/int fail_fs_terminate$/d' \
 	    -e '/int handle_message$/d' \
 	    -e '/int handle_progress$/d' \
-	    -e '/int helium_cursor_reserve$/d' \
-	    -e '/int helium_cursor_reset$/d' \
-	    -e '/int helium_session_verify$/d' \
 	    -e '/int index_compare_S$/d' \
 	    -e '/int index_compare_primary$/d' \
 	    -e '/int index_compare_u$/d' \

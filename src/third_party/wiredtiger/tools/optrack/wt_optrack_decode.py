@@ -142,20 +142,38 @@ def validateHeader(file):
     global currentLogVersion;
 
     bytesRead = "";
-    HEADER_SIZE = 12;
+    MIN_HEADER_SIZE = 12;
 
     try:
-        bytesRead = file.read(HEADER_SIZE);
+        bytesRead = file.read(MIN_HEADER_SIZE);
     except:
         return False, -1;
 
-    if (len(bytesRead) < HEADER_SIZE):
+    if (len(bytesRead) < MIN_HEADER_SIZE):
         return False, -1;
 
-    version, threadType, tsc_nsec = struct.unpack('III', bytesRead);
+    version, threadType, tsc_nsec = struct.unpack('=III', bytesRead);
+    print("VERSION IS " + str(version));
 
-    if (version == currentLogVersion):
-        return True, threadType, tsc_nsec;
+    # If the version number is 2, the header contains three fields:
+    # version, thread type, and clock ticks per nanosecond).
+    # If the version number is 3 or greater, the header also contains
+    # field: an 8-byte timestamp in seconds since the Epoch, as
+    # would be returned by a call to time() on Unix.
+    #
+    if (version == 2):
+        return True, threadType, tsc_nsec, 0;
+    elif(version >= 3):
+        ADDITIONAL_HEADER_SIZE = 12;
+        try:
+            bytesRead = file.read(ADDITIONAL_HEADER_SIZE);
+            if (len(bytesRead) < ADDITIONAL_HEADER_SIZE):
+                return False, -1;
+
+            padding, sec_from_epoch = struct.unpack('=IQ', bytesRead);
+            return True, threadType, tsc_nsec, sec_from_epoch;
+        except:
+            return False, -1;
     else:
         return False, -1, 1;
 
@@ -192,7 +210,8 @@ def parseFile(fileName):
         return;
 
     # Read and validate log header
-    validVersion, threadType, tsc_nsec_ratio = validateHeader(file);
+    validVersion, threadType, tsc_nsec_ratio, sec_from_epoch = \
+                                                    validateHeader(file);
     if (not validVersion):
         return;
 
@@ -221,6 +240,9 @@ def parseFile(fileName):
 
     print(color.BOLD + color.PURPLE +
           "Writing to output file " + outputFileName + "." + color.END);
+
+    # The first line of the output file contains the seconds from Epoch
+    outputFile.write(str(sec_from_epoch) + "\n");
 
     while (not done):
         record = parseOneRecord(file);

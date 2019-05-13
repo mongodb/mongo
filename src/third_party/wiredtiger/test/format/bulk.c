@@ -53,7 +53,7 @@ wts_load(void)
 	 * match the collation order.
 	 */
 	is_bulk = true;
-	if (DATASOURCE("kvsbdb") && DATASOURCE("helium"))
+	if (DATASOURCE("kvsbdb"))
 		is_bulk = false;
 	if (g.c_reverse)
 		is_bulk = false;

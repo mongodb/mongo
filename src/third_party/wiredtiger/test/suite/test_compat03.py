@@ -60,7 +60,7 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     compat_release = [
         ('def_rel', dict(rel='none', log_rel=3)),
         ('future_rel', dict(rel=future_rel, log_rel=future_logv)),
-        ('31_rel', dict(rel="3.1", log_rel=3)),
+        ('32_rel', dict(rel="3.2", log_rel=3)),
         ('30_rel', dict(rel="3.0", log_rel=2)),
         ('26_rel', dict(rel="2.6", log_rel=1)),
         ('26_patch_rel', dict(rel="2.6.1", log_rel=1)),
@@ -68,7 +68,7 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     compat_max = [
         ('def_max', dict(max_req='none', log_max=3)),
         ('future_max', dict(max_req=future_rel, log_max=future_logv)),
-        ('31_max', dict(max_req="3.1", log_max=3)),
+        ('32_max', dict(max_req="3.2", log_max=3)),
         ('30_max', dict(max_req="3.0", log_max=2)),
         ('26_max', dict(max_req="2.6", log_max=1)),
         ('26_patch_max', dict(max_req="2.6.1", log_max=1)),
@@ -76,7 +76,7 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     compat_min = [
         ('def_min', dict(min_req='none', log_min=3)),
         ('future_min', dict(min_req=future_rel, log_min=future_logv)),
-        ('31_min', dict(min_req="3.1", log_min=3)),
+        ('32_min', dict(min_req="3.2", log_min=3)),
         ('30_min', dict(min_req="3.0", log_min=2)),
         ('26_min', dict(min_req="2.6", log_min=1)),
         ('26_patch_min', dict(min_req="2.6.1", log_min=1)),

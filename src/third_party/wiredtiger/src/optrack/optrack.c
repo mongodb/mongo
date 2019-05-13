@@ -57,11 +57,12 @@ err:		WT_PANIC_MSG(session, ret,
 static int
 __optrack_open_file(WT_SESSION_IMPL *session)
 {
+	struct timespec ts;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_OPTRACK_HEADER optrack_header = { WT_OPTRACK_VERSION, 0,
-	    (uint32_t)WT_TSC_DEFAULT_RATIO * WT_THOUSAND };
+			     (uint32_t)WT_TSC_DEFAULT_RATIO * WT_THOUSAND, 0,0};
 
 	conn = S2C(session);
 
@@ -85,6 +86,10 @@ __optrack_open_file(WT_SESSION_IMPL *session)
 	 */
 	optrack_header.optrack_tsc_nsec_ratio =
 		(uint32_t)(__wt_process.tsc_nsec_ratio * WT_THOUSAND);
+
+	/* Record the time in seconds since the Epoch. */
+	__wt_epoch(session, &ts);
+	optrack_header.optrack_seconds_epoch = (uint64_t)ts.tv_sec;
 
 	/* Write the header into the operation-tracking file. */
 	WT_ERR(session->optrack_fh->handle->fh_write(

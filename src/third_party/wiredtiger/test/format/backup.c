@@ -105,7 +105,7 @@ backup(void *arg)
 	conn = g.wts_conn;
 
 	/* Backups aren't supported for non-standard data sources. */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb"))
 		return (WT_THREAD_RET_VALUE);
 
 	/* Open a session. */

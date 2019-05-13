@@ -1,6 +1,23 @@
 Ticket reference tags refer to tickets in the MongoDB JIRA tracking system:
 https://jira.mongodb.org
 
+WiredTiger release 3.2.0, 2019-05-09
+------------------------------------
+
+See the upgrading documentation for details of API and behavior changes.
+
+Significant changes:
+* WT-3968	Use compression ratio to tune page sizes
+* WT-4156	Add a new salvage API option to wiredtiger_open
+* WT-4192	Remove support for raw compression in WiredTiger
+* WT-4426	Change WiredTiger data format to optionally include timestamps in cells
+* WT-4447	Add a quota like system to manage I/O per subsystem
+* WT-4670	Remove support for LevelDB APIs in WiredTiger
+* WT-4765	Remove support for Helium/Levyx data sources in WiredTiger
+
+See JIRA changelog for a full listing:
+https://jira.mongodb.org/projects/WT/versions/21117
+
 WiredTiger release 3.1.0, 2018-07-12
 ------------------------------------
 

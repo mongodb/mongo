@@ -145,7 +145,7 @@ wts_salvage(void)
 	WT_DECL_RET;
 
 	/* Some data-sources don't support salvage. */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb"))
 		return;
 
 	if (g.c_salvage == 0)

@@ -215,6 +215,7 @@ extern bool __wt_las_page_skip(WT_SESSION_IMPL *session, WT_REF *ref) WT_GCC_FUN
 extern int __wt_las_insert_block(WT_CURSOR *cursor, WT_BTREE *btree, WT_PAGE *page, WT_MULTI *multi, WT_ITEM *key) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_las_cursor_position(WT_CURSOR *cursor, uint64_t pageid) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_las_remove_block(WT_SESSION_IMPL *session, uint64_t pageid) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_las_remove_dropped(WT_SESSION_IMPL *session);
 extern int __wt_las_save_dropped(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_las_sweep(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern uint32_t __wt_checksum_sw(const void *chunk, size_t len);

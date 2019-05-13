@@ -249,16 +249,6 @@ AC_MSG_RESULT($with_berkeleydb)
 AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $with_berkeleydb])
 AC_SUBST(BERKELEY_DB_PATH, [$with_berkeleydb])
 
-# test/format optionally supports the Levyx/Helium key/value store.
-AC_MSG_CHECKING([if --with-helium=DIR option specified])
-AC_ARG_WITH(helium,
-    [AS_HELP_STRING([--with-helium=DIR],
-	[Specify installed library directory of Helium])],
-    [with_helium="$withval"], [with_helium="NO_HELIUM_LIBRARY"])
-AC_MSG_RESULT($with_helium)
-AM_CONDITIONAL([HAVE_HELIUM], [test -d $with_helium])
-AC_SUBST(HELIUM_PATH, [$with_helium])
-
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then
 	AC_MSG_WARN(

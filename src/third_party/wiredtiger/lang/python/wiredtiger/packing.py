@@ -49,50 +49,15 @@ Format  Python  Notes
   u     str     raw byte array
 """
 
-import sys
-
-# In the Python3 world, we pack into the bytes type, which like a list of ints.
-# In Python2, we pack into a string.  Create a set of constants and methods
-# to hide the differences from the main code.
-if sys.version_info[0] >= 3:
-    x00 = b'\x00'
-    xff = b'\xff'
-    empty_pack = b''
-    def _ord(b):
-        return b
-
-    def _chr(x, y=None):
-        a = [x]
-        if y != None:
-            a.append(y)
-        return bytes(a)
-
-    def _is_string(s):
-        return type(s) is str
-
-    def _string_result(s):
-        return s.decode()
-
-else:
-    x00 = '\x00'
-    xff = '\xff'
-    empty_pack = ''
-    def _ord(b):
-        return ord(b)
-
-    def _chr(x, y=None):
-        s = chr(x)
-        if y != None:
-            s += chr(y)
-        return s
-
-    def _is_string(s):
-        return type(s) is unicode
-
-    def _string_result(s):
-        return s
-
-from wiredtiger.intpacking import pack_int, unpack_int
+try:
+    from wiredtiger.packutil import _chr, _is_string, _ord, _string_result, \
+        empty_pack, x00
+    from wiredtiger.intpacking import pack_int, unpack_int
+except ImportError:
+    # When WiredTiger is installed as a package, python2 needs this
+    from .packutil import _chr, _is_string, _ord, _string_result, \
+        empty_pack, x00
+    from intpacking import pack_int, unpack_int
 
 def __get_type(fmt):
     if not fmt:

@@ -22,6 +22,12 @@ related Basho Technologies Riak, HyperLevelDB HyperDex and Facebook
 RocksDB compatibility layers), has been removed in the 3.2.0 release.
 </dd>
 
+<dt>Helium Data Store volume support</dt>
+<dd>
+Support for the Levyx Inc., Helium Data Store volumes as a data-source has
+been removed in the 3.2.0 release.
+</dd>
+
 <dt>WiredTiger timestamps</dt>
 <dd>
 In previous releases of WiredTiger, it was possible to disable timestamp

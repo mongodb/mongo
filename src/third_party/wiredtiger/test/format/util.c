@@ -535,8 +535,7 @@ checkpoint(void *arg)
 		 */
 		ckpt_config = NULL;
 		backup_locked = false;
-		if (!DATASOURCE("helium") && !DATASOURCE("kvsbdb") &&
-		    !DATASOURCE("lsm"))
+		if (!DATASOURCE("kvsbdb") && !DATASOURCE("lsm"))
 			switch (mmrand(NULL, 1, 20)) {
 			case 1:
 				/*

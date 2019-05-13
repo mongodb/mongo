@@ -97,6 +97,9 @@ perFuncDF = {};
 perFileDataFrame = {};
 perFileLargestStackDepth = {};
 
+# Each file has a timestamp indicating when the logging began
+perFileTimeStamps = {};
+
 plotWidth = 1200;
 pixelsForTitle = 30;
 pixelsPerHeightUnit = 30;
@@ -899,17 +902,40 @@ def dumpCleanData(fname, df):
     newDF.to_csv(newfname, sep=' ', index=False, header=False,
                  columns = ['enterExit', 'function', 'timestamp']);
 
+def checkForTimestampAndGetRowSkip(fname):
+
+    global perFileTimeStamps;
+
+    with open(fname) as f:
+        firstLine = f.readline();
+
+        firstLine = firstLine.strip();
+        words = firstLine.split(" ");
+
+        if (len(words) == 1):
+            try:
+                perFileTimeStamps[fname] = long(words[0]);
+            except ValueError:
+                print(color.BOLD + color.RED +
+                      "Could not parse seconds since Epoch on first line" +
+                      + color.END);
+            return 1;
+        else:
+            return 0;
+
 def processFile(fname, dumpCleanDataBool):
 
     global perFileDataFrame;
     global perFuncDF;
 
+    skipRows = checkForTimestampAndGetRowSkip(fname);
+
     rawData = pd.read_csv(fname,
-                       header=None, delimiter=" ",
-                       index_col=2,
-                       names=["Event", "Function", "Timestamp"],
-                       dtype={"Event": np.int32, "Timestamp": np.int64},
-                       thousands=",");
+                          header=None, delimiter=" ",
+                          index_col=2,
+                          names=["Event", "Function", "Timestamp"],
+                          dtype={"Event": np.int32, "Timestamp": np.int64},
+                          thousands=",", skiprows = skipRows);
 
     print(color.BOLD + color.BLUE +
           "Processing file " + str(fname) + color.END);

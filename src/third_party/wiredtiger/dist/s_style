@@ -88,7 +88,6 @@ else
 	fi
 
 	if ! expr "$f" : 'examples/c/.*' > /dev/null &&
-	   ! expr "$f" : 'ext/datasources/helium/helium.c' > /dev/null &&
 	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
 	    egrep "%[0-9]*zu" $f | grep -v 'SIZET_FMT' > $t; then
 		echo "$f: %zu needs to be fixed for Windows"

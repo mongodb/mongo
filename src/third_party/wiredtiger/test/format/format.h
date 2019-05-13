@@ -61,8 +61,6 @@
 
 #define	KVS_BDB_PATH							\
 	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
-#define	HELIUM_PATH							\
-	EXTPATH "datasources/helium/.libs/libwiredtiger_helium.so"
 
 #undef	M
 #define	M(v)		((v) * WT_MILLION)	/* Million */
@@ -91,8 +89,6 @@ typedef struct {
 	char *home_rand;			/* RNG log file path */
 	char *home_salvage_copy;		/* Salvage copy command */
 	char *home_stats;			/* Statistics file path */
-
-	char *helium_mount;			/* Helium volume */
 
 	char wiredtiger_open_config[8 * 1024];	/* Database open config */
 

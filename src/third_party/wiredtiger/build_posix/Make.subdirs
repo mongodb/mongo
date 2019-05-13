@@ -13,7 +13,6 @@ ext/compressors/nop
 ext/compressors/snappy SNAPPY
 ext/compressors/zlib ZLIB
 ext/compressors/zstd ZSTD
-ext/datasources/helium HAVE_HELIUM
 ext/encryptors/nop
 ext/encryptors/rotn
 ext/extractors/csv

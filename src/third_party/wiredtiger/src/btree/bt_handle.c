@@ -143,6 +143,12 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	/* Initialize and configure the WT_BTREE structure. */
 	WT_ERR(__btree_conf(session, &ckpt));
 
+	/*
+	 * We could be a re-open of a table that was put in the lookaside
+	 * dropped list. Remove our id from that list.
+	 */
+	__wt_las_remove_dropped(session);
+
 	/* Connect to the underlying block manager. */
 	filename = dhandle->name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))

@@ -98,7 +98,7 @@ def check_needed_dependencies(builtins, inc_paths, lib_paths):
 #   Locate an executable in the PATH.
 def find_executable(exename, path):
     p = subprocess.Popen(['which', exename ], stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
+                         stderr=subprocess.PIPE, universal_newlines=True)
     out, err = p.communicate('')
     out = str(out)  # needed for Python3
     if out == '':
@@ -146,7 +146,8 @@ def get_sources_curdir():
     DEVNULL = open(os.devnull, 'w')
     gitproc = subprocess.Popen(
         ['git', 'ls-tree', '-r', '--name-only', 'HEAD^{tree}'],
-        stdin=DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdin=DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        universal_newlines=True)
     sources = [line.rstrip() for line in gitproc.stdout.readlines()]
     err = gitproc.stderr.read()
     gitproc.wait()
@@ -176,6 +177,7 @@ def get_library_dirs():
     dirs.append("/usr/local/lib")
     dirs.append("/usr/local/lib64")
     dirs.append("/lib/x86_64-linux-gnu")
+    dirs.append("/usr/lib/x86_64-linux-gnu")
     dirs.append("/opt/local/lib")
     dirs.append("/usr/lib")
     dirs.append("/usr/lib64")
@@ -230,10 +232,6 @@ elif os.path.isfile(os.path.join(this_dir, 'LICENSE')):
     wt_dir = this_dir
 else:
     die('running from an unknown directory')
-
-python3 = (sys.version_info[0] > 2)
-if python3:
-    die('Python3 is not yet supported')
 
 # Ensure that Extensions won't be built for 32 bit,
 # that won't work with WiredTiger.

@@ -94,7 +94,7 @@ main(int argc, char *argv[])
 	home = NULL;
 	onerun = 0;
 	while ((ch = __wt_getopt(
-	    progname, argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
+	    progname, argc, argv, "1C:c:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			onerun = 1;
@@ -104,9 +104,6 @@ main(int argc, char *argv[])
 			break;
 		case 'c':			/* Configuration from a file */
 			config = __wt_optarg;
-			break;
-		case 'H':
-			g.helium_mount = __wt_optarg;
 			break;
 		case 'h':
 			home = __wt_optarg;
@@ -364,14 +361,12 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s [-1Llqr] [-C wiredtiger-config]\n    "
-	    "[-c config-file] [-H mount] [-h home] "
-	    "[name=value ...]\n",
+	    "[-c config-file] [-h home] [name=value ...]\n",
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
 	    "\t-c read test program configuration from a file\n"
-	    "\t-H mount Helium volume mount point\n"
 	    "\t-h home (default 'RUNDIR')\n"
 	    "\t-L output to a log file\n"
 	    "\t-l log operations (implies -L)\n"

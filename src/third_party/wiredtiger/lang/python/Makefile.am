@@ -2,7 +2,7 @@ PYSRC = $(top_srcdir)/lang/python
 PYDIRS = -t $(abs_builddir) -I $(abs_top_srcdir):$(abs_top_builddir) -L $(abs_top_builddir)/.libs
 PYDST = $(abs_builddir)/wiredtiger
 PYFILES = $(PYDST)/fpacking.py $(PYDST)/intpacking.py $(PYDST)/packing.py \
-	$(PYDST)/__init__.py
+	$(PYDST)/packutil.py $(PYDST)/__init__.py
 PY_MAJOR_VERSION := $$($(PYTHON) -c \
 	'import sys; print(int(sys.version_info.major))')
 

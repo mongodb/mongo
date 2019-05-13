@@ -147,9 +147,8 @@ void
 wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
-	WT_DECL_RET;
 	size_t max;
-	char *config, *p, helium_config[1024];
+	char *config, *p;
 
 	*connp = NULL;
 
@@ -300,28 +299,6 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 	if (set_api)
 		g.wt_api = conn->get_extension_api(conn);
 
-	/*
-	 * Load the Helium shared library: it would be possible to do this as
-	 * part of the extensions configured for wiredtiger_open, there's no
-	 * difference, I am doing it here because it's easier to work with the
-	 * configuration strings.
-	 */
-	if (DATASOURCE("helium")) {
-		if (g.helium_mount == NULL)
-			testutil_die(EINVAL, "no Helium mount point specified");
-		testutil_check(
-		    __wt_snprintf(helium_config, sizeof(helium_config),
-		    "entry=wiredtiger_extension_init,config=["
-		    "helium_verbose=0,"
-		    "dev1=[helium_devices=\"he://./%s\","
-		    "helium_o_volume_truncate=1]]",
-		    g.helium_mount));
-		if ((ret = conn->load_extension(
-		    conn, HELIUM_PATH, helium_config)) != 0)
-			testutil_die(ret,
-			    "WT_CONNECTION.load_extension: %s:%s",
-			    HELIUM_PATH, helium_config);
-	}
 	*connp = conn;
 }
 
@@ -437,11 +414,6 @@ wts_init(void)
 	CONFIG_APPEND(p, ",split_pct=%" PRIu32, g.c_split_pct);
 
 	/* Configure LSM and data-sources. */
-	if (DATASOURCE("helium"))
-		CONFIG_APPEND(p,
-		    ",type=helium,helium_o_compress=%d,helium_o_truncate=1",
-		    g.c_compression_flag == COMPRESS_NONE ? 0 : 1);
-
 	if (DATASOURCE("kvsbdb"))
 		CONFIG_APPEND(p, ",type=kvsbdb");
 
@@ -507,7 +479,7 @@ wts_dump(const char *tag, int dump_bdb)
 	 */
 	if (g.c_in_memory != 0)
 		return;
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb"))
 		return;
 
 	track("dump files and compare", 0ULL, NULL);
@@ -586,7 +558,7 @@ wts_stats(void)
 		return;
 
 	/* Some data-sources don't support statistics. */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;

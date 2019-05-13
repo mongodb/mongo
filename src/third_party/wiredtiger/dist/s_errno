@@ -37,9 +37,6 @@ error_ok()
 
 # Loop through source files.
 for f in `find ext src -name '*.[ci]'`; do
-	if expr "$f" : 'ext/datasources/helium/helium.c' > /dev/null; then
-		continue
-	fi
 	if expr "$f" : 'src/os_win/os_winerr.c' > /dev/null; then
 		continue
 	fi

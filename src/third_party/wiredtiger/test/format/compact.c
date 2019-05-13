@@ -43,7 +43,7 @@ compact(void *arg)
 	(void)(arg);
 
 	/* Compaction isn't supported for all data sources. */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb"))
 		return (WT_THREAD_RET_VALUE);
 
 	/* Open a session. */

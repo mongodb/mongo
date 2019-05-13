@@ -81,7 +81,7 @@ def decode_arg(arg, allocsize):
     print(arg + ': ')
     if version != 1:
         print('**** ERROR: unknown version ' + str(version))
-    addr = addr[1:]
+    addr = bytes(addr[1:])
     result = unpack('iiiiiiiiiiiiii',addr)
     if len(result) != 14:
         print('**** ERROR: result len unexpected: ' + str(len(result)))

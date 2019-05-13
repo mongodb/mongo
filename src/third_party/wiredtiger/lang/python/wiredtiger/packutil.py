@@ -26,27 +26,50 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# WiredTiger packing and unpacking utility functions and constants
 
-# pip_init.py
-#      This is installed as __init__.py, and imports the file created by SWIG.
-# This is needed because SWIG's import helper code created by certain SWIG
-# versions may be broken, see: https://github.com/swig/swig/issues/769 .
-# Importing indirectly seems to avoid these issues.
-import os, sys
-fname = os.path.basename(__file__)
-if fname != '__init__.py' and fname != '__init__.pyc':
-    print(__file__ + ': this file is not yet installed')
-    sys.exit(1)
+import sys
 
-# After importing the SWIG-generated file, copy all symbols from from it
-# to this module so they will appear in the wiredtiger namespace.
-me = sys.modules[__name__]
-sys.path.append(os.path.dirname(__file__))
-try:
-    import wiredtiger.wiredtiger as swig_wiredtiger
-except ImportError:
-    # for Python2
-    import wiredtiger as swig_wiredtiger
-for name in dir(swig_wiredtiger):
-    value = getattr(swig_wiredtiger, name)
-    setattr(me, name, value)
+# In the Python3 world, we pack into the bytes type, which like a list of ints.
+# In Python2, we pack into a string.  Create a set of constants and methods
+# to hide the differences from the main code.
+
+# all bits on or off, expressed as a bytes type
+x00 = b'\x00'
+xff = b'\xff'
+x00_entry = x00[0]
+xff_entry = xff[0]
+empty_pack = b''
+
+_python3 = (sys.version_info >= (3, 0, 0))
+if _python3:
+    def _ord(b):
+        return b
+
+    def _chr(x, y=None):
+        a = [x]
+        if y != None:
+            a.append(y)
+        return bytes(a)
+
+    def _is_string(s):
+        return type(s) is str
+
+    def _string_result(s):
+        return s.decode()
+
+else:
+    def _ord(b):
+        return ord(b)
+
+    def _chr(x, y=None):
+        s = chr(x)
+        if y != None:
+            s += chr(y)
+        return s
+
+    def _is_string(s):
+        return type(s) is unicode
+
+    def _string_result(s):
+        return s

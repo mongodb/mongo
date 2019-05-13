@@ -58,7 +58,6 @@ each of which is ordered by one or more columns.
 - @subpage custom_extractors
 - @subpage custom_data_sources
 - @subpage custom_file_systems
-- @subpage helium
 @m_endif
 
 <h2>Performance monitoring and tuning</h2>

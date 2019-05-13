@@ -808,7 +808,7 @@ ops(void *arg)
 			 * Skip if we are using data-sources or LSM, they don't
 			 * support reading from checkpoints.
 			 */
-			if (!SINGLETHREADED && !DATASOURCE("helium") &&
+			if (!SINGLETHREADED &&
 			    !DATASOURCE("kvsbdb") && !DATASOURCE("lsm") &&
 			    mmrand(&tinfo->rnd, 1, 10) == 1) {
 				/*
