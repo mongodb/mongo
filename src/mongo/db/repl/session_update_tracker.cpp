@@ -143,9 +143,21 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
     if (!isTransactionEntry(entry)) {
         return _updateOrFlush(entry);
     }
-    auto txnTableUpdate = _createTransactionTableUpdateFromTransactionOp(entry);
-    return (txnTableUpdate) ? boost::optional<std::vector<OplogEntry>>({*txnTableUpdate})
-                            : boost::none;
+
+    // If we generate an update from a multi-statement transaction operation, we must clear (then
+    // replace) a possibly queued transaction table update for a retryable write on this session.
+    // It is okay to clear the transaction table update because retryable writes only care about
+    // the final state of the transaction table entry for a given session, not the full history
+    // of updates for the session. By contrast, we care about each transaction table update for
+    // multi-statement transactions -- we must maintain the timestamps and transaction states for
+    // each entry originating from a multi-statement transaction. For this reason, we cannot defer
+    // entries originating from multi-statement transactions.
+    if (auto txnTableUpdate = _createTransactionTableUpdateFromTransactionOp(entry)) {
+        _sessionsToUpdate.erase(*entry.getOperationSessionInfo().getSessionId());
+        return boost::optional<std::vector<OplogEntry>>({*txnTableUpdate});
+    }
+
+    return boost::none;
 }
 
 void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {

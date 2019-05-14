@@ -2672,6 +2672,140 @@ TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdateToTxnTa
     checkTxnTable(sessionInfo, newWriteOpTime, date);
 }
 
+TEST_F(SyncTailTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnSameSession) {
+    const NamespaceString cmdNss{"admin", "$cmd"};
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+    auto date = Date_t::now();
+    auto uuid = [&] {
+        return AutoGetCollectionForRead(_opCtx.get(), nss()).getCollection()->uuid();
+    }();
+
+    repl::OpTime retryableInsertOpTime(Timestamp(1, 0), 1);
+
+    auto retryableInsertOp = makeOplogEntry(nss(),
+                                            retryableInsertOpTime,
+                                            repl::OpTypeEnum::kInsert,
+                                            BSON("_id" << 1),
+                                            boost::none,
+                                            sessionInfo,
+                                            date);
+
+    repl::OpTime txnInsertOpTime(Timestamp(2, 0), 1);
+    sessionInfo.setTxnNumber(4);
+
+    auto txnInsertOp = makeCommandOplogEntryWithSessionInfoAndStmtId(
+        txnInsertOpTime,
+        cmdNss,
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "i"
+                                           << "ns"
+                                           << nss().ns()
+                                           << "ui"
+                                           << *uuid
+                                           << "o"
+                                           << BSON("_id" << 2)))
+                        << "partialTxn"
+                        << true),
+        sessionId,
+        *sessionInfo.getTxnNumber(),
+        StmtId(0),
+        OpTime());
+
+    repl::OpTime txnCommitOpTime(Timestamp(3, 0), 1);
+    auto txnCommitOp =
+        makeCommandOplogEntryWithSessionInfoAndStmtId(txnCommitOpTime,
+                                                      cmdNss,
+                                                      BSON("applyOps" << BSONArray()),
+                                                      sessionId,
+                                                      *sessionInfo.getTxnNumber(),
+                                                      StmtId(1),
+                                                      txnInsertOpTime);
+
+    auto writerPool = OplogApplier::makeWriterPool();
+    SyncTail syncTail(
+        nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
+
+    ASSERT_OK(syncTail.multiApply(_opCtx.get(), {retryableInsertOp, txnInsertOp, txnCommitOp}));
+
+    repl::checkTxnTable(_opCtx.get(),
+                        *sessionInfo.getSessionId(),
+                        *sessionInfo.getTxnNumber(),
+                        txnCommitOpTime,
+                        *txnCommitOp.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kCommitted);
+}
+
+TEST_F(SyncTailTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnSameSession) {
+    const NamespaceString cmdNss{"admin", "$cmd"};
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+    auto date = Date_t::now();
+    auto uuid = [&] {
+        return AutoGetCollectionForRead(_opCtx.get(), nss()).getCollection()->uuid();
+    }();
+
+    repl::OpTime txnInsertOpTime(Timestamp(1, 0), 1);
+    auto txnInsertOp = makeCommandOplogEntryWithSessionInfoAndStmtId(
+        txnInsertOpTime,
+        cmdNss,
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "i"
+                                           << "ns"
+                                           << nss().ns()
+                                           << "ui"
+                                           << *uuid
+                                           << "o"
+                                           << BSON("_id" << 2)))
+                        << "partialTxn"
+                        << true),
+        sessionId,
+        *sessionInfo.getTxnNumber(),
+        StmtId(0),
+        OpTime());
+
+    repl::OpTime txnCommitOpTime(Timestamp(2, 0), 1);
+    auto txnCommitOp =
+        makeCommandOplogEntryWithSessionInfoAndStmtId(txnCommitOpTime,
+                                                      cmdNss,
+                                                      BSON("applyOps" << BSONArray()),
+                                                      sessionId,
+                                                      *sessionInfo.getTxnNumber(),
+                                                      StmtId(1),
+                                                      txnInsertOpTime);
+
+    repl::OpTime retryableInsertOpTime(Timestamp(3, 0), 1);
+    sessionInfo.setTxnNumber(4);
+
+    auto retryableInsertOp = makeOplogEntry(nss(),
+                                            retryableInsertOpTime,
+                                            repl::OpTypeEnum::kInsert,
+                                            BSON("_id" << 1),
+                                            boost::none,
+                                            sessionInfo,
+                                            date);
+
+    auto writerPool = OplogApplier::makeWriterPool();
+    SyncTail syncTail(
+        nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
+
+    ASSERT_OK(syncTail.multiApply(_opCtx.get(), {txnInsertOp, txnCommitOp, retryableInsertOp}));
+
+    repl::checkTxnTable(_opCtx.get(),
+                        *sessionInfo.getSessionId(),
+                        *sessionInfo.getTxnNumber(),
+                        retryableInsertOpTime,
+                        *retryableInsertOp.getWallClockTime(),
+                        boost::none,
+                        boost::none);
+}
+
+
 TEST_F(SyncTailTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     NamespaceString ns0("test.0");
     NamespaceString ns1("test.1");
