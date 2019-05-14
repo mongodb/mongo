@@ -61,7 +61,9 @@ class AutoGetActiveCloner {
     AutoGetActiveCloner& operator=(const AutoGetActiveCloner&) = delete;
 
 public:
-    AutoGetActiveCloner(OperationContext* opCtx, const MigrationSessionId& migrationSessionId) {
+    AutoGetActiveCloner(OperationContext* opCtx,
+                        const MigrationSessionId& migrationSessionId,
+                        const bool holdCollectionLock) {
         const auto nss = ActiveMigrationsRegistry::get(opCtx).getActiveDonateChunkNss();
         uassert(ErrorCodes::NotYetInitialized, "No active migrations were found", nss);
 
@@ -95,6 +97,10 @@ public:
                               << " does not match active session id "
                               << _chunkCloner->getSessionId().toString(),
                 migrationSessionId.matches(_chunkCloner->getSessionId()));
+
+
+        if (!holdCollectionLock)
+            _autoColl = boost::none;
     }
 
     Database* getDb() const {
@@ -162,7 +168,7 @@ public:
         int arrSizeAtPrevIteration = -1;
 
         while (!arrBuilder || arrBuilder->arrSize() > arrSizeAtPrevIteration) {
-            AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
+            AutoGetActiveCloner autoCloner(opCtx, migrationSessionId, true);
 
             if (!arrBuilder) {
                 arrBuilder.emplace(autoCloner.getCloner()->getCloneBatchBufferAllocationSize());
@@ -217,7 +223,7 @@ public:
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
-        AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
+        AutoGetActiveCloner autoCloner(opCtx, migrationSessionId, true);
 
         uassertStatusOK(autoCloner.getCloner()->nextModsBatch(opCtx, autoCloner.getDb(), &result));
         return true;
@@ -278,7 +284,7 @@ public:
             "Fetching session related oplogs for migration",
             NamespaceString::kRsOplogNamespace.ns(),
             [&]() {
-                AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
+                AutoGetActiveCloner autoCloner(opCtx, migrationSessionId, false);
                 opTime = autoCloner.getCloner()->nextSessionMigrationBatch(opCtx, arrBuilder);
 
                 if (arrBuilder->arrSize() == 0) {
@@ -302,7 +308,7 @@ public:
             uassertStatusOK(waitForWriteConcern(opCtx, opTime.get(), majorityWC, &wcResult));
 
             auto rollbackIdAtMigrationInit = [&]() {
-                AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
+                AutoGetActiveCloner autoCloner(opCtx, migrationSessionId, false);
                 return autoCloner.getCloner()->getRollbackIdAtInit();
             }();
 
