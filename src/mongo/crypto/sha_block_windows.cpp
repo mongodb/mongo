@@ -151,8 +151,6 @@ void computeHmacImpl(BCRYPT_ALG_HANDLE algo,
                      std::initializer_list<ConstDataRange> input,
                      HashType* const output) {
     invariant(key);
-    invariant(
-        std::all_of(begin(input), end(input), [&](const auto& i) { return i.data() != nullptr; }));
 
     BCRYPT_HASH_HANDLE hHash;
 
