@@ -139,7 +139,7 @@ structs:
           ka:
             description: "Used to query the key vault by keyAltName. If omitted,
                 ki must be specified."
-            type: encryptSchemaAnyType
+            type: string
             cpp_name: keyAltName
             optional: true
           v:
