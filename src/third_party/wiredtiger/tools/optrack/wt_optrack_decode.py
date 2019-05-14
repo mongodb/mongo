@@ -70,7 +70,7 @@ def buildTranslationMap(mapFileName):
         print(color.BOLD + color.RED);
         print("Could not open " + mapFileName + " for reading");
         print(color.END);
-        return;
+        raise;
 
     # Read lines from the map file and build an in-memory map
     # of translations. Each line has a function ID followed by space and
@@ -97,7 +97,7 @@ def buildTranslationMap(mapFileName):
 
 def funcIDtoName(funcID):
 
-    if (functionMap.has_key(funcID)):
+    if funcID in functionMap:
         return functionMap[funcID];
     else:
        print("Could not find the name for func " + str(funcID));
@@ -147,10 +147,14 @@ def validateHeader(file):
     try:
         bytesRead = file.read(MIN_HEADER_SIZE);
     except:
-        return False, -1;
+        print(color.BOLD + color.RED +
+              "failed read of input file" + color.END);
+        raise;
 
     if (len(bytesRead) < MIN_HEADER_SIZE):
-        return False, -1;
+        print(color.BOLD + color.RED +
+              "unexpected sized input file" + color.END);
+        raise;
 
     version, threadType, tsc_nsec = struct.unpack('=III', bytesRead);
     print("VERSION IS " + str(version));
@@ -203,11 +207,11 @@ def parseFile(fileName):
 
     # Open the log file for reading
     try:
-        file = open(fileName, "r");
+        file = open(fileName, "rb");
     except:
         print(color.BOLD + color.RED +
               "Could not open " + fileName + " for reading" + color.END);
-        return;
+        raise;
 
     # Read and validate log header
     validVersion, threadType, tsc_nsec_ratio, sec_from_epoch = \
@@ -275,7 +279,8 @@ def parseFile(fileName):
 def waitOnOneProcess(runningProcesses):
 
     success = False;
-    for fname, p in runningProcesses.items():
+    # Use a copy since we will be deleting entries from the original
+    for fname, p in runningProcesses.copy().items():
         if (not p.is_alive()):
             del runningProcesses[fname];
             success = True;

@@ -25,7 +25,6 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#!/usr/bin/env python
 
 import argparse
 from bokeh.layouts import column
@@ -35,14 +34,12 @@ from bokeh.models import NumeralTickFormatter, OpenURL, Range1d, TapTool
 from bokeh.models.annotations import Label
 from bokeh.plotting import figure, output_file, reset_output, save, show
 from bokeh.resources import CDN
-import matplotlib
 from multiprocessing import Process, Queue, Array
 import multiprocessing
 import numpy as np
 import os
 import pandas as pd
 import sys
-import statvfs
 import traceback
 import time
 
@@ -120,21 +117,29 @@ timeUnitString = "nanoseconds";
 PERCENTILE = 0.999;
 
 def initColorList():
+    def hex2(n):
+        return hex(n)[2:].zfill(2)  # two digit hex string
 
     global colorList;
 
-    colorList = matplotlib.colors.cnames.keys();
-
-    for color in colorList:
-        # Some browsers break if you try to give them 'sage'
-        if (color == "sage"):
-            colorList.remove(color);
-        # We reserve red to highlight occurrences of functions
-        # that exceeded the user-defined latency threshold. Do
-        # not use red for regular function colors.
-        #
-        elif (color == "red"):
-            colorList.remove(color);
+    colorList = []
+    # Create a palette of 100 colors that are spaced around the RGB
+    # color wheel.  We advance R,G,B independently at different rates.
+    r = g = b = 0
+    while len(colorList) < 100:
+        r = (r + 87) % 256
+        g = (g + 153) % 256
+        b = (b + 61) % 256
+        # If the color is too close to red or white/grey/black, or
+        # too light, we'll choose a different color.  We reserve red
+        # to highlight occurrences of functions that exceeded the
+        # user-defined latency threshold. And white/grey/black and
+        # light colors do not stand out enough.
+        if (r > 128 and g < 20 and b < 20) or \
+           (abs(r - g) < 20 and abs(g - b) < 20 and abs(r - b) < 20) or \
+           (r > 246 and g > 246 and b > 246):
+            g = (g + 100) % 256
+        colorList.append('#' + hex2(r) + hex2(g) + hex2(b))
 
 #
 # Each unique function name gets a unique color.
@@ -147,7 +152,7 @@ def getColorForFunction(function):
     global lastColorUsed;
     global funcToColor;
 
-    if not funcToColor.has_key(function):
+    if not function in funcToColor:
         funcToColor[function] = colorList[lastColorUsed % len(colorList)];
         lastColorUsed += 1;
 
@@ -225,14 +230,14 @@ def plotOutlierHistogram(dataframe, maxOutliers, func,
                y_axis_label = "Number of outliers",
                tools = TOOLS, toolbar_location="above");
 
-    y_ticker_max = p.plot_height / pixelsPerHeightUnit;
-    y_ticker_step = max(1, (maxOutliers + 1)/y_ticker_max);
-    y_upper_bound = (maxOutliers / y_ticker_step + 2) * y_ticker_step;
+    y_ticker_max = p.plot_height // pixelsPerHeightUnit;
+    y_ticker_step = max(1, (maxOutliers + 1)//y_ticker_max);
+    y_upper_bound = (maxOutliers // y_ticker_step + 2) * y_ticker_step;
 
     p.yaxis.ticker = FixedTicker(ticks =
-                                 range(0, y_upper_bound, y_ticker_step));
+                                 list(range(0, y_upper_bound, y_ticker_step)));
     p.ygrid.ticker = FixedTicker(ticks =
-                                 range(0, y_upper_bound, y_ticker_step));
+                                 list(range(0, y_upper_bound, y_ticker_step)));
     p.xaxis.formatter = NumeralTickFormatter(format="0,");
 
     p.y_range = Range1d(0, y_upper_bound);
@@ -284,7 +289,7 @@ def normalizeIntervalData():
 
     print(color.BLUE + color.BOLD + "Normalizing data..." + color.END);
 
-    for file, df in perFileDataFrame.iteritems():
+    for file, df in perFileDataFrame.items():
         df['origstart'] = df['start'];
         df['start'] = df['start'] - firstTimeStamp;
         df['end'] = df['end'] - firstTimeStamp;
@@ -531,8 +536,8 @@ def generateBucketChartForFile(figureName, dataframe, y_max, x_min, x_max):
     p.yaxis.major_tick_line_color = None;
     p.yaxis.minor_tick_line_color = None;
     p.yaxis.major_label_text_font_size = '0pt';
-    p.yaxis.ticker = FixedTicker(ticks = range(0, y_max+1));
-    p.ygrid.ticker = FixedTicker(ticks = range(0, y_max+1));
+    p.yaxis.ticker = FixedTicker(ticks = list(range(0, y_max+1)));
+    p.ygrid.ticker = FixedTicker(ticks = list(range(0, y_max+1)));
 
     p.xaxis.formatter = NumeralTickFormatter(format="0,");
     p.title.text_font_style = "bold";
@@ -541,7 +546,7 @@ def generateBucketChartForFile(figureName, dataframe, y_max, x_min, x_max):
            top = 'stackdepthNext', color = 'color', line_color = "lightgrey",
            line_width = 0.5, source=cds);
 
-    for func, fColor in funcToColor.iteritems():
+    for func, fColor in funcToColor.items():
 
         # If this function is not present in this dataframe,
         # we don't care about it.
@@ -555,7 +560,7 @@ def generateBucketChartForFile(figureName, dataframe, y_max, x_min, x_max):
         # add it again to avoid redundancy in the charts and
         # in order not to waste space.
         #
-        if (colorAlreadyUsedInLegend.has_key(fColor)):
+        if fColor in colorAlreadyUsedInLegend:
             continue;
         else:
             colorAlreadyUsedInLegend[fColor] = True;
@@ -676,7 +681,7 @@ def generateCrossFilePlotsForBucket(i, lowerBound, upperBound, navigatorDF,
     save(column(figuresForAllFiles), filename = fileName,
          title=intervalTitle, resources=CDN);
 
-    retFilename.value = fileName;
+    retFilename.value = fileName.encode();
 
 
 # Generate a plot that shows a view of the entire timeline in a form of
@@ -718,8 +723,8 @@ def generateNavigatorFigure(dataframe, i, title):
     p.yaxis.major_tick_line_color = None;
     p.yaxis.minor_tick_line_color = None;
     p.yaxis.major_label_text_font_size = '0pt';
-    p.yaxis.ticker = FixedTicker(ticks = range(0, 1));
-    p.ygrid.ticker = FixedTicker(ticks = range(0, 1));
+    p.yaxis.ticker = FixedTicker(ticks = list(range(0, 1)));
+    p.ygrid.ticker = FixedTicker(ticks = list(range(0, 1)));
 
     p.xaxis.formatter = NumeralTickFormatter(format="0,");
 
@@ -780,7 +785,8 @@ def createIntervalNavigatorDF(numBuckets, timeUnitsPerBucket):
 def waitOnOneProcess(runningProcesses):
 
     success = False;
-    for i, p in runningProcesses.items():
+    # Use a copy since we will be deleting entries from the original
+    for i, p in runningProcesses.copy().items():
         if (not p.is_alive()):
             del runningProcesses[i];
             success = True;
@@ -797,7 +803,7 @@ def updatePercentComplete(runnableProcesses, runningProcesses,
 
     percentComplete = float(totalWorkItems - len(runnableProcesses) \
                         - len(runningProcesses)) / float(totalWorkItems) * 100;
-    print(color.BLUE + color.BOLD + " " + workName),
+    sys.stdout.write(color.BLUE + color.BOLD + "... " + workName);
     sys.stdout.write(" %d%% complete  \r" % (percentComplete) );
     sys.stdout.flush();
 
@@ -817,8 +823,8 @@ def generateTSSlicesForBuckets():
     returnValues = {};
     spawnedProcesses = {};
 
-    numBuckets = plotWidth / pixelsPerWidthUnit;
-    timeUnitsPerBucket = (lastTimeStamp - firstTimeStamp) / numBuckets;
+    numBuckets = plotWidth // pixelsPerWidthUnit;
+    timeUnitsPerBucket = (lastTimeStamp - firstTimeStamp) // numBuckets;
 
     navigatorDF = createIntervalNavigatorDF(numBuckets, timeUnitsPerBucket);
 
@@ -827,7 +833,7 @@ def generateTSSlicesForBuckets():
         + color.END);
 
     for i in range(numBuckets):
-        retFilename = Array('c', os.statvfs('/')[statvfs.F_NAMEMAX]);
+        retFilename = Array('c', os.statvfs('/').f_namemax)
         lowerBound = i * timeUnitsPerBucket;
         upperBound = (i+1) * timeUnitsPerBucket;
 
@@ -914,7 +920,7 @@ def checkForTimestampAndGetRowSkip(fname):
 
         if (len(words) == 1):
             try:
-                perFileTimeStamps[fname] = long(words[0]);
+                perFileTimeStamps[fname] = int(words[0]);
             except ValueError:
                 print(color.BOLD + color.RED +
                       "Could not parse seconds since Epoch on first line" +
@@ -952,7 +958,7 @@ def processFile(fname, dumpCleanDataBool):
         funcDF = iDF.loc[lambda iDF: iDF.function == func, :];
         funcDF = funcDF.drop(columns = ['function']);
 
-        if (not perFuncDF.has_key(func)):
+        if not func in perFuncDF:
             perFuncDF[func] = funcDF;
         else:
             perFuncDF[func] = pd.concat([perFuncDF[func], funcDF]);
@@ -974,7 +980,7 @@ def createOutlierHistogramForFunction(func, funcDF, bucketFilenames):
 
     statisticalOutlierThreshold = 0;
     statisticalOutlierThresholdDescr = "";
-    userLatencyThreshold = sys.maxint;
+    userLatencyThreshold = sys.maxsize;
     userLatencyThresholdDescr = None;
 
 
@@ -1007,10 +1013,10 @@ def createOutlierHistogramForFunction(func, funcDF, bucketFilenames):
     # we will highlight those bars that contain operations whose
     # duration exceeded the user-defined threshold.
     #
-    if (userDefinedLatencyThresholds.has_key(func)):
+    if (func in userDefinedLatencyThresholds):
         userLatencyThreshold = userDefinedLatencyThresholds[func];
         userLatencyThresholdDescr = userDefinedThresholdNames[func];
-    elif (userDefinedLatencyThresholds.has_key("*")):
+    elif ("*" in userDefinedLatencyThresholds):
         userLatencyThreshold = userDefinedLatencyThresholds["*"];
         userLatencyThresholdDescr = userDefinedThresholdNames["*"];
 
@@ -1022,8 +1028,8 @@ def createOutlierHistogramForFunction(func, funcDF, bucketFilenames):
                             "th percentile)";
 
 
-    numBuckets = plotWidth / pixelsPerWidthUnit;
-    timeUnitsPerBucket = (lastTimeStamp - firstTimeStamp) / numBuckets;
+    numBuckets = plotWidth // pixelsPerWidthUnit;
+    timeUnitsPerBucket = (lastTimeStamp - firstTimeStamp) // numBuckets;
 
     bucketHeights = [];
     markers = [];
@@ -1081,7 +1087,7 @@ def createOutlierHistogramForFunction(func, funcDF, bucketFilenames):
     dataframe = pd.DataFrame(data=dict);
     dataframe['markerX'] = dataframe['lowerbound'] +  \
                            (dataframe['upperbound'] -
-                            dataframe['lowerbound']) / 2 ;
+                            dataframe['lowerbound']) // 2 ;
     dataframe['markerY'] = dataframe['height'] + 0.2;
 
     return plotOutlierHistogram(dataframe, maxOutliers, func,
@@ -1172,9 +1178,9 @@ def parseConfigFile(fname):
         elif (firstNonCommentLine):
             try:
                 unitsPerSecond = int(line);
-                unitsPerMillisecond = unitsPerSecond / 1000;
-                unitsPerMicrosecond = unitsPerSecond / 1000000;
-                unitsPerNanosecond  = unitsPerSecond / 1000000000;
+                unitsPerMillisecond = unitsPerSecond // 1000;
+                unitsPerMicrosecond = unitsPerSecond // 1000000;
+                unitsPerNanosecond  = unitsPerSecond // 1000000000;
 
                 timeUnitString = getTimeUnitString(unitsPerSecond);
 
@@ -1321,7 +1327,8 @@ def main():
 
         i += 1;
         percentComplete = float(i) / float(totalFuncs) * 100;
-        print(color.BLUE + color.BOLD + " Generating outlier histograms... "),
+        sys.stdout.write(color.BLUE + color.BOLD +
+                         " Generating outlier histograms... ");
         sys.stdout.write("%d%% complete  \r" % (percentComplete) );
         sys.stdout.flush();
 

@@ -230,7 +230,7 @@ def checkForTimestampAndGetRowSkip(fname):
 
         if (len(words) == 1):
             try:
-                firstTimeStamp = long(words[0]);
+                firstTimeStamp = int(words[0]);
             except ValueError:
                 print(color.BOLD + color.RED +
                       "Could not parse seconds since Epoch on first line" +
@@ -308,7 +308,7 @@ def parseIntervals(df, firstTimeStamp, fname):
     firstIntervalTimestampSeconds = firstTimeStamp;
     lastIntervalTimestampSeconds = firstIntervalTimestampSeconds + \
                 (lastTimestampUnits - firstTimestampUnits) \
-                / unitsPerSecond;
+                // unitsPerSecond;
 
     if (lastIntervalTimestampSeconds < firstIntervalTimestampSeconds):
         print(color.BOLD + color.RED +
@@ -404,9 +404,9 @@ def parseIntervals(df, firstTimeStamp, fname):
 
         # Convert the durations to percentages and record them
         # in the output dictionary
-        for func, duration in thisIntDict.iteritems():
+        for func, duration in thisIntDict.items():
             outputDictKey =  columnNamePrefix + func;
-            percentDuration = float(duration) / \
+            percentDuration = float(duration) // \
                               float(intervalLength * unitsPerSecond) * 100;
             outputDict[outputDictKey].append(percentDuration);
 
@@ -415,7 +415,7 @@ def parseIntervals(df, firstTimeStamp, fname):
         # The list at each function's key should be as long as the list
         # at key 'time'.
         targetLen = len(outputDict['time']);
-        for key, theList in outputDict.iteritems():
+        for key, theList in outputDict.items():
             if len(theList) < targetLen:
                 theList.append(0);
 
@@ -427,7 +427,7 @@ def parseIntervals(df, firstTimeStamp, fname):
     #
     targetColumns = ['time'];
 
-    for key, value in outputDict.iteritems():
+    for key, value in outputDict.items():
         if key != 'time':
             targetColumns.append(key);
 
