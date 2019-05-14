@@ -258,6 +258,11 @@ void ReplicaSetMonitor::_doScheduledRefresh(const CallbackHandle& currentHandle)
 
 SemiFuture<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria,
                                                             Milliseconds maxWait) {
+    // If we're in shutdown, don't bother
+    if (globalInShutdownDeprecated()) {
+        return Status(ErrorCodes::ShutdownInProgress, "Server is shutting down"_sd);
+    }
+
     if (_isRemovedFromManager.load()) {
         return Status(ErrorCodes::ReplicaSetMonitorRemoved,
                       str::stream() << "ReplicaSetMonitor for set " << getName() << " is removed");
