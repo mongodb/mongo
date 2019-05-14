@@ -1631,6 +1631,7 @@ private:
     enum MetaType {
         TEXT_SCORE,
         RAND_VAL,
+        SEARCH_SCORE,
     };
 
     ExpressionMeta(const boost::intrusive_ptr<ExpressionContext>& expCtx, MetaType metaType);

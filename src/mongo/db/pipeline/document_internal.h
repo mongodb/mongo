@@ -192,7 +192,8 @@ public:
           _metaFields(),
           _textScore(0),
           _randVal(0),
-          _geoNearDistance(0) {}
+          _geoNearDistance(0),
+          _searchScore(0) {}
 
     ~DocumentStorage();
 
@@ -202,6 +203,7 @@ public:
         SORT_KEY,
         GEONEAR_DIST,
         GEONEAR_POINT,
+        SEARCH_SCORE,
 
         // New fields must be added before the NUM_FIELDS sentinel.
         NUM_FIELDS
@@ -296,6 +298,9 @@ public:
         if (source.hasGeoNearPoint()) {
             setGeoNearPoint(source.getGeoNearPoint());
         }
+        if (source.hasSearchScore()) {
+            setSearchScore(source.getSearchScore());
+        }
     }
 
     bool hasTextScore() const {
@@ -351,6 +356,17 @@ public:
     void setGeoNearPoint(Value point) {
         _metaFields.set(MetaType::GEONEAR_POINT);
         _geoNearPoint = std::move(point);
+    }
+
+    bool hasSearchScore() const {
+        return _metaFields.test(MetaType::SEARCH_SCORE);
+    }
+    double getSearchScore() const {
+        return _searchScore;
+    }
+    void setSearchScore(double score) {
+        _metaFields.set(MetaType::SEARCH_SCORE);
+        _searchScore = score;
     }
 
 private:
@@ -437,6 +453,7 @@ private:
     BSONObj _sortKey;
     double _geoNearDistance;
     Value _geoNearPoint;
+    double _searchScore;
     // When adding a field, make sure to update clone() method
 
     // Defined in document.cpp

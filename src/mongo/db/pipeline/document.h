@@ -96,6 +96,7 @@ public:
     static constexpr StringData metaFieldSortKey = "$sortKey"_sd;
     static constexpr StringData metaFieldGeoNearDistance = "$dis"_sd;
     static constexpr StringData metaFieldGeoNearPoint = "$pt"_sd;
+    static constexpr StringData metaFieldSearchScore = "$searchScore"_sd;
 
     static const std::vector<StringData> allMetadataFieldNames;
 
@@ -281,6 +282,13 @@ public:
     }
     Value getGeoNearPoint() const {
         return storage().getGeoNearPoint();
+    }
+
+    bool hasSearchScore() const {
+        return storage().hasSearchScore();
+    }
+    double getSearchScore() const {
+        return storage().getSearchScore();
     }
 
     /// members for Sorter
@@ -540,6 +548,10 @@ public:
 
     void setGeoNearPoint(Value point) {
         storage().setGeoNearPoint(std::move(point));
+    }
+
+    void setSearchScore(double score) {
+        storage().setSearchScore(score);
     }
 
     /** Convert to a read-only document and release reference.
