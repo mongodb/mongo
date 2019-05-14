@@ -44,7 +44,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/summation.h"
-#include "third_party/tdigest/TDigest.h"
+#include "third_party/folly/TDigest.h"
 
 namespace mongo {
 

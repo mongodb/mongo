@@ -36,7 +36,7 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/platform/decimal128.h"
 
-#include "third_party/tdigest/TDigest.h"
+#include "third_party/folly/TDigest.h"
 
 namespace mongo {
 
@@ -164,13 +164,9 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
                 {"digest_size", this->digest_size}
             }
         );
-        reset();
         return res;
     }
-
-    Value res = Value(digest.estimateQuantile(this->percentile));
-    reset();
-    return res;
+    return Value(digest.estimateQuantile(this->percentile));
 }
 
 AccumulatorPercentile::AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx)

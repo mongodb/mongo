@@ -20,7 +20,6 @@
 #include <limits>
 #include <array>
 #include <memory>
-#include <iostream>
 
 namespace mongo {
 
