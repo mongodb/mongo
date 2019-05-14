@@ -92,7 +92,9 @@ def split_if_exists(str_to_split):
 
 def remove_gen_suffix(task_name):
     """Remove '_gen' suffix from task_name."""
-    return task_name.rstrip(GEN_SUFFIX)
+    if task_name.endswith(GEN_SUFFIX):
+        return task_name[:-4]
+    return task_name
 
 
 def get_config_options(cmd_line_options, config_file):

@@ -28,12 +28,13 @@ def ns(relative_name):  # pylint: disable-invalid-name
 
 class TestHelperMethods(unittest.TestCase):
     def test_removes_gen_suffix(self):
-        input_task_name = "sharding_auth_audit_gen"
-        self.assertEqual("sharding_auth_audit", remove_gen_suffix(input_task_name))
+        input_task_name = "sharding_auth_auditg_gen"
+        self.assertEqual("sharding_auth_auditg", remove_gen_suffix(input_task_name))
 
     def test_doesnt_remove_non_gen_suffix(self):
-        input_task_name = "sharded_multi_stmt_txn_jscore_passthrough"
-        self.assertEqual("sharded_multi_stmt_txn_jscore_passthrough", remove_gen_suffix(input_task_name))
+        input_task_name = "sharded_multi_stmt_txn_jscore_passthroug"
+        self.assertEqual("sharded_multi_stmt_txn_jscore_passthroug",
+                         remove_gen_suffix(input_task_name))
 
 
 class TestTestStats(unittest.TestCase):
