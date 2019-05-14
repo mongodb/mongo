@@ -44,7 +44,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/summation.h"
-#include "mongo/db/pipeline/TDigest.h"
+#include "third_party/tdigest/TDigest.h"
 
 namespace mongo {
 
@@ -288,7 +288,6 @@ public:
     const char* getOpName() const final;
     void reset() final;
 
-
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -314,25 +313,23 @@ public:
     Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
-    
-    double percentile;
-    double digest_size;
-    double chunk_size = 100;
-
-    mongo::TDigest digest;
-
-    // push the vector of values to create tdigest object
-    void _add_to_tdigest(std::vector<double>&);
 
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
+    double percentile;
+    double digest_size=0;
+    double chunk_size = 100;
+    mongo::TDigest digest;
+
     // to be digested by TDigest algorithm
     std::vector<double> values;
 
+    // push the vector of values to create tdigest object
+    void _add_to_tdigest(std::vector<double>&);
+
     bool any_input{false};
-    double test_var;
 };
 
 class AccumulatorStdDev : public Accumulator {

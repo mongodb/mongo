@@ -36,7 +36,7 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/platform/decimal128.h"
 
-#include "mongo/db/pipeline/TDigest.h"
+#include "third_party/tdigest/TDigest.h"
 
 namespace mongo {
 
@@ -98,17 +98,14 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
             }
     }
 
-    // ToDo: Error codes are not accurate. Set better numbers later
-    // ToDo: It might be better evaluations for this part.
-    uassert(6677, "The 'percentile' should be present in the input document.",
+    uassert(51300, "The 'percentile' should be present in the input document.",
     !input.getDocument()["percentile"].missing());
 
-    uassert(6678, "The 'value' should be present in the input document.",
+    uassert(51301, "The 'value' should be present in the input document.",
     !input.getDocument()["value"].missing());
 
     this->percentile = input.getDocument()["percentile"].getDouble();
 
-    // ToDo: Choose a better name for input_value and refactor later
     Value input_value = input.getDocument()["value"];
 
     switch (input_value.getType()) {
@@ -155,8 +152,8 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
                     {"weight", centroid.weight()}
                 });
         };
-
-        return Value(
+        
+        Value res = Value(
             Document{
                 {"centroids", Value(centroids)},
                 {"sum", digest.sum()},
@@ -164,11 +161,16 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
                 {"max", digest.max()},
                 {"min", digest.min()},
                 {"percentile", this->percentile},
-                {"digest_size", this->digest_size}               
+                {"digest_size", this->digest_size}
             }
         );
+        reset();
+        return res;
     }
-    return Value(digest.estimateQuantile(this->percentile));
+
+    Value res = Value(digest.estimateQuantile(this->percentile));
+    reset();
+    return res;
 }
 
 AccumulatorPercentile::AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx)
@@ -185,6 +187,9 @@ void AccumulatorPercentile::_add_to_tdigest(std::vector<double> & values){
 }
 
 void AccumulatorPercentile::reset() {
-    return;
+    this->digest_size = 0;
+    values.clear();
+    digest = mongo::TDigest(this->digest_size);
+    any_input = false;
 }
 }

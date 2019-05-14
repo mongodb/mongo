@@ -162,7 +162,7 @@ env.Library(
         'accumulator_sum.cpp',
         'accumulator_merge_objects.cpp',
         'accumulator_percentile.cpp',
-        'TDigest.cpp'
+        '$BUILD_DIR/third_party/tdigest/TDigest.cpp'
         ],
     LIBDEPS=[
         'document_value',
