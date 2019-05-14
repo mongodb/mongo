@@ -299,6 +299,8 @@ public:
                 break;
             }
 
+            const Date_t startTime = Date_t::now();
+
             const Timestamp stableTimestamp = _wiredTigerKVEngine->getStableTimestamp();
             const Timestamp initialDataTimestamp = _wiredTigerKVEngine->getInitialDataTimestamp();
 
@@ -360,6 +362,11 @@ public:
                         _oplogNeededForCrashRecovery.store(
                             oplogNeededForRollback.getValue().asULL());
                     }
+                }
+
+                const auto secondsElapsed = durationCount<Seconds>(Date_t::now() - startTime);
+                if (secondsElapsed >= 30) {
+                    LOG(1) << "Checkpoint took " << secondsElapsed << " seconds to complete.";
                 }
             } catch (const WriteConflictException&) {
                 // Temporary: remove this after WT-3483
