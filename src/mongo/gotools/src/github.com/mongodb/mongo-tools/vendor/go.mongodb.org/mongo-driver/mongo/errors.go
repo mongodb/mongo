@@ -12,8 +12,8 @@ import (
 	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
 	"go.mongodb.org/mongo-driver/x/network/command"
 	"go.mongodb.org/mongo-driver/x/network/result"
 )
@@ -41,6 +41,13 @@ func replaceErrors(err error) error {
 	if ce, ok := err.(command.Error); ok {
 		return CommandError{Code: ce.Code, Message: ce.Message, Labels: ce.Labels, Name: ce.Name}
 	}
+	if conv, ok := err.(driverlegacy.BulkWriteException); ok {
+		return BulkWriteException{
+			WriteConcernError: convertWriteConcernError(conv.WriteConcernError),
+			WriteErrors:       convertBulkWriteErrors(conv.WriteErrors),
+		}
+	}
+
 	return err
 }
 
@@ -131,7 +138,7 @@ func (mwe WriteException) Error() string {
 	return buf.String()
 }
 
-func convertBulkWriteErrors(errors []driver.BulkWriteError) []BulkWriteError {
+func convertBulkWriteErrors(errors []driverlegacy.BulkWriteError) []BulkWriteError {
 	bwErrors := make([]BulkWriteError, 0, len(errors))
 	for _, err := range errors {
 		bwErrors = append(bwErrors, BulkWriteError{

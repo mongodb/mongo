@@ -104,7 +104,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:64629229e2ed5c7af1cb1629b8b85ef8d1b3b7c949e6d96dfd19afa383e9030f"
+  digest = "1:c1e7c7400eab4665796e35dd486992d480942ef46d8bfd4d2ffcc4c4352e8b3b"
   name = "github.com/mongodb/mongo-tools-common"
   packages = [
     "archive",
@@ -125,7 +125,7 @@
     "util",
   ]
   pruneopts = "T"
-  revision = "f450824d00a780709a0175633d91b50ffb766c8c"
+  revision = "1ca4ef7aeca6bbf734acd4122f3cfa36bda74b6e"
 
 [[projects]]
   digest = "1:f363c75e8cac5653bc5c0c2b90cbd8a522fdc48c13a5f8d85078750f82d1a009"
@@ -187,7 +187,7 @@
   revision = "73f8eece6fdcd902c185bf651de50f3828bed5ed"
 
 [[projects]]
-  digest = "1:32a9a7633bd99e681bbf89723928377fedaf9137cdfcc010848828a6cda1f46c"
+  digest = "1:2e7c9ba6722ef3e588363dd0a9fe109773f63551f7838cc909737b7935de77ad"
   name = "go.mongodb.org/mongo-driver"
   packages = [
     "bson",
@@ -207,12 +207,12 @@
     "version",
     "x/bsonx",
     "x/bsonx/bsoncore",
-    "x/mongo/driver",
-    "x/mongo/driver/auth",
-    "x/mongo/driver/auth/internal/gssapi",
-    "x/mongo/driver/session",
-    "x/mongo/driver/topology",
-    "x/mongo/driver/uuid",
+    "x/mongo/driverlegacy",
+    "x/mongo/driverlegacy/auth",
+    "x/mongo/driverlegacy/auth/internal/gssapi",
+    "x/mongo/driverlegacy/session",
+    "x/mongo/driverlegacy/topology",
+    "x/mongo/driverlegacy/uuid",
     "x/network/address",
     "x/network/command",
     "x/network/compressor",
@@ -223,7 +223,7 @@
     "x/network/wiremessage",
   ]
   pruneopts = "T"
-  revision = "51421e413403fe3c9b0097147841f752421133e4"
+  revision = "bb984ba94a90e2bdf108128bf6bef0c0505a4bc7"
 
 [[projects]]
   digest = "1:0f2b2cb9f84318c0f71fed3087ff9ac370370f842469b71b00348c3d72a19b44"
@@ -262,11 +262,8 @@
   digest = "1:202d7e19a366151a68e5d96a09caaf02d0e951ece729ac2c760b837af05558a9"
   name = "gopkg.in/mgo.v2"
   packages = [
-    ".",
     "bson",
     "internal/json",
-    "internal/sasl",
-    "internal/scram",
   ]
   pruneopts = "T"
   revision = "8c133fd1d0fc316302df84fc12769e17fb473bb1"
@@ -322,9 +319,7 @@
     "go.mongodb.org/mongo-driver/mongo/readpref",
     "go.mongodb.org/mongo-driver/mongo/writeconcern",
     "go.mongodb.org/mongo-driver/x/bsonx",
-    "go.mongodb.org/mongo-driver/x/network/connstring",
     "golang.org/x/crypto/ssh/terminal",
-    "gopkg.in/mgo.v2",
     "gopkg.in/mgo.v2/bson",
     "gopkg.in/tomb.v2",
   ]

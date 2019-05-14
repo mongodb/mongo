@@ -155,8 +155,9 @@ func TestOplogRestore(t *testing.T) {
 		c1.Drop(nil)
 
 		// Run mongorestore
-		err = restore.Restore()
-		So(err, ShouldBeNil)
+		result := restore.Restore()
+		So(result.Err, ShouldBeNil)
+		So(result.Failures, ShouldEqual, 0)
 
 		// Verify restoration
 		count, err := c1.CountDocuments(nil, bson.M{})
@@ -185,7 +186,8 @@ func TestOplogRestoreTools2002(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		// Run mongorestore
-		err = restore.Restore()
-		So(err, ShouldBeNil)
+		result := restore.Restore()
+		So(result.Err, ShouldBeNil)
+		So(result.Failures, ShouldEqual, 0)
 	})
 }

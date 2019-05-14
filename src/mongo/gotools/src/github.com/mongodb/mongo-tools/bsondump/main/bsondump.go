@@ -26,8 +26,8 @@ func main() {
 	opts, err := bsondump.ParseOptions(os.Args[1:], VersionStr, GitCommit)
 	if err != nil {
 		log.Logvf(log.Always, "%v", err)
-		log.Logvf(log.Always, "try 'bsondump --help' for more information")
-		os.Exit(util.ExitBadOptions)
+		log.Logvf(log.Always, util.ShortUsage("bsondump"))
+		os.Exit(util.ExitFailure)
 	}
 
 	// print help, if specified
@@ -45,13 +45,13 @@ func main() {
 	dumper, err := bsondump.New(opts)
 	if err != nil {
 		log.Logv(log.Always, err.Error())
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitFailure)
 	}
 	defer func() {
 		err := dumper.Close()
 		if err != nil {
 			log.Logvf(log.Always, "error cleaning up: %v", err)
-			os.Exit(util.ExitError)
+			os.Exit(util.ExitFailure)
 		}
 	}()
 
@@ -67,6 +67,6 @@ func main() {
 	log.Logvf(log.Always, "%v objects found", numFound)
 	if err != nil {
 		log.Logv(log.Always, err.Error())
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitFailure)
 	}
 }

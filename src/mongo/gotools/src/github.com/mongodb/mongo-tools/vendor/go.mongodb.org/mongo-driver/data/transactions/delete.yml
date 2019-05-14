@@ -1,3 +1,4 @@
+topology: [replicaset, sharded]
 database_name: &database_name "transaction-tests"
 collection_name: &collection_name "test"
 

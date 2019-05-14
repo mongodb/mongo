@@ -72,6 +72,10 @@ Test Format
 
 Each YAML file has the following keys:
 
+- ``topology``: Optional. An array of server topologies against which to run
+  the test. Valid topologies are "single", "replicaset" and "sharded". The
+  default is all topologies (ie ``[single, replicaset", sharded]``).
+
 - ``database_name`` and ``collection_name``: The database and collection to use
   for testing.
 
@@ -86,10 +90,15 @@ Each YAML file has the following keys:
   - ``skipReason``: Optional, string describing why this test should be
     skipped.
 
+  - ``useMultipleMongoses``: Optional, boolean. If true and this test is
+    running against a sharded cluster, intialize the MongoClient for this
+    test with multiple mongos seed addresses.
+
   - ``clientOptions``: Optional, parameters to pass to MongoClient().
 
   - ``failPoint``: Optional, a server failpoint to enable expressed as the
-    configureFailPoint command to run on the admin database.
+    configureFailPoint command to run on the admin database. This option and
+    ``useMultipleMongoses: true`` are mutually exclusive.
 
   - ``sessionOptions``: Optional, parameters to pass to
     MongoClient.startSession().
@@ -100,7 +109,8 @@ Each YAML file has the following keys:
     - ``name``: The name of the operation on ``object``.
 
     - ``object``: The name of the object to perform the operation on. Can be
-      "database", "collection", "session0", or "session1".
+      "database", "collection", "session0", "session1", or "testRunner". See
+      the "targetedFailPoint" operation in `Special Test Operations`_.
 
     - ``collectionOptions``: Optional, parameters to pass to the Collection()
       used for this operation.
@@ -149,47 +159,24 @@ ensure that no new bugs have been introduced related to arbiters.)
 
 A driver that implements support for sharded transactions MUST also run these
 tests against a MongoDB sharded cluster with multiple mongoses and
-**server version 4.1.6 or later**. Including multiple mongoses (and
-initializing the MongoClient with multiple mongos seeds!) ensures that
-mongos transaction pinning works properly.
+**server version 4.2 or later**. Some tests require
+initializing the MongoClient with multiple mongos seeds to ensures that mongos
+transaction pinning and the recoveryToken works properly.
 
 Load each YAML (or JSON) file using a Canonical Extended JSON parser.
 
 Then for each element in ``tests``:
 
-#. If the``skipReason`` field is present, skip this test completely.
+#. If the ``skipReason`` field is present, skip this test completely.
 #. Create a MongoClient and call
    ``client.admin.runCommand({killAllSessions: []})`` to clean up any open
    transactions from previous test failures.
 
-   To workaround `SERVER-38335`_, ensure this command does not send
-   an implicit session, otherwise the command will fail with an
-   "operation was interrupted" error because it kills itself and (on a sharded
-   cluster) future commands may fail with an error similar to:
-   "Encountered error from localhost:27217 during a transaction :: caused by :: operation was interrupted".
-
-   If your driver cannot run this command without an implicit session, then
-   either skip this step and live with the fact that previous test failures
-   may cause later tests to fail or use the `killAllSessionsByPattern` command
-   instead. During each test record all session ids sent to the server and at
-   the end of each test kill all the sessions ids (using a different session):
-
-   .. code:: python
-
-      # Be sure to use a distinct session to avoid "operation was interrupted".
-      session_for_cleanup = client.start_session()
-      recorded_session_uuids = []
-      # Run test case and record session uuids...
-      client.admin.runCommand({
-          'killAllSessionsByPattern': [
-              {'lsid': {'id': uuid}} for uuid in recorded_session_uuids]},
-          session=session_for_cleanup)
-
-   - When testing against a sharded cluster, create a list of MongoClients that
-     are directly connected to each mongos. Run the `killAllSessions`
-     (or `killAllSessionsByPattern`) command on ALL mongoses.
-
-   .. _SERVER-38335: https://jira.mongodb.org/browse/SERVER-38335
+   - Running ``killAllSessions`` cleans up any open transactions from
+     a previously failed test to prevent the current test from blocking.
+     It is sufficient to run this command once before starting the test suite
+     and once after each failed test.
+   - When testing against a sharded cluster run this command on ALL mongoses.
 
 #. Create a collection object from the MongoClient, using the ``database_name``
    and ``collection_name`` fields of the YAML file.
@@ -201,17 +188,15 @@ Then for each element in ``tests``:
    into the test collection, using writeConcern "majority".
 #. If ``failPoint`` is specified, its value is a configureFailPoint command.
    Run the command on the admin database to enable the fail point.
-
-   - When testing against a sharded cluster run this command on ALL mongoses.
-
 #. Create a **new** MongoClient ``client``, with Command Monitoring listeners
    enabled. (Using a new MongoClient for each test ensures a fresh session pool
    that hasn't executed any transactions previously, so the tests can assert
    actual txnNumbers, starting from 1.) Pass this test's ``clientOptions`` if
    present.
 
-   - When testing against a sharded cluster this client MUST be created with
-     multiple (valid) mongos seed addreses.
+   - When testing against a sharded cluster and ``useMultipleMongoses`` is
+     ``true`` the client MUST be created with multiple (valid) mongos seed
+     addreses.
 
 #. Call ``client.startSession`` twice to create ClientSession objects
    ``session0`` and ``session1``, using the test's "sessionOptions" if they
@@ -219,6 +204,8 @@ Then for each element in ``tests``:
    ``endSession``, see `Logical Session Id`.
 #. For each element in ``operations``:
 
+   - If the operation ``name`` is a special test operation type, execute it and
+     go to the next operation, otherwise proceed to the next step.
    - Enter a "try" block or your programming language's closest equivalent.
    - Create a Database object from the MongoClient, using the ``database_name``
      field at the top level of the test file.
@@ -270,8 +257,6 @@ Then for each element in ``tests``:
         mode: "off"
     });
 
-   - When testing against a sharded cluster run this command on ALL mongoses.
-
 #. For each element in ``outcome``:
 
    - If ``name`` is "collection", verify that the test collection contains
@@ -279,6 +264,68 @@ Then for each element in ``tests``:
      latest data by using **primary read preference** with
      **local read concern** even when the MongoClient is configured with
      another read preference or read concern.
+
+Special Test Operations
+```````````````````````
+
+Certain operations that appear in the "operations" array do not correspond to
+API methods but instead represent special test operations. Such operations are
+defined on the "testRunner" object and documented here:
+
+targetedFailPoint
+~~~~~~~~~~~~~~~~~
+
+The "targetedFailPoint" operation instructs the test runner to configure a fail
+point on a specific mongos. The mongos to run the ``configureFailPoint`` is
+determined by the "session" argument (either "session0" or "session1").
+The session must already be pinned to a mongos server. The "failPoint" argument
+is the ``configureFailPoint`` command to run.
+
+If a test uses ``targetedFailPoint``, disable the fail point after running
+all ``operations`` to avoid spurious failures in subsequent tests. The fail
+point may be disabled like so::
+
+    db.adminCommand({
+        configureFailPoint: <fail point name>,
+        mode: "off"
+    });
+
+Here is an example which instructs the test runner to enable the failCommand
+fail point on the mongos server which "session0" is pinned to::
+
+      # Enable the fail point only on the Mongos that session0 is pinned to.
+      - name: targetedFailPoint
+        object: testRunner
+        arguments:
+          session: session0
+          failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+              failCommands: ["commitTransaction"]
+              closeConnection: true
+
+assertSessionPinned
+~~~~~~~~~~~~~~~~~~~
+
+The "assertSessionPinned" operation instructs the test runner to assert that
+the given session is pinned to a mongos::
+
+      - name: assertSessionPinned
+        object: testRunner
+        arguments:
+          session: session0
+
+assertSessionUnpinned
+~~~~~~~~~~~~~~~~~~~~~
+
+The "assertSessionUnpinned" operation instructs the test runner to assert that
+the given session is not pinned to a mongos::
+
+      - name: assertSessionPinned
+        object: testRunner
+        arguments:
+          session: session0
 
 Command-Started Events
 ``````````````````````
@@ -316,6 +363,14 @@ afterClusterTime
 A ``readConcern.afterClusterTime`` value of ``42`` in a command-started event
 is a fake cluster time. Drivers MUST assert that the actual command includes an
 afterClusterTime.
+
+recoveryToken
+^^^^^^^^^^^^^
+
+A ``recoveryToken`` value of ``42`` in a command-started event is a
+placeholder for an arbitrary recovery token. Drivers MUST assert that the
+actual command includes a "recoveryToken" field and SHOULD assert that field
+is a BSON document.
 
 Mongos Pinning Prose Tests
 ==========================
@@ -382,3 +437,49 @@ instead.
             addresses.add(cursor.address)
 
           assert len(addresses) > 1
+
+Q & A
+=====
+
+Why do some tests appear to hang for 60 seconds on a sharded cluster?
+`````````````````````````````````````````````````````````````````````
+
+There are two cases where this can happen. When the initial commitTransaction
+attempt fails on mongos A and is retried on mongos B, mongos B will block
+waiting for the transaction to complete. However because the initial commit
+attempt failed, the command will only complete after the transaction is
+automatically aborted for exceeding the shard's
+transactionLifetimeLimitSeconds setting. `SERVER-39726`_ requests that
+recovering the outcome of an uncommitted transaction should immediately abort
+the transaction.
+
+The second case is when a *single-shard* transaction is committed successfully
+on mongos A and then explicitly committed again on mongos B. Mongos B will also
+block until the transactionLifetimeLimitSeconds timeout is hit at which point
+``{ok:1}`` will be returned. `SERVER-39349`_ requests that recovering the
+outcome of a completed single-shard transaction should not block.
+Note that this test suite only includes single shard transactions.
+
+To workaround these issues, drivers SHOULD decrease the transaction timeout
+setting by running setParameter **on each shard**. Setting the timeout to 3
+seconds significantly speeds up the test suite without a high risk of
+prematurely timing out any tests' transactions. To decrease the timeout, run::
+
+  db.adminCommand( { setParameter: 1, transactionLifetimeLimitSeconds: 3 } )
+
+Note that mongo-orchestration >=0.6.13 automatically sets this timeout to 3
+seconds so drivers using mongo-orchestration do not need to run these commands
+manually.
+
+.. _SERVER-39726: https://jira.mongodb.org/browse/SERVER-39726
+
+.. _SERVER-39349: https://jira.mongodb.org/browse/SERVER-39349
+
+**Changelog**
+=============
+
+:2019-02-28: ``useMultipleMongoses: true`` and non-targeted fail points are
+             mutually exclusive.
+:2019-02-13: Modify test format for 4.2 sharded transactions, including
+             "useMultipleMongoses", ``object: testRunner``, the
+             ``targetedFailPoint`` operation, and recoveryToken assertions.

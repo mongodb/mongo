@@ -87,7 +87,7 @@
   revision = "73f8eece6fdcd902c185bf651de50f3828bed5ed"
 
 [[projects]]
-  digest = "1:b91e388223a5c6ca11b46504772777685b019e4c63503f0197beb9af19187bba"
+  digest = "1:305116d943d35382349686adfcef4786746272e77c2e7d2eba6b30caa94e2cf4"
   name = "go.mongodb.org/mongo-driver"
   packages = [
     "bson",
@@ -106,12 +106,12 @@
     "version",
     "x/bsonx",
     "x/bsonx/bsoncore",
-    "x/mongo/driver",
-    "x/mongo/driver/auth",
-    "x/mongo/driver/auth/internal/gssapi",
-    "x/mongo/driver/session",
-    "x/mongo/driver/topology",
-    "x/mongo/driver/uuid",
+    "x/mongo/driverlegacy",
+    "x/mongo/driverlegacy/auth",
+    "x/mongo/driverlegacy/auth/internal/gssapi",
+    "x/mongo/driverlegacy/session",
+    "x/mongo/driverlegacy/topology",
+    "x/mongo/driverlegacy/uuid",
     "x/network/address",
     "x/network/command",
     "x/network/compressor",
@@ -122,7 +122,7 @@
     "x/network/wiremessage",
   ]
   pruneopts = "UT"
-  revision = "51421e413403fe3c9b0097147841f752421133e4"
+  revision = "bb984ba94a90e2bdf108128bf6bef0c0505a4bc7"
 
 [[projects]]
   digest = "1:79784b4d6789bbd40f17a9d204051bdd887d889acbbdc24ed8263b3dca28dfbf"
@@ -157,20 +157,6 @@
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
   version = "v0.3.0"
 
-[[projects]]
-  digest = "1:d724ed97f2d61a000d808e99f52099de3a393b18ba92f30fcd0e100a4de84cb6"
-  name = "gopkg.in/mgo.v2"
-  packages = [
-    ".",
-    "bson",
-    "internal/json",
-    "internal/sasl",
-    "internal/scram",
-  ]
-  pruneopts = "UT"
-  revision = "8c133fd1d0fc316302df84fc12769e17fb473bb1"
-  source = "github.com/10gen/mgo"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
@@ -188,8 +174,6 @@
     "go.mongodb.org/mongo-driver/x/network/connection",
     "go.mongodb.org/mongo-driver/x/network/connstring",
     "golang.org/x/crypto/ssh/terminal",
-    "gopkg.in/mgo.v2",
-    "gopkg.in/mgo.v2/bson",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

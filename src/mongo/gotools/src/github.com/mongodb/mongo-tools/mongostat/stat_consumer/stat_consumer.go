@@ -87,7 +87,7 @@ func (sc *StatConsumer) FormatLines(lines []*line.StatLine) bool {
 	_, err := fmt.Fprintf(sc.writer, "%s", str)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error writing formatted output: %v", err)
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitFailure)
 	}
 	return sc.formatter.IsFinished()
 }

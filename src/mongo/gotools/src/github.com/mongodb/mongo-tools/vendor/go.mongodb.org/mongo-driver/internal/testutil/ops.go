@@ -11,17 +11,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/internal/testutil/helpers"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"go.mongodb.org/mongo-driver/x/bsonx"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/uuid"
 	"go.mongodb.org/mongo-driver/x/network/command"
 	"go.mongodb.org/mongo-driver/x/network/description"
-	"github.com/stretchr/testify/require"
 )
 
 // AutoCreateIndexes creates an index in the test cluster.
@@ -40,7 +40,7 @@ func AutoCreateIndexes(t *testing.T, keys []string) {
 		Indexes: bsonx.Arr{bsonx.Document(indexes)},
 	}
 	id, _ := uuid.New()
-	_, err := driver.CreateIndexes(
+	_, err := driverlegacy.CreateIndexes(
 		context.Background(),
 		cmd,
 		Topology(t),
@@ -60,7 +60,7 @@ func AutoDropCollection(t *testing.T) {
 func DropCollection(t *testing.T, dbname, colname string) {
 	cmd := command.Write{DB: dbname, Command: bsonx.Doc{{"drop", bsonx.String(colname)}}}
 	id, _ := uuid.New()
-	_, err := driver.Write(
+	_, err := driverlegacy.Write(
 		context.Background(),
 		cmd,
 		Topology(t),
@@ -76,7 +76,7 @@ func DropCollection(t *testing.T, dbname, colname string) {
 func autoDropDB(t *testing.T, topo *topology.Topology) {
 	cmd := command.Write{DB: DBName(t), Command: bsonx.Doc{{"dropDatabase", bsonx.Int32(1)}}}
 	id, _ := uuid.New()
-	_, err := driver.Write(
+	_, err := driverlegacy.Write(
 		context.Background(),
 		cmd,
 		topo,
@@ -98,7 +98,7 @@ func InsertDocs(t *testing.T, dbname, colname string, writeConcern *writeconcern
 
 	topo := Topology(t)
 	id, _ := uuid.New()
-	_, err := driver.Insert(
+	_, err := driverlegacy.Insert(
 		context.Background(),
 		cmd,
 		topo,

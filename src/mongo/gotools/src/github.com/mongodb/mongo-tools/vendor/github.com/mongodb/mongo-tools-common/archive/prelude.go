@@ -195,11 +195,6 @@ func (hpc *preludeParserConsumer) BodyBSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	cm.Collection, err = util.UnescapeCollectionName(cm.Collection)
-	if err != nil {
-		return err
-	}
-
 	hpc.prelude.AddMetadata(cm)
 	return nil
 }

@@ -71,11 +71,11 @@ func TestMongorestoreShortArchive(t *testing.T) {
 				In:      ioutil.NopCloser(io.LimitReader(file, i)),
 			}
 
-			err = restore.Restore()
+			result := restore.Restore()
 			if i == fileSize {
-				So(err, ShouldBeNil)
+				So(result.Err, ShouldBeNil)
 			} else {
-				So(err, ShouldNotBeNil)
+				So(result.Err, ShouldNotBeNil)
 			}
 			restore.Close()
 		}
@@ -98,7 +98,9 @@ func TestMongorestoreArchiveWithOplog(t *testing.T) {
 		restore, err := getRestoreWithArgs(args...)
 		So(err, ShouldBeNil)
 
-		err = restore.Restore()
-		So(err, ShouldBeNil)
+		result := restore.Restore()
+		So(result.Err, ShouldBeNil)
+		So(result.Failures, ShouldEqual, 0)
+		So(result.Successes, ShouldNotEqual, 0)
 	})
 }

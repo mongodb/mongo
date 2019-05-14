@@ -1,5 +1,6 @@
 # Test snapshot isolation.
 # This test doesn't check contents of command-started events.
+topology: [replicaset, sharded]
 database_name: &database_name "transaction-tests"
 collection_name: &collection_name "test"
 

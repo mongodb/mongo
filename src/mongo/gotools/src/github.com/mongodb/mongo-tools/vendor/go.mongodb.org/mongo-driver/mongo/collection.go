@@ -17,8 +17,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"go.mongodb.org/mongo-driver/x/bsonx"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
 	"go.mongodb.org/mongo-driver/x/network/command"
 	"go.mongodb.org/mongo-driver/x/network/description"
 	"go.mongodb.org/mongo-driver/x/network/result"
@@ -164,7 +164,7 @@ func (coll *Collection) BulkWrite(ctx context.Context, models []WriteModel,
 		return nil, err
 	}
 
-	dispatchModels := make([]driver.WriteModel, len(models))
+	dispatchModels := make([]driverlegacy.WriteModel, len(models))
 	for i, model := range models {
 		if model == nil {
 			return nil, ErrNilDocument
@@ -172,7 +172,7 @@ func (coll *Collection) BulkWrite(ctx context.Context, models []WriteModel,
 		dispatchModels[i] = model.convertModel()
 	}
 
-	res, err := driver.BulkWrite(
+	res, err := driverlegacy.BulkWrite(
 		ctx,
 		coll.namespace(),
 		dispatchModels,
@@ -187,26 +187,16 @@ func (coll *Collection) BulkWrite(ctx context.Context, models []WriteModel,
 		coll.registry,
 		opts...,
 	)
-
-	if err != nil {
-		if conv, ok := err.(driver.BulkWriteException); ok {
-			return &BulkWriteResult{}, BulkWriteException{
-				WriteConcernError: convertWriteConcernError(conv.WriteConcernError),
-				WriteErrors:       convertBulkWriteErrors(conv.WriteErrors),
-			}
-		}
-
-		return &BulkWriteResult{}, replaceErrors(err)
-	}
-
-	return &BulkWriteResult{
+	result := BulkWriteResult{
 		InsertedCount: res.InsertedCount,
 		MatchedCount:  res.MatchedCount,
 		ModifiedCount: res.ModifiedCount,
 		DeletedCount:  res.DeletedCount,
 		UpsertedCount: res.UpsertedCount,
 		UpsertedIDs:   res.UpsertedIDs,
-	}, nil
+	}
+
+	return &result, replaceErrors(err)
 }
 
 // InsertOne inserts a single document into the collection.
@@ -249,7 +239,7 @@ func (coll *Collection) InsertOne(ctx context.Context, document interface{},
 		insertOpts[i].BypassDocumentValidation = opt.BypassDocumentValidation
 	}
 
-	res, err := driver.Insert(
+	res, err := driverlegacy.Insert(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -316,7 +306,7 @@ func (coll *Collection) InsertMany(ctx context.Context, documents []interface{},
 		Clock:        coll.client.clock,
 	}
 
-	res, err := driver.Insert(
+	res, err := driverlegacy.Insert(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -395,7 +385,7 @@ func (coll *Collection) DeleteOne(ctx context.Context, filter interface{},
 		Clock:        coll.client.clock,
 	}
 
-	res, err := driver.Delete(
+	res, err := driverlegacy.Delete(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -447,7 +437,7 @@ func (coll *Collection) DeleteMany(ctx context.Context, filter interface{},
 		Clock:        coll.client.clock,
 	}
 
-	res, err := driver.Delete(
+	res, err := driverlegacy.Delete(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -494,7 +484,7 @@ func (coll *Collection) updateOrReplaceOne(ctx context.Context, filter,
 		Clock:        coll.client.clock,
 	}
 
-	r, err := driver.Update(
+	r, err := driverlegacy.Update(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -607,7 +597,7 @@ func (coll *Collection) UpdateMany(ctx context.Context, filter interface{}, upda
 		Clock:        coll.client.clock,
 	}
 
-	r, err := driver.Update(
+	r, err := driverlegacy.Update(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -721,7 +711,7 @@ func (coll *Collection) Aggregate(ctx context.Context, pipeline interface{},
 		Clock:        coll.client.clock,
 	}
 
-	batchCursor, err := driver.Aggregate(
+	batchCursor, err := driverlegacy.Aggregate(
 		ctx, cmd,
 		coll.client.topology,
 		coll.readSelector,
@@ -779,7 +769,7 @@ func (coll *Collection) CountDocuments(ctx context.Context, filter interface{},
 		Clock:       coll.client.clock,
 	}
 
-	count, err := driver.CountDocuments(
+	count, err := driverlegacy.CountDocuments(
 		ctx, cmd,
 		coll.client.topology,
 		coll.readSelector,
@@ -827,7 +817,7 @@ func (coll *Collection) EstimatedDocumentCount(ctx context.Context,
 		countOpts = countOpts.SetMaxTime(*opts[len(opts)-1].MaxTime)
 	}
 
-	count, err := driver.Count(
+	count, err := driverlegacy.Count(
 		ctx, cmd,
 		coll.client.topology,
 		coll.readSelector,
@@ -877,7 +867,7 @@ func (coll *Collection) Distinct(ctx context.Context, fieldName string, filter i
 		Clock:       coll.client.clock,
 	}
 
-	res, err := driver.Distinct(
+	res, err := driverlegacy.Distinct(
 		ctx, cmd,
 		coll.client.topology,
 		coll.readSelector,
@@ -927,7 +917,7 @@ func (coll *Collection) Find(ctx context.Context, filter interface{},
 		Clock:       coll.client.clock,
 	}
 
-	batchCursor, err := driver.Find(
+	batchCursor, err := driverlegacy.Find(
 		ctx, cmd,
 		coll.client.topology,
 		coll.readSelector,
@@ -1002,7 +992,7 @@ func (coll *Collection) FindOne(ctx context.Context, filter interface{},
 		}
 	}
 
-	batchCursor, err := driver.Find(
+	batchCursor, err := driverlegacy.Find(
 		ctx, cmd,
 		coll.client.topology,
 		coll.readSelector,
@@ -1054,7 +1044,7 @@ func (coll *Collection) FindOneAndDelete(ctx context.Context, filter interface{}
 		Clock:        coll.client.clock,
 	}
 
-	res, err := driver.FindOneAndDelete(
+	res, err := driverlegacy.FindOneAndDelete(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -1121,7 +1111,7 @@ func (coll *Collection) FindOneAndReplace(ctx context.Context, filter interface{
 		Clock:        coll.client.clock,
 	}
 
-	res, err := driver.FindOneAndReplace(
+	res, err := driverlegacy.FindOneAndReplace(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -1190,7 +1180,7 @@ func (coll *Collection) FindOneAndUpdate(ctx context.Context, filter interface{}
 		Clock:        coll.client.clock,
 	}
 
-	res, err := driver.FindOneAndUpdate(
+	res, err := driverlegacy.FindOneAndUpdate(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,
@@ -1251,7 +1241,7 @@ func (coll *Collection) Drop(ctx context.Context) error {
 		Session:      sess,
 		Clock:        coll.client.clock,
 	}
-	_, err = driver.DropCollection(
+	_, err = driverlegacy.DropCollection(
 		ctx, cmd,
 		coll.client.topology,
 		coll.writeSelector,

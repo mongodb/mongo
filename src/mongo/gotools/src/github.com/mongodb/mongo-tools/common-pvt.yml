@@ -233,10 +233,10 @@ buildvariants:
 #           macOS Buildvariant        #
 #######################################
 
-- name: macOS-1012-ssl
-  display_name: MacOS 10.12 SSL
+- name: macOS-1014-ssl
+  display_name: MacOS 10.14 SSL
   run_on:
-  - macos-1012
+  - macos-1014
   expansions:
     build_tags: "ssl"
   tasks: *atlas_live_tasks

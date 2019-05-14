@@ -354,7 +354,7 @@ func (b *Bucket) openDownloadStream(filter interface{}, opts ...*options.FindOpt
 	default:
 		fileLen = fileLenElem.Int64()
 	}
-	
+
 	if fileLen == 0 {
 		return newDownloadStream(nil, b.chunkSize, 0), nil
 	}

@@ -105,7 +105,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 		fileNeedsIOBuffer.ReleaseIOBuffer()
 	}
 
-	log.Logvf(log.Info, "applied %v ops", totalOps)
+	log.Logvf(log.Always, "applied %v oplog entries", totalOps)
 	if err := bsonSource.Err(); err != nil {
 		return fmt.Errorf("error reading oplog bson input: %v", err)
 	}

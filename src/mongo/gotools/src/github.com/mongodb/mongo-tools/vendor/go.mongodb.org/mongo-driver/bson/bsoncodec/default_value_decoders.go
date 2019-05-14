@@ -614,7 +614,7 @@ func (dvd DefaultValueDecoders) TimeDecodeValue(dc DecodeContext, vr bsonrw.Valu
 		return ValueDecoderError{Name: "TimeDecodeValue", Types: []reflect.Type{tTime}, Received: val}
 	}
 
-	val.Set(reflect.ValueOf(time.Unix(dt/1000, dt%1000*1000000)))
+	val.Set(reflect.ValueOf(time.Unix(dt/1000, dt%1000*1000000).UTC()))
 	return nil
 }
 

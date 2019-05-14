@@ -505,6 +505,9 @@ func MergeClientOptions(opts ...*ClientOptions) *ClientOptions {
 		if opt.ZlibLevel != nil {
 			c.ZlibLevel = opt.ZlibLevel
 		}
+		if opt.err != nil {
+			c.err = opt.err
+		}
 	}
 
 	return c

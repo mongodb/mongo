@@ -13,9 +13,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
 	"go.mongodb.org/mongo-driver/x/network/command"
 	"go.mongodb.org/mongo-driver/x/network/description"
 )
@@ -102,7 +102,7 @@ func (s *sessionImpl) AbortTransaction(ctx context.Context) error {
 	}
 
 	s.Aborting = true
-	_, err = driver.AbortTransaction(ctx, cmd, s.topo, description.WriteSelector())
+	_, err = driverlegacy.AbortTransaction(ctx, cmd, s.topo, description.WriteSelector())
 
 	_ = s.Client.AbortTransaction()
 	return replaceErrors(err)
@@ -136,7 +136,7 @@ func (s *sessionImpl) CommitTransaction(ctx context.Context) error {
 			s.Committing = false
 		}()
 	}
-	_, err = driver.CommitTransaction(ctx, cmd, s.topo, description.WriteSelector())
+	_, err = driverlegacy.CommitTransaction(ctx, cmd, s.topo, description.WriteSelector())
 	if err == nil {
 		return s.Client.CommitTransaction()
 	}

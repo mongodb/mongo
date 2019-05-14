@@ -26,8 +26,8 @@ func main() {
 
 	if err != nil {
 		log.Logv(log.Always, err.Error())
-		log.Logvf(log.Always, "try 'mongorestore --help' for more information")
-		os.Exit(util.ExitBadOptions)
+		log.Logvf(log.Always, util.ShortUsage("mongorestore"))
+		os.Exit(util.ExitFailure)
 	}
 
 	// print help or version info, if specified
@@ -42,18 +42,26 @@ func main() {
 	restore, err := mongorestore.New(opts)
 	if err != nil {
 		log.Logvf(log.Always, err.Error())
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitFailure)
 	}
 	defer restore.Close()
 
 	finishedChan := signals.HandleWithInterrupt(restore.HandleInterrupt)
 	defer close(finishedChan)
 
-	if err = restore.Restore(); err != nil {
-		log.Logvf(log.Always, "Failed: %v", err)
-		if err == util.ErrTerminated {
-			os.Exit(util.ExitKill)
-		}
-		os.Exit(util.ExitError)
+	result := restore.Restore()
+	if result.Err != nil {
+		log.Logvf(log.Always, "Failed: %v", result.Err)
 	}
+
+	if restore.ToolOptions.WriteConcern.Acknowledged() {
+		log.Logvf(log.Always, "%v document(s) restored successfully. %v document(s) failed to restore.", result.Successes, result.Failures)
+	} else {
+		log.Logvf(log.Always, "done")
+	}
+
+	if result.Err != nil {
+		os.Exit(util.ExitFailure)
+	}
+	os.Exit(util.ExitSuccess)
 }

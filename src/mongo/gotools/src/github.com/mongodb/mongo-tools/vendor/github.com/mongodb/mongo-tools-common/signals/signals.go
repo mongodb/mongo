@@ -55,7 +55,7 @@ func handleSignals(finalizer func(), finishedChan chan struct{}) {
 	case sig := <-sigChan:
 		// second signal exits immediately
 		log.Logvf(log.Always, "signal '%s' received; forcefully terminating", sig)
-		os.Exit(util.ExitKill)
+		os.Exit(util.ExitFailure)
 	case <-finishedChan:
 		return
 	}

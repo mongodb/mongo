@@ -35,12 +35,21 @@
 //    if err != nil { log.Fatal(err) }
 //    defer cur.Close(context.Background())
 //    for cur.Next(context.Background()) {
-//       raw, err := cur.DecodeBytes()
-//       if err != nil { log.Fatal(err) }
-//       // do something with elem....
+//      // To decode into a struct, use cursor.Decode()
+//      result := struct{
+//        Foo string
+//        Bar int32
+//      }{}
+//      err := cur.Decode(&result)
+//      if err != nil { log.Fatal(err) }
+//      // do something with result...
+//
+//      // To get the raw bson bytes use cursor.Current
+//      raw := cur.Current
+//      // do something with raw...
 //    }
 //    if err := cur.Err(); err != nil {
-//    		return err
+//      return err
 //    }
 //
 // Methods that only return a single document will return a *SingleResult, which works
@@ -60,4 +69,13 @@
 //
 // Additional examples can be found under the examples directory in the driver's repository and
 // on the MongoDB website.
+//
+// Potential DNS Issues
+//
+// Building with Go 1.11+ and using connection strings with the "mongodb+srv"[1] scheme is
+// incompatible with some DNS servers in the wild due to the change introduced in
+// https://github.com/golang/go/issues/10622. If you receive an error with the message "cannot
+// unmarshal DNS message" while running an operation, we suggest you use a different DNS server.
+//
+// [1] See https://docs.mongodb.com/manual/reference/connection-string/#dns-seedlist-connection-format
 package mongo

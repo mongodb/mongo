@@ -8,6 +8,6 @@ package integration // import "go.mongodb.org/mongo-driver/x/network/integration
 
 import (
 	// These imports are for coverage information.
-	_ "go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	_ "go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
 	_ "go.mongodb.org/mongo-driver/x/network/connection"
 )

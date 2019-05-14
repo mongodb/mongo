@@ -18,7 +18,6 @@ import (
 	"sync/atomic"
 
 	"github.com/mongodb/mongo-tools-common/bsonutil"
-	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/mongodb/mongo-tools-common/log"
 	"github.com/mongodb/mongo-tools-common/util"
 	"go.mongodb.org/mongo-driver/bson"
@@ -233,30 +232,6 @@ func getUpsertValue(field string, document bson.D) interface{} {
 		log.Logvf(log.DebugHigh, "subdoc found for '%v', but couldn't coerce to bson.D", left)
 		return nil
 	}
-}
-
-// filterIngestError accepts a boolean indicating if a non-nil error should be,
-// returned as an actual error.
-//
-// If the error indicates an unreachable server, it returns that immediately.
-//
-// If the error indicates an invalid write concern was passed, it returns nil
-//
-// If the error is not nil, it logs the error. If the error is an io.EOF error -
-// indicating a lost connection to the server, it sets the error as such.
-//
-func filterIngestError(stopOnError bool, err error) error {
-	if err == nil {
-		return nil
-	}
-	if err.Error() == io.EOF.Error() {
-		return fmt.Errorf(db.ErrLostConnection)
-	}
-	if stopOnError || db.IsConnectionError(err) {
-		return err
-	}
-	log.Logvf(log.Always, "error inserting documents: %v", err)
-	return nil
 }
 
 // removeBlankFields takes document and returns a new copy in which

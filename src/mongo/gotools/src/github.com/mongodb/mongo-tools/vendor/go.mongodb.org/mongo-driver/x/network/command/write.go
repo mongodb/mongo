@@ -15,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"go.mongodb.org/mongo-driver/x/bsonx"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
 	"go.mongodb.org/mongo-driver/x/network/description"
 	"go.mongodb.org/mongo-driver/x/network/wiremessage"
 )
@@ -175,12 +175,17 @@ func (w *Write) Decode(desc description.SelectedServer, wm wiremessage.WireMessa
 	}
 
 	if w.err != nil {
-		if _, ok := w.err.(Error); !ok {
+		cerr, ok := w.err.(Error)
+		if !ok {
 			return w
+		}
+		if cerr.HasErrorLabel(TransientTransactionError) {
+			w.Session.ClearPinnedServer()
 		}
 	}
 
 	_ = updateClusterTimes(w.Session, w.Clock, w.result)
+	w.Session.UpdateRecoveryToken(w.result)
 
 	if writeconcern.AckWrite(w.WriteConcern) {
 		// don't update session operation time for unacknowledged write
@@ -216,6 +221,7 @@ func (w *Write) RoundTrip(ctx context.Context, desc description.SelectedServer, 
 			return nil, err
 		}
 		// Connection errors are transient
+		w.Session.ClearPinnedServer()
 		return nil, Error{Message: err.Error(), Labels: []string{TransientTransactionError, NetworkError}}
 	}
 
@@ -232,6 +238,7 @@ func (w *Write) RoundTrip(ctx context.Context, desc description.SelectedServer, 
 			return nil, err
 		}
 		// Connection errors are transient
+		w.Session.ClearPinnedServer()
 		return nil, Error{Message: err.Error(), Labels: []string{TransientTransactionError, NetworkError}}
 	}
 

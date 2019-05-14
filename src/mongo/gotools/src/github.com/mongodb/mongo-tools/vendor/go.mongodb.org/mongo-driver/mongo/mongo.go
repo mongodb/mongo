@@ -233,7 +233,7 @@ func countDocumentsAggregatePipeline(registry *bsoncodec.Registry, filter interf
 
 	pipeline = append(pipeline, bsonx.Document(bsonx.Doc{
 		{"$group", bsonx.Document(bsonx.Doc{
-			{"_id", bsonx.Null()},
+			{"_id", bsonx.Int32(1)},
 			{"n", bsonx.Document(bsonx.Doc{{"$sum", bsonx.Int32(1)}})},
 		})},
 	},

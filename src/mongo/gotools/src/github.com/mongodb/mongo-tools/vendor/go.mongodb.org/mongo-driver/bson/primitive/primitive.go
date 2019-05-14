@@ -37,7 +37,17 @@ type DateTime int64
 
 // MarshalJSON marshal to time type
 func (d DateTime) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Unix(int64(d)/1000, int64(d)%1000*1000000))
+	return json.Marshal(d.Time())
+}
+
+// Time returns the date as a time type.
+func (d DateTime) Time() time.Time {
+	return time.Unix(int64(d)/1000, int64(d)%1000*1000000)
+}
+
+// NewDateTimeFromTime creates a new DateTime from a Time.
+func NewDateTimeFromTime(t time.Time) DateTime {
+	return DateTime(t.UnixNano() / 1000000)
 }
 
 // Null repreesnts the BSON null value.

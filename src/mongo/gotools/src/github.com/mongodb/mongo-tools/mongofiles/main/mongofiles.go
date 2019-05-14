@@ -26,31 +26,36 @@ func main() {
 	opts, err := mongofiles.ParseOptions(os.Args[1:], VersionStr, GitCommit)
 	if err != nil {
 		log.Logv(log.Always, err.Error())
-		os.Exit(util.ExitBadOptions)
+		log.Logv(log.Always, util.ShortUsage("mongofiles"))
+		os.Exit(util.ExitFailure)
 	}
 
 	signals.Handle()
 
 	// print help, if specified
 	if opts.PrintHelp(false) {
-		os.Exit(util.ExitClean)
+		os.Exit(util.ExitSuccess)
 	}
 
 	// print version, if specified
 	if opts.PrintVersion() {
-		os.Exit(util.ExitClean)
+		os.Exit(util.ExitSuccess)
 	}
 
 	mf, err := mongofiles.New(opts)
 	if err != nil {
 		log.Logv(log.Always, err.Error())
+		if setupErr, ok := err.(util.SetupError); ok && setupErr.Message != "" {
+			log.Logvf(log.Always, setupErr.Message)
+		}
+		os.Exit(util.ExitFailure)
 	}
 	defer mf.Close()
 
 	output, err := mf.Run(true)
 	if err != nil {
 		log.Logvf(log.Always, "Failed: %v", err)
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitFailure)
 	}
 	fmt.Printf("%s", output)
 }

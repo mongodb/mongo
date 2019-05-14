@@ -1,10 +1,10 @@
 # Test that all the operations go to the same mongos.
 #
-# The assertion is implicit: that all the read operations succeed.
-# If the driver does not properly pin to a single mongos then one of the
-# operations in a transaction will eventually be sent to a different mongos,
-# which is unaware of the transaction, and the mongos will return a command
-# error. An example of such an error is:
+# In tests that don't include command-started events the assertion is implicit:
+# that all the read operations succeed. If the driver does not properly pin to
+# a single mongos then one of the operations in a transaction will eventually
+# be sent to a different mongos, which is unaware of the transaction, and the
+# mongos will return a command error. An example of such an error is:
 # {
 #   'ok': 0.0,
 #   'errmsg': 'cannot continue txnId -1 for session 28938f50-9d29-4ca5-8de5-ddaf261267c4 - 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU= with txnId 1',
@@ -12,19 +12,20 @@
 #   'codeName': 'NoSuchTransaction',
 #   'errorLabels': ['TransientTransactionError']
 # }
-#
-# This test doesn't check contents of command-started events.
-# Note: these tests should also pass when run against a replica set.
+topology: [sharded]
 database_name: &database_name "transaction-tests"
 collection_name: &collection_name "test"
+
 data: &data
   - {_id: 1}
   - {_id: 2}
 
 tests:
   - description: countDocuments
+    useMultipleMongoses: true
     operations:
-      - name: startTransaction
+      - &startTransaction
+        name: startTransaction
         object: session0
       - &countDocuments
         name: countDocuments
@@ -41,7 +42,8 @@ tests:
       - *countDocuments
       - *countDocuments
       - *countDocuments
-      - name: commitTransaction
+      - &commitTransaction
+        name: commitTransaction
         object: session0
 
     outcome:
@@ -49,9 +51,9 @@ tests:
         data: *data
 
   - description: distinct
+    useMultipleMongoses: true
     operations:
-      - name: startTransaction
-        object: session0
+      - *startTransaction
       - &distinct
         name: distinct
         object: collection
@@ -66,14 +68,14 @@ tests:
       - *distinct
       - *distinct
       - *distinct
-      - name: commitTransaction
-        object: session0
+      - *commitTransaction
 
     outcome:
       collection:
         data: *data
 
   - description: find
+    useMultipleMongoses: true
     operations:
       - name: startTransaction
         object: session0
@@ -93,14 +95,14 @@ tests:
       - *find
       - *find
       - *find
-      - name: commitTransaction
-        object: session0
+      - *commitTransaction
 
     outcome:
       collection:
         data: *data
 
   - description: insertOne
+    useMultipleMongoses: true
     operations:
       - name: startTransaction
         object: session0
@@ -168,8 +170,7 @@ tests:
           session: session0
         result:
           insertedId: 10
-      - name: commitTransaction
-        object: session0
+      - *commitTransaction
 
     outcome:
       collection:
@@ -186,6 +187,7 @@ tests:
           - {_id: 10}
 
   - description: mixed read write operations
+    useMultipleMongoses: true
     operations:
       - name: startTransaction
         object: session0
@@ -241,8 +243,7 @@ tests:
           session: session0
         result:
           insertedId: 7
-      - name: commitTransaction
-        object: session0
+      - *commitTransaction
 
     outcome:
       collection:
@@ -256,6 +257,7 @@ tests:
           - {_id: 7}
 
   - description: multiple commits
+    useMultipleMongoses: true
     operations:
       - name: startTransaction
         object: session0
@@ -268,26 +270,24 @@ tests:
           session: session0
         result:
           insertedIds: {0: 3, 1: 4}
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
-      - name: commitTransaction
-        object: session0
+      # Session is pinned and remains pinned after successful commits.
+      - &assertSessionPinned
+        name: assertSessionPinned
+        object: testRunner
+        arguments:
+          session: session0
+      - *commitTransaction
+      - *assertSessionPinned
+      - *commitTransaction
+      - *commitTransaction
+      - *commitTransaction
+      - *commitTransaction
+      - *commitTransaction
+      - *commitTransaction
+      - *commitTransaction
+      - *commitTransaction
+      - *commitTransaction
+      - *assertSessionPinned
 
     outcome:
       collection:
@@ -296,3 +296,257 @@ tests:
           - {_id: 2}
           - {_id: 3}
           - {_id: 4}
+
+  - description: remain pinned after non-transient error on commit
+    useMultipleMongoses: true
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertMany
+        object: collection
+        arguments:
+          documents:
+            - _id: 3
+            - _id: 4
+          session: session0
+        result:
+          insertedIds: {0: 3, 1: 4}
+      # Session is pinned.
+      - *assertSessionPinned
+      # Fail the commit with a non-transient error, eg MaxTimeMSExpired.
+      - name: targetedFailPoint
+        object: testRunner
+        arguments:
+          session: session0
+          failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+              failCommands: ["commitTransaction"]
+              errorCode: 50 # MaxTimeMSExpired
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsOmit: ["TransientTransactionError"]
+          errorCode: 50
+      - *assertSessionPinned
+      # The next commit should succeed.
+      - name: commitTransaction
+        object: session0
+      - *assertSessionPinned
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+          - {_id: 3}
+          - {_id: 4}
+
+  - description: unpin after transient error within a transaction
+    useMultipleMongoses: true
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 3
+        result:
+          insertedId: 3
+      # Enable the fail point only on the Mongos that session0 is pinned to.
+      - name: targetedFailPoint
+        object: testRunner
+        arguments:
+          session: session0
+          failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+              failCommands: ["insert"]
+              closeConnection: true
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 4
+        result:
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      # Session unpins from the first mongos after the insert error and
+      # abortTransaction succeeds immediately on any mongos.
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 3
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 4
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+            recoveryToken:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+          - _id: 2
+
+  # Applications should not run commitTransaction after transient errors but
+  # the transactions API allows it and this test confirms unpinning behavior.
+  # In a sharded cluster, a transient error within a transaction unpins the
+  # session. This way a subsequent abort can "succeed" immediately instead of
+  # blocking for serverSelectionTimeoutMS in the case the mongos went down.
+  # However since the abortTransaction helper ignores errors, this test uses
+  # commitTransaction to prove the session was unpinned.
+  - description: unpin after transient error within a transaction and commit
+    useMultipleMongoses: true
+    clientOptions:
+      # Increase heartbeatFrequencyMS to avoid the race condition where an in
+      # flight heartbeat refreshes the first mongoes' SDAM state in between
+      # the insert connection error and the single commit attempt.
+      heartbeatFrequencyMS: 30000
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 3
+        result:
+          insertedId: 3
+      # Enable the fail point only on the Mongos that session0 is pinned to.
+      # Fail isMaster to prevent the heartbeat requested directly after the
+      # insert error from racing with server selection for the commit.
+      # Note: times: 7 is slightly artbitrary but it accounts for one failed
+      # insert and some SDAM heartbeats. A test runner will have multiple
+      # clients connected to this server so this fail point configuration
+      # is also racy.
+      - name: targetedFailPoint
+        object: testRunner
+        arguments:
+          session: session0
+          failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 7 }
+            data:
+              failCommands: ["insert", "isMaster"]
+              closeConnection: true
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 4
+        result:
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+      # Session unpins from the first mongos after the insert error and
+      # commitTransaction selects the second mongos which is unaware of the
+      # transaction and therefore fails with NoSuchTransaction error. If this
+      # commit succeeds it indicates a bug, either:
+      # - the driver mistakenly remained pinned even after the insert error, or
+      # - the test client was initialized with a single mongos seed
+      #
+      # Note that the commit attempt should not select the original mongos
+      # because that server's SDAM state is reset by the connection error,
+      # heartbeatFrequencyMS is high, and subsequent isMaster heartbeats
+      # should fail.
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsContain: ["TransientTransactionError"]
+          errorLabelsOmit: ["UnknownTransactionCommitResult"]
+          errorCodeName: NoSuchTransaction
+
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 3
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 4
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+            recoveryToken: 42
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+          - _id: 2

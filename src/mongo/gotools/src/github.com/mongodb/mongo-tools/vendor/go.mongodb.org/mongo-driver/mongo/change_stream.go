@@ -18,8 +18,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
 	"go.mongodb.org/mongo-driver/x/network/command"
 	"go.mongodb.org/mongo-driver/x/network/description"
 )
@@ -216,7 +216,7 @@ func (cs *ChangeStream) runCommand(ctx context.Context, replaceOptions bool) err
 		return replaceErrors(err)
 	}
 
-	batchCursor, err := driver.NewBatchCursor(bsoncore.Document(rdr), readCmd.Session, readCmd.Clock, ss.Server, cs.getMoreOpts...)
+	batchCursor, err := driverlegacy.NewBatchCursor(bsoncore.Document(rdr), readCmd.Session, readCmd.Clock, ss.Server, cs.getMoreOpts...)
 	if err != nil {
 		cs.sess.EndSession(ctx)
 		return replaceErrors(err)
@@ -462,7 +462,7 @@ func (cs *ChangeStream) Next(ctx context.Context) bool {
 			}
 		}
 
-		_, _ = driver.KillCursors(ctx, cs.ns, cs.cursor.bc.Server(), cs.ID())
+		_, _ = driverlegacy.KillCursors(ctx, cs.ns, cs.cursor.bc.Server(), cs.ID())
 
 		cs.err = cs.runCommand(ctx, true)
 		if cs.err != nil {

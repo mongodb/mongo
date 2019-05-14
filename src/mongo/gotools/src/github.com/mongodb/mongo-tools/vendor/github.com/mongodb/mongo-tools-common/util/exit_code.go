@@ -11,13 +11,27 @@ import (
 )
 
 const (
-	ExitError      int = 1
-	ExitClean      int = 0
-	ExitBadOptions int = 3
-	ExitKill       int = 4
-	// Go reserves exit code 2 for its own use
+	ExitSuccess int = iota
+	ExitFailure
 )
 
 var (
 	ErrTerminated = errors.New("received termination signal")
 )
+
+func ShortUsage(tool string) string {
+	return "try '" + tool + " --help' for more information"
+}
+
+// SetupError is the error thrown by "New" functions used to convey what error occurred and the appropriate exit code.
+type SetupError struct {
+	Err error
+
+	// An optional message to be logged before exiting
+	Message string
+}
+
+// Error implements the error interface.
+func (se SetupError) Error() string {
+	return se.Err.Error()
+}

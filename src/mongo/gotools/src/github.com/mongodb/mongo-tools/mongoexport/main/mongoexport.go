@@ -25,8 +25,8 @@ func main() {
 	opts, err := mongoexport.ParseOptions(os.Args[1:], VersionStr, GitCommit)
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
-		log.Logvf(log.Always, "try 'mongoexport --help' for more information")
-		os.Exit(util.ExitBadOptions)
+		log.Logvf(log.Always, util.ShortUsage("mongoexport"))
+		os.Exit(util.ExitFailure)
 	}
 
 	signals.Handle()
@@ -45,19 +45,18 @@ func main() {
 	if err != nil {
 		log.Logvf(log.Always, "%v", err)
 
-		if se, ok := err.(mongoexport.SetupError); ok {
-			os.Exit(se.Code)
+		if se, ok := err.(util.SetupError); ok && se.Message != "" {
+			log.Logv(log.Always, se.Message)
 		}
 
-		// default to ExitError if a different type of error was thrown
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitFailure)
 	}
 	defer exporter.Close()
 
 	writer, err := exporter.GetOutputWriter()
 	if err != nil {
 		log.Logvf(log.Always, "error opening output stream: %v", err)
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitFailure)
 	}
 	if writer == nil {
 		writer = os.Stdout
@@ -68,7 +67,7 @@ func main() {
 	numDocs, err := exporter.Export(writer)
 	if err != nil {
 		log.Logvf(log.Always, "Failed: %v", err)
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitFailure)
 	}
 
 	if numDocs == 1 {

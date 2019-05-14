@@ -64,13 +64,13 @@ type IngestOptions struct {
 	IgnoreBlanks bool `long:"ignoreBlanks" description:"ignore fields with empty values in CSV and TSV"`
 
 	// Indicates that documents will be inserted in the order of their appearance in the input source.
-	MaintainInsertionOrder bool `long:"maintainInsertionOrder" description:"insert documents in the order of their appearance in the input source"`
+	MaintainInsertionOrder bool `long:"maintainInsertionOrder" description:"insert the documents in the order of their appearance in the input source. By default the insertions will be performed in an arbitrary order. Setting this flag also enables the behavior of --stopOnError and restricts NumInsertionWorkers to 1."`
 
 	// Sets the number of insertion routines to use
 	NumInsertionWorkers int `short:"j" value-name:"<number>" long:"numInsertionWorkers" description:"number of insert operations to run concurrently (defaults to 1)" default:"1" default-mask:"-"`
 
 	// Forces mongoimport to halt the import operation at the first insert or upsert error.
-	StopOnError bool `long:"stopOnError" description:"stop importing at first insert/upsert error"`
+	StopOnError bool `long:"stopOnError" description:"halt after encountering any error during importing. By default, mongoimport will attempt to continue through document validation and DuplicateKey errors, but with this option enabled, the tool will stop instead. A small number of documents may be inserted after encountering an error even with this option enabled; use --maintainInsertionOrder to halt immediately after an error"`
 
 	// Modify the import process.
 	// Always insert the documents if they are new (do NOT match --upsertFields).

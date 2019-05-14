@@ -23,10 +23,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/uuid"
 	"go.mongodb.org/mongo-driver/x/network/command"
 	"go.mongodb.org/mongo-driver/x/network/description"
 )
@@ -136,7 +136,7 @@ func work(ctx context.Context, idx int, c *topology.Topology) {
 				Pipeline: pipeline,
 				ReadPref: rp,
 			}
-			cursor, err := driver.Aggregate(
+			cursor, err := driverlegacy.Aggregate(
 				ctx, cmd, c,
 				description.ReadPrefSelector(rp),
 				description.ReadPrefSelector(rp),

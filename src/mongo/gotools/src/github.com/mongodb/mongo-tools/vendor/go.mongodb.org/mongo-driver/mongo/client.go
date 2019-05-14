@@ -18,11 +18,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/auth"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/uuid"
 	"go.mongodb.org/mongo-driver/x/network/command"
 	"go.mongodb.org/mongo-driver/x/network/connection"
 	"go.mongodb.org/mongo-driver/x/network/connstring"
@@ -187,7 +187,7 @@ func (c *Client) endSessions(ctx context.Context) {
 		SessionIDs: c.topology.SessionPool.IDSlice(),
 	}
 
-	_, _ = driver.EndSessions(ctx, cmd, c.topology, description.ReadPrefSelector(readpref.PrimaryPreferred()))
+	_, _ = driverlegacy.EndSessions(ctx, cmd, c.topology, description.ReadPrefSelector(readpref.PrimaryPreferred()))
 }
 
 func (c *Client) configure(opts *options.ClientOptions) error {
@@ -230,7 +230,9 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 		))
 	}
 	// Handshaker
-	var handshaker connection.Handshaker = &command.Handshake{Client: command.ClientDoc(appName), Compressors: comps}
+	var handshaker = func(connection.Handshaker) connection.Handshaker {
+		return &command.Handshake{Client: command.ClientDoc(appName), Compressors: comps}
+	}
 	// Auth & Database & Password & Username
 	if opts.Auth != nil {
 		cred := &auth.Cred{
@@ -272,11 +274,11 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 			}
 		}
 
-		handshaker = auth.Handshaker(nil, handshakeOpts)
+		handshaker = func(connection.Handshaker) connection.Handshaker {
+			return auth.Handshaker(nil, handshakeOpts)
+		}
 	}
-	connOpts = append(connOpts, connection.WithHandshaker(
-		func(connection.Handshaker) connection.Handshaker { return handshaker },
-	))
+	connOpts = append(connOpts, connection.WithHandshaker(handshaker))
 	// ConnectTimeout
 	if opts.ConnectTimeout != nil {
 		serverOpts = append(serverOpts, topology.WithHeartbeatTimeout(
@@ -444,7 +446,7 @@ func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...
 		description.ReadPrefSelector(readpref.Primary()),
 		description.LatencySelector(c.localThreshold),
 	})
-	res, err := driver.ListDatabases(
+	res, err := driverlegacy.ListDatabases(
 		ctx, cmd,
 		c.topology,
 		readSelector,
@@ -529,6 +531,9 @@ func (c *Client) UseSessionWithOptions(ctx context.Context, opts *options.Sessio
 // The client must have read concern majority or no read concern for a change stream to be created successfully.
 func (c *Client) Watch(ctx context.Context, pipeline interface{},
 	opts ...*options.ChangeStreamOptions) (*ChangeStream, error) {
+	if c.topology.SessionPool == nil {
+		return nil, ErrClientDisconnected
+	}
 
 	return newClientChangeStream(ctx, c, pipeline, opts...)
 }

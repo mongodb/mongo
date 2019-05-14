@@ -11,10 +11,11 @@ package db
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"time"
 
-	"go.mongodb.org/mongo-driver/x/network/connection"
-
+	"github.com/mongodb/mongo-tools-common/log"
 	"github.com/mongodb/mongo-tools-common/options"
 	"github.com/mongodb/mongo-tools-common/password"
 	"go.mongodb.org/mongo-driver/bson"
@@ -22,11 +23,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	mopt "go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-
-	"fmt"
-	"io"
-	"strings"
-	"sync"
+	"go.mongodb.org/mongo-driver/x/network/connection"
 )
 
 type (
@@ -66,6 +63,17 @@ const (
 	ErrUnableToTargetPrefix         = "unable to target"
 	ErrNotMaster                    = "not master"
 	ErrConnectionRefusedSuffix      = "Connection refused"
+
+	// ignorable errors
+	ErrDuplicateKeyCode         = 11000
+	ErrFailedDocumentValidation = 121
+	ErrUnacknowledgedWrite      = "unacknowledged write"
+)
+
+var ignorableWriteErrorCodes = map[int]bool{ErrDuplicateKeyCode: true, ErrFailedDocumentValidation: true}
+
+const (
+	continueThroughErrorFormat = "continuing through error: %v"
 )
 
 // Used to manage database sessions
@@ -237,32 +245,56 @@ func configureClient(opts options.ToolOptions) (*mongo.Client, error) {
 	return mongo.NewClient(uriOpts, clientopt)
 }
 
-// IsConnectionError returns a boolean indicating if a given error is due to
-// an error in an underlying DB connection (as opposed to some other write
-// failure such as a duplicate key error)
-func IsConnectionError(err error) bool {
+// FilterError determines whether an error needs to be propagated back to the user or can be continued through. If an
+// error cannot be ignored, a non-nil error is returned. If an error can be continued through, it is logged and nil is
+// returned.
+func FilterError(stopOnError bool, err error) error {
+	if err == nil || err.Error() == ErrUnacknowledgedWrite {
+		return nil
+	}
+
+	if !stopOnError && CanIgnoreError(err) {
+		// Just log the error but don't propagate it.
+		if bwe, ok := err.(mongo.BulkWriteException); ok {
+			for _, be := range bwe.WriteErrors {
+				log.Logvf(log.Always, continueThroughErrorFormat, be.Message)
+			}
+		} else {
+			log.Logvf(log.Always, continueThroughErrorFormat, err)
+		}
+		return nil
+	}
+	// Propagate this error, since it's either a fatal error or the user has turned on --stopOnError
+	return err
+}
+
+// Returns whether the tools can continue when encountering the given error.
+// Currently, only DuplicateKeyErrors are ignorable.
+func CanIgnoreError(err error) bool {
 	if err == nil {
-		return false
-	}
-
-	// The new driver stringifies command errors as "(Name) Message" rather than just "message". Cast to the
-	// CommandError type if possible to extract the correct error message.
-	errMsg := err.Error()
-	if cmdErr, ok := err.(mongo.CommandError); ok {
-		errMsg = cmdErr.Message
-	}
-
-	lowerCaseError := strings.ToLower(errMsg)
-	if lowerCaseError == ErrNoReachableServers ||
-		err == io.EOF ||
-		strings.Contains(lowerCaseError, ErrReplTimeoutPrefix) ||
-		strings.Contains(lowerCaseError, ErrCouldNotContactPrimaryPrefix) ||
-		strings.Contains(lowerCaseError, ErrWriteResultsUnavailable) ||
-		strings.Contains(lowerCaseError, ErrCouldNotFindPrimaryPrefix) ||
-		strings.Contains(lowerCaseError, ErrUnableToTargetPrefix) ||
-		strings.Contains(lowerCaseError, ErrNotMaster) ||
-		strings.HasSuffix(lowerCaseError, ErrConnectionRefusedSuffix) {
 		return true
 	}
+
+	switch mongoErr := err.(type) {
+	case mongo.WriteError:
+		_, ok := ignorableWriteErrorCodes[mongoErr.Code]
+		return ok
+	case mongo.BulkWriteException:
+		for _, writeErr := range mongoErr.WriteErrors {
+			if _, ok := ignorableWriteErrorCodes[writeErr.Code]; !ok {
+				return false
+			}
+		}
+
+		if mongoErr.WriteConcernError != nil {
+			log.Logvf(log.Always, "write concern error when inserting documents: %v", mongoErr.WriteConcernError)
+			return false
+		}
+		return true
+	case mongo.CommandError:
+		_, ok := ignorableWriteErrorCodes[int(mongoErr.Code)]
+		return ok
+	}
+
 	return false
 }

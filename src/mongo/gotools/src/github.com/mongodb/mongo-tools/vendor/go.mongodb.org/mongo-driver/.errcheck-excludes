@@ -1,7 +1,7 @@
 (*go.mongodb.org/mongo-driver/x/network/connection.connection).Close
 (go.mongodb.org/mongo-driver/x/network/connection.Connection).Close
-(*go.mongodb.org/mongo-driver/x/mongo/driver/topology.Subscription).Unsubscribe
-(*go.mongodb.org/mongo-driver/x/mongo/driver/topology.Server).Close
+(*go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology.Subscription).Unsubscribe
+(*go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology.Server).Close
 (*go.mongodb.org/mongo-driver/x/network/connection.pool).closeConnection
 (go.mongodb.org/mongo-driver/x/network/wiremessage.ReadWriteCloser).Close
 (*go.mongodb.org/mongo-driver/mongo.Cursor).Close

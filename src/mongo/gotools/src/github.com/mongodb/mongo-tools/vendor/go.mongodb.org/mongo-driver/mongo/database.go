@@ -14,7 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
 	"go.mongodb.org/mongo-driver/x/network/command"
 	"go.mongodb.org/mongo-driver/x/network/description"
 )
@@ -141,7 +141,7 @@ func (db *Database) RunCommand(ctx context.Context, runCommand interface{}, opts
 		return &SingleResult{err: err}
 	}
 
-	doc, err := driver.Read(ctx,
+	doc, err := driverlegacy.Read(ctx,
 		readCmd,
 		db.client.topology,
 		readSelect,
@@ -164,7 +164,7 @@ func (db *Database) RunCommandCursor(ctx context.Context, runCommand interface{}
 		return nil, err
 	}
 
-	batchCursor, err := driver.ReadCursor(
+	batchCursor, err := driverlegacy.ReadCursor(
 		ctx,
 		readCmd,
 		db.client.topology,
@@ -198,7 +198,7 @@ func (db *Database) Drop(ctx context.Context) error {
 		Session: sess,
 		Clock:   db.client.clock,
 	}
-	_, err = driver.DropDatabase(
+	_, err = driverlegacy.DropDatabase(
 		ctx, cmd,
 		db.client.topology,
 		db.writeSelector,
@@ -241,7 +241,7 @@ func (db *Database) ListCollections(ctx context.Context, filter interface{}, opt
 		description.ReadPrefSelector(readpref.Primary()),
 		description.LatencySelector(db.client.localThreshold),
 	})
-	batchCursor, err := driver.ListCollections(
+	batchCursor, err := driverlegacy.ListCollections(
 		ctx, cmd,
 		db.client.topology,
 		readSelector,

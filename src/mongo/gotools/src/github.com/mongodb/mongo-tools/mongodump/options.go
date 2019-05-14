@@ -7,9 +7,6 @@
 package mongodump
 
 import (
-	"github.com/mongodb/mongo-tools-common/options"
-	"go.mongodb.org/mongo-driver/x/network/connstring"
-
 	"fmt"
 	"io/ioutil"
 )
@@ -26,21 +23,13 @@ See http://docs.mongodb.org/manual/reference/program/mongodump/ for more informa
 type InputOptions struct {
 	Query          string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
 	QueryFile      string `long:"queryFile" description:"path to a file containing a query filter (JSON)"`
-	ReadPreference string `long:"readPreference" value-name:"<string>|<json>" description:"specify either a preference name or a preference json object"`
+	ReadPreference string `long:"readPreference" value-name:"<string>|<json>" description:"specify either a preference mode (e.g. 'nearest') or a preference json object (e.g. '{mode: \"nearest\", tagSets: [{a: \"b\"}], maxStalenessSeconds: 123}')"`
 	TableScan      bool   `long:"forceTableScan" description:"force a table scan"`
 }
 
 // Name returns a human-readable group name for input options.
 func (*InputOptions) Name() string {
 	return "query"
-}
-
-func (inputOpts *InputOptions) SetOptionsFromURI(cs connstring.ConnString) error {
-	if inputOpts.ReadPreference != "" {
-		return fmt.Errorf(options.IncompatibleArgsErrorFormat, "--readPreference")
-	}
-	inputOpts.ReadPreference = cs.ReadPreference
-	return nil
 }
 
 func (inputOptions *InputOptions) HasQuery() bool {

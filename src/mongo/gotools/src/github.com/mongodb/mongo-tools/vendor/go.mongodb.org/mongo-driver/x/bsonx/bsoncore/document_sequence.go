@@ -83,9 +83,9 @@ func (ds *DocumentSequence) ResetIterator() {
 	ds.Pos = 0
 }
 
-// documents returns a slice of the documents. If nil either the Data field is also nil or could not
+// Documents returns a slice of the documents. If nil either the Data field is also nil or could not
 // be properly read.
-func (ds *DocumentSequence) documents() ([]Document, error) {
+func (ds *DocumentSequence) Documents() ([]Document, error) {
 	if ds == nil {
 		return nil, nil
 	}

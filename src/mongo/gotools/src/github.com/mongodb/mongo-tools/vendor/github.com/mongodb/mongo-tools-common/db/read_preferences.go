@@ -8,6 +8,7 @@ package db
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/mongodb/mongo-tools-common/json"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -15,9 +16,11 @@ import (
 	"go.mongodb.org/mongo-driver/x/network/connstring"
 )
 
+// readPrefDoc is a struct corresponding to the json object passed in for the --readPreference command line arg.
 type readPrefDoc struct {
-	Mode string
-	Tags map[string]string
+	Mode                *string
+	TagSets             []map[string]string
+	MaxStalenessSeconds *int
 }
 
 const (
@@ -38,17 +41,28 @@ func NewReadPreference(rp string, cs *connstring.ConnString) (*readpref.ReadPref
 	}
 
 	var mode string
-	var tagSet tag.Set
+	var options []readpref.Option
 	if rp[0] != '{' {
 		mode = rp
 	} else {
 		var doc readPrefDoc
 		err := json.Unmarshal([]byte(rp), &doc)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --ReadPreferences json object: %v", err)
+			return nil, fmt.Errorf("invalid json object: %v", err)
 		}
-		tagSet = tag.NewTagSetFromMap(doc.Tags)
-		mode = doc.Mode
+
+		if doc.Mode == nil {
+			return nil, fmt.Errorf("no 'mode' specified")
+		}
+		mode = *doc.Mode
+
+		if doc.TagSets != nil {
+			options = append(options, readpref.WithTagSets(tag.NewTagSetsFromMaps(doc.TagSets)...))
+		}
+
+		if doc.MaxStalenessSeconds != nil {
+			options = append(options, readpref.WithMaxStaleness(time.Duration(*doc.MaxStalenessSeconds)*time.Second))
+		}
 	}
 
 	rpMode, err := readpref.ModeFromString(mode)
@@ -56,7 +70,7 @@ func NewReadPreference(rp string, cs *connstring.ConnString) (*readpref.ReadPref
 		return nil, err
 	}
 
-	return readpref.New(rpMode, readpref.WithTagSets(tagSet))
+	return readpref.New(rpMode, options...)
 }
 
 func readPrefFromConnString(cs *connstring.ConnString) (*readpref.ReadPref, error) {

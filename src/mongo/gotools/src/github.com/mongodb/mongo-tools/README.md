@@ -15,7 +15,7 @@ Report any bugs, improvements, or new feature requests at https://jira.mongodb.o
 
 Setup
 ---------------
-Clone the repo and run `. ./set_gopath.sh` (`set_gopath.bat` on Windows) to setup your GOPATH:
+Clone the repo and run `. ./set_goenv.sh` to setup your GOPATH:
 
 ```
 git clone https://github.com/mongodb/mongo-tools

@@ -7,11 +7,9 @@
 package mongoimport
 
 import (
-	"fmt"
 	"io"
 	"testing"
 
-	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/mongodb/mongo-tools-common/log"
 	"github.com/mongodb/mongo-tools-common/options"
 	"github.com/mongodb/mongo-tools-common/testtype"
@@ -585,33 +583,6 @@ func TestChannelQuorumError(t *testing.T) {
 			ch <- nil
 			ch <- io.EOF
 			So(channelQuorumError(ch, 2), ShouldBeNil)
-		})
-	})
-}
-
-func TestFilterIngestError(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
-
-	Convey("Given a boolean 'stopOnError' and an error...", t, func() {
-
-		Convey("an error should be returned if stopOnError is true the err is not nil", func() {
-			So(filterIngestError(true, fmt.Errorf("")), ShouldNotBeNil)
-		})
-
-		Convey("errLostConnection should be returned if stopOnError is true the err is io.EOF", func() {
-			So(filterIngestError(true, io.EOF).Error(), ShouldEqual, db.ErrLostConnection)
-		})
-
-		Convey("no error should be returned if stopOnError is false the err is not nil", func() {
-			So(filterIngestError(false, fmt.Errorf("")), ShouldBeNil)
-		})
-
-		Convey("no error should be returned if stopOnError is false the err is nil", func() {
-			So(filterIngestError(false, nil), ShouldBeNil)
-		})
-
-		Convey("no error should be returned if stopOnError is true the err is nil", func() {
-			So(filterIngestError(true, nil), ShouldBeNil)
 		})
 	})
 }

@@ -10,11 +10,12 @@ import (
 	"context"
 	"errors"
 	"io"
+	"reflect"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
 	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
-	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
 )
 
 // Cursor is used to iterate a stream of documents. Each document is decoded into the result
@@ -63,7 +64,7 @@ func newCursor(bc batchCursor, registry *bsoncodec.Registry) (*Cursor, error) {
 }
 
 func newEmptyCursor() *Cursor {
-	return &Cursor{bc: driver.NewEmptyBatchCursor()}
+	return &Cursor{bc: driverlegacy.NewEmptyBatchCursor()}
 }
 
 // ID returns the ID of this cursor.
@@ -128,3 +129,68 @@ func (c *Cursor) Err() error { return c.err }
 
 // Close closes this cursor.
 func (c *Cursor) Close(ctx context.Context) error { return c.bc.Close(ctx) }
+
+// All iterates the cursor and decodes each document into results.
+// The results parameter must be a pointer to a slice. The slice pointed to by results will be completely overwritten.
+// If the cursor has been iterated, any previously iterated documents will not be included in results.
+func (c *Cursor) All(ctx context.Context, results interface{}) error {
+	resultsVal := reflect.ValueOf(results)
+	if resultsVal.Kind() != reflect.Ptr {
+		return errors.New("results argument must be a pointer to a slice")
+	}
+
+	sliceVal := resultsVal.Elem()
+	elementType := sliceVal.Type().Elem()
+	var index int
+	var err error
+
+	batch := c.batch // exhaust the current batch before iterating the batch cursor
+	for {
+		sliceVal, index, err = c.addFromBatch(sliceVal, elementType, batch, index)
+		if err != nil {
+			return err
+		}
+
+		if !c.bc.Next(ctx) {
+			break
+		}
+
+		batch = c.bc.Batch()
+	}
+
+	if err = c.bc.Err(); err != nil {
+		return err
+	}
+
+	resultsVal.Elem().Set(sliceVal.Slice(0, index))
+	return nil
+}
+
+// addFromBatch adds all documents from batch to sliceVal starting at the given index. It returns the new slice value,
+// the next empty index in the slice, and an error if one occurs.
+func (c *Cursor) addFromBatch(sliceVal reflect.Value, elemType reflect.Type, batch *bsoncore.DocumentSequence,
+	index int) (reflect.Value, int, error) {
+
+	docs, err := batch.Documents()
+	if err != nil {
+		return sliceVal, index, err
+	}
+
+	for _, doc := range docs {
+		if sliceVal.Len() == index {
+			// slice is full
+			newElem := reflect.New(elemType)
+			sliceVal = reflect.Append(sliceVal, newElem.Elem())
+			sliceVal = sliceVal.Slice(0, sliceVal.Cap())
+		}
+
+		currElem := sliceVal.Index(index).Addr().Interface()
+		if err = bson.UnmarshalWithRegistry(c.registry, doc, currElem); err != nil {
+			return sliceVal, index, err
+		}
+
+		index++
+	}
+
+	return sliceVal, index, nil
+}
