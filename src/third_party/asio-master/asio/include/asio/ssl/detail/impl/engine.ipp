@@ -46,9 +46,10 @@ engine::engine(SSL_CTX* context)
 
   ::SSL_set_mode(ssl_, SSL_MODE_ENABLE_PARTIAL_WRITE);
   ::SSL_set_mode(ssl_, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-#if defined(SSL_MODE_RELEASE_BUFFERS)
-  ::SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
-#endif // defined(SSL_MODE_RELEASE_BUFFERS)
+// SERVER-40393 - Disable SSL_MODE_RELEASE_BUFFERS in ASIO
+//#if defined(SSL_MODE_RELEASE_BUFFERS)
+  //::SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
+//#endif // defined(SSL_MODE_RELEASE_BUFFERS)
 
   ::BIO* int_bio = 0;
   ::BIO_new_bio_pair(&int_bio, 0, &ext_bio_, 0);
