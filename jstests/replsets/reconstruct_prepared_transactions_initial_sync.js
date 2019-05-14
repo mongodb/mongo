@@ -4,7 +4,9 @@
  * It also tests that after reconstructing a prepared transaction at the end of initial sync, we can
  * successfully apply a commitTransaction oplog entry during secondary oplog application. To be able
  * to test this, we have to pause collection cloning and run operations on the sync source so that
- * we have oplog entries to apply during the oplog application phase of initial sync.
+ * we have oplog entries to apply during the oplog application phase of initial sync. We will also
+ * prepare a transaction while collection cloning is paused to test applying a prepare oplog entry
+ * during oplog application phase of initial sync.
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
@@ -47,6 +49,7 @@
     assert.commandWorked(sessionColl1.insert({_id: 1}));
     assert.commandWorked(sessionColl2.insert({_id: 2}));
     assert.commandWorked(sessionColl3.insert({_id: 3}));
+    assert.commandWorked(sessionColl3.insert({_id: 4}));
 
     jsTestLog("Preparing three transactions");
 
@@ -95,8 +98,19 @@
 
     // Perform writes while collection cloning is paused so that we know they must be applied during
     // the oplog application stage of initial sync.
-    assert.commandWorked(testColl.insert({_id: 4}));
     assert.commandWorked(testColl.insert({_id: 5}));
+
+    let session4 = primary.startSession();
+    let sessionDB4 = session4.getDatabase(dbName);
+    const sessionColl4 = sessionDB4.getCollection(collName);
+
+    jsTestLog("Preparing the fourth transaction");
+
+    // Prepare a transaction while collection cloning is paused so that its oplog entry must be
+    // applied during the oplog application phase of initial sync.
+    session4.startTransaction();
+    assert.commandWorked(sessionColl4.update({_id: 4}, {_id: 4, a: 1}));
+    const prepareTimestamp4 = PrepareHelpers.prepareTransaction(session4, {w: 1});
 
     jsTestLog("Resuming initial sync");
 
@@ -122,7 +136,7 @@
 
     // Make sure that we can't read changes to the document from the first prepared transaction
     // after initial sync.
-    assert.eq(secondaryColl.findOne({_id: 1}), {_id: 1});
+    assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1});
 
     jsTestLog("Committing the first transaction");
 
@@ -131,7 +145,22 @@
 
     // Make sure that we can see the data from a committed transaction on the secondary if it was
     // applied during secondary oplog application.
-    assert.eq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 1});
+    assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 1});
+
+    jsTestLog("Checking that the fourth transaction is properly prepared");
+
+    // Make sure that we can't read changes to the document from the first prepared transaction
+    // after initial sync.
+    assert.docEq(secondaryColl.findOne({_id: 4}), {_id: 4});
+
+    jsTestLog("Committing the fourth transaction");
+
+    assert.commandWorked(PrepareHelpers.commitTransaction(session4, prepareTimestamp4));
+    replTest.awaitReplication();
+
+    // Make sure that we can see the data from a committed transaction on the secondary if it was
+    // applied during secondary oplog application.
+    assert.docEq(secondaryColl.findOne({_id: 4}), {_id: 4, a: 1});
 
     jsTestLog("Stepping up the secondary");
 
@@ -190,7 +219,7 @@
     assert.commandWorked(sessionDB2[collName].update({_id: 2}, {_id: 2, a: 3}));
     prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
     assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp2));
-    assert.eq(testColl.findOne({_id: 2}), {_id: 2, a: 3});
+    assert.docEq(testColl.findOne({_id: 2}), {_id: 2, a: 3});
 
     // Force the third session to use the same lsid and txnNumber as from before the restart. This
     // ensures that we're working with the same session and transaction.
