@@ -1150,14 +1150,17 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
         // yet.
         if (op.isPartialTransaction()) {
             auto& partialTxnList = partialTxnOps[*op.getSessionId()];
-            if (!partialTxnList.empty() &&
-                partialTxnList.front()->getTxnNumber() != op.getTxnNumber()) {
-                // TODO: When abortTransaction is implemented, this should invariant and
-                // the list should be cleared on abort.
-                partialTxnList.clear();
-            }
+            // If this operation belongs to an existing partial transaction, partialTxnList
+            // must contain the previous operations of the transaction.
+            invariant(partialTxnList.empty() ||
+                      partialTxnList.front()->getTxnNumber() == op.getTxnNumber());
             partialTxnList.push_back(&op);
             continue;
+        }
+
+        if (op.getCommandType() == OplogEntry::CommandType::kAbortTransaction) {
+            auto& partialTxnList = partialTxnOps[*op.getSessionId()];
+            partialTxnList.clear();
         }
 
         if (op.isCrudOpType()) {

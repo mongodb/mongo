@@ -1180,6 +1180,21 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     auto txnOps = retrieveCompletedTransactionOperations(opCtx);
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
+
+    auto abortGuard = makeGuard([&] {
+        if (gUseMultipleOplogEntryFormatForTransactions &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+            // We should already be holding the RSTL if we have performed a read or write
+            // as part of this unprepared transaction.
+            invariant(opCtx->lockState()->isRSTLLocked());
+            opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
+                _abortActiveTransaction(
+                    opCtx, TransactionState::kInProgress, true /* writeOplog */);
+            });
+        }
+    });
+
     opObserver->onUnpreparedTransactionCommit(opCtx, txnOps);
 
     auto wc = opCtx->getWriteConcern();
@@ -1193,6 +1208,8 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
         // before this point in the function, entry point will abort the transaction.
         o(lk).txnState.transitionTo(TransactionState::kCommittingWithoutPrepare);
     }
+
+    abortGuard.dismiss();
 
     try {
         // Once entering "committing without prepare" we cannot throw an exception.
@@ -1383,7 +1400,9 @@ void TransactionParticipant::Participant::abortActiveTransaction(OperationContex
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
     }
 
-    _abortActiveTransaction(opCtx, TransactionState::kInProgress | TransactionState::kPrepared);
+    _abortActiveTransaction(opCtx,
+                            TransactionState::kInProgress | TransactionState::kPrepared,
+                            o().txnState.isPrepared());
 }
 
 void TransactionParticipant::Participant::abortActiveUnpreparedOrStashPreparedTransaction(
@@ -1400,7 +1419,7 @@ void TransactionParticipant::Participant::abortActiveUnpreparedOrStashPreparedTr
         return;
     }
 
-    _abortActiveTransaction(opCtx, TransactionState::kInProgress);
+    _abortActiveTransaction(opCtx, TransactionState::kInProgress, false /* writeOplog */);
 } catch (...) {
     // It is illegal for this to throw so we catch and log this here for diagnosability.
     severe() << "Caught exception during transaction " << opCtx->getTxnNumber()
@@ -1410,7 +1429,7 @@ void TransactionParticipant::Participant::abortActiveUnpreparedOrStashPreparedTr
 }
 
 void TransactionParticipant::Participant::_abortActiveTransaction(
-    OperationContext* opCtx, TransactionState::StateSet expectedStates) {
+    OperationContext* opCtx, TransactionState::StateSet expectedStates, bool writeOplog) {
     invariant(!o().txnResourceStash);
     invariant(!o().txnState.isCommittingWithPrepare());
 
@@ -1419,14 +1438,13 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         o(lk).transactionMetricsObserver.onTransactionOperation(
             opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
     }
-
     // We reserve an oplog slot before aborting the transaction so that no writes that are causally
     // related to the transaction abort enter the oplog at a timestamp earlier than the abort oplog
     // entry. On secondaries, we generate a fake empty oplog slot, since it's not used by the
     // OpObserver.
     boost::optional<OplogSlotReserver> oplogSlotReserver;
     boost::optional<OplogSlot> abortOplogSlot;
-    if (o().txnState.isPrepared() && opCtx->writesAreReplicated()) {
+    if (opCtx->writesAreReplicated() && writeOplog) {
         oplogSlotReserver.emplace(opCtx);
         abortOplogSlot = oplogSlotReserver->getLastSlot();
     }

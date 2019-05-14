@@ -727,8 +727,10 @@ public:
 
         // Abort the transaction if it's in one of the expected states and clean up the transaction
         // states associated with the opCtx.
+        // If 'writeOplog' is true, logs an 'abortTransaction' oplog entry if writes are replicated.
         void _abortActiveTransaction(OperationContext* opCtx,
-                                     TransactionState::StateSet expectedStates);
+                                     TransactionState::StateSet expectedStates,
+                                     bool writeOplog);
 
         // Releases stashed transaction resources to abort the transaction on the session.
         void _abortTransactionOnSession(OperationContext* opCtx);

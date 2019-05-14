@@ -1267,10 +1267,10 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
     return stmtId;
 }
 
-void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
-                                            const OplogSlot& oplogSlot,
-                                            const BSONObj& objectField,
-                                            DurableTxnStateEnum durableState) {
+void logCommitOrAbortForTransaction(OperationContext* opCtx,
+                                    const OplogSlot& oplogSlot,
+                                    const BSONObj& objectField,
+                                    DurableTxnStateEnum durableState) {
     const NamespaceString cmdNss{"admin", "$cmd"};
 
     OperationSessionInfo sessionInfo;
@@ -1299,7 +1299,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     invariant(!opCtx->lockState()->hasMaxLockTimeout());
 
     writeConflictRetry(
-        opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        opCtx, "onTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
 
             // Writes to the oplog only require a Global intent lock. Guaranteed by
             // OplogSlotReserver.
@@ -1452,7 +1452,7 @@ void OpObserverImpl::onPreparedTransactionCommit(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         cmdObj.setPrepared(true);
     }
-    logCommitOrAbortForPreparedTransaction(
+    logCommitOrAbortForTransaction(
         opCtx, commitOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kCommitted);
 }
 
@@ -1606,7 +1606,7 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
     }
 
     AbortTransactionOplogObject cmdObj;
-    logCommitOrAbortForPreparedTransaction(
+    logCommitOrAbortForTransaction(
         opCtx, *abortOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kAborted);
 }
 
