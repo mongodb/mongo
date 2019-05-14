@@ -259,28 +259,22 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             auto writeConcernDetail = getWriteConcernErrorDetailFromBSONObj(commitResponse);
             if (writeConcernDetail && !writeConcernDetail->toStatus().isOK())
                 response->setWriteConcernError(writeConcernDetail.release());
-        } catch (const DBException& e) {
-            // Set the error status to the status of the failed command and abort the transaction.
-            auto status = e.toStatus();
-            if (status == ErrorCodes::DuplicateKey) {
-                BSONObjBuilder extraInfoBuilder;
-                status.extraInfo()->serialize(&extraInfoBuilder);
-                auto extraInfo = extraInfoBuilder.obj();
-                if (extraInfo.getObjectField("keyPattern").hasField("_id"))
-                    status = status.withContext(
-                        "Failed to update document's shard key field. There is either an "
-                        "orphan for this document or _id for this collection is not globally "
-                        "unique.");
+        } catch (DBException& e) {
+            if (e.code() == ErrorCodes::DuplicateKey &&
+                e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {
+                e.addContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext);
             } else {
-                status = status.withContext(
-                    "Update operation was converted into a distributed transaction because the "
-                    "document being updated would move shards and that transaction failed");
+                e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
             }
+
             if (!response->isErrDetailsSet() || !response->getErrDetails().back()) {
                 auto error = stdx::make_unique<WriteErrorDetail>();
                 error->setIndex(0);
                 response->addToErrDetails(error.release());
             }
+
+            // Set the error status to the status of the failed command and abort the transaction.
+            auto status = e.toStatus();
             response->getErrDetails().back()->setStatus(status);
 
             auto txnRouterForAbort = TransactionRouter::get(opCtx);
@@ -296,9 +290,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
                 opCtx, request, response, wouldChangeOwningShardErrorInfo.get());
         } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
             Status status = ex->getKeyPattern().hasField("_id")
-                ? ex.toStatus().withContext(
-                      "Failed to update document's shard key field. There is either an orphan "
-                      "for this document or _id for this collection is not globally unique.")
+                ? ex.toStatus().withContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext)
                 : ex.toStatus();
             uassertStatusOK(status);
         }

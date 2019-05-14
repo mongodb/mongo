@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/find_and_modify_common.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
@@ -108,9 +109,13 @@ void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
             result->appendNull("value");
         }
         result->append("ok", 1.0);
-    } catch (const DBException& e) {
-        auto status = e.toStatus();
-        uassertStatusOK(status.withContext("findAndModify"));
+    } catch (DBException& e) {
+        if (e.code() == ErrorCodes::DuplicateKey &&
+            e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {
+            e.addContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext);
+        }
+        e.addContext("findAndModify");
+        throw;
     }
 }
 
@@ -296,9 +301,11 @@ private:
                         appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
                     }
                 } catch (DBException& e) {
-                    e.addContext(
-                        "Update operation was converted into a distributed transaction because the "
-                        "document being updated would move shards and that transaction failed");
+                    if (e.code() != ErrorCodes::DuplicateKey ||
+                        (e.code() == ErrorCodes::DuplicateKey &&
+                         !e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
+                        e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
+                    };
 
                     auto txnRouterForAbort = TransactionRouter::get(opCtx);
                     if (txnRouterForAbort)

@@ -54,6 +54,16 @@ class TaskExecutor;
  */
 namespace documentShardKeyUpdateUtil {
 
+static constexpr StringData kDuplicateKeyErrorContext =
+    "Failed to update document's shard key "
+    "field. There is either an orphan for this document or _id for this collection is not "
+    "globally unique."_sd;
+
+static constexpr StringData kNonDuplicateKeyErrorContext =
+    "Update operation was converted into a "
+    "distributed transaction because the document being updated would move shards and that "
+    "transaction failed."_sd;
+
 /**
  * Coordinating method and external point of entry for updating a document's shard key. This method
  * creates the necessary extra operations. It will then run each operation using the ClusterWriter.
