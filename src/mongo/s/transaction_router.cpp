@@ -780,8 +780,7 @@ BSONObj TransactionRouter::commitTransaction(
     return _handOffCommitToCoordinator(opCtx);
 }
 
-std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
-    OperationContext* opCtx, bool isImplicit) {
+BSONObj TransactionRouter::abortTransaction(OperationContext* opCtx) {
     // The router has yet to send any commands to a remote shard for this transaction.
     // Return the same error that would have been returned by a shard.
     uassert(ErrorCodes::NoSuchTransaction,
@@ -789,23 +788,41 @@ std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
             !_participants.empty());
 
     auto abortCmd = BSON("abortTransaction" << 1);
-
     std::vector<AsyncRequestsSender::Request> abortRequests;
     for (const auto& participantEntry : _participants) {
         abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);
     }
 
-    // Implicit aborts log earlier.
-    if (!isImplicit) {
-        LOG(3) << txnIdToString() << " Aborting transaction on " << _participants.size()
-               << " shard(s)";
+    LOG(3) << txnIdToString() << " Aborting transaction on " << _participants.size() << " shard(s)";
+
+    const auto responses = gatherResponses(opCtx,
+                                           NamespaceString::kAdminDb,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           Shard::RetryPolicy::kIdempotent,
+                                           abortRequests);
+
+    BSONObj lastResult;
+    for (const auto& response : responses) {
+        uassertStatusOK(response.swResponse);
+
+        lastResult = response.swResponse.getValue().data;
+
+        // If any shard returned an error, return the error immediately.
+        const auto commandStatus = getStatusFromCommandResult(lastResult);
+        if (!commandStatus.isOK()) {
+            return lastResult;
+        }
+
+        // If any participant had a writeConcern error, return the participant's writeConcern
+        // error immediately.
+        const auto writeConcernStatus = getWriteConcernStatusFromCommandResult(lastResult);
+        if (!writeConcernStatus.isOK()) {
+            return lastResult;
+        }
     }
 
-    return gatherResponses(opCtx,
-                           NamespaceString::kAdminDb,
-                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                           Shard::RetryPolicy::kIdempotent,
-                           abortRequests);
+    // If all the responses were ok, return the last response.
+    return lastResult;
 }
 
 void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx,
@@ -821,11 +838,22 @@ void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx,
         return;
     }
 
+    auto abortCmd = BSON("abortTransaction" << 1);
+    std::vector<AsyncRequestsSender::Request> abortRequests;
+    for (const auto& participantEntry : _participants) {
+        abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);
+    }
+
     LOG(3) << txnIdToString() << " Implicitly aborting transaction on " << _participants.size()
            << " shard(s) due to error: " << errorStatus;
 
     try {
-        abortTransaction(opCtx, true /*isImplicit*/);
+        // Ignore the responses.
+        gatherResponses(opCtx,
+                        NamespaceString::kAdminDb,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        Shard::RetryPolicy::kIdempotent,
+                        abortRequests);
     } catch (const DBException& ex) {
         LOG(3) << txnIdToString() << " Implicitly aborting transaction failed "
                << causedBy(ex.toStatus());

@@ -510,8 +510,7 @@
         if (TransactionsUtil.isTransientTransactionError(res)) {
             return;
         }
-        // TODO (SERVER-40001) enforce abortTransaction errors.
-        // assert.commandWorked(res);
+        assert.commandWorked(res);
     }
 
     function startNewTransaction(conn, cmdObj) {

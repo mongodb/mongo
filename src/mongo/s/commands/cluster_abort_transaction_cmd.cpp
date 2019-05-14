@@ -76,10 +76,9 @@ public:
                 "abortTransaction can only be run within a session",
                 txnRouter);
 
-        auto response = txnRouter->abortTransaction(opCtx);
-
-        std::string errMsg;
-        return appendRawResponses(opCtx, &errMsg, &result, response);
+        auto abortRes = txnRouter->abortTransaction(opCtx);
+        CommandHelpers::filterCommandReplyForPassthrough(abortRes, &result);
+        return true;
     }
 
 } clusterAbortTransactionCmd;

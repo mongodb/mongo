@@ -52,6 +52,8 @@ using executor::RemoteCommandRequest;
 
 const BSONObj kOkReadOnlyFalseResponse = BSON("ok" << 1 << "readOnly" << false);
 const BSONObj kOkReadOnlyTrueResponse = BSON("ok" << 1 << "readOnly" << true);
+const BSONObj kNoSuchTransactionResponse =
+    BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
 
 class TransactionRouterTest : public ShardingTestFixture {
 protected:
@@ -1869,10 +1871,10 @@ TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
     });
 
     auto response = future.default_timed_get();
-    ASSERT_FALSE(response.empty());
+    ASSERT_BSONOBJ_EQ(kOkReadOnlyFalseResponse, response);
 }
 
-TEST_F(TransactionRouterTest, AbortForMultipleParticipants) {
+TEST_F(TransactionRouterTest, AbortForMultipleParticipantsAllReturnSuccess) {
     LogicalSessionId lsid(makeLogicalSessionIdForTest());
     TxnNumber txnNum{3};
 
@@ -1912,7 +1914,109 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipants) {
     }
 
     auto response = future.default_timed_get();
-    ASSERT_FALSE(response.empty());
+    ASSERT_BSONOBJ_EQ(kOkReadOnlyFalseResponse, response);
+}
+
+TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNoSuchTransaction) {
+    LogicalSessionId lsid(makeLogicalSessionIdForTest());
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    RouterOperationContextSession scopedSession(opCtx);
+    auto txnRouter = TransactionRouter::get(opCtx);
+
+    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter->setDefaultAtClusterTime(operationContext());
+    txnRouter->attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter->attachTxnFieldsIfNeeded(shard2, {});
+    txnRouter->attachTxnFieldsIfNeeded(shard3, {});
+    txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter->processParticipantResponse(shard3, kOkReadOnlyFalseResponse);
+
+    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+
+    std::map<HostAndPort, boost::optional<bool>> targets = {
+        {hostAndPort1, true}, {hostAndPort2, {}}, {hostAndPort3, {}}};
+
+    int count = 0;
+    while (!targets.empty()) {
+        onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+            auto target = targets.find(request.target);
+            ASSERT(target != targets.end());
+            ASSERT_EQ("admin", request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "abortTransaction");
+
+            checkSessionDetails(request.cmdObj, lsid, txnNum, target->second);
+
+            targets.erase(request.target);
+
+            // The middle response is NoSuchTransaction, the rest are success.
+            return (count == 1 ? kNoSuchTransactionResponse : kOkReadOnlyFalseResponse);
+        });
+        count++;
+    }
+
+    auto response = future.default_timed_get();
+    ASSERT_BSONOBJ_EQ(kNoSuchTransactionResponse, response);
+}
+
+TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNetworkError) {
+    LogicalSessionId lsid(makeLogicalSessionIdForTest());
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    RouterOperationContextSession scopedSession(opCtx);
+    auto txnRouter = TransactionRouter::get(opCtx);
+
+    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter->setDefaultAtClusterTime(operationContext());
+    txnRouter->attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter->attachTxnFieldsIfNeeded(shard2, {});
+    txnRouter->attachTxnFieldsIfNeeded(shard3, {});
+    txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter->processParticipantResponse(shard3, kOkReadOnlyFalseResponse);
+
+    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+
+    std::map<HostAndPort, boost::optional<bool>> targets = {
+        {hostAndPort1, true}, {hostAndPort2, {}}, {hostAndPort3, {}}};
+
+    int count = 0;
+    while (!targets.empty()) {
+        onCommandForPoolExecutor([&](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+            auto target = targets.find(request.target);
+            ASSERT(target != targets.end());
+            ASSERT_EQ("admin", request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "abortTransaction");
+
+            checkSessionDetails(request.cmdObj, lsid, txnNum, target->second);
+
+            targets.erase(request.target);
+
+            // The middle response is a "network error", the rest are success. Use InternalError as
+            // the "network error" because the server will retry three times on actual network
+            // errors; this just skips the retries.
+            if (count == 1) {
+                return Status{ErrorCodes::InternalError, "dummy"};
+            }
+            return kOkReadOnlyFalseResponse;
+        });
+        count++;
+    }
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), AssertionException, ErrorCodes::InternalError);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNewParticipants) {

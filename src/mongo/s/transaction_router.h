@@ -238,17 +238,23 @@ public:
     const boost::optional<ShardId>& getRecoveryShardId() const;
 
     /**
-     * Commits the transaction. For transactions that performed writes to multiple shards, this will
-     * hand off the participant list to the coordinator to do two-phase commit.
+     * Commits the transaction.
+     *
+     * For transactions that only did reads or only wrote to one shard, sends commit directly to the
+     * participants and returns the first error response or the last (success) response.
+     *
+     * For transactions that performed writes to multiple shards, hands off the participant list to
+     * the coordinator to do two-phase commit, and returns the coordinator's response.
      */
     BSONObj commitTransaction(OperationContext* opCtx,
                               const boost::optional<TxnRecoveryToken>& recoveryToken);
 
     /**
-     * Sends abort to all participants and returns the responses from all shards.
+     * Sends abort to all participants.
+     *
+     * Returns the first error response or the last (success) response.
      */
-    std::vector<AsyncRequestsSender::Response> abortTransaction(OperationContext* opCtx,
-                                                                bool isImplicit = false);
+    BSONObj abortTransaction(OperationContext* opCtx);
 
     /**
      * Sends abort to all shards in the current participant list. Will retry on retryable errors,
