@@ -1563,8 +1563,6 @@ OpTime getOpTimeFromOplogEntry(const BSONObj& entry) {
 }
 
 TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
-    // TODO: SERVER-40452 Fix this test
-    return;
     createOplog(_opCtx.get());
     Collection* coll = nullptr;
     CollectionOptions options;
@@ -1711,7 +1709,6 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         mutable std::multiset<int> searchedIds;
     } rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
 
-    _createCollection(_opCtx.get(), "test.t", options);
     ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock({applyOpsOperation, commonOperation}),
                            rollbackSource,

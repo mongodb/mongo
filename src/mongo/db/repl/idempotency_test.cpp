@@ -184,8 +184,8 @@ void RandomizedIdempotencyTest::runIdempotencyTestCase() {
 
     for (auto doc : enumerator) {
         BSONObj docWithId = (BSONObjBuilder(doc) << "_id" << kDocId).obj();
-        this->initOps = std::vector<OplogEntry>{createCollection(), insert(docWithId)};
         for (size_t i = 0; i < kNumUpdateSequencesPerDoc; i++) {
+            this->initOps = std::vector<OplogEntry>{createCollection(), insert(docWithId)};
             std::vector<OplogEntry> updateSequence =
                 createUpdateSequence(updateGenerator, kUpdateSequenceLength);
             testOpsAreIdempotent(updateSequence, SequenceType::kAnyPrefixOrSuffix);
@@ -194,8 +194,6 @@ void RandomizedIdempotencyTest::runIdempotencyTestCase() {
 }
 
 TEST_F(RandomizedIdempotencyTest, CheckUpdateSequencesAreIdempotent) {
-    // TODO: SERVER-40452 Fix this test
-    return;
     runIdempotencyTestCase();
 }
 

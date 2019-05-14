@@ -362,7 +362,9 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
                    << "o"
                    << BSON("create" << nss.coll())
                    << "ts"
-                   << Timestamp(1, 1));
+                   << Timestamp(1, 1)
+                   << "ui"
+                   << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
                                             Collection*,
@@ -2148,8 +2150,6 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
-    // TODO: SERVER-40452 Fix this test
-    return;
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     const BSONObj uuidObj = kUuid.toBSON();
@@ -2177,11 +2177,8 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
-    // TODO: SERVER-40452 Fix this test
-    return;
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_RECOVERING));
-    ASSERT_OK(runOpInitialSync(createCollection()));
     CollectionUUID uuid = UUID::gen();
 
     auto runOpsAndValidate = [this, uuid]() {
@@ -2213,7 +2210,9 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
                                         << uuid);
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
 
-        auto ops = {insertOp1, insertOp2, updateOp, dropColl, createColl};
+        // We don't drop and re-create the collection since we don't have ways
+        // to wait until second-phase drop to completely finish.
+        auto ops = {createColl, insertOp1, insertOp2, updateOp};
         ASSERT_OK(runOpsInitialSync(ops));
         auto state = validate();
 
@@ -2226,8 +2225,6 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
-    // TODO: SERVER-40452 Fix this test
-    return;
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_RECOVERING));
     CollectionUUID uuid = kUuid;

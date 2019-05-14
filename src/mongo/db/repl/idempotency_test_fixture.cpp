@@ -254,8 +254,13 @@ OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
                                           const BSONObj& options) {
     BSONObjBuilder bob;
     bob.append("create", nss.coll());
+    boost::optional<UUID> optionalUUID;
+    if (options.hasField("uuid")) {
+        StatusWith<UUID> uuid = UUID::parse(options.getField("uuid"));
+        optionalUUID = uuid.getValue();
+    }
     bob.appendElements(options);
-    return makeCommandOplogEntry(opTime, nss, bob.obj());
+    return makeCommandOplogEntry(opTime, nss, bob.obj(), optionalUUID);
 }
 
 /**
@@ -394,7 +399,10 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
     auto iterations = sequenceType == SequenceType::kEntireSequence ? 1 : ops.size();
 
     for (std::size_t i = 0; i < iterations; i++) {
-        ASSERT_OK(resetState());
+        // Since the end state after each iteration is expected to be the same as the start state,
+        // we don't drop and re-create the collections. Dropping and re-creating the collections
+        // won't work either because we don't have ways to wait until second-phase drop to
+        // completely finish.
         std::vector<OplogEntry> fullSequence;
 
         if (sequenceType == SequenceType::kEntireSequence) {
