@@ -1480,7 +1480,7 @@ functions:
     - command: generate.tasks
       params:
         files:
-          - src/generated_resmoke_config/${task}.json
+          - src/generated_resmoke_config/*.json
 
   "run generated tests":
   - *retrieve_generated_test_configuration
@@ -5370,7 +5370,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: auth
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 4
 
@@ -5378,7 +5377,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: auth_audit
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 4
 
@@ -5812,7 +5810,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharded_causally_consistent_jscore_txns_passthrough
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
 
@@ -5820,7 +5817,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot
       suite: sharded_causally_consistent_jscore_txns_passthrough
       resmoke_args: --storageEngine=wiredTiger --excludeWithAnyTags=uses_snapshot_read_concern
       fallback_num_sub_suites: 1
@@ -5849,7 +5845,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: replica_sets_jscore_passthrough
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -5881,7 +5876,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -5989,7 +5983,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: noPassthrough
       suite: no_passthrough
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 11
@@ -5998,7 +5991,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: noPassthroughWithMongod
       suite: no_passthrough_with_mongod
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
@@ -6015,7 +6007,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: slow1
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 4
       resmoke_jobs_max: 1
@@ -6065,7 +6056,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding_jscore_passthrough_wire_ops
       suite: sharding_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility --excludeWithAnyTags=requires_find_command
@@ -6087,7 +6077,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: multi_shard_multi_stmt_txn_jscore_passthrough
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6100,7 +6089,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 4
@@ -6111,7 +6099,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: multi_stmt_txn_jscore_passthrough_with_migration
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6123,7 +6110,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6135,7 +6121,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6147,7 +6132,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: parallel
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
@@ -6267,7 +6251,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: concurrency_sharded_causal_consistency
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 3
       use_large_distro: "true"
@@ -6379,7 +6362,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: read_concern_majority_passthrough
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6401,7 +6383,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: secondary_reads_passthrough
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6419,7 +6400,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: replica_sets_ese
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
@@ -6428,7 +6408,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: replica_sets_ese_gcm
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
@@ -6437,7 +6416,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: replica_sets_auth
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
@@ -6446,7 +6424,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: replica_sets_multi_oplog_txns
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
 
@@ -6462,7 +6439,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 15
@@ -6471,7 +6447,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding_csrs_continuous_config_stepdown
       suite: sharding_continuous_config_stepdown
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6481,7 +6456,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding_ese
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 21
@@ -6490,7 +6464,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding_ese_gcm
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 21
@@ -6499,7 +6472,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding_op_query
       suite: sharding
       use_large_distro: "true"
       resmoke_args: --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
@@ -6509,7 +6481,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding_auth
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 20
@@ -6520,7 +6491,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding_auth_audit
       depends_on: sharding_auth
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6530,7 +6500,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharding_last_stable_mongos_and_mixed_shards
       use_large_distro: "true"
       use_multiversion: /data/multiversion
       resmoke_args: ""
@@ -6550,7 +6519,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: ssl
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
 
@@ -6558,7 +6526,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sslSpecial
       suite: ssl_special
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 3
@@ -6611,7 +6578,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: causally_consistent_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 6
@@ -6622,7 +6588,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: causally_consistent_jscore_passthrough_auth
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
@@ -6633,7 +6598,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: sharded_causally_consistent_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 6
@@ -6644,7 +6608,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: retryable_writes_jscore_passthrough
       depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
@@ -6656,7 +6619,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_replication_default_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
@@ -6667,7 +6629,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_replication_100ms_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 8
@@ -6678,7 +6639,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_replication_1sec_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
@@ -6689,7 +6649,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_replication_10sec_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
@@ -6700,7 +6659,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_sharding_default_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
@@ -6711,7 +6669,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
@@ -6722,7 +6679,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 3
@@ -6733,7 +6689,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
@@ -6744,7 +6699,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_standalone_default_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
@@ -6755,7 +6709,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
@@ -6766,7 +6719,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 3
@@ -6777,7 +6729,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
