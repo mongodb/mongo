@@ -606,6 +606,23 @@ func (dump *MongoDump) dumpQueryToIntent(
 	return dump.dumpFilteredQueryToIntent(query, intent, buffer, copyDocumentFilter)
 }
 
+// getCount counts the number of documents in the namespace for the given intent. It does not run the count for
+// the oplog collection to avoid the performance issue in TOOLS-2068.
+func (dump *MongoDump) getCount(query *mgo.Query, intent *intents.Intent) (int64, error) {
+	if len(dump.query) != 0 || intent.IsOplog() {
+		log.Logvf(log.DebugLow, "not counting query on %v", intent.Namespace())
+		return 0, nil
+	}
+
+	total, err := query.Count()
+	if err != nil {
+		return 0, fmt.Errorf("error getting count from db: %v", err)
+	}
+
+	log.Logvf(log.DebugLow, "counted %v %v in %v", total, docPlural(int64(total)), intent.Namespace())
+	return int64(total), nil
+}
+
 // dumpFilterQueryToIntent takes an mgo Query, its intent, a writer, and a document filter, performs the query,
 // passes the results through the filter
 // and writes the raw bson results to the writer. Returns a final count of documents
@@ -629,18 +646,13 @@ func (dump *MongoDump) dumpFilteredQueryToIntent(
 	if intent.IsView() && !dump.OutputOptions.ViewsAsCollections {
 		return 0, nil
 	}
-	var total int
-	if len(dump.query) == 0 {
-		total, err = query.Count()
-		if err != nil {
-			return int64(0), fmt.Errorf("error reading from db: %v", err)
-		}
-		log.Logvf(log.DebugLow, "counted %v %v in %v", total, docPlural(int64(total)), intent.Namespace())
-	} else {
-		log.Logvf(log.DebugLow, "not counting query on %v", intent.Namespace())
+
+	total, err := dump.getCount(query, intent)
+	if err != nil {
+		return 0, err
 	}
 
-	dumpProgressor := progress.NewCounter(int64(total))
+	dumpProgressor := progress.NewCounter(total)
 	if dump.ProgressManager != nil {
 		dump.ProgressManager.Attach(intent.Namespace(), dumpProgressor)
 		defer dump.ProgressManager.Detach(intent.Namespace())
