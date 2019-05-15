@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* serviceContext) {
+void startPeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded(ServiceContext* serviceContext) {
     // Enforce calling this function once, and only once.
     static bool firstCall = true;
     invariant(firstCall);
@@ -53,7 +53,7 @@ void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* s
     invariant(periodicRunner);
 
     PeriodicRunner::PeriodicJob job(
-        "startPeriodicThreadToDecreaseSnapshotHistoryCachePressure",
+        "startPeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded",
         [](Client* client) {
             try {
                 // The opCtx destructor handles unsetting itself from the Client.
@@ -69,17 +69,18 @@ void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* s
                 }
             }
         },
-        Seconds(snapshotWindowParams.checkCachePressurePeriodSeconds.load()));
+        Seconds(snapshotWindowParams.decreaseHistoryIfNotNeededPeriodSeconds.load()));
 
     auto handle = periodicRunner->makeJob(std::move(job));
     handle->start();
 
-    SnapshotWindowParams::observeCheckCachePressurePeriodSeconds
+    SnapshotWindowParams::observeDecreaseHistoryIfNotNeededPeriodSeconds
         .addObserver([handle = std::move(handle)](const auto& secs) {
             try {
                 handle->setPeriod(Seconds(secs));
             } catch (const DBException& ex) {
-                log() << "Failed to update period of thread which checks snapshot cache pressure "
+                log() << "Failed to update the period of the thread which decreases data history "
+                         "target window size if there have been no new SnapshotTooOld errors."
                       << ex.toStatus();
             }
         });

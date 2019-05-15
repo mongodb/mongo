@@ -69,9 +69,11 @@ TEST_F(SnapshotWindowTest, DecreaseAndIncreaseSnapshotWindow) {
     snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.store(100);
 
     // Lower the time enforced between function calls to speed up testing.
-    // Dec must match Inc b/c increaseTargetWindowSize can call into decreaseTargetWindowSize.
     snapshotWindowParams.minMillisBetweenSnapshotWindowInc.store(100);
-    snapshotWindowParams.minMillisBetweenSnapshotWindowDec.store(100);
+
+    // Stabilize for the test so we know that we are testing things as expected.
+    snapshotWindowParams.snapshotWindowAdditiveIncreaseSeconds.store(2);
+    snapshotWindowParams.snapshotWindowMultiplicativeDecrease.store(0.75);
 
     auto maxTargetSnapshotWindowSeconds =
         snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load();
@@ -82,78 +84,117 @@ TEST_F(SnapshotWindowTest, DecreaseAndIncreaseSnapshotWindow) {
         snapshotWindowParams.snapshotWindowMultiplicativeDecrease.load();
     auto windowAdditiveIncrease = snapshotWindowParams.snapshotWindowAdditiveIncreaseSeconds.load();
 
-    auto cachePressureThreshold = snapshotWindowParams.cachePressureThreshold.load();
     auto minTimeBetweenInc = snapshotWindowParams.minMillisBetweenSnapshotWindowInc.load();
 
     /**
-     * Test that decreasing the size succeeds when cache pressure is ABOVE the threshold
+     * Test that trying to decrease the window size FAILS when there have been no writes to the
+     * cache overflow table.
      */
-
-    engine->setCachePressureForTest(cachePressureThreshold + 5);
 
     decreaseTargetSnapshotWindowSize(_opCtx.get());
     auto snapshotWindowSecondsOne =
         snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load();
 
-    ASSERT_GT(snapshotWindowSeconds, snapshotWindowSecondsOne);
-    ASSERT_EQ(snapshotWindowSecondsOne,
-              static_cast<int>(snapshotWindowSeconds * windowMultiplicativeDecrease));
+    ASSERT_EQ(snapshotWindowSeconds, snapshotWindowSecondsOne);
 
     /**
-     * Test that increasing the size SUCCEEDS when the cache pressure is BELOW the threshold.
+     * Test that trying to decrease the window size SUCCEEDS when there have been writes to the
+     * cache overflow table.
      */
 
-    engine->setCachePressureForTest(cachePressureThreshold - 5);
+    engine->setCacheOverflowTableInsertCountForTest(1);
 
-    increaseTargetSnapshotWindowSize(_opCtx.get());
+    decreaseTargetSnapshotWindowSize(_opCtx.get());
     auto snapshotWindowSecondsTwo =
         snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load();
 
-    ASSERT_EQ(snapshotWindowSecondsTwo, snapshotWindowSecondsOne + windowAdditiveIncrease);
+    ASSERT_GT(snapshotWindowSecondsOne, snapshotWindowSecondsTwo);
+    ASSERT_EQ(snapshotWindowSecondsTwo,
+              static_cast<int>(snapshotWindowSeconds * windowMultiplicativeDecrease));
 
     /**
-     * Test that increasing the size FAILS when the cache pressure is ABOVE the threshold, and
-     * instead this causes the size to be decreased.
+     * Test that trying to decrease the window size FAILS when there have been writes to the
+     * cache overflow table AND SnapshotTooOld errors have occurred.
      */
 
-    engine->setCachePressureForTest(cachePressureThreshold + 5);
+    engine->setCacheOverflowTableInsertCountForTest(2);
+    incrementSnapshotTooOldErrorCount();
+
+    decreaseTargetSnapshotWindowSize(_opCtx.get());
+    auto snapshotWindowSecondsThree =
+        snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load();
+
+    ASSERT_EQ(snapshotWindowSecondsTwo, snapshotWindowSecondsThree);
+
+    /**
+     * Now test again that decreasing the size SUCCEEDS when there have been writes to the cache
+     * overflow table again (without any further SnapshotTooOld errors).
+     */
+
+    engine->setCacheOverflowTableInsertCountForTest(3);
+
+    decreaseTargetSnapshotWindowSize(_opCtx.get());
+    auto snapshotWindowSecondsFour =
+        snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load();
+
+    ASSERT_GT(snapshotWindowSecondsThree, snapshotWindowSecondsFour);
+    ASSERT_EQ(snapshotWindowSecondsFour,
+              static_cast<int>(snapshotWindowSecondsThree * windowMultiplicativeDecrease));
+
+    /**
+     * Test that increasing the size SUCCEEDS.
+     */
+
+    increaseTargetSnapshotWindowSize(_opCtx.get());
+    auto snapshotWindowSecondsFive =
+        snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load();
+
+    ASSERT_EQ(snapshotWindowSecondsFive, snapshotWindowSecondsFour + windowAdditiveIncrease);
+
+    /**
+     * Test that increasing the size SUCCEEDS even when there have been writes to the cache overflow
+     * table.
+     */
 
     // Sleep for a time because increaseTargetSnapshotWindowSize() enforces a wait time between
     // updates.
     sleepmillis(2 * minTimeBetweenInc);
 
+    engine->setCacheOverflowTableInsertCountForTest(4);
+
     increaseTargetSnapshotWindowSize(_opCtx.get());
-    auto snapshotWindowSecondsThree =
+    auto snapshotWindowSecondsSix =
         snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load();
 
-    ASSERT_EQ(snapshotWindowSecondsThree,
-              static_cast<int>(snapshotWindowSecondsTwo * windowMultiplicativeDecrease));
-
-    engine->setCachePressureForTest(cachePressureThreshold - 5);
+    ASSERT_EQ(snapshotWindowSecondsSix, snapshotWindowSecondsFive + windowAdditiveIncrease);
 
     /**
      * Test that the size cannot be increased above the maximum size.
      */
 
+    // Bump up the additive increase to make this run faster.
+    snapshotWindowParams.snapshotWindowAdditiveIncreaseSeconds.store(9);
+    windowAdditiveIncrease = snapshotWindowParams.snapshotWindowAdditiveIncreaseSeconds.load();
+
     // Integers round down, so add 1 to make sure it reaches the max.
     int numIncreasesToReachMax =
-        (maxTargetSnapshotWindowSeconds - snapshotWindowSecondsThree) / windowAdditiveIncrease + 1;
+        (maxTargetSnapshotWindowSeconds - snapshotWindowSecondsSix) / windowAdditiveIncrease + 1;
     for (int i = 0; i < numIncreasesToReachMax; ++i) {
         sleepmillis(2 * minTimeBetweenInc);
         increaseTargetSnapshotWindowSize(_opCtx.get());
     }
 
     // Should be at max.
-    auto snapshotWindowSecondsFour =
+    auto snapshotWindowSecondsSeven =
         snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load();
-    ASSERT_EQ(snapshotWindowSecondsFour, maxTargetSnapshotWindowSeconds);
+    ASSERT_EQ(snapshotWindowSecondsSeven, maxTargetSnapshotWindowSeconds);
 
     // An attempt to increase beyond max should have no effect.
     sleepmillis(2 * minTimeBetweenInc);
     increaseTargetSnapshotWindowSize(_opCtx.get());
-    auto snapshotWindowSecondsFive =
+    auto snapshotWindowSecondsEight =
         snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load();
-    ASSERT_EQ(snapshotWindowSecondsFive, maxTargetSnapshotWindowSeconds);
+    ASSERT_EQ(snapshotWindowSecondsEight, maxTargetSnapshotWindowSeconds);
 }
 
 }  // namespace

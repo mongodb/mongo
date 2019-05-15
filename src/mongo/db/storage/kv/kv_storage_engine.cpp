@@ -681,12 +681,12 @@ void KVStorageEngine::setOldestActiveTransactionTimestampCallback(
     _engine->setOldestActiveTransactionTimestampCallback(callback);
 }
 
-bool KVStorageEngine::isCacheUnderPressure(OperationContext* opCtx) const {
-    return _engine->isCacheUnderPressure(opCtx);
+int64_t KVStorageEngine::getCacheOverflowTableInsertCount(OperationContext* opCtx) const {
+    return _engine->getCacheOverflowTableInsertCount(opCtx);
 }
 
-void KVStorageEngine::setCachePressureForTest(int pressure) {
-    return _engine->setCachePressureForTest(pressure);
+void KVStorageEngine::setCacheOverflowTableInsertCountForTest(int insertCount) {
+    return _engine->setCacheOverflowTableInsertCountForTest(insertCount);
 }
 
 bool KVStorageEngine::supportsRecoverToStableTimestamp() const {

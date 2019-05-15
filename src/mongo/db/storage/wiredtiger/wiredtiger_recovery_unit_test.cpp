@@ -192,10 +192,11 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CreateAndCheckForCachePressure) {
     auto recordId = ress.getValue();
     wu.commit();
 
+    auto startOverflowInsertsCount = engine->getCacheOverflowTableInsertCount(opCtx);
     for (int j = 0; j < 1000; ++j) {
-        // Once we hit the cache pressure threshold, i.e. have successfully created cache pressure
-        // that is detectable, we are done.
-        if (engine->isCacheUnderPressure(opCtx)) {
+        // We know that we have successfully created cache pressure when the in-memory cache
+        // overflows to disk by writing to the cache overflow table (the WT lookaside table).
+        if (engine->getCacheOverflowTableInsertCount(opCtx) > startOverflowInsertsCount) {
             invariant(j != 0);
             break;
         }

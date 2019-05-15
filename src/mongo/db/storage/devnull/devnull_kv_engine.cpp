@@ -261,13 +261,13 @@ SortedDataInterface* DevNullKVEngine::getSortedDataInterface(OperationContext* o
     return new DevNullSortedDataInterface();
 }
 
-bool DevNullKVEngine::isCacheUnderPressure(OperationContext* opCtx) const {
-    return (_cachePressureForTest >= snapshotWindowParams.cachePressureThreshold.load());
+int64_t DevNullKVEngine::getCacheOverflowTableInsertCount(OperationContext* opCtx) const {
+    return _overflowTableInsertCountForTest;
 }
 
-void DevNullKVEngine::setCachePressureForTest(int pressure) {
-    invariant(pressure >= 0 && pressure <= 100);
-    _cachePressureForTest = pressure;
+void DevNullKVEngine::setCacheOverflowTableInsertCountForTest(int insertsCount) {
+    invariant(insertsCount >= 0);
+    _overflowTableInsertCountForTest = insertsCount;
 }
 
 StatusWith<std::vector<std::string>> DevNullKVEngine::beginNonBlockingBackup(

@@ -187,7 +187,7 @@ class TransactionParticipant {
     };
 
 public:
-    static inline MutableObeserverRegistry<int32_t> observeTransactionLifetimeLimitSeconds;
+    static inline MutableObserverRegistry<int32_t> observeTransactionLifetimeLimitSeconds;
 
     TransactionParticipant();
 

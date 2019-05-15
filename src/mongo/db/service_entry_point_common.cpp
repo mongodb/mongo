@@ -836,6 +836,7 @@ void execCommandDatabase(OperationContext* opCtx,
             // of successful future PIT atClusterTime requests.
             auto engine = opCtx->getServiceContext()->getStorageEngine();
             if (engine && engine->supportsReadConcernSnapshot()) {
+                SnapshotWindowUtil::incrementSnapshotTooOldErrorCount();
                 SnapshotWindowUtil::increaseTargetSnapshotWindowSize(opCtx);
             }
         } else {

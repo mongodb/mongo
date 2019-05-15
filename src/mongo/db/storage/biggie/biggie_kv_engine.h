@@ -105,11 +105,11 @@ public:
         return true;
     }
 
-    virtual bool isCacheUnderPressure(OperationContext* opCtx) const override {
-        return false;
+    virtual int64_t getCacheOverflowTableInsertCount(OperationContext* opCtx) const override {
+        return 0;
     }
 
-    virtual void setCachePressureForTest(int pressure) override;
+    virtual void setCacheOverflowTableInsertCountForTest(int insertCount) override;
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) {
         return 0;

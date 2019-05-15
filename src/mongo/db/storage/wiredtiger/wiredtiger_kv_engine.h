@@ -243,7 +243,7 @@ public:
      */
     void replicationBatchIsComplete() const override;
 
-    bool isCacheUnderPressure(OperationContext* opCtx) const override;
+    int64_t getCacheOverflowTableInsertCount(OperationContext* opCtx) const override;
 
     bool supportsReadConcernMajority() const final;
 

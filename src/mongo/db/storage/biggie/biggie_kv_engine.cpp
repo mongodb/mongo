@@ -47,7 +47,7 @@ mongo::RecoveryUnit* KVEngine::newRecoveryUnit() {
     return new RecoveryUnit(this, nullptr);
 }
 
-void KVEngine::setCachePressureForTest(int pressure) {
+void KVEngine::setCacheOverflowTableInsertCountForTest(int insertCount) {
     // TODO : implement.
 }
 

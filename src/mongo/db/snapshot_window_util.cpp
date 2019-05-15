@@ -52,25 +52,12 @@ namespace SnapshotWindowUtil {
 // Adds concurrency control to increaseTargetSnapshotWindowSize() and
 // decreaseTargetSnapshotWindowSize(). They should not run concurrently with themselves or one
 // another, since they act on and modify the same storage parameters. Further guards the static
-// variables "_snapshotWindowLastDecreasedAt" and "_snapshotWindowLastIncreasedAt" used in
-// increaseTargetSnapshotWindowSize() and decreaseSnapshowWindow().
+// variable "_snapshotWindowLastIncreasedAt" used in increaseTargetSnapshotWindowSize().
 stdx::mutex snapshotWindowMutex;
 
 namespace {
 
-void _decreaseTargetSnapshotWindowSize(WithLock lock, OperationContext* opCtx) {
-    // Tracks the last time that the snapshot window was decreased so that it does not go down so
-    // fast that the system does not have time to react and reduce snapshot availability.
-    static Date_t _snapshotWindowLastDecreasedAt{Date_t::min()};
-
-    if (_snapshotWindowLastDecreasedAt >
-        (Date_t::now() -
-         Milliseconds(snapshotWindowParams.minMillisBetweenSnapshotWindowDec.load()))) {
-        // We have already decreased the window size in the last minMillisBetweenSnapshotWindowDec
-        // milliseconds.
-        return;
-    }
-
+void _decreaseTargetSnapshotWindowSize(WithLock, OperationContext* opCtx) {
     snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.store(
         snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load() *
         snapshotWindowParams.snapshotWindowMultiplicativeDecrease.load());
@@ -80,8 +67,6 @@ void _decreaseTargetSnapshotWindowSize(WithLock lock, OperationContext* opCtx) {
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
     invariant(engine);
     engine->setOldestTimestampFromStable();
-
-    _snapshotWindowLastDecreasedAt = Date_t::now();
 }
 
 }  // namespace
@@ -102,23 +87,6 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
          Milliseconds(snapshotWindowParams.minMillisBetweenSnapshotWindowInc.load()))) {
         // We have already increased the window size in the last minMillisBetweenSnapshotWindowInc
         // milliseconds.
-        return;
-    }
-
-    // If the cache pressure is already too high, we will not put more pressure on it by increasing
-    // the window size.
-    StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
-    if (engine && engine->isCacheUnderPressure(opCtx)) {
-        warning() << "Attempted to increase the time window of available snapshots for "
-                     "point-in-time operations (readConcern level 'snapshot' or transactions), but "
-                     "the storage engine cache pressure, per the cachePressureThreshold setting of "
-                     "'"
-                  << snapshotWindowParams.cachePressureThreshold.load()
-                  << "', is too high to allow it to increase. If this happens frequently, consider "
-                     "either increasing the cache pressure threshold or increasing the memory "
-                     "available to the storage engine cache, in order to improve the success rate "
-                     "or speed of point-in-time requests.";
-        _decreaseTargetSnapshotWindowSize(lock, opCtx);
         return;
     }
 
@@ -151,9 +119,27 @@ void decreaseTargetSnapshotWindowSize(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lock(snapshotWindowMutex);
 
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
-    if (engine && engine->isCacheUnderPressure(opCtx)) {
-        _decreaseTargetSnapshotWindowSize(lock, opCtx);
+    if (engine) {
+        static auto lastInsertsCount = 0;
+        static auto lastSnapshotErrorCount = 0;
+
+        auto currentInsertsCount = engine->getCacheOverflowTableInsertCount(opCtx);
+        auto currentSnapshotErrorCount = snapshotWindowParams.snapshotTooOldErrorCount.load();
+
+        // Only decrease the snapshot window size if there were writes to the cache overflow table
+        // and there has been no new SnapshotTooOld errors in the same time period.
+        if (currentInsertsCount > lastInsertsCount &&
+            currentSnapshotErrorCount == lastSnapshotErrorCount) {
+            _decreaseTargetSnapshotWindowSize(lock, opCtx);
+        }
+
+        lastInsertsCount = currentInsertsCount;
+        lastSnapshotErrorCount = currentSnapshotErrorCount;
     }
+}
+
+void incrementSnapshotTooOldErrorCount() {
+    snapshotWindowParams.snapshotTooOldErrorCount.addAndFetch(1);
 }
 
 }  // namespace SnapshotWindowUtil

@@ -46,7 +46,7 @@ namespace mongo {
  * Then adding observers via someGlobalMutableObserverRegistry.addObserver();
  */
 template <typename T>
-class MutableObeserverRegistry {
+class MutableObserverRegistry {
 public:
     using Argument = T;
 
