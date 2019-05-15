@@ -309,6 +309,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     output->appendNumber("numExtents", numExtents);
     output->appendNumber("indexes", indexes);
     output->appendNumber("indexSize", indexSize / scale);
+    output->appendNumber("scaleFactor", scale);
 
     if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         boost::filesystem::path dbpath(

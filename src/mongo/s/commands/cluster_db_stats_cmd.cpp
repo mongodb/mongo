@@ -39,7 +39,8 @@
 namespace mongo {
 namespace {
 
-void aggregateResults(const std::vector<AsyncRequestsSender::Response>& responses,
+void aggregateResults(int scale,
+                      const std::vector<AsyncRequestsSender::Response>& responses,
                       BSONObjBuilder& output) {
     long long objects = 0;
     long long unscaledDataSize = 0;
@@ -75,6 +76,7 @@ void aggregateResults(const std::vector<AsyncRequestsSender::Response>& response
     output.appendNumber("numExtents", numExtents);
     output.appendNumber("indexes", indexes);
     output.appendNumber("indexSize", indexSize);
+    output.appendNumber("scaleFactor", scale);
     output.appendNumber("fileSize", fileSize);
 }
 
@@ -107,6 +109,18 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& output) override {
+        int scale = 1;
+        if (cmdObj["scale"].isNumber()) {
+            scale = cmdObj["scale"].numberInt();
+            if (scale <= 0) {
+                errmsg = "scale has to be > 0";
+                return false;
+            }
+        } else if (cmdObj["scale"].trueValue()) {
+            errmsg = "scale has to be a number > 0";
+            return false;
+        }
+
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
             dbName,
@@ -117,7 +131,7 @@ public:
             return false;
         }
 
-        aggregateResults(shardResponses, output);
+        aggregateResults(scale, shardResponses, output);
         return true;
     }
 

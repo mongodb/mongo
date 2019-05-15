@@ -702,6 +702,7 @@ public:
             result.appendNumber("numExtents", 0);
             result.appendNumber("indexes", 0);
             result.appendNumber("indexSize", 0);
+            result.appendNumber("scaleFactor", scale);
             result.appendNumber("fileSize", 0);
             if (!getGlobalServiceContext()->getStorageEngine()->isEphemeral()) {
                 result.appendNumber("fsUsedSize", 0);
