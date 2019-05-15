@@ -70,8 +70,6 @@ public:
                                  StringData indexName,
                                  MultikeyPaths* multikeyPaths) const;
 
-    virtual RecordId getIndexHead(OperationContext* opCtx, StringData indexName) const;
-
     virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const;
 
     virtual bool isIndexPresent(OperationContext* opCtx, StringData indexName) const;
@@ -91,7 +89,6 @@ public:
 
         BSONObj spec;
         bool ready = false;
-        RecordId head;
         bool multikey = false;
         KVPrefix prefix = KVPrefix::kNotPrefixed;
         bool isBackgroundSecondaryBuild = false;

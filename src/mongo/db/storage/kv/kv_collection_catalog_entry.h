@@ -63,8 +63,6 @@ public:
     // 4.4 can only downgrade to 4.2 which can read long TypeBits.
     void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) final;
 
-    void setIndexHead(OperationContext* opCtx, StringData indexName, const RecordId& newHead) final;
-
     Status removeIndex(OperationContext* opCtx, StringData indexName) final;
 
     Status prepareForIndexBuild(OperationContext* opCtx,

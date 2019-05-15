@@ -47,7 +47,6 @@ namespace mongo {
 class CollatorInterface;
 class CollectionCatalogEntry;
 class CollectionInfoCache;
-class HeadManager;
 class IndexAccessMethod;
 class IndexBuildInterceptor;
 class IndexDescriptor;
@@ -90,13 +89,7 @@ public:
 
     /// ---------------------
 
-    virtual const RecordId& head(OperationContext* const opCtx) const = 0;
-
-    virtual void setHead(OperationContext* const opCtx, const RecordId newHead) = 0;
-
     virtual void setIsReady(const bool newIsReady) = 0;
-
-    virtual HeadManager* headManager() const = 0;
 
     // --
 

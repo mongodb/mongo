@@ -373,7 +373,6 @@ TEST_F(KVCatalogTest, Idx1) {
         imd.spec = BSON("name"
                         << "foo");
         imd.ready = false;
-        imd.head = RecordId();
         imd.multikey = false;
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
@@ -407,7 +406,6 @@ TEST_F(KVCatalogTest, Idx1) {
         imd.spec = BSON("name"
                         << "foo");
         imd.ready = false;
-        imd.head = RecordId();
         imd.multikey = false;
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
@@ -461,7 +459,6 @@ TEST_F(KVCatalogTest, DirectoryPerDb1) {
         imd.spec = BSON("name"
                         << "foo");
         imd.ready = false;
-        imd.head = RecordId();
         imd.multikey = false;
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
@@ -513,7 +510,6 @@ TEST_F(KVCatalogTest, Split1) {
         imd.spec = BSON("name"
                         << "foo");
         imd.ready = false;
-        imd.head = RecordId();
         imd.multikey = false;
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
@@ -567,7 +563,6 @@ TEST_F(KVCatalogTest, DirectoryPerAndSplit1) {
         imd.spec = BSON("name"
                         << "foo");
         imd.ready = false;
-        imd.head = RecordId();
         imd.multikey = false;
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
@@ -624,7 +619,6 @@ TEST_F(KVCatalogTest, RestartForPrefixes) {
             imd.spec = BSON("name"
                             << "foo");
             imd.ready = false;
-            imd.head = RecordId();
             imd.multikey = false;
             imd.prefix = fooIndexPrefix;
             imd.isBackgroundSecondaryBuild = false;

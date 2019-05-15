@@ -38,7 +38,6 @@
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_info_cache_impl.h"
-#include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_access_method.h"
@@ -58,24 +57,6 @@ namespace mongo {
 
 using std::string;
 
-class HeadManagerImpl : public HeadManager {
-public:
-    HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) {}
-    virtual ~HeadManagerImpl() {}
-
-    const RecordId getHead(OperationContext* opCtx) const {
-        return _catalogEntry->head(opCtx);
-    }
-
-    void setHead(OperationContext* opCtx, const RecordId newHead) {
-        _catalogEntry->setHead(opCtx, newHead);
-    }
-
-private:
-    // Not owned here.
-    IndexCatalogEntry* _catalogEntry;
-};
-
 IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
                                              const StringData ns,
                                              CollectionCatalogEntry* const collection,
@@ -85,14 +66,12 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
       _collection(collection),
       _descriptor(std::move(descriptor)),
       _infoCache(infoCache),
-      _headManager(stdx::make_unique<HeadManagerImpl>(this)),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
       _prefix(collection->getIndexPrefix(opCtx, _descriptor->indexName())) {
     _descriptor->_cachedEntry = this;
 
     _isReady = _catalogIsReady(opCtx);
-    _head = _catalogHead(opCtx);
 
     {
         stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
@@ -134,18 +113,12 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
 IndexCatalogEntryImpl::~IndexCatalogEntryImpl() {
     _descriptor->_cachedEntry = nullptr;  // defensive
 
-    _headManager.reset();
     _descriptor.reset();
 }
 
 void IndexCatalogEntryImpl::init(std::unique_ptr<IndexAccessMethod> accessMethod) {
     invariant(!_accessMethod);
     _accessMethod = std::move(accessMethod);
-}
-
-const RecordId& IndexCatalogEntryImpl::head(OperationContext* opCtx) const {
-    DEV invariant(_head == _catalogHead(opCtx));
-    return _head;
 }
 
 bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
@@ -221,26 +194,6 @@ void IndexCatalogEntryImpl::setMinimumVisibleSnapshot(Timestamp newMinimumVisibl
 
 void IndexCatalogEntryImpl::setIsReady(bool newIsReady) {
     _isReady = newIsReady;
-}
-
-class IndexCatalogEntryImpl::SetHeadChange : public RecoveryUnit::Change {
-public:
-    SetHeadChange(IndexCatalogEntryImpl* ice, RecordId oldHead) : _ice(ice), _oldHead(oldHead) {}
-
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        _ice->_head = _oldHead;
-    }
-
-    IndexCatalogEntryImpl* _ice;
-    const RecordId _oldHead;
-};
-
-void IndexCatalogEntryImpl::setHead(OperationContext* opCtx, RecordId newHead) {
-    _collection->setIndexHead(opCtx, _descriptor->indexName(), newHead);
-
-    opCtx->recoveryUnit()->registerChange(new SetHeadChange(this, _head));
-    _head = newHead;
 }
 
 void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
@@ -355,10 +308,6 @@ void IndexCatalogEntryImpl::setNs(NamespaceString ns) {
 
 bool IndexCatalogEntryImpl::_catalogIsReady(OperationContext* opCtx) const {
     return _collection->isIndexReady(opCtx, _descriptor->indexName());
-}
-
-RecordId IndexCatalogEntryImpl::_catalogHead(OperationContext* opCtx) const {
-    return _collection->getIndexHead(opCtx, _descriptor->indexName());
 }
 
 bool IndexCatalogEntryImpl::_catalogIsPresent(OperationContext* opCtx) const {

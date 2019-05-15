@@ -127,12 +127,6 @@ public:
                                     StringData indexName,
                                     const MultikeyPaths& multikeyPaths) = 0;
 
-    virtual RecordId getIndexHead(OperationContext* opCtx, StringData indexName) const = 0;
-
-    virtual void setIndexHead(OperationContext* opCtx,
-                              StringData indexName,
-                              const RecordId& newHead) = 0;
-
     virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const = 0;
 
     virtual bool isIndexPresent(OperationContext* opCtx, StringData indexName) const = 0;

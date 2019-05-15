@@ -48,7 +48,6 @@ namespace mongo {
 class CollatorInterface;
 class CollectionCatalogEntry;
 class CollectionInfoCache;
-class HeadManager;
 class IndexAccessMethod;
 class IndexDescriptor;
 class MatchExpression;
@@ -120,15 +119,7 @@ public:
 
     /// ---------------------
 
-    const RecordId& head(OperationContext* opCtx) const final;
-
-    void setHead(OperationContext* opCtx, RecordId newHead) final;
-
     void setIsReady(bool newIsReady) final;
-
-    HeadManager* headManager() const final {
-        return _headManager.get();
-    }
 
     // --
 
@@ -192,11 +183,9 @@ public:
 
 private:
     class SetMultikeyChange;
-    class SetHeadChange;
 
     bool _catalogIsReady(OperationContext* opCtx) const;
     bool _catalogIsPresent(OperationContext* opCtx) const;
-    RecordId _catalogHead(OperationContext* opCtx) const;
 
     /**
      * Retrieves the multikey information associated with this index from '_collection',
@@ -221,8 +210,6 @@ private:
 
     IndexBuildInterceptor* _indexBuildInterceptor = nullptr;  // not owned here
 
-    // Owned here.
-    std::unique_ptr<HeadManager> _headManager;
     std::unique_ptr<CollatorInterface> _collator;
     std::unique_ptr<MatchExpression> _filterExpression;
 
@@ -230,7 +217,6 @@ private:
 
     Ordering _ordering;  // TODO: this might be b-tree specific
     bool _isReady;       // cache of NamespaceDetails info
-    RecordId _head;      // cache of IndexDetails
 
     // Set to true if this index supports path-level multikey tracking.
     // '_indexTracksPathLevelMultikeyInfo' is effectively const after IndexCatalogEntry::init() is
