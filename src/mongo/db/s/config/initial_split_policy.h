@@ -47,6 +47,35 @@ namespace mongo {
 class InitialSplitPolicy {
 public:
     /**
+     * Indicates the optimization allowed for sharding a collection given the collection's initial
+     * properties.
+     */
+    enum ShardingOptimizationType {
+        // If split points are provided, we directly generate corresponding initial chunks.
+        SplitPointsProvided,
+
+        // If tags are provided and the collection is empty, we directly write corresponding zones
+        // to the config server.
+        TagsProvidedWithEmptyCollection,
+
+        // If tags are provided and the collection is not empty, we create one chunk on the primary
+        // shard and leave the balancer to do zone splitting and placement.
+        TagsProvidedWithNonEmptyCollection,
+
+        // If the chunk is empty, we create one chunk on the primary shard.
+        EmptyCollection,
+
+        // If no optimizations are available, we calculate split points on the primary shard.
+        None,
+    };
+
+    static ShardingOptimizationType calculateOptimizationType(
+        const std::vector<BSONObj>& splitPoints,
+        const std::vector<TagsType>& tags,
+        bool collectionIsEmpty);
+
+
+    /**
      * For new collections which use hashed shard keys, we can can pre-split the range of possible
      * hashes into a large number of chunks, and distribute them evenly at creation time.
      *
@@ -127,14 +156,22 @@ public:
      * zoning rules) shards. Otherwise, they will all end up on the primary shard after which the
      * balancer will take care of properly distributing them around.
      */
-    static ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const ShardKeyPattern& shardKeyPattern,
-                                                   const ShardId& primaryShardId,
-                                                   const std::vector<BSONObj>& splitPoints,
-                                                   const std::vector<TagsType>& tags,
-                                                   bool isEmpty,
-                                                   int numContiguousChunksPerShard = 1);
+    static ShardCollectionConfig createFirstChunksOptimized(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ShardKeyPattern& shardKeyPattern,
+        const ShardId& primaryShardId,
+        const std::vector<BSONObj>& splitPoints,
+        const std::vector<TagsType>& tags,
+        ShardingOptimizationType optimizationType,
+        bool isEmpty,
+        int numContiguousChunksPerShard = 1);
+
+    static ShardCollectionConfig createFirstChunksUnoptimized(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ShardKeyPattern& shardKeyPattern,
+        const ShardId& primaryShardId);
 
     /**
      * Throws an exception if the collection is already sharded with different options.

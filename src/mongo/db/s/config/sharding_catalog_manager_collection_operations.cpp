@@ -420,13 +420,27 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                               ->makeFromBSON(defaultCollation));
     }
 
-    const auto initialChunks = InitialSplitPolicy::createFirstChunks(opCtx,
-                                                                     nss,
-                                                                     fieldsAndOrder,
-                                                                     dbPrimaryShardId,
-                                                                     splitPoints,
-                                                                     treatAsNoZonesDefined,
-                                                                     treatAsEmpty);
+    auto optimizationType = InitialSplitPolicy::calculateOptimizationType(
+        splitPoints, treatAsNoZonesDefined, treatAsEmpty);
+
+    InitialSplitPolicy::ShardCollectionConfig initialChunks;
+
+    if (optimizationType != InitialSplitPolicy::ShardingOptimizationType::None) {
+        initialChunks =
+            InitialSplitPolicy::createFirstChunksOptimized(opCtx,
+                                                           nss,
+                                                           fieldsAndOrder,
+                                                           dbPrimaryShardId,
+                                                           splitPoints,
+                                                           treatAsNoZonesDefined,
+                                                           optimizationType,
+                                                           treatAsEmpty,
+                                                           1  // numContiguousChunksPerShard
+                                                           );
+    } else {
+        initialChunks = InitialSplitPolicy::createFirstChunksUnoptimized(
+            opCtx, nss, fieldsAndOrder, dbPrimaryShardId);
+    }
 
     writeFirstChunksForShardCollection(opCtx, initialChunks);
 
