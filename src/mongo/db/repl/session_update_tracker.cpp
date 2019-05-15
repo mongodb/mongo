@@ -249,7 +249,7 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
     const repl::OplogEntry& entry) {
     auto sessionInfo = entry.getOperationSessionInfo();
 
-    // We only update the transaction table on the first inTxn operation.
+    // We only update the transaction table on the first partialTxn operation.
     if (entry.isPartialTransaction() && !entry.getPrevWriteOpTimeInTransaction()->isNull()) {
         return boost::none;
     }

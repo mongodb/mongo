@@ -306,7 +306,6 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                                            stmtId,
                                            oplogLink,
                                            false /* prepare */,
-                                           false /* inTxn */,
                                            OplogSlot());
 
             const auto& oplogOpTime = result.oplogTime;

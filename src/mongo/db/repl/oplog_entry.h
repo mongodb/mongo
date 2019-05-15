@@ -149,11 +149,10 @@ public:
      * and so this method will always return false for them.
      */
     bool isPartialTransaction() const {
-        if (getCommandType() == CommandType::kApplyOps) {
-            return getObject()[ApplyOpsCommandInfoBase::kPartialTxnFieldName].booleanSafe();
+        if (getCommandType() != CommandType::kApplyOps) {
+            return false;
         }
-        // TODO(SERVER-40763): Remove "inTxn" entirely and return false here.
-        return getInTxn() && *getInTxn();
+        return getObject()[ApplyOpsCommandInfoBase::kPartialTxnFieldName].booleanSafe();
     }
 
     /**

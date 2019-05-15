@@ -377,8 +377,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             const OperationSessionInfo& sessionInfo,
                             StmtId statementId,
                             const OplogLink& oplogLink,
-                            bool prepare,
-                            bool inTxn) {
+                            bool prepare) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -407,10 +406,6 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
 
     if (prepare) {
         b.appendBool(OplogEntryBase::kPrepareFieldName, true);
-    }
-
-    if (inTxn) {
-        b.appendBool(OplogEntryBase::kInTxnFieldName, true);
     }
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
@@ -498,7 +493,6 @@ OpTime logOp(OperationContext* opCtx,
              StmtId statementId,
              const OplogLink& oplogLink,
              bool prepare,
-             bool inTxn,
              const OplogSlot& oplogSlot) {
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
@@ -552,8 +546,7 @@ OpTime logOp(OperationContext* opCtx,
                                sessionInfo,
                                statementId,
                                oplogLink,
-                               prepare,
-                               inTxn);
+                               prepare);
     const DocWriter* basePtr = &writer;
     auto timestamp = slot.getTimestamp();
     _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot, wallClockTime);
@@ -627,8 +620,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                           sessionInfo,
                                           begin[i].stmtId,
                                           oplogLink,
-                                          prepare,
-                                          false /* inTxn */));
+                                          prepare));
         oplogLink.prevOpTime = insertStatementOplogSlot;
         timestamps[i] = oplogLink.prevOpTime.getTimestamp();
         opTimes.push_back(insertStatementOplogSlot);
@@ -1330,9 +1322,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
         mode == repl::OplogApplication::Mode::kApplyOpsCmd || opCtx->writesAreReplicated();
     OpCounters* opCounters = shouldUseGlobalOpCounters ? &globalOpCounters : &replOpCounters;
 
-    // TODO(SERVER-40763): Remove "inTxn" entirely.
-    std::array<StringData, 9> names = {"ts", "t", "o", "ui", "ns", "op", "b", "o2", "inTxn"};
-    std::array<BSONElement, 9> fields;
+    std::array<StringData, 8> names = {"ts", "t", "o", "ui", "ns", "op", "b", "o2"};
+    std::array<BSONElement, 8> fields;
     op.getFields(names, &fields);
     BSONElement& fieldTs = fields[0];
     BSONElement& fieldT = fields[1];
@@ -1342,16 +1333,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
     BSONElement& fieldOp = fields[5];
     BSONElement& fieldB = fields[6];
     BSONElement& fieldO2 = fields[7];
-    BSONElement& fieldInTxn = fields[8];
 
     BSONObj o;
     if (fieldO.isABSONObj())
         o = fieldO.embeddedObject();
-
-    // Make sure we don't apply partial transactions through applyOps.
-    uassert(51117,
-            "Operations with 'inTxn' set are only used internally by secondaries.",
-            fieldInTxn.eoo());
 
     // operation type -- see logOp() comments for types
     const char* opType = fieldOp.valuestrsafe();

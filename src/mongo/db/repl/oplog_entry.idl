@@ -147,9 +147,3 @@ structs:
                 type: bool
                 optional: true
                 description: "Specifies that this operation should be put into a 'prepare' state"
-
-            inTxn:
-                type: bool
-                optional: true
-                description: "Specifies that this oplog entry is part of a multi-statement
-                              transaction that has not yet been committed or prepared."

@@ -213,24 +213,6 @@ Status applyAbortTransaction(OperationContext* opCtx,
     return Status::OK();
 }
 
-namespace {
-// Reconstruct the entry "as if" it were at the time given in topLevelObj, with the session
-// information also from "topLevelObj", and remove the "partialTxn" indicator.
-// TODO(SERVER-40763): Remove "inTxn" entirely.  We can replace this helper with a direct call to
-// repl::ApplyOps::extractOperationsTo.
-void _reconstructPartialTxnEntryAtGivenTime(const OplogEntry& operationEntry,
-                                            const BSONObj& topLevelObj,
-                                            repl::MultiApplier::Operations* operations) {
-    if (operationEntry.getInTxn()) {
-        BSONObjBuilder builder(operationEntry.getDurableReplOperation().toBSON());
-        builder.appendElementsUnique(topLevelObj);
-        operations->emplace_back(builder.obj());
-    } else {
-        repl::ApplyOps::extractOperationsTo(operationEntry, topLevelObj, operations);
-    }
-}
-}  // namespace
-
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const OplogEntry& commitOrPrepare,
@@ -263,7 +245,7 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
         const auto& operationEntry = iter.next(opCtx);
         invariant(operationEntry.isPartialTransaction());
         auto prevOpsEnd = ops.size();
-        _reconstructPartialTxnEntryAtGivenTime(operationEntry, commitOrPrepareObj, &ops);
+        repl::ApplyOps::extractOperationsTo(operationEntry, commitOrPrepareObj, &ops);
         // Because BSONArrays do not have fast way of determining size without iterating through
         // them, and we also have no way of knowing how many oplog entries are in a transaction
         // without iterating, reversing each applyOps and then reversing the whole array is
@@ -278,12 +260,12 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     for (auto* cachedOp : cachedOps) {
         const auto& operationEntry = *cachedOp;
         invariant(operationEntry.isPartialTransaction());
-        _reconstructPartialTxnEntryAtGivenTime(operationEntry, commitOrPrepareObj, &ops);
+        repl::ApplyOps::extractOperationsTo(operationEntry, commitOrPrepareObj, &ops);
     }
 
     // Reconstruct the operations from the commit or prepare oplog entry.
     if (commitOrPrepare.getCommandType() == OplogEntry::CommandType::kApplyOps) {
-        _reconstructPartialTxnEntryAtGivenTime(commitOrPrepare, commitOrPrepareObj, &ops);
+        repl::ApplyOps::extractOperationsTo(commitOrPrepare, commitOrPrepareObj, &ops);
     }
     return ops;
 }
