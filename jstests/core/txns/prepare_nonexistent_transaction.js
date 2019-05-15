@@ -77,15 +77,13 @@
     assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1, autocommit: false}),
                                  ErrorCodes.InvalidOptions);
 
-    // It isn't ideal that NoSuchTransaction is thrown instead of InvalidOptions here, but it's okay
-    // to leave as is for now since this case fails in some way.
     jsTestLog("Test the error precedence when calling prepare on a nonexistent transaction but " +
               "not providing autocommit to prepareTransaction.");
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
         txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
     }),
-                                 ErrorCodes.NoSuchTransaction);
+                                 50768);
 
     jsTestLog("Test the error precedence when calling prepare on a nonexistent transaction and " +
               "providing startTransaction to prepareTransaction.");

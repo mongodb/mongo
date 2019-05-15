@@ -31,47 +31,26 @@
 
 #include "mongo/db/transaction_validation.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 namespace {
 
-// The command names for which to check out a session. These are commands that support retryable
-// writes, readConcern snapshot, or multi-statement transactions. We additionally check out the
-// session for commands that can take a lock and then run another whitelisted command in
-// DBDirectClient. Otherwise, the nested command would try to check out a session under a lock,
-// which is not allowed.
-const StringMap<int> sessionCheckOutList = {{"abortTransaction", 1},
-                                            {"aggregate", 1},
-                                            {"applyOps", 1},
-                                            {"commitTransaction", 1},
-                                            {"count", 1},
-                                            {"delete", 1},
-                                            {"distinct", 1},
-                                            {"doTxn", 1},
-                                            {"explain", 1},
-                                            {"filemd5", 1},
-                                            {"find", 1},
-                                            {"findandmodify", 1},
-                                            {"findAndModify", 1},
-                                            {"geoNear", 1},
-                                            {"geoSearch", 1},
-                                            {"getMore", 1},
-                                            {"group", 1},
-                                            {"insert", 1},
-                                            {"killCursors", 1},
-                                            {"prepareTransaction", 1},
-                                            {"refreshLogicalSessionCacheNow", 1},
-                                            {"update", 1}};
+const StringMap<int> retryableWriteCommands = {
+    {"delete", 1}, {"findandmodify", 1}, {"findAndModify", 1}, {"insert", 1}, {"update", 1}};
 
 // Commands that can be sent with session info but should not check out a session.
 const StringMap<int> skipSessionCheckoutList = {{"coordinateCommitTransaction", 1}};
 
-bool commandCanCheckOutSession(StringData cmdName) {
-    return sessionCheckOutList.find(cmdName) != sessionCheckOutList.cend();
+bool isRetryableWriteCommand(StringData cmdName) {
+    return retryableWriteCommands.find(cmdName) != retryableWriteCommands.cend();
 }
 
 }  // namespace
@@ -95,10 +74,12 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
         uassertStatusOK(CommandHelpers::canUseTransactions(dbname, cmdName));
     }
 
-    if (sessionOptions.getTxnNumber()) {
+    if (!sessionOptions.getAutocommit() && sessionOptions.getTxnNumber()) {
         uassert(50768,
-                str::stream() << "It is illegal to provide a txnNumber for command " << cmdName,
-                commandCanCheckOutSession(cmdName) || shouldCommandSkipSessionCheckout(cmdName));
+                "txnNumber may only be provided for multi-document transactions and retryable "
+                "write commands. autocommit:false was not provided, and {} is not a retryable "
+                "write command."_format(cmdName),
+                isRetryableWriteCommand(cmdName));
     }
 
     if (sessionOptions.getStartTransaction()) {

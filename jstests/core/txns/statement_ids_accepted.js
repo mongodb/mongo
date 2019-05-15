@@ -1,5 +1,5 @@
-// Makes sure all commands which are supposed to take statement ids do.  This should test the
-// commands in the sessionCheckOutWhiteList in service_entry_point_common.cpp.
+// Makes sure all commands which are supposed to take statement ids do.  This should test all
+// commands that are allowed in transactions.
 // @tags: [uses_transactions, uses_prepare_transaction]
 (function() {
     "use strict";
@@ -90,23 +90,6 @@
     }));
 
     // The doTxn command is intentionally left out.
-
-    jsTestLog("Check that explain accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        explain: {
-            delete: collName,
-            deletes: [{q: {}, limit: 1}],
-        },
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-    }));
-
-    jsTestLog("Check that filemd5 accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        filemd5: "nofile",
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-    }));
 
     jsTestLog("Check that find and getmore accept a statement ID");
     // Put in some data to find so getMore has a cursor to use.

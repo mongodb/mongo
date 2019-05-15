@@ -73,13 +73,14 @@
     assert.commandFailedWithCode(sessionDb.foo.insert({_id: 0}), ErrorCodes.NotMaster);
 
     /**
-     * Test starting a read with txnNumber, but without autocommit. This is not an officially
-     * supported combination, but should still be disallowed on a secondary.
+     * Test starting a read with txnNumber, but without autocommit. This fails in general because
+     * txnNumber isn't supported for the find command outside of transactions, but we check that
+     * this fails on a secondary.
      */
 
     jsTestLog("Start a read with txnNumber but without autocommit");
     assert.commandFailedWithCode(sessionDb.runCommand({find: 'foo', txnNumber: NumberLong(10)}),
-                                 ErrorCodes.NotMaster);
+                                 50768);
 
     session.endSession();
     rst.stopSet(undefined, false, {skipValidation: true});

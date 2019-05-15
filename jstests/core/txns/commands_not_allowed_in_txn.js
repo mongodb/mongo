@@ -97,31 +97,14 @@
     }
 
     //
-    // Test commands that check out the session but are not allowed in multi-document
-    // transactions.
+    // Test a selection of commands that are not allowed in transactions.
     //
 
-    const sessionCommands = [
+    const commands = [
         {count: collName},
         {count: collName, query: {a: 1}},
         {explain: {find: collName}},
         {filemd5: 1, root: "fs"},
-    ];
-
-    // There is no applyOps command on mongos.
-    if (!isMongos) {
-        sessionCommands.push(
-            {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]});
-    }
-
-    sessionCommands.forEach(testCommand);
-
-    //
-    // Test a selection of commands that do not check out the session. It is illegal to provide a
-    // 'txnNumber' on these commands.
-    //
-
-    const nonSessionCommands = [
         {isMaster: 1},
         {buildInfo: 1},
         {ping: 1},
@@ -139,14 +122,13 @@
         {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: {inline: 1}},
     ];
 
-    nonSessionCommands.forEach(testCommand);
+    // There is no applyOps command on mongos.
+    if (!isMongos) {
+        commands.push(
+            {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]});
+    }
 
-    nonSessionCommands.forEach(function(command) {
-        setup();
-        assert.commandFailedWithCode(
-            sessionDb.runCommand(Object.assign({}, command, {txnNumber: NumberLong(++txnNumber)})),
-            [50768, 50889]);
-    });
+    commands.forEach(testCommand);
 
     //
     // Test that doTxn is not allowed at positions after the first in transactions.

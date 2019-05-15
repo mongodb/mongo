@@ -22,16 +22,13 @@
     let txnNumber = 0;
     let stmtId = 0;
 
-    function tryCommands({testDB, assignTxnNumber, message}) {
+    function tryCommands({testDB, message}) {
         jsTestLog("Verify that inserts cannot use readConcern snapshot " + message);
         let cmd = {
             insert: collName,
             documents: [{_id: 0}],
             readConcern: {level: "snapshot"},
         };
-        if (assignTxnNumber) {
-            Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
-        }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
 
         jsTestLog("Verify that updates cannot use readConcern snapshot " + message);
@@ -40,9 +37,6 @@
             updates: [{q: {_id: 0}, u: {$set: {x: 1}}}],
             readConcern: {level: "snapshot"},
         };
-        if (assignTxnNumber) {
-            Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
-        }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
 
         jsTestLog("Verify that deletes cannot use readConcern snapshot " + message);
@@ -51,9 +45,6 @@
             deletes: [{q: {_id: 0}, limit: 1}],
             readConcern: {level: "snapshot"},
         };
-        if (assignTxnNumber) {
-            Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
-        }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
 
         jsTestLog("Verify that findAndModify cannot use readConcern snapshot " + message);
@@ -63,32 +54,18 @@
             remove: true,
             readConcern: {level: "snapshot"},
         };
-        if (assignTxnNumber) {
-            Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
-        }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
 
         jsTestLog("Verify that finds cannot use readConcern snapshot " + message);
         cmd = {find: collName, readConcern: {level: "snapshot"}};
-        if (assignTxnNumber) {
-            Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
-        }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
 
         jsTestLog("Verify that aggregate cannot use readConcern snapshot " + message);
         cmd = {aggregate: collName, pipeline: [], readConcern: {level: "snapshot"}};
-        if (assignTxnNumber) {
-            Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
-        }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
     }
-    tryCommands({
-        testDB: sessionDb,
-        assignTxnNumber: true,
-        message: "in session using snapshot read syntax."
-    });
-    tryCommands({testDB: sessionDb, assignTxnNumber: false, message: "in session."});
-    tryCommands({testDB: testDB, assignTxnNumber: false, message: "outside session."});
+    tryCommands({testDB: sessionDb, message: "in session."});
+    tryCommands({testDB: testDB, message: "outside session."});
 
     session.endSession();
 }());
