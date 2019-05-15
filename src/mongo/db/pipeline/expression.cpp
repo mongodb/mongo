@@ -2519,6 +2519,8 @@ intrusive_ptr<Expression> ExpressionMeta::parse(
         return new ExpressionMeta(expCtx, MetaType::RAND_VAL);
     } else if (expr.valueStringData() == "searchScore") {
         return new ExpressionMeta(expCtx, MetaType::SEARCH_SCORE);
+    } else if (expr.valueStringData() == "searchHighlights") {
+        return new ExpressionMeta(expCtx, MetaType::SEARCH_HIGHLIGHTS);
     } else {
         uasserted(17308, "Unsupported argument to $meta: " + expr.String());
     }
@@ -2539,6 +2541,9 @@ Value ExpressionMeta::serialize(bool explain) const {
         case MetaType::SEARCH_SCORE:
             return Value(DOC("$meta"
                              << "searchScore"_sd));
+        case MetaType::SEARCH_HIGHLIGHTS:
+            return Value(DOC("$meta"
+                             << "searchHighlights"_sd));
     }
     MONGO_UNREACHABLE;
 }
@@ -2551,6 +2556,8 @@ Value ExpressionMeta::evaluate(const Document& root) const {
             return root.hasRandMetaField() ? Value(root.getRandMetaField()) : Value();
         case MetaType::SEARCH_SCORE:
             return root.hasSearchScore() ? Value(root.getSearchScore()) : Value();
+        case MetaType::SEARCH_HIGHLIGHTS:
+            return root.hasSearchHighlights() ? Value(root.getSearchHighlights()) : Value();
     }
     MONGO_UNREACHABLE;
 }
@@ -2558,6 +2565,9 @@ Value ExpressionMeta::evaluate(const Document& root) const {
 void ExpressionMeta::_doAddDependencies(DepsTracker* deps) const {
     if (_metaType == MetaType::TEXT_SCORE) {
         deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
+
+        // We do not add the dependencies for SEARCH_SCORE or SEARCH_HIGHLIGHTS because those values
+        // are not stored in the collection (or in mongod at all).
     }
 }
 

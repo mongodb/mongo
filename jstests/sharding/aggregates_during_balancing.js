@@ -179,7 +179,9 @@
     function testSample() {
         jsTestLog('testing $sample');
         [0, 1, 10, nItems, nItems + 1].forEach(function(size) {
-            var res = db.ts1.aggregate([{$sample: {size: size}}]).toArray();
+            // Run with 'allowDiskUse' set to true because this may exceed the in-memory sort
+            // limit.
+            var res = db.ts1.aggregate([{$sample: {size: size}}], {allowDiskUse: true}).toArray();
             assert.eq(res.length, Math.min(nItems, size));
         });
     }

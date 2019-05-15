@@ -45,12 +45,14 @@ using std::vector;
 
 const DocumentStorage DocumentStorage::kEmptyDoc;
 
-const std::vector<StringData> Document::allMetadataFieldNames = {Document::metaFieldTextScore,
-                                                                 Document::metaFieldRandVal,
-                                                                 Document::metaFieldSortKey,
-                                                                 Document::metaFieldGeoNearDistance,
-                                                                 Document::metaFieldGeoNearPoint,
-                                                                 Document::metaFieldSearchScore};
+const std::vector<StringData> Document::allMetadataFieldNames = {
+    Document::metaFieldGeoNearDistance,
+    Document::metaFieldGeoNearPoint,
+    Document::metaFieldRandVal,
+    Document::metaFieldSearchHighlights,
+    Document::metaFieldSearchScore,
+    Document::metaFieldSortKey,
+    Document::metaFieldTextScore};
 
 Position DocumentStorage::findField(StringData requested) const {
     int reqSize = requested.size();  // get size calculation out of the way if needed
@@ -226,9 +228,22 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
         out->_geoNearDistance = _geoNearDistance;
         out->_geoNearPoint = _geoNearPoint.getOwned();
         out->_searchScore = _searchScore;
+        out->_searchHighlights = _searchHighlights;
     }
 
     return out;
+}
+
+size_t DocumentStorage::getMetadataApproximateSize() const {
+    size_t size = 0;
+    size += sizeof(_textScore);
+    size += sizeof(_randVal);
+    size += _sortKey.objsize();
+    size += sizeof(_geoNearDistance);
+    size += _geoNearPoint.getApproximateSize();
+    size += sizeof(_searchScore);
+    size += _searchHighlights.getApproximateSize();
+    return size;
 }
 
 DocumentStorage::~DocumentStorage() {
@@ -292,6 +307,7 @@ constexpr StringData Document::metaFieldSortKey;
 constexpr StringData Document::metaFieldGeoNearDistance;
 constexpr StringData Document::metaFieldGeoNearPoint;
 constexpr StringData Document::metaFieldSearchScore;
+constexpr StringData Document::metaFieldSearchHighlights;
 
 BSONObj Document::toBsonWithMetaData() const {
     BSONObjBuilder bb;
@@ -308,6 +324,8 @@ BSONObj Document::toBsonWithMetaData() const {
         getGeoNearPoint().addToBsonObj(&bb, metaFieldGeoNearPoint);
     if (hasSearchScore())
         bb.append(metaFieldSearchScore, getSearchScore());
+    if (hasSearchHighlights())
+        getSearchHighlights().addToBsonObj(&bb, metaFieldSearchHighlights);
     return bb.obj();
 }
 
@@ -324,6 +342,9 @@ Document Document::fromBsonWithMetaData(const BSONObj& bson) {
                 continue;
             } else if (fieldName == metaFieldSearchScore) {
                 md.setSearchScore(elem.Double());
+                continue;
+            } else if (fieldName == metaFieldSearchHighlights) {
+                md.setSearchHighlights(Value(elem));
                 continue;
             } else if (fieldName == metaFieldRandVal) {
                 md.setRandMetaField(elem.Double());
@@ -431,6 +452,9 @@ size_t Document::getApproximateSize() const {
         size -= sizeof(Value);  // already accounted for above
     }
 
+    // The metadata also occupies space in the document storage that's pre-allocated.
+    size += getMetadataApproximateSize();
+
     return size;
 }
 
@@ -526,6 +550,10 @@ void Document::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(char(DocumentStorage::MetaType::SEARCH_SCORE + 1));
         buf.appendNum(getSearchScore());
     }
+    if (hasSearchHighlights()) {
+        buf.appendNum(char(DocumentStorage::MetaType::SEARCH_HIGHLIGHTS + 1));
+        getSearchHighlights().serializeForSorter(buf);
+    }
     buf.appendNum(char(0));
 }
 
@@ -547,6 +575,9 @@ Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeS
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else if (marker == char(DocumentStorage::MetaType::SEARCH_SCORE) + 1) {
             doc.setSearchScore(buf.read<LittleEndian<double>>());
+        } else if (marker == char(DocumentStorage::MetaType::SEARCH_HIGHLIGHTS) + 1) {
+            doc.setSearchHighlights(
+                Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }

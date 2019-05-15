@@ -6005,6 +6005,34 @@ TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithDottedInputPath) 
 
 }  // namespace GetComputedPathsTest
 
+namespace expression_meta_test {
+TEST(ExpressionMetaTest, ExpressionMetaSearchScore) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    VariablesParseState vps = expCtx->variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"searchScore\"}");
+    auto expressionMeta = ExpressionMeta::parse(expCtx, expr.firstElement(), vps);
+
+    MutableDocument doc;
+    doc.setSearchScore(1.234);
+    Value val = expressionMeta->evaluate(doc.freeze());
+    ASSERT_EQ(val.getDouble(), 1.234);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    VariablesParseState vps = expCtx->variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"searchHighlights\"}");
+    auto expressionMeta = ExpressionMeta::parse(expCtx, expr.firstElement(), vps);
+
+    MutableDocument doc;
+    Document highlights = DOC("this part" << 1 << "is opaque to the server" << 1);
+    doc.setSearchHighlights(Value(highlights));
+
+    Value val = expressionMeta->evaluate(doc.freeze());
+    ASSERT_DOCUMENT_EQ(val.getDocument(), highlights);
+}
+}  // namespace expression_meta_test
+
 namespace ExpressionRegexTest {
 
 class ExpressionRegexTest {

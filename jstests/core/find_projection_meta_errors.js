@@ -14,6 +14,10 @@
         ErrorCodes.BadValue);
 
     assert.commandFailedWithCode(
+        db.runCommand({find: coll.getName(), projection: {score: {$meta: "searchHighlights"}}}),
+        ErrorCodes.BadValue);
+
+    assert.commandFailedWithCode(
         db.runCommand({find: coll.getName(), projection: {score: {$meta: "some garbage"}}}),
         ErrorCodes.BadValue);
 }());

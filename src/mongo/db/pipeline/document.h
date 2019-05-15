@@ -97,6 +97,7 @@ public:
     static constexpr StringData metaFieldGeoNearDistance = "$dis"_sd;
     static constexpr StringData metaFieldGeoNearPoint = "$pt"_sd;
     static constexpr StringData metaFieldSearchScore = "$searchScore"_sd;
+    static constexpr StringData metaFieldSearchHighlights = "$searchHighlights"_sd;
 
     static const std::vector<StringData> allMetadataFieldNames;
 
@@ -160,8 +161,19 @@ public:
     /** Get the approximate storage size of the document and sub-values in bytes.
      *  Note: Some memory may be shared with other Documents or between fields within
      *        a single Document so this can overestimate usage.
+     *
+     *  Note: the value returned by this function includes the size of the metadata associated with
+     *  the document.
      */
     size_t getApproximateSize() const;
+
+    /**
+     * Return the approximate amount of space used by metadata. Note that documents may reserve
+     * space for metadata even no metadata is used.
+     */
+    size_t getMetadataApproximateSize() const {
+        return storage().getMetadataApproximateSize();
+    }
 
     /**
      * Compare two documents. Most callers should prefer using DocumentComparator instead. See
@@ -289,6 +301,13 @@ public:
     }
     double getSearchScore() const {
         return storage().getSearchScore();
+    }
+
+    bool hasSearchHighlights() const {
+        return storage().hasSearchHighlights();
+    }
+    Value getSearchHighlights() const {
+        return storage().getSearchHighlights();
     }
 
     /// members for Sorter
@@ -552,6 +571,10 @@ public:
 
     void setSearchScore(double score) {
         storage().setSearchScore(score);
+    }
+
+    void setSearchHighlights(Value highlights) {
+        storage().setSearchHighlights(highlights);
     }
 
     /** Convert to a read-only document and release reference.

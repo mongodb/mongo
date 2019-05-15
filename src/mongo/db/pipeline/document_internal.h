@@ -204,6 +204,7 @@ public:
         GEONEAR_DIST,
         GEONEAR_POINT,
         SEARCH_SCORE,
+        SEARCH_HIGHLIGHTS,
 
         // New fields must be added before the NUM_FIELDS sentinel.
         NUM_FIELDS
@@ -279,6 +280,12 @@ public:
     }
 
     /**
+     * Compute the space allocated for the metadata fields. Will account for space allocated for
+     * unused metadata fields as well.
+     */
+    size_t getMetadataApproximateSize() const;
+
+    /**
      * Copies all metadata from source if it has any.
      * Note: does not clear metadata from this.
      */
@@ -300,6 +307,9 @@ public:
         }
         if (source.hasSearchScore()) {
             setSearchScore(source.getSearchScore());
+        }
+        if (source.hasSearchHighlights()) {
+            setSearchHighlights(source.getSearchHighlights());
         }
     }
 
@@ -367,6 +377,17 @@ public:
     void setSearchScore(double score) {
         _metaFields.set(MetaType::SEARCH_SCORE);
         _searchScore = score;
+    }
+
+    bool hasSearchHighlights() const {
+        return _metaFields.test(MetaType::SEARCH_HIGHLIGHTS);
+    }
+    Value getSearchHighlights() const {
+        return _searchHighlights;
+    }
+    void setSearchHighlights(Value highlights) {
+        _metaFields.set(MetaType::SEARCH_HIGHLIGHTS);
+        _searchHighlights = highlights;
     }
 
 private:
@@ -454,7 +475,8 @@ private:
     double _geoNearDistance;
     Value _geoNearPoint;
     double _searchScore;
-    // When adding a field, make sure to update clone() method
+    Value _searchHighlights;
+    // When adding a field, make sure to update clone() and getMetadataApproximateSize() methods.
 
     // Defined in document.cpp
     static const DocumentStorage kEmptyDoc;

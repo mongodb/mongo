@@ -1635,6 +1635,7 @@ private:
         TEXT_SCORE,
         RAND_VAL,
         SEARCH_SCORE,
+        SEARCH_HIGHLIGHTS,
     };
 
     ExpressionMeta(const boost::intrusive_ptr<ExpressionContext>& expCtx, MetaType metaType);
