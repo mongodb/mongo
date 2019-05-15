@@ -31,7 +31,9 @@
 #include <algorithm>
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog_entry_mock.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/operation_context_noop.h"
@@ -666,4 +668,127 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
 
     catalog.deregisterAllCatalogEntriesAndCollectionObjects();
 }
+
+class ForEachCollectionFromDbTest : public CatalogTestFixture {
+public:
+    void createTestData() {
+        CollectionOptions emptyCollOptions;
+
+        CollectionOptions tempCollOptions;
+        tempCollOptions.temp = true;
+
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), NamespaceString("db", "coll1"), emptyCollOptions));
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), NamespaceString("db", "coll2"), tempCollOptions));
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), NamespaceString("db", "coll3"), tempCollOptions));
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), NamespaceString("db2", "coll4"), emptyCollOptions));
+    }
+};
+
+TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
+    createTestData();
+    auto opCtx = operationContext();
+
+    {
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db", MODE_IX);
+        int numCollectionsTraversed = 0;
+        catalog::forEachCollectionFromDb(
+            opCtx,
+            "db",
+            MODE_X,
+            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+                ASSERT_TRUE(
+                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+                numCollectionsTraversed++;
+                return true;
+            });
+
+        ASSERT_EQUALS(numCollectionsTraversed, 3);
+    }
+
+    {
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db2", MODE_IX);
+        int numCollectionsTraversed = 0;
+        catalog::forEachCollectionFromDb(
+            opCtx,
+            "db2",
+            MODE_IS,
+            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+                ASSERT_TRUE(
+                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
+                numCollectionsTraversed++;
+                return true;
+            });
+
+        ASSERT_EQUALS(numCollectionsTraversed, 1);
+    }
+
+    {
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db3", MODE_IX);
+        int numCollectionsTraversed = 0;
+        catalog::forEachCollectionFromDb(
+            opCtx,
+            "db3",
+            MODE_S,
+            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+                numCollectionsTraversed++;
+                return true;
+            });
+
+        ASSERT_EQUALS(numCollectionsTraversed, 0);
+    }
+}
+
+TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
+    createTestData();
+    auto opCtx = operationContext();
+
+    {
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db", MODE_IX);
+        int numCollectionsTraversed = 0;
+        catalog::forEachCollectionFromDb(
+            opCtx,
+            "db",
+            MODE_X,
+            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+                ASSERT_TRUE(
+                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+                numCollectionsTraversed++;
+                return true;
+            },
+            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+                ASSERT_TRUE(
+                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
+                return catalogEntry->getCollectionOptions(opCtx).temp;
+            });
+
+        ASSERT_EQUALS(numCollectionsTraversed, 2);
+    }
+
+    {
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db", MODE_IX);
+        int numCollectionsTraversed = 0;
+        catalog::forEachCollectionFromDb(
+            opCtx,
+            "db",
+            MODE_IX,
+            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+                ASSERT_TRUE(
+                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
+                numCollectionsTraversed++;
+                return true;
+            },
+            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+                ASSERT_TRUE(
+                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
+                return !catalogEntry->getCollectionOptions(opCtx).temp;
+            });
+
+        ASSERT_EQUALS(numCollectionsTraversed, 1);
+    }
+}
+
 }  // namespace

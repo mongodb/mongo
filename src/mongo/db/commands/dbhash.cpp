@@ -223,7 +223,7 @@ public:
             opCtx,
             dbname,
             MODE_IS,
-            [&](Collection* collection, CollectionCatalogEntry* catalogEntry) {
+            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
                 auto collNss = collection->ns();
 
                 if (collNss.size() - 1 <= dbname.size()) {

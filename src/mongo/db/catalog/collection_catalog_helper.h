@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/operation_context.h"
 
@@ -40,14 +41,21 @@ class CollectionCatalogEntry;
 namespace catalog {
 
 /**
- * Looping through all the collections in the database and run callback function on each one of
- * them. The return value of the callback decides whether we should continue the loop.
+ * Iterates through all the collections in the given database and runs the callback function on each
+ * collection. If a predicate is provided, then the callback will only be executed against the
+ * collections that satisfy the predicate.
+ *
+ * Additionally, no collection lock is held while checking the outcome of the predicate. The
+ * predicate must not block, as an internal collection catalog mutex is held during its evaluation.
+ * The collection lock is acquired when executing the callback only on the satisfying collections.
+ *
+ * Iterating through the remaining collections stops when the callback returns false.
  */
-void forEachCollectionFromDb(
-    OperationContext* opCtx,
-    StringData dbName,
-    LockMode collLockMode,
-    std::function<bool(Collection* collection, CollectionCatalogEntry* catalogEntry)> callback);
+void forEachCollectionFromDb(OperationContext* opCtx,
+                             StringData dbName,
+                             LockMode collLockMode,
+                             CollectionCatalog::CollectionInfoFn callback,
+                             CollectionCatalog::CollectionInfoFn predicate = nullptr);
 
 }  // namespace catalog
 }  // namespace mongo

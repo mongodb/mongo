@@ -36,15 +36,19 @@
 namespace mongo {
 namespace catalog {
 
-void forEachCollectionFromDb(
-    OperationContext* opCtx,
-    StringData dbName,
-    LockMode collLockMode,
-    std::function<bool(Collection* collection, CollectionCatalogEntry* catalogEntry)> callback) {
+void forEachCollectionFromDb(OperationContext* opCtx,
+                             StringData dbName,
+                             LockMode collLockMode,
+                             CollectionCatalog::CollectionInfoFn callback,
+                             CollectionCatalog::CollectionInfoFn predicate) {
 
     CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
     for (auto collectionIt = catalog.begin(dbName); collectionIt != catalog.end(); ++collectionIt) {
         auto uuid = collectionIt.uuid().get();
+        if (predicate && !catalog.checkIfCollectionSatisfiable(uuid, predicate)) {
+            continue;
+        }
+
         auto nss = catalog.lookupNSSByUUID(uuid);
 
         // If the NamespaceString can't be resolved from the uuid, then the collection was dropped.

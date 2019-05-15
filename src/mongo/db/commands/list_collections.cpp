@@ -324,7 +324,8 @@ public:
                         opCtx,
                         dbname,
                         MODE_IS,
-                        [&](Collection* collection, CollectionCatalogEntry* catalogEntry) {
+                        [&](const Collection* collection,
+                            const CollectionCatalogEntry* catalogEntry) {
                             if (authorizedCollections &&
                                 (!as->isAuthorizedForAnyActionOnResource(
                                     ResourcePattern::forExactNamespace(collection->ns())))) {

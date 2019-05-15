@@ -915,7 +915,10 @@ int64_t KVStorageEngine::sizeOnDiskForDb(OperationContext* opCtx, StringData dbN
     int64_t size = 0;
 
     catalog::forEachCollectionFromDb(
-        opCtx, dbName, MODE_IS, [&](Collection* collection, CollectionCatalogEntry* catalogEntry) {
+        opCtx,
+        dbName,
+        MODE_IS,
+        [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
             size += catalogEntry->getRecordStore()->storageSize(opCtx);
 
             std::vector<std::string> indexNames;

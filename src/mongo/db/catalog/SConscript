@@ -339,7 +339,9 @@ env.CppUnitTest(
         'collection_catalog_test.cpp',
     ],
     LIBDEPS=[
+        'catalog_test_fixture',
         'collection_catalog',
+        'collection_catalog_helper',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
     ],

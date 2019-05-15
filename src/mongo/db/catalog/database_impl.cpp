@@ -194,32 +194,32 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 }
 
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
 
-    for (const auto& nss :
-         CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, _name)) {
-        CollectionCatalogEntry* coll =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
-        CollectionOptions options = coll->getCollectionOptions(opCtx);
-
-        if (!options.temp)
-            continue;
+    CollectionCatalog::CollectionInfoFn callback = [&](const Collection* collection,
+                                                       const CollectionCatalogEntry* catalogEntry) {
         try {
-            WriteUnitOfWork wunit(opCtx);
-            Status status = dropCollection(opCtx, nss, {});
-
+            WriteUnitOfWork wuow(opCtx);
+            Status status = dropCollection(opCtx, collection->ns(), {});
             if (!status.isOK()) {
-                warning() << "could not drop temp collection '" << nss << "': " << redact(status);
-                continue;
+                warning() << "could not drop temp collection '" << collection->ns()
+                          << "': " << redact(status);
             }
-
-            wunit.commit();
+            wuow.commit();
         } catch (const WriteConflictException&) {
-            warning() << "could not drop temp collection '" << nss << "' due to "
-                                                                      "WriteConflictException";
+            warning() << "could not drop temp collection '" << collection->ns()
+                      << "' due to WriteConflictException";
             opCtx->recoveryUnit()->abandonSnapshot();
         }
-    }
+        return true;
+    };
+
+    CollectionCatalog::CollectionInfoFn predicate =
+        [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+            return catalogEntry->getCollectionOptions(opCtx).temp;
+        };
+
+    catalog::forEachCollectionFromDb(opCtx, name(), MODE_X, callback, predicate);
 }
 
 Status DatabaseImpl::setProfilingLevel(OperationContext* opCtx, int newLevel) {
@@ -283,7 +283,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
         opCtx,
         name(),
         MODE_IS,
-        [&](Collection* collection, CollectionCatalogEntry* catalogEntry) -> bool {
+        [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) -> bool {
             nCollections += 1;
             objects += collection->numRecords(opCtx);
             size += collection->dataSize(opCtx);

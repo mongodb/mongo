@@ -281,6 +281,10 @@ void CollectionCatalog::onOpenCatalog(OperationContext* opCtx) {
 
 Collection* CollectionCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    return _lookupCollectionByUUID(lock, uuid);
+}
+
+Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock, CollectionUUID uuid) const {
     auto foundIt = _catalog.find(uuid);
     return foundIt == _catalog.end() || foundIt->second.collectionPtr == nullptr
         ? nullptr
@@ -298,6 +302,11 @@ Collection* CollectionCatalog::lookupCollectionByNamespace(const NamespaceString
 CollectionCatalogEntry* CollectionCatalog::lookupCollectionCatalogEntryByUUID(
     CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    return _lookupCollectionCatalogEntryByUUID(lock, uuid);
+}
+
+CollectionCatalogEntry* CollectionCatalog::_lookupCollectionCatalogEntryByUUID(
+    WithLock, CollectionUUID uuid) const {
     auto foundIt = _catalog.find(uuid);
     return foundIt == _catalog.end() ? nullptr : foundIt->second.collectionCatalogEntry.get();
 }
@@ -344,6 +353,21 @@ boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
         ++it;
     }
     return boost::none;
+}
+
+bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
+                                                     CollectionInfoFn predicate) const {
+    invariant(predicate);
+
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    auto collection = _lookupCollectionByUUID(lock, uuid);
+    auto catalogEntry = _lookupCollectionCatalogEntryByUUID(lock, uuid);
+
+    if (!collection || !catalogEntry) {
+        return false;
+    }
+
+    return predicate(collection, catalogEntry);
 }
 
 std::vector<CollectionUUID> CollectionCatalog::getAllCollectionUUIDsFromDb(
