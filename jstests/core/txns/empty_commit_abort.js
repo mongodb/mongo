@@ -47,7 +47,7 @@
 
     // ---- Test 5. Noop writes before commit ----
     session.startTransaction();
-    let res = assert.commandWorked(sessionColl.update({a: 1}, {$set: {b: 1}}));
+    let res = assert.commandWorked(sessionColl.update({_id: 1}, {$set: {b: 1}}));
     assert.eq(res.nMatched, 1, tojson(res));
     assert.eq(res.nModified, 0, tojson(res));
     assert.eq(res.nUpserted, 0, tojson(res));
@@ -55,7 +55,7 @@
 
     // ---- Test 6. Noop writes before abort ----
     session.startTransaction();
-    res = assert.commandWorked(sessionColl.update({a: 1}, {$set: {b: 1}}));
+    res = assert.commandWorked(sessionColl.update({_id: 1}, {$set: {b: 1}}));
     assert.eq(res.nMatched, 1, tojson(res));
     assert.eq(res.nModified, 0, tojson(res));
     assert.eq(res.nUpserted, 0, tojson(res));

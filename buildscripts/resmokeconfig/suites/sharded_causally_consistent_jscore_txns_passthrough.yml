@@ -41,10 +41,6 @@ selector:
   # attached to statements in a transaction beyond the first one.
   - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
 
-  # Empty commit/abort is currently allowed in mongos.
-  # TODO: SERVER-40885: unblacklist this.
-  - jstests/core/txns/empty_commit_abort.js
-
   exclude_with_any_tags:
   # Transactions are not allowed to operate on capped collections.
   - requires_capped
