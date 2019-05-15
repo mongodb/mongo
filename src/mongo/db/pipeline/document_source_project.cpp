@@ -47,6 +47,20 @@ REGISTER_DOCUMENT_SOURCE(project,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceProject::createFromBson);
 
+REGISTER_DOCUMENT_SOURCE(unset,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceProject::createFromBson);
+
+namespace {
+BSONObj buildExclusionProjectionSpecification(const std::vector<BSONElement>& unsetSpec) {
+    BSONObjBuilder objBuilder;
+    for (const auto& elem : unsetSpec) {
+        objBuilder << elem.valueStringData() << 0;
+    }
+    return objBuilder.obj();
+}
+}  // namespace
+
 intrusive_ptr<DocumentSource> DocumentSourceProject::create(
     BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
     const bool isIndependentOfAnyCollection = false;
@@ -64,8 +78,25 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(15969, "$project specification must be an object", elem.type() == Object);
-    return DocumentSourceProject::create(elem.Obj(), expCtx);
+    if (elem.fieldNameStringData() == kStageName) {
+        uassert(15969, "$project specification must be an object", elem.type() == BSONType::Object);
+        return DocumentSourceProject::create(elem.Obj(), expCtx);
+    }
+
+    invariant(elem.fieldNameStringData() == kAliasNameUnset);
+    uassert(31002, "$unset specification must be an array", elem.type() == BSONType::Array);
+
+    const auto unsetSpec = elem.Array();
+    uassert(31119,
+            "$unset specification must be an array with at least one field",
+            unsetSpec.size() > 0);
+
+    uassert(31120,
+            "$unset specification must be an array containing only string values",
+            std::all_of(unsetSpec.cbegin(), unsetSpec.cend(), [](BSONElement elem) {
+                return elem.type() == BSONType::String;
+            }));
+    return DocumentSourceProject::create(buildExclusionProjectionSpecification(unsetSpec), expCtx);
 }
 
 }  // namespace mongo

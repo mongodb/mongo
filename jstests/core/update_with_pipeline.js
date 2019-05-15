@@ -63,6 +63,13 @@
     });
     testUpdate({
         query: {_id: 1},
+        initialDocumentList: [{_id: 1, x: 1, y: [{z: 1, foo: 1}]}],
+        update: [{$unset: ["x", "y.z"]}],
+        resultDocList: [{_id: 1, y: [{foo: 1}]}],
+        nModified: 1
+    });
+    testUpdate({
+        query: {_id: 1},
         initialDocumentList: [{_id: 1, x: 1, t: {u: {v: 1}}}],
         update: [{$replaceWith: "$t"}],
         resultDocList: [{_id: 1, u: {v: 1}}],
@@ -96,6 +103,7 @@
     testUpsertDoesInsert({_id: 1, x: 1}, [{$set: {foo: 4}}], {_id: 1, x: 1, foo: 4});
     testUpsertDoesInsert({_id: 1, x: 1}, [{$project: {x: 1}}], {_id: 1, x: 1});
     testUpsertDoesInsert({_id: 1, x: 1}, [{$project: {x: "foo"}}], {_id: 1, x: "foo"});
+    testUpsertDoesInsert({_id: 1, x: 1, y: 1}, [{$unset: ["x"]}], {_id: 1, y: 1});
 
     // Update fails when invalid stage is specified. This is a sanity check rather than an
     // exhaustive test of all stages.

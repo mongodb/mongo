@@ -42,6 +42,7 @@ namespace mongo {
 class DocumentSourceProject final {
 public:
     static constexpr StringData kStageName = "$project"_sd;
+    static constexpr StringData kAliasNameUnset = "$unset"_sd;
 
     /**
      * Convenience method to create a $project stage from 'projectSpec'.

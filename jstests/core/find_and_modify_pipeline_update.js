@@ -17,6 +17,9 @@
     found = coll.findAndModify({query: {_id: 0}, update: [{$set: {z: 2}}], new: true});
     assert.eq(found, {_id: 0, y: 1, z: 2});
 
+    found = coll.findAndModify({query: {_id: 0}, update: [{$unset: ["z"]}], new: true});
+    assert.eq(found, {_id: 0, y: 1});
+
     // Test that pipeline-style update supports the 'fields' argument.
     assert(coll.drop());
     assert.commandWorked(
