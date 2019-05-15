@@ -249,7 +249,7 @@ public:
         std::abort();
     }
 
-    uint64_t getIndexSize(OperationContext* opCtx, BSONObjBuilder* details, int scale) {
+    uint64_t getIndexSize(OperationContext* opCtx, BSONObjBuilder* details, int scale) const {
         std::abort();
     }
 

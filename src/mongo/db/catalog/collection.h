@@ -421,7 +421,7 @@ public:
 
     virtual uint64_t getIndexSize(OperationContext* const opCtx,
                                   BSONObjBuilder* const details = nullptr,
-                                  const int scale = 1) = 0;
+                                  const int scale = 1) const = 0;
 
     /**
      * If return value is not boost::none, reads with majority read concern using an older snapshot

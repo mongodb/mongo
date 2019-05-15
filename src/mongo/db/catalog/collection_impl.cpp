@@ -747,8 +747,10 @@ uint64_t CollectionImpl::dataSize(OperationContext* opCtx) const {
     return _recordStore->dataSize(opCtx);
 }
 
-uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx, BSONObjBuilder* details, int scale) {
-    IndexCatalog* idxCatalog = getIndexCatalog();
+uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
+                                      BSONObjBuilder* details,
+                                      int scale) const {
+    const IndexCatalog* idxCatalog = getIndexCatalog();
 
     std::unique_ptr<IndexCatalog::IndexIterator> ii = idxCatalog->getIndexIterator(opCtx, true);
 
