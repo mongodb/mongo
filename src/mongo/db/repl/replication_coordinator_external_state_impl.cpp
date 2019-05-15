@@ -463,6 +463,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     invariant(opCtx->lockState()->isRSTLExclusive());
     invariant(!opCtx->shouldParticipateInFlowControl());
 
+    MongoDSessionCatalog::onStepUp(opCtx);
+
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
     // done before we add anything to our oplog.
     // We record this update at the 'lastAppliedOpTime'. If there are any outstanding
@@ -489,14 +491,9 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     fassert(28665, loadLastOpTimeAndWallTimeResult);
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
 
-
     _shardingOnTransitionToPrimaryHook(opCtx);
 
-    // This has to go before reaquiring locks for prepared transactions, otherwise this can be
-    // blocked by prepared transactions.
     _dropAllTempCollections(opCtx);
-
-    MongoDSessionCatalog::onStepUp(opCtx);
 
     notifyFreeMonitoringOnTransitionToPrimary();
 
@@ -834,7 +831,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
         if (*it == "local")
             continue;
         LOG(2) << "Removing temporary collections from " << *it;
-        AutoGetDb autoDb(opCtx, *it, MODE_X);
+        AutoGetDb autoDb(opCtx, *it, MODE_IX);
         invariant(autoDb.getDb(), str::stream() << "Unable to get reference to database " << *it);
         autoDb.getDb()->clearTmpCollections(opCtx);
     }
