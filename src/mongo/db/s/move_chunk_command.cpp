@@ -42,6 +42,7 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
@@ -142,6 +143,9 @@ public:
                 status = Status::OK();
             } catch (const DBException& e) {
                 status = e.toStatus();
+                if (status.code() == ErrorCodes::LockTimeout) {
+                    ShardingStatistics::get(opCtx).countDonorMoveChunkLockTimeout.addAndFetch(1);
+                }
             } catch (const std::exception& e) {
                 scopedMigration.signalComplete(
                     {ErrorCodes::InternalError,

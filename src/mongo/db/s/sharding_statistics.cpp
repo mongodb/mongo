@@ -62,6 +62,7 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("countDocsClonedOnDonor", countDocsClonedOnDonor.load());
     builder->append("countRecipientMoveChunkStarted", countRecipientMoveChunkStarted.load());
     builder->append("countDocsDeletedOnDonor", countDocsDeletedOnDonor.load());
+    builder->append("countDonorMoveChunkLockTimeout", countDonorMoveChunkLockTimeout.load());
 }
 
 }  // namespace mongo
