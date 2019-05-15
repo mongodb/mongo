@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
@@ -92,7 +93,8 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     }
 
     // Parse the update, get an executor for it, run the executor, get stats out.
-    ParsedUpdate parsedUpdate(opCtx, &request);
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
+    ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;

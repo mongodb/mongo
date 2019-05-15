@@ -50,6 +50,7 @@
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
@@ -590,7 +591,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
                                                const UpdateRequest& updateRequest) {
-    ParsedUpdate parsedUpdate(opCtx, &updateRequest);
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
+    ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -724,7 +726,8 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
         try {
             return performSingleUpdateOp(opCtx, ns, stmtId, request);
         } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-            ParsedUpdate parsedUpdate(opCtx, &request);
+            const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
+            ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
             uassertStatusOK(parsedUpdate.parseRequest());
 
             if (!parsedUpdate.hasParsedQuery()) {

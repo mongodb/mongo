@@ -47,6 +47,7 @@
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request.h"
@@ -269,7 +270,8 @@ public:
             const bool isExplain = true;
             makeUpdateRequest(opCtx, args, isExplain, &request);
 
-            ParsedUpdate parsedUpdate(opCtx, &request);
+            const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
+            ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
             uassertStatusOK(parsedUpdate.parseRequest());
 
             // Explain calls of the findAndModify command are read-only, but we take write
@@ -411,7 +413,9 @@ public:
                     request.setStmtId(stmtId);
                 }
 
-                ParsedUpdate parsedUpdate(opCtx, &request);
+                const ExtensionsCallbackReal extensionsCallback(opCtx,
+                                                                &request.getNamespaceString());
+                ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
                 uassertStatusOK(parsedUpdate.parseRequest());
 
                 // These are boost::optional, because if the database or collection does not exist,

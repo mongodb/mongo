@@ -31,7 +31,6 @@
 
 #include "mongo/db/ops/parsed_update.h"
 
-#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -40,11 +39,14 @@
 
 namespace mongo {
 
-ParsedUpdate::ParsedUpdate(OperationContext* opCtx, const UpdateRequest* request)
+ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
+                           const UpdateRequest* request,
+                           const ExtensionsCallback& extensionsCallback)
     : _opCtx(opCtx),
       _request(request),
       _driver(new ExpressionContext(opCtx, nullptr)),
-      _canonicalQuery() {}
+      _canonicalQuery(),
+      _extensionsCallback(extensionsCallback) {}
 
 Status ParsedUpdate::parseRequest() {
     // It is invalid to request that the UpdateStage return the prior or newly-updated version
@@ -95,8 +97,6 @@ Status ParsedUpdate::parseQuery() {
 Status ParsedUpdate::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
-    const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNamespaceString());
-
     // The projection needs to be applied after the update operation, so we do not specify a
     // projection during canonicalization.
     auto qr = stdx::make_unique<QueryRequest>(_request->getNamespaceString());
@@ -125,7 +125,7 @@ Status ParsedUpdate::parseQueryToCQ() {
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        _opCtx, std::move(qr), std::move(expCtx), extensionsCallback, allowedMatcherFeatures);
+        _opCtx, std::move(qr), std::move(expCtx), _extensionsCallback, allowedMatcherFeatures);
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());
     }
