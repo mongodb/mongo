@@ -326,7 +326,7 @@ def _get_task_name(task):
     """Return the task var from a "generate resmoke task" instead of the task name."""
 
     if task.is_generate_resmoke_task:
-        return task.get_vars_task_name(task.generate_resmoke_tasks_command["vars"])
+        return task.generated_task_name
 
     return task.name
 

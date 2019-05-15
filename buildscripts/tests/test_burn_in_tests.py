@@ -21,34 +21,28 @@ EVG_CLIENT = "buildscripts.client.evergreen"
 GIT = "buildscripts.git"
 RESMOKELIB = "buildscripts.resmokelib"
 
-GENERATE_RESMOKE_TASKS_NAME = "this_is_a_gen_task"
+GENERATE_RESMOKE_TASKS_BASENAME = "this_is_a_gen_task"
+GENERATE_RESMOKE_TASKS_NAME = GENERATE_RESMOKE_TASKS_BASENAME + "_gen"
 GET_GENERATE_RESMOKE_TASKS_NAME = lambda _: GENERATE_RESMOKE_TASKS_NAME
 GENERATE_RESMOKE_TASKS_COMMAND = {
-    "func": "generate resmoke tasks", "vars": {
-        "task": GENERATE_RESMOKE_TASKS_NAME, "suite": "suite3",
-        "resmoke_args": "--shellWriteMode=commands"
-    }
+    "func": "generate resmoke tasks",
+    "vars": {"suite": "suite3", "resmoke_args": "--shellWriteMode=commands"}
 }
 
 GENERATE_RESMOKE_TASKS_COMMAND2 = {
-    "func": "generate resmoke tasks",
-    "vars": {"task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands"}
+    "func": "generate resmoke tasks", "vars": {"resmoke_args": "--shellWriteMode=commands"}
 }
 
 MULTIVERSION_PATH = "/data/multiversion"
 GENERATE_RESMOKE_TASKS_MULTIVERSION_COMMAND = {
-    "func": "generate resmoke tasks", "vars": {
-        "task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands",
-        "use_multiversion": MULTIVERSION_PATH
-    }
+    "func": "generate resmoke tasks",
+    "vars": {"resmoke_args": "--shellWriteMode=commands", "use_multiversion": MULTIVERSION_PATH}
 }
 
 MULTIVERSION_COMMAND = {"func": "do multiversion setup"}
 RUN_TESTS_MULTIVERSION_COMMAND = {
-    "func": "run tests", "vars": {
-        "task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands",
-        "task_path_suffix": MULTIVERSION_PATH
-    }
+    "func": "run tests",
+    "vars": {"resmoke_args": "--shellWriteMode=commands", "task_path_suffix": MULTIVERSION_PATH}
 }
 
 
@@ -72,6 +66,8 @@ def tasks_mock(  #pylint: disable=too-many-arguments
             resmoke_args, "suites") if resmoke_args else None
         task_list.tasks[idx].multiversion_path = multiversion_path
         task_list.tasks[idx].multiversion_setup_command = multiversion_setup_command
+        if task["name"].endswith("_gen"):
+            task_list.tasks[idx].generated_task_name = task["name"][:-4]
 
     return task_list
 
@@ -385,10 +381,7 @@ class TestGetTaskName(unittest.TestCase):
 
     def test__get_task_name_generate_resmoke_task(self):
         task_name = "mytask"
-        task = Mock()
-        task.is_generate_resmoke_task = True
-        task.get_vars_task_name = lambda cmd_vars: cmd_vars["task"]
-        task.generate_resmoke_tasks_command = {"vars": {"task": task_name}}
+        task = Mock(is_generate_resmoke_task=True, generated_task_name=task_name)
         self.assertEqual(task_name, burn_in._get_task_name(task))
 
 
@@ -893,20 +886,9 @@ class CreateTaskList(unittest.TestCase):
         suite_list = _create_executor_list(suites, exclude_suites)
         task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
         self.assertEqual(len(task_list), len(VARIANTS["variant_generate_tasks"].tasks))
-        self.assertIn(GENERATE_RESMOKE_TASKS_NAME, task_list)
-        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
-        self.assertIsNone(task_list[GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"])
-
-    def test_create_task_list_gen_tasks_diff_task_names(self):
-        variant = "variant_generate_tasks_diff_names"
-        suites = [SUITE3]
-        exclude_suites = []
-        suite_list = _create_executor_list(suites, exclude_suites)
-        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
-        self.assertEqual(len(task_list), len(VARIANTS["variant_generate_tasks"].tasks))
-        self.assertIn(GENERATE_RESMOKE_TASKS_NAME, task_list)
-        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
-        self.assertIsNone(task_list[GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"])
+        self.assertIn(GENERATE_RESMOKE_TASKS_BASENAME, task_list)
+        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_BASENAME]["tests"], SUITE3.tests)
+        self.assertIsNone(task_list[GENERATE_RESMOKE_TASKS_BASENAME]["use_multiversion"])
 
     def test_create_task_list_gen_tasks_multiversion(self):
         variant = "variant_generate_tasks_multiversion"
@@ -915,7 +897,7 @@ class CreateTaskList(unittest.TestCase):
         suite_list = _create_executor_list(suites, exclude_suites)
         task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
         self.assertEqual(len(task_list), len(VARIANTS["variant_generate_tasks_multiversion"].tasks))
-        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"],
+        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_BASENAME]["use_multiversion"],
                          MULTIVERSION_PATH)
 
     def test_create_task_list_gen_tasks_no_suite(self):
@@ -925,8 +907,8 @@ class CreateTaskList(unittest.TestCase):
         suite_list = _create_executor_list(suites, exclude_suites)
         task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
         self.assertEqual(len(task_list), len(VARIANTS["variant_generate_tasks_no_suite"].tasks))
-        self.assertIn(GENERATE_RESMOKE_TASKS_NAME, task_list)
-        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
+        self.assertIn(GENERATE_RESMOKE_TASKS_BASENAME, task_list)
+        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_BASENAME]["tests"], SUITE3.tests)
 
     def test_create_task_list_no_excludes(self):
         variant = "variant1"
