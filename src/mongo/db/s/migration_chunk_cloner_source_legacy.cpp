@@ -87,20 +87,6 @@ BSONObj createRequestWithSessionId(StringData commandName,
     return builder.obj();
 }
 
-bool shouldApplyOplogToSession(const repl::OplogEntry& oplog,
-                               const ChunkRange& range,
-                               const ShardKeyPattern& keyPattern) {
-    // Skip appending CRUD operations that don't pertain to the ChunkRange being migrated.
-    if (oplog.isCrudOpType()) {
-        auto shardKey = keyPattern.extractShardKeyFromDoc(oplog.getObjectContainingDocumentKey());
-        if (!range.containsKey(shardKey)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 }  // namespace
 
 /**
@@ -187,8 +173,11 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-        _sessionCatalogSource =
-            stdx::make_unique<SessionCatalogMigrationSource>(opCtx, _args.getNss());
+        _sessionCatalogSource = stdx::make_unique<SessionCatalogMigrationSource>(
+            opCtx,
+            _args.getNss(),
+            ChunkRange(_args.getMinKey(), _args.getMaxKey()),
+            _shardKeyPattern.getKeyPattern());
 
         // Prime up the session migration source if there are oplog entries to migrate.
         _sessionCatalogSource->fetchNextOplog(opCtx);
@@ -859,8 +848,7 @@ boost::optional<repl::OpTime> MigrationChunkClonerSourceLegacy::nextSessionMigra
     while (_sessionCatalogSource->hasMoreOplog()) {
         auto result = _sessionCatalogSource->getLastFetchedOplog();
 
-        if (!result.oplog ||
-            !shouldApplyOplogToSession(result.oplog.get(), range, _shardKeyPattern)) {
+        if (!result.oplog) {
             _sessionCatalogSource->fetchNextOplog(opCtx);
             continue;
         }

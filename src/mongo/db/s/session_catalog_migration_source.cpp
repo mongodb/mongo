@@ -128,8 +128,13 @@ repl::OplogEntry makeSentinelOplogEntry(const LogicalSessionId& lsid,
 }  // namespace
 
 SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* opCtx,
-                                                             NamespaceString ns)
-    : _ns(std::move(ns)), _rollbackIdAtInit(repl::ReplicationProcess::get(opCtx)->getRollbackID()) {
+                                                             NamespaceString ns,
+                                                             ChunkRange chunk,
+                                                             KeyPattern shardKey)
+    : _ns(std::move(ns)),
+      _rollbackIdAtInit(repl::ReplicationProcess::get(opCtx)->getRollbackID()),
+      _chunkRange(std::move(chunk)),
+      _keyPattern(shardKey) {
     // Exclude entries for transaction.
     Query query;
     // Sort is not needed for correctness. This is just for making it easier to write deterministic
@@ -248,16 +253,25 @@ std::shared_ptr<Notification<bool>> SessionCatalogMigrationSource::getNotificati
 }
 
 bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationContext* opCtx) {
-    if (_currentOplogIterator) {
+    while (_currentOplogIterator) {
         if (auto nextOplog = _currentOplogIterator->getNext(opCtx)) {
             auto nextStmtId = nextOplog->getStatementId();
 
-            // Note: This is an optimization based on the assumption that it is not possible to be
-            // touching different namespaces in the same transaction.
+            // Skip the rest of the chain for this session since the ns is unrelated with the
+            // current one being migrated. It is ok to not check the rest of the chain because
+            // retryable writes doesn't allow touching different namespaces.
             if (!nextStmtId || (nextStmtId && *nextStmtId != kIncompleteHistoryStmtId &&
                                 nextOplog->getNss() != _ns)) {
                 _currentOplogIterator.reset();
                 return false;
+            }
+
+            if (nextOplog->isCrudOpType()) {
+                auto shardKey =
+                    _keyPattern.extractShardKeyFromDoc(nextOplog->getObjectContainingDocumentKey());
+                if (!_chunkRange.containsKey(shardKey)) {
+                    continue;
+                }
             }
 
             auto doc = fetchPrePostImageOplog(opCtx, *nextOplog);
@@ -267,6 +281,7 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationConte
             } else {
                 _lastFetchedOplog = *nextOplog;
             }
+
             return true;
         } else {
             _currentOplogIterator.reset();

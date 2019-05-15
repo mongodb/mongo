@@ -37,6 +37,8 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -87,7 +89,10 @@ public:
         bool shouldWaitForMajority = false;
     };
 
-    SessionCatalogMigrationSource(OperationContext* opCtx, NamespaceString ns);
+    SessionCatalogMigrationSource(OperationContext* opCtx,
+                                  NamespaceString ns,
+                                  ChunkRange chunk,
+                                  KeyPattern shardKey);
 
     /**
      * Returns true if there are more oplog entries to fetch at this moment. Note that new writes
@@ -220,6 +225,9 @@ private:
     // The rollback id just before migration started. This value is needed so that step-down
     // followed by step-up situations can be discovered.
     const int _rollbackIdAtInit;
+
+    const ChunkRange _chunkRange;
+    const ShardKeyPattern _keyPattern;
 
     // Protects _sessionCatalogCursor, _sessionOplogIterators, _currentOplogIterator,
     // _lastFetchedOplogBuffer, _lastFetchedOplog
