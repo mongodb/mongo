@@ -1062,9 +1062,10 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
             oplogSlotReserver.emplace(opCtx);
         } else {
+            // Even if the prepared transaction contained no statements, we always reserve at least
+            // 1 oplog slot for the prepare oplog entry.
             const auto numSlotsToReserve = retrieveCompletedTransactionOperations(opCtx).size();
-            // Reserve an extra slot here for the prepare oplog entry.
-            oplogSlotReserver.emplace(opCtx, numSlotsToReserve + 1);
+            oplogSlotReserver.emplace(opCtx, std::max(1, static_cast<int>(numSlotsToReserve)));
             invariant(oplogSlotReserver->getSlots().size() >= 1);
         }
         prepareOplogSlot = oplogSlotReserver->getLastSlot();
@@ -2099,18 +2100,7 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
         newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
         newTxnRecord.setLastWriteDate(newLastWriteDate);
         newTxnRecord.setState(newState);
-        if (gUseMultipleOplogEntryFormatForTransactions &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
-            startOpTime) {
-            // The startOpTime should only be set when transitioning the txn to in-progress or
-            // prepared.
-            invariant(newState == DurableTxnStateEnum::kInProgress ||
-                      newState == DurableTxnStateEnum::kPrepared);
-            newTxnRecord.setStartOpTime(*startOpTime);
-        } else if (newState == DurableTxnStateEnum::kPrepared) {
-            newTxnRecord.setStartOpTime(o().prepareOpTime);
-        }
+        newTxnRecord.setStartOpTime(startOpTime);
         return newTxnRecord.toBSON();
     }();
     updateRequest.setUpdateModification(updateBSON);

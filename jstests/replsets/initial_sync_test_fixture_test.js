@@ -147,21 +147,10 @@
     }
 
     // Check that we see the expected number of batches during oplog application.
-    // TODO(SERVER-39810):
-    // Remove this if-condition check once the new oplog format for large transactions is made the
-    // default.
-    if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
-        // These oplog batches should correspond to the 'in-progress' transaction op and the
-        // 'prepare' op.
-        assert(!initialSyncTest.step());
-        checkLogForOplogApplicationMsg(secondary, 1);
-        assert(!initialSyncTest.step());
-        checkLogForOplogApplicationMsg(secondary, 1);
-    } else {
-        // This batch should correspond to the 'prepare' op.
-        assert(!initialSyncTest.step());
-        checkLogForOplogApplicationMsg(secondary, 1);
-    }
+
+    // This batch should correspond to the 'prepare' op.
+    assert(!initialSyncTest.step());
+    checkLogForOplogApplicationMsg(secondary, 1);
     assert(!initialSyncTest.step());
     checkLogForOplogApplicationMsg(secondary, 9);
     assert(!initialSyncTest.step());

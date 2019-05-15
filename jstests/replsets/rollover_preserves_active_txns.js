@@ -15,7 +15,7 @@
 
     function findPrepareEntry(oplogColl) {
         if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
-            return oplogColl.findOne({op: "c", o: {"prepareTransaction": 1}});
+            return oplogColl.findOne({op: "c", "o.prepare": true});
         } else {
             return oplogColl.findOne({prepare: true});
         }
@@ -54,7 +54,7 @@
 
         const txnEntry = primary.getDB("config").transactions.findOne();
         if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
-            assert.lt(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
+            assert.lte(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
         } else {
             assert.eq(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
         }

@@ -17,7 +17,7 @@
 
     function findPrepareEntry(oplogColl) {
         if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
-            return oplogColl.findOne({op: "c", o: {"prepareTransaction": 1}});
+            return oplogColl.findOne({op: "c", "o.prepare": true});
         } else {
             return oplogColl.findOne({prepare: true});
         }
