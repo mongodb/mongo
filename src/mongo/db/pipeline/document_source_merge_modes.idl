@@ -55,5 +55,6 @@ enums:
         description: "Possible merge mode values for $merge's 'whenNotMatched'. field"
         type: string
         values:
+            kDiscard: "discard"
             kFail: "fail"
             kInsert: "insert"

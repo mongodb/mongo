@@ -613,6 +613,14 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
                                  << "whenMatched"
+                                 << "replaceWithNew"
+                                 << "whenNotMatched"
+                                 << "discard"));
+    ASSERT(createMergeStage(spec));
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
                                  << "fail"
                                  << "whenNotMatched"
                                  << "insert"));
@@ -624,6 +632,14 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
                                  << "fail"
                                  << "whenNotMatched"
                                  << "fail"));
+    ASSERT_THROWS_CODE(createMergeStage(spec), DBException, 51189);
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
+                                 << "fail"
+                                 << "whenNotMatched"
+                                 << "discard"));
     ASSERT_THROWS_CODE(createMergeStage(spec), DBException, 51189);
 
     spec = BSON("$merge" << BSON("into"
@@ -645,6 +661,14 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
                                  << "whenMatched"
+                                 << "merge"
+                                 << "whenNotMatched"
+                                 << "discard"));
+    ASSERT(createMergeStage(spec));
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
                                  << "keepExisting"
                                  << "whenNotMatched"
                                  << "insert"));
@@ -661,6 +685,14 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
                                  << "whenMatched"
+                                 << "keepExisting"
+                                 << "whenNotMatched"
+                                 << "discard"));
+    ASSERT_THROWS_CODE(createMergeStage(spec), DBException, 51189);
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
                                  << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
                                  << "whenNotMatched"
                                  << "insert"));
@@ -672,6 +704,14 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
                                  << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
                                  << "whenNotMatched"
                                  << "fail"));
+    ASSERT(createMergeStage(spec));
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "whenMatched"
+                                 << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
+                                 << "whenNotMatched"
+                                 << "discard"));
     ASSERT(createMergeStage(spec));
 
     spec = BSON("$merge" << BSON("into"

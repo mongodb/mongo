@@ -9,16 +9,9 @@
     load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
     load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
 
-    // Asserts that two arrays are equal - that is, if their sizes are equal and each element in
-    // the 'actual' array has a matching element in the 'expected' array, without honoring elements
-    // order.
-    function assertArrayEq({actual = [], expected = []} = {}) {
-        assert(arrayEq(actual, expected), `actual=${tojson(actual)}, expected=${tojson(expected)}`);
-    }
-
     // A helper function to create a pipeline with a $merge stage using a custom 'updatePipeline'
     // for the whenMatched mode. If 'initialStages' array is specified, the $merge stage will be
-    // appened to this array and the result returned to the caller, otherwise an array with a
+    // appended to this array and the result returned to the caller, otherwise an array with a
     // single $merge stage is returned. An output collection for the $merge stage is specified
     // in the 'target', and the $merge stage 'on' fields in the 'on' parameter.
     function makeMergePipeline(
@@ -325,7 +318,7 @@
     // $merge's 'on' field. When the _id is missing, the $merge stage will create a new ObjectId in
     // its place before performing the insert or update.
     (function testMergeWhenDocIdIsRemovedFromProjection() {
-        const pipeline = makeMergePipeline({
+        let pipeline = makeMergePipeline({
             initialStages: [{$project: {_id: 0}}],
             target: target.getName(),
             updatePipeline: [{$addFields: {z: 1}}]
@@ -345,14 +338,23 @@
             expected: [{b: "c"}, {z: 1}, {z: 1}]
         });
 
+        pipeline = makeMergePipeline({
+            initialStages: [{$project: {_id: 0}}],
+            on: ["_id", "a"],
+            target: target.getName(),
+            updatePipeline: [{$addFields: {z: 1}}]
+        });
+
         // The _id is part of the compound 'on' field.
         assert(target.drop());
         assert.commandWorked(target.insert({_id: 1, b: "c"}));
-        assert.commandWorked(source.createIndex({_id: 1, a: -1}));
-        assert.commandWorked(target.createIndex({_id: 1, a: -1}));
+        assert.commandWorked(source.createIndex({_id: 1, a: -1}, {unique: true}));
+        assert.commandWorked(target.createIndex({_id: 1, a: -1}, {unique: true}));
         assert.doesNotThrow(() => source.aggregate(pipeline));
-        assertArrayEq(
-            {actual: target.find({}, {_id: 0}).toArray(), expected: [{b: "c"}, {z: 1}, {z: 1}]});
+        assertArrayEq({
+            actual: target.find({}, {_id: 0}).toArray(),
+            expected: [{b: "c"}, {a: 1, z: 1}, {a: 2, z: 1}]
+        });
         assert.commandWorked(source.dropIndex({_id: 1, a: -1}));
         assert.commandWorked(target.dropIndex({_id: 1, a: -1}));
     })();

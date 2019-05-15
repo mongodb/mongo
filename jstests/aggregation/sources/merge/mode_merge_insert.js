@@ -294,10 +294,6 @@
         assert.commandWorked(target.insert({_id: 1, b: "c"}));
         assert.doesNotThrow(() => source.aggregate([{$project: {_id: 0}}, mergeStage]));
         assertArrayEq({
-            // Remove the _id field from the projection as the arrayEq function cannot ignore
-            // mismatches in the ObjectId. The target collection should contain all elements from
-            // the source and the target even though they had the same _id's and would have been
-            // merged should we not remove the _id field from the aggregate projection.
             actual: target.find({}, {_id: 0}).toArray(),
             expected: [{b: "c"}, {a: 1, b: "a"}, {a: 2, b: "b"}]
         });
@@ -305,14 +301,13 @@
         // The _id is part of the compound 'on' field.
         assert(target.drop());
         assert.commandWorked(target.insert({_id: 1, b: "c"}));
-        assert.commandWorked(source.createIndex({_id: 1, a: -1}));
-        assert.commandWorked(target.createIndex({_id: 1, a: -1}));
-        assert.doesNotThrow(() => source.aggregate([{$project: {_id: 0}}, mergeStage]));
+        assert.commandWorked(source.createIndex({_id: 1, a: -1}, {unique: true}));
+        assert.commandWorked(target.createIndex({_id: 1, a: -1}, {unique: true}));
+        assert.doesNotThrow(() => source.aggregate([
+            {$project: {_id: 0}},
+            {$merge: Object.assign({on: ["_id", "a"]}, mergeStage.$merge)}
+        ]));
         assertArrayEq({
-            // Remove the _id field from the projection as the arrayEq function cannot ignore
-            // mismatches in the ObjectId. The target collection should contain all elements from
-            // the source and the target even though they had the same _id's and would have been
-            // merged should we not remove the _id field from the aggregate projection.
             actual: target.find({}, {_id: 0}).toArray(),
             expected: [{b: "c"}, {a: 1, b: "a"}, {a: 2, b: "b"}]
         });

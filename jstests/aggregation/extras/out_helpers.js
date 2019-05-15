@@ -17,12 +17,11 @@ function withEachOutMode(callback) {
 function withEachMergeMode(callback) {
     callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "insert"});
     callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "fail"});
-    // TODO SERVER-40439 callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode:
-    // "discard"});
+    callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "discard"});
 
     callback({whenMatchedMode: "merge", whenNotMatchedMode: "insert"});
     callback({whenMatchedMode: "merge", whenNotMatchedMode: "fail"});
-    // TODO SERVER-40439 callback({whenMatchedMode: "merge", whenNotMatchedMode: "discard"});
+    callback({whenMatchedMode: "merge", whenNotMatchedMode: "discard"});
 
     callback({whenMatchedMode: "fail", whenNotMatchedMode: "insert"});
 
@@ -30,8 +29,7 @@ function withEachMergeMode(callback) {
 
     callback({whenMatchedMode: [], whenNotMatchedMode: "insert"});
     callback({whenMatchedMode: [], whenNotMatchedMode: "fail"});
-    // TODO SERVER-40439 callback({whenMatchedMode: [{$addFields: {x: 1}}], whenNotMatchedMode:
-    // "discard"});
+    callback({whenMatchedMode: [], whenNotMatchedMode: "discard"});
 }
 
 function assertUniqueKeyIsInvalid({source, target, uniqueKey, options, prevStages}) {

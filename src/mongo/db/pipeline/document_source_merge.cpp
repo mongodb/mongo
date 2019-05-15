@@ -66,13 +66,17 @@ constexpr auto kReplaceWithNewInsertMode =
     MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kInsert};
 constexpr auto kReplaceWithNewFailMode =
     MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kFail};
+constexpr auto kReplaceWithNewDiscardMode =
+    MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kDiscard};
 constexpr auto kMergeInsertMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kInsert};
 constexpr auto kMergeFailMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kFail};
+constexpr auto kMergeDiscardMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kDiscard};
 constexpr auto kKeepExistingInsertMode =
     MergeMode{WhenMatched::kKeepExisting, WhenNotMatched::kInsert};
 constexpr auto kFailInsertMode = MergeMode{WhenMatched::kFail, WhenNotMatched::kInsert};
 constexpr auto kPipelineInsertMode = MergeMode{WhenMatched::kPipeline, WhenNotMatched::kInsert};
 constexpr auto kPipelineFailMode = MergeMode{WhenMatched::kPipeline, WhenNotMatched::kFail};
+constexpr auto kPipelineDiscardMode = MergeMode{WhenMatched::kPipeline, WhenNotMatched::kDiscard};
 
 /**
  * Creates a merge strategy which uses update semantics to perform a merge operation. If
@@ -193,6 +197,9 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
         // whenMatched: replaceWithNew, whenNotMatched: fail
         {kReplaceWithNewFailMode,
          {kReplaceWithNewFailMode, {ActionType::update}, makeStrictUpdateStrategy(false, {})}},
+        // whenMatched: replaceWithNew, whenNotMatched: discard
+        {kReplaceWithNewDiscardMode,
+         {kReplaceWithNewDiscardMode, {ActionType::update}, makeUpdateStrategy(false, {})}},
         // whenMatched: merge, whenNotMatched: insert
         {kMergeInsertMode,
          {kMergeInsertMode,
@@ -203,6 +210,11 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
          {kMergeFailMode,
           {ActionType::update},
           makeStrictUpdateStrategy(false, makeUpdateTransform("$set"))}},
+        // whenMatched: merge, whenNotMatched: discard
+        {kMergeDiscardMode,
+         {kMergeDiscardMode,
+          {ActionType::update},
+          makeUpdateStrategy(false, makeUpdateTransform("$set"))}},
         // whenMatched: keepExisting, whenNotMatched: insert
         {kKeepExistingInsertMode,
          {kKeepExistingInsertMode,
@@ -216,6 +228,9 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
         // whenMatched: [pipeline], whenNotMatched: fail
         {kPipelineFailMode,
          {kPipelineFailMode, {ActionType::update}, makeStrictUpdateStrategy(false, {})}},
+        // whenMatched: [pipeline], whenNotMatched: discard
+        {kPipelineDiscardMode,
+         {kPipelineDiscardMode, {ActionType::update}, makeUpdateStrategy(false, {})}},
         // whenMatched: fail, whenNotMatched: insert
         {kFailInsertMode, {kFailInsertMode, {ActionType::insert}, makeInsertStrategy()}}};
     return mergeStrategyDescriptors;
