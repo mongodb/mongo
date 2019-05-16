@@ -35,9 +35,16 @@
 
 #include <boost/filesystem.hpp>
 
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/ftdc/ftdc_server.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/executor/connection_pool_stats.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 
@@ -111,10 +118,44 @@ private:
     boost::filesystem::path _path;
 } exportedFTDCDirectoryPathParameter;
 
+class ConnPoolStatsCollector : public FTDCCollectorInterface {
+public:
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
+        executor::ConnectionPoolStats stats{};
+
+        // Global connection pool connections.
+        globalConnPool.appendConnectionStats(&stats);
+
+        // Sharding connections.
+        {
+            auto const grid = Grid::get(opCtx);
+            if (grid->getExecutorPool()) {
+                grid->getExecutorPool()->appendConnectionStats(&stats);
+            }
+
+            auto const customConnPoolStatsFn = grid->getCustomConnectionPoolStatsFn();
+            if (customConnPoolStatsFn) {
+                customConnPoolStatsFn(&stats);
+            }
+        }
+
+        // Output to a BSON object.
+        builder.appendNumber("numClientConnections", DBClientConnection::getNumConnections());
+        builder.appendNumber("numAScopedConnections", AScopedConnection::getNumConnections());
+        stats.appendToBSON(builder, true /* forFTDC */);
+
+        // All replica sets being tracked.
+        globalRSMonitorManager.report(&builder, true /* forFTDC */);
+    }
+
+    std::string name() const override {
+        return "connPoolStats";
+    }
+};
+
 void registerMongoSCollectors(FTDCController* controller) {
     // PoolStats
-    controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
-        "connPoolStats", "connPoolStats", "", BSON("connPoolStats" << 1)));
+    controller->addPeriodicCollector(stdx::make_unique<ConnPoolStatsCollector>());
 }
 
 }  // namespace

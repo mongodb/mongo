@@ -80,7 +80,10 @@ env.Library(
         'ftdc_mongos.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        'ftdc_server'
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
+        '$BUILD_DIR/mongo/executor/task_executor_pool',
+        '$BUILD_DIR/mongo/s/grid',
+        'ftdc_server',
     ],
 )
 

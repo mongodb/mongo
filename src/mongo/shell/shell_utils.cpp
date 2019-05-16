@@ -257,7 +257,8 @@ BSONObj replMonitorStats(const BSONObj& a, void* data) {
             "replMonitorStats requires a single string argument (the ReplSet name)",
             a.nFields() == 1 && a.firstElement().type() == String);
 
-    ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(a.firstElement().valuestrsafe());
+    auto name = a.firstElement().valuestrsafe();
+    ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(name);
     if (!rsm) {
         return BSON(""
                     << "no ReplSetMonitor exists by that name");
@@ -265,7 +266,8 @@ BSONObj replMonitorStats(const BSONObj& a, void* data) {
 
     BSONObjBuilder result;
     rsm->appendInfo(result);
-    return result.obj();
+    // Stats are like {replSetName: {hosts: [{ ... }, { ... }]}}.
+    return result.obj()[name].Obj().getOwned();
 }
 
 BSONObj useWriteCommandsDefault(const BSONObj& a, void* data) {
