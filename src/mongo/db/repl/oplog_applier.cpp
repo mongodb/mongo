@@ -141,22 +141,24 @@ void OplogApplier::enqueue(OperationContext* opCtx,
 namespace {
 
 /**
- * Returns whether an oplog entry represents a commitTransaction for a transaction which has not
+ * Returns whether an oplog entry represents an implicit commit for a transaction which has not
  * been prepared.  An entry is an unprepared commit if it has a boolean "prepared" field set to
- * false.
+ * false and "isPartial" is not present.
  */
 bool isUnpreparedCommit(const OplogEntry& entry) {
-    if (entry.getCommandType() != OplogEntry::CommandType::kCommitTransaction) {
+    if (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) {
         return false;
     }
 
-    auto preparedElement = entry.getObject()[CommitTransactionOplogObject::kPreparedFieldName];
-    if (!preparedElement.isBoolean()) {
+    if (entry.isPartialTransaction()) {
         return false;
     }
 
-    auto isPrepared = preparedElement.boolean();
-    return !isPrepared;
+    if (entry.shouldPrepare()) {
+        return false;
+    }
+
+    return true;
 }
 
 /**

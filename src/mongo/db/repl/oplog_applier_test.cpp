@@ -155,14 +155,19 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare) {
 }
 
 /**
- * Generates a commitTransaction oplog entry with the given number used for the timestamp.
+ * Generates a commitTransaction/applyOps oplog entry, depending on whether this is for a prepared
+ * transaction, with the given number used for the timestamp.
  */
 OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepared, int count) {
     auto nss = NamespaceString(dbName).getCommandNS();
-    CommitTransactionOplogObject cmdObj;
-    cmdObj.setPrepared(prepared);
-    cmdObj.setCount(count);
-    BSONObj oField = cmdObj.toBSON();
+    BSONObj oField;
+    if (prepared) {
+        CommitTransactionOplogObject cmdObj;
+        cmdObj.setCount(count);
+        oField = cmdObj.toBSON();
+    } else {
+        oField = BSON("applyOps" << BSONArray() << "count" << count);
+    }
     return OplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                       boost::none,                 // hash
                       OpTypeEnum::kCommand,        // op type
