@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session_catalog.h"
 
 namespace mongo {
 namespace {
@@ -49,8 +50,13 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         const auto logicalSessionCache = LogicalSessionCache::get(opCtx);
+        const auto sessionCatalog = SessionCatalog::get(opCtx);
 
-        return logicalSessionCache ? logicalSessionCache->getStats().toBSON() : BSONObj();
+        BSONObjBuilder statsBuilder(logicalSessionCache ? logicalSessionCache->getStats().toBSON()
+                                                        : BSONObj());
+        statsBuilder.append("sessionCatalogSize", int32_t(sessionCatalog->size()));
+
+        return statsBuilder.obj();
     }
 
 } logicalSessionsServerStatusSection;
