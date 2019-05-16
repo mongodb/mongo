@@ -58,16 +58,16 @@ repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
     return Grid::get(_serviceContext)->configOpTime();
 }
 
-Status ShardingEgressMetadataHookForMongod::_advanceConfigOptimeFromShard(
-    ShardId shardId, const BSONObj& metadataObj) {
+Status ShardingEgressMetadataHookForMongod::_advanceConfigOpTimeFromShard(
+    OperationContext* opCtx, const ShardId& shardId, const BSONObj& metadataObj) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
 
-    return ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(shardId, metadataObj);
+    return ShardingEgressMetadataHook::_advanceConfigOpTimeFromShard(opCtx, shardId, metadataObj);
 }
 
-void advanceConfigOptimeFromRequestMetadata(OperationContext* opCtx) {
+void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) {
     auto const shardingState = ShardingState::get(opCtx);
 
     if (!shardingState->enabled()) {
@@ -85,7 +85,7 @@ void advanceConfigOptimeFromRequestMetadata(OperationContext* opCtx) {
                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                    ActionType::internal));
 
-    Grid::get(opCtx)->advanceConfigOpTime(*opTime);
+    Grid::get(opCtx)->advanceConfigOpTime(opCtx, *opTime, "request from");
 }
 
 }  // namespace rpc

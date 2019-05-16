@@ -76,7 +76,7 @@ struct ServiceEntryPointCommon {
 
         virtual void handleException(const DBException& e, OperationContext* opCtx) const = 0;
 
-        virtual void advanceConfigOptimeFromRequestMetadata(OperationContext* opCtx) const = 0;
+        virtual void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const = 0;
 
         MONGO_WARN_UNUSED_RESULT_FUNCTION virtual std::unique_ptr<PolymorphicScoped>
         scopedOperationCompletionShardingActions(OperationContext* opCtx) const = 0;

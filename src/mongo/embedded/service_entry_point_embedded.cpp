@@ -83,7 +83,7 @@ public:
 
     void handleException(const DBException& e, OperationContext* opCtx) const override {}
 
-    void advanceConfigOptimeFromRequestMetadata(OperationContext* opCtx) const override {}
+    void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const override {}
 
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(
         OperationContext* opCtx) const override {

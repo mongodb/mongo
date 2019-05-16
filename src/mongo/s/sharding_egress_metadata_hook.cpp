@@ -71,13 +71,14 @@ Status ShardingEgressMetadataHook::readReplyMetadata(OperationContext* opCtx,
                                                      const BSONObj& metadataObj) {
     try {
         _saveGLEStats(metadataObj, replySource);
-        return _advanceConfigOptimeFromShard(replySource.toString(), metadataObj);
+        return _advanceConfigOpTimeFromShard(opCtx, replySource.toString(), metadataObj);
     } catch (...) {
         return exceptionToStatus();
     }
 }
 
-Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId,
+Status ShardingEgressMetadataHook::_advanceConfigOpTimeFromShard(OperationContext* opCtx,
+                                                                 const ShardId& shardId,
                                                                  const BSONObj& metadataObj) {
     auto const grid = Grid::get(_serviceContext);
 
@@ -103,8 +104,8 @@ Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId
                 // due to rollback as explained in SERVER-24630 and the last committed optime
                 // is safe to use.
                 const auto& replMetadata = parseStatus.getValue();
-                auto opTime = replMetadata.getLastOpCommitted();
-                grid->advanceConfigOpTime(opTime);
+                const auto opTime = replMetadata.getLastOpCommitted();
+                grid->advanceConfigOpTime(opCtx, opTime, "reply from config server node");
             }
         } else {
             // Regular shards return the config opTime as part of ConfigServerMetadata.
@@ -114,9 +115,12 @@ Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId
             }
 
             const auto& configMetadata = parseStatus.getValue();
-            auto opTime = configMetadata.getOpTime();
+            const auto opTime = configMetadata.getOpTime();
             if (opTime.is_initialized()) {
-                grid->advanceConfigOpTime(opTime.get());
+                grid->advanceConfigOpTime(opCtx,
+                                          opTime.get(),
+                                          str::stream() << "reply from shard " << shardId
+                                                        << " node");
             }
         }
         return Status::OK();
