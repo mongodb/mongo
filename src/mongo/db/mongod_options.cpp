@@ -243,6 +243,20 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
         }
     }
 
+    // "storage.indexBuildRetry" comes from the config file, so override it if "noIndexBuildRetry"
+    // is set since that comes from the command line.
+    if (params->count("noIndexBuildRetry")) {
+        Status ret = params->set("storage.indexBuildRetry",
+                                 moe::Value(!(*params)["noIndexBuildRetry"].as<bool>()));
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = params->remove("noIndexBuildRetry");
+        if (!ret.isOK()) {
+            return ret;
+        }
+    }
+
     // "sharding.clusterRole" comes from the config file, so override it if "configsvr" or
     // "shardsvr" are set since those come from the command line.
     if (params->count("configsvr")) {
@@ -420,6 +434,10 @@ Status storeMongodOptions(const moe::Environment& params) {
 
     if (params.count("cpu")) {
         serverGlobalParams.cpu = params["cpu"].as<bool>();
+    }
+
+    if (params.count("storage.indexBuildRetry")) {
+        serverGlobalParams.indexBuildRetry = params["storage.indexBuildRetry"].as<bool>();
     }
 
     if (params.count("storage.journal.enabled")) {

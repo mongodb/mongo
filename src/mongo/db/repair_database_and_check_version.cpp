@@ -260,6 +260,16 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     std::vector<StorageEngine::CollectionIndexNamePair> indexesToRebuild =
         fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
 
+    if (!indexesToRebuild.empty() && serverGlobalParams.indexBuildRetry) {
+        log() << "note: restart the server with --noIndexBuildRetry "
+              << "to skip index rebuilds";
+    }
+
+    if (!serverGlobalParams.indexBuildRetry) {
+        log() << "  not rebuilding interrupted indexes";
+        return;
+    }
+
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;

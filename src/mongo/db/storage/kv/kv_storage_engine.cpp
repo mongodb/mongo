@@ -42,6 +42,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
@@ -431,9 +432,18 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
             // table is not found, or the index build did not successfully complete, this code
             // will return the index to be rebuilt.
             if (indexMetaData.isBackgroundSecondaryBuild && (!foundIdent || !indexMetaData.ready)) {
-                log()
-                    << "Expected background index build did not complete, rebuilding. Collection: "
-                    << coll << " Index: " << indexName;
+                if (!serverGlobalParams.indexBuildRetry) {
+                    log() << "Dropping an unfinished index because --noIndexBuildRetry is set. "
+                             "Collection: "
+                          << coll << " Index: " << indexName;
+                    fassert(51197, _engine->dropIdent(opCtx, indexIdent));
+                    indexesToDrop.push_back(indexName);
+                    continue;
+                }
+
+                log() << "Expected background index build did not complete, rebuilding. "
+                         "Collection: "
+                      << coll << " Index: " << indexName;
                 ret.emplace_back(coll.ns(), indexName);
                 continue;
             }

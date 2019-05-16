@@ -54,11 +54,13 @@ configs:
         description: 'Each database will be stored in a separate directory'
         short_name: directoryperdb
         arg_vartype: Switch
+
     'storage.queryableBackupMode':
         description: 'Enable read-only mode - if true the server will not accept writes'
         short_name: queryableBackupMode
         arg_vartype: Switch
         hidden: true
+
     'storage.groupCollections':
         description: >-
             Group collections - if true the storage engine may group
@@ -66,6 +68,7 @@ configs:
         short_name: groupCollections
         arg_vartype: Switch
         hidden: true
+
     'storage.syncPeriodSecs':
         description: 'Seconds between disk syncs (0=never, but not recommended)'
         short_name: syncdelay
@@ -74,19 +77,36 @@ configs:
         validator:
             gte: 0.0
             lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
+
+    'storage.indexBuildRetry':
+        description: "Do not retry any index builds that were interrupted by shutdown"
+        arg_vartype: Switch
+        conflicts: ['replication.replSet', 'replication.replSetName']
+        source: yaml
+
+    noIndexBuildRetry:
+        description: "Do not retry any index builds that were interrupted by shutdown"
+        short_name: noIndexBuildRetry
+        arg_vartype: Switch
+        conflicts: ['replication.replSet', 'replication.replSetName']
+        source: [ cli, ini ]
+
     upgrade:
         description: 'Upgrade db if needed'
         arg_vartype: Switch
         source: [ cli, ini ]
+
     repair:
         description: 'Run repair on all dbs'
         arg_vartype: Switch
         source: [ cli, ini ]
+
     'storage.journal.enabled':
         description: 'Enable journaling'
         short_name: journal
         deprecated_short_name: dur
         arg_vartype: Switch
+
     nojournal:
         description: 'Disable journaling (journaling is on by default for 64 bit)'
         deprecated_short_name: nodur
