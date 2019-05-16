@@ -27,7 +27,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
@@ -54,6 +54,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -319,6 +320,92 @@ TEST_F(MetadataManagerTest, RangesToCleanMembership) {
     ASSERT(!notifn.ready());
     ASSERT(_manager->numberOfRangesToClean() == 1UL);
     notifn.abandon();
+}
+
+TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectsLastSnapshotInList) {
+    _manager->refreshActiveMetadata(makeEmptyMetadata());
+    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
+
+    auto scm1 = _manager->getActiveMetadata(_manager);
+    {
+        _manager->refreshActiveMetadata(
+            cloneMetadataPlusChunk(*scm1.getMetadata(), cr1.getMin(), cr1.getMax()));
+        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1UL);
+        ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
+
+        auto scm2 = _manager->getActiveMetadata(_manager);
+        ASSERT_EQ(scm2->getChunks().size(), 1UL);
+        _manager->refreshActiveMetadata(
+            cloneMetadataPlusChunk(*scm2.getMetadata(), cr2.getMin(), cr2.getMax()));
+        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 2UL);
+        ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 0);
+    }
+
+    // The CollectionMetadata in scm2 should be set to boost::none because the object accessing it
+    // is now out of scope, but that in scm1 should remain
+    ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 1);
+    ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 2UL);
+    ASSERT_EQ((_manager->getActiveMetadata(_manager))->getChunks().size(), 2UL);
+}
+
+TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectSnapshotInMiddleOfList) {
+    _manager->refreshActiveMetadata(makeEmptyMetadata());
+    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
+    ChunkRange cr3(BSON("key" << 50), BSON("key" << 80));
+    ChunkRange cr4(BSON("key" << 90), BSON("key" << 100));
+
+    auto scm = _manager->getActiveMetadata(_manager);
+    _manager->refreshActiveMetadata(
+        cloneMetadataPlusChunk(*scm.getMetadata(), cr1.getMin(), cr1.getMax()));
+    ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1UL);
+    ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
+
+    auto scm2 = _manager->getActiveMetadata(_manager);
+    ASSERT_EQ(scm2->getChunks().size(), 1UL);
+    _manager->refreshActiveMetadata(
+        cloneMetadataPlusChunk(*scm2.getMetadata(), cr2.getMin(), cr2.getMax()));
+
+    {
+        auto scm3 = _manager->getActiveMetadata(_manager);
+        ASSERT_EQ(scm3->getChunks().size(), 2UL);
+        _manager->refreshActiveMetadata(
+            cloneMetadataPlusChunk(*scm3.getMetadata(), cr3.getMin(), cr3.getMax()));
+        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 3UL);
+        ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 0);
+
+        /**
+         * The CollectionMetadata object created when creating scm2 above will be set to boost::none
+         * when we overrwrite scm2 below. The _metadata list will then look like:
+         * [
+         *      CollectionMetadataTracker{ metadata: xxx, orphans: [], usageCounter: 1},
+         *      CollectionMetadataTracker{ metadata: boost::none, orphans: [], usageCounter: 0},
+         *      CollectionMetadataTracker{ metadata: xxx, orphans: [], usageCounter: 1},
+         *      CollectionMetadataTracker{ metadata: xxx, orphans: [], usageCounter: 1}
+         * ]
+         */
+        scm2 = _manager->getActiveMetadata(_manager);
+        ASSERT_EQ(scm2->getChunks().size(), 3UL);
+        _manager->refreshActiveMetadata(
+            cloneMetadataPlusChunk(*scm2.getMetadata(), cr4.getMin(), cr4.getMax()));
+        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 4UL);
+        ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 1);
+    }
+
+
+    /** The CollectionMetadata in scm3 should be set to boost::none because the object accessing it
+     * is now out of scope. The _metadata list should look like:
+     * [
+     *      CollectionMetadataTracker{ metadata: xxx, orphans: [], usageCounter: 1},
+     *      CollectionMetadataTracker{ metadata: boost::none, orphans: [], usageCounter: 0},
+     *      CollectionMetadataTracker{ metadata: boost::none, orphans: [], usageCounter: 0},
+     *      CollectionMetadataTracker{ metadata: xxx, orphans: [], usageCounter: 1}
+     * ]
+     */
+
+    ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 4UL);
+    ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 2);
 }
 
 }  // namespace
