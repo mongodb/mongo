@@ -559,6 +559,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='prepare_conflict_tracker',
+    source=[
+        'prepare_conflict_tracker.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
 env.CppUnitTest(
     target= 'thread_client_test',
     source= 'thread_client_test.cpp',

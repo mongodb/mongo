@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,31 +27,52 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
-
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
-// When set, simulates WT_PREPARE_CONFLICT returned from WiredTiger API calls.
-MONGO_FAIL_POINT_DEFINE(WTPrepareConflictForReads);
+/**
+ * The PrepareConflictTracker tracks if a read operation encounters a prepare conflict. If it
+ * is blocked on a prepare conflict, we will kill the operation during step down. This will
+ * help us avoid deadlocks between prepare conflicts and state transitions.
+ *
+ * TODO SERVER-41037: Modify above comment to include step up or use "state transitions" to
+ * encompass both.
+ */
+class PrepareConflictTracker {
+public:
+    static const OperationContext::Decoration<PrepareConflictTracker> get;
 
-MONGO_FAIL_POINT_DEFINE(WTSkipPrepareConflictRetries);
+    /**
+     * Decoration requires a default constructor.
+     */
+    PrepareConflictTracker() = default;
 
-MONGO_FAIL_POINT_DEFINE(WTPrintPrepareConflictLog);
+    /**
+     * Returns whether a read thread is currently blocked on a prepare conflict.
+     */
+    bool isWaitingOnPrepareConflict() const;
 
-void wiredTigerPrepareConflictLog(int attempts) {
-    LOG(1) << "Caught WT_PREPARE_CONFLICT, attempt " << attempts
-           << ". Waiting for unit of work to commit or abort.";
-}
+    /**
+     * Sets _waitOnPrepareConflict to true after a read thread hits a WT_PREPARE_CONFLICT
+     * error code.
+     */
+    void beginPrepareConflict();
 
-void wiredTigerPrepareConflictFailPointLog() {
-    log() << "WTPrintPrepareConflictLog fail point enabled.";
-}
+    /**
+     * Sets _waitOnPrepareConflict to false after wiredTigerPrepareConflictRetry returns,
+     * implying that the read thread is not blocked on a prepare conflict.
+     */
+    void endPrepareConflict();
+
+private:
+    /**
+     * Set to true when a read operation is currently blocked on a prepare conflict.
+     */
+    AtomicWord<bool> _waitOnPrepareConflict{false};
+};
 
 }  // namespace mongo

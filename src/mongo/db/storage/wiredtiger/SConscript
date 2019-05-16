@@ -62,6 +62,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/global_settings',
             '$BUILD_DIR/mongo/db/namespace_string',
+            '$BUILD_DIR/mongo/db/prepare_conflict_tracker',
             '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
             '$BUILD_DIR/mongo/db/repl/repl_settings',
             '$BUILD_DIR/mongo/db/server_options_core',

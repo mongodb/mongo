@@ -54,6 +54,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/is_master_response.h"
@@ -1832,7 +1833,8 @@ void ReplicationCoordinatorImpl::_killUserOperationsOnStepDown(
         // Don't kill the stepdown thread.
         if (toKill && !toKill->isKillPending() && toKill->getOpID() != stepDownOpCtx->getOpID()) {
             auto locker = toKill->lockState();
-            if (locker->wasGlobalLockTakenInModeConflictingWithWrites()) {
+            if (locker->wasGlobalLockTakenInModeConflictingWithWrites() ||
+                PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict()) {
                 serviceCtx->killOperation(lk, toKill, ErrorCodes::InterruptedDueToStepDown);
                 userOpsKilled.increment();
             } else {

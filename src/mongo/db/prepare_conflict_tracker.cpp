@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,31 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-
+#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
-
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
-// When set, simulates WT_PREPARE_CONFLICT returned from WiredTiger API calls.
-MONGO_FAIL_POINT_DEFINE(WTPrepareConflictForReads);
+const OperationContext::Decoration<PrepareConflictTracker> PrepareConflictTracker::get =
+    OperationContext::declareDecoration<PrepareConflictTracker>();
 
-MONGO_FAIL_POINT_DEFINE(WTSkipPrepareConflictRetries);
-
-MONGO_FAIL_POINT_DEFINE(WTPrintPrepareConflictLog);
-
-void wiredTigerPrepareConflictLog(int attempts) {
-    LOG(1) << "Caught WT_PREPARE_CONFLICT, attempt " << attempts
-           << ". Waiting for unit of work to commit or abort.";
+bool PrepareConflictTracker::isWaitingOnPrepareConflict() const {
+    return _waitOnPrepareConflict.load();
 }
 
-void wiredTigerPrepareConflictFailPointLog() {
-    log() << "WTPrintPrepareConflictLog fail point enabled.";
+void PrepareConflictTracker::beginPrepareConflict() {
+    // Implies that the current read operation is blocked on a prepared transaction.
+    _waitOnPrepareConflict.store(true);
+}
+
+void PrepareConflictTracker::endPrepareConflict() {
+    // Implies that the current read operation is not blocked on a prepared transaction.
+    _waitOnPrepareConflict.store(false);
 }
 
 }  // namespace mongo

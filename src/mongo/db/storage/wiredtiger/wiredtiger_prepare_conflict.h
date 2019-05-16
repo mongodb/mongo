@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/curop.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/util/fail_point_service.h"
@@ -43,10 +43,17 @@ MONGO_FAIL_POINT_DECLARE(WTPrepareConflictForReads);
 // When set, WT_ROLLBACK is returned in place of retrying on WT_PREPARE_CONFLICT errors.
 MONGO_FAIL_POINT_DECLARE(WTSkipPrepareConflictRetries);
 
+MONGO_FAIL_POINT_DECLARE(WTPrintPrepareConflictLog);
+
 /**
  * Logs a message with the number of prepare conflict retry attempts.
  */
 void wiredTigerPrepareConflictLog(int attempt);
+
+/**
+ * Logs a message to confirm we've hit the WTPrintPrepareConflictLog fail point.
+ */
+void wiredTigerPrepareConflictFailPointLog();
 
 /**
  * Runs the argument function f as many times as needed for f to return an error other than
@@ -61,11 +68,21 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
 
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
     int attempts = 1;
+    // If we return from this function, we have either returned successfully or we've returned an
+    // error other than WT_PREPARE_CONFLICT. Reset PrepareConflictTracker accordingly.
+    ON_BLOCK_EXIT([opCtx] { PrepareConflictTracker::get(opCtx).endPrepareConflict(); });
     // If the failpoint is enabled, don't call the function, just simulate a conflict.
     int ret =
         MONGO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
+
+    PrepareConflictTracker::get(opCtx).beginPrepareConflict();
+
+    if (MONGO_FAIL_POINT(WTPrintPrepareConflictLog)) {
+        wiredTigerPrepareConflictFailPointLog();
+    }
+
     CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
     wiredTigerPrepareConflictLog(attempts);
 
@@ -109,6 +126,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
 
         CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
         wiredTigerPrepareConflictLog(attempts);
+
         // Wait on the session cache to signal that a unit of work has been committed or aborted.
         recoveryUnit->getSessionCache()->waitUntilPreparedUnitOfWorkCommitsOrAborts(opCtx,
                                                                                     lastCount);
