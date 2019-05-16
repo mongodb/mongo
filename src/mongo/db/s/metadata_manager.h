@@ -81,6 +81,13 @@ public:
      */
     size_t numberOfMetadataSnapshots() const;
 
+    /**
+     * Returns the number of metadata objects that have been set to boost::none in
+     * _retireExpiredMetadata(). The actual number may vary after it returns, so this is really only
+     * useful for unit tests.
+     */
+    int numberOfEmptyMetadataSnapshots() const;
+
     void setFilteringMetadata(CollectionMetadata newMetadata);
 
     void clearFilteringMetadata();
@@ -162,7 +169,7 @@ private:
             invariant(!usageCounter);
         }
 
-        CollectionMetadata metadata;
+        boost::optional<CollectionMetadata> metadata;
 
         std::list<Deletion> orphans;
 
