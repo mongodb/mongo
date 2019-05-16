@@ -70,24 +70,39 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
     totalRefreshing += newStats.refreshing;
 }
 
-void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result) {
+void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC) {
     result.appendNumber("totalInUse", totalInUse);
     result.appendNumber("totalAvailable", totalAvailable);
     result.appendNumber("totalCreated", totalCreated);
     result.appendNumber("totalRefreshing", totalRefreshing);
 
+    if (forFTDC) {
+        BSONObjBuilder poolBuilder(result.subobjStart("connectionsInUsePerPool"));
+        for (const auto& pool : statsByPool) {
+            BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool.first));
+            auto& poolStats = pool.second;
+            poolInfo.appendNumber("poolInUse", poolStats.inUse);
+            for (const auto& host : statsByPoolHost[pool.first]) {
+                auto hostStats = host.second;
+                poolInfo.appendNumber(host.first.toString(), hostStats.inUse);
+            }
+        }
+
+        return;
+    }
+
     {
         BSONObjBuilder poolBuilder(result.subobjStart("pools"));
-        for (auto&& pool : statsByPool) {
+        for (const auto& pool : statsByPool) {
             BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool.first));
-            auto poolStats = pool.second;
+            auto& poolStats = pool.second;
             poolInfo.appendNumber("poolInUse", poolStats.inUse);
             poolInfo.appendNumber("poolAvailable", poolStats.available);
             poolInfo.appendNumber("poolCreated", poolStats.created);
             poolInfo.appendNumber("poolRefreshing", poolStats.refreshing);
-            for (auto&& host : statsByPoolHost[pool.first]) {
+            for (const auto& host : statsByPoolHost[pool.first]) {
                 BSONObjBuilder hostInfo(poolInfo.subobjStart(host.first.toString()));
-                auto hostStats = host.second;
+                auto& hostStats = host.second;
                 hostInfo.appendNumber("inUse", hostStats.inUse);
                 hostInfo.appendNumber("available", hostStats.available);
                 hostInfo.appendNumber("created", hostStats.created);

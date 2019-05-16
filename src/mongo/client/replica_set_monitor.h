@@ -161,9 +161,10 @@ public:
     bool contains(const HostAndPort& server) const;
 
     /**
-     * Writes information about our cached view of the set to a BSONObjBuilder.
+     * Writes information about our cached view of the set to a BSONObjBuilder. If
+     * forFTDC, trim to minimize its size for full-time diagnostic data capture.
      */
-    void appendInfo(BSONObjBuilder& b) const;
+    void appendInfo(BSONObjBuilder& b, bool forFTDC = false) const;
 
     /**
      * Returns true if the monitor knows a usable primary from it's interal view.

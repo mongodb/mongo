@@ -198,19 +198,22 @@ void ReplicaSetMonitorManager::removeAllMonitors() {
     }
 }
 
-void ReplicaSetMonitorManager::report(BSONObjBuilder* builder) {
+void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
     // Don't hold _mutex the whole time to avoid ever taking a monitor's mutex while holding the
     // manager's mutex.  Otherwise we could get a deadlock between the manager's, monitor's, and
     // ShardRegistry's mutex due to the ReplicaSetMonitor's AsynchronousConfigChangeHook potentially
     // calling ShardRegistry::updateConfigServerConnectionString.
     auto setNames = getAllSetNames();
+
+    BSONObjBuilder setStats(
+        builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));
+
     for (const auto& setName : setNames) {
         auto monitor = getMonitor(setName);
         if (!monitor) {
             continue;
         }
-        BSONObjBuilder monitorInfo(builder->subobjStart(setName));
-        monitor->appendInfo(monitorInfo);
+        monitor->appendInfo(setStats, forFTDC);
     }
 }
 

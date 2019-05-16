@@ -107,9 +107,7 @@ public:
         stats.appendToBSON(result);
 
         // Always report all replica sets being tracked.
-        BSONObjBuilder setStats(result.subobjStart("replicaSets"));
-        globalRSMonitorManager.report(&setStats);
-        setStats.doneFast();
+        globalRSMonitorManager.report(&result);
 
         return true;
     }

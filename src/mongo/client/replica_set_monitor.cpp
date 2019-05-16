@@ -162,6 +162,15 @@ struct HostNotIn {
     const std::set<HostAndPort>& _hosts;
 };
 
+int32_t pingTimeMillis(const Node& node) {
+    auto latencyMillis = node.latencyMicros / 1000;
+    if (latencyMillis > numeric_limits<int32_t>::max()) {
+        // In particular, Node::unknownLatency does not fit in an int32.
+        return numeric_limits<int32_t>::max();
+    }
+    return latencyMillis;
+}
+
 /**
  * Replica set refresh period on the task executor.
  */
@@ -415,12 +424,21 @@ void ReplicaSetMonitor::setSynchronousConfigChangeHook(ConfigChangeHook hook) {
 }
 
 // TODO move to correct order with non-statics before pushing
-void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder) const {
+void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder, bool forFTDC) const {
     stdx::lock_guard<stdx::mutex> lk(_state->mutex);
 
+    BSONObjBuilder monitorInfo(bsonObjBuilder.subobjStart(getName()));
+    if (forFTDC) {
+        for (size_t i = 0; i < _state->nodes.size(); i++) {
+            const Node& node = _state->nodes[i];
+            monitorInfo.appendNumber(node.host.toString(), pingTimeMillis(node));
+        }
+        return;
+    }
+
     // NOTE: the format here must be consistent for backwards compatibility
-    BSONArrayBuilder hosts(bsonObjBuilder.subarrayStart("hosts"));
-    for (unsigned i = 0; i < _state->nodes.size(); i++) {
+    BSONArrayBuilder hosts(monitorInfo.subarrayStart("hosts"));
+    for (size_t i = 0; i < _state->nodes.size(); i++) {
         const Node& node = _state->nodes[i];
 
         BSONObjBuilder builder;
@@ -429,15 +447,7 @@ void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder) const {
         builder.append("ismaster", node.isMaster);  // intentionally not camelCase
         builder.append("hidden", false);            // we don't keep hidden nodes in the set
         builder.append("secondary", node.isUp && !node.isMaster);
-
-        int32_t pingTimeMillis = 0;
-        if (node.latencyMicros / 1000 > numeric_limits<int32_t>::max()) {
-            // In particular, Node::unknownLatency does not fit in an int32.
-            pingTimeMillis = numeric_limits<int32_t>::max();
-        } else {
-            pingTimeMillis = node.latencyMicros / 1000;
-        }
-        builder.append("pingTimeMillis", pingTimeMillis);
+        builder.append("pingTimeMillis", pingTimeMillis(node));
 
         if (!node.tags.isEmpty()) {
             builder.append("tags", node.tags);
@@ -445,7 +455,6 @@ void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder) const {
 
         hosts.append(builder.obj());
     }
-    hosts.done();
 }
 
 void ReplicaSetMonitor::shutdown() {

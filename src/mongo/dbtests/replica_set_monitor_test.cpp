@@ -163,7 +163,8 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
             replMonitor->appendInfo(monitorStateBuilder);
             BSONObj monitorState = monitorStateBuilder.done();
 
-            BSONElement hostsElem = monitorState["hosts"];
+            // Stats are under the replica set name, "test".
+            BSONElement hostsElem = monitorState["test"]["hosts"];
             BSONElement addrElem = hostsElem[mongo::str::stream() << idxToRemove]["addr"];
             hostToRemove = addrElem.String();
         }
