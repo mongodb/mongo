@@ -778,7 +778,7 @@ void execCommandDatabase(OperationContext* opCtx,
                 uassertStatusOK(shardingState->canAcceptShardedCommands());
             }
 
-            behaviors.advanceConfigOptimeFromRequestMetadata(opCtx);
+            behaviors.advanceConfigOpTimeFromRequestMetadata(opCtx);
         }
 
         oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);

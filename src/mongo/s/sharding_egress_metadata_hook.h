@@ -71,7 +71,9 @@ protected:
      * On shards and mongoses this advances the Grid's stored config server optime based on the
      * metadata in the response object from running a command.
      */
-    virtual Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj);
+    virtual Status _advanceConfigOpTimeFromShard(OperationContext* opCtx,
+                                                 const ShardId& shardId,
+                                                 const BSONObj& metadataObj);
 
     ServiceContext* const _serviceContext;
 };

@@ -240,9 +240,9 @@ public:
         }
     }
 
-    void advanceConfigOptimeFromRequestMetadata(OperationContext* opCtx) const override {
+    void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const override {
         // Handle config optime information that may have been sent along with the command.
-        rpc::advanceConfigOptimeFromRequestMetadata(opCtx);
+        rpc::advanceConfigOpTimeFromRequestMetadata(opCtx);
     }
 
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(
