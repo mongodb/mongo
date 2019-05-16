@@ -4,6 +4,7 @@
 //   uses_change_streams,
 //   uses_multi_shard_transaction,
 //   uses_transactions,
+//   exclude_from_large_txns_due_to_change_streams,
 // ]
 (function() {
     "use strict";

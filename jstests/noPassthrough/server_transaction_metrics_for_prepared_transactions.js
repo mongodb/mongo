@@ -1,6 +1,6 @@
 /**
  * Tests prepared transactions metrics in the serverStatus output.
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, exclude_from_large_txns]
  */
 (function() {
     "use strict";

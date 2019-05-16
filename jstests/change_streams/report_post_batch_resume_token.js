@@ -1,7 +1,7 @@
 /**
  * Tests that an aggregate with a $changeStream stage reports the latest postBatchResumeToken. This
  * test verifies postBatchResumeToken semantics that are common to sharded and unsharded streams.
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, exclude_from_large_txns_due_to_change_streams]
  */
 (function() {
     "use strict";
