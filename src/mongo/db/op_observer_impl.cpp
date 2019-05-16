@@ -1474,48 +1474,6 @@ void OpObserverImpl::onPreparedTransactionCommit(
         opCtx, commitOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kCommitted);
 }
 
-repl::OpTime logPrepareTransaction(OperationContext* opCtx,
-                                   StmtId stmtId,
-                                   const repl::OpTime& prevOpTime,
-                                   const OplogSlot oplogSlot,
-                                   const repl::OpTime& startOpTime) {
-    const NamespaceString cmdNss{"admin", "$cmd"};
-
-    const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
-
-    OperationSessionInfo sessionInfo;
-    repl::OplogLink oplogLink;
-    PrepareTransactionOplogObject cmdObj;
-    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
-    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-    oplogLink.prevOpTime = prevOpTime;
-
-    const auto oplogOpTime = logOperation(opCtx,
-                                          "c",
-                                          cmdNss,
-                                          {} /* uuid */,
-                                          cmdObj.toBSON(),
-                                          nullptr /* o2 */,
-                                          false /* fromMigrate */,
-                                          wallClockTime,
-                                          sessionInfo,
-                                          stmtId,
-                                          oplogLink,
-                                          false /* prepare */,
-                                          oplogSlot);
-    invariant(oplogSlot == oplogOpTime);
-
-    onWriteOpCompleted(opCtx,
-                       cmdNss,
-                       {stmtId},
-                       oplogOpTime,
-                       wallClockTime,
-                       DurableTxnStateEnum::kPrepared,
-                       startOpTime /* startOpTime */);
-
-    return oplogSlot;
-}
-
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                                           const std::vector<OplogSlot>& reservedSlots,
                                           std::vector<repl::ReplOperation>& statements) {
