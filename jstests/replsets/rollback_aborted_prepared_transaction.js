@@ -5,7 +5,7 @@
  * by the transaction coordinator because transaction coordinator should always call
  * prepareTransaction with {w : "majority"}.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, exclude_from_large_txns_due_to_fast_count]
  */
 (function() {
     "use strict";
