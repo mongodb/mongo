@@ -122,12 +122,12 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     
     if (any_input == false)
     {
-        digest = mongo::TDigest(this->digest_size);
+        digest = mongo::TDigest(digest_size);
         any_input = true;
     }
 
-    if (values.size() == this->chunk_size){
-        _add_to_tdigest(values);
+    if (values.size() == chunk_size){
+        _add_to_tdigest();
         }
 }
 
@@ -140,42 +140,46 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
 
     // To add the remainders
     if (not values.empty()){
-        _add_to_tdigest(values);
+        _add_to_tdigest();
         }
 
     if (toBeMerged) {
         std::vector<Document> centroids;
 
-        for (const auto& centroid: this->digest.getCentroids()) {
+        for (const auto& centroid:digest.getCentroids()) {
             centroids.push_back(Document{
                     {"mean", centroid.mean()},
                     {"weight", centroid.weight()}
                 });
         };
         
-        Value res = Value(
+        return Value(
             Document{
                 {"centroids", Value(centroids)},
                 {"sum", digest.sum()},
                 {"count", digest.count()},
                 {"max", digest.max()},
                 {"min", digest.min()},
-                {"percentile", this->percentile},
-                {"digest_size", this->digest_size}
+                {"percentile", percentile},
+                {"digest_size", digest_size}
             }
         );
-        return res;
     }
-    return Value(digest.estimateQuantile(this->percentile));
+
+    if (digest.count() == 0)
+    {
+        return Value(BSONNULL);
+    }
+
+    return Value(digest.estimateQuantile(percentile));
 }
 
 AccumulatorPercentile::AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : Accumulator(expCtx) {
     // This is a fixed size Accumulator so we never need to update this
-    _memUsageBytes = sizeof(*this);
 }
 
-void AccumulatorPercentile::_add_to_tdigest(std::vector<double> & values){
+void AccumulatorPercentile::_add_to_tdigest(){
     // Sort, Push and Clear the "values" vector in each chunk
     std::sort(values.begin(), values.end());
     digest = digest.merge(values);
@@ -183,9 +187,9 @@ void AccumulatorPercentile::_add_to_tdigest(std::vector<double> & values){
 }
 
 void AccumulatorPercentile::reset() {
-    this->digest_size = 0;
+    digest_size = 0;
     values.clear();
-    digest = mongo::TDigest(this->digest_size);
+    digest = mongo::TDigest(digest_size);
     any_input = false;
 }
 }

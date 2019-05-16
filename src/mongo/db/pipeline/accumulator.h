@@ -319,7 +319,7 @@ public:
 
 private:
     double percentile;
-    double digest_size=0;
+    double digest_size = 0;
     double chunk_size = 100;
     mongo::TDigest digest;
 
@@ -327,9 +327,9 @@ private:
     std::vector<double> values;
 
     // push the vector of values to create tdigest object
-    void _add_to_tdigest(std::vector<double>&);
+    void _add_to_tdigest();
 
-    bool any_input{false};
+    bool any_input = false;
 };
 
 class AccumulatorStdDev : public Accumulator {

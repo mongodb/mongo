@@ -80,7 +80,7 @@ static void assertExpectedResults(
                 ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
-            
+
             // Asserts that result equals expected result when each input is on a separate shard.
             {
                 boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
@@ -105,7 +105,20 @@ TEST(Accumulators, Percentile) {
     assertExpectedResults(
         "$percentile",
         expCtx,
-        {
+        {           
+           {{}, Value(BSONNULL)},
+
+           {{
+            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", Value(BSONNULL)}})),
+           }, Value(BSONNULL)},
+
+           {{
+            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 10}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 20}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 30}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", Value(BSONNULL)}})),
+           }, Value(11.00)},
+
            {{
             Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 10}})),
             Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 20}})),
