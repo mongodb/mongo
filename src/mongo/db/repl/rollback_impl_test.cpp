@@ -31,11 +31,14 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
+#include <vector>
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/logical_session_id_gen.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
@@ -239,6 +242,13 @@ protected:
         ASSERT_OK(_insertOplogEntry(makeDeleteOplogEntry(time, id.wrap(), nss.ns(), uuid)));
         ASSERT_OK(_storageInterface->deleteById(_opCtx.get(), nss, id));
     }
+
+    /**
+     * Sets up a test for an unprepared transaction that is comprised of multiple
+     * applyOps oplog entries.
+     * Returns entries appended to the oplog.
+     */
+    std::vector<OplogInterfaceMock::Operation> _setUpUnpreparedTransactionForCountTest(UUID collId);
 
     std::unique_ptr<OplogInterfaceLocal> _localOplog;
     std::unique_ptr<OplogInterfaceMock> _remoteOplog;
@@ -1347,6 +1357,114 @@ TEST_F(RollbackImplTest, ResetToZeroIfCountGoesNegative) {
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
     ASSERT_EQ(_storageInterface->getFinalCollectionCount(kGenericUUID), 0);
+}
+
+std::vector<OplogInterfaceMock::Operation>
+RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
+    std::vector<OplogInterfaceMock::Operation> ops;
+
+    // Initialize the collection with one document inserted outside a transaction.
+    // The final collection count after rolling back the transaction, which has one entry before the
+    // stable timestamp, should be 1.
+    auto nss = NamespaceString("test.coll1");
+    _initializeCollection(_opCtx.get(), collId, nss);
+    auto insertOp1 = _insertDocAndReturnOplogEntry(BSON("_id" << 1), collId, nss, 1);
+    ops.push_back(insertOp1);
+    ASSERT_OK(_insertOplogEntry(insertOp1.first));
+
+    // Common field values for applyOps oplog entries.
+    auto adminCmdNss = NamespaceString(NamespaceString::kAdminDb).getCommandNS();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionId(_opCtx.get()));
+    sessionInfo.setTxnNumber(1);
+
+    // Start an unprepared transaction with an applyOps oplog entry with the "partialTxn" field
+    // set to true.
+    auto insertOp2 = _insertDocAndReturnOplogEntry(BSON("_id" << 2), collId, nss, 2);
+    auto partialApplyOpsOpTime = unittest::assertGet(OpTime::parseFromOplogEntry(insertOp2.first));
+    auto partialApplyOpsObj =
+        BSON("applyOps" << BSON_ARRAY(insertOp2.first) << "partialTxn" << true);
+    OplogEntry partialApplyOpsOplogEntry(partialApplyOpsOpTime,      // opTime
+                                         1LL,                        // hash
+                                         OpTypeEnum::kCommand,       // opType
+                                         adminCmdNss,                // nss
+                                         boost::none,                // uuid
+                                         boost::none,                // fromMigrate
+                                         OplogEntry::kOplogVersion,  // version
+                                         partialApplyOpsObj,         // oField
+                                         boost::none,                // o2Field
+                                         sessionInfo,                // sessionInfo
+                                         boost::none,                // isUpsert
+                                         boost::none,                // wallClockTime
+                                         boost::none,                // statementId
+                                         OpTime(),                   // prevWriteOpTimeInTransaction
+                                         boost::none,                // preImageOpTime
+                                         boost::none,                // postImageOpTime
+                                         boost::none);               // prepare
+    ASSERT_OK(_insertOplogEntry(partialApplyOpsOplogEntry.toBSON()));
+    ops.push_back(std::make_pair(partialApplyOpsOplogEntry.toBSON(), insertOp2.second));
+
+    // Complete the unprepared transaction with an implicit commit oplog entry.
+    // When rolling back the implicit commit operation, we should be traversing, in reverse, the
+    // chain of applyOps oplog entries for this transaction.
+    auto insertOp3 = _insertDocAndReturnOplogEntry(BSON("_id" << 3), collId, nss, 3);
+    auto commitApplyOpsOpTime = unittest::assertGet(OpTime::parseFromOplogEntry(insertOp3.first));
+    auto commitApplyOpsObj = BSON("applyOps" << BSON_ARRAY(insertOp3.first) << "count" << 1);
+    OplogEntry commitApplyOpsOplogEntry(commitApplyOpsOpTime,       // opTime
+                                        1LL,                        // hash
+                                        OpTypeEnum::kCommand,       // opType
+                                        adminCmdNss,                // nss
+                                        boost::none,                // uuid
+                                        boost::none,                // fromMigrate
+                                        OplogEntry::kOplogVersion,  // version
+                                        commitApplyOpsObj,          // oField
+                                        boost::none,                // o2Field
+                                        sessionInfo,                // sessionInfo
+                                        boost::none,                // isUpsert
+                                        boost::none,                // wallClockTime
+                                        boost::none,                // statementId
+                                        partialApplyOpsOpTime,      // prevWriteOpTimeInTransaction
+                                        boost::none,                // preImageOpTime
+                                        boost::none,                // postImageOpTime
+                                        boost::none);               // prepare
+    ASSERT_OK(_insertOplogEntry(commitApplyOpsOplogEntry.toBSON()));
+    ops.push_back(std::make_pair(commitApplyOpsOplogEntry.toBSON(), insertOp3.second));
+
+    ASSERT_OK(_storageInterface->setCollectionCount(nullptr, {nss.db().toString(), collId}, 3));
+    _assertDocsInOplog(_opCtx.get(), {1, 2, 3});
+
+    return ops;
+}
+
+TEST_F(RollbackImplTest, RollbackFixesCountForUnpreparedTransactionApplyOpsChain1) {
+    auto collId = UUID::gen();
+    auto ops = _setUpUnpreparedTransactionForCountTest(collId);
+
+    // Make the non-transaction CRUD oplog entry the common point and use its timestamp for the
+    // stable timestamp.
+    const auto& commonOp = ops[0];
+    _storageInterface->setStableTimestamp(nullptr, commonOp.first["ts"].timestamp());
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+
+    // The entire applyOps chain occurs after the common point.
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 1);
+}
+
+TEST_F(RollbackImplTest, RollbackFixesCountForUnpreparedTransactionApplyOpsChain2) {
+    auto collId = UUID::gen();
+    auto ops = _setUpUnpreparedTransactionForCountTest(collId);
+
+    // Make the starting applyOps oplog entry the common point and use its timestamp for the stable
+    // timestamp.
+    const auto& commonOp = ops[1];
+    _storageInterface->setStableTimestamp(nullptr, commonOp.first["ts"].timestamp());
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+
+    // TODO(SERVER-40566): Change expected count from 2 to 1. Currently, RollbackImpl does not
+    // traverse the chain of applyOps oplog entries to fix up the collection count.
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 2);
 }
 
 /**

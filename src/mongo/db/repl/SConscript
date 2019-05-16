@@ -662,6 +662,7 @@ env.CppUnitTest(
         'rollback_test_fixture',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
     ],
 )
 
