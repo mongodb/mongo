@@ -1462,9 +1462,7 @@ TEST_F(RollbackImplTest, RollbackFixesCountForUnpreparedTransactionApplyOpsChain
     _remoteOplog->setOperations({commonOp});
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
-    // TODO(SERVER-40566): Change expected count from 2 to 1. Currently, RollbackImpl does not
-    // traverse the chain of applyOps oplog entries to fix up the collection count.
-    ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 2);
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 1);
 }
 
 /**

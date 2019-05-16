@@ -679,7 +679,20 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             // prepare oplog entry is rolled-back, it is guaranteed that it has never committed.
             return Status::OK();
         }
-        return _processRollbackOpForApplyOps(opCtx, oplogEntry);
+        if (oplogEntry.isPartialTransaction()) {
+            // This oplog entry will be processed when we rollback the implicit commit for the
+            // unprepared transaction (applyOps without partialTxn field).
+            return Status::OK();
+        }
+        // Follow chain on applyOps oplog entries to process entire unprepared transaction.
+        // The beginning of the applyOps chain may precede the common point.
+        auto status = _processRollbackOpForApplyOps(opCtx, oplogEntry);
+        if (const auto prevOpTime = oplogEntry.getPrevWriteOpTimeInTransaction()) {
+            for (TransactionHistoryIterator iter(*prevOpTime); status.isOK() && iter.hasNext();) {
+                status = _processRollbackOpForApplyOps(opCtx, iter.next(opCtx));
+            }
+        }
+        return status;
     }
 
     // No information to record for a no-op.
