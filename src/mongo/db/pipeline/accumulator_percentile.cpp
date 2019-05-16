@@ -50,8 +50,6 @@ const char* AccumulatorPercentile::getOpName() const {
 }
 
 namespace {
-const char subTotalName[] = "subTotal";
-const char subTotalErrorName[] = "subTotalError";  // Used for extra precision
 
 const char sumName[] = "sum";
 const char countName[] = "count";
@@ -76,26 +74,44 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
         double digest_min = input[minName].getDouble();
         double digest_size = input[digestSizeName].getDouble();
 
+        if (any_input == false){
+            digest = mongo::TDigest(digest_size);
+            any_input = true;
+        }
+
         std::vector<mongo::TDigest::Centroid> centroids;
         for (const auto& centroid: digest_centroids.getArray()) {
             centroids.push_back(mongo::TDigest::Centroid(centroid[meanName].getDouble(), centroid[weightName].getDouble()));
         };
+        
+        // ToReview: This is the vector created to receive the centroids from Shards and needs to be counted in memory usage.
+        _memUsageBytes += centroids.size() * sizeof(centroids[0]);
 
-        digest = digest.merge({mongo::TDigest(centroids, digest_sum, digest_count, digest_max, digest_min, digest_size), digest});
+        digest = digest.merge({
+            mongo::TDigest(
+                centroids, 
+                digest_sum, 
+                digest_count, 
+                digest_max, 
+                digest_min, 
+                digest_size), 
+            digest
+        });
+
+        _memUsageBytes += sizeof(digest.getCentroids()[0]) * digest_size;
+
         this->percentile = input[percentileName].getDouble();
         return;
     }
 
     // Determining 'digest_size'
     if (this->digest_size == 0){
-        if (input.getDocument()["digest_size"].missing())
-            {
+        if (input.getDocument()["digest_size"].missing()){
             this->digest_size = 1000;
-            }
-        else
-            {
+        }
+        else{
             this->digest_size = input.getDocument()["digest_size"].getDouble();
-            }
+        }
     }
 
     uassert(51300, "The 'percentile' should be present in the input document.",
@@ -120,15 +136,20 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
             return;
     }
     
-    if (any_input == false)
-    {
+    if (any_input == false){
         digest = mongo::TDigest(digest_size);
         any_input = true;
+
+        // To add the memory used by 'values' vector. 
+        _memUsageBytes += sizeof(double) * chunk_size;
+
+        // To add the memory used by new digest with custom digest_size
+        _memUsageBytes += sizeof(digest.getCentroids()[0]) * digest_size;
     }
 
     if (values.size() == chunk_size){
         _add_to_tdigest();
-        }
+    }
 }
 
 intrusive_ptr<Accumulator> AccumulatorPercentile::create(
@@ -141,7 +162,7 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
     // To add the remainders
     if (not values.empty()){
         _add_to_tdigest();
-        }
+    }
 
     if (toBeMerged) {
         std::vector<Document> centroids;
@@ -153,6 +174,9 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
                 });
         };
         
+        // ToReview: This is the vector created to pass the centroids to MongoS and needs to be counted in memory usage.
+        _memUsageBytes += centroids.size() * sizeof(centroids[0]);
+
         return Value(
             Document{
                 {"centroids", Value(centroids)},
@@ -166,8 +190,7 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
         );
     }
 
-    if (digest.count() == 0)
-    {
+    if (digest.empty()){
         return Value(BSONNULL);
     }
 
@@ -176,7 +199,7 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
 
 AccumulatorPercentile::AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : Accumulator(expCtx) {
-    // This is a fixed size Accumulator so we never need to update this
+    _memUsageBytes = sizeof(*this);
 }
 
 void AccumulatorPercentile::_add_to_tdigest(){
@@ -191,5 +214,6 @@ void AccumulatorPercentile::reset() {
     values.clear();
     digest = mongo::TDigest(digest_size);
     any_input = false;
+    _memUsageBytes = sizeof(*this);
 }
 }

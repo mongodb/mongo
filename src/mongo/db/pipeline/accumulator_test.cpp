@@ -63,7 +63,6 @@ static void assertExpectedResults(
                     accum->process(val, false);
                 }
                 Value result = accum->getValue(false);
-
                 ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
@@ -109,32 +108,32 @@ TEST(Accumulators, Percentile) {
            {{}, Value(BSONNULL)},
 
            {{
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", Value(BSONNULL)}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 110},{"value", Value(BSONNULL)}})),
            }, Value(BSONNULL)},
 
            {{
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 10}})),
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 20}})),
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 30}})),
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", Value(BSONNULL)}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 120},{"value", 10}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 120},{"value", 20}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 120},{"value", 30}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 120},{"value", Value(BSONNULL)}})),
            }, Value(11.00)},
 
            {{
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 10}})),
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 20}})),
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 30}})),
-            Value(Document({{"percentile", 0.20}, {"digest_size", 100},{"value", 40}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 130},{"value", 10}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 130},{"value", 20}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 130},{"value", 30}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 130},{"value", 40}})),
            }, Value(13.00)},
 
            {{
-            Value(Document({{"percentile", 0.50}, {"digest_size", 200},{"value", 10}})),
-            Value(Document({{"percentile", 0.50}, {"digest_size", 200},{"value", 20}})),
-            Value(Document({{"percentile", 0.50}, {"digest_size", 200},{"value", 30}})),
-            Value(Document({{"percentile", 0.50}, {"digest_size", 200},{"value", 40}})),
-            Value(Document({{"percentile", 0.50}, {"digest_size", 200},{"value", 42}})),
-            Value(Document({{"percentile", 0.50}, {"digest_size", 200},{"value", 43}})),
-            Value(Document({{"percentile", 0.50}, {"digest_size", 200},{"value", 44}})),
-            Value(Document({{"percentile", 0.50}, {"digest_size", 200},{"value", 45}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 10}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 20}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 30}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 40}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 42}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 43}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 44}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 45}})),
            }, Value(41.25)},  
 
            {{
