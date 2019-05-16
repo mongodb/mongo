@@ -244,7 +244,7 @@ repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
 }
 
 /**
- * Creates a prepareTransaction, commitTransaction or abortTransaction OplogEntry.
+ * Creates a transaction oplog entry.
  */
 repl::OplogEntry _makeTransactionOplogEntry(repl::OpTime opTime,
                                             repl::OpTypeEnum opType,

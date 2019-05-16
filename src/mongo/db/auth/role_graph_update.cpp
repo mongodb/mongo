@@ -297,8 +297,7 @@ Status handleOplogCommand(RoleGraph* roleGraph, const BSONObj& cmdObj) {
         return Status::OK();
     }
 
-    if (cmdName == "commitTransaction" || cmdName == "abortTransaction" ||
-        cmdName == "prepareTransaction") {
+    if (cmdName == "commitTransaction" || cmdName == "abortTransaction") {
         return Status::OK();
     }
 

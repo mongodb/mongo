@@ -6,7 +6,7 @@
  *
  * To make sure that it is applying from the correct point, the test prepares a transaction before
  * the beginFetchingTimestamp and commits it before the beginApplyingTimestamp. Since the
- * transaction is not active by the time initial sync begins, its prepareTransaction oplog entry
+ * transaction is not active by the time initial sync begins, its prepare oplog entry
  * won't be fetched during oplog application and trying to apply the commitTransaction oplog entry
  * will cause initial sync to fail.
  *
@@ -71,7 +71,7 @@
 
     // Commit the first transaction so that we have an operation that is fetched during initial sync
     // but should not be applied. If this is applied, initial sync will fail because while trying to
-    // apply the commitTransaction oplog entry, it will fail to get the prepareTransaction oplog
+    // apply the commitTransaction oplog entry, it will fail to get the prepare oplog
     // entry since its optime is before the beginFetchingTimestamp. Doing another operation will
     // also cause the beginApplyingTimestamp to be different from the beginFetchingTimestamp. Note
     // that since the beginApplyingTimestamp is the timestamp after which operations are applied

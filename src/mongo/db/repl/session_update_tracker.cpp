@@ -115,7 +115,6 @@ bool isTransactionEntry(OplogEntry entry) {
     }
 
     return entry.isPartialTransaction() ||
-        entry.getCommandType() == repl::OplogEntry::CommandType::kPrepareTransaction ||
         entry.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction ||
         entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
         entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps;
@@ -299,17 +298,6 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
                     }
                 } else {
                     newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
-                }
-                break;
-            case repl::OplogEntry::CommandType::kPrepareTransaction:
-                newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
-                if (entry.getPrevWriteOpTimeInTransaction()->isNull()) {
-                    // The 'prepareTransaction' entry is the first operation of the transaction.
-                    newTxnRecord.setStartOpTime(entry.getOpTime());
-                } else {
-                    // Update the transaction record using $set to avoid overwriting the
-                    // startOpTime.
-                    return BSON("$set" << newTxnRecord.toBSON());
                 }
                 break;
             case repl::OplogEntry::CommandType::kCommitTransaction:

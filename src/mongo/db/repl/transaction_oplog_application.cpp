@@ -74,11 +74,8 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
 }
 
 /**
- * Helper that will find the previous oplog entry for that transaction, then for old-style applyOps
- * entries, will transform it to be a normal applyOps command and applies the oplog entry.
- *
- * For new-style transactions, with multiple oplog entries, will then read the entire set of oplog
- * entries for the transaction and apply each of them.
+ * Helper that will read the entire sequence of oplog entries for the transaction and apply each of
+ * them.
  *
  * Currently used for oplog application of a commitTransaction oplog entry during recovery, rollback
  * and initial sync.
@@ -96,7 +93,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         // Traverse the oplog chain with its own snapshot and read timestamp.
         ReadSourceScope readSourceScope(opCtx);
 
-        // Get the corresponding prepareTransaction oplog entry.
+        // Get the corresponding prepare applyOps oplog entry.
         const auto prepareOpTime = entry.getPrevWriteOpTimeInTransaction();
         invariant(prepareOpTime);
         TransactionHistoryIterator iter(prepareOpTime.get());
@@ -213,7 +210,7 @@ Status applyAbortTransaction(OperationContext* opCtx,
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const OplogEntry& commitOrPrepare,
-    const std::vector<OplogEntry*> cachedOps) {
+    const std::vector<OplogEntry*>& cachedOps) {
     repl::MultiApplier::Operations ops;
 
     // Get the previous oplog entry.
@@ -382,7 +379,7 @@ Status applyPrepareTransaction(OperationContext* opCtx,
 
     // Return error if run via applyOps command.
     uassert(51145,
-            "prepareTransaction oplog entry is only used internally by secondaries.",
+            "prepare applyOps oplog entry is only used internally by secondaries.",
             oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
 
     invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);

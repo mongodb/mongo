@@ -57,7 +57,7 @@ Status applyAbortTransaction(OperationContext* opCtx,
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const repl::OplogEntry& entry,
-    const std::vector<repl::OplogEntry*> cachedOps);
+    const std::vector<repl::OplogEntry*>& cachedOps);
 
 /**
  * Apply `prepareTransaction` oplog entry.
