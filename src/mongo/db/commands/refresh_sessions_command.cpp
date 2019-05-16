@@ -29,15 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/sessions_commands_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/refresh_sessions_gen.h"
 
 namespace mongo {
 namespace {
@@ -81,9 +80,11 @@ public:
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        IDLParserErrorContext ctx("RefreshSessionsCmdFromClient");
-        auto cmd = RefreshSessionsCmdFromClient::parse(ctx, cmdObj);
-        uassertStatusOK(LogicalSessionCache::get(opCtx)->refreshSessions(opCtx, cmd));
+        auto refreshSessionsRequest = RefreshSessionsCmdFromClient::parse(
+            IDLParserErrorContext("RefreshSessionsCmdFromClient"), cmdObj);
+
+        uassertStatusOK(LogicalSessionCache::get(opCtx)->refreshSessions(
+            opCtx, refreshSessionsRequest.getSessions()));
 
         return true;
     }

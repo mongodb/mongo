@@ -38,4 +38,14 @@ structs:
     description: "A struct representing an endSessions command from a client"
     strict: false
     fields:
-      endSessions: array<LogicalSessionFromClient>
+      endSessions:
+        type: array<LogicalSessionFromClient>
+        cpp_name: sessions
+
+  RefreshSessionsCmdFromClient:
+    description: "A struct representing a refreshSessions command from a client"
+    strict: false
+    fields:
+      refreshSessions:
+        type: array<LogicalSessionFromClient>
+        cpp_name: sessions

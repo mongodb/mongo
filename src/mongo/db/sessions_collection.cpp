@@ -39,7 +39,6 @@
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/refresh_sessions_gen.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/functional.h"

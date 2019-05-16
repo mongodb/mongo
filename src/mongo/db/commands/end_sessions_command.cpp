@@ -33,7 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/end_sessions_gen.h"
+#include "mongo/db/commands/sessions_commands_gen.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
@@ -51,15 +51,19 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
+
     bool adminOnly() const override {
         return false;
     }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     std::string help() const override {
         return "end a set of logical sessions";
     }
+
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) const override {
@@ -79,11 +83,12 @@ public:
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto lsCache = LogicalSessionCache::get(opCtx);
+        auto endSessionsRequest = EndSessionsCmdFromClient::parse(
+            IDLParserErrorContext("EndSessionsCmdFromClient"), cmdObj);
 
-        auto cmd = EndSessionsCmdFromClient::parse("EndSessionsCmdFromClient"_sd, cmdObj);
+        LogicalSessionCache::get(opCtx)->endSessions(
+            makeLogicalSessionIds(endSessionsRequest.getSessions(), opCtx));
 
-        lsCache->endSessions(makeLogicalSessionIds(cmd.getEndSessions(), opCtx));
         return true;
     }
 

@@ -66,22 +66,18 @@ public:
 
     void joinOnShutDown() override;
 
-    Status promote(LogicalSessionId lsid) override;
+    Status promote(const LogicalSessionId& lsid) override;
 
-    Status startSession(OperationContext* opCtx, LogicalSessionRecord record) override;
+    Status startSession(OperationContext* opCtx, const LogicalSessionRecord& record) override;
 
     Status refreshSessions(OperationContext* opCtx,
-                           const RefreshSessionsCmdFromClient& cmd) override;
-    Status refreshSessions(OperationContext* opCtx,
-                           const RefreshSessionsCmdFromClusterMember& cmd) override;
+                           const std::vector<LogicalSessionFromClient>& sessions) override;
 
     Status vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override;
 
     Status refreshNow(Client* client) override;
 
     Status reapNow(Client* client) override;
-
-    Date_t now() override;
 
     size_t size() override;
 

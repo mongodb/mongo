@@ -44,20 +44,16 @@ class LogicalSessionCacheNoop : public LogicalSessionCache {
 public:
     void joinOnShutDown() override {}
 
-    Status promote(LogicalSessionId lsid) override {
+    Status promote(const LogicalSessionId& lsid) override {
         return Status::OK();
     }
 
-    Status startSession(OperationContext* opCtx, LogicalSessionRecord record) override {
+    Status startSession(OperationContext* opCtx, const LogicalSessionRecord& record) override {
         return Status::OK();
     }
 
     Status refreshSessions(OperationContext* opCtx,
-                           const RefreshSessionsCmdFromClient& cmd) override {
-        return Status::OK();
-    }
-    Status refreshSessions(OperationContext* opCtx,
-                           const RefreshSessionsCmdFromClusterMember& cmd) override {
+                           const std::vector<LogicalSessionFromClient>& sessions) override {
         return Status::OK();
     }
 
@@ -71,10 +67,6 @@ public:
 
     Status reapNow(Client* client) override {
         return Status::OK();
-    }
-
-    Date_t now() override {
-        return Date_t::now();
     }
 
     size_t size() override {

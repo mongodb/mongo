@@ -45,6 +45,7 @@
 #include "mongo/db/stats/top.h"
 
 namespace mongo {
+namespace {
 
 class StartSessionCommand final : public BasicCommand {
     StartSessionCommand(const StartSessionCommand&) = delete;
@@ -56,37 +57,43 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
+
     bool adminOnly() const override {
         return false;
     }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     std::string help() const override {
         return "start a logical session";
     }
+
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) const override {
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& db,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) override {
-        auto client = opCtx->getClient();
-        ServiceContext* serviceContext = client->getServiceContext();
+    bool run(OperationContext* opCtx,
+             const std::string& db,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const auto service = opCtx->getServiceContext();
+        const auto lsCache = LogicalSessionCache::get(service);
 
-        auto lsCache = LogicalSessionCache::get(serviceContext);
-        boost::optional<LogicalSessionRecord> record =
-            makeLogicalSessionRecord(opCtx, lsCache->now());
-        uassertStatusOK(lsCache->startSession(opCtx, record.get()));
+        auto newSessionRecord =
+            makeLogicalSessionRecord(opCtx, service->getFastClockSource()->now());
 
-        makeLogicalSessionToClient(record->getId()).serialize(&result);
+        uassertStatusOK(lsCache->startSession(opCtx, newSessionRecord));
+
+        makeLogicalSessionToClient(newSessionRecord.getId()).serialize(&result);
 
         return true;
     }
+
 } startSessionCommand;
 
+}  // namespace
 }  // namespace mongo

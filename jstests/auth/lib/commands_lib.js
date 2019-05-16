@@ -5945,11 +5945,6 @@ var authCommandsLib = {
           testcases: [{runOnDb: adminDbName, roles: roles_all}],
         },
         {
-          testname: "refreshSessionsInternal",
-          command: {refreshSessionsInternal: []},
-          testcases: [{runOnDb: adminDbName, roles: {__system: 1}}],
-        },
-        {
           testname: "_getNextSessionMods",
           command: {_getNextSessionMods: "a-b"},
           skipSharded: true,

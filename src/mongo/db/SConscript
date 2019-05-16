@@ -1319,7 +1319,6 @@ env.Library(
     source=[
         'logical_session_id.cpp',
         env.Idlc('logical_session_id.idl')[0],
-        env.Idlc('refresh_sessions.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

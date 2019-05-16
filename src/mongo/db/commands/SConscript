@@ -106,8 +106,8 @@ env.Library(
         'refresh_sessions_command.cpp',
         'rename_collection_common.cpp',
         'start_session_command.cpp',
-        env.Idlc('end_sessions.idl')[0],
         env.Idlc('parameters.idl')[0],
+        env.Idlc('sessions_commands.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -143,7 +143,6 @@ env.Library(
         'logical_session_server_status_section.cpp',
         'mr_common.cpp',
         'reap_logical_session_cache_now.cpp',
-        'refresh_sessions_command_internal.cpp',
         'traffic_recording_cmds.cpp',
         'user_management_commands_common.cpp',
         env.Idlc('drop_connections.idl')[0],

@@ -356,7 +356,8 @@
         reapLogicalSessionCacheNow: {skip: "is a no-op on mongos"},
         refreshLogicalSessionCacheNow: {skip: "goes through the cluster write path"},
         refreshSessions: {skip: "executes locally on mongos (not sent to any remote node)"},
-        refreshSessionsInternal: {skip: "executes locally on mongos (not sent to any remote node)"},
+        refreshSessionsInternal:
+            {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
         removeShard: {skip: "not on a user database"},
         removeShardFromZone: {skip: "not on a user database"},
         renameCollection: {
