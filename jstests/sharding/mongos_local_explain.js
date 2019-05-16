@@ -25,7 +25,7 @@
     // We expect the stages to appear under the 'mongos' heading, for 'splitPipeline' to be
     // null, and for the 'mongos.host' field to be the hostname:port of the mongoS itself.
     assert.docEq(explainPlan.mongos.stages, expectedExplainStages);
-    assert.eq(explainPlan.mongos.host, mongosConn.name);
+    assert.eq(explainPlan.mongos.host.toLowerCase(), mongosConn.name.toLowerCase());
     assert.isnull(explainPlan.splitPipeline);
 
     st.stop();

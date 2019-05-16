@@ -62,6 +62,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/winutil.h"
 
+#include <string>
+
 namespace mongo {
 
 #if defined(_WIN32)
@@ -199,6 +201,12 @@ std::string getHostName() {
         log() << "can't get this server's hostname " << errnoWithDescription();
         return "";
     }
+
+    for (char* c = buf; *c; c++) {
+        // See https://en.cppreference.com/w/cpp/string/byte/tolower
+        *c = static_cast<char>(::tolower(static_cast<unsigned char>(*c)));
+    }
+
     return buf;
 }
 

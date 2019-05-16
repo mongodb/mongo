@@ -58,7 +58,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             for (var idx = 0; idx < NODES; idx++) {
                 var node = replConf.members[idx];
 
-                if (node.host == nodeToCheck) {
+                if (node.host.toLowerCase() == nodeToCheck.toLowerCase()) {
                     jsTest.log('node[' + node.host + '], Tag: ' + tojson(node['tags']));
                     jsTest.log('tagToCheck: ' + tojson(tag));
 
@@ -125,7 +125,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         var getExplainServer = function(explain) {
             assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
             var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
-            return serverInfo.host + ":" + serverInfo.port.toString();
+            return serverInfo.host.toLowerCase() + ":" + serverInfo.port.toString();
         };
 
         // Read pref should work without slaveOk

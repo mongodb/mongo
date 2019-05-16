@@ -14,7 +14,7 @@
     let testColl = testDB.test;
 
     // getHostName() doesn't include port, db.getMongo().host is 127.0.0.1:<port>
-    const hostName = (getHostName() + ":" + db.getMongo().host.split(":")[1]);
+    const hostName = (getHostName().toLowerCase() + ":" + db.getMongo().host.split(":")[1]);
 
     // Test that the shard field is absent and the host field is present when run on mongoD.
     assert.eq(testColl
@@ -41,6 +41,10 @@
     assert.commandWorked(
         testDB.adminCommand({shardCollection: testColl.getFullName(), key: {_id: "hashed"}}));
 
+    const getPrimary = (rs) => {
+        return rs.getPrimary().host.toLowerCase();
+    };
+
     // Group $collStats result by $shard and $host to confirm that both fields are present.
     assert.eq(testColl
                   .aggregate([
@@ -50,8 +54,8 @@
                   ])
                   .toArray(),
               [
-                {_id: {shard: st.shard0.shardName, host: st.rs0.getPrimary().host}},
-                {_id: {shard: st.shard1.shardName, host: st.rs1.getPrimary().host}},
+                {_id: {shard: st.shard0.shardName, host: getPrimary(st.rs0)}},
+                {_id: {shard: st.shard1.shardName, host: getPrimary(st.rs1)}},
               ]);
 
     st.stop();
