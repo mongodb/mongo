@@ -35,6 +35,8 @@ function verifyGetDiagnosticData(adminDb) {
 
     assert(foundGoodDocument,
            "getDiagnosticData failed to return a non-empty command, is FTDC running?");
+
+    return data;
 }
 
 /**

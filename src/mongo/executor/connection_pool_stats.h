@@ -60,7 +60,7 @@ struct ConnectionStatsPer {
 struct ConnectionPoolStats {
     void updateStatsForHost(std::string pool, HostAndPort host, ConnectionStatsPer newStats);
 
-    void appendToBSON(mongo::BSONObjBuilder& result);
+    void appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC = false);
 
     size_t totalInUse = 0u;
     size_t totalAvailable = 0u;

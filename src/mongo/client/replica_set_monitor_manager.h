@@ -86,9 +86,10 @@ public:
     void shutdown();
 
     /**
-     * Reports information about the replica sets tracked by us, for diagnostic purposes.
+     * Reports information about the replica sets tracked by us, for diagnostic purposes. If
+     * forFTDC, trim to minimize its size for full-time diagnostic data capture.
      */
-    void report(BSONObjBuilder* builder);
+    void report(BSONObjBuilder* builder, bool forFTDC = false);
 
     /**
      * Returns an executor for running RSM tasks.
