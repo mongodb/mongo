@@ -296,7 +296,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
     }
 
-    // Block application of prepare oplog entries on secondaries when a concurrent background index
+    // Block application of prepare oplog entry on secondaries when a concurrent background index
     // build is running.
     // This will prevent hybrid index builds from corrupting an index on secondary nodes if a
     // prepared transaction becomes prepared during a build but commits after the index build
@@ -304,12 +304,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     for (const auto& op : ops) {
         auto ns = op.getNss();
         auto uuid = *op.getUuid();
-        if (BackgroundOperation::inProgForNs(ns)) {
-            warning() << "blocking replication until index builds are finished on "
-                      << redact(ns.toString()) << ", due to prepared transaction";
-            BackgroundOperation::awaitNoBgOpInProgForNs(ns);
-            IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(uuid);
-        }
+        BackgroundOperation::awaitNoBgOpInProgForNs(ns);
+        IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(uuid);
     }
 
     // Transaction operations are in their own batch, so we can modify their opCtx.
