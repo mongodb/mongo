@@ -10,7 +10,15 @@ load("jstests/sharding/move_chunk_with_session_helper.js");
         return;
     }
 
-    var st = new ShardingTest({shards: {rs0: {nodes: 2}, rs1: {nodes: 2}}});
+    // Prevent unnecessary elections in the first shard replica set. Shard 'rs1' shard will need its
+    // secondary to get elected, so we don't give it a zero priority.
+    var st = new ShardingTest({
+        mongos: 2,
+        shards: {
+            rs0: {nodes: [{rsConfig: {}}, {rsConfig: {priority: 0}}]},
+            rs1: {nodes: [{rsConfig: {}}, {rsConfig: {}}]}
+        }
+    });
     assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard0.shardName);
 
