@@ -70,7 +70,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    shell=self.use_shell)
         buff_stdout, _ = process.communicate()
-        return process.poll(), buff_stdout
+        return process.poll(), buff_stdout.decode("utf-8", "replace")
 
     def _remote_access(self):
         """Check if a remote session is possible."""

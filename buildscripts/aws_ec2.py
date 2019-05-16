@@ -23,8 +23,8 @@ def write_binary_file(path, string_buffer):
 
 def write_utf8_file(path, string_buffer):
     """Write string_buffer to path in utf-8 format."""
-    with open(path, "w") as fh:
-        fh.write(string_buffer.encode("utf-8"))
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(string_buffer)
 
 
 def write_yaml_file(path, dictionary):
@@ -78,7 +78,7 @@ class AwsEc2(object):
             except botocore.exceptions.ClientError as err:
                 # A ClientError exception can sometimes be generated, due to RequestLimitExceeded,
                 # so we ignore it and retry until we time out.
-                client_error = " {}".format(err.message)
+                client_error = " {}".format(err)
 
             wait_interval_secs = 15 if time_left > 15 else time_left
             time.sleep(wait_interval_secs)
@@ -121,7 +121,7 @@ class AwsEc2(object):
                 state = None
                 wait_time_secs = 0
         except botocore.exceptions.ClientError as err:
-            return 1, err.message
+            return 1, err.args[0]
 
         ret = 0
         if wait_time_secs > 0:
@@ -145,7 +145,7 @@ class AwsEc2(object):
                     else:
                         print("Unable to generate console_ouptut file, data not available")
                 except botocore.exceptions.ClientError as err:
-                    print("Unable to generate console_ouptut file: {}".format(err.message))
+                    print("Unable to generate console_ouptut file: {}".format(err))
 
             if console_screenshot_file:
                 client = boto3.client("ec2")
@@ -153,14 +153,14 @@ class AwsEc2(object):
                     console_screenshot = client.get_console_screenshot(InstanceId=image_id)
                     if console_screenshot and "ImageData" in console_screenshot:
                         write_binary_file(console_screenshot_file,
-                                          base64.decodestring(console_screenshot["ImageData"]))
+                                          base64.b64decode(console_screenshot["ImageData"]))
                     else:
                         print("Unable to generate console_screenshot file, data not available")
                 except botocore.exceptions.ClientError as err:
-                    print("Unable to generate console_screenshot file: {}".format(err.message))
+                    print("Unable to generate console_screenshot file: {}".format(err))
 
         except botocore.exceptions.ClientError as err:
-            return 1, err.message
+            return 1, err.args[0]
 
         return ret, status
 
@@ -213,7 +213,7 @@ class AwsEc2(object):
             instances = self.connection.create_instances(ImageId=ami, InstanceType=instance_type,
                                                          MaxCount=1, MinCount=1, **kwargs)
         except (botocore.exceptions.ClientError, botocore.exceptions.ParamValidationError) as err:
-            return 1, err.message
+            return 1, err.args[0]
 
         instance = instances[0]
         if wait_time_secs > 0:
