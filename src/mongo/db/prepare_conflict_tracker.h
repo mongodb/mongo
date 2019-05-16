@@ -76,4 +76,3 @@ private:
 };
 
 }  // namespace mongo
-

@@ -50,4 +50,3 @@ void PrepareConflictTracker::endPrepareConflict() {
 }
 
 }  // namespace mongo
-
