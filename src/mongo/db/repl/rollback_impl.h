@@ -380,6 +380,12 @@ private:
     Status _processRollbackOp(OperationContext* opCtx, const OplogEntry& oplogEntry);
 
     /**
+     * Process a single applyOps oplog entry that is getting rolled back.
+     * This function processes each sub-operation using _processRollbackOp().
+     */
+    Status _processRollbackOpForApplyOps(OperationContext* opCtx, const OplogEntry& oplogEntry);
+
+    /**
      * Iterates through the _countDiff map and retrieves the count of the record store pointed to
      * by each UUID. It then saves the post-rollback counts to the _newCounts map.
      */

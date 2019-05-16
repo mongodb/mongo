@@ -679,18 +679,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             // prepare oplog entry is rolled-back, it is guaranteed that it has never committed.
             return Status::OK();
         }
-        try {
-            auto subOps = ApplyOps::extractOperations(oplogEntry);
-            for (auto& subOp : subOps) {
-                auto subStatus = _processRollbackOp(opCtx, subOp);
-                if (!subStatus.isOK()) {
-                    return subStatus;
-                }
-            }
-            return Status::OK();
-        } catch (DBException& e) {
-            return e.toStatus();
-        }
+        return _processRollbackOpForApplyOps(opCtx, oplogEntry);
     }
 
     // No information to record for a no-op.
@@ -834,7 +823,8 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                         return swApplyOpsEntry.getStatus();
                     }
 
-                    auto subStatus = _processRollbackOp(opCtx, swApplyOpsEntry.getValue());
+                    auto subStatus =
+                        _processRollbackOpForApplyOps(opCtx, swApplyOpsEntry.getValue());
                     if (!subStatus.isOK()) {
                         return subStatus;
                     }
@@ -849,6 +839,26 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
     }
     if (opType == OpTypeEnum::kDelete) {
         ++_observerInfo.rollbackCommandCounts[kDeleteCmdName];
+    }
+
+    return Status::OK();
+}
+
+Status RollbackImpl::_processRollbackOpForApplyOps(OperationContext* opCtx,
+                                                   const OplogEntry& oplogEntry) {
+    invariant(oplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps);
+
+    try {
+        auto subOps = ApplyOps::extractOperations(oplogEntry);
+        for (auto& subOp : subOps) {
+            auto subStatus = _processRollbackOp(opCtx, subOp);
+            if (!subStatus.isOK()) {
+                return subStatus;
+            }
+        }
+        return Status::OK();
+    } catch (DBException& e) {
+        return e.toStatus();
     }
 
     return Status::OK();
