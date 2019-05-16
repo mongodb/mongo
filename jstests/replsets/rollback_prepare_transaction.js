@@ -1,7 +1,7 @@
 /**
  * Tests that a prepared transactions are correctly rolled-back.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, exclude_from_large_txns_due_to_fast_count]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

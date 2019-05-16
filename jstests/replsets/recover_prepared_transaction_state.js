@@ -12,7 +12,7 @@
  * After a rollback of commit/abort, we should correctly reconstruct the two prepared transactions
  * and be able to commit/abort them again.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, exclude_from_large_txns_due_to_fast_count]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";
