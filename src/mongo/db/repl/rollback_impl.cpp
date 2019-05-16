@@ -819,30 +819,19 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             // entry to compute size adjustments. After recovering to the stable timestamp, prepared
             // transactions are reconstituted and any count adjustments will be replayed and
             // committed again.
-            // TODO (SERVER-40566): Handle new oplog format for transactions larger than 16 MB
-
-            if (const auto prepareOpTime = oplogEntry.getPrevWriteOpTimeInTransaction()) {
-                TransactionHistoryIterator iter(*prepareOpTime);
-                invariant(iter.hasNext());
-
-                const auto prepareOplogEntry = iter.next(opCtx);
-                if (prepareOplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps &&
-                    prepareOplogEntry.shouldPrepare()) {
-                    // Transform the prepare command into a normal applyOps command. If the
-                    // "prepare" field were not removed, the operation would be ignored.
-                    const auto swApplyOpsEntry =
-                        OplogEntry::parse(prepareOplogEntry.toBSON().removeField("prepare"));
-                    if (!swApplyOpsEntry.isOK()) {
-                        return swApplyOpsEntry.getStatus();
+            if (const auto prevOpTime = oplogEntry.getPrevWriteOpTimeInTransaction()) {
+                for (TransactionHistoryIterator iter(*prevOpTime); iter.hasNext();) {
+                    auto nextOplogEntry = iter.next(opCtx);
+                    if (nextOplogEntry.getCommandType() != OplogEntry::CommandType::kApplyOps) {
+                        continue;
                     }
-
-                    auto subStatus =
-                        _processRollbackOpForApplyOps(opCtx, swApplyOpsEntry.getValue());
-                    if (!subStatus.isOK()) {
-                        return subStatus;
+                    auto status = _processRollbackOpForApplyOps(opCtx, nextOplogEntry);
+                    if (!status.isOK()) {
+                        return status;
                     }
                 }
             }
+            return Status::OK();
         }
     }
 
