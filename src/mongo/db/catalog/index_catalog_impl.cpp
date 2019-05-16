@@ -860,7 +860,6 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     string pluginName = IndexNames::findPluginName(key);
     if (pluginName == IndexNames::TEXT) {
         vector<const IndexDescriptor*> textIndexes;
-        const bool includeUnfinishedIndexes = true;
         findIndexByType(opCtx, IndexNames::TEXT, textIndexes, includeUnfinishedIndexes);
         if (textIndexes.size() > 0) {
             return Status(ErrorCodes::CannotCreateIndex,
