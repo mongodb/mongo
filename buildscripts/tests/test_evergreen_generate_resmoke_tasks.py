@@ -68,6 +68,17 @@ class TestTestStats(unittest.TestCase):
         ]
         self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
 
+    def test_zero_runs(self):
+        evg_results = [
+            self._make_evg_result("dir/test1.js", 0, 0),
+            self._make_evg_result("dir/test1.js", 0, 0),
+        ]
+        test_stats = grt.TestStats(evg_results)
+        expected_runtimes = [
+            ("dir/test1.js", 0),
+        ]
+        self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
+
     @staticmethod
     def _make_evg_result(test_file="dir/test1.js", num_pass=0, duration=0):
         return Mock(

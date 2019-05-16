@@ -503,7 +503,11 @@ class TestStats(object):
     @staticmethod
     def _average(value_a, num_a, value_b, num_b):
         """Compute a weighted average of 2 values with associated numbers."""
-        return float(value_a * num_a + value_b * num_b) / (num_a + num_b)
+        divisor = num_a + num_b
+        if divisor == 0:
+            return 0
+        else:
+            return float(value_a * num_a + value_b * num_b) / divisor
 
     def get_tests_runtimes(self):
         """Return the list of (test_file, runtime_in_secs) tuples ordered by decreasing runtime."""
