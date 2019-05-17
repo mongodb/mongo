@@ -1062,6 +1062,22 @@ std::string explainTrustFailure(::SecTrustRef trust, ::SecTrustResultType result
     return ret("No trust failure reason available");
 }
 
+boost::optional<std::string> getRawSNIServerName(::SSLContextRef _ssl) {
+    size_t len = 0;
+    auto status = ::SSLCopyRequestedPeerNameLength(_ssl, &len);
+    if (status != ::errSecSuccess) {
+        return boost::none;
+    }
+    std::string ret;
+    ret.resize(len + 1);
+    status = ::SSLCopyRequestedPeerName(_ssl, &ret[0], &len);
+    if (status != ::errSecSuccess) {
+        return boost::none;
+    }
+    ret.resize(len);
+    return ret;
+}
+
 }  // namespace
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1112,19 +1128,7 @@ public:
     }
 
     std::string getSNIServerName() const final {
-        size_t len = 0;
-        auto status = ::SSLCopyRequestedPeerNameLength(_ssl.get(), &len);
-        if (status != ::errSecSuccess) {
-            return "";
-        }
-        std::string ret;
-        ret.resize(len + 1);
-        status = ::SSLCopyRequestedPeerName(_ssl.get(), &ret[0], &len);
-        if (status != ::errSecSuccess) {
-            return "";
-        }
-        ret.resize(len);
-        return ret;
+        return getRawSNIServerName(get()).value_or("");
     }
 
     ::SSLContextRef get() const {
@@ -1210,7 +1214,7 @@ public:
                                                           const std::string& remoteHost,
                                                           const HostAndPort& hostForLogging) final;
 
-    StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
+    StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
         ::SSLContextRef conn,
         const std::string& remoteHost,
         const HostAndPort& hostForLogging) final;
@@ -1411,7 +1415,7 @@ SSLPeerInfo SSLManagerApple::parseAndValidatePeerCertificateDeprecated(
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
     }
-    return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
+    return swPeerSubjectName.getValue();
 }
 
 StatusWith<TLSVersion> mapTLSVersion(SSLContextRef ssl) {
@@ -1432,8 +1436,9 @@ StatusWith<TLSVersion> mapTLSVersion(SSLContextRef ssl) {
 }
 
 
-StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCertificate(
+StatusWith<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     ::SSLContextRef ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) {
+    auto sniName = getRawSNIServerName(ssl);
 
     // Record TLS version stats
     auto tlsVersionStatus = mapTLSVersion(ssl);
@@ -1451,15 +1456,14 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
      * so that the validation path runs anyway.
      */
     if (!_sslConfiguration.hasCA && isSSLServer) {
-        return {boost::none};
+        return SSLPeerInfo(sniName);
     }
 
-    const auto badCert = [](StringData msg,
-                            bool warn = false) -> StatusWith<boost::optional<SSLPeerInfo>> {
+    const auto badCert = [&](StringData msg, bool warn = false) -> StatusWith<SSLPeerInfo> {
         constexpr StringData prefix = "SSL peer certificate validation failed: "_sd;
         if (warn) {
             warning() << prefix << msg;
-            return {boost::none};
+            return SSLPeerInfo(sniName);
         } else {
             std::string m = str::stream() << prefix << msg << "; connection rejected";
             error() << m;
@@ -1472,7 +1476,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     CFUniquePtr<::SecTrustRef> cftrust(trust);
     if ((status != ::errSecSuccess) || (!cftrust)) {
         if (_weakValidation && _suppressNoCertificateWarning) {
-            return {boost::none};
+            return SSLPeerInfo(sniName);
         } else {
             if (status == ::errSecSuccess) {
                 return badCert(str::stream() << "no SSL certificate provided by peer: "
@@ -1563,8 +1567,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
         if (!swPeerCertificateRoles.isOK()) {
             return swPeerCertificateRoles.getStatus();
         }
-        return boost::make_optional(
-            SSLPeerInfo(peerSubjectName, std::move(swPeerCertificateRoles.getValue())));
+        return SSLPeerInfo(peerSubjectName, sniName, std::move(swPeerCertificateRoles.getValue()));
     }
 
     // If this is an SSL client context (on a MongoDB server or client)
@@ -1633,7 +1636,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
         }
     }
 
-    return boost::make_optional(SSLPeerInfo(peerSubjectName, stdx::unordered_set<RoleName>()));
+    return SSLPeerInfo(peerSubjectName);
 }
 
 int SSLManagerApple::SSL_read(SSLConnectionInterface* conn, void* buf, int num) {

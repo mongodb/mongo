@@ -179,9 +179,10 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
 
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
-    setX509PeerInfo(
-        session,
-        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("readWrite", "test")}));
+    setX509PeerInfo(session,
+                    SSLPeerInfo(buildX509Name(),
+                                boost::none,
+                                {RoleName("read", "test"), RoleName("readWrite", "test")}));
 
     auto swu = authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"));
     ASSERT_OK(swu.getStatus());
@@ -206,9 +207,10 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
 #endif
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
-    setX509PeerInfo(
-        session,
-        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("write", "test")}));
+    setX509PeerInfo(session,
+                    SSLPeerInfo(buildX509Name(),
+                                boost::none,
+                                {RoleName("read", "test"), RoleName("write", "test")}));
 
     ASSERT_NOT_OK(
         authzManager->acquireUser(opCtx.get(), UserName("CN=10gen.com", "$external")).getStatus());

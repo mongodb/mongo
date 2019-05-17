@@ -359,6 +359,14 @@ private:
 std::vector<std::unique_ptr<stdx::recursive_mutex>> SSLThreadInfo::_mutex;
 SSLThreadInfo::ThreadIDManager SSLThreadInfo::_idManager;
 
+boost::optional<std::string> getRawSNIServerName(const SSL* const ssl) {
+    const char* name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+    if (!name) {
+        return boost::none;
+    }
+    return std::string(name);
+}
+
 class SSLConnectionOpenSSL : public SSLConnectionInterface {
 public:
     SSL* ssl;
@@ -371,11 +379,7 @@ public:
     ~SSLConnectionOpenSSL();
 
     std::string getSNIServerName() const final {
-        const char* name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-        if (!name)
-            return "";
-
-        return name;
+        return getRawSNIServerName(ssl).value_or("");
     }
 };
 
@@ -408,7 +412,7 @@ public:
                                                           const std::string& remoteHost,
                                                           const HostAndPort& hostForLogging) final;
 
-    StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
+    StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
         SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
@@ -1472,8 +1476,9 @@ StatusWith<TLSVersion> mapTLSVersion(SSL* conn) {
     }
 }
 
-StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
+StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) {
+    auto sniName = getRawSNIServerName(conn);
 
     auto tlsVersionStatus = mapTLSVersion(conn);
     if (!tlsVersionStatus.isOK()) {
@@ -1483,7 +1488,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
     if (!_sslConfiguration.hasCA && isSSLServer)
-        return {boost::none};
+        return SSLPeerInfo(std::move(sniName));
 
     X509* peerCert = SSL_get_peer_certificate(conn);
 
@@ -1493,7 +1498,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
             if (!_suppressNoCertificateWarning) {
                 warning() << "no SSL certificate provided by peer";
             }
-            return {boost::none};
+            return SSLPeerInfo(std::move(sniName));
         } else {
             auto msg = "no SSL certificate provided by peer; connection rejected";
             error() << msg;
@@ -1508,7 +1513,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
         if (_allowInvalidCertificates) {
             warning() << "SSL peer certificate validation failed: "
                       << X509_verify_cert_error_string(result);
-            return {boost::none};
+            return SSLPeerInfo(std::move(sniName));
         } else {
             str::stream msg;
             msg << "SSL peer certificate validation failed: "
@@ -1535,8 +1540,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
     // If this is an SSL client context (on a MongoDB server or client)
     // perform hostname validation of the remote server
     if (remoteHost.empty()) {
-        return boost::make_optional(
-            SSLPeerInfo(peerSubject, std::move(swPeerCertificateRoles.getValue())));
+        return SSLPeerInfo(peerSubject, sniName, std::move(swPeerCertificateRoles.getValue()));
     }
 
     // This is to standardize the IPAddress format for comparison.
@@ -1636,7 +1640,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
         }
     }
 
-    return boost::make_optional(SSLPeerInfo(peerSubject, stdx::unordered_set<RoleName>()));
+    return SSLPeerInfo(peerSubject);
 }
 
 
@@ -1651,7 +1655,7 @@ SSLPeerInfo SSLManagerOpenSSL::parseAndValidatePeerCertificateDeprecated(
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
     }
-    return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
+    return swPeerSubjectName.getValue();
 }
 
 StatusWith<stdx::unordered_set<RoleName>> SSLManagerOpenSSL::_parsePeerRoles(X509* peerCert) const {

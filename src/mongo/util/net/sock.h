@@ -78,7 +78,7 @@ typedef int SOCKET;
 #endif  // _WIN32
 
 /**
- * thin wrapped around file descriptor and system calls
+ * thin wrapper around file descriptor and system calls
  * todo: ssl
  */
 class Socket {

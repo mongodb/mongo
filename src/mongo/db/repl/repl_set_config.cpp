@@ -142,12 +142,14 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, OID defa
                                         << " to be Object, but found "
                                         << typeName(memberElement.type()));
         }
-        _members.resize(_members.size() + 1);
         const auto& memberBSON = memberElement.Obj();
-        status = _members.back().initialize(memberBSON, &_tagConfig);
-        if (!status.isOK())
-            return Status(ErrorCodes::InvalidReplicaSetConfig,
-                          str::stream() << status.toString() << " for member:" << memberBSON);
+        try {
+            _members.emplace_back(memberBSON, &_tagConfig);
+        } catch (const DBException& ex) {
+            return Status(
+                ErrorCodes::InvalidReplicaSetConfig,
+                str::stream() << ex.toStatus().toString() << " for member:" << memberBSON);
+        }
     }
 
     //
@@ -439,11 +441,53 @@ Status ReplSetConfig::validate() const {
     size_t voterCount = 0;
     size_t arbiterCount = 0;
     size_t electableCount = 0;
+
+    auto extractHorizonMembers = [](const auto& replMember) {
+        std::vector<std::string> rv;
+        std::transform(begin(replMember.getHorizonMappings()),
+                       end(replMember.getHorizonMappings()),
+                       back_inserter(rv),
+                       [](auto&& mapping) { return mapping.first; });
+        std::sort(begin(rv), end(rv));
+        return rv;
+    };
+
+    const auto expectedHorizonNameMapping = extractHorizonMembers(_members[0]);
+
+    stdx::unordered_set<std::string> nonUniversalHorizons;
+    std::map<HostAndPort, int> horizonHostNameCounts;
     for (size_t i = 0; i < _members.size(); ++i) {
         const MemberConfig& memberI = _members[i];
         Status status = memberI.validate();
         if (!status.isOK())
             return status;
+
+        // Check the replica set configuration for errors in horizon specification:
+        //   * Check that all members have the same set of horizon names
+        //   * Check that no hostname:port appears more than once for any member
+        //   * Check that all hostname:port endpoints are unique for all members
+        const auto seenHorizonNameMapping = extractHorizonMembers(memberI);
+
+        if (expectedHorizonNameMapping != seenHorizonNameMapping) {
+            // Collect a list of horizons only seen on one side of the pair of horizon maps
+            // considered.  Names that are only on one side are non-universal, and should be
+            // reported -- the same set of horizon names must exist across all replica set members.
+            // We collect the list while parsing over ALL members, this way we can report all
+            // horizons which are not universally listed in the replica set configuration in a
+            // single error message.
+            std::set_symmetric_difference(
+                begin(expectedHorizonNameMapping),
+                end(expectedHorizonNameMapping),
+                begin(seenHorizonNameMapping),
+                end(seenHorizonNameMapping),
+                inserter(nonUniversalHorizons, end(nonUniversalHorizons)));
+        } else {
+            // Because "__default" always lives in the mappings, we don't have to get it separately
+            for (const auto& mapping : memberI.getHorizonMappings()) {
+                ++horizonHostNameCounts[mapping.second];
+            }
+        }
+
         if (memberI.getHostAndPort().isLocalHost()) {
             ++localhostCount;
         }
@@ -500,6 +544,48 @@ Status ReplSetConfig::validate() const {
             }
         }
     }
+
+    // If we found horizons that weren't universally present, list all non-universally present
+    // horizons for this replica set.
+    if (!nonUniversalHorizons.empty()) {
+        const auto missingHorizonList = [&] {
+            std::string rv;
+            for (const auto& horizonName : nonUniversalHorizons) {
+                rv += " " + horizonName + ",";
+            }
+            rv.pop_back();
+            return rv;
+        }();
+        return Status(ErrorCodes::BadValue,
+                      "Saw a replica set member with a different horizon mapping than the "
+                      "others.  The following horizons were not universally present:" +
+                          missingHorizonList);
+    }
+
+    const auto nonUniqueHostNameList = [&] {
+        std::vector<HostAndPort> rv;
+        for (const auto& host : horizonHostNameCounts) {
+            if (host.second > 1)
+                rv.push_back(host.first);
+        }
+        return rv;
+    }();
+
+    if (!nonUniqueHostNameList.empty()) {
+        const auto nonUniqueHostNames = [&] {
+            std::string rv;
+            for (const auto& hostName : nonUniqueHostNameList) {
+                rv += " " + hostName.toString() + ",";
+            }
+            rv.pop_back();
+            return rv;
+        }();
+        return Status(ErrorCodes::BadValue,
+                      "The following hostnames are not unique across all horizons and host "
+                      "specifications in the replica set:" +
+                          nonUniqueHostNames);
+    }
+
 
     if (localhostCount != 0 && localhostCount != _members.size()) {
         return Status(

@@ -115,14 +115,22 @@ inline bool operator<(const SSLX509Name::Entry& lhs, const SSLX509Name::Entry& r
  * outside of the networking stack.
  */
 struct SSLPeerInfo {
-    SSLPeerInfo(SSLX509Name subjectName, stdx::unordered_set<RoleName> roles)
-        : subjectName(std::move(subjectName)), roles(std::move(roles)) {}
+    explicit SSLPeerInfo(SSLX509Name subjectName,
+                         boost::optional<std::string> sniName = {},
+                         stdx::unordered_set<RoleName> roles = {})
+        : subjectName(std::move(subjectName)),
+          sniName(std::move(sniName)),
+          roles(std::move(roles)) {}
     SSLPeerInfo() = default;
 
+    explicit SSLPeerInfo(boost::optional<std::string> sniName) : sniName(std::move(sniName)) {}
+
     SSLX509Name subjectName;
+    boost::optional<std::string> sniName;
     stdx::unordered_set<RoleName> roles;
 
     static SSLPeerInfo& forSession(const transport::SessionHandle& session);
+    static const SSLPeerInfo& forSession(const transport::ConstSessionHandle& session);
 };
 
 }  // namespace mongo

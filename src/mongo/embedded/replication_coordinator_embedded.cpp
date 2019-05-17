@@ -304,7 +304,8 @@ Status ReplicationCoordinatorEmbedded::processReplSetGetStatus(BSONObjBuilder*,
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::fillIsMasterForReplSet(IsMasterResponse*) {
+void ReplicationCoordinatorEmbedded::fillIsMasterForReplSet(IsMasterResponse*,
+                                                            const SplitHorizon::Parameters&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

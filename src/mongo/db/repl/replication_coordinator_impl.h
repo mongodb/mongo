@@ -211,7 +211,8 @@ public:
     virtual Status processReplSetGetStatus(BSONObjBuilder* result,
                                            ReplSetGetStatusResponseStyle responseStyle) override;
 
-    virtual void fillIsMasterForReplSet(IsMasterResponse* result) override;
+    virtual void fillIsMasterForReplSet(IsMasterResponse* result,
+                                        const SplitHorizon::Parameters& horizonParams) override;
 
     virtual void appendSlaveInfoData(BSONObjBuilder* result) override;
 

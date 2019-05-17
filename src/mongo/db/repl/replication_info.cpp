@@ -68,12 +68,13 @@ using std::string;
 using std::stringstream;
 
 namespace repl {
-
+namespace {
 void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets()) {
+        const auto& horizonParams = SplitHorizon::getParameters(opCtx->getClient());
         IsMasterResponse isMasterResponse;
-        replCoord->fillIsMasterForReplSet(&isMasterResponse);
+        replCoord->fillIsMasterForReplSet(&isMasterResponse, horizonParams);
         result.appendElements(isMasterResponse.toBSON());
         if (level) {
             replCoord->appendSlaveInfoData(&result);
@@ -147,8 +148,6 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
         replCoord->appendSlaveInfoData(&result);
     }
 }
-
-namespace {
 
 class ReplicationInfoServerStatus : public ServerStatusSection {
 public:
@@ -255,6 +254,7 @@ public:
 
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
+
         if (!seenIsMaster) {
             clientMetadataIsMasterState.setSeenIsMaster();
         }
@@ -266,16 +266,19 @@ public:
                           "The client metadata document may only be sent in the first isMaster");
             }
 
-            auto swParseClientMetadata = ClientMetadata::parse(element);
+            auto parsedClientMetadata = uassertStatusOK(ClientMetadata::parse(element));
 
-            uassertStatusOK(swParseClientMetadata.getStatus());
+            invariant(parsedClientMetadata);
 
-            invariant(swParseClientMetadata.getValue());
+            parsedClientMetadata->logClientMetadata(opCtx->getClient());
 
-            swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
+            clientMetadataIsMasterState.setClientMetadata(opCtx->getClient(),
+                                                          std::move(parsedClientMetadata));
+        }
 
-            clientMetadataIsMasterState.setClientMetadata(
-                opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
+        if (!seenIsMaster) {
+            auto sniName = opCtx->getClient()->getSniNameForSession();
+            SplitHorizon::setParameters(opCtx->getClient(), std::move(sniName));
         }
 
         // Parse the optional 'internalClient' field. This is provided by incoming connections from
