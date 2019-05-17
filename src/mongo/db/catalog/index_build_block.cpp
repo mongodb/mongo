@@ -80,7 +80,7 @@ Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collecti
     }
 
     // Setup on-disk structures.
-    const auto protocol = IndexBuildProtocol::kTwoPhase;
+    const auto protocol = IndexBuildProtocol::kSinglePhase;
     Status status = collection->getCatalogEntry()->prepareForIndexBuild(
         opCtx, descriptor.get(), protocol, isBackgroundSecondaryBuild);
     if (!status.isOK())
@@ -95,14 +95,14 @@ Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collecti
         _indexBuildInterceptor = stdx::make_unique<IndexBuildInterceptor>(opCtx, _entry);
         _entry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
-        const auto sideWritesIdent = _indexBuildInterceptor->getSideWritesTableIdent();
-        // Only unique indexes have a constraint violations table.
-        const auto constraintsIdent = (_entry->descriptor()->unique())
-            ? boost::optional<std::string>(
-                  _indexBuildInterceptor->getConstraintViolationsTableIdent())
-            : boost::none;
-
         if (IndexBuildProtocol::kTwoPhase == protocol) {
+            const auto sideWritesIdent = _indexBuildInterceptor->getSideWritesTableIdent();
+            // Only unique indexes have a constraint violations table.
+            const auto constraintsIdent = (_entry->descriptor()->unique())
+                ? boost::optional<std::string>(
+                      _indexBuildInterceptor->getConstraintViolationsTableIdent())
+                : boost::none;
+
             collection->getCatalogEntry()->setIndexBuildScanning(
                 opCtx, _entry->descriptor()->indexName(), sideWritesIdent, constraintsIdent);
         }
