@@ -49,14 +49,20 @@ stdx::variant<CIDR, std::string> makeExemption(T exemption) {
 }
 
 transport::SessionHandle makeIPSession(StringData ip) {
-    return transport::MockSession::create(
-        HostAndPort(SockAddr(ip, 27017, AF_INET)), HostAndPort(), nullptr);
+    return transport::MockSession::create(HostAndPort(ip.toString(), 27017),
+                                          HostAndPort(),
+                                          SockAddr(ip, 27017, AF_INET),
+                                          SockAddr(),
+                                          nullptr);
 }
 
 #ifndef _WIN32
 transport::SessionHandle makeUNIXSession(StringData path) {
-    return transport::MockSession::create(HostAndPort(SockAddr(""_sd, -1, AF_UNIX)),
-                                          HostAndPort(SockAddr(path, -1, AF_UNIX)),
+    return transport::MockSession::create(HostAndPort(""_sd.toString(), -1),
+                                          HostAndPort(path.toString(), -1),
+                                          SockAddr(""_sd, -1, AF_UNIX),
+                                          SockAddr(path, -1, AF_UNIX),
+
                                           nullptr);
 }
 #endif

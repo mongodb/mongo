@@ -38,6 +38,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/sockaddr.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -144,6 +145,9 @@ public:
 
     virtual const HostAndPort& remote() const = 0;
     virtual const HostAndPort& local() const = 0;
+
+    virtual const SockAddr& remoteAddr() const = 0;
+    virtual const SockAddr& localAddr() const = 0;
 
     virtual boost::optional<std::string> getSniName() const {
         return boost::none;

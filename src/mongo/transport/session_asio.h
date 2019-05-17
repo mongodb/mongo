@@ -91,8 +91,10 @@ public:
             setSocketKeepAliveParams(_socket.native_handle());
         }
 
-        _local = endpointToHostAndPort(_socket.local_endpoint());
-        _remote = endpointToHostAndPort(_socket.remote_endpoint());
+        _localAddr = endpointToSockAddr(_socket.local_endpoint());
+        _remoteAddr = endpointToSockAddr(_socket.remote_endpoint());
+        _local = HostAndPort(_localAddr.toString(true));
+        _remote = HostAndPort(_remoteAddr.toString(true));
     } catch (const DBException&) {
         throw;
     } catch (const asio::system_error& error) {
@@ -115,6 +117,14 @@ public:
 
     const HostAndPort& local() const override {
         return _local;
+    }
+
+    const SockAddr& remoteAddr() const override {
+        return _remoteAddr;
+    }
+
+    const SockAddr& localAddr() const override {
+        return _localAddr;
     }
 
     void end() override {
@@ -684,6 +694,9 @@ private:
 
     HostAndPort _remote;
     HostAndPort _local;
+
+    SockAddr _remoteAddr;
+    SockAddr _localAddr;
 
     boost::optional<Milliseconds> _configuredTimeout;
     boost::optional<Milliseconds> _socketTimeout;

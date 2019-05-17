@@ -56,7 +56,7 @@ inline SockAddr endpointToSockAddr(const asio::generic::stream_protocol::endpoin
 
 // Utility function to turn an ASIO endpoint into a mongo HostAndPort
 inline HostAndPort endpointToHostAndPort(const asio::generic::stream_protocol::endpoint& endPoint) {
-    return HostAndPort(endpointToSockAddr(endPoint));
+    return HostAndPort(endpointToSockAddr(endPoint).toString(true));
 }
 
 inline Status errorCodeToStatus(const std::error_code& ec) {
