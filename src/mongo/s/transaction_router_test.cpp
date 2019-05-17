@@ -3044,7 +3044,7 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsDurationAtEnd) {
     tickSource()->advance(Milliseconds(111));
     assertDurationIs(Milliseconds(111));
     runCommit(kDummyOkRes);
-    ASSERT_EQUALS(1, countLogLinesContaining(" 111ms\n"));
+    ASSERT_EQUALS(1, countLogLinesContaining(" 111ms\n") + countLogLinesContaining(" 111ms\r\n"));
 }
 
 //
