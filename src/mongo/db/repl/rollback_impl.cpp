@@ -35,6 +35,8 @@
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/rollback_impl_gen.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -67,6 +69,8 @@
 
 namespace mongo {
 namespace repl {
+
+using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(rollbackHangAfterTransitionToRollback);
 
@@ -268,6 +272,40 @@ bool RollbackImpl::_isInShutdown() const {
     return _inShutdown;
 }
 
+namespace {
+void killAllUserOperations(OperationContext* opCtx) {
+    invariant(opCtx);
+    ServiceContext* serviceCtx = opCtx->getServiceContext();
+    invariant(serviceCtx);
+
+    int numOpsKilled = 0;
+
+    for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
+        if (!client->isFromUserConnection()) {
+            // Don't kill system operations.
+            // TODO SERVER-40594: kill RangeDeleter if needed.
+            // TODO SERVER-40641: kill TTLMonitor if needed.
+            continue;
+        }
+
+        stdx::lock_guard<Client> lk(*client);
+        OperationContext* toKill = client->getOperationContext();
+
+        if (toKill && toKill->getOpID() == opCtx->getOpID()) {
+            // Don't kill the rollback thread.
+            continue;
+        }
+
+        if (toKill && !toKill->isKillPending()) {
+            serviceCtx->killOperation(lk, toKill, ErrorCodes::NotMasterOrSecondary);
+            numOpsKilled++;
+        }
+    }
+
+    log() << "Killed {} operation(s) while transitioning to ROLLBACK"_format(numOpsKilled);
+}
+}  // namespace
+
 Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
     invariant(opCtx);
     if (_isInShutdown()) {
@@ -276,7 +314,15 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
 
     log() << "transition to ROLLBACK";
     {
-        ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
+        ReplicationStateTransitionLockGuard rstlLock(
+            opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
+
+        // Kill all user operations to ensure we can successfully acquire the RSTL. Since the node
+        // must be a secondary, this is only killing readers, whose connections will be closed
+        // shortly regardless.
+        killAllUserOperations(opCtx);
+
+        rstlLock.waitForLockUntil(Date_t::max());
 
         auto status =
             _replicationCoordinator->setFollowerModeStrict(opCtx, MemberState::RS_ROLLBACK);

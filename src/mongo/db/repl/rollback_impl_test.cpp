@@ -49,6 +49,9 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_config_version.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -496,6 +499,49 @@ TEST_F(RollbackImplTest, RollbackSucceedsIfRollbackPeriodIsWithinTimeLimit) {
 
     // Run rollback.
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+}
+
+TEST_F(RollbackImplTest, RollbackKillsNecessaryOperations) {
+    auto op = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({op});
+    ASSERT_OK(_insertOplogEntry(op.first));
+    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session = transportLayer.createSession();
+
+    auto writeClient = getGlobalServiceContext()->makeClient("writeClient", session);
+    auto writeOpCtx = writeClient->makeOperationContext();
+    boost::optional<Lock::GlobalLock> globalWrite;
+    globalWrite.emplace(writeOpCtx.get(), MODE_IX);
+    ASSERT(globalWrite->isLocked());
+
+    auto readClient = getGlobalServiceContext()->makeClient("readClient", session);
+    auto readOpCtx = readClient->makeOperationContext();
+    boost::optional<Lock::GlobalLock> globalRead;
+    globalRead.emplace(readOpCtx.get(), MODE_IS);
+    ASSERT(globalRead->isLocked());
+
+    // Run rollback in a separate thread so the locking threads can check for interrupt.
+    Status status(ErrorCodes::InternalError, "Not set");
+    stdx::thread rollbackThread([&] { status = _rollback->runRollback(_opCtx.get()); });
+
+    while (!(writeOpCtx->isKillPending() && readOpCtx->isKillPending())) {
+        // Do nothing.
+        sleepmillis(10);
+    }
+
+    // We assume that an interrupted opCtx would release its locks.
+    unittest::log() << "Both opCtx's marked for kill";
+    ASSERT_EQ(ErrorCodes::NotMasterOrSecondary, writeOpCtx->checkForInterruptNoAssert());
+    globalWrite = boost::none;
+    ASSERT_EQ(ErrorCodes::NotMasterOrSecondary, readOpCtx->checkForInterruptNoAssert());
+    globalRead = boost::none;
+    unittest::log() << "Both opCtx's were interrupted";
+
+    rollbackThread.join();
+    ASSERT_OK(status);
 }
 
 TEST_F(RollbackImplTest, RollbackFailsIfRollbackPeriodIsTooLong) {
