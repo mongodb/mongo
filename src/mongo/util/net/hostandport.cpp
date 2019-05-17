@@ -60,10 +60,6 @@ HostAndPort::HostAndPort(StringData text) {
 
 HostAndPort::HostAndPort(const std::string& h, int p) : _host(h), _port(p) {}
 
-HostAndPort::HostAndPort(SockAddr addr) : _addr(std::move(addr)) {
-    uassertStatusOK(initialize(_addr->toString(true)));
-}
-
 bool HostAndPort::operator<(const HostAndPort& r) const {
     const int cmp = host().compare(r.host());
     if (cmp)
