@@ -184,8 +184,9 @@ selector:
 
   # Uses non-retryable commands in the same state function as a command not supported in a
   # transaction.
-  - jstests/concurrency/fsm_workloads/agg_out_mode_insert_documents.js
-  - jstests/concurrency/fsm_workloads/agg_out_mode_replace_documents.js
+  - jstests/concurrency/fsm_workloads/agg_merge_when_not_matched_insert.js
+  - jstests/concurrency/fsm_workloads/agg_merge_when_matched_replace_with_new.js
+
 
   # TODO SERVER-40713 moveChunk is not considered retryable by the network retry override.
   - jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js

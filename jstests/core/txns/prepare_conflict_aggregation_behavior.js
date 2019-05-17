@@ -35,9 +35,12 @@
     assert.commandWorked(sessionOutColl.update({_id: 0}, {a: 1}));
     let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    jsTestLog("Test that reads from an aggregation pipeline with $out don't block on prepare" +
+    jsTestLog("Test that reads from an aggregation pipeline with $merge don't block on prepare" +
               " conflicts");
-    testColl.aggregate([{$addFields: {b: 1}}, {$out: {to: outCollName, mode: "insertDocuments"}}]);
+    testColl.aggregate([
+        {$addFields: {b: 1}},
+        {$merge: {into: outCollName, whenMatched: "fail", whenNotMatched: "insert"}}
+    ]);
 
     // Make sure that we can see the inserts from the aggregation but not the updates from the
     // prepared transaction.
@@ -49,7 +52,10 @@
     prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
     jsTestLog("Test that writes from an aggregation pipeline block on prepare conflicts");
-    let pipeline = [{$addFields: {c: 1}}, {$out: {to: outCollName, mode: "replaceDocuments"}}];
+    let pipeline = [
+        {$addFields: {c: 1}},
+        {$merge: {into: outCollName, whenMatched: "replaceWithNew", whenNotMatched: "insert"}}
+    ];
     assert.commandFailedWithCode(testDB.runCommand({
         aggregate: collName,
         pipeline: pipeline,
@@ -63,7 +69,7 @@
 
     assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
-    // Make sure that the $out pipeline works once the transaction is committed.
+    // Make sure that the $merge pipeline works once the transaction is committed.
     testColl.aggregate(pipeline);
     assert.eq([{_id: 0}, {_id: 1, c: 1}], outColl.find().toArray());
 

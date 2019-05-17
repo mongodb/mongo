@@ -78,22 +78,42 @@
     assertErrorCode(coll,
                     [{$out: {to: "emptyPipelineView", mode: "replaceCollection"}}],
                     ErrorCodes.CommandNotSupportedOnView);
+    // Test that the $merge stage errors when writing to a view namespace.
+    assertErrorCode(
+        coll,
+        [{$merge: {into: "emptyPipelineView", whenMatched: "fail", whenNotMatched: "insert"}}],
+        ErrorCodes.CommandNotSupportedOnView);
     assertErrorCode(coll,
-                    [{$out: {to: "emptyPipelineView", mode: "insertDocuments"}}],
-                    ErrorCodes.CommandNotSupportedOnView);
-    assertErrorCode(coll,
-                    [{$out: {to: "emptyPipelineView", mode: "replaceDocuments"}}],
+                    [{
+                       $merge: {
+                           into: "emptyPipelineView",
+                           whenMatched: "replaceWithNew",
+                           whenNotMatched: "insert"
+                       }
+                    }],
                     ErrorCodes.CommandNotSupportedOnView);
 
-    // Test that the $out stage errors when writing to a view namespace in a foreign database.
+    // Test that the $merge stage errors when writing to a view namespace in a foreign database.
     let foreignDB = db.getSiblingDB("views_aggregation_foreign");
     foreignDB.view.drop();
     assert.commandWorked(foreignDB.createView("view", "coll", []));
     assertErrorCode(coll,
-                    [{$out: {db: foreignDB.getName(), to: "view", mode: "insertDocuments"}}],
+                    [{
+                       $merge: {
+                           into: {db: foreignDB.getName(), coll: "view"},
+                           whenMatched: "fail",
+                           whenNotMatched: "insert"
+                       }
+                    }],
                     ErrorCodes.CommandNotSupportedOnView);
     assertErrorCode(coll,
-                    [{$out: {db: foreignDB.getName(), to: "view", mode: "replaceDocuments"}}],
+                    [{
+                       $merge: {
+                           into: {db: foreignDB.getName(), coll: "view"},
+                           whenMatched: "replaceWithNew",
+                           whenNotMatched: "insert"
+                       }
+                    }],
                     ErrorCodes.CommandNotSupportedOnView);
     // TODO (SERVER-36832): When $out to foreign database is allowed with "replaceCollection", this
     // should fail with ErrorCodes.CommandNotSupportedOnView.

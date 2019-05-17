@@ -1,5 +1,5 @@
 /**
- * Tests that $out with readConcern majority will only see committed data.
+ * Tests that $out and $merge with readConcern majority will only see committed data.
  *
  * Each operation is tested on a single node, and (if supported) through mongos on both sharded and
  * unsharded collections. Mongos doesn't directly handle readConcern majority, but these tests
@@ -48,7 +48,7 @@
         assert.commandWorked(targetReplaceDocsColl.insert({_id: 1, state: 'before'}));
         setCommittedSnapshot(makeSnapshot());
 
-        // This insert will not be visible to $out.
+        // This insert will not be visible to $merge.
         assert.commandWorked(sourceColl.insert({_id: 2, state: 'before'}));
         assert.commandWorked(targetReplaceDocsColl.insert({_id: 2, state: 'before'}));
         // Similarly this update will not be visible.
@@ -59,17 +59,17 @@
         let res = sourceColl.aggregate([], {readConcern: {level: 'majority'}});
         assert.eq(res.itcount(), 1);
 
-        // Run $out with the insertDocuments mode. It will pick only the first document. Also it
-        // will not see the update ('after').
+        // Run $merge with whenNotMatched set to "insert". It will pick only the first document.
+        // Also it will not see the update ('after').
         res = sourceColl.aggregate(
             [
               {$match: {state: 'before'}},
-              {$project: {state: 'out'}},
+              {$project: {state: 'merge'}},
               {
-                $out: {
-                    to: targetColl.getName(),
-                    db: targetColl.getDB().getName(),
-                    mode: "insertDocuments"
+                $merge: {
+                    into: {db: targetColl.getDB().getName(), coll: targetColl.getName()},
+                    whenMatched: "fail",
+                    whenNotMatched: "insert"
                 }
               }
             ],
@@ -77,22 +77,24 @@
 
         assert.eq(res.itcount(), 0);
 
-        // Validate the insertDocuments results.
         res = targetColl.find().sort({_id: 1});
-        // Only a single document is visible ($out did not see the second insert).
-        assert.docEq(res.next(), {_id: 1, state: 'out'});
+        // Only a single document is visible ($merge did not see the second insert).
+        assert.docEq(res.next(), {_id: 1, state: 'merge'});
         assert(res.isExhausted());
 
-        // The same $out but in replaceDocuments.
+        // The same $merge but with whenMatched set to "replaceWithNew".
         res = sourceColl.aggregate(
             [
               {$match: {state: 'before'}},
-              {$project: {state: 'out'}},
+              {$project: {state: 'merge'}},
               {
-                $out: {
-                    to: targetReplaceDocsColl.getName(),
-                    db: targetReplaceDocsColl.getDB().getName(),
-                    mode: "replaceDocuments"
+                $merge: {
+                    into: {
+                        db: targetReplaceDocsColl.getDB().getName(),
+                        coll: targetReplaceDocsColl.getName()
+                    },
+                    whenMatched: "replaceWithNew",
+                    whenNotMatched: "insert"
                 }
               }
             ],
@@ -101,30 +103,29 @@
 
         setCommittedSnapshot(makeSnapshot());
 
-        // Validate the replaceDocuments results.
         res = targetReplaceDocsColl.find().sort({_id: 1});
-        // The first document must overwrite the update that the read portion of $out did not see.
-        assert.docEq(res.next(), {_id: 1, state: 'out'});
-        // The second document is the result of the independent insert that $out did not see.
+        // The first document must overwrite the update that the read portion of $merge did not see.
+        assert.docEq(res.next(), {_id: 1, state: 'merge'});
+        // The second document is the result of the independent insert that $merge did not see.
         assert.docEq(res.next(), {_id: 2, state: 'before'});
         assert(res.isExhausted());
 
         assert.commandWorked(targetColl.remove({}));
         setCommittedSnapshot(makeSnapshot());
 
-        // Insert a document that will collide with $out insert. The insert is not majority
+        // Insert a document that will collide with $merge insert. The insert is not majority
         // commited.
         assert.commandWorked(targetColl.insert({_id: 1, state: 'collision'}));
 
         res = db.runCommand({
             aggregate: sourceColl.getName(),
             pipeline: [
-                {$project: {state: 'out'}},
+                {$project: {state: 'merge'}},
                 {
-                  $out: {
-                      to: targetColl.getName(),
-                      db: targetColl.getDB().getName(),
-                      mode: "insertDocuments"
+                  $merge: {
+                      into: {db: targetColl.getDB().getName(), coll: targetColl.getName()},
+                      whenMatched: "fail",
+                      whenNotMatched: "insert"
                   }
                 }
             ],
@@ -138,16 +139,16 @@
         assert.commandWorked(targetColl.remove({_id: 1}));
         assert.commandWorked(targetColl.remove({_id: 2}));
 
-        // $out should successfuly 'overwrite' the collection as it is 'empty' (not majority).
+        // $merge should successfuly 'overwrite' the collection as it is 'empty' (not majority).
         res = targetReplaceDocsColl.aggregate(
             [
               {$match: {state: 'before'}},
-              {$project: {state: 'out'}},
+              {$project: {state: 'merge'}},
               {
-                $out: {
-                    to: targetColl.getName(),
-                    db: targetColl.getDB().getName(),
-                    mode: "insertDocuments"
+                $merge: {
+                    into: {db: targetColl.getDB().getName(), coll: targetColl.getName()},
+                    whenMatched: "fail",
+                    whenNotMatched: "insert"
                 }
               }
             ],
@@ -157,10 +158,9 @@
 
         setCommittedSnapshot(makeSnapshot());
 
-        // Validate the insertDocuments results.
         res = targetColl.find().sort({_id: 1});
-        // Only a single document is visible ($out did not see the second insert).
-        assert.docEq(res.next(), {_id: 2, state: 'out'});
+        // Only a single document is visible ($merge did not see the second insert).
+        assert.docEq(res.next(), {_id: 2, state: 'merge'});
         assert(res.isExhausted());
     }
 

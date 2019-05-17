@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * agg_out_mode_replace_documents.js
+ * agg_merge_when_matched_replace_with_new.js
  *
- * Tests $out with mode "replaceDocuments" concurrently with moveChunk operations on the output
- * collection.
+ * Tests $merge with whenMatched set to "replaceWithNew" concurrently with moveChunk operations on
+ * the output collection.
  *
  * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
  * requires_non_retryable_writes]
@@ -14,7 +14,7 @@ load('jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js');  // for 
 
 var $config = extendWorkload($config, function($config, $super) {
     // Set the collection to run concurrent moveChunk operations as the output collection.
-    $config.data.collWithMigrations = "out_mode_replace_documents";
+    $config.data.collWithMigrations = "agg_merge_when_matched_replace_with_new";
     $config.data.threadRunCount = 0;
 
     $config.states.aggregate = function aggregate(db, collName, connCache) {
@@ -22,10 +22,16 @@ var $config = extendWorkload($config, function($config, $super) {
         // subsequent runs.
         const res = db[collName].aggregate([
             {$addFields: {_id: this.tid, count: this.threadRunCount}},
-            {$out: {to: this.collWithMigrations, mode: "replaceDocuments"}},
+            {
+              $merge: {
+                  into: this.collWithMigrations,
+                  whenMatched: "replaceWithNew",
+                  whenNotMatched: "insert"
+              }
+            },
         ]);
 
-        // $out should always return 0 documents.
+        // $merge should always return 0 documents.
         assert.eq(0, res.itcount());
         // If running with causal consistency, the writes may not have propagated to the secondaries
         // yet.

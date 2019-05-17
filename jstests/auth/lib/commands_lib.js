@@ -1113,11 +1113,17 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "aggregate_out_insert_documents",
+          testname: "aggregate_merge_insert_documents",
           command: function(state, args) {
               return {
                   aggregate: "foo",
-                  pipeline: [{$out: {db: args.targetDB, to: "foo_out", mode: "insertDocuments"}}],
+                  pipeline: [{
+                      $merge: {
+                          into: {db: args.targetDB, coll: "foo_out"},
+                          whenMatched: "fail",
+                          whenNotMatched: "insert"
+                      }
+                  }],
                   cursor: {},
                   bypassDocumentValidation: args.bypassDocumentValidation,
               };
@@ -1181,11 +1187,17 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "aggregate_out_replace_documents",
+          testname: "aggregate_merge_replace_documents",
           command: function(state, args) {
               return {
                   aggregate: "foo",
-                  pipeline: [{$out: {db: args.targetDB, to: "foo_out", mode: "replaceDocuments"}}],
+                  pipeline: [{
+                      $merge: {
+                          into: {db: args.targetDB, coll: "foo_out"},
+                          whenMatched: "replaceWithNew",
+                          whenNotMatched: "insert"
+                      }
+                  }],
                   cursor: {},
                   bypassDocumentValidation: args.bypassDocumentValidation,
               };

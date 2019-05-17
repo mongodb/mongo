@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * agg_out_mode_insert_documents.js
+ * agg_merge_when_not_matched_insert.js
  *
- * Tests $out with mode "insertDocuments" concurrently with moveChunk operations on the output
- * collection.
+ * Tests $merge with "whenNotMatched" set to "insert" concurrently with moveChunk operations on the
+ * output collection.
  *
  * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
  * requires_non_retryable_writes]]
@@ -14,7 +14,7 @@ load('jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js');  // for 
 
 var $config = extendWorkload($config, function($config, $super) {
     // Set the collection to run concurrent moveChunk operations as the output collection.
-    $config.data.collWithMigrations = "out_mode_insert_documents";
+    $config.data.collWithMigrations = "agg_merge_when_not_matched_insert";
     $config.data.threadRunCount = 0;
 
     $config.states.aggregate = function aggregate(db, collName, connCache) {
@@ -26,10 +26,13 @@ var $config = extendWorkload($config, function($config, $super) {
                   "_id.doc": "$_id"
               }
             },
-            {$out: {to: this.collWithMigrations, mode: "insertDocuments"}},
+            {
+              $merge:
+                  {into: this.collWithMigrations, whenMatched: "fail", whenNotMatched: "insert"}
+            },
         ]);
 
-        // $out should always return 0 documents.
+        // $merge should always return 0 documents.
         assert.eq(0, res.itcount());
         // If running with causal consistency, the writes may not have propagated to the secondaries
         // yet.

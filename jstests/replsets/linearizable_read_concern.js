@@ -78,10 +78,16 @@ load('jstests/libs/write_concern_util.js');
     assert.eq(opTimeCmd.code, ErrorCodes.FailedToParse);
 
     // A $out aggregation is not allowed with readConcern level "linearizable".
-    let result = assert.throws(
-        () => primary.getDB("test").foo.aggregate([{$out: {to: "out", mode: "replaceDocuments"}}],
-                                                  {readConcern: {level: "linearizable"}}));
-    assert.eq(result.code, ErrorCodes.InvalidOptions);
+    let outResult = assert.throws(() => primary.getDB("test").foo.aggregate(
+                                      [{$out: "out"}], {readConcern: {level: "linearizable"}}));
+    assert.eq(outResult.code, ErrorCodes.InvalidOptions);
+
+    // A $merge aggregation is not allowed with readConcern level "linearizable".
+    let mergeResult = assert.throws(
+        () => primary.getDB("test").foo.aggregate(
+            [{$merge: {into: "out", whenMatched: "replaceWithNew", whenNotMatched: "insert"}}],
+            {readConcern: {level: "linearizable"}}));
+    assert.eq(mergeResult.code, ErrorCodes.InvalidOptions);
 
     primary = replTest.getPrimary();
 
