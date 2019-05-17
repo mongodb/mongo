@@ -115,6 +115,7 @@ env.Library(
         'util/allocator.cpp',
         'util/assert_util.cpp',
         'util/base64.cpp',
+        'util/boost_assert_impl.cpp',
         'util/concurrency/idle_thread_block.cpp',
         'util/concurrency/thread_name.cpp',
         'util/duration.cpp',
@@ -150,11 +151,22 @@ env.Library(
         '$BUILD_DIR/third_party/shim_fmt',
         '$BUILD_DIR/third_party/shim_intel_decimal128',
         '$BUILD_DIR/third_party/shim_pcrecpp',
+        'boost_assert_shim',
         'util/quick_exit',
     ],
     LIBDEPS_PRIVATE=[
         'util/debugger',
     ],
+)
+
+# Shim library for boost to depend on
+env.Library(
+    target='boost_assert_shim',
+    source=[
+        'util/boost_assert_shim.cpp'
+    ],
+    # NOTE: This library *must not* depend on any mongodb code
+    LIBDEPS=[],
 )
 
 js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else "none"

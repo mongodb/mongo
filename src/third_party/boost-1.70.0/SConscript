@@ -9,9 +9,19 @@ env = env.Clone()
 if env.ToolchainIs('GCC'):
     env.AppendUnique(CXXFLAGS=['-Wno-overloaded-virtual'])
 
-env.Library('boost_system', ['libs/system/src/error_code.cpp'])
+env.Library(
+    target='boost_system', 
+    source=[
+        'libs/system/src/error_code.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/boost_assert_shim',
+    ],
+)
 
-env.Library('boost_filesystem', [
+env.Library(
+    target='boost_filesystem', 
+    source=[
         'libs/filesystem/src/codecvt_error_category.cpp',
         'libs/filesystem/src/operations.cpp',
         'libs/filesystem/src/path.cpp',
@@ -20,12 +30,16 @@ env.Library('boost_filesystem', [
         'libs/filesystem/src/unique_path.cpp',
         'libs/filesystem/src/utf8_codecvt_facet.cpp',
         'libs/filesystem/src/windows_file_codecvt.cpp',
-        ],
-        LIBDEPS=[
-            'boost_system',
-        ])
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/boost_assert_shim',
+        'boost_system',
+    ],
+)
 
-env.Library('boost_program_options', [
+env.Library(
+    target='boost_program_options', 
+    source=[
         'libs/program_options/src/cmdline.cpp',
         'libs/program_options/src/config_file.cpp',
         'libs/program_options/src/convert.cpp',
@@ -37,17 +51,25 @@ env.Library('boost_program_options', [
         'libs/program_options/src/value_semantic.cpp',
         'libs/program_options/src/variables_map.cpp',
         'libs/program_options/src/winmain.cpp',
-        ],
-        # Because `::environ` is resolved in `/usr/lib/crt1.o` on FreeBSD, this library needs to be
-        # marked `incomplete` on FreeBSD.
-        LIBDEPS_TAGS=[] if not env.TargetOSIs('freebsd') else [
-            'illegal_cyclic_or_unresolved_dependencies_whitelisted',
-        ])
+    ],
+    # Because `::environ` is resolved in `/usr/lib/crt1.o` on FreeBSD, this library needs to be
+    # marked `incomplete` on FreeBSD.
+    LIBDEPS_TAGS=[] if not env.TargetOSIs('freebsd') else [
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/boost_assert_shim',
+    ],
+)
 
-env.Library('boost_iostreams', [
+env.Library(
+    target='boost_iostreams', 
+    source=[
         'libs/iostreams/src/file_descriptor.cpp',
         'libs/iostreams/src/mapped_file.cpp',
-        ],
-        LIBDEPS=[
-            'boost_system',
-        ])
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/boost_assert_shim',
+        'boost_system',
+    ],
+)
