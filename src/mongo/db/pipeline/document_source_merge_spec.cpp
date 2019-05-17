@@ -65,7 +65,7 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
     std::vector<std::string> fields;
 
     uassert(51186,
-            "{} 'into' field  must be either a string or an array of strings, "
+            "{} 'on' field  must be either a string or an array of strings, "
             "but found {}"_format(DocumentSourceMerge::kStageName, typeName(elem.type())),
             elem.type() == BSONType::String || elem.type() == BSONType::Array);
 

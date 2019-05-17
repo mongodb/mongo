@@ -57,6 +57,7 @@ selector:
   - jstests/sharding/lookup_mongod_unaware.js
   - jstests/sharding/lookup_on_shard.js
   - jstests/sharding/lookup_stale_mongos.js
+  - jstests/sharding/merge_requires_unique_index.js
   - jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
   - jstests/sharding/out_cannot_run_on_mongos.js
   - jstests/sharding/out_command_options.js
@@ -67,7 +68,6 @@ selector:
   - jstests/sharding/out_to_existing.js
   - jstests/sharding/out_to_non_existing.js
   - jstests/sharding/out_unique_key.js
-  - jstests/sharding/out_unique_key_requires_index.js
   - jstests/sharding/out_with_chunk_migrations.js
   - jstests/sharding/out_with_drop_shard.js
   - jstests/sharding/out_with_move_primary.js

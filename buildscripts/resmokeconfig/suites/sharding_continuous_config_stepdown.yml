@@ -189,9 +189,9 @@ selector:
   - jstests/sharding/transactions_target_at_point_in_time.js
   # Tests that rely on shards becoming aware of collection drops regardless of config stepdowns.
   # (SERVER-34760)
+  - jstests/sharding/merge_requires_unique_index.js
   - jstests/sharding/out_fails_to_replace_sharded_collection.js
   - jstests/sharding/out_stale_unique_key.js
-  - jstests/sharding/out_unique_key_requires_index.js
   # In this suite the cluster may end up in a state where each shard believes the
   # collection is sharded and the mongos believes it is unsharded. $out is not
   # prepared to work correctly in this situation. This should be fixed by a future
