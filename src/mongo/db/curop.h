@@ -168,6 +168,11 @@ public:
      */
     BSONObj makeFlowControlObject(FlowControlTicketholder::CurOp flowControlStats) const;
 
+    /**
+     * Make object from $searchBeta stats with non-populated values omitted.
+     */
+    BSONObj makeSearchBetaObject() const;
+
     // -------------------
 
     // basic options
@@ -184,6 +189,10 @@ public:
     long long ntoreturn{-1};
     long long ntoskip{-1};
     bool exhaust{false};
+
+    // For searchBeta.
+    boost::optional<long long> mongotCursorId{boost::none};
+    boost::optional<long long> msWaitingForMongot{boost::none};
 
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 

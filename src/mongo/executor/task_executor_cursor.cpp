@@ -37,6 +37,8 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/killcursors_request.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace executor {
@@ -132,9 +134,14 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
         return;
     }
 
+    auto clock = opCtx->getServiceContext()->getPreciseClockSource();
+    auto dateStart = clock->now();
     // pull out of the pipe before setting cursor id so we don't spoil this object if we're opCtx
     // interrupted
-    auto out = uassertStatusOK(_pipe.consumer.pop(opCtx));
+    auto out = _pipe.consumer.pop(opCtx);
+    auto dateEnd = clock->now();
+    _millisecondsWaiting += std::max(Milliseconds(0), dateEnd - dateStart);
+    uassertStatusOK(out);
 
     // If we had a cursor id, set it to 0 so that we don't attempt to kill the cursor if there was
     // an error
@@ -146,7 +153,7 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     // is done.
     _cbHandle.reset();
 
-    auto cr = uassertStatusOK(CursorResponse::parseFromBSON(out));
+    auto cr = uassertStatusOK(CursorResponse::parseFromBSON(out.getValue()));
 
     // If this was our first batch
     if (_cursorId == -1) {

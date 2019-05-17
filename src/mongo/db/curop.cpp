@@ -659,6 +659,9 @@ string OpDebug::report(Client* client,
 
     OPDEBUG_TOSTRING_HELP(nShards);
     OPDEBUG_TOSTRING_HELP(cursorid);
+    if (mongotCursorId) {
+        s << " mongot: " << makeSearchBetaObject().toString();
+    }
     OPDEBUG_TOSTRING_HELP(ntoreturn);
     OPDEBUG_TOSTRING_HELP(ntoskip);
     OPDEBUG_TOSTRING_HELP_BOOL(exhaust);
@@ -761,6 +764,9 @@ void OpDebug::append(const CurOp& curop,
 
     OPDEBUG_APPEND_NUMBER(nShards);
     OPDEBUG_APPEND_NUMBER(cursorid);
+    if (mongotCursorId) {
+        b.append("mongot", makeSearchBetaObject());
+    }
     OPDEBUG_APPEND_BOOL(exhaust);
 
     OPDEBUG_APPEND_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
@@ -854,6 +860,16 @@ BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) con
     }
 
     return builder.obj();
+}
+
+BSONObj OpDebug::makeSearchBetaObject() const {
+    BSONObjBuilder cursorBuilder;
+    invariant(mongotCursorId);
+    cursorBuilder.append("cursorid", mongotCursorId.get());
+    if (msWaitingForMongot) {
+        cursorBuilder.append("timeWaitingMillis", msWaitingForMongot.get());
+    }
+    return cursorBuilder.obj();
 }
 
 

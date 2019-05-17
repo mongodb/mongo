@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
 
@@ -88,6 +89,16 @@ public:
      */
     boost::optional<BSONObj> getNext(OperationContext* opCtx);
 
+    const CursorId getCursorId() const {
+        return _cursorId;
+    }
+
+    Milliseconds resetWaitingTime() {
+        auto toRet = _millisecondsWaiting;
+        _millisecondsWaiting = Milliseconds(0);
+        return toRet;
+    }
+
 private:
     /**
      * Runs a remote command and pipes the output back to this object
@@ -123,6 +134,9 @@ private:
     // 0  - Cursor is done (errored or consumed)
     // >1 - Cursor is live on the remote
     CursorId _cursorId = -1;
+
+    // This is a sum of the time spent waiting on remote calls.
+    Milliseconds _millisecondsWaiting = Milliseconds(0);
 
     // Namespace after we resolved the initial request
     NamespaceString _ns;
