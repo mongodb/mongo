@@ -77,12 +77,7 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
 
         if (any_input == false){
             digest = mongo::TDigest(digest_size);
-
-            // "digest" will be extended by digest_size. Similar to "centroids", it is also 16 * digest_size
-            _memUsageBytes += sizeof(digest.getCentroids()[0]) * digest_size; 
-
-            // "centroids" will be the vector of two doubles (mean, weight) 
-            _memUsageBytes += (16 * digest_size);
+            _memUsageBytes += sizeof(mongo::TDigest::Centroid) * digest_size;
             any_input = true;
         }
 
@@ -142,11 +137,11 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
         digest = mongo::TDigest(digest_size);
         any_input = true;
 
-        // To add the memory used by 'values' vector. 
+        // To add the memory used by 'values' vector.
         _memUsageBytes += sizeof(double) * chunk_size;
 
-        // To add the memory used by new digest with custom digest_size
-        _memUsageBytes += sizeof(digest.getCentroids()[0]) * digest_size;
+        // To add the memory used by digest with custom size
+        _memUsageBytes += sizeof(mongo::TDigest::Centroid) * digest_size;
     }
 
     if (values.size() == chunk_size){
