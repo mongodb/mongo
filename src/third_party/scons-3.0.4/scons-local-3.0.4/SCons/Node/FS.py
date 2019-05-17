@@ -3347,6 +3347,11 @@ class File(Base):
 
         # First try the simple name for node
         c_str = str(self)
+        df = dmap.get(c_str, None)
+        if df:
+            return df
+
+        # If not found swap alstep for sep (\ -> /) and try again
         if os.altsep:
             c_str = c_str.replace(os.sep, os.altsep)
         df = dmap.get(c_str, None)
@@ -3406,6 +3411,7 @@ class File(Base):
             except AttributeError:
                 pass
             return False
+
         return self.changed_content(target, prev_ni)
 
     def changed_timestamp_newer(self, target, prev_ni):
