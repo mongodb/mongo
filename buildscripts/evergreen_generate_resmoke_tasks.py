@@ -97,6 +97,17 @@ def remove_gen_suffix(task_name):
     return task_name
 
 
+def string_contains_any_of_args(string, args):
+    """
+    Return whether array contains any of a group of args.
+
+    :param string: String being checked.
+    :param args: Args being analyzed.
+    :return: True if any args are found in the string.
+    """
+    return any(arg in string for arg in args)
+
+
 def get_config_options(cmd_line_options, config_file):
     """
     Get the configuration to use for generated tests.
@@ -326,7 +337,8 @@ class EvergreenConfigGenerator(object):
     def _generate_resmoke_args(self, suite_file):
         resmoke_args = "--suite={0}.yml --originSuite={1} {2}".format(
             suite_file, self.options.suite, self.options.resmoke_args)
-        if self.options.repeat_suites and "repeatSuites" not in resmoke_args:
+        if self.options.repeat_suites and not string_contains_any_of_args(
+                resmoke_args, ["repeatSuites", "repeat"]):
             resmoke_args += " --repeatSuites={0} ".format(self.options.repeat_suites)
 
         return resmoke_args

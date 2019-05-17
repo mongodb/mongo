@@ -11,8 +11,8 @@ import yaml
 from mock import patch, mock_open, call, Mock, MagicMock
 
 from buildscripts import evergreen_generate_resmoke_tasks as grt
-from buildscripts.evergreen_generate_resmoke_tasks import render_suite, render_misc_suite, \
-    prepare_directory_for_suite, remove_gen_suffix
+from buildscripts.evergreen_generate_resmoke_tasks import string_contains_any_of_args, \
+    prepare_directory_for_suite, remove_gen_suffix, render_suite, render_misc_suite
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
@@ -35,6 +35,21 @@ class TestHelperMethods(unittest.TestCase):
         input_task_name = "sharded_multi_stmt_txn_jscore_passthroug"
         self.assertEqual("sharded_multi_stmt_txn_jscore_passthroug",
                          remove_gen_suffix(input_task_name))
+
+    def test_string_contains_any_of_args(self):
+        args = ["repeatSuites", "repeat"]
+        string = "--suite=suite 0.yml --originSuite=suite resmoke_args --repeat=5"
+        self.assertEqual(True, string_contains_any_of_args(string, args))
+
+    def test_string_contains_any_of_args_for_empty_args(self):
+        args = []
+        string = "--suite=suite 0.yml --originSuite=suite resmoke_args --repeat=5"
+        self.assertEqual(False, string_contains_any_of_args(string, args))
+
+    def test_string_contains_any_of_args_for_non_matching_args(self):
+        args = ["random_string_1", "random_string_2", "random_string_3"]
+        string = "--suite=suite 0.yml --originSuite=suite resmoke_args --repeat=5"
+        self.assertEqual(False, string_contains_any_of_args(string, args))
 
 
 class TestTestStats(unittest.TestCase):
@@ -486,6 +501,26 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         self.assertEqual(expected_timeout, timeout_cmd["params"]["timeout_secs"])
         expected_exec_timeout = grt.calculate_timeout(suites[0].get_runtime(), 3) * 5
         self.assertEqual(expected_exec_timeout, timeout_cmd["params"]["exec_timeout_secs"])
+
+    def test_evg_config_does_not_overwrite_repeatSuites_resmoke_arg_with_repeatSuites_default(self):
+        options = self.generate_mock_options()
+        options.resmoke_args = "resmoke_args --repeatSuites=5"
+        suites = self.generate_mock_suites(1)
+
+        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+        command1 = config["tasks"][0]["commands"][2]
+        self.assertIn("--repeatSuites=5", command1["vars"]["resmoke_args"])
+        self.assertNotIn("--repeatSuites=1", command1["vars"]["resmoke_args"])
+
+    def test_evg_config_does_not_overwrite_repeat_resmoke_arg_with_repeatSuites_default(self):
+        options = self.generate_mock_options()
+        options.resmoke_args = "resmoke_args --repeat=5"
+        suites = self.generate_mock_suites(1)
+
+        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+        command1 = config["tasks"][0]["commands"][2]
+        self.assertIn("--repeat=5", command1["vars"]["resmoke_args"])
+        self.assertNotIn("--repeatSuites=1", command1["vars"]["resmoke_args"])
 
     def test_suites_without_enough_info_should_not_include_timeouts(self):
         suite_without_timing_info = 1
