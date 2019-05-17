@@ -1,8 +1,8 @@
 /**
- * Test aggregation explain of $out pipelines.
+ * Test aggregation explain of $merge and $out pipelines.
  *
- * The 'replaceCollection' $out mode is not allowed with a sharded output collection. Explain of
- * $out does not accept writeConcern.
+ * The $out stage is not allowed with a sharded output collection. Explain of $out or $merge does
+ * not accept writeConcern.
  * @tags: [assumes_unsharded_collection, assumes_write_concern_unchanged]
  */
 (function() {
@@ -12,57 +12,85 @@
     load("jstests/libs/analyze_plan.js");               // For getAggPlanStage().
     load("jstests/aggregation/extras/out_helpers.js");  // For withEachOutMode().
 
-    let sourceColl = db.explain_out_source;
-    let targetColl = db.explain_out_target;
+    let sourceColl = db.explain_writing_aggs_source;
+    let targetColl = db.explain_writing_aggs_target;
     sourceColl.drop();
     targetColl.drop();
 
     assert.writeOK(sourceColl.insert({_id: 1}));
 
-    function assertQueryPlannerExplainSucceeds(outStage) {
-        let explain = sourceColl.explain("queryPlanner").aggregate([outStage]);
-        let outExplain = getAggPlanStage(explain, "$out");
-        assert.neq(outExplain, null, explain);
-        assert.eq(targetColl.find().itcount(), 0, explain);
-        return outExplain.$out;
-    }
+    // Test that $out can be explained with 'queryPlanner' explain verbosity and does not perform
+    // any writes.
+    let explain = sourceColl.explain("queryPlanner").aggregate([{$out: targetColl.getName()}]);
+    let outExplain = getAggPlanStage(explain, "$out");
+    assert.neq(outExplain, null, explain);
+    // TODO SERVER-40432 $out serialization should never use the 'mode: "replaceCollection"'.
+    assert.eq(outExplain.$out.to, targetColl.getName(), explain);
+    assert.eq(targetColl.find().itcount(), 0, explain);
 
-    // Test each out mode with 'queryPlanner' explain verbosity;
-    withEachOutMode(function(outMode) {
-        const outStage = {$out: {to: targetColl.getName(), mode: outMode}};
-        const explain = sourceColl.explain("queryPlanner").aggregate([outStage]);
-        const outExplain = getAggPlanStage(explain, "$out");
-        assert.neq(outExplain, null, explain);
-        assert(outExplain.hasOwnProperty("$out"), explain);
-        assert.eq(outExplain.$out.mode, outMode, outExplain);
-        assert.eq(outExplain.$out.uniqueKey, {_id: 1}, outExplain);
+    // Test each $merge mode with 'queryPlanner' explain verbosity.
+    withEachMergeMode(function({whenMatchedMode, whenNotMatchedMode}) {
+        const mergeStage = {
+            $merge: {
+                into: targetColl.getName(),
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode
+            }
+        };
+        const explain = sourceColl.explain("queryPlanner").aggregate([mergeStage]);
+        const mergeExplain = getAggPlanStage(explain, "$merge");
+        assert.neq(mergeExplain, null, explain);
+        assert(mergeExplain.hasOwnProperty("$merge"), explain);
+        assert.eq(mergeExplain.$merge.whenMatched, whenMatchedMode, mergeExplain);
+        assert.eq(mergeExplain.$merge.whenNotMatched, whenNotMatchedMode, mergeExplain);
+        assert.eq(mergeExplain.$merge.on, "_id", mergeExplain);
         assert.eq(targetColl.find().itcount(), 0, explain);
     });
 
-    function assertExecutionExplainFails(outStage, verbosity) {
+    function assertExecutionExplainFails(writingStage, verbosity) {
         assert.commandFailedWithCode(db.runCommand({
-            explain: {aggregate: sourceColl.getName(), pipeline: [outStage], cursor: {}},
+            explain: {aggregate: sourceColl.getName(), pipeline: [writingStage], cursor: {}},
             verbosity: verbosity
         }),
                                      [51029, 51184]);
         assert.eq(targetColl.find().itcount(), 0);
     }
 
-    // Test that 'executionStats' and 'allPlansExec' level explain fail with each $out mode. These
+    // Test that 'executionStats' and 'allPlansExec' level explain fail with each $merge mode. These
     // explain modes must fail, since they would attempt to do writes. Explain must always be
     // read-only (including explain of update and delete, which describe what writes they _would_ do
     // if exected for real).
-    withEachOutMode(function(outMode) {
-        const outStage = {$out: {to: targetColl.getName(), mode: outMode}};
-        assertExecutionExplainFails(outStage, "executionStats");
-        assertExecutionExplainFails(outStage, "allPlansExecution");
+    withEachMergeMode(function({whenMatchedMode, whenNotMatchedMode}) {
+        const mergeStage = {
+            $merge: {
+                into: targetColl.getName(),
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode
+            }
+        };
+        assertExecutionExplainFails(mergeStage, "executionStats");
+        assertExecutionExplainFails(mergeStage, "allPlansExecution");
     });
+
+    // Also test the $out stage since it also performs writes.
+    assertExecutionExplainFails({$out: targetColl.getName()}, "executionStats");
+    assertExecutionExplainFails({$out: targetColl.getName()}, "allPlansExecution");
 
     // Execution explain should fail even if the source collection does not exist.
     sourceColl.drop();
-    withEachOutMode(function(outMode) {
-        const outStage = {$out: {to: targetColl.getName(), mode: outMode}};
-        assertExecutionExplainFails(outStage, "executionStats");
-        assertExecutionExplainFails(outStage, "allPlansExecution");
+    withEachMergeMode(function({whenMatchedMode, whenNotMatchedMode}) {
+        const mergeStage = {
+            $merge: {
+                into: targetColl.getName(),
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode
+            }
+        };
+        assertExecutionExplainFails(mergeStage, "executionStats");
+        assertExecutionExplainFails(mergeStage, "allPlansExecution");
     });
+
+    // Also test the $out stage since it also performs writes.
+    assertExecutionExplainFails({$out: targetColl.getName()}, "executionStats");
+    assertExecutionExplainFails({$out: targetColl.getName()}, "allPlansExecution");
 }());

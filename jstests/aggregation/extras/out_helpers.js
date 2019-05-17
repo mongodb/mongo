@@ -10,6 +10,30 @@ function withEachOutMode(callback) {
     callback("replaceDocuments");
 }
 
+/**
+ * Executes the callback function with each valid combination of 'whenMatched' and 'whenNotMatched'
+ * modes (as named arguments). Note that one mode is a pipeline.
+ */
+function withEachMergeMode(callback) {
+    callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "insert"});
+    callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "fail"});
+    // TODO SERVER-40439 callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode:
+    // "discard"});
+
+    callback({whenMatchedMode: "merge", whenNotMatchedMode: "insert"});
+    callback({whenMatchedMode: "merge", whenNotMatchedMode: "fail"});
+    // TODO SERVER-40439 callback({whenMatchedMode: "merge", whenNotMatchedMode: "discard"});
+
+    callback({whenMatchedMode: "fail", whenNotMatchedMode: "insert"});
+
+    callback({whenMatchedMode: "keepExisting", whenNotMatchedMode: "insert"});
+
+    callback({whenMatchedMode: [], whenNotMatchedMode: "insert"});
+    callback({whenMatchedMode: [], whenNotMatchedMode: "fail"});
+    // TODO SERVER-40439 callback({whenMatchedMode: [{$addFields: {x: 1}}], whenNotMatchedMode:
+    // "discard"});
+}
+
 function assertUniqueKeyIsInvalid({source, target, uniqueKey, options, prevStages}) {
     withEachOutMode((mode) => {
         if (mode === "replaceCollection" && FixtureHelpers.isSharded(target))
