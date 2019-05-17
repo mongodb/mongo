@@ -281,14 +281,12 @@ void killAllUserOperations(OperationContext* opCtx) {
     int numOpsKilled = 0;
 
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
-        if (!client->isFromUserConnection()) {
-            // Don't kill system operations.
+        stdx::lock_guard<Client> lk(*client);
+        if (client->isFromSystemConnection() && !client->shouldKillSystemOperation(lk)) {
             // TODO SERVER-40594: kill RangeDeleter if needed.
-            // TODO SERVER-40641: kill TTLMonitor if needed.
             continue;
         }
 
-        stdx::lock_guard<Client> lk(*client);
         OperationContext* toKill = client->getOperationContext();
 
         if (toKill && toKill->getOpID() == opCtx->getOpID()) {
