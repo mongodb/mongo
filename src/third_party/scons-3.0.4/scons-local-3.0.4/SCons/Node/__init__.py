@@ -50,6 +50,12 @@ import collections
 import copy
 from itertools import chain
 
+try:
+    from itertools import zip_longest
+except ImportError:
+    from itertools import izip_longest as zip_longest
+
+
 import SCons.Debug
 from SCons.Debug import logInstanceCreation
 import SCons.Executor
@@ -1672,9 +1678,16 @@ class Node(object, with_metaclass(NoSlotsPyPy)):
                     lines.append("`%s' changed\n" % stringify(k))
 
         if len(lines) == 0 and old_bkids != new_bkids:
-            lines.append("the dependency order changed:\n" +
-                         "%sold: %s\n" % (' '*15, list(map(stringify, old_bkids))) +
-                         "%snew: %s\n" % (' '*15, list(map(stringify, new_bkids))))
+            lines.append("the dependency order changed:\n")
+            lines.append("->Sources\n")
+            for (o,n) in zip_longest(old.bsources, new.bsources, fillvalue=None):
+                lines.append("Old:%s\tNew:%s\n"%(o,n))
+            lines.append("->Depends\n")
+            for (o,n) in zip_longest(old.bdepends, new.bdepends, fillvalue=None):
+                lines.append("Old:%s\tNew:%s\n"%(o,n))
+            lines.append("->Implicit\n")
+            for (o,n) in zip_longest(old.bimplicit, new.bimplicit, fillvalue=None):
+                lines.append("Old:%s\tNew:%s\n"%(o,n)) 
 
         if len(lines) == 0:
             def fmt_with_title(title, strlines):
