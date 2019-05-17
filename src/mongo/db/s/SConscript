@@ -121,6 +121,7 @@ env.Library(
 env.Library(
     target='transaction_coordinator',
     source=[
+        'server_transaction_coordinators_metrics.cpp',
         'single_transaction_coordinator_stats.cpp',
         'transaction_coordinator_catalog.cpp',
         'transaction_coordinator_factory_mongod.cpp',
