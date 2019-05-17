@@ -77,7 +77,27 @@
         assert(target.drop());
         assert.commandWorked(target.insert(
             [{_id: 10, a: 10, c: "x"}, {_id: 3, a: 30, c: "y"}, {_id: 4, a: 40, c: "z"}]));
+        // Besides ensuring that a DuplicateKey error is raised when we find a matching document,
+        // this test also verifies that this $merge mode does perform an unordered insert and all
+        // documents in the batch without a matching document get inserted into the target
+        // collection. There is a special case when we can bail out early without processing all
+        // documents which fit into a single batch. Namely, if we have a sharded cluster with two
+        // shards, and shard documents by {_id: "hashed"}, we will end up with the document {_id: 3}
+        // landed on shard0, and {_id: 1} and {_id: 2} on shard1 in the source collection. Note
+        // that {_id: 3} has a duplicate key with the document in the target collection. For this
+        // particlar case, the entire pipeline is sent to each shard. Lets assume that shard0 has
+        // processed its single document with {_id: 3} and raised a DuplicateKey error, whilst
+        // shard1 hasn't performed any writes yet (or even hasn't started reading from the cursor).
+        // The mongos, after receiving the DuplicateKey, will stop pulling data from the shards
+        // and will kill the cursors open on the remaining shards. Shard1, eventually, will throw
+        // a CursorKilled during an interrupt check, and so no writes will be done into the target
+        // collection. To workaround this scenario and guarantee that the writes will always be
+        // performed, we will sort the documents by _id in ascending order. In this case, the
+        // pipeline will be split and we will pull everything to mongos before doing the $merge.
+        // This also ensures that documents with {_id: 1 } and {_id: 2} will be inserted first
+        // before the DuplicateKey error is raised.
         const error = assert.throws(() => source.aggregate([
+            {$sort: {_id: 1}},
             {$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"}}
         ]));
         assert.commandFailedWithCode(error, ErrorCodes.DuplicateKey);

@@ -158,6 +158,7 @@
             return;
         }
 
+        assert(source.drop());
         assert(target.drop());
         assert.commandWorked(source.insert({_id: 4, a: 2}));
         assert.commandWorked(target.insert([{_id: 1, x: 1}, {_id: 2, a: 2}]));

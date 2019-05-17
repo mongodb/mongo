@@ -124,6 +124,7 @@
             return;
         }
 
+        assert(source.drop());
         assert.commandWorked(source.insert({_id: 4, a: 1}));
         assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
         const error = assert.throws(() => source.aggregate(pipeline));
