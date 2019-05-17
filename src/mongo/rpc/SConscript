@@ -1,6 +1,8 @@
 # -*- mode: python -*-
 
 Import("env")
+Import("wiredtiger")
+Import("get_option")
 
 env = env.Clone()
 
@@ -19,7 +21,11 @@ env.Library(
     ],
 )
 
-env.Library(
+protoEnv = env.Clone()
+if wiredtiger:
+    protoEnv.InjectThirdParty(libraries=['wiredtiger'])
+
+protoEnv.Library(
     target=[
         'protocol',
     ],
@@ -36,7 +42,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum',
+        '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum' if wiredtiger else [],
     ],
 )
 

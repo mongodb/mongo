@@ -37,12 +37,16 @@
 #include <set>
 
 #include "mongo/base/data_type_endian.h"
+#include "mongo/config.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
-#include "third_party/wiredtiger/wiredtiger.h"
+
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
+#include <wiredtiger.h>
+#endif
 
 namespace mongo {
 namespace {
@@ -61,6 +65,7 @@ enum class Section : uint8_t {
 
 constexpr int kCrc32Size = 4;
 
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
 // All fields including size, requestId, and responseTo must already be set. The size must already
 // include the final 4-byte checksum.
 uint32_t calculateChecksum(const Message& message) {
@@ -71,6 +76,7 @@ uint32_t calculateChecksum(const Message& message) {
     invariant(OpMsg::isFlagSet(message, OpMsg::kChecksumPresent));
     return wiredtiger_crc32c_func()(message.singleData().view2ptr(), message.size() - kCrc32Size);
 }
+#endif  // MONGO_CONFIG_WIREDTIGER_ENABLED
 }  // namespace
 
 uint32_t OpMsg::flags(const Message& message) {
@@ -97,6 +103,7 @@ uint32_t OpMsg::getChecksum(const Message& message) {
 }
 
 void OpMsg::appendChecksum(Message* message) {
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     if (message->operation() != dbMsg) {
         return;
     }
@@ -112,6 +119,7 @@ void OpMsg::appendChecksum(Message* message) {
     message->header().setLen(newSize);
     DataView(message->singleData().view2ptr() + newSize - kCrc32Size)
         .write<LittleEndian<uint32_t>>(calculateChecksum(*message));
+#endif
 }
 
 OpMsg OpMsg::parse(const Message& message) try {
@@ -189,11 +197,13 @@ OpMsg OpMsg::parse(const Message& message) try {
                 !inBody);
     }
 
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     if (haveChecksum) {
         uassert(ErrorCodes::ChecksumMismatch,
                 "OP_MSG checksum does not match contents",
                 OpMsg::getChecksum(message) == calculateChecksum(message));
     }
+#endif
 
     return msg;
 } catch (const DBException& ex) {
