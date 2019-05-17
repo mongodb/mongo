@@ -46,10 +46,10 @@ engine::engine(SSL_CTX* context)
 
   ::SSL_set_mode(ssl_, SSL_MODE_ENABLE_PARTIAL_WRITE);
   ::SSL_set_mode(ssl_, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-// SERVER-40393 - Disable SSL_MODE_RELEASE_BUFFERS in ASIO
-//#if defined(SSL_MODE_RELEASE_BUFFERS)
-  //::SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
-//#endif // defined(SSL_MODE_RELEASE_BUFFERS)
+  // SERVER-40393 - Disable SSL_MODE_RELEASE_BUFFERS in ASIO
+  //#if defined(SSL_MODE_RELEASE_BUFFERS)
+    //::SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
+  //#endif // defined(SSL_MODE_RELEASE_BUFFERS)
 
   ::BIO* int_bio = 0;
   ::BIO_new_bio_pair(&int_bio, 0, &ext_bio_, 0);
@@ -226,12 +226,29 @@ asio::detail::static_mutex& engine::accept_mutex()
 }
 #endif // (OPENSSL_VERSION_NUMBER < 0x10000000L)
 
+void engine::purge_error_state() {
+#if (OPENSSL_VERSION_NUMBER < 0x1010000fL)
+    // OpenSSL 1.1.0 introduced a thread local state storage mechanism.
+    // Versions prior sometimes had contention issues on global mutexes
+    // which protected thread local state.
+    // If we are compiled against a version without native thread local
+    // support, cache a pointer to this thread's error state, which we can
+    // access without contention. If that state requires no cleanup,
+    // we can avoid invoking OpenSSL's more expensive machinery.
+    const static thread_local ERR_STATE* es = ERR_get_state();
+    if (es->bottom == es->top) {
+        return;
+    }
+#endif  // (OPENSSL_VERSION_NUMBER < 0x1010000fL)
+    ::ERR_clear_error();
+}
+
 engine::want engine::perform(int (engine::* op)(void*, std::size_t),
     void* data, std::size_t length, asio::error_code& ec,
     std::size_t* bytes_transferred)
 {
   std::size_t pending_output_before = ::BIO_ctrl_pending(ext_bio_);
-  ::ERR_clear_error();
+  purge_error_state();
   int result = (this->*op)(data, length);
   int ssl_error = ::SSL_get_error(ssl_, result);
   int sys_error = static_cast<int>(::ERR_get_error());
