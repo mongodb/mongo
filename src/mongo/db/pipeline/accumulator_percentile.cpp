@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2011 10gen Inc.
  *
@@ -76,6 +77,12 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
 
         if (any_input == false){
             digest = mongo::TDigest(digest_size);
+
+            // "digest" will be extended by digest_size. Similar to "centroids", it is also 16 * digest_size
+            _memUsageBytes += sizeof(digest.getCentroids()[0]) * digest_size; 
+
+            // "centroids" will be the vector of two doubles (mean, weight) 
+            _memUsageBytes += (16 * digest_size);
             any_input = true;
         }
 
@@ -84,9 +91,6 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
             centroids.push_back(mongo::TDigest::Centroid(centroid[meanName].getDouble(), centroid[weightName].getDouble()));
         };
         
-        // ToReview: This is the vector created to receive the centroids from Shards and needs to be counted in memory usage.
-        _memUsageBytes += centroids.size() * sizeof(centroids[0]);
-
         digest = digest.merge({
             mongo::TDigest(
                 centroids, 
@@ -97,8 +101,6 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
                 digest_size), 
             digest
         });
-
-        _memUsageBytes += sizeof(digest.getCentroids()[0]) * digest_size;
 
         this->percentile = input[percentileName].getDouble();
         return;
