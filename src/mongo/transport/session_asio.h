@@ -237,13 +237,10 @@ protected:
         return doHandshake().then([this, target] {
             _ranHandshake = true;
 
-            auto sslManager = getSSLManager();
-            auto swPeerInfo = uassertStatusOK(sslManager->parseAndValidatePeerCertificate(
-                _sslSocket->native_handle(), target.host(), target));
+            SSLPeerInfo::forSession(shared_from_this()) =
+                uassertStatusOK(getSSLManager()->parseAndValidatePeerCertificate(
+                    _sslSocket->native_handle(), target.host(), target));
 
-            if (swPeerInfo) {
-                SSLPeerInfo::forSession(shared_from_this()) = std::move(*swPeerInfo);
-            }
         });
     }
 
@@ -513,6 +510,10 @@ private:
 
         return boost::none;
     }
+
+    boost::optional<std::string> getSniName() const override {
+        return SSLPeerInfo::forSession(shared_from_this()).sniName;
+    }
 #endif
 
     template <typename Stream, typename ConstBufferSequence>
@@ -616,25 +617,8 @@ private:
                 auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
 
                 if (sslPeerInfo.subjectName.empty()) {
-                    auto sslManager = getSSLManager();
-                    auto swPeerInfo = sslManager->parseAndValidatePeerCertificate(
-                        _sslSocket->native_handle(), "", _remote);
-
-                    // The value of swPeerInfo is a bit complicated:
-                    //
-                    // If !swPeerInfo.isOK(), then there was an error doing the SSL
-                    // handshake and we should reject the connection.
-                    //
-                    // If !sslPeerInfo.getValue(), then the SSL handshake was successful,
-                    // but the peer didn't provide a SSL certificate, and we do not require
-                    // one. sslPeerInfo should be empty.
-                    //
-                    // Otherwise the SSL handshake was successful and the peer did provide
-                    // a certificate that is valid, and we should store that info on the
-                    // session's SSLPeerInfo decoration.
-                    if (auto optPeerInfo = uassertStatusOK(swPeerInfo)) {
-                        sslPeerInfo = *optPeerInfo;
-                    }
+                    sslPeerInfo = uassertStatusOK(getSSLManager()->parseAndValidatePeerCertificate(
+                        _sslSocket->native_handle(), "", _remote));
                 }
                 return true;
             });

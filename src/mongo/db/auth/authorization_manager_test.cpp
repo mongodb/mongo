@@ -182,9 +182,10 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
 
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
-    setX509PeerInfo(
-        session,
-        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("readWrite", "test")}));
+    setX509PeerInfo(session,
+                    SSLPeerInfo(buildX509Name(),
+                                boost::none,
+                                {RoleName("read", "test"), RoleName("readWrite", "test")}));
 
     User* x509User;
     ASSERT_OK(
@@ -212,9 +213,10 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
 #endif
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
-    setX509PeerInfo(
-        session,
-        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("write", "test")}));
+    setX509PeerInfo(session,
+                    SSLPeerInfo(buildX509Name(),
+                                boost::none,
+                                {RoleName("read", "test"), RoleName("write", "test")}));
 
     User* x509User;
     ASSERT_NOT_OK(

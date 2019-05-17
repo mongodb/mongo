@@ -2262,26 +2262,12 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
     }
 }
 
-void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* response) {
+void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* const response,
+                                                 const SplitHorizon::Parameters& horizonParams) {
     const MemberState myState = getMemberState();
     if (!_rsConfig.isInitialized()) {
         response->markAsNoConfig();
         return;
-    }
-
-    for (ReplSetConfig::MemberIterator it = _rsConfig.membersBegin(); it != _rsConfig.membersEnd();
-         ++it) {
-        if (it->isHidden() || it->getSlaveDelay() > Seconds{0}) {
-            continue;
-        }
-
-        if (it->isElectable()) {
-            response->addHost(it->getHostAndPort());
-        } else if (it->isArbiter()) {
-            response->addArbiter(it->getHostAndPort());
-        } else {
-            response->addPassive(it->getHostAndPort());
-        }
     }
 
     response->setReplSetName(_rsConfig.getReplSetName());
@@ -2290,13 +2276,34 @@ void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* response) {
         return;
     }
 
+    invariant(!_rsConfig.members().empty());
+
+    const auto& self = _rsConfig.members()[_selfIndex];
+
+    const auto horizon = self.determineHorizon(horizonParams).toString();
+
+    for (const auto& member : _rsConfig.members()) {
+        if (member.isHidden() || member.getSlaveDelay() > Seconds{0}) {
+            continue;
+        }
+        auto hostView = member.getHostAndPort(horizon);
+
+        if (member.isElectable()) {
+            response->addHost(std::move(hostView));
+        } else if (member.isArbiter()) {
+            response->addArbiter(std::move(hostView));
+        } else {
+            response->addPassive(std::move(hostView));
+        }
+    }
+
     response->setReplSetVersion(_rsConfig.getConfigVersion());
     response->setIsMaster(myState.primary());
     response->setIsSecondary(myState.secondary());
 
     const MemberConfig* curPrimary = _currentPrimaryMember();
     if (curPrimary) {
-        response->setPrimary(curPrimary->getHostAndPort());
+        response->setPrimary(curPrimary->getHostAndPort(horizon));
     }
 
     const MemberConfig& selfConfig = _rsConfig.getMemberAt(_selfIndex);

@@ -40,7 +40,6 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
@@ -122,6 +121,10 @@ public:
      */
     const transport::SessionHandle& session() const& {
         return _session;
+    }
+
+    boost::optional<std::string> getSniNameForSession() const {
+        return _session ? _session->getSniName() : boost::none;
     }
 
     transport::SessionHandle session() && {
