@@ -15,7 +15,10 @@
  *     does_not_support_stepdowns,
  *     # A write takes a global exclusive lock on the mobile engine, so two concurrent writers
  *     # (index builds) are impossible.
- *     requires_db_locking,
+ *     # The ephemeralForTest engine has collection level locking, meaning that it upgrades
+ *     # collection intent locks to exclusive. This test depends on two concurrent ops taking
+ *     # concurrent collection IX locks.
+ *     requires_document_locking,
  * ]
  */
 
