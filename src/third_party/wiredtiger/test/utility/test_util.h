@@ -224,6 +224,9 @@ u64_to_string_zf(uint64_t n, char *buf, size_t len)
 /* Allow tests to add their own death handling. */
 extern void (*custom_die)(void);
 
+#ifdef _WIN32
+__declspec(noreturn)
+#endif
 void testutil_die(int, const char *, ...)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 

@@ -684,8 +684,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		    WT_SESSION_BTREE_SYNC(session)) &&
 		    next_ref->state == WT_REF_DELETED &&
 		    __wt_delete_page_skip(session, next_ref, true) &&
-		    __wt_atomic_casv32(
-		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT))) {
+		    WT_REF_CAS_STATE(
+		    session, next_ref, WT_REF_DELETED, WT_REF_SPLIT))) {
 			WT_ERR(__wt_buf_grow(session, scr,
 			    (deleted_entries + 1) * sizeof(uint32_t)));
 			deleted_refs = scr->mem;
@@ -860,6 +860,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				parent_decr += size;
 			}
 		}
+
+		/* Check that we are not discarding active history. */
+		WT_ASSERT(session, !__wt_page_las_active(session, next_ref));
 
 		/*
 		 * The page-delete and lookaside memory weren't added to the

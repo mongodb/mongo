@@ -14,6 +14,35 @@ typedef enum {
 	WT_VISIBLE_PREPARE=1,   /* Prepared update */
 	WT_VISIBLE_TRUE=2       /* A visible update */
 } WT_VISIBLE_TYPE;
+/*
+ * __wt_ref_cas_state_int --
+ *	Try to do a compare and swap, if successful update the ref history in
+ *      diagnostic mode.
+ */
+static inline bool
+__wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref,
+    uint32_t old_state, uint32_t new_state, const char *file, int line)
+{
+	bool cas_result;
+
+	/* Parameters that are used in a macro for diagnostic builds */
+	WT_UNUSED(session);
+	WT_UNUSED(file);
+	WT_UNUSED(line);
+
+	cas_result = __wt_atomic_casv32(&ref->state, old_state, new_state);
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * The history update here has potential to race; if the state gets
+	 * updated again after the CAS above but before the history has been
+	 * updated.
+	 */
+	 if (cas_result)
+		WT_REF_SAVE_STATE(ref, new_state, file, line);
+#endif
+	return (cas_result);
+}
 
 /*
  * __wt_txn_timestamp_flags --
@@ -380,9 +409,8 @@ __wt_txn_op_apply_prepare_state(
 	for (;; __wt_yield()) {
 		previous_state = ref->state;
 		WT_ASSERT(session, previous_state != WT_REF_READING);
-		if (previous_state != WT_REF_LOCKED &&
-		    __wt_atomic_casv32(
-		    &ref->state, previous_state, WT_REF_LOCKED))
+		if (previous_state != WT_REF_LOCKED && WT_REF_CAS_STATE(
+		    session, ref, previous_state, WT_REF_LOCKED))
 			break;
 	}
 

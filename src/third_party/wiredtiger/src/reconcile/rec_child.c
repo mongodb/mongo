@@ -165,8 +165,8 @@ __wt_rec_child_modify(WT_SESSION_IMPL *session,
 			 * to see if the delete is visible to us.  Lock down the
 			 * structure.
 			 */
-			if (!__wt_atomic_casv32(
-			    &ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+			if (!WT_REF_CAS_STATE(
+			    session, ref, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret = __rec_child_deleted(session, r, ref, statep);
 			WT_REF_SET_STATE(ref, WT_REF_DELETED);

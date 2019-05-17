@@ -464,7 +464,7 @@ __wt_las_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	    previous_state != WT_REF_LOOKASIDE)
 		return (false);
 
-	if (!__wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED))
+	if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
 		return (false);
 
 	skip = __wt_las_page_skip_locked(session, ref);

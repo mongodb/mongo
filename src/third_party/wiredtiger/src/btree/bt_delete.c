@@ -74,7 +74,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	/* If we have a clean page in memory, attempt to evict it. */
 	previous_state = ref->state;
 	if ((previous_state == WT_REF_MEM || previous_state == WT_REF_LIMBO) &&
-	    __wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED)) {
+	    WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED)) {
 		if (__wt_page_is_modified(ref->page)) {
 			WT_REF_SET_STATE(ref, previous_state);
 			return (0);
@@ -99,7 +99,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	default:
 		return (0);
 	}
-	if (!__wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED))
+	if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
 		return (0);
 
 	/*
@@ -190,7 +190,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			 * If the page is still "deleted", it's as we left it,
 			 * reset the state.
 			 */
-			if (__wt_atomic_casv32(&ref->state,
+			if (WT_REF_CAS_STATE(session, ref,
 			    WT_REF_DELETED, ref->page_del->previous_state))
 				goto done;
 			break;
@@ -201,8 +201,8 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			break;
 		case WT_REF_MEM:
 		case WT_REF_SPLIT:
-			if (__wt_atomic_casv32(
-			    &ref->state, current_state, WT_REF_LOCKED))
+			if (WT_REF_CAS_STATE(
+			    session, ref, current_state, WT_REF_LOCKED))
 				locked = true;
 			break;
 		case WT_REF_DISK:
@@ -279,13 +279,14 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 	 * the page could switch to an in-memory state at any time.  Lock down
 	 * the structure, just to be safe.
 	 */
-	if (ref->page_del == NULL)
+	if (ref->page_del == NULL && ref->page_las == NULL)
 		return (true);
 
-	if (!__wt_atomic_casv32(&ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+	if (!WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, WT_REF_LOCKED))
 		return (false);
 
-	skip = !__wt_page_del_active(session, ref, visible_all);
+	skip = !__wt_page_del_active(session, ref, visible_all) &&
+	    !__wt_page_las_active(session, ref);
 
 	/*
 	 * The page_del structure can be freed as soon as the delete is stable:
@@ -300,7 +301,7 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 		__wt_free(session, ref->page_del);
 	}
 
-	WT_PUBLISH(ref->state, WT_REF_DELETED);
+	WT_REF_SET_STATE(ref, WT_REF_DELETED);
 	return (skip);
 }
 

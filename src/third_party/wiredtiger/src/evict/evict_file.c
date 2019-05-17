@@ -16,7 +16,6 @@ int
 __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -25,7 +24,6 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
 	dhandle = session->dhandle;
 	btree = dhandle->handle;
-	conn = S2C(session);
 
 	/*
 	 * We need exclusive access to the file, we're about to discard the root
@@ -40,24 +38,6 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	 */
 	if (btree->root.page == NULL)
 		return (0);
-
-	/*
-	 * If discarding a dead tree, remove any lookaside entries.  This deals
-	 * with the case where a tree is dropped with "force=true".  It happens
-	 * that we also force-drop the lookaside table itself: it can never
-	 * participate in lookaside eviction, and we can't open a cursor on it
-	 * as we are discarding it.
-	 *
-	 * We use the special page ID zero so that all lookaside entries for
-	 * the tree are removed.
-	 */
-	if (F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
-	    F_ISSET(conn, WT_CONN_LOOKASIDE_OPEN) && btree->lookaside_entries) {
-		WT_ASSERT(session, !WT_IS_METADATA(dhandle) &&
-		    !F_ISSET(btree, WT_BTREE_LOOKASIDE));
-
-		WT_RET(__wt_las_save_dropped(session));
-	}
 
 	/* Make sure the oldest transaction ID is up-to-date. */
 	WT_RET(__wt_txn_update_oldest(
@@ -124,7 +104,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			 */
 			WT_ASSERT(session,
 			    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
-			    F_ISSET(conn, WT_CONN_CLOSING) ||
+			    F_ISSET(S2C(session), WT_CONN_CLOSING) ||
 			    __wt_page_can_evict(session, ref, NULL));
 			__wt_ref_out(session, ref);
 			break;
