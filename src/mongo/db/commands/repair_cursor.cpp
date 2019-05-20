@@ -103,6 +103,7 @@ public:
             {std::move(exec),
              ns,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->getWriteConcern(),
              repl::ReadConcernArgs::get(opCtx),
              cmdObj,
              ClientCursorParams::LockPolicy::kLockExternally,

@@ -20,7 +20,7 @@
     } catch (e) {
         // The exhaust option is not valid against mongos, ensure that this query throws the right
         // code
-        assert.eq(e.code, 18526);
+        assert.eq(e.code, 18526, () => tojson(e));
     }
 
 }());

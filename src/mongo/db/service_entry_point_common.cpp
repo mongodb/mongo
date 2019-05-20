@@ -478,35 +478,33 @@ bool runCommandImpl(OperationContext* opCtx,
     const bool shouldCheckOutSession =
         sessionOptions.getTxnNumber() && !shouldCommandSkipSessionCheckout(command->getName());
 
-    if (!invocation->supportsWriteConcern()) {
-        behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
-        if (shouldCheckOutSession) {
-            invokeWithSessionCheckedOut(opCtx, invocation, sessionOptions, replyBuilder);
-        } else {
-            invocation->run(opCtx, replyBuilder);
-            MONGO_FAIL_POINT_BLOCK(waitAfterReadCommandFinishesExecution, options) {
-                const BSONObj& data = options.getData();
-                auto db = data["db"].str();
-                if (db.empty() || request.getDatabase() == db) {
-                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                        &waitAfterReadCommandFinishesExecution,
-                        opCtx,
-                        "waitAfterReadCommandFinishesExecution");
-                }
-            }
-        }
-    } else {
-        auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
-        if (sessionOptions.getAutocommit()) {
-            validateWriteConcernForTransaction(wcResult, invocation->definition()->getName());
-        }
+    // getMore operations inherit a WriteConcern from their originating cursor. For example, if the
+    // originating command was an aggregate with a $out and batchSize: 0. Note that if the command
+    // only performed reads then we will not need to wait at all.
+    const bool shouldWaitForWriteConcern =
+        invocation->supportsWriteConcern() || command->getLogicalOp() == LogicalOp::opGetMore;
 
+    if (shouldWaitForWriteConcern) {
         auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
         // Change the write concern while running the command.
         const auto oldWC = opCtx->getWriteConcern();
         ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
-        opCtx->setWriteConcern(wcResult);
+
+        boost::optional<WriteConcernOptions> extractedWriteConcern;
+        if (command->getLogicalOp() == LogicalOp::opGetMore) {
+            // WriteConcern will be set up during command processing, it must not be specified on
+            // the command body.
+            behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
+        } else {
+            extractedWriteConcern.emplace(
+                uassertStatusOK(extractWriteConcern(opCtx, request.body)));
+            if (sessionOptions.getAutocommit()) {
+                validateWriteConcernForTransaction(*extractedWriteConcern,
+                                                   invocation->definition()->getName());
+            }
+            opCtx->setWriteConcern(*extractedWriteConcern);
+        }
 
         auto waitForWriteConcern = [&](auto&& bb) {
             MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
@@ -539,9 +537,35 @@ bool runCommandImpl(OperationContext* opCtx,
 
         waitForWriteConcern(replyBuilder->getBodyBuilder());
 
-        // Nothing in run() should change the writeConcern.
-        dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
-                                                            wcResult.toBSON()));
+        // With the exception of getMores inheriting the WriteConcern from the originating command,
+        // nothing in run() should change the writeConcern.
+        dassert(command->getLogicalOp() == LogicalOp::opGetMore
+                    ? !extractedWriteConcern
+                    : (extractedWriteConcern &&
+                       SimpleBSONObjComparator::kInstance.evaluate(
+                           opCtx->getWriteConcern().toBSON() == extractedWriteConcern->toBSON())));
+    } else {
+        behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
+        if (shouldCheckOutSession) {
+            invokeWithSessionCheckedOut(opCtx, invocation, sessionOptions, replyBuilder);
+        } else {
+            invocation->run(opCtx, replyBuilder);
+        }
+    }
+
+    // This failpoint should affect both getMores and commands which are read-only and thus don't
+    // support writeConcern.
+    if (!shouldWaitForWriteConcern || command->getLogicalOp() == LogicalOp::opGetMore) {
+        MONGO_FAIL_POINT_BLOCK(waitAfterReadCommandFinishesExecution, options) {
+            const BSONObj& data = options.getData();
+            auto db = data["db"].str();
+            if (db.empty() || request.getDatabase() == db) {
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &waitAfterReadCommandFinishesExecution,
+                    opCtx,
+                    "waitAfterReadCommandFinishesExecution");
+            }
+        }
     }
 
     behaviors.waitForLinearizableReadConcern(opCtx);

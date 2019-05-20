@@ -59,6 +59,10 @@ public:
 
     WriteConcernOptions() {
         reset();
+        // It is assumed that a default-constructed WriteConcernOptions will be populated with the
+        // default options. If it is subsequently populated with non-default options, it is the
+        // caller's responsibility to set this flag accordingly.
+        usedDefault = true;
     }
 
     WriteConcernOptions(int numNodes, SyncMode sync, int timeout);

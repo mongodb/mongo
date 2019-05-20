@@ -397,6 +397,13 @@ Message getMore(OperationContext* opCtx,
             "OP_GET_MORE operations are not supported on tailable aggregations. Only clients "
             "which support the getMore command can be used on tailable aggregations.",
             readLock || !cursorPin->isAwaitData());
+    uassert(
+        31124,
+        str::stream()
+            << "OP_GET_MORE does not support cursors with a write concern other than the default."
+               " Use the getMore command instead. Write concern was: "
+            << cursorPin->getWriteConcernOptions().toBSON(),
+        cursorPin->getWriteConcernOptions().usedDefault);
 
     // If the operation that spawned this cursor had a time limit set, apply leftover time to this
     // getmore.
@@ -724,6 +731,7 @@ std::string runQuery(OperationContext* opCtx,
             {std::move(exec),
              nss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->getWriteConcern(),
              readConcernArgs,
              upconvertedQuery,
              ClientCursorParams::LockPolicy::kLockExternally,

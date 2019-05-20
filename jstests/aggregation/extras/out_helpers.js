@@ -4,6 +4,11 @@
 
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
+function withEachKindOfWriteStage(targetColl, callback) {
+    callback({$out: targetColl.getName()});
+    callback({$merge: {into: targetColl.getName()}});
+}
+
 /**
  * Executes the callback function with each valid combination of 'whenMatched' and 'whenNotMatched'
  * modes (as named arguments). Note that one mode is a pipeline.

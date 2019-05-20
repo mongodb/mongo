@@ -111,9 +111,7 @@ public:
         onCommand([this, shard](const RemoteCommandRequest& request) {
             ASSERT_EQ(HostAndPort(shard.getHost()), request.target);
             ASSERT_EQ(_dropNS.db(), request.dbname);
-            ASSERT_BSONOBJ_EQ(BSON("drop" << _dropNS.coll() << "writeConcern"
-                                          << BSON("w" << 0 << "wtimeout" << 0)),
-                              request.cmdObj);
+            ASSERT_BSONOBJ_EQ(BSON("drop" << _dropNS.coll()), request.cmdObj);
 
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
@@ -222,9 +220,7 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     onCommand([this](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort(shard1().getHost()), request.target);
         ASSERT_EQ(dropNS().db(), request.dbname);
-        ASSERT_BSONOBJ_EQ(
-            BSON("drop" << dropNS().coll() << "writeConcern" << BSON("w" << 0 << "wtimeout" << 0)),
-            request.cmdObj);
+        ASSERT_BSONOBJ_EQ(BSON("drop" << dropNS().coll()), request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
@@ -235,9 +231,7 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     onCommand([this](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort(shard2().getHost()), request.target);
         ASSERT_EQ(dropNS().db(), request.dbname);
-        ASSERT_BSONOBJ_EQ(
-            BSON("drop" << dropNS().coll() << "writeConcern" << BSON("w" << 0 << "wtimeout" << 0)),
-            request.cmdObj);
+        ASSERT_BSONOBJ_EQ(BSON("drop" << dropNS().coll()), request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));

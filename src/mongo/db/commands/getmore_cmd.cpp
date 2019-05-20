@@ -169,6 +169,45 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
 }
 
 /**
+ * Sets a deadline on the operation if the originating command had a maxTimeMS specified or if this
+ * is a tailable, awaitData cursor.
+ */
+void setUpOperationDeadline(OperationContext* opCtx,
+                            const ClientCursor& cursor,
+                            const GetMoreRequest& request,
+                            bool disableAwaitDataFailpointActive) {
+
+    // We assume that cursors created through a DBDirectClient are always used from their
+    // original OperationContext, so we do not need to move time to and from the cursor.
+    if (!opCtx->getClient()->isInDirectClient()) {
+        // There is no time limit set directly on this getMore command. If the cursor is
+        // awaitData, then we supply a default time of one second. Otherwise we roll over
+        // any leftover time from the maxTimeMS of the operation that spawned this cursor,
+        // applying it to this getMore.
+        if (cursor.isAwaitData() && !disableAwaitDataFailpointActive) {
+            awaitDataState(opCtx).waitForInsertsDeadline =
+                opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                request.awaitDataTimeout.value_or(Seconds{1});
+        } else if (cursor.getLeftoverMaxTimeMicros() < Microseconds::max()) {
+            opCtx->setDeadlineAfterNowBy(cursor.getLeftoverMaxTimeMicros(),
+                                         ErrorCodes::MaxTimeMSExpired);
+        }
+    }
+}
+/**
+ * Sets up the OperationContext in order to correctly inherit options like the read concern from the
+ * cursor to this operation.
+ */
+void setUpOperationContextStateForGetMore(OperationContext* opCtx,
+                                          const ClientCursor& cursor,
+                                          const GetMoreRequest& request,
+                                          bool disableAwaitDataFailpointActive) {
+    applyCursorReadConcern(opCtx, cursor.getReadConcernArgs());
+    opCtx->setWriteConcern(cursor.getWriteConcernOptions());
+    setUpOperationDeadline(opCtx, cursor, request, disableAwaitDataFailpointActive);
+}
+
+/**
  * A command for running getMore() against an existing cursor registered with a CursorManager.
  * Used to generate the next batch of results for a ClientCursor.
  *
@@ -455,28 +494,13 @@ public:
                     _request.nss);
             }
 
-            // We must respect the read concern from the cursor.
-            applyCursorReadConcern(opCtx, cursorPin->getReadConcernArgs());
-
             const bool disableAwaitDataFailpointActive =
                 MONGO_FAIL_POINT(disableAwaitDataForGetMoreCmd);
 
-            // We assume that cursors created through a DBDirectClient are always used from their
-            // original OperationContext, so we do not need to move time to and from the cursor.
-            if (!opCtx->getClient()->isInDirectClient()) {
-                // There is no time limit set directly on this getMore command. If the cursor is
-                // awaitData, then we supply a default time of one second. Otherwise we roll over
-                // any leftover time from the maxTimeMS of the operation that spawned this cursor,
-                // applying it to this getMore.
-                if (cursorPin->isAwaitData() && !disableAwaitDataFailpointActive) {
-                    awaitDataState(opCtx).waitForInsertsDeadline =
-                        opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                        _request.awaitDataTimeout.value_or(Seconds{1});
-                } else if (cursorPin->getLeftoverMaxTimeMicros() < Microseconds::max()) {
-                    opCtx->setDeadlineAfterNowBy(cursorPin->getLeftoverMaxTimeMicros(),
-                                                 ErrorCodes::MaxTimeMSExpired);
-                }
-            }
+            // Inherit properties like readConcern and maxTimeMS from our originating cursor.
+            setUpOperationContextStateForGetMore(
+                opCtx, *cursorPin.getCursor(), _request, disableAwaitDataFailpointActive);
+
             if (!cursorPin->isAwaitData()) {
                 opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
             }

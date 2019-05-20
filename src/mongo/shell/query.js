@@ -801,9 +801,7 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
 
     // Deliver the getMore command, and check for errors in the response.
     var cmdRes = this._db.runCommand(getMoreCmd);
-    if (cmdRes.ok != 1) {
-        throw _getErrorWithCode(cmdRes, "getMore command failed: " + tojson(cmdRes));
-    }
+    assert.commandWorked(cmdRes, () => "getMore command failed: " + tojson(cmdRes));
 
     if (this._ns !== cmdRes.cursor.ns) {
         throw Error("unexpected collection in getMore response: " + this._ns + " != " +
