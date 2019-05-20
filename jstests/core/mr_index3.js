@@ -1,4 +1,8 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+// ]
 
 t = db.mr_index3;
 t.drop();

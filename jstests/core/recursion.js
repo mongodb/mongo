@@ -2,6 +2,8 @@
 // the past. See SERVER-19614.
 //
 // @tags: [
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   requires_non_retryable_commands,
 // ]

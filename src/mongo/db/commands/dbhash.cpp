@@ -68,6 +68,14 @@ public:
         return false;
     }
 
+    bool allowsAfterClusterTime(const BSONObj& cmd) const override {
+        return false;
+    }
+
+    bool canIgnorePrepareConflicts() const override {
+        return true;
+    }
+
     ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
     }

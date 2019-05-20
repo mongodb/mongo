@@ -616,6 +616,10 @@ private:
         return _command->allowsAfterClusterTime(cmdObj());
     }
 
+    bool canIgnorePrepareConflicts() const override {
+        return _command->canIgnorePrepareConflicts();
+    }
+
     void doCheckAuthorization(OperationContext* opCtx) const override {
         uassertStatusOK(_command->checkAuthForOperation(
             opCtx, _request->getDatabase().toString(), _request->body));

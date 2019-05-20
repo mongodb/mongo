@@ -48,6 +48,9 @@ selector:
   # Unacknowledged writes prohibited in an explicit session.
   - jstests/core/batch_write_command_w0.js
 
+  exclude_with_any_tags:
+  - does_not_support_causal_consistency
+
 executor:
   archive:
     hooks:

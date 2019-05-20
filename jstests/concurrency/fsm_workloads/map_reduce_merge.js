@@ -12,6 +12,10 @@
  * of the output collection.
  *
  * Writes the results of each thread to the same collection.
+ * @tags: [
+ *   # mapReduce does not support afterClusterTime.
+ *   does_not_support_causal_consistency,
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config

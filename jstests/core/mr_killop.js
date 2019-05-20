@@ -3,6 +3,8 @@
 // when the "finalize" option to the "mapReduce" command is used on a sharded collection.
 // @tags: [
 //   assumes_unsharded_collection,
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   uses_multiple_connections,
 // ]

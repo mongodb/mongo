@@ -1,6 +1,11 @@
 // Cannot implicitly shard accessed collections because of following errmsg: Cannot output to a
 // non-sharded collection because sharded collection exists already.
-// @tags: [assumes_unsharded_collection, does_not_support_stepdowns]
+// @tags: [
+//   assumes_unsharded_collection,
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+// ]
 
 normal = "mr_outreduce2";
 out = normal + "_out";

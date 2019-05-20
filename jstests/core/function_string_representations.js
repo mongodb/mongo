@@ -1,4 +1,8 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+// ]
 
 /** Demonstrate that mapReduce can accept functions represented by strings.
  * Some drivers do not have a type which represents a Javascript function. These languages represent

@@ -1,6 +1,12 @@
 // TODO SERVER-40402: Remove 'assumes_write_concern_unchanged' tag.
-// @tags: [does_not_support_stepdowns, requires_non_retryable_commands, requires_fastcount,
-// assumes_write_concern_unchanged]
+// @tags: [
+//   assumes_write_concern_unchanged,
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+//   requires_fastcount,
+//   requires_non_retryable_commands,
+// ]
 
 /**
  * Tests that various database commands respect the 'bypassDocumentValidation' flag:

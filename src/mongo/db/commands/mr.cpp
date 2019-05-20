@@ -169,6 +169,9 @@ void assertCollectionNotNull(const NamespaceString& nss, AutoT& autoT) {
 void dropTempCollections(OperationContext* cleanupOpCtx,
                          const NamespaceString& tempNamespace,
                          const NamespaceString& incLong) {
+    // Make sure we enforce prepare conflicts before writing.
+    EnforcePrepareConflictsBlock enforcePrepare(cleanupOpCtx);
+
     if (!tempNamespace.isEmpty()) {
         writeConflictRetry(
             cleanupOpCtx,
@@ -499,6 +502,9 @@ void State::prepTempCollection() {
     if (!_onDisk)
         return;
 
+    // Make sure we enforce prepare conflicts before writing.
+    EnforcePrepareConflictsBlock enforcePrepare(_opCtx);
+
     dropTempCollections(
         _opCtx, _config.tempNamespace, _useIncremental ? _config.incLong : NamespaceString());
 
@@ -715,6 +721,9 @@ long long State::postProcessCollection(OperationContext* opCtx, CurOp* curOp) {
 long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
                                                 CurOp* curOp,
                                                 bool callerHoldsGlobalLock) {
+    // Make sure we enforce prepare conflicts before writing.
+    EnforcePrepareConflictsBlock enforcePrepare(opCtx);
+
     if (_config.outputOptions.finalNamespace == _config.tempNamespace)
         return collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
 
@@ -806,6 +815,9 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
 void State::insert(const NamespaceString& nss, const BSONObj& o) {
     invariant(_onDisk);
 
+    // Make sure we enforce prepare conflicts before writing.
+    EnforcePrepareConflictsBlock enforcePrepare(_opCtx);
+
     writeConflictRetry(_opCtx, "M/R insert", nss.ns(), [this, &nss, &o] {
         AutoGetCollection autoColl(_opCtx, nss, MODE_IX);
         uassert(
@@ -844,6 +856,9 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
  */
 void State::_insertToInc(BSONObj& o) {
     verify(_onDisk);
+
+    // Make sure we enforce prepare conflicts before writing.
+    EnforcePrepareConflictsBlock enforcePrepare(_opCtx);
 
     writeConflictRetry(_opCtx, "M/R insertToInc", _config.incLong.ns(), [this, &o] {
         AutoGetCollection autoColl(_opCtx, _config.incLong, MODE_IX);
@@ -1397,6 +1412,17 @@ public:
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return mrSupportsWriteConcern(cmd);
+    }
+
+    bool allowsAfterClusterTime(const BSONObj& cmd) const override {
+        return false;
+    }
+
+    bool canIgnorePrepareConflicts() const override {
+        // Map-Reduce is a special case for prepare conflicts. It may do writes to an output
+        // collection, but it enables enforcement of prepare conflicts before doing so. See use of
+        // EnforcePrepareConflictsBlock.
+        return true;
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

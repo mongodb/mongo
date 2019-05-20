@@ -1,6 +1,12 @@
 // This test expects a function stored in the system.js collection to be available for a map/reduce,
 // which may not be the case if it is implicitly sharded in a passthrough.
-// @tags: [does_not_support_stepdowns, requires_non_retryable_writes, assumes_unsharded_collection]
+// @tags: [
+//   assumes_unsharded_collection,
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+//   requires_non_retryable_writes,
+// ]
 (function() {
     "use strict";
 

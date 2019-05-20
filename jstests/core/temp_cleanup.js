@@ -1,4 +1,9 @@
-// @tags: [does_not_support_stepdowns, requires_fastcount]
+// @tags: [
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+//   requires_fastcount,
+// ]
 
 mydb = db.getSisterDB("temp_cleanup_test");
 

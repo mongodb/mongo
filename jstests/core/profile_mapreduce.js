@@ -1,4 +1,9 @@
-// @tags: [does_not_support_stepdowns, requires_profiling]
+// @tags: [
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+//   requires_profiling,
+// ]
 
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
 

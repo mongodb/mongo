@@ -7,7 +7,11 @@
  * operation. This workload is intended to test that there are no deadlocks or unhandled exceptions
  * when tearing down a map-reduce command following an interrupt.
  *
- * @tags: [uses_curop_agg_stage]
+ * @tags: [
+ *   # mapReduce does not support afterClusterTime.
+ *   does_not_support_causal_consistency,
+ *   uses_curop_agg_stage,
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                      // for extendWorkload
 load('jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js');  // for $config

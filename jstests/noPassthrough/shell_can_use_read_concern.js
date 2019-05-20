@@ -196,36 +196,6 @@
         }
 
         //
-        // Tests for the "mapReduce" command.
-        //
-
-        testCommandCanBeCausallyConsistent(function() {
-            const res = assert.commandWorked(db.runCommand({
-                mapReduce: coll.getName(),
-                map: function() {
-                    emit("x", 1);
-                },
-                reduce: function(key, values) {
-                    return values.length;
-                },
-                out: {inline: 1}
-            }));
-            assert.eq([{_id: "x", value: 5}], res.results, tojson(res));
-        });
-
-        testCommandCanBeCausallyConsistent(function() {
-            const res = coll.mapReduce(
-                function() {
-                    emit("x", 1);
-                },
-                function(key, values) {
-                    return values.length;
-                },
-                {out: {inline: 1}});
-            assert.eq([{_id: "x", value: 5}], res.results, tojson(res));
-        });
-
-        //
         // Tests for the "geoSearch" command.
         //
 

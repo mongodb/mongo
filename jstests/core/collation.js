@@ -1,7 +1,13 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, does_not_support_stepdowns,
-// requires_non_retryable_commands, requires_non_retryable_writes]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+//   requires_non_retryable_commands,
+//   requires_non_retryable_writes,
+// ]
 
 // Integration tests for the collation feature.
 (function() {

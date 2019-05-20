@@ -3,6 +3,8 @@
  * that the user gets back a JavaScript stacktrace.
  *
  * @tags: [
+ *   # mapReduce does not support afterClusterTime.
+ *   does_not_support_causal_consistency,
  *   does_not_support_stepdowns,
  *   requires_scripting,
  * ]

@@ -1,6 +1,11 @@
 // Cannot implicitly shard accessed collections because the "jsMode" option to the "mapReduce"
 // command cannot be used on a sharded collection.
-// @tags: [assumes_unsharded_collection, does_not_support_stepdowns]
+// @tags: [
+//   assumes_unsharded_collection,
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+// ]
 
 t = db.mr2;
 t.drop();

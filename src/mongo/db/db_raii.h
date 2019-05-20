@@ -222,4 +222,40 @@ private:
  */
 LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<NamespaceString>& nss);
 
+/**
+ * When in scope, enforces prepare conflicts in the storage engine. Reads and writes in this scope
+ * will block on accessing an already updated document which is in prepared state. And they will
+ * unblock after the prepared transaction that performed the update commits/aborts.
+ */
+class EnforcePrepareConflictsBlock {
+public:
+    explicit EnforcePrepareConflictsBlock(OperationContext* opCtx)
+        : _opCtx(opCtx), _originalValue(opCtx->recoveryUnit()->getIgnorePrepared()) {
+        // It is illegal to call setIgnorePrepared() while any storage transaction is active.
+        // setIgnorePrepared() invariants that there is no active storage transaction.
+        _opCtx->recoveryUnit()->setIgnorePrepared(false);
+    }
+
+    ~EnforcePrepareConflictsBlock() {
+        // If we are still holding locks, we might still have open storage transactions. However, we
+        // did not start with any active transactions when we first entered the scope. And
+        // transactions started within this scope cannot be reused outside of the scope. So we need
+        // to call abandonSnapshot() to close any open transactions on destruction. Any reads or
+        // writes should have already completed as we are exiting the scope. Therefore, this call is
+        // safe.
+        if (_opCtx->lockState()->isLocked()) {
+            _opCtx->recoveryUnit()->abandonSnapshot();
+        }
+        // It is illegal to call setIgnorePrepared() while any storage transaction is active. There
+        // should not be any active transaction if we are not holding locks. If locks are still
+        // being held, the above abandonSnapshot() call should have already closed all storage
+        // transactions.
+        _opCtx->recoveryUnit()->setIgnorePrepared(_originalValue);
+    }
+
+private:
+    OperationContext* _opCtx;
+    bool _originalValue;
+};
+
 }  // namespace mongo

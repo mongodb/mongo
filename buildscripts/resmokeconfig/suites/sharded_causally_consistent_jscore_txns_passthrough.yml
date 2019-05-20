@@ -44,6 +44,7 @@ selector:
   - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
 
   exclude_with_any_tags:
+  - does_not_support_causal_consistency
   # Transactions are not allowed to operate on capped collections.
   - requires_capped
   # Prepare is not a command on mongos.

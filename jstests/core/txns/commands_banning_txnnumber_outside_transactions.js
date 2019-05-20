@@ -1,5 +1,9 @@
 // Test that commands other than retryable writes may not use txnNumber outside transactions.
-// @tags: [requires_document_locking]
+// @tags: [
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   requires_document_locking,
+// ]
 (function() {
     "use strict";
 

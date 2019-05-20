@@ -27,6 +27,7 @@ selector:
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 
   exclude_with_any_tags:
+  - does_not_support_causal_consistency
   - requires_sharding
   # Sharing cursors between state functions will fail in this suite because it will attempt to use
   # the same cursor in multiple transactions.

@@ -1,4 +1,8 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+// ]
 
 // See SERVER-9448
 // Test argument and receiver (aka 'this') objects and their children can be mutated

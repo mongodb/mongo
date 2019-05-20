@@ -17,6 +17,7 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex_background.js
 
   exclude_with_any_tags:
+  - does_not_support_causal_consistency
   - uses_transactions
   # collStats is not causally consistent
   - requires_collstats

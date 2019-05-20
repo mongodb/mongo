@@ -146,6 +146,7 @@ selector:
   - assumes_read_preference_unchanged
   # TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
   - creates_and_authenticates_user
+  - does_not_support_causal_consistency
   - requires_collstats
 
 executor:

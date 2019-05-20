@@ -11,6 +11,10 @@
  *
  * This workload serves as a regression test for SERVER-6757, SERVER-15087,
  * and SERVER-15842.
+ * @tags: [
+ *   # mapReduce does not support afterClusterTime.
+ *   does_not_support_causal_consistency,
+ * ]
  */
 var $config = (function() {
 

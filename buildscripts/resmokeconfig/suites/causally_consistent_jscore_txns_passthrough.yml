@@ -17,6 +17,7 @@ selector:
   - jstests/core/txns/prepare_conflict_aggregation_behavior.js
 
   exclude_with_any_tags:
+  - does_not_support_causal_consistency
   # Transactions are not allowed to operate on capped collections.
   - requires_capped
 

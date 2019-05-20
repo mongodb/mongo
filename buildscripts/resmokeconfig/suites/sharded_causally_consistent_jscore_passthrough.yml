@@ -151,6 +151,7 @@ selector:
   # "Cowardly refusing to run test with overridden read preference when it reads from a
   #  non-replicated collection: ..."
   - assumes_read_preference_unchanged
+  - does_not_support_causal_consistency
 
 executor:
   archive:

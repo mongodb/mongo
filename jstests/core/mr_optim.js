@@ -1,4 +1,9 @@
-// @tags: [does_not_support_stepdowns, requires_getmore]
+// @tags: [
+//   # mapReduce does not support afterClusterTime.
+//   does_not_support_causal_consistency,
+//   does_not_support_stepdowns,
+//   requires_getmore,
+// ]
 
 t = db.mr_optim;
 t.drop();
