@@ -526,6 +526,47 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "applyOps_c_renameCollection_twoDbs",
+          command: {
+              applyOps: [{
+                  "op": "c",
+                  "ns": firstDbName + ".$cmd",
+                  "o": {
+                      "renameCollection": firstDbName + ".x",
+                      "to": secondDbName + ".y",
+                      "stayTemp": false,
+                      "dropTarget": false
+                  }
+              }]
+          },
+          skipSharded: true,
+          setup: function(db) {
+              db.getSisterDB(firstDbName).x.save({});
+              db.getSisterDB(adminDbName).runCommand({movePrimary: firstDbName, to: shard0name});
+              db.getSisterDB(adminDbName).runCommand({movePrimary: secondDbName, to: shard0name});
+          },
+          teardown: function(db) {
+              db.getSisterDB(firstDbName).x.drop();
+              db.getSisterDB(secondDbName).y.drop();
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {
+                      resource: {db: firstDbName, collection: "x"},
+                      actions: ["find", "dropCollection"]
+                    },
+                    {
+                      resource: {db: secondDbName, collection: "y"},
+                      actions: ["insert", "createIndex"]
+                    }
+                ]
+              },
+          ]
+        },
+        {
           testname: "applyOps_insert",
           command: {
               applyOps: [{

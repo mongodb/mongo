@@ -1026,9 +1026,56 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntries) {
         {"create", "index", "inserts", "rename", "drop"});
 }
 
+TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntries) {
+    bool forApplyOps = true;
+    _testRenameCollectionAcrossDatabaseOplogEntries(
+        _opCtx.get(),
+        _sourceNss,
+        _targetNssDifferentDb,
+        &_opObserver->oplogEntries,
+        forApplyOps,
+        {"create", "index", "inserts", "rename", "drop"});
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesDropTarget) {
+    _createCollection(_opCtx.get(), _targetNssDifferentDb);
+    bool forApplyOps = false;
+    _testRenameCollectionAcrossDatabaseOplogEntries(
+        _opCtx.get(),
+        _sourceNss,
+        _targetNssDifferentDb,
+        &_opObserver->oplogEntries,
+        forApplyOps,
+        {"create", "index", "inserts", "rename", "drop"});
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntriesDropTarget) {
+    _createCollection(_opCtx.get(), _targetNssDifferentDb);
+    bool forApplyOps = true;
+    _testRenameCollectionAcrossDatabaseOplogEntries(
+        _opCtx.get(),
+        _sourceNss,
+        _targetNssDifferentDb,
+        &_opObserver->oplogEntries,
+        forApplyOps,
+        {"create", "index", "inserts", "rename", "drop"});
+}
+
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesWritesNotReplicated) {
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     bool forApplyOps = false;
+    _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
+                                                    _sourceNss,
+                                                    _targetNssDifferentDb,
+                                                    &_opObserver->oplogEntries,
+                                                    forApplyOps,
+                                                    {});
+}
+
+TEST_F(RenameCollectionTest,
+       RenameCollectionForApplyOpsAcrossDatabaseOplogEntriesWritesNotReplicated) {
+    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+    bool forApplyOps = true;
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
                                                     _targetNssDifferentDb,

@@ -830,9 +830,12 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     log() << "renameCollectionForApplyOps: rename " << sourceNss << " (" << uuidString << ") to "
           << targetNss << dropTargetMsg;
 
-    invariant(sourceNss.db() == targetNss.db());
-    return renameCollectionWithinDBForApplyOps(
-        opCtx, sourceNss, targetNss, uuidToDrop, renameOpTime, options);
+    if (sourceNss.db() == targetNss.db()) {
+        return renameCollectionWithinDBForApplyOps(
+            opCtx, sourceNss, targetNss, uuidToDrop, renameOpTime, options);
+    } else {
+        return renameBetweenDBs(opCtx, sourceNss, targetNss, options);
+    }
 }
 
 Status renameCollectionForRollback(OperationContext* opCtx,
