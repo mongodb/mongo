@@ -224,7 +224,7 @@ MetadataManager::~MetadataManager() {
 void MetadataManager::_clearAllCleanups(WithLock lock) {
     _clearAllCleanups(
         lock,
-        {ErrorCodes::InterruptedDueToStepDown,
+        {ErrorCodes::InterruptedDueToReplStateChange,
          str::stream() << "Range deletions in " << _nss.ns()
                        << " abandoned because collection was dropped or became unsharded"});
 }

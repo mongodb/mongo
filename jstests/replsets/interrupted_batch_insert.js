@@ -60,7 +60,7 @@
         assert.commandFailedWithCode(
             coll.insert(docsToInsert,
                         {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
-            ErrorCodes.InterruptedDueToStepDown);
+            ErrorCodes.InterruptedDueToReplStateChange);
     }, primary.host, collName, 10 * batchSize);
     worker.start();
 

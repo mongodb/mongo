@@ -163,7 +163,8 @@ protected:
         response.setVoteGranted(true);
         response.setTerm(1);
         response.addToBSON(&result);
-        auto status = Status(ErrorCodes::InterruptedDueToStepDown, "operation was interrupted");
+        auto status =
+            Status(ErrorCodes::InterruptedDueToReplStateChange, "operation was interrupted");
         CommandHelpers::appendCommandStatusNoThrow(result, status);
         return RemoteCommandResponse(result.obj(), Milliseconds(10));
     }

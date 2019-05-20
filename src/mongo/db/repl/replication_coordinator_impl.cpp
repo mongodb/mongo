@@ -1874,9 +1874,8 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn()
     auto uniqueOpCtx = cc().makeOperationContext();
     OperationContext* opCtx = uniqueOpCtx.get();
 
-    // TODO: SERVER-41216 should change the error code as InterruptedDueToReplStateChange.
     // Set the reason for killing operations.
-    ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToStepDown;
+    ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToReplStateChange;
 
     while (true) {
         // Reset the value before killing user operations as we only want to track the number

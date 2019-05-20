@@ -100,7 +100,7 @@ TEST_F(InsertRetryTest, RetryOnInterruptedAndNetworkErrorSuccess) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[0]);
         configTargeter()->setFindHostReturnValue({kTestHosts[1]});
-        return Status(ErrorCodes::InterruptedDueToStepDown, "Interruption");
+        return Status(ErrorCodes::InterruptedDueToReplStateChange, "Interruption");
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
@@ -488,7 +488,8 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
 
         auto writeErrDetail = stdx::make_unique<WriteErrorDetail>();
         writeErrDetail->setIndex(0);
-        writeErrDetail->setStatus({ErrorCodes::InterruptedDueToStepDown, "Operation interrupted"});
+        writeErrDetail->setStatus(
+            {ErrorCodes::InterruptedDueToReplStateChange, "Operation interrupted"});
         response.addToErrDetails(writeErrDetail.release());
 
         return response.toBSON();

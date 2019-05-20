@@ -50,7 +50,7 @@
             data: {shouldContinueOnInterrupt: true}
         }));
 
-        errorCode = errorCode || ErrorCodes.InterruptedDueToStepDown;
+        errorCode = errorCode || ErrorCodes.InterruptedDueToReplStateChange;
         const writeCommand = `db.getMongo().forceWriteMode("commands");
                               assert.commandFailedWithCode(${operation}, ${errorCode});
                               assert.commandWorked(db.adminCommand({ping:1}));`;

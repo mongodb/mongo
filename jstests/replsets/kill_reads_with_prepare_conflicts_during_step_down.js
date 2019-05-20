@@ -66,7 +66,7 @@
             filter: {_id: 1},
             readConcern: {afterClusterTime: clusterTime}
         }),
-                                     ErrorCodes.InterruptedDueToStepDown);
+                                     ErrorCodes.InterruptedDueToReplStateChange);
     }, primary.port);
 
     jsTestLog("Waiting for failpoint");

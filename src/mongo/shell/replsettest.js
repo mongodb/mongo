@@ -939,7 +939,7 @@ var ReplSetTest = function(opts) {
                 [
                   ErrorCodes.NodeNotFound,
                   ErrorCodes.NewReplicaSetConfigurationIncompatible,
-                  ErrorCodes.InterruptedDueToStepDown
+                  ErrorCodes.InterruptedDueToReplStateChange
                 ],
                 errorMsg);
             return result.ok;
@@ -982,8 +982,8 @@ var ReplSetTest = function(opts) {
         // replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error if a
         // heartbeat times out during the quorum check. They may also fail with
         // NewReplicaSetConfigurationIncompatible on similar timeout during the config validation
-        // stage while deducing isSelf(). This can fail with an InterruptedDueToStepDown error when
-        // interrupted. We try several times, to reduce the chance of failing this way.
+        // stage while deducing isSelf(). This can fail with an InterruptedDueToReplStateChange
+        // error when interrupted. We try several times, to reduce the chance of failing this way.
         replSetCommandWithRetry(master, cmd);
         this.getPrimary();  // Blocks until there is a primary.
 

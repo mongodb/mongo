@@ -279,7 +279,7 @@ error_code("UnsatisfiableCommitQuorum", 278)
 error_code("ClientDisconnect", 279)
 error_code("ChangeStreamFatalError", 280)
 # The two codes below are for internal use only and must never be returned in a network response
-error_code("TransactionCoordinatorSteppingDown", 281) # Gets converted to InterruptedDueToStepDown
+error_code("TransactionCoordinatorSteppingDown", 281) # Gets converted to InterruptedDueToReplStateChange
 error_code("TransactionCoordinatorReachedAbortDecision", 282)
 error_code("WouldChangeOwningShard", 283, extra="WouldChangeOwningShardInfo")
 error_code("ForTestingErrorExtraInfoWithExtraInfoInNamespace", 284, extra="nested::twice::NestedErrorExtraInfoExample")
@@ -300,7 +300,7 @@ error_code("BSONObjectTooLarge", 10334)
 error_code("DuplicateKey", 11000, extra="DuplicateKeyErrorInfo")
 error_code("InterruptedAtShutdown", 11600)
 error_code("Interrupted", 11601)
-error_code("InterruptedDueToStepDown", 11602)
+error_code("InterruptedDueToReplStateChange", 11602)
 error_code("OutOfDiskSpace", 14031 )
 # TODO SERVER-36385: Mark KeyTooLong error as obsolete
 error_code("KeyTooLong", 17280);
@@ -318,7 +318,7 @@ error_code("MergeStageNoMatchingDocument", 13113);
 error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout", "SocketException"])
 error_class("Interruption", ["Interrupted",
                              "InterruptedAtShutdown",
-                             "InterruptedDueToStepDown",
+                             "InterruptedDueToReplStateChange",
                              "ExceededTimeLimit",
                              "MaxTimeMSExpired",
                              "CursorKilled",
@@ -332,7 +332,7 @@ error_class("NotMasterError", [
     "NotMaster",
     "NotMasterNoSlaveOk",
     "NotMasterOrSecondary",
-    "InterruptedDueToStepDown",
+    "InterruptedDueToReplStateChange",
     "PrimarySteppedDown",
     ])
 error_class("StaleShardVersionError",

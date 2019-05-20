@@ -276,10 +276,10 @@ bool TransactionCoordinator::_reserveKickOffCommitPromise() {
 void TransactionCoordinator::_done(Status status) {
     // TransactionCoordinatorSteppingDown indicates the *sending* node (that is, *this* node) is
     // stepping down. Active coordinator tasks are interrupted with this code instead of
-    // InterruptedDueToStepDown, because InterruptedDueToStepDown indicates the *receiving* node was
-    // stepping down.
+    // InterruptedDueToReplStateChange, because InterruptedDueToReplStateChange indicates the
+    // *receiving* node was stepping down.
     if (status == ErrorCodes::TransactionCoordinatorSteppingDown)
-        status = Status(ErrorCodes::InterruptedDueToStepDown,
+        status = Status(ErrorCodes::InterruptedDueToReplStateChange,
                         str::stream() << "Coordinator " << _lsid.getId() << ':' << _txnNumber
                                       << " stopped due to: "
                                       << status.reason());

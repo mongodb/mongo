@@ -76,8 +76,8 @@
         }));
 
         // Start transaction.
-        TestData.cmd =
-            preOp + `assert.commandFailedWithCode(${op}, ErrorCodes.InterruptedDueToStepDown);`;
+        TestData.cmd = preOp +
+            `assert.commandFailedWithCode(${op}, ErrorCodes.InterruptedDueToReplStateChange);`;
         const waitForTxnShell = startTxn({});
 
         jsTestLog("Waiting for primary to reach failPoint '" + failPoint + "'.");

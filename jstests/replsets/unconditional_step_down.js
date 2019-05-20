@@ -84,7 +84,7 @@
             jsTestLog("Start blocking insert cmd before step down");
             assert.commandFailedWithCode(
                 db.getSiblingDB(TestData.dbName)[TestData.collName].insert([{val: 'writeOp1'}]),
-                ErrorCodes.InterruptedDueToStepDown);
+                ErrorCodes.InterruptedDueToReplStateChange);
         }, primary.port);
 
         const joinUnblockStepDown = startSafeParallelShell(() => {

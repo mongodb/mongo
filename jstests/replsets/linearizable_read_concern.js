@@ -28,7 +28,7 @@ load('jstests/libs/write_concern_util.js');
         assert.commandFailedWithCode(
             coll.runCommand(
                 {'find': 'foo', readConcern: {level: "linearizable"}, maxTimeMS: 60000}),
-            ErrorCodes.InterruptedDueToStepDown);
+            ErrorCodes.InterruptedDueToReplStateChange);
     };
 
     var num_nodes = 3;

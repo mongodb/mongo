@@ -534,9 +534,9 @@ TEST_F(RollbackImplTest, RollbackKillsNecessaryOperations) {
 
     // We assume that an interrupted opCtx would release its locks.
     unittest::log() << "Both opCtx's marked for kill";
-    ASSERT_EQ(ErrorCodes::NotMasterOrSecondary, writeOpCtx->checkForInterruptNoAssert());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, writeOpCtx->checkForInterruptNoAssert());
     globalWrite = boost::none;
-    ASSERT_EQ(ErrorCodes::NotMasterOrSecondary, readOpCtx->checkForInterruptNoAssert());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, readOpCtx->checkForInterruptNoAssert());
     globalRead = boost::none;
     unittest::log() << "Both opCtx's were interrupted";
 

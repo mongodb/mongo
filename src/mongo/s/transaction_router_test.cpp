@@ -83,7 +83,7 @@ protected:
 
     const Status kDummyStatus = {ErrorCodes::InternalError, "dummy"};
 
-    const Status kDummyRetryableStatus = {ErrorCodes::InterruptedDueToStepDown, "dummy"};
+    const Status kDummyRetryableStatus = {ErrorCodes::InterruptedDueToReplStateChange, "dummy"};
 
     const BSONObj kDummyOkRes = BSON("ok" << 1);
 
@@ -2467,7 +2467,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     auto retryableError = [&] {
         BSONObjBuilder bob;
         CommandHelpers::appendCommandStatusNoThrow(
-            bob, Status(ErrorCodes::InterruptedDueToStepDown, "dummy"));
+            bob, Status(ErrorCodes::InterruptedDueToReplStateChange, "dummy"));
         return bob.obj();
     }();
 

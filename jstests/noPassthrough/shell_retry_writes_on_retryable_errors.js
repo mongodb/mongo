@@ -108,7 +108,7 @@
                 configureFailPoint: "onPrimaryTransactionalWrite",
                 data: {
                     closeConnection: false,
-                    failBeforeCommitExceptionCode: ErrorCodes.InterruptedDueToStepDown
+                    failBeforeCommitExceptionCode: ErrorCodes.InterruptedDueToReplStateChange
                 },
                 mode: {times: 1}
             });

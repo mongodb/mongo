@@ -85,7 +85,7 @@ function isRetryableError(error) {
     const retryableErrors = [
         "Interrupted",
         "InterruptedAtShutdown",
-        "InterruptedDueToStepDown",
+        "InterruptedDueToReplStateChange",
         "ExceededTimeLimit",
         "MaxTimeMSExpired",
         "CursorKilled",
@@ -98,7 +98,6 @@ function isRetryableError(error) {
         "NotMaster",
         "NotMasterNoSlaveOk",
         "NotMasterOrSecondary",
-        "InterruptedDueToStepDown",
         "PrimarySteppedDown",
         "WriteConcernFailed",
         "WriteConcernLegacyOK",

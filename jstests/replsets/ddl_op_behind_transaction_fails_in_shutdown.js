@@ -56,7 +56,7 @@
         const res = db.getSiblingDB(dbName).runCommand({drop: collName});
         assert.commandFailedWithCode(
             res,
-            [ErrorCodes.InterruptedAtShutdown, ErrorCodes.InterruptedDueToStepDown],
+            [ErrorCodes.InterruptedAtShutdown, ErrorCodes.InterruptedDueToReplStateChange],
             "parallel shell drop cmd completed in an unexpected way: " + tojson(res));
         jsTest.log("Done dropping collection in parallel shell");
     }

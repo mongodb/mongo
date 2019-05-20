@@ -295,7 +295,7 @@ void killAllUserOperations(OperationContext* opCtx) {
         }
 
         if (toKill && !toKill->isKillPending()) {
-            serviceCtx->killOperation(lk, toKill, ErrorCodes::NotMasterOrSecondary);
+            serviceCtx->killOperation(lk, toKill, ErrorCodes::InterruptedDueToReplStateChange);
             numOpsKilled++;
         }
     }

@@ -108,32 +108,32 @@ TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
     ASSERT_NOT_CATCHES(ErrorCodes::NotMaster, ExceptionForCat<ErrorCategory::Interruption>);
 }
 
-// InterruptedDueToStepDown - NotMasterError and Interruption
+// InterruptedDueToReplStateChange - NotMasterError and Interruption
 MONGO_STATIC_ASSERT(
     std::is_same<
-        error_details::ErrorCategoriesFor<ErrorCodes::InterruptedDueToStepDown>,
+        error_details::ErrorCategoriesFor<ErrorCodes::InterruptedDueToReplStateChange>,
         error_details::CategoryList<ErrorCategory::Interruption, ErrorCategory::NotMasterError>>());
-MONGO_STATIC_ASSERT(
-    std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::InterruptedDueToStepDown>>());
+MONGO_STATIC_ASSERT(std::is_base_of<AssertionException,
+                                    ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
 MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
-                                     ExceptionFor<ErrorCodes::InterruptedDueToStepDown>>());
+                                     ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
 MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
-                                    ExceptionFor<ErrorCodes::InterruptedDueToStepDown>>());
+                                    ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
 MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
-                                    ExceptionFor<ErrorCodes::InterruptedDueToStepDown>>());
+                                    ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
 
 TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
-    ASSERT_CATCHES(ErrorCodes::InterruptedDueToStepDown, DBException);
-    ASSERT_CATCHES(ErrorCodes::InterruptedDueToStepDown, AssertionException);
-    ASSERT_CATCHES(ErrorCodes::InterruptedDueToStepDown,
-                   ExceptionFor<ErrorCodes::InterruptedDueToStepDown>);
-    ASSERT_NOT_CATCHES(ErrorCodes::InterruptedDueToStepDown,
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange, DBException);
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange, AssertionException);
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
+                   ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>);
+    ASSERT_NOT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
                        ExceptionFor<ErrorCodes::DuplicateKey>);
-    ASSERT_NOT_CATCHES(ErrorCodes::InterruptedDueToStepDown,
+    ASSERT_NOT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
                        ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT_CATCHES(ErrorCodes::InterruptedDueToStepDown,
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
                    ExceptionForCat<ErrorCategory::NotMasterError>);
-    ASSERT_CATCHES(ErrorCodes::InterruptedDueToStepDown,
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
                    ExceptionForCat<ErrorCategory::Interruption>);
 }
 
