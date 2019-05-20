@@ -38,6 +38,7 @@
 #include <algorithm>
 
 #include "mongo/base/status.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_clock.h"
@@ -401,20 +402,24 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     auto opCtx = cc().makeOperationContext();
 
-    // kill all write operations which are no longer safe to run on step down. Also, operations that
-    // have taken global lock in S mode and operations blocked on prepare conflict will be killed to
-    // avoid 3-way deadlock between read, prepared transaction and step down thread.
-    AutoGetRstlForStepUpStepDown arsd(this, opCtx.get());
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    ReplicationStateTransitionLockGuard rstlLock(
+        opCtx.get(), MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
 
-    // This node has already stepped down due to reconfig.
-    if (!_topCoord->isSteppingDownUnconditionally()) {
-        return;
+    // kill all write operations which are no longer safe to run on step down. Also, operations that
+    // have taken global lock in S mode will be killed to avoid 3-way deadlock between read,
+    // prepared transaction and step down thread.
+    KillOpContainer koc(this, opCtx.get());
+    koc.startKillOpThread();
+
+    {
+        auto rstlOnErrorGuard = makeGuard([&koc] { koc.stopAndWaitForKillOpThread(); });
+        rstlLock.waitForLockUntil(Date_t::max());
     }
 
     // Yield locks for prepared transactions.
     yieldLocksForPreparedTransactions(opCtx.get());
-    _updateAndLogStatsOnStepDown(&arsd);
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     _topCoord->finishUnconditionalStepDown();
     const auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx.get());
@@ -428,14 +433,8 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     }
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
+    _updateAndLogStatsOnStepDown(&koc);
     _replExecutor->signalEvent(finishedEvent);
-}
-
-bool ReplicationCoordinatorImpl::_shouldStepDownOnReconfig(WithLock,
-                                                           const ReplSetConfig& newConfig,
-                                                           StatusWith<int> myIndex) {
-    return _memberState.primary() &&
-        !(myIndex.isOK() && newConfig.getMemberAt(myIndex.getValue()).isElectable());
 }
 
 void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSetConfig& newConfig) {
@@ -591,58 +590,36 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         return;
     }
 
-    // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
-    // If there is an election in-progress, there can be at most one. No new election can happen as
-    // we have already set our ReplicationCoordinatorImpl::_rsConfigState state to
-    // "kConfigReconfiguring" which prevents new elections from happening.
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
-            LOG_FOR_HEARTBEATS(0)
-                << "Waiting for election to complete before finishing reconfig to version "
-                << newConfig.getConfigVersion();
-            // Wait for the election to complete and the node's Role to be set to follower.
-            _replExecutor
-                ->onEvent(electionFinishedEvent,
-                          [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                              _heartbeatReconfigFinish(cbData, newConfig, myIndex);
-                          })
-                .status_with_transitional_ignore();
-            return;
-        }
-    }
-
     auto opCtx = cc().makeOperationContext();
-
-    boost::optional<AutoGetRstlForStepUpStepDown> arsd;
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (_shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
-        _topCoord->prepareForUnconditionalStepDown();
+    boost::optional<ReplicationStateTransitionLockGuard> transitionGuard;
+    stdx::unique_lock<stdx::mutex> lk{_mutex};
+    if (_memberState.primary()) {
+        // If we are primary, we need the RSTL in mode X to step down. If we somehow
+        // transition out of primary while waiting for the RSTL, there's no harm in holding
+        // it.
         lk.unlock();
-
-        // Primary node will be either unelectable or removed after the configuration change.
-        // So, finish the reconfig under RSTL, so that the step down occurs safely.
-        arsd.emplace(this, opCtx.get());
-
+        transitionGuard.emplace(opCtx.get(), MODE_X);
         lk.lock();
-        if (_topCoord->isSteppingDownUnconditionally()) {
-            invariant(opCtx->lockState()->isRSTLExclusive());
-            log() << "stepping down from primary, because we received a new config via heartbeat";
-            yieldLocksForPreparedTransactions(opCtx.get());
-            _updateAndLogStatsOnStepDown(&arsd.get());
-        } else {
-            // Release the rstl lock as the node might have stepped down due to
-            // other unconditional step down code paths like learning new term via heartbeat &
-            // liveness timeout. And, no new election can happen as we have already set our
-            // ReplicationCoordinatorImpl::_rsConfigState state to "kConfigReconfiguring" which
-            // prevents new elections from happening. So, its safe to release the RSTL lock.
-            arsd.reset();
-        }
     }
 
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
+
+    // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
+        LOG_FOR_HEARTBEATS(0)
+            << "Waiting for election to complete before finishing reconfig to version "
+            << newConfig.getConfigVersion();
+        // Wait for the election to complete and the node's Role to be set to follower.
+        _replExecutor
+            ->onEvent(electionFinishedEvent,
+                      [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                          _heartbeatReconfigFinish(cbData, newConfig, myIndex);
+                      })
+            .status_with_transitional_ignore();
+        return;
+    }
 
     if (!myIndex.isOK()) {
         switch (myIndex.getStatus().code()) {
@@ -669,7 +646,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
-
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 

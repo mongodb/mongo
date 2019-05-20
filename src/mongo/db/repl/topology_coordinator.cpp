@@ -1317,9 +1317,8 @@ bool TopologyCoordinator::prepareForUnconditionalStepDown() {
         // Can only be processing one required stepdown at a time.
         return false;
     }
-    // Heartbeat and reconfig (via cmd or heartbeat) initiated stepdowns take precedence over
-    // stepdown command initiated stepdowns, so it's safe to transition from kAttemptingStepDown
-    // to kSteppingDown.
+    // Heartbeat-initiated stepdowns take precedence over stepdown command initiated stepdowns, so
+    // it's safe to transition from kAttemptingStepDown to kSteppingDown.
     _setLeaderMode(LeaderMode::kSteppingDown);
     return true;
 }
@@ -2118,12 +2117,9 @@ int TopologyCoordinator::_getTotalPings() {
     return totalPings;
 }
 
-bool TopologyCoordinator::isSteppingDownUnconditionally() const {
-    return _leaderMode == LeaderMode::kSteppingDown;
-}
-
 bool TopologyCoordinator::isSteppingDown() const {
-    return isSteppingDownUnconditionally() || _leaderMode == LeaderMode::kAttemptingStepDown;
+    return _leaderMode == LeaderMode::kAttemptingStepDown ||
+        _leaderMode == LeaderMode::kSteppingDown;
 }
 
 void TopologyCoordinator::_setLeaderMode(TopologyCoordinator::LeaderMode newMode) {

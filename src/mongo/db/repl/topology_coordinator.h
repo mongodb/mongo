@@ -123,16 +123,10 @@ public:
     bool canAcceptWrites() const;
 
     /**
-     * Returns true if this node is in the process of stepping down unconditionally.
-     */
-    bool isSteppingDownUnconditionally() const;
-
-    /**
-     * Returns true if this node is in the process of stepping down either conditionally or
-     * unconditionally. Note that this can be due to an unconditional stepdown that must
-     * succeed (for instance from learning about a new term) or due to a stepdown attempt
-     * that could fail (for instance from a stepdown cmd that could fail if not enough nodes
-     * are caught up).
+     * Returns true if this node is in the process of stepping down.  Note that this can be
+     * due to an unconditional stepdown that must succeed (for instance from learning about a new
+     * term) or due to a stepdown attempt that could fail (for instance from a stepdown cmd that
+     * could fail if not enough nodes are caught up).
      */
     bool isSteppingDown() const;
 
@@ -579,18 +573,8 @@ public:
      * Readies the TopologyCoordinator for stepdown.  Returns false if we're already in the process
      * of an unconditional step down.  If we are in the middle of a stepdown command attempt when
      * this is called then this unconditional stepdown will supersede the stepdown attempt, which
-     * will cause the stepdown to fail.  When this returns true, step down via heartbeat and
-     * reconfig should call finishUnconditionalStepDown() and updateConfig respectively by holding
-     * the RSTL lock in X mode.
-     *
-     * An unconditional step down can be caused due to below reasons.
-     *     1) Learning new term via heartbeat.
-     *     2) Liveness timeout.
-     *     3) Force reconfig command.
-     *     4) Force reconfig via heartbeat.
-     * At most 2 operations can be in the middle of unconditional step down. And, out of 2
-     * operations, one should be due to reason #1 or #2 and other should be due to reason #3 or #4,
-     * in which case only one succeeds in stepping down and other does nothing.
+     * will cause the stepdown to fail.  When this returns true it must be followed by a call to
+     * finishUnconditionalStepDown() that is called when holding the global X lock.
      */
     bool prepareForUnconditionalStepDown();
 
@@ -772,8 +756,7 @@ private:
         kNotLeader,           // This node is not currently a leader.
         kLeaderElect,         // This node has been elected leader, but can't yet accept writes.
         kMaster,              // This node reports ismaster:true and can accept writes.
-        kSteppingDown,        // This node is in the middle of a (hb/force reconfig) stepdown that
-                              // must complete.
+        kSteppingDown,        // This node is in the middle of a (hb) stepdown that must complete.
         kAttemptingStepDown,  // This node is in the middle of a stepdown (cmd) that might fail.
     };
 
