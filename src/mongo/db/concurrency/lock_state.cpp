@@ -977,7 +977,7 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
 void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {
     auto ticketholder = FlowControlTicketholder::get(opCtx);
     if (ticketholder && lockMode == LockMode::MODE_IX && _clientState.load() == kInactive &&
-        opCtx->shouldParticipateInFlowControl()) {
+        opCtx->shouldParticipateInFlowControl() && !_uninterruptibleLocksRequested) {
         // FlowControl only acts when a MODE_IX global lock is being taken. The clientState is only
         // being modified here to change serverStatus' `globalLock.currentQueue` metrics. This
         // method must not exit with a side-effect on the clientState. That value is also used for
