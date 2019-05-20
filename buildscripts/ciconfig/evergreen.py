@@ -6,8 +6,6 @@ configuration file.
 
 import datetime
 import distutils.spawn  # pylint: disable=no-name-in-module
-import fnmatch
-import os
 import re
 
 import yaml
@@ -29,10 +27,10 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
         error_code, output = cmd.execute()
         if error_code:
             raise RuntimeError("Unable to evaluate {}: {}".format(path, output))
-        config = yaml.load(output)
+        config = yaml.safe_load(output)
     else:
         with open(path, "r") as fstream:
-            config = yaml.load(fstream)
+            config = yaml.safe_load(fstream)
 
     return EvergreenProjectConfig(config)
 
