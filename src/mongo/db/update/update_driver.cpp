@@ -150,6 +150,7 @@ UpdateDriver::UpdateDriver(const boost::intrusive_ptr<ExpressionContext>& expCtx
 void UpdateDriver::parse(
     const write_ops::UpdateModification& updateMod,
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+    boost::optional<BSONObj> constants,
     const bool multi) {
     invariant(!_updateExecutor, "Multiple calls to parse() on same UpdateDriver");
 
@@ -158,10 +159,12 @@ void UpdateDriver::parse(
                 "arrayFilters may not be specified for pipeline-syle updates",
                 arrayFilters.empty());
         _updateExecutor =
-            stdx::make_unique<PipelineExecutor>(_expCtx, updateMod.getUpdatePipeline());
+            stdx::make_unique<PipelineExecutor>(_expCtx, updateMod.getUpdatePipeline(), constants);
         _updateType = UpdateType::kPipeline;
         return;
     }
+
+    uassert(51198, "Constant values may only be specified for pipeline updates", !constants);
 
     // Check if the update expression is a full object replacement.
     if (isDocReplacement(updateMod)) {

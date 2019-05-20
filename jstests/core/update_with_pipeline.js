@@ -21,14 +21,26 @@
      * Confirms that an update returns the expected set of documents. 'nModified' documents from
      * 'resultDocList' must match. 'nModified' may be smaller then the number of elements in
      * 'resultDocList'. This allows for the case where there are multiple documents that could be
-     * updated, but only one is actually updated due to a 'multi: false' argument.
+     * updated, but only one is actually updated due to a 'multi: false' argument. Constant values
+     * to the update command are passed in the 'constants' argument.
      */
-    function testUpdate(
-        {query, initialDocumentList, update, resultDocList, nModified, options = {}}) {
+    function testUpdate({
+        query,
+        initialDocumentList,
+        update,
+        resultDocList,
+        nModified,
+        options = {},
+        constants = undefined
+    }) {
         assert.eq(initialDocumentList.length, resultDocList.length);
         assert.commandWorked(coll.remove({}));
         assert.commandWorked(coll.insert(initialDocumentList));
-        const res = assert.commandWorked(coll.update(query, update, options));
+        const upd = Object.assign({q: query, u: update}, options);
+        if (constants !== undefined) {
+            upd.c = constants;
+        }
+        const res = assert.commandWorked(db.runCommand({update: collName, updates: [upd]}));
         assert.eq(nModified, res.nModified);
 
         let nMatched = 0;
@@ -37,7 +49,8 @@
                 ++nMatched;
             }
         }
-        assert.eq(nModified, nMatched);
+        assert.eq(
+            nModified, nMatched, `actual=${coll.find().toArray()}, expected=${resultDocList}`);
     }
 
     function testUpsertDoesInsert(query, update, resultDoc) {
@@ -146,4 +159,64 @@
     assert.commandFailedWithCode(
         coll.update({_id: 1}, [{$set: {x: 1}}], {arrayFilters: [{x: {$eq: 1}}]}),
         ErrorCodes.FailedToParse);
+
+    // Constants can be specified with pipeline-style updates.
+    testUpdate({
+        query: {_id: 1},
+        initialDocumentList: [{_id: 1, x: 1}],
+        useUpdateCommand: true,
+        constants: {foo: "bar"},
+        update: [{$set: {foo: "$$foo"}}],
+        resultDocList: [{_id: 1, x: 1, foo: "bar"}],
+        nModified: 1
+    });
+    testUpdate({
+        query: {_id: 1},
+        initialDocumentList: [{_id: 1, x: 1}],
+        useUpdateCommand: true,
+        constants: {foo: {a: {b: {c: "bar"}}}},
+        update: [{$set: {foo: "$$foo"}}],
+        resultDocList: [{_id: 1, x: 1, foo: {a: {b: {c: "bar"}}}}],
+        nModified: 1
+    });
+    testUpdate({
+        query: {_id: 1},
+        initialDocumentList: [{_id: 1, x: 1}],
+        useUpdateCommand: true,
+        constants: {foo: [1, 2, 3]},
+        update: [{$set: {foo: {$arrayElemAt: ["$$foo", 2]}}}],
+        resultDocList: [{_id: 1, x: 1, foo: 3}],
+        nModified: 1
+    });
+
+    // References to document fields are not resolved in constants.
+    testUpdate({
+        query: {_id: 1},
+        initialDocumentList: [{_id: 1, x: 1}],
+        useUpdateCommand: true,
+        constants: {foo: "$x"},
+        update: [{$set: {foo: "$$foo"}}],
+        resultDocList: [{_id: 1, x: 1, foo: "$x"}],
+        nModified: 1
+    });
+
+    // Cannot use expressions in constants.
+    assert.commandFailedWithCode(db.runCommand({
+        update: collName,
+        updates: [{q: {_id: 1}, u: [{$set: {x: "$$foo"}}], c: {foo: {$add: [1, 2]}}}]
+    }),
+                                 ErrorCodes.DollarPrefixedFieldName);
+
+    // Cannot use constants with regular updates.
+    assert.commandFailedWithCode(
+        db.runCommand(
+            {update: collName, updates: [{q: {_id: 1}, u: {x: "$$foo"}, c: {foo: "bar"}}]}),
+        51198);
+    assert.commandFailedWithCode(
+        db.runCommand(
+            {update: collName, updates: [{q: {_id: 1}, u: {$set: {x: "$$foo"}}, c: {foo: "bar"}}]}),
+        51198);
+    assert.commandFailedWithCode(
+        db.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {x: "1"}}, c: {}}]}),
+        51198);
 })();

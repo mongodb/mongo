@@ -64,16 +64,14 @@ public:
                 boost::optional<OID> targetEpoch) override;
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                std::vector<BSONObj>&& queries,
-                std::vector<write_ops::UpdateModification>&& updates,
+                BatchedObjects&& batch,
                 const WriteConcernOptions& wc,
                 bool upsert,
                 bool multi,
                 boost::optional<OID> targetEpoch) override;
     WriteResult updateWithResult(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  const NamespaceString& ns,
-                                 std::vector<BSONObj>&& queries,
-                                 std::vector<write_ops::UpdateModification>&& updates,
+                                 BatchedObjects&& batch,
                                  const WriteConcernOptions& wc,
                                  bool upsert,
                                  bool multi,
@@ -162,8 +160,7 @@ protected:
      * Note that 'queries' and 'updates' must be the same length.
      */
     Update buildUpdateOp(const NamespaceString& nss,
-                         std::vector<BSONObj>&& queries,
-                         std::vector<write_ops::UpdateModification>&& updates,
+                         BatchedObjects&& batch,
                          bool upsert,
                          bool multi,
                          bool bypassDocValidation);

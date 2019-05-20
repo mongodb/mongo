@@ -260,4 +260,23 @@
         assert.commandWorked(source.dropIndex({_id: 1, a: -1}));
         assert.commandWorked(target.dropIndex({_id: 1, a: -1}));
     })();
+
+    // Test that variables referencing the fields in the source document can be specified in the
+    // 'let' argument and referenced in the update pipeline.
+    (function testMergeWithLetVariables() {
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+        assert.commandWorked(target.insert([{_id: 1, c: 1}]));
+
+        assert.doesNotThrow(() => source.aggregate([{
+            $merge: {
+                into: target.getName(),
+                let : {x: "$a", y: "$b"},
+                whenMatched: [{$set: {z: {$add: ["$$x", "$$y"]}}}],
+                whenNotMatched: "discard"
+            }
+        }]));
+        assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 2}]});
+    })();
 }());

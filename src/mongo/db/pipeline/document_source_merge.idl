@@ -92,6 +92,13 @@ structs:
                 optional: true
                 description: A single field or array of fields that uniquely identify a document.
 
+            let:
+                type: object
+                optional: true
+                description: Specifies variables to use in the update pipeline defined in
+                             MergeWhenMatchedPolicy when the 'whenMatched' mode is a custom
+                             pipeline.
+
             whenMatched:
                 type: MergeWhenMatchedPolicy
                 optional: true

@@ -42,41 +42,9 @@ namespace mongo {
  */
 class DocumentSourceMerge final : public DocumentSource {
 public:
+    using BatchedObjects = MongoProcessInterface::BatchedObjects;
+
     static constexpr StringData kStageName = "$merge"_sd;
-
-    /**
-     * Storage for a batch of BSON Objects to be inserted/updated to the write namespace. The
-     * extracted 'on' field values are also stored in a batch, used by 'MergeStrategy' as the query
-     * portion of the update or insert.
-     */
-    struct BatchedObjects {
-        void emplace(write_ops::UpdateModification&& mod, BSONObj&& key) {
-            modifications.emplace_back(std::move(mod));
-            uniqueKeys.emplace_back(std::move(key));
-        }
-
-        bool empty() const {
-            return modifications.empty();
-        }
-
-        size_t size() const {
-            return modifications.size();
-        }
-
-        void clear() {
-            modifications.clear();
-            uniqueKeys.clear();
-        }
-
-        // For each element in the batch we store an UpdateModification which is either the new
-        // document we want to upsert or insert into the collection (i.e. a 'classic' replacement
-        // update), or the pipeline to run to compute the new document.
-        std::vector<write_ops::UpdateModification> modifications;
-
-        // Store the unique keys as BSON objects instead of Documents for compatibility with the
-        // batch update command. (e.g. {q: <array of uniqueKeys>, u: <array of objects>})
-        std::vector<BSONObj> uniqueKeys;
-    };
 
     // A descriptor for a merge strategy. Holds a merge strategy function and a set of actions
     // the client should be authorized to perform in order to be able to execute a merge operation
@@ -125,7 +93,8 @@ public:
     DocumentSourceMerge(NamespaceString outputNs,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const MergeStrategyDescriptor& descriptor,
-                        boost::optional<std::vector<BSONObj>>&& pipeline,
+                        boost::optional<BSONObj> letVariables,
+                        boost::optional<std::vector<BSONObj>> pipeline,
                         std::set<FieldPath> mergeOnFields,
                         boost::optional<ChunkVersion> targetCollectionVersion,
                         bool serializeAsOutStage);
@@ -205,7 +174,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         MergeStrategyDescriptor::WhenMatched whenMatched,
         MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
-        boost::optional<std::vector<BSONObj>>&& pipeline,
+        boost::optional<BSONObj> letVariables,
+        boost::optional<std::vector<BSONObj>> pipeline,
         std::set<FieldPath> mergeOnFields,
         boost::optional<ChunkVersion> targetCollectionVersion,
         bool serializeAsOutStage);
@@ -224,18 +194,44 @@ private:
         OutStageWriteBlock writeBlock(pExpCtx->opCtx);
 
         try {
-            _descriptor.strategy(
-                pExpCtx, _outputNs, _writeConcern, _targetEpoch(), std::move(batch));
+            auto targetEpoch = _targetCollectionVersion
+                ? boost::optional<OID>(_targetCollectionVersion->epoch())
+                : boost::none;
+
+            _descriptor.strategy(pExpCtx, _outputNs, _writeConcern, targetEpoch, std::move(batch));
         } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {
             uassertStatusOKWithContext(ex.toStatus(),
                                        "$merge failed to update the matching document, did you "
                                        "attempt to modify the _id or the shard key?");
         }
-    };
+    }
 
-    boost::optional<OID> _targetEpoch() {
-        return _targetCollectionVersion ? boost::optional<OID>(_targetCollectionVersion->epoch())
-                                        : boost::none;
+    /**
+     * Creates an UpdateModification object from the given 'doc' to be used with the batched update.
+     */
+    auto makeBatchUpdateModification(const Document& doc) {
+        return _pipeline ? write_ops::UpdateModification(*_pipeline)
+                         : write_ops::UpdateModification(doc.toBson());
+    }
+
+    /**
+     * Resolves 'let' defined variables against the 'doc' and stores the results in the returned
+     * BSON.
+     */
+    boost::optional<BSONObj> resolveLetVariablesIfNeeded(const Document& doc) {
+        // When we resolve 'let' variables, an empty BSON object or boost::none won't make any
+        // difference at the end-point (in the PipelineExecutor), as in both cases we will end up
+        // with the update pipeline ExpressionContext not being populated with any variables, so we
+        // are not making a distinction between these two cases here.
+        if (!_letVariables || _letVariables->empty()) {
+            return boost::none;
+        }
+
+        BSONObjBuilder bob;
+        for (auto && [ name, expr ] : *_letVariables) {
+            bob << name << expr->evaluate(doc);
+        }
+        return bob.obj();
     }
 
     // Stash the writeConcern of the original command as the operation context may change by the
@@ -256,6 +252,13 @@ private:
     // a reference to an element in a static const map 'kMergeStrategyDescriptors', which owns the
     // descriptor.
     const MergeStrategyDescriptor& _descriptor;
+
+    // Holds 'let' variables defined in this stage. These variables are propagated to the
+    // ExpressionContext of the pipeline update for use in the inner pipeline execution. The key
+    // of the map is a variable name as defined in the $merge spec 'let' argument, and the value is
+    // a parsed Expression, defining how the variable value must be evaluated.
+    boost::optional<stdx::unordered_map<std::string, boost::intrusive_ptr<Expression>>>
+        _letVariables;
 
     // A custom pipeline to compute a new version of merging documents.
     boost::optional<std::vector<BSONObj>> _pipeline;

@@ -95,12 +95,25 @@ TEST(Parse, ObjectReplacment) {
 }
 
 TEST(Parse, ParseUpdateWithPipeline) {
-    setTestCommandsEnabled(true);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto updateObj = BSON("u" << BSON_ARRAY(BSON("$addFields" << BSON("a" << 1))));
     ASSERT_DOES_NOT_THROW(driver.parse(updateObj["u"], arrayFilters));
+    ASSERT_TRUE(driver.type() == UpdateDriver::UpdateType::kPipeline);
+}
+
+TEST(Parse, ParseUpdateWithPipelineAndVariables) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver driver(expCtx);
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    const auto variables = BSON("var1" << 1 << "var2"
+                                       << "foo");
+    auto updateObj = BSON("u" << BSON_ARRAY(BSON("$set" << BSON("a"
+                                                                << "$$var1"
+                                                                << "b"
+                                                                << "$$var2"))));
+    ASSERT_DOES_NOT_THROW(driver.parse(updateObj["u"], arrayFilters, variables));
     ASSERT_TRUE(driver.type() == UpdateDriver::UpdateType::kPipeline);
 }
 
@@ -551,6 +564,7 @@ public:
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         UpdateDriver driver(expCtx);
         std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+
         for (const auto& filter : arrayFilterSpec) {
             auto parsedFilter = assertGet(MatchExpressionParser::parse(filter, expCtx));
             auto expr = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));

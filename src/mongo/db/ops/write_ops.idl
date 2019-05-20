@@ -101,6 +101,11 @@ structs:
             u:
                 description: "Set of modifications to apply."
                 type: update_modification
+            c:
+                description: "Specifies constant values that can be referred to in the pipeline
+                              performing a custom update."
+                type: object
+                optional: true
             arrayFilters:
                 description: "Specifies which array elements an update modifier should apply to."
                 type: array<object>

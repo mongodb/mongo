@@ -146,7 +146,10 @@ void ParsedUpdate::parseUpdate() {
     _driver.setLogOp(true);
     _driver.setFromOplogApplication(_request->isFromOplogApplication());
 
-    _driver.parse(_request->getUpdateModification(), _arrayFilters, _request->isMulti());
+    _driver.parse(_request->getUpdateModification(),
+                  _arrayFilters,
+                  _request->getUpdateConstants(),
+                  _request->isMulti());
 }
 
 StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>

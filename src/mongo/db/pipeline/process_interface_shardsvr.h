@@ -76,8 +76,7 @@ public:
      */
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                std::vector<BSONObj>&& queries,
-                std::vector<write_ops::UpdateModification>&& updates,
+                BatchedObjects&& batch,
                 const WriteConcernOptions& wc,
                 bool upsert,
                 bool multi,

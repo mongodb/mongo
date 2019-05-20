@@ -192,19 +192,20 @@ Insert MongoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
 }
 
 Update MongoInterfaceStandalone::buildUpdateOp(const NamespaceString& nss,
-                                               std::vector<BSONObj>&& queries,
-                                               std::vector<write_ops::UpdateModification>&& updates,
+                                               BatchedObjects&& batch,
                                                bool upsert,
                                                bool multi,
                                                bool bypassDocValidation) {
     Update updateOp(nss);
     updateOp.setUpdates([&] {
         std::vector<UpdateOpEntry> updateEntries;
-        for (size_t index = 0; index < queries.size(); ++index) {
+        for (auto&& obj : batch) {
             updateEntries.push_back([&] {
                 UpdateOpEntry entry;
-                entry.setQ(std::move(queries[index]));
-                entry.setU(std::move(updates[index]));
+                auto && [ q, u, c ] = obj;
+                entry.setQ(std::move(q));
+                entry.setU(std::move(u));
+                entry.setC(std::move(c));
                 entry.setUpsert(upsert);
                 entry.setMulti(multi);
                 return entry;
@@ -245,19 +246,14 @@ void MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionConte
 WriteResult MongoInterfaceStandalone::updateWithResult(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    std::vector<BSONObj>&& queries,
-    std::vector<write_ops::UpdateModification>&& updates,
+    BatchedObjects&& batch,
     const WriteConcernOptions& wc,
     bool upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto writeResults = performUpdates(expCtx->opCtx,
-                                       buildUpdateOp(ns,
-                                                     std::move(queries),
-                                                     std::move(updates),
-                                                     upsert,
-                                                     multi,
-                                                     expCtx->bypassDocumentValidation));
+    auto writeResults = performUpdates(
+        expCtx->opCtx,
+        buildUpdateOp(ns, std::move(batch), upsert, multi, expCtx->bypassDocumentValidation));
     // Need to check each result in the batch since the writes are unordered.
     uassertStatusOKWithContext(
         [&writeResults]() {
@@ -275,14 +271,13 @@ WriteResult MongoInterfaceStandalone::updateWithResult(
 
 void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& ns,
-                                      std::vector<BSONObj>&& queries,
-                                      std::vector<write_ops::UpdateModification>&& updates,
+                                      BatchedObjects&& batch,
                                       const WriteConcernOptions& wc,
                                       bool upsert,
                                       bool multi,
                                       boost::optional<OID> targetEpoch) {
-    [[maybe_unused]] auto writeResult = updateWithResult(
-        expCtx, ns, std::move(queries), std::move(updates), wc, upsert, multi, targetEpoch);
+    [[maybe_unused]] auto writeResult =
+        updateWithResult(expCtx, ns, std::move(batch), wc, upsert, multi, targetEpoch);
 }
 
 CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext* opCtx,

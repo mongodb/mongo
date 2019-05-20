@@ -215,9 +215,10 @@ public:
             request.setUpdateModification(updates);
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+            const auto constants = boost::none;
 
-            ASSERT_DOES_NOT_THROW(
-                driver.parse(request.getUpdateModification(), arrayFilters, request.isMulti()));
+            ASSERT_DOES_NOT_THROW(driver.parse(
+                request.getUpdateModification(), arrayFilters, constants, request.isMulti()));
 
             // Setup update params.
             UpdateStageParams params(&request, &driver, opDebug);
@@ -288,9 +289,10 @@ public:
             request.setUpdateModification(updates);
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+            const auto constants = boost::none;
 
-            ASSERT_DOES_NOT_THROW(
-                driver.parse(request.getUpdateModification(), arrayFilters, request.isMulti()));
+            ASSERT_DOES_NOT_THROW(driver.parse(
+                request.getUpdateModification(), arrayFilters, constants, request.isMulti()));
 
             // Configure the scan.
             CollectionScanParams collScanParams;
@@ -399,9 +401,10 @@ public:
         request.setReturnDocs(UpdateRequest::RETURN_OLD);
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        const auto constants = boost::none;
 
-        ASSERT_DOES_NOT_THROW(
-            driver.parse(request.getUpdateModification(), arrayFilters, request.isMulti()));
+        ASSERT_DOES_NOT_THROW(driver.parse(
+            request.getUpdateModification(), arrayFilters, constants, request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
@@ -490,9 +493,10 @@ public:
         request.setReturnDocs(UpdateRequest::RETURN_NEW);
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        const auto constants = boost::none;
 
-        ASSERT_DOES_NOT_THROW(
-            driver.parse(request.getUpdateModification(), arrayFilters, request.isMulti()));
+        ASSERT_DOES_NOT_THROW(driver.parse(
+            request.getUpdateModification(), arrayFilters, constants, request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.

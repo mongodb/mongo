@@ -13,12 +13,19 @@
     // for the whenMatched mode. If 'initialStages' array is specified, the $merge stage will be
     // appended to this array and the result returned to the caller, otherwise an array with a
     // single $merge stage is returned. An output collection for the $merge stage is specified
-    // in the 'target', and the $merge stage 'on' fields in the 'on' parameter.
-    function makeMergePipeline(
-        {target = "", initialStages = [], updatePipeline = [], on = "_id"} = {}) {
+    // in the 'target', and the $merge stage 'on' fields in the 'on' parameter. The 'letVars'
+    // parameter describes the 'let' argument of the $merge stage and holds variables that can be
+    // referenced in the pipeline.
+    function makeMergePipeline({target = "",
+                                initialStages = [],
+                                updatePipeline = [],
+                                on = "_id",
+                                letVars = undefined} = {}) {
+        const baseObj = letVars !== undefined ? {let : letVars} : {};
         return initialStages.concat([{
-            $merge:
-                {into: target, on: on, whenMatched: updatePipeline, whenNotMatched: "insert"}
+            $merge: Object.assign(
+                baseObj,
+                {into: target, on: on, whenMatched: updatePipeline, whenNotMatched: "insert"})
         }]);
     }
 
@@ -407,5 +414,233 @@
         assert.doesNotThrow(() => source.aggregate(foreignPipeline));
         assertArrayEq({actual: foreignTarget.find().toArray(), expected: [{_id: 1, z: 1}]});
         assert.commandWorked(foreignDb.dropDatabase());
+    })();
+
+    // Test that $merge can reference the default 'let' variable 'new' which holds the entire
+    // document from the source collection.
+    (function testMergeWithDefaultLetVariable() {
+        assert(source.drop());
+        assert(target.drop());
+
+        assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            target: target.getName(),
+            updatePipeline: [{$set: {x: {$add: ["$$new.a", "$$new.b"]}}}]
+        })));
+        assertArrayEq(
+            {actual: target.find().toArray(), expected: [{_id: 1, c: 1, x: 2}, {_id: 2, x: 4}]});
+    })();
+
+    // Test that the default 'let' variable 'new' is not available once the 'let' argument to the
+    // $merge stage is specified explicitly.
+    (function testMergeCannotUseDefaultLetVariableIfLetIsSpecified() {
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        const error = assert.throws(() => source.aggregate(makeMergePipeline({
+            letVars: {foo: "bar"},
+            target: target.getName(),
+            updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}]
+        })));
+        assert.commandFailedWithCode(error, 17276);
+    })();
+
+    // Test that $merge can accept an empty object holding no variables and the default 'new'
+    // variable is not available.
+    (function testMergeWithEmptyLetVariables() {
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        // Can use an empty object.
+        assert.doesNotThrow(
+            () => source.aggregate(makeMergePipeline(
+                {letVars: {}, target: target.getName(), updatePipeline: [{$set: {x: "foo"}}]})));
+        assertArrayEq({
+            actual: target.find().toArray(),
+            expected: [{_id: 1, c: 1, x: "foo"}, {_id: 2, x: "foo"}]
+        });
+
+        // No default variable 'new' is available.
+        const error = assert.throws(() => source.aggregate(makeMergePipeline({
+            letVars: {},
+            target: target.getName(),
+            updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}]
+        })));
+        assert.commandFailedWithCode(error, 17276);
+    })();
+
+    // Test that $merge can accept a null value as the 'let' argument and the default variable 'new'
+    // can be used.
+    // Note that this is not a desirable behaviour but rather a limitation in the IDL parser which
+    // cannot differentiate between an optional field specified explicitly as 'null', or not
+    // specified at all. In both cases it will treat the field like it wasn't specified. So, this
+    // test ensures that we're aware of this limitation. Once the limitation is addressed in
+    // SERVER-41272, this test should be updated to accordingly.
+    (function testMergeWithNullLetVariables() {
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        // Can use a null 'let' argument.
+        assert.doesNotThrow(
+            () => source.aggregate(makeMergePipeline(
+                {letVars: null, target: target.getName(), updatePipeline: [{$set: {x: "foo"}}]})));
+        assertArrayEq({
+            actual: target.find().toArray(),
+            expected: [{_id: 1, c: 1, x: "foo"}, {_id: 2, x: "foo"}]
+        });
+
+        // Can use the default 'new' variable.
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            letVars: null,
+            target: target.getName(),
+            updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}]
+        })));
+        assertArrayEq({
+            actual: target.find().toArray(),
+            expected: [{_id: 1, x: 1, y: 1}, {_id: 2, x: 2, y: 2}]
+        });
+    })();
+
+    // Test that constant values can be specified in the 'let' argument and referenced in the update
+    // pipeline.
+    (function testMergeWithConstantLetVariable() {
+        // Non-array constants.
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            letVars: {a: 1, b: "foo", c: true},
+            target: target.getName(),
+            updatePipeline: [{$set: {x: "$$a", y: "$$b", z: "$$c"}}]
+        })));
+        assertArrayEq({
+            actual: target.find().toArray(),
+            expected:
+                [{_id: 1, c: 1, x: 1, y: "foo", z: true}, {_id: 2, x: 1, y: "foo", z: true}]
+        });
+
+        // Constant array.
+        assert(target.drop());
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            letVars: {a: [1, 2, 3]},
+            target: target.getName(),
+            updatePipeline: [{$set: {x: {$arrayElemAt: ["$$a", 1]}}}]
+        })));
+        assertArrayEq(
+            {actual: target.find().toArray(), expected: [{_id: 1, c: 1, x: 2}, {_id: 2, x: 2}]});
+    })();
+
+    // Test that variables referencing the fields in the source document can be specified in the
+    // 'let' argument and referenced in the update pipeline.
+    (function testMergeWithNonConstantLetVariables() {
+        // Non-array fields.
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            letVars: {x: "$a", y: "$b"},
+            target: target.getName(),
+            updatePipeline: [{$set: {z: {$add: ["$$x", "$$y"]}}}]
+        })));
+        assertArrayEq(
+            {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 2}, {_id: 2, z: 4}]});
+
+        // Array field with expressions in the pipeline.
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(source.insert([{_id: 1, a: [1, 2, 3]}, {_id: 2, a: [4, 5, 6]}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            letVars: {x: "$a"},
+            target: target.getName(),
+            updatePipeline: [{$set: {z: {$arrayElemAt: ["$$x", 1]}}}]
+        })));
+        assertArrayEq(
+            {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 2}, {_id: 2, z: 5}]});
+
+        // Array field with expressions in the 'let' argument.
+        assert(target.drop());
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            letVars: {x: {$arrayElemAt: ["$a", 2]}},
+            target: target.getName(),
+            updatePipeline: [{$set: {z: "$$x"}}]
+        })));
+        assertArrayEq(
+            {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 3}, {_id: 2, z: 6}]});
+    })();
+
+    // Test that variables using the dotted path can be specified in the 'let' argument and
+    // referenced in the update pipeline.
+    (function testMergeWithDottedPathLetVariables() {
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(source.insert([{_id: 1, a: {b: {c: 2}}}, {_id: 2, a: {b: {c: 3}}}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            letVars: {x: "$a.b.c"},
+            target: target.getName(),
+            updatePipeline: [{$set: {z: {$pow: ["$$x", 2]}}}]
+        })));
+        assertArrayEq(
+            {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 4}, {_id: 2, z: 9}]});
+    })();
+
+    // Test that 'let' variables are referred to the computed document in the aggregation pipeline,
+    // not the original document in the source collection.
+    (function testMergeLetVariablesHoldsComputedValues() {
+        // Test the default 'new' variable.
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(
+            source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 1, b: 2}, {_id: 3, a: 2, b: 3}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        // In the $group stage the total field 'a' uses the same name as in the source collection
+        // intentionally, to make sure that even when a referenced field is present in the source
+        // collection under the same name, the actual value for the variable will be picked up from
+        // the computed document.
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            initialStages: [{$group: {_id: "$a", a: {$sum: "$b"}}}],
+            target: target.getName(),
+            updatePipeline: [{$set: {z: "$$new"}}]
+        })));
+        assertArrayEq({
+            actual: target.find().toArray(),
+            expected: [{_id: 1, c: 1, z: {_id: 1, a: 3}}, {_id: 2, z: {_id: 2, a: 3}}]
+        });
+
+        // Test custom 'let' variables.
+        assert(source.drop());
+        assert(target.drop());
+        assert.commandWorked(
+            source.insert([{_id: 1, a: 1, b: 5}, {_id: 2, a: 1, b: 2}, {_id: 3, a: 2, b: 3}]));
+        assert.commandWorked(target.insert({_id: 1, c: 1}));
+
+        assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
+            initialStages: [{$group: {_id: "$a", a: {$sum: "$b"}}}],
+            letVars: {x: {$pow: ["$a", 2]}},
+            target: target.getName(),
+            updatePipeline: [{$set: {z: "$$x"}}]
+        })));
+        assertArrayEq(
+            {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 49}, {_id: 2, z: 9}]});
     })();
 }());

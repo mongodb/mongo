@@ -132,8 +132,7 @@ void MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionCont
 
 void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        const NamespaceString& ns,
-                                       std::vector<BSONObj>&& queries,
-                                       std::vector<write_ops::UpdateModification>&& updates,
+                                       BatchedObjects&& batch,
                                        const WriteConcernOptions& wc,
                                        bool upsert,
                                        bool multi,
@@ -141,12 +140,8 @@ void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionCont
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
-    BatchedCommandRequest updateCommand(buildUpdateOp(ns,
-                                                      std::move(queries),
-                                                      std::move(updates),
-                                                      upsert,
-                                                      multi,
-                                                      expCtx->bypassDocumentValidation));
+    BatchedCommandRequest updateCommand(
+        buildUpdateOp(ns, std::move(batch), upsert, multi, expCtx->bypassDocumentValidation));
 
     // If applicable, attach a write concern to the batched command request.
     attachWriteConcern(&updateCommand, wc);

@@ -51,7 +51,8 @@ public:
      * Initializes the node with an aggregation pipeline definition.
      */
     explicit PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              const std::vector<BSONObj>& pipeline);
+                              const std::vector<BSONObj>& pipeline,
+                              boost::optional<BSONObj> constants = boost::none);
 
     /**
      * Replaces the document that 'applyParams.element' belongs to with 'val'. If 'val' does not

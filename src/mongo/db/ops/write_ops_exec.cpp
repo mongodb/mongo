@@ -708,6 +708,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
     UpdateRequest request(ns);
     request.setQuery(op.getQ());
     request.setUpdateModification(op.getU());
+    request.setUpdateConstants(op.getC());
     request.setRuntimeConstants(std::move(runtimeConstants));
     request.setCollation(write_ops::collationOf(op));
     request.setStmtId(stmtId);

@@ -240,10 +240,7 @@ struct stitch_support_v1_update {
         this->parsedFilters = uassertStatusOK(mongo::ParsedUpdate::parseArrayFilters(
             arrayFilterVector, this->opCtx.get(), collator ? collator->collator.get() : nullptr));
 
-        // Initializing the update as single-document allows document-replacement updates.
-        bool multi = false;
-
-        updateDriver.parse(this->updateExpr, parsedFilters, multi);
+        updateDriver.parse(this->updateExpr, parsedFilters);
 
         uassert(51037,
                 "Updates with a positional operator require a matcher object.",
