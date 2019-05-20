@@ -357,8 +357,6 @@ TEST(CommandWriteOpsParsers, Update) {
 }
 
 TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
-    // TODO SERVER-40419: Remove 'setTestCommandsEnable(true)' for this test.
-    setTestCommandsEnabled(true);
     const auto ns = NamespaceString("test", "foo");
     const BSONObj query = BSON("q" << BSON("x" << 1));
     std::vector<BSONObj> pipeline{BSON("$addFields" << BSON("x" << 1))};

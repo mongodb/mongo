@@ -31,7 +31,6 @@
 
 #include "mongo/db/ops/write_ops_parsers.h"
 
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/aggregation_request.h"
@@ -219,9 +218,6 @@ write_ops::UpdateModification::UpdateModification(BSONElement update) {
         _type = Type::kClassic;
         return;
     }
-
-    uassert(
-        ErrorCodes::FailedToParse, "Update argument must be an object", getTestCommandsEnabled());
 
     uassert(ErrorCodes::FailedToParse,
             "Update argument must be either an object or an array",
