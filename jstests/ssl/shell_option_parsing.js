@@ -78,15 +78,13 @@
         });
     }
 
-    const testSuccessfulConnect =
-        function(expectPasswordPrompt, ...args) {
+    const testSuccessfulConnect = function(expectPasswordPrompt, ...args) {
         testConnect(expectPasswordPrompt, true, ...args);
-    }
+    };
 
-    const testFailedConnect =
-        function(expectPasswordPrompt, ...args) {
+    const testFailedConnect = function(expectPasswordPrompt, ...args) {
         testConnect(expectPasswordPrompt, false, ...args);
-    }
+    };
 
     testSuccessfulConnect(true, `mongodb://${username}@${host}/test`);
     testSuccessfulConnect(true, `mongodb://${username}@${host}/test`, '--password');
