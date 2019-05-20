@@ -34,10 +34,8 @@ TestData.skipCheckDBHashes = true;
     st.ensurePrimaryShard('test', st.shard0.name);
     assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
     assert.commandWorked(st.s0.adminCommand({split: 'test.user', middle: {x: 0}}));
-    // TODO (SERVER-40594): Remove _waitForDelete once the range deleter doesn't block step
-    // down if it enters a prepare conflict retry loop.
-    assert.commandWorked(st.s0.adminCommand(
-        {moveChunk: 'test.user', find: {x: 0}, to: st.shard1.name, _waitForDelete: true}));
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard1.name}));
 
     const testDB = st.s0.getDB('test');
     assert.commandWorked(testDB.runCommand({insert: 'user', documents: [{x: -10}, {x: 10}]}));

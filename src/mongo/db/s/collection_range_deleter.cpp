@@ -74,6 +74,8 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kWriteConcernTimeoutSharding);
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeDoingDeletion);
+
 boost::optional<DeleteNotification> checkOverlap(std::list<Deletion> const& deletions,
                                                  ChunkRange const& range) {
     // Start search with newest entries by using reverse iterators
@@ -123,7 +125,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         auto& metadataManager = csr->_metadataManager;
 
         if (!_checkCollectionMetadataStillValid(
-                opCtx, nss, epoch, forTestOnly, collection, metadataManager)) {
+                nss, epoch, forTestOnly, collection, metadataManager)) {
             return boost::none;
         }
 
@@ -243,7 +245,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         auto& metadataManager = csr->_metadataManager;
 
         if (!_checkCollectionMetadataStillValid(
-                opCtx, nss, epoch, forTestOnly, collection, metadataManager)) {
+                nss, epoch, forTestOnly, collection, metadataManager)) {
             return boost::none;
         }
 
@@ -288,7 +290,6 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
 }
 
 bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
-    OperationContext* opCtx,
     const NamespaceString& nss,
     OID const& epoch,
     CollectionRangeDeleter* forTestOnly,
@@ -391,6 +392,11 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
                                                      BoundInclusion::kIncludeStartKeyOnly,
                                                      PlanExecutor::YIELD_MANUAL,
                                                      InternalPlanner::FORWARD);
+
+    if (MONGO_FAIL_POINT(hangBeforeDoingDeletion)) {
+        LOG(0) << "Hit hangBeforeDoingDeletion failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDoingDeletion);
+    }
 
     PlanYieldPolicy planYieldPolicy(exec.get(), PlanExecutor::YIELD_MANUAL);
 

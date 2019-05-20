@@ -189,7 +189,6 @@ private:
      * the collection has not been dropped (or dropped then recreated).
      */
     static bool _checkCollectionMetadataStillValid(
-        OperationContext* opCtx,
         const NamespaceString& nss,
         OID const& epoch,
         CollectionRangeDeleter* forTestOnly,

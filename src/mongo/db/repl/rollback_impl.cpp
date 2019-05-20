@@ -283,7 +283,6 @@ void killAllUserOperations(OperationContext* opCtx) {
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
         stdx::lock_guard<Client> lk(*client);
         if (client->isFromSystemConnection() && !client->shouldKillSystemOperation(lk)) {
-            // TODO SERVER-40594: kill RangeDeleter if needed.
             continue;
         }
 

@@ -78,16 +78,10 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
             assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
             assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-            // TODO (SERVER-40594): Remove _waitForDelete once the range deleter doesn't block step
-            // down if it enters a prepare conflict retry loop.
-            assert.commandWorked(st.s.adminCommand(
-                {moveChunk: ns, find: {_id: 0}, to: participant1.shardName, _waitForDelete: true}));
-            assert.commandWorked(st.s.adminCommand({
-                moveChunk: ns,
-                find: {_id: 10},
-                to: participant2.shardName,
-                _waitForDelete: true
-            }));
+            assert.commandWorked(
+                st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 

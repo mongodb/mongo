@@ -151,6 +151,10 @@ void scheduleCleanup(executor::TaskExecutor* executor,
             invariant(status);
 
             ThreadClient tc("Collection-Range-Deleter", getGlobalServiceContext());
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillable(lk);
+            }
             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
