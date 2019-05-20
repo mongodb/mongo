@@ -347,7 +347,8 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
 
         if (!passes) {
             std::string s = err.str();
-            log() << "FAIL: " << s;
+            // Don't truncate failure messages, e.g: stacktraces.
+            log().setIsTruncatable(false) << "FAIL: " << s;
             r->_fails.push_back(tc->getName());
             r->_messages.push_back(s);
         }
@@ -408,7 +409,7 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
 
     Result::cur = NULL;
     for (const auto& r : results) {
-        log() << r->toString();
+        log().setIsTruncatable(false) << r->toString();
         if (abs(r->rc()) > abs(rc))
             rc = r->rc();
 

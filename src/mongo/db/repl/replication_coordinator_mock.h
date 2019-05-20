@@ -311,6 +311,8 @@ public:
 
     virtual void attemptToAdvanceStableTimestamp() override;
 
+    virtual void setCanAcceptNonLocalWrites(bool canAcceptNonLocalWrites);
+
 private:
     AtomicWord<unsigned long long> _snapshotNameGenerator;
     ServiceContext* const _service;
@@ -328,6 +330,7 @@ private:
     bool _alwaysAllowWrites = false;
     bool _resetLastOpTimesCalled = false;
     long long _term = OpTime::kInitialTerm;
+    bool _canAcceptNonLocalWrites = false;
 };
 
 }  // namespace repl

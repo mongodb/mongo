@@ -55,6 +55,11 @@ class FlowControl : public ServerStatusSection {
 public:
     FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord);
 
+    /**
+     * Construct a flow control object without adding a periodic job runner for testing.
+     */
+    FlowControl(repl::ReplicationCoordinator* replCoord);
+
     static FlowControl* get(ServiceContext* service);
     static FlowControl* get(ServiceContext& service);
     static FlowControl* get(OperationContext* ctx);
@@ -82,8 +87,9 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override;
 
-private:
-    const int _kMaxTickets = 1000 * 1000 * 1000;
+    /**
+     * Underscore methods are public for testing.
+     */
     std::int64_t _getLocksUsedLastPeriod();
     double _getLocksPerOp();
 
@@ -98,6 +104,15 @@ private:
                                    std::uint64_t thresholdLagMillis);
     void _trimSamples(const Timestamp trimSamplesTo);
 
+    // Sample of (timestamp, ops, lock acquisitions) where ops and lock acquisitions are
+    // observations of the corresponding counter at (roughly) <timestamp>.
+    typedef std::tuple<std::uint64_t, std::uint64_t, std::int64_t> Sample;
+    const std::deque<Sample>& _getSampledOpsApplied_forTest() {
+        return _sampledOpsApplied;
+    }
+
+private:
+    const int _kMaxTickets = 1000 * 1000 * 1000;
     repl::ReplicationCoordinator* _replCoord;
 
     // These values are updated with each flow control computation and are also surfaced in server
@@ -107,9 +122,6 @@ private:
     AtomicWord<int> _lastSustainerAppliedCount{0};
 
     mutable stdx::mutex _sampledOpsMutex;
-    // Sample of (timestamp, ops, lock acquisitions) where ops and lock acquisitions are
-    // observations of the corresponding counter at (roughly) <timestamp>.
-    typedef std::tuple<std::uint64_t, std::uint64_t, std::int64_t> Sample;
     std::deque<Sample> _sampledOpsApplied;
 
     // These values are used in the sampling process.

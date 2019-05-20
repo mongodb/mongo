@@ -109,8 +109,11 @@ std::vector<MemberData> ReplicationCoordinatorMock::getMemberData() const {
 }
 
 bool ReplicationCoordinatorMock::canAcceptNonLocalWrites() const {
-    MONGO_UNREACHABLE;
-    return false;
+    return _canAcceptNonLocalWrites;
+}
+
+void ReplicationCoordinatorMock::setCanAcceptNonLocalWrites(bool canAcceptNonLocalWrites) {
+    _canAcceptNonLocalWrites = canAcceptNonLocalWrites;
 }
 
 Status ReplicationCoordinatorMock::waitForMemberState(MemberState expectedState,

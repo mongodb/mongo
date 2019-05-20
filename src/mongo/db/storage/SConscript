@@ -378,12 +378,29 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status',
     ],
     LIBDEPS_PRIVATE=[
-        'flow_control_parameters',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/mongo/util/fail_point',
+        'flow_control_parameters',
+    ],
+)
+
+env.CppUnitTest(
+    target='flow_control_test',
+    source=[
+        'flow_control_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/repl/topology_coordinator',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        'flow_control',
+        'flow_control_parameters',
     ],
 )

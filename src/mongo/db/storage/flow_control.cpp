@@ -45,9 +45,12 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/util/background.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(flowControlTicketOverride);
 
 namespace {
 const auto getFlowControl = ServiceContext::declareDecoration<std::unique_ptr<FlowControl>>();
@@ -117,6 +120,11 @@ bool sustainerAdvanced(const std::vector<repl::MemberData>& prevMemberData,
     return true;
 }
 }  // namespace
+
+FlowControl::FlowControl(repl::ReplicationCoordinator* replCoord)
+    : ServerStatusSection("flowControl"),
+      _replCoord(replCoord),
+      _lastTimeSustainerAdvanced(Date_t::now()) {}
 
 FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord)
     : ServerStatusSection("flowControl"),
@@ -294,6 +302,12 @@ int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>&
 }
 
 int FlowControl::getNumTickets() {
+    MONGO_FAIL_POINT_BLOCK(flowControlTicketOverride, failpointObj) {
+        int numTickets = failpointObj.getData().getIntField("numTickets");
+        if (numTickets > 0) {
+            return numTickets;
+        }
+    }
 
     // Flow Control is only enabled on nodes that can accept writes.
     const bool canAcceptWrites = _replCoord->canAcceptNonLocalWrites();
@@ -383,11 +397,11 @@ std::int64_t FlowControl::_approximateOpsBetween(Timestamp prevTs, Timestamp cur
 
     stdx::lock_guard<stdx::mutex> lk(_sampledOpsMutex);
     for (auto&& sample : _sampledOpsApplied) {
-        if (prevApplied == -1 && prevTs.asULL() < std::get<0>(sample)) {
+        if (prevApplied == -1 && prevTs.asULL() <= std::get<0>(sample)) {
             prevApplied = std::get<1>(sample);
         }
 
-        if (currApplied == -1 && currTs.asULL() < std::get<0>(sample)) {
+        if (currApplied == -1 && currTs.asULL() <= std::get<0>(sample)) {
             currApplied = std::get<1>(sample);
             break;
         }
