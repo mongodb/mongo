@@ -32,8 +32,8 @@
     assert.eq(1, outColl.find().itcount());
     outColl.drop();
 
-    // Agg should reject writeConcern if the last stage is not an $out.
-    assert.commandFailed(
+    // Agg should accept writeConcern even if read-only.
+    assert.commandWorked(
         db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, writeConcern: {w: 1}}));
 
     // Agg should succeed if the last stage is an $out and the explain flag is set.

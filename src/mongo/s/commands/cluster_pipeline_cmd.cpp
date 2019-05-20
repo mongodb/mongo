@@ -67,7 +67,7 @@ public:
 
     private:
         bool supportsWriteConcern() const override {
-            return Pipeline::aggSupportsWriteConcern(_request.body);
+            return true;
         }
 
         bool supportsReadConcern(repl::ReadConcernLevel level) const override {
@@ -104,7 +104,7 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(
-                opCtx, !Pipeline::aggSupportsWriteConcern(_request.body));
+                opCtx, !Pipeline::aggHasWriteStage(_request.body));
 
             auto bob = reply->getBodyBuilder();
             _runAggCommand(opCtx, _dbName, _request.body, boost::none, &bob);

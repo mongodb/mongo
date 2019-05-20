@@ -115,7 +115,7 @@ public:
                     // OpTime and the prepare OpTime.
                     const auto systemLastOpTime =
                         repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
-                    replClient.setLastOp(std::max(prepareOpTime, systemLastOpTime));
+                    replClient.setLastOp(opCtx, std::max(prepareOpTime, systemLastOpTime));
                 }
 
                 invariant(opCtx->recoveryUnit()->getPrepareTimestamp() ==

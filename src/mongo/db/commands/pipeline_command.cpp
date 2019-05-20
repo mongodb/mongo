@@ -73,7 +73,7 @@ public:
 
     private:
         bool supportsWriteConcern() const override {
-            return Pipeline::aggSupportsWriteConcern(this->_request.body);
+            return true;
         }
 
         bool canIgnorePrepareConflicts() const override {
@@ -102,7 +102,7 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(
-                opCtx, !Pipeline::aggSupportsWriteConcern(_request.body));
+                opCtx, !Pipeline::aggHasWriteStage(_request.body));
 
             const auto aggregationRequest = uassertStatusOK(
                 AggregationRequest::parseFromBSON(_dbName, _request.body, boost::none));

@@ -15,9 +15,11 @@
 
     var commands = [];
 
-    commands.push({count: collName, query: {type: 'oak'}});
+    commands.push({find: collName, query: {_id: 1}});
 
-    commands.push({aggregate: collName, pipeline: [{$sort: {type: 1}}], cursor: {}});
+    commands.push({distinct: collName, key: "_id"});
+
+    commands.push({count: collName, query: {type: 'oak'}});
 
     commands.push({
         mapReduce: collName,

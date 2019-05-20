@@ -297,7 +297,7 @@ void Pipeline::optimizePipeline() {
     stitch();
 }
 
-bool Pipeline::aggSupportsWriteConcern(const BSONObj& cmd) {
+bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
     auto pipelineElement = cmd["pipeline"];
     if (pipelineElement.type() != BSONType::Array) {
         return false;

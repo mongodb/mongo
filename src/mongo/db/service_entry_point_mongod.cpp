@@ -105,6 +105,20 @@ public:
                              BSONObjBuilder& commandResponseBuilder) const override {
         auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
+        auto waitForWriteConcernAndAppendStatus = [&]() {
+            WriteConcernResult res;
+            auto waitForWCStatus =
+                mongo::waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
+
+            CommandHelpers::appendCommandWCStatus(commandResponseBuilder, waitForWCStatus, res);
+        };
+
+        if (lastOpAfterRun != lastOpBeforeRun) {
+            invariant(lastOpAfterRun > lastOpBeforeRun);
+            waitForWriteConcernAndAppendStatus();
+            return;
+        }
+
         // Ensures that if we tried to do a write, we wait for write concern, even if that write was
         // a noop.
         //
@@ -116,18 +130,24 @@ public:
         // concern on operations the transaction observed. As a result, "abortTransaction" only ever
         // waits on an oplog entry it wrote (and has already set lastOp to) or previous writes on
         // the same client.
-        if ((lastOpAfterRun == lastOpBeforeRun) &&
-            opCtx->lockState()->wasGlobalLockTakenForWrite() &&
-            (invocation->definition()->getName() != "abortTransaction")) {
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-            lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        if (opCtx->lockState()->wasGlobalLockTakenForWrite()) {
+            if (invocation->definition()->getName() != "abortTransaction") {
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+                lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+            }
+            waitForWriteConcernAndAppendStatus();
+            return;
         }
 
-        WriteConcernResult res;
-        auto waitForWCStatus =
-            mongo::waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
+        if (repl::ReplClientInfo::forClient(opCtx->getClient())
+                .lastOpWasSetExplicitlyByClientForCurrentOperation(opCtx)) {
+            waitForWriteConcernAndAppendStatus();
+            return;
+        }
 
-        CommandHelpers::appendCommandWCStatus(commandResponseBuilder, waitForWCStatus, res);
+        // If no write was attempted and the client's lastOp was not changed by the current network
+        // operation then we skip waiting for writeConcern.
     }
 
     void waitForLinearizableReadConcern(OperationContext* opCtx) const override {

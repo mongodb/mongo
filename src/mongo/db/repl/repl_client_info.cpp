@@ -45,9 +45,25 @@ namespace repl {
 const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
     Client::declareDecoration<ReplClientInfo>();
 
-void ReplClientInfo::setLastOp(const OpTime& ot) {
+namespace {
+// We use a struct to wrap lastOpSetExplicitly here in order to give the boolean a default value
+// when initially constructed for the associated OperationContext.
+struct LastOpInfo {
+    bool lastOpSetExplicitly = false;
+};
+static const OperationContext::Decoration<LastOpInfo> lastOpInfo =
+    OperationContext::declareDecoration<LastOpInfo>();
+}  // namespace
+
+bool ReplClientInfo::lastOpWasSetExplicitlyByClientForCurrentOperation(
+    OperationContext* opCtx) const {
+    return lastOpInfo(opCtx).lastOpSetExplicitly;
+}
+
+void ReplClientInfo::setLastOp(OperationContext* opCtx, const OpTime& ot) {
     invariant(ot >= _lastOp);
     _lastOp = ot;
+    lastOpInfo(opCtx).lastOpSetExplicitly = true;
 }
 
 void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
@@ -66,6 +82,8 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
                   << " as that would be moving the OpTime backwards.  This should only happen if "
                      "there was a rollback recently";
         }
+
+        lastOpInfo(opCtx).lastOpSetExplicitly = true;
     }
 }
 

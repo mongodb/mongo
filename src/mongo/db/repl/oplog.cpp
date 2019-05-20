@@ -476,7 +476,7 @@ void _logOpsInner(OperationContext* opCtx,
 
             // We set the last op on the client to 'finalOpTime', because that contains the
             // timestamp of the operation that the client actually performed.
-            ReplClientInfo::forClient(opCtx->getClient()).setLastOp(finalOpTime);
+            ReplClientInfo::forClient(opCtx->getClient()).setLastOp(opCtx, finalOpTime);
         });
 }
 
