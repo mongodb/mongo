@@ -349,6 +349,9 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
         auto opCtx = cc().makeOperationContext();
         auto nss = NamespaceString::kSessionTransactionsTableNamespace;
         auto deadline = Date_t::now() + Milliseconds(100);
+
+        ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+            opCtx->lockState());
         Lock::DBLock dbLock(opCtx.get(), nss.db(), MODE_IS, deadline);
         Lock::CollectionLock collLock(opCtx.get(), nss, MODE_IS, deadline);
 

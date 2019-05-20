@@ -845,6 +845,9 @@ void KVStorageEngine::TimestampMonitor::startup() {
                     uOpCtx = client->makeOperationContext();
                     opCtx = uOpCtx.get();
                 }
+
+                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                    opCtx->lockState());
                 Lock::GlobalLock lock(opCtx, MODE_IS);
 
                 // The checkpoint timestamp is not cached in mongod and needs to be fetched with a
