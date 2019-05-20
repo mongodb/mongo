@@ -152,6 +152,28 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectFacetsContainingAnOutStage) {
                   AssertionException);
 }
 
+TEST_F(DocumentSourceFacetTest, ShouldRejectFacetsContainingAMergeStage) {
+    auto ctx = getExpCtx();
+    auto spec =
+        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into"
+                                                                      << "merge_collection")))));
+    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                  AssertionException);
+
+    spec =
+        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$skip" << 1)
+                                                << BSON("$merge" << BSON("into"
+                                                                         << "merge_collection")))));
+    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                  AssertionException);
+
+    spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into"
+                                                                         << "merge_collection"))
+                                                   << BSON("$skip" << 1))));
+    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                  AssertionException);
+}
+
 TEST_F(DocumentSourceFacetTest, ShouldRejectFacetsContainingAFacetStage) {
     auto ctx = getExpCtx();
     auto spec = fromjson("{$facet: {a: [{$facet: {a: [{$skip: 2}]}}]}}");

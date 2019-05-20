@@ -53,7 +53,7 @@ const StringData kDefaultWhenNotMatchedMode =
 
 /**
  * For the purpsoses of this test, assume every collection is unsharded. Stages may ask this during
- * setup. For example, to compute its constraints, the $out stage needs to know if the output
+ * setup. For example, to compute its constraints, the $merge stage needs to know if the output
  * collection is sharded.
  */
 class MongoProcessInterfaceForTest : public StubMongoProcessInterface {

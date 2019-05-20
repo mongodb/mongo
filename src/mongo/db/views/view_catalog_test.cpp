@@ -252,6 +252,14 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStagePersi
         viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
         AssertionException,
         ErrorCodes::OptionNotSupportedOnView);
+
+    invalidPipeline = BSON_ARRAY(BSON("$merge"
+                                      << "someOtherCollection"));
+
+    ASSERT_THROWS_CODE(
+        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
+        AssertionException,
+        ErrorCodes::OptionNotSupportedOnView);
 }
 
 TEST_F(ViewCatalogFixture, CreateViewOnInvalidCollectionName) {

@@ -284,8 +284,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
 
         if (involvedNs.db() != request.getNamespaceString().db()) {
             // If the involved namespace is not in the same database as the aggregation, it must be
-            // from a $out to a collection in a different database. Since we cannot write to views,
-            // simply assume that the namespace is a collection.
+            // from a $merge to a collection in a different database. Since we cannot write to
+            // views, simply assume that the namespace is a collection.
             resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
         } else if (!db || db->getCollection(opCtx, involvedNs)) {
             // If the aggregation database exists and 'involvedNs' refers to a collection namespace,

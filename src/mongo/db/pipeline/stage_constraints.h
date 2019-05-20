@@ -193,8 +193,8 @@ struct StageConstraints {
 
         // Stages which write data to user collections should not be permitted with readConcern
         // level "snapshot" or inside of a multi-document transaction.
-        // TODO (SERVER-36259): relax this requirement when $out (which writes persistent data)
-        // is allowed in a transaction.
+        // TODO (SERVER-36259): relax this requirement when $out and/or $merge (which write
+        // persistent data) is allowed in a transaction.
         if (diskRequirement == DiskUseRequirement::kWritesPersistentData) {
             invariant(!isAllowedInTransaction());
         }

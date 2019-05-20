@@ -52,7 +52,7 @@ public:
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const final {
         // We don't expect anyone to use this method on the shard itself (yet). This is currently
-        // only used for $out. For $out in a sharded cluster, the mongos is responsible for
+        // only used for $merge. For $out in a sharded cluster, the mongos is responsible for
         // collecting the document key fields before serializing them and sending them to the
         // shards. This is logically a MONGO_UNREACHABLE, but a malicious user could construct a
         // request to send directly to the shards which does not include the uniqueKey, so we must

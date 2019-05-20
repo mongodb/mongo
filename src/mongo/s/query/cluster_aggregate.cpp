@@ -625,8 +625,9 @@ Status runPipelineOnMongoS(const boost::intrusive_ptr<ExpressionContext>& expCtx
     auto cursorResponse = establishMergingMongosCursor(
         opCtx, request, requestedNss, litePipe, std::move(pipeline), privileges);
 
-    // We don't need to storePossibleCursor or propagate writeConcern errors; an $out pipeline
-    // can never run on mongoS. Filter the command response and return immediately.
+    // We don't need to storePossibleCursor or propagate writeConcern errors; a pipeline with
+    // writing stages like $out can never run on mongoS. Filter the command response and return
+    // immediately.
     CommandHelpers::filterCommandReplyForPassthrough(cursorResponse, result);
     return getStatusFromCommandResult(result->asTempObj());
 }

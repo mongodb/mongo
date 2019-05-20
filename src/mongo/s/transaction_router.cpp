@@ -145,9 +145,9 @@ BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
 }
 
 // Commands that are idempotent in a transaction context and can be blindly retried in the middle of
-// a transaction. Aggregate with $out is disallowed in a transaction, so aggregates must be read
-// operations. Note: aggregate and find do have the side-effect of creating cursors, but any
-// established during an unsuccessful attempt are best-effort killed.
+// a transaction. Writing aggregates (e.g. with a $out or $merge) is disallowed in a transaction, so
+// aggregates must be read operations. Note: aggregate and find do have the side-effect of creating
+// cursors, but any established during an unsuccessful attempt are best-effort killed.
 const StringMap<int> alwaysRetryableCmds = {
     {"aggregate", 1}, {"distinct", 1}, {"find", 1}, {"getMore", 1}, {"killCursors", 1}};
 

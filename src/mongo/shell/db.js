@@ -232,13 +232,18 @@ var DB;
 
         const pipeline = cmdObj.pipeline;
 
-        // Check whether the pipeline has an $out stage. If not, we may run on a Secondary and
-        // should attach a readPreference.
-        const hasOutStage =
-            pipeline.length >= 1 && pipeline[pipeline.length - 1].hasOwnProperty("$out");
+        // Check whether the pipeline has a stage which performs writes like $out. If not, we may
+        // run on a Secondary and should attach a readPreference.
+        const hasWritingStage = (function() {
+            if (pipeline.length == 0) {
+                return false;
+            }
+            const lastStage = pipeline[pipeline.length - 1];
+            return lastStage.hasOwnProperty("$out") || lastStage.hasOwnProperty("$merge");
+        }());
 
         const doAgg = function(cmdObj) {
-            return hasOutStage ? this.runCommand(cmdObj) : this.runReadCommand(cmdObj);
+            return hasWritingStage ? this.runCommand(cmdObj) : this.runReadCommand(cmdObj);
         }.bind(this);
 
         const res = doAgg(cmdObj);
